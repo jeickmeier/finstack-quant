@@ -137,7 +137,7 @@ let rate = tree.rate_at_node(10, 3)?;
 
 `ShortRateTreeConfig` fields: `steps`, `model` (`ShortRateModel::HoLee` or
 `::BlackDermanToy`), `volatility`, `mean_reversion` (must be `0.0` for Ho-Lee),
-`compounding` (`TreeCompounding::{Continuous, Simple, SemiAnnual, Quarterly,
+`compounding` (`TreeDiscounting::{Continuous, Simple, SemiAnnual, Quarterly,
 Monthly}` — Bloomberg's lognormal OAS model uses `Simple`), and
 `curve_fit_tolerance_bp`. Constructors `ho_lee` and `bdt` set consistent
 defaults; `Default` is Ho-Lee with `DEFAULT_NORMAL_VOL = 0.01`.

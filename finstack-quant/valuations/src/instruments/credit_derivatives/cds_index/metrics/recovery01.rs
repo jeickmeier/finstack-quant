@@ -40,7 +40,7 @@ fn market_with_recovery(
     new_recovery: f64,
 ) -> Result<MarketContext> {
     let hazard = market.get_hazard(curve_id)?;
-    let discount_id = index.premium.discount_curve_id.clone();
+    let discount_id = index.premium_leg.discount_curve_id.clone();
     let synthetic = index.to_synthetic_cds()?;
 
     let frozen_curve_market = || -> Result<MarketContext> {
@@ -89,8 +89,8 @@ impl MetricCalculator for Recovery01Calculator {
         let bump = |idx: &CDSIndex, delta: f64| -> CDSIndex {
             let mut bumped = idx.clone();
             if bumped.constituents.is_empty() {
-                let base = bumped.protection.recovery_rate;
-                bumped.protection.recovery_rate = (base + delta).clamp(0.0, 1.0);
+                let base = bumped.protection_leg.recovery_rate;
+                bumped.protection_leg.recovery_rate = (base + delta).clamp(0.0, 1.0);
             } else {
                 for con in &mut bumped.constituents {
                     let base = con.credit.recovery_rate;
@@ -102,7 +102,7 @@ impl MetricCalculator for Recovery01Calculator {
 
         let effective_delta = |idx: &CDSIndex, delta: f64| -> f64 {
             if idx.constituents.is_empty() {
-                let base = idx.protection.recovery_rate;
+                let base = idx.protection_leg.recovery_rate;
                 (base + delta).clamp(0.0, 1.0) - base
             } else {
                 let sum: f64 = idx
@@ -126,8 +126,8 @@ impl MetricCalculator for Recovery01Calculator {
                     context,
                     bumped,
                     &market,
-                    bumped.protection.credit_curve_id.as_str(),
-                    bumped.protection.recovery_rate,
+                    bumped.protection_leg.credit_curve_id.as_str(),
+                    bumped.protection_leg.recovery_rate,
                 )?;
             } else {
                 for con in &bumped.constituents {

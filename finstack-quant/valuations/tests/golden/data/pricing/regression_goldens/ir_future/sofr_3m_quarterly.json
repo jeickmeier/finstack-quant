@@ -144,7 +144,7 @@
         },
         "discount_curve_id": "USD-OIS",
         "forward_curve_id": "USD-SOFR-3M",
-        "rate_averaging": "term",
+        "compounding": "simple",
         "vol_surface_id": null,
         "attributes": {
           "tags": [

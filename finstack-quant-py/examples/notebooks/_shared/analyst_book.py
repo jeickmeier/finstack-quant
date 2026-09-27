@@ -115,7 +115,7 @@ def instruments(stage: str = "base") -> dict[str, dict[str, Any]]:
     if index >= 1:
         _, swap = irs(0)
         swap["spec"].update({"id": "USD-PAYER-IRS", "notional": {"amount": "2000000", "currency": "USD"}})
-        swap["spec"]["fixed"]["rate"] = "0.045"
+        swap["spec"]["fixed_leg"]["rate"] = "0.045"
         raw["USD-PAYER-IRS"] = swap
     if index >= 2:
         raw["SPX-CALL"] = {
@@ -141,9 +141,9 @@ def instruments(stage: str = "base") -> dict[str, dict[str, Any]]:
     if index >= 3:
         _, credit = cds(0)
         credit["spec"].update({"id": "ACME-CDS", "notional": {"amount": "1000000", "currency": "USD"}})
-        credit["spec"]["premium"]["end"] = "2030-03-20"
-        credit["spec"]["premium"]["coupon_bp"] = "100"
-        credit["spec"]["protection"]["credit_curve_id"] = "ACME-HZD"
+        credit["spec"]["premium_leg"]["end"] = "2030-03-20"
+        credit["spec"]["premium_leg"]["coupon_bp"] = "100"
+        credit["spec"]["protection_leg"]["credit_curve_id"] = "ACME-HZD"
         credit["spec"]["attributes"] = {"tags": ["credit-hedge"], "meta": {"sector": "corporate"}}
         raw["ACME-CDS"] = credit
     if index >= 4:

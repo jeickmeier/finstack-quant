@@ -138,8 +138,8 @@ class TestCreditDefaultSwap:
         assert cds.side == "pay"
         assert cds.convention == "isda_na"
         assert isinstance(cds.notional, Money)
-        assert isinstance(cds.premium, PremiumLegSpec)
-        assert isinstance(cds.protection, ProtectionLegSpec)
+        assert isinstance(cds.premium_leg, PremiumLegSpec)
+        assert isinstance(cds.protection_leg, ProtectionLegSpec)
         assert cds.upfront is None
         assert cds.doc_clause is None
         assert cds.doc_clause_effective == "xr14"
@@ -165,8 +165,8 @@ class TestCreditDefaultSwap:
             .notional(Money(10_000_000.0, USD))
             .side("pay")
             .convention("isda_na")
-            .premium(premium)
-            .protection(protection)
+            .premium_leg(premium)
+            .protection_leg(protection)
             .upfront((upfront_date, Money(-250_000.0, USD)))
             .doc_clause("xr14")
             .attributes({"desk": "credit", "tags": ["ig"]})
@@ -215,8 +215,8 @@ class TestCreditDefaultSwap:
             .notional(Money(1_000_000.0, USD))
             .side("receive")
             .convention("isda_eu")
-            .premium(premium)
-            .protection(protection)
+            .premium_leg(premium)
+            .protection_leg(protection)
             .protection_effective_date("2024-06-20")
             .valuation_convention("isda_dirty")
             .build()
@@ -253,7 +253,7 @@ class TestCDSIndex:
         assert index.pricing == "single_curve"
         assert index.constituents == []
         assert index.convention == "isda_na"
-        assert isinstance(index.premium, PremiumLegSpec)
+        assert isinstance(index.premium_leg, PremiumLegSpec)
 
         market = _credit_market()
         result = index.price(market, "2024-06-20")
@@ -284,8 +284,8 @@ class TestCDSIndex:
                 .index_factor(1.0)
                 .side("pay")
                 .convention("isda_na")
-                .premium(premium)
-                .protection(protection)
+                .premium_leg(premium)
+                .protection_leg(protection)
                 .pricing("constituents")
                 .constituents(constituents)
                 .build()

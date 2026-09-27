@@ -475,8 +475,8 @@ impl BermudanSwaption {
             .id(InstrumentId::new(format!("{}:UNDERLIER", self.id.as_str())))
             .notional(self.notional)
             .side(PayReceive::Pay)
-            .fixed(fixed)
-            .float(float)
+            .fixed_leg(fixed)
+            .float_leg(float)
             .build()?;
         underlier.validate()?;
         Ok(underlier)

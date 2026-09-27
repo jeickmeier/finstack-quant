@@ -18,18 +18,18 @@ use finstack_quant_valuations::metrics::MetricId;
 /// metric to price the financing leg with the SAME engine.
 ///
 /// Before the fix, equity-TRS `base_value` priced financing through the
-/// cashflow-builder path with `overnight_compounding` hard-coded to `None`,
+/// cashflow-builder path with `compounding` hard-coded to `None`,
 /// while the par-spread/annuity metrics used `TrsEngine` (which honors
-/// `FinancingRateCompounding`). For a SOFR-style `OvernightCompounded` leg the
+/// `FloatingLegCompounding`). For a SOFR-style compounded leg the
 /// two engines disagreed by the daily-compounding convexity, so plugging the
 /// par spread back into the contract did NOT zero the NPV.
 fn assert_par_spread_reprices_to_zero(
-    compounding: finstack_quant_valuations::instruments::FinancingRateCompounding,
+    compounding: finstack_quant_valuations::instruments::rates::irs::FloatingLegCompounding,
 ) {
     let market = create_market_context();
     let as_of = as_of_date();
     let mut trs = TestEquityTrsBuilder::new().spread_bp(0.0).build();
-    trs.financing = trs.financing.clone().with_compounding(compounding);
+    trs.financing_leg = trs.financing_leg.clone().with_compounding(compounding);
 
     let result = trs
         .price_with_metrics(
@@ -43,7 +43,7 @@ fn assert_par_spread_reprices_to_zero(
     assert!(par_spread_bp.is_finite());
 
     let mut repriced = trs;
-    repriced.financing.spread_bp =
+    repriced.financing_leg.spread_bp =
         rust_decimal::Decimal::try_from(par_spread_bp).expect("par spread fits Decimal");
 
     let npv = repriced.value(&market, as_of).unwrap();
@@ -58,14 +58,14 @@ fn assert_par_spread_reprices_to_zero(
 #[test]
 fn par_spread_reprices_term_rate_equity_trs_to_zero() {
     assert_par_spread_reprices_to_zero(
-        finstack_quant_valuations::instruments::FinancingRateCompounding::TermRate,
+        finstack_quant_valuations::instruments::rates::irs::FloatingLegCompounding::Simple,
     );
 }
 
 #[test]
 fn par_spread_reprices_overnight_compounded_equity_trs_to_zero() {
     assert_par_spread_reprices_to_zero(
-        finstack_quant_valuations::instruments::FinancingRateCompounding::OvernightCompounded,
+        finstack_quant_valuations::instruments::rates::irs::FloatingLegCompounding::CompoundedInArrears { lookback_days: 0 },
     );
 }
 
@@ -805,7 +805,7 @@ fn test_par_spread_annuity_relationship() {
 
     let tr_pv = trs.pv_total_return_leg(&market, as_of).unwrap();
     let float_pv = finstack_quant_valuations::instruments::TrsEngine::pv_financing_float_only(
-        &trs.financing,
+        &trs.financing_leg,
         &trs.schedule,
         trs.notional,
         &market,

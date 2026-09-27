@@ -165,7 +165,7 @@ impl RateSpec {
                     calendar,
                 )?;
                 if reset_date <= as_of {
-                    if spec.overnight_compounding.is_some() {
+                    if spec.compounding.is_some() {
                         return Err(finstack_quant_core::Error::Validation(
                             "seasoned compounded-overnight tranche coupons require a canonical compounded fixing schedule"
                                 .into(),

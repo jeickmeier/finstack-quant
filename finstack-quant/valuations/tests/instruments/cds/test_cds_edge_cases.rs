@@ -187,7 +187,7 @@ fn test_zero_recovery_rate() {
         "CORP",
     )
     .expect("CDS construction should succeed");
-    cds.protection.recovery_rate = 0.0;
+    cds.protection_leg.recovery_rate = 0.0;
 
     let npv = cds.value(&market, as_of).unwrap();
     assert!(npv.amount().is_finite(), "Zero recovery should be handled");
@@ -227,7 +227,7 @@ fn test_full_recovery_rate_is_rejected() {
         "CORP",
     )
     .expect("CDS construction should succeed");
-    cds.protection.recovery_rate = 1.0;
+    cds.protection_leg.recovery_rate = 1.0;
 
     // Pricing must surface a structured error rather than silently degenerate.
     let registry = finstack_quant_valuations::pricer::standard_pricer_registry();
@@ -644,7 +644,7 @@ fn test_settlement_delay_zero_is_valid() {
         "CORP",
     )
     .expect("CDS construction should succeed");
-    cds.protection.settlement_delay = 0;
+    cds.protection_leg.settlement_delay = 0;
 
     let npv = cds.value(&market, as_of);
     assert!(npv.is_ok(), "Zero settlement delay should be valid");
@@ -671,7 +671,7 @@ fn test_recovery_rate_bounds_not_enforced() {
         "CORP",
     )
     .expect("CDS construction should succeed");
-    cds.protection.recovery_rate = -0.2;
+    cds.protection_leg.recovery_rate = -0.2;
 
     let result = cds.value(&market, as_of);
     assert!(

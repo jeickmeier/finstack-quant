@@ -44,9 +44,9 @@ fn test_cdx_na_ig_standard_conventions() {
     .expect("valid test parameters");
 
     assert_eq!(idx.convention, CdsConvention::IsdaNa);
-    assert_eq!(idx.premium.frequency, Tenor::quarterly());
-    assert_eq!(idx.premium.day_count, DayCount::Act360);
-    assert_eq!(idx.premium.calendar_id.as_deref(), Some("nyse"));
+    assert_eq!(idx.premium_leg.frequency, Tenor::quarterly());
+    assert_eq!(idx.premium_leg.day_count, DayCount::Act360);
+    assert_eq!(idx.premium_leg.calendar_id.as_deref(), Some("nyse"));
 }
 
 #[test]
@@ -69,7 +69,7 @@ fn test_cdx_na_hy_standard_conventions() {
     .expect("valid test parameters");
 
     assert_eq!(idx.convention, CdsConvention::IsdaNa);
-    assert_eq!(idx.premium.frequency, Tenor::quarterly());
+    assert_eq!(idx.premium_leg.frequency, Tenor::quarterly());
 }
 
 #[test]
@@ -92,7 +92,7 @@ fn test_itraxx_europe_standard_conventions() {
     .expect("valid test parameters");
 
     assert_eq!(idx.convention, CdsConvention::IsdaEu);
-    assert_eq!(idx.premium.calendar_id.as_deref(), Some("target2"));
+    assert_eq!(idx.premium_leg.calendar_id.as_deref(), Some("target2"));
 }
 
 #[test]
@@ -127,7 +127,7 @@ fn test_quarterly_payment_frequency() {
 
     let idx = standard_single_curve_index("CDX-FREQ", start, end, 10_000_000.0);
 
-    assert_eq!(idx.premium.frequency, Tenor::quarterly());
+    assert_eq!(idx.premium_leg.frequency, Tenor::quarterly());
 }
 
 #[test]
@@ -138,7 +138,7 @@ fn test_act_360_day_count() {
 
     let idx = standard_single_curve_index("CDX-DC", start, end, 10_000_000.0);
 
-    assert_eq!(idx.premium.day_count, DayCount::Act360);
+    assert_eq!(idx.premium_leg.day_count, DayCount::Act360);
 }
 
 #[test]
@@ -159,7 +159,7 @@ fn test_standard_maturity_dates() {
         let id = format!("CDX-IMM-{}", i);
         let idx = standard_single_curve_index(&id, start, *end, 10_000_000.0);
 
-        assert!(idx.premium.end == *end);
+        assert!(idx.premium_leg.end == *end);
     }
 }
 
@@ -217,7 +217,7 @@ fn test_recovery_rate_standard() {
     let idx = standard_single_curve_index("CDX-REC", start, end, 10_000_000.0);
 
     // Recovery should be standard senior unsecured
-    assert_eq!(idx.protection.recovery_rate, 0.40);
+    assert_eq!(idx.protection_leg.recovery_rate, 0.40);
 }
 
 #[test]
@@ -311,7 +311,7 @@ fn test_settlement_delay_standard() {
     let idx = standard_single_curve_index("CDX-SETTLE", start, end, 10_000_000.0);
 
     // Settlement delay from convention
-    assert_eq!(idx.protection.settlement_delay, 3);
+    assert_eq!(idx.protection_leg.settlement_delay, 3);
 }
 
 #[test]
@@ -386,5 +386,5 @@ fn test_fixed_coupon_in_premium_leg() {
     )
     .expect("valid test parameters");
 
-    assert_eq!(idx.premium.coupon_bp, rust_decimal::Decimal::from(100));
+    assert_eq!(idx.premium_leg.coupon_bp, rust_decimal::Decimal::from(100));
 }

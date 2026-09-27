@@ -70,7 +70,7 @@ fn floating_cashflow_spec_json() -> String {
                 "reset_frequency": {"count": 3, "unit": "months"},
                 "reset_lag_days": 0,
                 "fixing_calendar_id": null,
-                "overnight_compounding": null,
+                "compounding": null,
                 "overnight_basis": null,
               },
               "coupon_type": "cash",

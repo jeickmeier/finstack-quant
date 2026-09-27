@@ -332,12 +332,12 @@ impl ForwardCdsContext {
                 break;
             }
         }
-        let pcd = pcd.unwrap_or_else(|| cds.premium.start.min(option.expiry));
+        let pcd = pcd.unwrap_or_else(|| cds.premium_leg.start.min(option.expiry));
         let accrual_pcd_to_expiry = if pcd >= option.expiry {
             0.0
         } else {
             finstack_quant_core::dates::DayCount::year_fraction(
-                cds.premium.day_count,
+                cds.premium_leg.day_count,
                 pcd,
                 option.expiry,
                 finstack_quant_core::dates::DayCountContext::default(),

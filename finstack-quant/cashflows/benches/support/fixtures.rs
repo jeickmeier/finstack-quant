@@ -6,8 +6,8 @@
 
 use finstack_quant_cashflows::builder::{
     AmortizationSpec, CashFlowMeta, CashFlowSchedule, CouponType, FeeBase, FeeSpec,
-    FixedCouponSpec, FloatingCouponSpec, FloatingRateFallback, FloatingRateSpec, Notional,
-    OvernightCompoundingMethod, OvernightIndexConstraintApplication, ScheduleParams,
+    FixedCouponSpec, FloatingCouponSpec, FloatingLegCompounding, FloatingRateFallback,
+    FloatingRateSpec, Notional, OvernightIndexConstraintApplication, ScheduleParams,
 };
 use finstack_quant_cashflows::primitives::{CFKind, CashFlow};
 use finstack_quant_cashflows::{schedule_from_classified_flows, ScheduleBuildOpts};
@@ -190,7 +190,7 @@ pub fn term_float_spec(frequency: Tenor) -> FloatingCouponSpec {
             index_tenor: None,
             reset_lag_days: 2,
             fixing_calendar_id: None,
-            overnight_compounding: None,
+            compounding: None,
             overnight_basis: None,
             fallback: FloatingRateFallback::Error,
         },
@@ -201,7 +201,7 @@ pub fn term_float_spec(frequency: Tenor) -> FloatingCouponSpec {
 
 pub fn overnight_float_spec(
     frequency: Tenor,
-    method: OvernightCompoundingMethod,
+    method: FloatingLegCompounding,
 ) -> FloatingCouponSpec {
     FloatingCouponSpec {
         rate_spec: FloatingRateSpec {
@@ -218,7 +218,7 @@ pub fn overnight_float_spec(
             index_tenor: None,
             reset_lag_days: 0,
             fixing_calendar_id: None,
-            overnight_compounding: Some(method),
+            compounding: Some(method),
             overnight_basis: Some(DayCount::Act360),
             fallback: FloatingRateFallback::Error,
         },
@@ -242,7 +242,7 @@ pub fn build_floating_term(base: Date, years: i32, market: &MarketContext) -> Ca
 pub fn build_overnight(
     base: Date,
     years: i32,
-    method: OvernightCompoundingMethod,
+    method: FloatingLegCompounding,
     market: &MarketContext,
 ) -> CashFlowSchedule {
     CashFlowSchedule::builder()

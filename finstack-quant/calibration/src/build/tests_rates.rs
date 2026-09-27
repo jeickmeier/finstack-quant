@@ -99,7 +99,10 @@ fn test_build_swap() {
 
     if let Some(swap) = instrument.as_any().downcast_ref::<InterestRateSwap>() {
         assert_eq!(swap.notional.currency(), Currency::USD);
-        assert_eq!(swap.fixed.rate, Decimal::try_from(0.030).expect("valid"));
+        assert_eq!(
+            swap.fixed_leg.rate,
+            Decimal::try_from(0.030).expect("valid")
+        );
     } else {
         panic!("Expected InterestRateSwap");
     }

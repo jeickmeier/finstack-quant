@@ -30,7 +30,7 @@ fn test_irs_at_par_npv_zero() {
         id: "SWAP_PAR".into(),
         notional: Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         side: PayReceive::Receive,
-        fixed: finstack_quant_valuations::instruments::FixedLegSpec {
+        fixed_leg: finstack_quant_valuations::instruments::FixedLegSpec {
             discount_curve_id: "USD-OIS".into(),
             rate: rust_decimal::Decimal::try_from(0.05).expect("valid"),
             frequency: Tenor::quarterly(),
@@ -39,13 +39,12 @@ fn test_irs_at_par_npv_zero() {
             calendar_id: None,
             stub: StubKind::None,
             par_method: None,
-            compounding_simple: true,
             payment_lag_days: 0,
             end_of_month: false,
             start: as_of,
             end,
         },
-        float: finstack_quant_valuations::instruments::FloatLegSpec {
+        float_leg: finstack_quant_valuations::instruments::FloatLegSpec {
             discount_curve_id: "USD-OIS".into(),
             forward_curve_id: "USD-SOFR-3M".into(),
             spread_bp: rust_decimal::Decimal::try_from(0.0).expect("valid"),
@@ -91,7 +90,7 @@ fn test_irs_receive_fixed_below_market() {
         id: "SWAP_OFF_MARKET".into(),
         notional: Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         side: PayReceive::Receive,
-        fixed: finstack_quant_valuations::instruments::FixedLegSpec {
+        fixed_leg: finstack_quant_valuations::instruments::FixedLegSpec {
             discount_curve_id: "USD-OIS".into(),
             rate: rust_decimal::Decimal::try_from(0.03).expect("valid"), // Below market
             frequency: Tenor::quarterly(),
@@ -100,13 +99,12 @@ fn test_irs_receive_fixed_below_market() {
             calendar_id: None,
             stub: StubKind::None,
             par_method: None,
-            compounding_simple: true,
             payment_lag_days: 0,
             end_of_month: false,
             start: as_of,
             end,
         },
-        float: finstack_quant_valuations::instruments::FloatLegSpec {
+        float_leg: finstack_quant_valuations::instruments::FloatLegSpec {
             discount_curve_id: "USD-OIS".into(),
             forward_curve_id: "USD-SOFR-3M".into(),
             spread_bp: rust_decimal::Decimal::try_from(0.0).expect("valid"),
@@ -151,7 +149,7 @@ fn test_irs_receive_fixed_above_market() {
         id: "SWAP_ABOVE_MARKET".into(),
         notional: Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         side: PayReceive::Receive,
-        fixed: finstack_quant_valuations::instruments::FixedLegSpec {
+        fixed_leg: finstack_quant_valuations::instruments::FixedLegSpec {
             discount_curve_id: "USD-OIS".into(),
             rate: rust_decimal::Decimal::try_from(0.07).expect("valid"), // Above market
             frequency: Tenor::quarterly(),
@@ -160,13 +158,12 @@ fn test_irs_receive_fixed_above_market() {
             calendar_id: None,
             stub: StubKind::None,
             par_method: None,
-            compounding_simple: true,
             payment_lag_days: 0,
             end_of_month: false,
             start: as_of,
             end,
         },
-        float: finstack_quant_valuations::instruments::FloatLegSpec {
+        float_leg: finstack_quant_valuations::instruments::FloatLegSpec {
             discount_curve_id: "USD-OIS".into(),
             forward_curve_id: "USD-SOFR-3M".into(),
             spread_bp: rust_decimal::Decimal::try_from(0.0).expect("valid"),
@@ -217,7 +214,6 @@ fn test_irs_pay_vs_receive_opposite_signs() {
         calendar_id: None,
         stub: StubKind::None,
         par_method: None,
-        compounding_simple: true,
         payment_lag_days: 0,
         end_of_month: false,
         start: as_of,
@@ -246,8 +242,8 @@ fn test_irs_pay_vs_receive_opposite_signs() {
         id: "SWAP_RECEIVE".into(),
         notional: Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         side: PayReceive::Receive,
-        fixed: fixed_leg.clone(),
-        float: float_leg.clone(),
+        fixed_leg: fixed_leg.clone(),
+        float_leg: float_leg.clone(),
         margin_spec: None,
         instrument_pricing_overrides: Default::default(),
         metric_pricing_overrides: Default::default(),
@@ -259,8 +255,8 @@ fn test_irs_pay_vs_receive_opposite_signs() {
         id: "SWAP_PAY".into(),
         notional: Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         side: PayReceive::Pay,
-        fixed: fixed_leg,
-        float: float_leg,
+        fixed_leg,
+        float_leg,
         margin_spec: None,
         instrument_pricing_overrides: Default::default(),
         metric_pricing_overrides: Default::default(),
@@ -344,7 +340,7 @@ fn test_irs_with_spread() {
         PayReceive::Receive,
     )
     .unwrap();
-    swap.float.spread_bp = dec!(50.0);
+    swap.float_leg.spread_bp = dec!(50.0);
 
     let npv = swap.value(&market, as_of).unwrap();
 
@@ -527,10 +523,10 @@ fn theta_receives_final_coupon_on_roll_date_and_survives_payment_lag() {
             PayReceive::Pay,
         )
         .unwrap();
-        swap.fixed.frequency = Tenor::quarterly();
-        swap.fixed.day_count = DayCount::Act360;
-        swap.fixed.payment_lag_days = lag;
-        swap.float.payment_lag_days = lag;
+        swap.fixed_leg.frequency = Tenor::quarterly();
+        swap.fixed_leg.day_count = DayCount::Act360;
+        swap.fixed_leg.payment_lag_days = lag;
+        swap.float_leg.payment_lag_days = lag;
         let market = MarketContext::new()
             .insert(
                 DiscountCurve::builder("USD-OIS")

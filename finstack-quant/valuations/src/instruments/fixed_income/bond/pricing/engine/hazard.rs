@@ -137,11 +137,13 @@ impl HazardBondEngine {
                 "hazard-rate OAS must be finite, got {oas_quote_decimal}"
             )));
         }
-        let continuous_oas = bond
-            .instrument_pricing_overrides
-            .model_config
-            .oas_quote_compounding
-            .continuous_from_quote_decimal(oas_quote_decimal);
+        let continuous_oas =
+            crate::instruments::pricing_overrides::oas_continuous_from_quote_decimal(
+                bond.instrument_pricing_overrides
+                    .model_config
+                    .oas_quote_compounding,
+                oas_quote_decimal,
+            )?;
         let disc = market.get_discount(&bond.discount_curve_id)?;
 
         // Explicit hazard-rate pricing must fail loudly when credit market data

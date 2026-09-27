@@ -46,17 +46,17 @@ pub enum RateCalibrationOisCompounding {
     /// Daily compounding in arrears, optionally with a lookback or observation shift.
     CompoundedInArrears {
         /// Business-day lookback applied to rate observations.
-        lookback_days: i32,
+        lookback_days: u32,
     },
     /// Daily compounding with an ISDA observation shift.
     CompoundedWithObservationShift {
         /// Business days by which observations and accrual weights are shifted.
-        shift_days: i32,
+        shift_days: u32,
     },
     /// Daily compounding with the final observed rate held through a cutoff window.
     CompoundedWithRateCutoff {
         /// Number of business days in the rate-cutoff window.
-        cutoff_days: i32,
+        cutoff_days: u32,
     },
 }
 

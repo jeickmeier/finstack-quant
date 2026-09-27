@@ -49,10 +49,10 @@ __all__ = [
     "FeeSpec",
     "FixedCouponSpec",
     "FloatingCouponSpec",
+    "FloatingLegCompounding",
     "FloatingRateFallback",
     "FloatingRateSpec",
     "Notional",
-    "OvernightCompoundingMethod",
     "OvernightIndexConstraintApplication",
     "PrepaymentModelSpec",
     "PrincipalEvent",
@@ -3023,7 +3023,7 @@ class FloatingRateSpec:
         index_tenor: Tenor | str | None = None,
         reset_lag_days: int = 2,
         fixing_calendar_id: str | None = None,
-        overnight_compounding: OvernightCompoundingMethod | None = None,
+        compounding: FloatingLegCompounding | None = None,
         overnight_basis: DayCount | None = None,
         fallback: FloatingRateFallback | None = None,
     ) -> None:
@@ -3063,9 +3063,10 @@ class FloatingRateSpec:
         fixing_calendar_id : str, optional
             Calendar for the reset lag; defaults to the coupon schedule
             calendar when omitted.
-        overnight_compounding : OvernightCompoundingMethod, optional
-            Overnight compounding method for RFR indices (SOFR/ESTR/SONIA);
-            leave unset for term rates.
+        compounding : FloatingLegCompounding, optional
+            How each period's fixings combine into the rate. Leave unset to
+            let a pricing instrument resolve it from the rate-index registry
+            (the bare cashflow builder then projects one term forward).
         overnight_basis : DayCount, optional
             Day-count basis for the overnight compounding denominator
             (default Act/360).
@@ -3307,14 +3308,14 @@ class FloatingRateSpec:
         ...
 
     @property
-    def overnight_compounding(self) -> OvernightCompoundingMethod | None:
+    def compounding(self) -> FloatingLegCompounding | None:
         """
-        Overnight compounding method, if set.
+        Period-rate compounding convention, if set.
 
         Returns
         -------
-        OvernightCompoundingMethod | None
-            Overnight compounding method, if set.
+        FloatingLegCompounding | None
+            The compounding convention, or ``None`` when unset.
 
         Notes
         -----
@@ -3704,40 +3705,43 @@ class Notional:
         """
         ...
 
-class OvernightCompoundingMethod:
+class FloatingLegCompounding:
     """
-    Compounding method for overnight rate indices (SOFR, ESTR, SONIA).
+    How the fixings of one accrual period combine into the period rate.
 
-    ``SIMPLE_AVERAGE`` and ``COMPOUNDED_IN_ARREARS`` are class-attribute
-    singletons; the remaining variants carry a business-day parameter and
-    are constructed via their named factories.
+    ``SIMPLE`` (one term forward per period) and ``SIMPLE_AVERAGE``
+    (accrual-weighted arithmetic average of daily overnight fixings) are
+    class-attribute singletons; the compounded variants carry a business-day
+    parameter and are built via their named factories. The JSON wire form is
+    ``"simple"``, ``"simple_average"`` or e.g.
+    ``{"compounded_in_arrears": {"lookback_days": 0}}``.
 
     Examples
     --------
-    >>> from finstack_quant.cashflows.builder import OvernightCompoundingMethod
-    >>> OvernightCompoundingMethod.COMPOUNDED_IN_ARREARS is not None
+    >>> from finstack_quant.cashflows.builder import FloatingLegCompounding
+    >>> FloatingLegCompounding.compounded_in_arrears() is not None
     True
     """
 
-    SIMPLE_AVERAGE: OvernightCompoundingMethod
+    SIMPLE: FloatingLegCompounding
+    """Simple term-rate projection (one forward per period; the default)."""
+    SIMPLE_AVERAGE: FloatingLegCompounding
     """Arithmetic average of daily fixings weighted by accrual days."""
-    COMPOUNDED_IN_ARREARS: OvernightCompoundingMethod
-    """Compounded in arrears (ISDA 2021 standard; default)."""
 
     @staticmethod
-    def compounded_with_lookback(lookback_days: int) -> OvernightCompoundingMethod:
+    def compounded_in_arrears(lookback_days: int = 0) -> FloatingLegCompounding:
         """
-        Compounded in arrears with an observation lookback.
+        Compounded in arrears with an optional observation lookback.
 
         Parameters
         ----------
-        lookback_days : int
-            Number of business days to look back for rate observations.
+        lookback_days : int, default 0
+            Business days by which observation dates move back while the day-count weights stay on the accrual dates; ``0`` is plain in-arrears (cleared OIS).
 
         Returns
         -------
-        OvernightCompoundingMethod
-            A lookback-compounding method with the given window.
+        FloatingLegCompounding
+            A compounded-in-arrears convention with the given lookback.
 
         Raises
         ------
@@ -3746,59 +3750,26 @@ class OvernightCompoundingMethod:
 
         Examples
         --------
-        >>> from finstack_quant.cashflows.builder import OvernightCompoundingMethod
-        >>> OvernightCompoundingMethod.compounded_with_lookback(2) is not None
+        >>> from finstack_quant.cashflows.builder import FloatingLegCompounding
+        >>> FloatingLegCompounding.compounded_in_arrears(2) is not None
         True
         """
         ...
 
     @staticmethod
-    def compounded_with_lockout(lockout_days: int) -> OvernightCompoundingMethod:
-        """
-        Compounded in arrears with a rate lockout near period end.
-
-        Parameters
-        ----------
-        lockout_days : int
-            Number of final business-day observations to freeze at the fixing
-            immediately preceding them (ARRC convention). Zero disables lockout.
-            Building a schedule raises ValueError if a positive lockout leaves
-            no preceding fixing.
-
-        Returns
-        -------
-        OvernightCompoundingMethod
-            A lockout-compounding method with the given window.
-
-        Raises
-        ------
-        OverflowError
-            If *lockout_days* is outside the unsigned 32-bit integer range.
-
-        Examples
-        --------
-        >>> from finstack_quant.cashflows.builder import OvernightCompoundingMethod
-        >>> OvernightCompoundingMethod.compounded_with_lockout(2) is not None
-        True
-        """
-        ...
-
-    @staticmethod
-    def compounded_with_observation_shift(
-        shift_days: int,
-    ) -> OvernightCompoundingMethod:
+    def compounded_with_observation_shift(shift_days: int) -> FloatingLegCompounding:
         """
         Compounded in arrears with both dates and weights shifted back.
 
         Parameters
         ----------
         shift_days : int
-            Number of business days to shift observations and weights.
+            Number of business days to shift observations and weights (ISDA 2021).
 
         Returns
         -------
-        OvernightCompoundingMethod
-            An observation-shift compounding method with the given window.
+        FloatingLegCompounding
+            An observation-shift compounding convention with the given window.
 
         Raises
         ------
@@ -3807,8 +3778,36 @@ class OvernightCompoundingMethod:
 
         Examples
         --------
-        >>> from finstack_quant.cashflows.builder import OvernightCompoundingMethod
-        >>> OvernightCompoundingMethod.compounded_with_observation_shift(2) is not None
+        >>> from finstack_quant.cashflows.builder import FloatingLegCompounding
+        >>> FloatingLegCompounding.compounded_with_observation_shift(2) is not None
+        True
+        """
+        ...
+
+    @staticmethod
+    def compounded_with_rate_cutoff(cutoff_days: int) -> FloatingLegCompounding:
+        """
+        Compounded in arrears with a rate cut-off near period end.
+
+        Parameters
+        ----------
+        cutoff_days : int
+            Number of final business-day observations frozen at the fixing immediately preceding them (ARRC lockout). Zero disables the cut-off; building a schedule raises ValueError if a positive cut-off leaves no preceding fixing.
+
+        Returns
+        -------
+        FloatingLegCompounding
+            A rate-cut-off compounding convention with the given window.
+
+        Raises
+        ------
+        OverflowError
+            If *cutoff_days* is outside the unsigned 32-bit integer range.
+
+        Examples
+        --------
+        >>> from finstack_quant.cashflows.builder import FloatingLegCompounding
+        >>> FloatingLegCompounding.compounded_with_rate_cutoff(2) is not None
         True
         """
         ...

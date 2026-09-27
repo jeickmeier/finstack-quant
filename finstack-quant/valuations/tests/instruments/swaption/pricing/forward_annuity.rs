@@ -298,7 +298,6 @@ fn test_single_curve_forward_honors_explicit_fixed_leg_payment_cashflows() {
         start: swap_start,
         end: swap_end,
         par_method: None,
-        compounding_simple: true,
         payment_lag_days: 2,
         end_of_month: false,
     };

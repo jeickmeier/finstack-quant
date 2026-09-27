@@ -61,7 +61,9 @@ impl MetricCalculator for AnnuityCalculator {
         let irs: &InterestRateSwap = context.instrument_as()?;
         let as_of = context.as_of;
 
-        let disc = context.curves.get_discount(&irs.fixed.discount_curve_id)?;
+        let disc = context
+            .curves
+            .get_discount(&irs.fixed_leg.discount_curve_id)?;
 
         let fixed = irs.resolved_fixed_leg()?;
         let periods = crate::cashflow::builder::periods::build_periods(

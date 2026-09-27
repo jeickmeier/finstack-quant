@@ -183,23 +183,34 @@ pub(crate) fn adjust_overnight_accrual_boundaries(
 
 fn shifted_observation_days(compounding: &FloatingLegCompounding) -> Result<(i32, bool)> {
     match compounding {
-        FloatingLegCompounding::Simple => Err(finstack_quant_core::Error::Validation(
-            "Overnight coupon projection requires a compounded convention, not Simple".into(),
-        )),
+        FloatingLegCompounding::Simple | FloatingLegCompounding::SimpleAverage => {
+            Err(finstack_quant_core::Error::Validation(format!(
+                "Overnight coupon projection requires a compounded convention, not {compounding}"
+            )))
+        }
         FloatingLegCompounding::CompoundedInArrears { lookback_days } => {
-            Ok((*lookback_days, false))
+            Ok((i32_days(*lookback_days)?, false))
         }
         FloatingLegCompounding::CompoundedWithObservationShift { shift_days } => {
-            Ok((*shift_days, true))
+            Ok((i32_days(*shift_days)?, true))
         }
         FloatingLegCompounding::CompoundedWithRateCutoff { .. } => Ok((0, false)),
     }
 }
 
+/// Convert a business-day count to the signed day arithmetic used here.
+fn i32_days(days: u32) -> Result<i32> {
+    i32::try_from(days).map_err(|_| {
+        finstack_quant_core::Error::Validation(format!(
+            "overnight compounding day count {days} exceeds i32::MAX"
+        ))
+    })
+}
+
 fn cutoff_days(compounding: &FloatingLegCompounding) -> Option<i32> {
     match compounding {
         FloatingLegCompounding::CompoundedWithRateCutoff { cutoff_days } if *cutoff_days > 0 => {
-            Some(*cutoff_days)
+            i32::try_from(*cutoff_days).ok()
         }
         _ => None,
     }

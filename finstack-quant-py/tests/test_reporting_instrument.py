@@ -440,14 +440,14 @@ def test_instrument_cds_renders_credit_blocks() -> None:
             "id": "ACME",
             "notional": {"amount": "10000000", "currency": "USD"},
             "side": "pay",
-            "premium": {
+            "premium_leg": {
                 "roll_rule": "cds_imm",
                 "start": "2024-06-20",
                 "end": "2029-06-20",
                 "coupon_bp": "100",
                 "frequency": {"count": 3, "unit": "months"},
             },
-            "protection": {"credit_curve_id": "ACME-SR", "recovery_rate": 0.4},
+            "protection_leg": {"credit_curve_id": "ACME-SR", "recovery_rate": 0.4},
             "doc_clause": "XR14",
         },
     }

@@ -444,7 +444,7 @@ print(convert_regimes.to_string(index=False))
 from finstack_quant.margin import CsaSpec,VmCalculator,ScheduleImCalculator
 irs_position=next(p for p in book_input["positions"] if p["instrument_id"]=="USD-PAYER-IRS")
 irs_notional=float(irs_position["instrument_spec"]["spec"]["notional"]["amount"])*irs_position["quantity"]
-irs_end=date.fromisoformat(irs_position["instrument_spec"]["spec"]["fixed"]["end"])
+irs_end=date.fromisoformat(irs_position["instrument_spec"]["spec"]["fixed_leg"]["end"])
 irs_remaining_years=(irs_end-AS_OF).days/365
 im_schedule=ScheduleImCalculator.bcbs_standard()
 schedule_im=im_schedule.calculate_for_notional(irs_notional,"USD","interest_rate",irs_remaining_years,AS_OF)
@@ -1054,7 +1054,7 @@ print("The held native future is a fixed-deliverable clean-price proxy. The cand
 from finstack_quant.margin import CsaSpec,VmCalculator,ScheduleImCalculator
 irs_position=next(p for p in book_input["positions"] if p["instrument_id"]=="USD-PAYER-IRS")
 irs_notional=float(irs_position["instrument_spec"]["spec"]["notional"]["amount"])*irs_position["quantity"]
-irs_end=date.fromisoformat(irs_position["instrument_spec"]["spec"]["fixed"]["end"])
+irs_end=date.fromisoformat(irs_position["instrument_spec"]["spec"]["fixed_leg"]["end"])
 irs_remaining_years=(irs_end-AS_OF).days/365
 im_schedule=ScheduleImCalculator.bcbs_standard()
 schedule_im=im_schedule.calculate_for_notional(irs_notional,"USD","interest_rate",irs_remaining_years,AS_OF)

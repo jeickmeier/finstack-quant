@@ -37,7 +37,7 @@ enum OisCompoundingSpec {
     Tona,
     Fedfunds,
     Saron,
-    CompoundedInArrears { lookback_days: i32 },
+    CompoundedInArrears { lookback_days: u32 },
 }
 
 impl OisCompoundingSpec {

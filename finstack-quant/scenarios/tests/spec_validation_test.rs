@@ -434,3 +434,20 @@ fn rate_binding_validate_eagerly_parses_tenor() {
     }"#;
     assert!(serde_json::from_str::<RateBindingSpec>(invalid_day_count).is_err());
 }
+
+#[test]
+fn rate_binding_compounding_uses_core_wire_form() {
+    let base = serde_json::json!({
+        "node_id": "rate",
+        "curve_id": "USD-OIS",
+        "tenor": "1Y",
+    });
+    let mut retired = base.clone();
+    // schema-rejection-test: the scenarios-only `semi_annual` label is core `{"periodic": 2}`.
+    retired["compounding"] = serde_json::json!("semi_annual");
+    assert!(serde_json::from_value::<RateBindingSpec>(retired).is_err());
+    let mut canonical = base;
+    canonical["compounding"] = serde_json::json!({ "periodic": 2 });
+    let spec: RateBindingSpec = serde_json::from_value(canonical).expect("core periodic basis");
+    assert_eq!(spec.compounding, Compounding::SEMI_ANNUAL);
+}

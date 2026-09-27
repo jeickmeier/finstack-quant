@@ -637,7 +637,7 @@ fn bond_bdt_tree_reads_bdt_sigma() {
     let reference = super::TreePricer::with_config(super::TreePricerConfig {
         tree_steps: 100,
         tree_model: super::TreeModelChoice::BlackDermanToy { sigma: 0.20 },
-        tree_compounding: finstack_quant_models::trees::TreeCompounding::Simple,
+        tree_compounding: finstack_quant_core::math::Compounding::Simple,
         ..super::TreePricerConfig::default()
     })
     .price_at_oas(&bond, &market, as_of, 0.0)

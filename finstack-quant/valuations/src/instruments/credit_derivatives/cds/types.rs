@@ -274,9 +274,9 @@ pub struct CreditDefaultSwap {
     /// ISDA convention
     pub convention: CdsConvention,
     /// Premium leg specification
-    pub premium: PremiumLegSpec,
+    pub premium_leg: PremiumLegSpec,
     /// Protection leg specification
-    pub protection: ProtectionLegSpec,
+    pub protection_leg: ProtectionLegSpec,
     /// Instrument-owned pricing inputs.
     #[builder(default)]
     #[serde(
@@ -390,8 +390,8 @@ impl CreditDefaultSwap {
         as_of: finstack_quant_core::dates::Date,
     ) -> finstack_quant_core::Result<f64> {
         crate::instruments::common_impl::traits::Instrument::validate_for_pricing(self)?;
-        let discount = market.get_discount(self.premium.discount_curve_id.as_str())?;
-        let hazard = market.get_hazard(self.protection.credit_curve_id.as_str())?;
+        let discount = market.get_discount(self.premium_leg.discount_curve_id.as_str())?;
+        let hazard = market.get_hazard(self.protection_leg.credit_curve_id.as_str())?;
         super::pricing::CDSPricer::with_config(super::pricing::CDSPricerConfig::from_cds(self))
             .par_spread(self, discount.as_ref(), hazard.as_ref(), as_of)
     }
@@ -415,7 +415,7 @@ impl CreditDefaultSwap {
             .notional(Money::from((10_000_000_i64, Currency::USD)))
             .side(PayReceive::Pay)
             .convention(convention)
-            .premium(PremiumLegSpec {
+            .premium_leg(PremiumLegSpec {
                 roll_rule: crate::cashflow::builder::specs::RollRule::CdsImm,
                 start: date!(2024 - 03 - 20),
                 end: date!(2029 - 03 - 20),
@@ -427,7 +427,7 @@ impl CreditDefaultSwap {
                 coupon_bp,
                 discount_curve_id: finstack_quant_core::types::CurveId::new("USD-OIS"),
             })
-            .protection(ProtectionLegSpec {
+            .protection_leg(ProtectionLegSpec {
                 credit_curve_id: finstack_quant_core::types::CurveId::new("CORP-HAZARD"),
                 recovery_rate: STANDARD_RECOVERY_SENIOR,
                 settlement_delay: convention.settlement_delay(),
@@ -474,7 +474,7 @@ impl CreditDefaultSwap {
             notional,
             side,
             convention,
-            premium: PremiumLegSpec {
+            premium_leg: PremiumLegSpec {
                 roll_rule: crate::cashflow::builder::specs::RollRule::CdsImm,
                 start,
                 end,
@@ -486,7 +486,7 @@ impl CreditDefaultSwap {
                 coupon_bp,
                 discount_curve_id: discount_curve_id.into(),
             },
-            protection: ProtectionLegSpec {
+            protection_leg: ProtectionLegSpec {
                 credit_curve_id: credit_curve_id.into(),
                 recovery_rate,
                 settlement_delay: convention.settlement_delay(),
@@ -541,7 +541,7 @@ impl CreditDefaultSwap {
     ///     .notional(Money::from((10_000_000_i64, Currency::USD)))
     ///     .side(PayReceive::Pay)
     ///     .convention(CdsConvention::IsdaNa)
-    ///     .premium(PremiumLegSpec {
+    ///     .premium_leg(PremiumLegSpec {
     ///         roll_rule: RollRule::CdsImm,
     ///         start: date!(2024 - 03 - 20),
     ///         end: date!(2029 - 03 - 20),
@@ -553,7 +553,7 @@ impl CreditDefaultSwap {
     ///         coupon_bp: Decimal::try_from(100.0).expect("valid bp"),
     ///         discount_curve_id: CurveId::new("USD-OIS"),
     ///     })
-    ///     .protection(ProtectionLegSpec {
+    ///     .protection_leg(ProtectionLegSpec {
     ///         credit_curve_id: CurveId::new("CORP-HAZARD"),
     ///         recovery_rate: STANDARD_RECOVERY_SENIOR,
     ///         settlement_delay: CdsConvention::IsdaNa.settlement_delay(),
@@ -569,26 +569,26 @@ impl CreditDefaultSwap {
         // Validate date ordering (start must not be after end)
         // Note: start == end is allowed for "expired" CDS (valuation handles this edge case)
         validation::validate_date_range_non_strict(
-            self.premium.start,
-            self.premium.end,
+            self.premium_leg.start,
+            self.premium_leg.end,
             "CDS premium",
         )?;
 
         // Validate recovery rate (must be in [0, 1])
-        validation::validate_recovery_rate(self.protection.recovery_rate)?;
+        validation::validate_recovery_rate(self.protection_leg.recovery_rate)?;
 
         // Validate protection_effective_date bounds if set
         if let Some(ped) = self.protection_effective_date {
-            if ped < self.premium.start {
+            if ped < self.premium_leg.start {
                 return Err(finstack_quant_core::Error::Validation(format!(
                     "CDS protection_effective_date ({}) must be >= premium start date ({})",
-                    ped, self.premium.start
+                    ped, self.premium_leg.start
                 )));
             }
-            if ped > self.premium.end {
+            if ped > self.premium_leg.end {
                 return Err(finstack_quant_core::Error::Validation(format!(
                     "CDS protection_effective_date ({}) must be <= premium end date ({})",
-                    ped, self.premium.end
+                    ped, self.premium_leg.end
                 )));
             }
         }
@@ -647,7 +647,8 @@ impl CreditDefaultSwap {
     /// For a standard (spot) CDS, this returns `premium.start`.
     #[must_use]
     pub fn protection_start(&self) -> Date {
-        self.protection_effective_date.unwrap_or(self.premium.start)
+        self.protection_effective_date
+            .unwrap_or(self.premium_leg.start)
     }
 
     pub(crate) fn uses_clean_price(&self) -> bool {
@@ -666,20 +667,20 @@ impl CreditDefaultSwap {
     fn build_premium_leg_schedule(
         &self,
     ) -> finstack_quant_core::Result<crate::cashflow::builder::CashFlowSchedule> {
-        let spread = self.premium.coupon_bp.to_f64().ok_or_else(|| {
+        let spread = self.premium_leg.coupon_bp.to_f64().ok_or_else(|| {
             finstack_quant_core::Error::Validation(
                 "premium.coupon_bp cannot be represented as f64".to_string(),
             )
         })? / 10_000.0;
         let pricer = CDSPricer::new();
         let payment_accruals = if self.uses_adjusted_premium_accrual_dates() {
-            pricer.premium_cashflow_accruals(self, self.premium.start)?
+            pricer.premium_cashflow_accruals(self, self.premium_leg.start)?
         } else {
             pricer
                 .generate_isda_schedule(self)?
                 .windows(2)
                 .map(|window| {
-                    let accrual = self.premium.day_count.year_fraction(
+                    let accrual = self.premium_leg.day_count.year_fraction(
                         window[0],
                         window[1],
                         finstack_quant_core::dates::DayCountContext::default(),
@@ -707,7 +708,7 @@ impl CreditDefaultSwap {
 
         Ok(crate::cashflow::traits::schedule_from_classified_flows(
             flows,
-            self.premium.day_count,
+            self.premium_leg.day_count,
             crate::cashflow::traits::ScheduleBuildOpts {
                 notional_hint: Some(self.notional),
                 ..Default::default()
@@ -738,8 +739,8 @@ impl CreditDefaultSwap {
         as_of: finstack_quant_core::dates::Date,
     ) -> finstack_quant_core::Result<f64> {
         self.validate()?;
-        let disc = market.get_discount(&self.premium.discount_curve_id)?;
-        let surv = market.get_hazard(&self.protection.credit_curve_id)?;
+        let disc = market.get_discount(&self.premium_leg.discount_curve_id)?;
+        let surv = market.get_hazard(&self.protection_leg.credit_curve_id)?;
         CDSPricer::new().npv_full(self, disc.as_ref(), surv.as_ref(), as_of)
     }
 
@@ -763,8 +764,8 @@ impl crate::instruments::common_impl::traits::Instrument for CreditDefaultSwap {
         crate::instruments::common_impl::dependencies::MarketDependencies,
     > {
         let mut deps = crate::instruments::common_impl::dependencies::MarketDependencies::new();
-        deps.add_discount_curve(self.premium.discount_curve_id.clone());
-        deps.add_credit_curve(self.protection.credit_curve_id.clone());
+        deps.add_discount_curve(self.premium_leg.discount_curve_id.clone());
+        deps.add_credit_curve(self.protection_leg.credit_curve_id.clone());
         Ok(deps)
     }
     fn as_marginable(&self) -> Option<&dyn finstack_quant_margin::Marginable> {
@@ -799,11 +800,11 @@ impl crate::instruments::common_impl::traits::Instrument for CreditDefaultSwap {
     }
 
     fn expiry(&self) -> Option<finstack_quant_core::dates::Date> {
-        Some(self.premium.end)
+        Some(self.premium_leg.end)
     }
 
     fn effective_start_date(&self) -> Option<finstack_quant_core::dates::Date> {
-        Some(self.premium.start)
+        Some(self.premium_leg.start)
     }
 
     crate::impl_focused_pricing_overrides!();
@@ -879,24 +880,27 @@ mod tests {
         assert_eq!(cds.notional, Money::from((10_000_000_i64, Currency::USD)));
         assert_eq!(cds.side, PayReceive::Pay);
         assert_eq!(cds.convention, CdsConvention::IsdaNa);
-        assert_eq!(cds.premium.start, date!(2025 - 03 - 20));
-        assert_eq!(cds.premium.end, date!(2030 - 03 - 20));
-        assert_eq!(cds.premium.day_count, CdsConvention::IsdaNa.day_count());
-        assert_eq!(cds.premium.frequency, CdsConvention::IsdaNa.frequency());
+        assert_eq!(cds.premium_leg.start, date!(2025 - 03 - 20));
+        assert_eq!(cds.premium_leg.end, date!(2030 - 03 - 20));
+        assert_eq!(cds.premium_leg.day_count, CdsConvention::IsdaNa.day_count());
+        assert_eq!(cds.premium_leg.frequency, CdsConvention::IsdaNa.frequency());
         assert_eq!(
-            cds.premium.business_day_convention,
+            cds.premium_leg.business_day_convention,
             CdsConvention::IsdaNa.business_day_convention()
         );
         assert_eq!(
-            cds.premium.calendar_id.as_deref(),
+            cds.premium_leg.calendar_id.as_deref(),
             Some(CdsConvention::IsdaNa.default_calendar())
         );
-        assert_eq!(cds.premium.coupon_bp.to_f64(), Some(100.0));
-        assert_eq!(cds.premium.discount_curve_id, CurveId::new("USD-OIS"));
-        assert_eq!(cds.protection.credit_curve_id, CurveId::new("CORP-HAZARD"));
-        assert_eq!(cds.protection.recovery_rate, 0.40);
+        assert_eq!(cds.premium_leg.coupon_bp.to_f64(), Some(100.0));
+        assert_eq!(cds.premium_leg.discount_curve_id, CurveId::new("USD-OIS"));
         assert_eq!(
-            cds.protection.settlement_delay,
+            cds.protection_leg.credit_curve_id,
+            CurveId::new("CORP-HAZARD")
+        );
+        assert_eq!(cds.protection_leg.recovery_rate, 0.40);
+        assert_eq!(
+            cds.protection_leg.settlement_delay,
             CdsConvention::IsdaNa.settlement_delay()
         );
     }
@@ -904,7 +908,7 @@ mod tests {
     #[test]
     fn builder_rejects_invalid_cds_recovery_rate() {
         let cds = CreditDefaultSwap::example();
-        let mut protection = cds.protection;
+        let mut protection = cds.protection_leg;
         protection.recovery_rate = 1.1;
 
         let error = CreditDefaultSwap::builder()
@@ -912,8 +916,8 @@ mod tests {
             .notional(cds.notional)
             .side(cds.side)
             .convention(cds.convention)
-            .premium(cds.premium)
-            .protection(protection)
+            .premium_leg(cds.premium_leg)
+            .protection_leg(protection)
             .attributes(cds.attributes)
             .build()
             .expect_err("recovery above one must fail at the builder boundary");

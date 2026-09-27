@@ -28,7 +28,7 @@ impl MetricCalculator for IrsDv01Calculator {
         let par_rate = *context.computed.get(&MetricId::ParRate).ok_or_else(|| {
             finstack_quant_core::Error::Validation("IRS DV01 requires par_rate".to_string())
         })?;
-        let fixed_rate = decimal_to_f64(irs.fixed.rate, "fixed leg rate")?;
+        let fixed_rate = decimal_to_f64(irs.fixed_leg.rate, "fixed leg rate")?;
         let bump_bp = crate::metrics::sensitivities::config::from_context_or_default(
             context.get_config(),
             context.get_metric_overrides(),
@@ -60,13 +60,15 @@ fn annuity_derivative_per_bp(
     // drops one full `MarketContext` clone per DV01 versus bumping a shared scratch
     // in place and cloning it for each side, and removes the revert bookkeeping.
     let mut curves_up = context.curves.as_ref().clone();
-    let _bump_up = curves_up
-        .apply_curve_bump_in_place(&irs.fixed.discount_curve_id, BumpSpec::parallel_bp(bump_bp))?;
+    let _bump_up = curves_up.apply_curve_bump_in_place(
+        &irs.fixed_leg.discount_curve_id,
+        BumpSpec::parallel_bp(bump_bp),
+    )?;
     let annuity_up = annuity_with_curves(context, curves_up)?;
 
     let mut curves_down = context.curves.as_ref().clone();
     let _bump_down = curves_down.apply_curve_bump_in_place(
-        &irs.fixed.discount_curve_id,
+        &irs.fixed_leg.discount_curve_id,
         BumpSpec::parallel_bp(-bump_bp),
     )?;
     let annuity_down = annuity_with_curves(context, curves_down)?;

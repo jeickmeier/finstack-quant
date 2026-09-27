@@ -31,7 +31,7 @@ impl CdsDv01Calculator {
         let mut bumped_market: MarketContext = context.curves.as_ref().clone();
         let base_discount = context
             .curves
-            .get_discount(cds.premium.discount_curve_id.as_str())?;
+            .get_discount(cds.premium_leg.discount_curve_id.as_str())?;
         if let Some(calibration) = base_discount.rate_calibration() {
             let bumped_discount = context.rebuild_discount_curve(
                 DiscountCurveRecalibrationRequest {
@@ -45,7 +45,7 @@ impl CdsDv01Calculator {
             bumped_market = bumped_market.insert(bumped_discount.as_ref().clone());
         } else {
             bumped_market.apply_curve_bump_in_place(
-                &cds.premium.discount_curve_id,
+                &cds.premium_leg.discount_curve_id,
                 BumpSpec::parallel_bp(bump_bp),
             )?;
         }
@@ -53,13 +53,13 @@ impl CdsDv01Calculator {
         if rebootstrap_hazard {
             let base_hazard = context
                 .curves
-                .get_hazard(cds.protection.credit_curve_id.as_str())?;
+                .get_hazard(cds.protection_leg.credit_curve_id.as_str())?;
             let recalibrated = context.rebuild_hazard_curve(
                 HazardRecalibrationRequest {
                     hazard: base_hazard,
                     source_market: std::sync::Arc::clone(&context.curves),
                     target_market: std::sync::Arc::new(bumped_market.clone()),
-                    discount_curve_id: cds.premium.discount_curve_id.clone(),
+                    discount_curve_id: cds.premium_leg.discount_curve_id.clone(),
                     doc_clause: Some(market_doc_clause(cds)),
                     cds_valuation_convention: Some(cds.valuation_convention),
                     deal_quote_override: deal_quote_override(cds),
@@ -88,7 +88,7 @@ impl MetricCalculator for CdsDv01Calculator {
 
         let hazard = context
             .curves
-            .get_hazard(cds.protection.credit_curve_id.as_str())?;
+            .get_hazard(cds.protection_leg.credit_curve_id.as_str())?;
         let rebootstrap_hazard = hazard.hazard_calibration().is_some();
 
         let pv_up = Self::price_at_rate_bump(&cds, context, bump_bp, rebootstrap_hazard)?;

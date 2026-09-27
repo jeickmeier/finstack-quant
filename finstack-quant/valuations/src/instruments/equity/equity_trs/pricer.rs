@@ -126,7 +126,7 @@ impl TrsReturnModel for EquityReturnModel<'_> {
             t_end,
             initial_level: _,
         } = *inputs;
-        let disc = context.get_discount(self.trs.financing.discount_curve_id.as_str())?;
+        let disc = context.get_discount(self.trs.financing_leg.discount_curve_id.as_str())?;
 
         let uses_discrete_dividends = !self.trs.discrete_dividends.is_empty();
         let carry_div_yield = if uses_discrete_dividends {
@@ -289,7 +289,7 @@ pub(crate) fn pv_total_return_leg(
     let params = TotalReturnLegParams {
         schedule: &trs.schedule,
         notional: trs.notional,
-        discount_curve_id: trs.financing.discount_curve_id.as_str(),
+        discount_curve_id: trs.financing_leg.discount_curve_id.as_str(),
         contract_size: trs.underlying.contract_size,
         initial_level: Some(initial),
     };
@@ -330,7 +330,7 @@ mod tests {
             .expect("curve");
         let market = MarketContext::new().insert(curve);
         let mut trs = EquityTotalReturnSwap::example().expect("TRS");
-        trs.financing.discount_curve_id = CurveId::new("DISC");
+        trs.financing_leg.discount_curve_id = CurveId::new("DISC");
         trs.discrete_dividends = vec![(date(2025, 2, 15), 5.0)];
         trs.dividend_tax_rate = 0.3;
         let actual = EquityReturnModel {
@@ -367,7 +367,7 @@ mod tests {
         let context = MarketContext::new().insert(disc);
 
         let mut trs = EquityTotalReturnSwap::example().expect("example TRS");
-        trs.financing.discount_curve_id = CurveId::new("DISC");
+        trs.financing_leg.discount_curve_id = CurveId::new("DISC");
         trs.underlying.div_yield_id = None;
         trs.dividend_tax_rate = 0.0;
         trs.discrete_dividends = vec![
@@ -422,7 +422,7 @@ mod tests {
 
         let dividend = 5.0;
         let mut with_div = EquityTotalReturnSwap::example().expect("example TRS");
-        with_div.financing.discount_curve_id = CurveId::new("DISC");
+        with_div.financing_leg.discount_curve_id = CurveId::new("DISC");
         with_div.underlying.div_yield_id = None;
         with_div.dividend_tax_rate = 0.0;
         with_div.dividend_settlement = TrsDividendSettlement::AtPeriodEnd;

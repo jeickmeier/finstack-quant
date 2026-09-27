@@ -86,8 +86,8 @@ impl ResolvedConstituent<'_> {
             index.notional.amount() * index.index_factor * self.weight_effective,
             index.notional.currency(),
         )?;
-        cds.protection.credit_curve_id = self.credit_curve_id.clone();
-        cds.protection.recovery_rate = self.recovery_rate;
+        cds.protection_leg.credit_curve_id = self.credit_curve_id.clone();
+        cds.protection_leg.recovery_rate = self.recovery_rate;
         Ok(())
     }
 }
@@ -156,7 +156,7 @@ impl CDSIndexPricer {
         )?;
         if let Some((date, amount)) = index.upfront.filter(|(date, _)| *date >= as_of) {
             let df = curves
-                .get_discount(index.premium.discount_curve_id.as_str())?
+                .get_discount(index.premium_leg.discount_curve_id.as_str())?
                 .df_between_dates(as_of, date)?;
             let upfront = Money::new(amount.amount() * df, amount.currency())?;
             result.total = match index.side {
@@ -256,8 +256,8 @@ impl CDSIndexPricer {
         match index.pricing {
             IndexPricing::SingleCurve => {
                 let cds = self.synthetic_cds(index)?;
-                let disc = curves.get_discount(&cds.premium.discount_curve_id)?;
-                let surv = curves.get_hazard(&cds.protection.credit_curve_id)?;
+                let disc = curves.get_discount(&cds.premium_leg.discount_curve_id)?;
+                let surv = curves.get_hazard(&cds.protection_leg.credit_curve_id)?;
                 let numerator_protection_pv =
                     pricer.pv_protection_leg(&cds, disc.as_ref(), surv.as_ref(), as_of)?;
                 let denom_per_unit =
@@ -281,7 +281,7 @@ impl CDSIndexPricer {
             }
             IndexPricing::Constituents => {
                 let mut cds = self.synthetic_cds(index)?;
-                let disc = curves.get_discount(&cds.premium.discount_curve_id)?;
+                let disc = curves.get_discount(&cds.premium_leg.discount_curve_id)?;
                 let mut numerator_protection_pv = Money::from((0_i64, index.notional.currency()));
                 let mut denominator = 0.0;
                 let mut constituents_spread_bp = Vec::with_capacity(index.constituents.len());
@@ -356,7 +356,7 @@ impl CDSIndexPricer {
         match projected.single_curve {
             Some(flows) => Ok(schedule_from_classified_flows(
                 flows,
-                index.premium.day_count,
+                index.premium_leg.day_count,
                 ScheduleBuildOpts {
                     notional_hint: Some(index.notional),
                     ..Default::default()
@@ -369,7 +369,7 @@ impl CDSIndexPricer {
                     .map(|projection| {
                         schedule_from_classified_flows(
                             projection.flows,
-                            index.premium.day_count,
+                            index.premium_leg.day_count,
                             ScheduleBuildOpts {
                                 notional_hint: Some(index.notional),
                                 ..Default::default()
@@ -380,7 +380,7 @@ impl CDSIndexPricer {
                 Ok(merge_cashflow_schedules(
                     schedules,
                     Notional::par(index.notional.amount(), index.notional.currency())?,
-                    index.premium.day_count,
+                    index.premium_leg.day_count,
                 ))
             }
         }
@@ -429,8 +429,8 @@ impl CDSIndexPricer {
         as_of: Date,
         provider: &dyn RecalibrationProvider,
     ) -> Result<f64> {
-        let credit_id = &cds.protection.credit_curve_id;
-        let discount_id = &cds.premium.discount_curve_id;
+        let credit_id = &cds.protection_leg.credit_curve_id;
+        let discount_id = &cds.premium_leg.discount_curve_id;
         let bump_bp = 1.0_f64;
 
         let pricer = CDSPricer::with_config(self.cds_config.clone());
@@ -495,7 +495,7 @@ impl CDSIndexPricer {
         F: Fn(&CDSPricer, &CreditDefaultSwap, &DiscountCurve, &HazardCurve, Date) -> Result<f64>,
     {
         index.validate()?;
-        if as_of >= index.premium.end {
+        if as_of >= index.premium_leg.end {
             return Ok(IndexResult {
                 total: 0.0,
                 constituents: Vec::new(),
@@ -505,14 +505,14 @@ impl CDSIndexPricer {
         match index.pricing {
             IndexPricing::SingleCurve => {
                 let cds = self.synthetic_cds(index)?;
-                let disc = curves.get_discount(&cds.premium.discount_curve_id)?;
-                let surv = curves.get_hazard(&cds.protection.credit_curve_id)?;
+                let disc = curves.get_discount(&cds.premium_leg.discount_curve_id)?;
+                let surv = curves.get_hazard(&cds.protection_leg.credit_curve_id)?;
                 let total = f(&pricer, &cds, disc.as_ref(), surv.as_ref(), as_of)?;
                 Ok(IndexResult::single_curve(total))
             }
             IndexPricing::Constituents => {
                 let mut cds = self.synthetic_cds(index)?;
-                let disc = curves.get_discount(&cds.premium.discount_curve_id)?;
+                let disc = curves.get_discount(&cds.premium_leg.discount_curve_id)?;
                 let mut total = 0.0;
                 let mut constituents = Vec::with_capacity(index.constituents.len());
                 self.for_each_constituent(index, |position| {
@@ -553,7 +553,7 @@ impl CDSIndexPricer {
     {
         index.validate()?;
         let currency = index.notional.currency();
-        if as_of >= index.premium.end {
+        if as_of >= index.premium_leg.end {
             return Ok(IndexResult {
                 total: Money::from((0_i64, currency)),
                 constituents: Vec::new(),
@@ -563,14 +563,14 @@ impl CDSIndexPricer {
         match index.pricing {
             IndexPricing::SingleCurve => {
                 let cds = self.synthetic_cds(index)?;
-                let disc = curves.get_discount(&cds.premium.discount_curve_id)?;
-                let surv = curves.get_hazard(&cds.protection.credit_curve_id)?;
+                let disc = curves.get_discount(&cds.premium_leg.discount_curve_id)?;
+                let surv = curves.get_hazard(&cds.protection_leg.credit_curve_id)?;
                 let total = f(&pricer, &cds, disc.as_ref(), surv.as_ref(), as_of)?;
                 Ok(IndexResult::single_curve(total))
             }
             IndexPricing::Constituents => {
                 let mut cds = self.synthetic_cds(index)?;
-                let disc = curves.get_discount(&cds.premium.discount_curve_id)?;
+                let disc = curves.get_discount(&cds.premium_leg.discount_curve_id)?;
                 let mut total = Money::from((0_i64, currency));
                 let mut constituents = Vec::with_capacity(index.constituents.len());
                 self.for_each_constituent(index, |position| {
@@ -722,7 +722,7 @@ impl CDSIndexPricer {
         match index.pricing {
             IndexPricing::SingleCurve => {
                 let cds = self.synthetic_cds(index)?;
-                let surv = curves.get_hazard(&cds.protection.credit_curve_id)?;
+                let surv = curves.get_hazard(&cds.protection_leg.credit_curve_id)?;
                 Ok(ProjectedIndexFlows {
                     single_curve: Some(self.project_cds_flows(&cds, surv.as_ref(), as_of)?),
                     constituents: Vec::new(),
@@ -766,7 +766,7 @@ impl CDSIndexPricer {
             PayReceive::Receive => 1.0,
         };
         let protection_sign = -premium_sign;
-        let loss_given_default = 1.0 - cds.protection.recovery_rate;
+        let loss_given_default = 1.0 - cds.protection_leg.recovery_rate;
 
         schedule.retain_flows(|flow| flow.date >= as_of);
         let mut prev_survival = if as_of <= survival.base_date() {
@@ -811,7 +811,7 @@ impl CDSIndexPricer {
                         Self::midpoint_default_date(survival, previous_premium_date, flow.date)?;
                     let settlement_date = Self::settlement_date_with_delay(
                         default_date,
-                        cds.protection.settlement_delay,
+                        cds.protection_leg.settlement_delay,
                     );
                     projected_flows.push(CashFlow::new(
                         settlement_date,

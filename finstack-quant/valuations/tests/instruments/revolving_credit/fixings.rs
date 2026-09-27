@@ -72,7 +72,7 @@ fn build_seasoned_floating_facility(
             index_tenor: None,
             reset_lag_days: 0,
             fixing_calendar_id: None,
-            overnight_compounding: None,
+            compounding: None,
             overnight_basis: None,
             fallback: Default::default(),
         }))
@@ -232,7 +232,7 @@ fn test_fixings_respect_floor() {
             index_tenor: None,
             reset_lag_days: 0,
             fixing_calendar_id: None,
-            overnight_compounding: None,
+            compounding: None,
             overnight_basis: None,
             fallback: Default::default(),
         }))

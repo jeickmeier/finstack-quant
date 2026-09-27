@@ -6,8 +6,9 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::scalars::ScalarTimeSeries;
 use finstack_quant_core::market_data::term_structures::ForwardCurve;
 use finstack_quant_valuations::instruments::rates::ir_future::{
-    FutureContractSpecs, InterestRateFuture, RateAveragingMethod,
+    FutureContractSpecs, InterestRateFuture,
 };
+use finstack_quant_valuations::instruments::rates::irs::FloatingLegCompounding;
 use finstack_quant_valuations::instruments::{ListedFutureTerms, Position};
 use time::macros::date;
 
@@ -27,7 +28,7 @@ fn overnight_future(
     start: Date,
     end: Date,
     day_count: DayCount,
-    rate_averaging: RateAveragingMethod,
+    compounding: FloatingLegCompounding,
 ) -> InterestRateFuture {
     InterestRateFuture::builder()
         .id(id.into())
@@ -45,7 +46,7 @@ fn overnight_future(
         })
         .discount_curve_id("UNUSED-DISCOUNT".into())
         .forward_curve_id(curve_id.into())
-        .rate_averaging(rate_averaging)
+        .compounding(compounding)
         .index_id(curve_id.into())
         .attributes(Default::default())
         .build()
@@ -65,7 +66,7 @@ fn one_month_sofr_uses_calendar_day_weighted_arithmetic_average() {
         start,
         end,
         DayCount::Act360,
-        RateAveragingMethod::ArithmeticAverage,
+        FloatingLegCompounding::SimpleAverage,
     );
     let fixings = ScalarTimeSeries::new(
         "FIXING:USD-SOFR",
@@ -101,7 +102,7 @@ fn one_month_sofr_carries_the_prior_fixing_when_month_starts_on_weekend() {
         start,
         end,
         DayCount::Act360,
-        RateAveragingMethod::ArithmeticAverage,
+        FloatingLegCompounding::SimpleAverage,
     );
     let fixings = ScalarTimeSeries::new(
         "FIXING:USD-SOFR",
@@ -133,7 +134,7 @@ fn corra_compounds_on_actual_365_with_weekend_weights() {
         start,
         end,
         DayCount::Act365F,
-        RateAveragingMethod::CompoundedOvernight,
+        FloatingLegCompounding::CompoundedInArrears { lookback_days: 0 },
     );
     let fixings = ScalarTimeSeries::new(
         "FIXING:CAD-CORRA",
@@ -170,7 +171,7 @@ fn seasoned_overnight_future_requires_every_published_fixing() {
         start,
         end,
         DayCount::Act360,
-        RateAveragingMethod::ArithmeticAverage,
+        FloatingLegCompounding::SimpleAverage,
     );
     let incomplete =
         ScalarTimeSeries::new("FIXING:USD-SOFR", vec![(date!(2025 - 01 - 02), 0.04)], None)
@@ -198,7 +199,7 @@ fn realized_arithmetic_observations_drop_out_of_forward_risk() {
         start,
         end,
         DayCount::Act360,
-        RateAveragingMethod::ArithmeticAverage,
+        FloatingLegCompounding::SimpleAverage,
     );
     let fixings =
         ScalarTimeSeries::new("FIXING:USD-SOFR", vec![(date!(2025 - 01 - 02), 0.04)], None)

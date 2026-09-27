@@ -399,8 +399,8 @@ note = "cdr_to_mdr/cpr_to_smm/mdr_to_cdr/smm_to_cpr are also re-exported at the 
 public = [
     "AmortizationSpec", "CashFlowBuilder", "CashFlowMeta", "CashFlowSchedule", "CouponType",
     "DefaultModelSpec", "FeeAccrualBasis", "FeeBase",
-    "FeeSpec", "FixedCouponSpec", "FloatingCouponSpec", "FloatingRateFallback",
-    "FloatingRateSpec", "Notional", "OvernightCompoundingMethod",
+    "FeeSpec", "FixedCouponSpec", "FloatingCouponSpec", "FloatingLegCompounding",
+    "FloatingRateFallback", "FloatingRateSpec", "Notional",
     "OvernightIndexConstraintApplication", "PrepaymentModelSpec", "PrincipalEvent",
     "PrincipalExchange",
     "RecoveryModelSpec", "RollRule", "ScheduleParams", "StepUpCouponSpec",

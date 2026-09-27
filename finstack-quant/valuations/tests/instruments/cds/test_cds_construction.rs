@@ -37,7 +37,7 @@ fn test_buy_protection_constructor() {
     assert_eq!(cds.notional.amount(), 10_000_000.0);
     assert_eq!(cds.notional.currency(), Currency::USD);
     assert_eq!(cds.side, PayReceive::Pay);
-    assert_eq!(cds.premium.coupon_bp, Decimal::from(100));
+    assert_eq!(cds.premium_leg.coupon_bp, Decimal::from(100));
     assert_eq!(cds.convention, CdsConvention::IsdaNa);
 }
 
@@ -59,7 +59,7 @@ fn test_sell_protection_constructor() {
     .expect("CDS construction should succeed");
 
     assert_eq!(cds.side, PayReceive::Receive);
-    assert_eq!(cds.premium.coupon_bp, Decimal::from(150));
+    assert_eq!(cds.premium_leg.coupon_bp, Decimal::from(150));
     assert_eq!(cds.notional.currency(), Currency::EUR);
 }
 
@@ -114,7 +114,7 @@ fn test_builder_pattern() {
         .notional(Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"))
         .side(PayReceive::Pay)
         .convention(convention)
-        .premium(PremiumLegSpec {
+        .premium_leg(PremiumLegSpec {
             roll_rule: finstack_quant_cashflows::builder::specs::RollRule::CdsImm,
             start,
             end,
@@ -126,7 +126,7 @@ fn test_builder_pattern() {
             coupon_bp: Decimal::from(200),
             discount_curve_id: "USD-OIS".into(),
         })
-        .protection(ProtectionLegSpec {
+        .protection_leg(ProtectionLegSpec {
             credit_curve_id: "CORP".into(),
             recovery_rate: 0.40,
             settlement_delay: 3,
@@ -137,8 +137,8 @@ fn test_builder_pattern() {
         .unwrap();
 
     assert_eq!(cds.id.as_str(), "BUILDER_TEST");
-    assert_eq!(cds.premium.coupon_bp, Decimal::from(200));
-    assert_eq!(cds.protection.recovery_rate, 0.40);
+    assert_eq!(cds.premium_leg.coupon_bp, Decimal::from(200));
+    assert_eq!(cds.protection_leg.recovery_rate, 0.40);
 }
 
 #[test]
@@ -158,11 +158,11 @@ fn test_recovery_rate_applied() {
     .expect("CDS construction should succeed");
 
     // Default recovery for senior unsecured
-    assert_eq!(cds.protection.recovery_rate, 0.40);
+    assert_eq!(cds.protection_leg.recovery_rate, 0.40);
 
     // Override recovery rate
-    cds.protection.recovery_rate = 0.25;
-    assert_eq!(cds.protection.recovery_rate, 0.25);
+    cds.protection_leg.recovery_rate = 0.25;
+    assert_eq!(cds.protection_leg.recovery_rate, 0.25);
 }
 
 #[test]
@@ -202,7 +202,7 @@ fn test_maturity_after_start() {
     )
     .expect("CDS construction should succeed");
 
-    assert!(cds.premium.end > cds.premium.start);
+    assert!(cds.premium_leg.end > cds.premium_leg.start);
 }
 
 #[test]
@@ -222,8 +222,8 @@ fn test_short_tenor_cds() {
     )
     .expect("CDS construction should succeed");
 
-    assert_eq!(cds.premium.start, start);
-    assert_eq!(cds.premium.end, end);
+    assert_eq!(cds.premium_leg.start, start);
+    assert_eq!(cds.premium_leg.end, end);
 }
 
 #[test]
@@ -243,7 +243,7 @@ fn test_long_tenor_cds() {
     )
     .expect("CDS construction should succeed");
 
-    assert_eq!(cds.premium.end, end);
+    assert_eq!(cds.premium_leg.end, end);
 }
 
 #[test]
@@ -262,11 +262,11 @@ fn test_premium_leg_spec_fields() {
     )
     .expect("CDS construction should succeed");
 
-    assert_eq!(cds.premium.start, start);
-    assert_eq!(cds.premium.end, end);
-    assert_eq!(cds.premium.frequency, Tenor::quarterly());
-    assert_eq!(cds.premium.day_count, DayCount::Act360);
-    assert_eq!(cds.premium.discount_curve_id.as_str(), "USD-OIS");
+    assert_eq!(cds.premium_leg.start, start);
+    assert_eq!(cds.premium_leg.end, end);
+    assert_eq!(cds.premium_leg.frequency, Tenor::quarterly());
+    assert_eq!(cds.premium_leg.day_count, DayCount::Act360);
+    assert_eq!(cds.premium_leg.discount_curve_id.as_str(), "USD-OIS");
 }
 
 #[test]
@@ -285,7 +285,7 @@ fn test_protection_leg_spec_fields() {
     )
     .expect("CDS construction should succeed");
 
-    assert_eq!(cds.protection.credit_curve_id.as_str(), "CORP-CREDIT");
-    assert_eq!(cds.protection.recovery_rate, 0.40);
-    assert_eq!(cds.protection.settlement_delay, 3);
+    assert_eq!(cds.protection_leg.credit_curve_id.as_str(), "CORP-CREDIT");
+    assert_eq!(cds.protection_leg.recovery_rate, 0.40);
+    assert_eq!(cds.protection_leg.settlement_delay, 3);
 }

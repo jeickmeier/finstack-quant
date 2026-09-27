@@ -109,11 +109,13 @@ impl BondEngine {
                 "discounting OAS must be finite, got {oas_quote_decimal}"
             )));
         }
-        let continuous_oas = bond
-            .instrument_pricing_overrides
-            .model_config
-            .oas_quote_compounding
-            .continuous_from_quote_decimal(oas_quote_decimal);
+        let continuous_oas =
+            crate::instruments::pricing_overrides::oas_continuous_from_quote_decimal(
+                bond.instrument_pricing_overrides
+                    .model_config
+                    .oas_quote_compounding,
+                oas_quote_decimal,
+            )?;
         let flows = bond.pricing_dated_cashflows(context, as_of)?;
         let discount = context.get_discount(bond.discount_curve_id.as_str())?;
         let mut pv = finstack_quant_core::math::summation::NeumaierAccumulator::default();

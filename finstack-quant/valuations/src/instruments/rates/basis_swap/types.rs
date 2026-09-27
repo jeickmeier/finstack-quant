@@ -36,7 +36,7 @@ use crate::instruments::common_impl::pricing::swap_legs::{FloatingLegParams, Leg
 use crate::instruments::common_impl::validation;
 use rust_decimal::Decimal;
 
-pub use crate::instruments::common_impl::parameters::legs::BasisSwapLeg;
+use crate::instruments::common_impl::parameters::legs::FloatLegSpec;
 
 /// Basis swap instrument that exchanges two floating rate payments with different tenors.
 ///
@@ -55,13 +55,13 @@ pub use crate::instruments::common_impl::parameters::legs::BasisSwapLeg;
 /// # Examples
 /// ```rust
 /// use finstack_quant_core::{dates::*, money::Money, currency::Currency, types::CurveId};
-/// use finstack_quant_valuations::instruments::rates::basis_swap::{BasisSwap, BasisSwapLeg};
+/// use finstack_quant_valuations::instruments::rates::basis_swap::BasisSwap;
 /// use time::Month;
 ///
 /// let start = Date::from_calendar_date(2024, Month::January, 3).expect("valid date");
 /// let end = Date::from_calendar_date(2025, Month::January, 3).expect("valid date");
 ///
-/// let primary_leg = BasisSwapLeg {
+/// let primary_leg = FloatLegSpec {
 ///     forward_curve_id: CurveId::new("3M-SOFR"),
 ///     discount_curve_id: CurveId::new("OIS"),
 ///     start,
@@ -77,7 +77,7 @@ pub use crate::instruments::common_impl::parameters::legs::BasisSwapLeg;
 ///     compounding: Default::default(),
 /// };
 ///
-/// let reference_leg = BasisSwapLeg {
+/// let reference_leg = FloatLegSpec {
 ///     forward_curve_id: CurveId::new("6M-SOFR"),
 ///     discount_curve_id: CurveId::new("OIS"),
 ///     start,
@@ -115,9 +115,9 @@ pub struct BasisSwap {
     /// Notional amount for both legs.
     pub notional: Money,
     /// Primary leg that typically receives the spread.
-    pub primary_leg: BasisSwapLeg,
+    pub primary_leg: FloatLegSpec,
     /// Reference leg that typically pays flat.
-    pub reference_leg: BasisSwapLeg,
+    pub reference_leg: FloatLegSpec,
     /// Allow calendar-day fallback when the calendar cannot be resolved.
     ///
     /// When `false` (default), missing calendars are treated as an input error to
@@ -180,8 +180,8 @@ impl BasisSwap {
     pub fn new(
         id: impl Into<String>,
         notional: Money,
-        primary_leg: BasisSwapLeg,
-        reference_leg: BasisSwapLeg,
+        primary_leg: FloatLegSpec,
+        reference_leg: FloatLegSpec,
     ) -> Result<Self> {
         let id_str = id.into();
         validation::validate_money_finite(notional, "BasisSwap notional")?;
@@ -292,8 +292,8 @@ impl BasisSwap {
     pub fn new_allowing_same_curve(
         id: impl Into<String>,
         notional: Money,
-        primary_leg: BasisSwapLeg,
-        reference_leg: BasisSwapLeg,
+        primary_leg: FloatLegSpec,
+        reference_leg: FloatLegSpec,
     ) -> Result<Self> {
         let id_str = id.into();
         validation::validate_money_finite(notional, "BasisSwap notional")?;
@@ -357,7 +357,9 @@ impl BasisSwap {
             finstack_quant_core::Error::Validation(format!("Invalid example end date: {}", e))
         })?;
 
-        let primary_leg = BasisSwapLeg {
+        let primary_leg = FloatLegSpec {
+            end_of_month: false,
+            fixing_calendar_id: None,
             forward_curve_id: CurveId::new("USD-SOFR-3M"),
             discount_curve_id: CurveId::new("USD-OIS"),
             start,
@@ -373,7 +375,9 @@ impl BasisSwap {
             compounding: Default::default(),
         };
 
-        let reference_leg = BasisSwapLeg {
+        let reference_leg = FloatLegSpec {
+            end_of_month: false,
+            fixing_calendar_id: None,
             forward_curve_id: CurveId::new("USD-SOFR-1M"),
             discount_curve_id: CurveId::new("USD-OIS"),
             start,
@@ -397,7 +401,14 @@ impl BasisSwap {
         )
     }
 
-    fn validate_leg_lags(id: &str, leg_name: &str, leg: &BasisSwapLeg) -> Result<()> {
+    fn validate_leg_lags(id: &str, leg_name: &str, leg: &FloatLegSpec) -> Result<()> {
+        if leg.compounding == crate::instruments::rates::irs::FloatingLegCompounding::SimpleAverage
+        {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "BasisSwap '{id}' {leg_name}_leg.compounding = simple_average is not supported; \
+                 use simple or a compounded_* variant"
+            )));
+        }
         if leg.payment_lag_days < 0 {
             return Err(finstack_quant_core::Error::Validation(format!(
                 "BasisSwap '{}' {} leg has negative payment_lag_days ({}); \
@@ -415,7 +426,7 @@ impl BasisSwap {
         Ok(())
     }
 
-    fn resolve_leg_calendar<'a>(&self, leg_name: &str, leg: &'a BasisSwapLeg) -> Result<&'a str> {
+    fn resolve_leg_calendar<'a>(&self, leg_name: &str, leg: &'a FloatLegSpec) -> Result<&'a str> {
         if let Some(id) = leg.calendar_id.as_deref() {
             if crate::cashflow::builder::calendar::resolve_calendar_strict(id).is_ok() {
                 return Ok(id);
@@ -436,7 +447,7 @@ impl BasisSwap {
     /// robust discounting and numerical stability (Kahan summation).
     pub fn pv_float_leg(
         &self,
-        leg: &BasisSwapLeg,
+        leg: &FloatLegSpec,
         context: &MarketContext,
         valuation_date: Date,
     ) -> Result<Money> {
@@ -500,7 +511,7 @@ impl BasisSwap {
                 stub: leg.stub,
                 business_day_convention: leg.business_day_convention,
                 calendar_id: self.resolve_leg_calendar("priced", leg)?,
-                end_of_month: false,
+                end_of_month: leg.end_of_month,
                 day_count: leg.day_count,
                 payment_lag_days: leg.payment_lag_days,
                 reset_lag_days: Some(leg.reset_lag_days),
@@ -558,7 +569,7 @@ impl BasisSwap {
     /// Calculates the discounted accrual sum (annuity) for a leg.
     pub fn annuity_for_leg(
         &self,
-        leg: &BasisSwapLeg,
+        leg: &FloatLegSpec,
         curves: &MarketContext,
         as_of: Date,
     ) -> Result<f64> {
@@ -578,7 +589,7 @@ impl BasisSwap {
                 stub: leg.stub,
                 business_day_convention: leg.business_day_convention,
                 calendar_id: self.resolve_leg_calendar("cashflow", leg)?,
-                end_of_month: false,
+                end_of_month: leg.end_of_month,
                 day_count: leg.day_count,
                 payment_lag_days: leg.payment_lag_days,
                 reset_lag_days: Some(leg.reset_lag_days),
@@ -683,7 +694,7 @@ impl BasisSwap {
 
     fn floating_leg_schedule(
         &self,
-        leg: &BasisSwapLeg,
+        leg: &FloatLegSpec,
         market: &MarketContext,
         as_of: Date,
     ) -> Result<CashFlowSchedule> {
@@ -711,8 +722,8 @@ impl BasisSwap {
                     reset_frequency: leg.frequency,
                     index_tenor: None,
                     reset_lag_days: leg.reset_lag_days,
-                    fixing_calendar_id: None,
-                    overnight_compounding: None,
+                    fixing_calendar_id: leg.fixing_calendar_id.clone(),
+                    compounding: None,
                     overnight_basis: None,
                     fallback: FloatingRateFallback::Error,
                 },
@@ -723,7 +734,7 @@ impl BasisSwap {
                     business_day_convention: leg.business_day_convention,
                     calendar_id: self.resolve_leg_calendar("cashflow", leg)?.into(),
                     stub: leg.stub,
-                    end_of_month: false,
+                    end_of_month: leg.end_of_month,
                     payment_lag_days: leg.payment_lag_days,
                     adjust_accrual_dates: false,
                     roll_rule: crate::cashflow::builder::specs::RollRule::None,
@@ -734,7 +745,7 @@ impl BasisSwap {
 
     fn overnight_leg_schedule(
         &self,
-        leg: &BasisSwapLeg,
+        leg: &FloatLegSpec,
         market: &MarketContext,
         as_of: Date,
     ) -> Result<CashFlowSchedule> {
@@ -759,7 +770,7 @@ impl BasisSwap {
                 stub: leg.stub,
                 business_day_convention: leg.business_day_convention,
                 calendar_id,
-                end_of_month: false,
+                end_of_month: leg.end_of_month,
                 day_count: leg.day_count,
                 payment_lag_days: leg.payment_lag_days,
                 reset_lag_days: Some(leg.reset_lag_days),
@@ -972,7 +983,9 @@ mod tests {
             .insert(forward_6m);
 
         // Create basis swap: 3M receives 6M + 5bp
-        let primary_leg = BasisSwapLeg {
+        let primary_leg = FloatLegSpec {
+            end_of_month: false,
+            fixing_calendar_id: None,
             forward_curve_id: CurveId::new("3M-SOFR"),
             discount_curve_id: CurveId::new("OIS"),
             start: start_date,
@@ -988,7 +1001,9 @@ mod tests {
             compounding: Default::default(),
         };
 
-        let reference_leg = BasisSwapLeg {
+        let reference_leg = FloatLegSpec {
+            end_of_month: false,
+            fixing_calendar_id: None,
             forward_curve_id: CurveId::new("6M-SOFR"),
             discount_curve_id: CurveId::new("OIS"),
             start: start_date,
@@ -1054,7 +1069,9 @@ mod tests {
             .insert(forward_3m)
             .insert(forward_6m);
 
-        let primary_leg = BasisSwapLeg {
+        let primary_leg = FloatLegSpec {
+            end_of_month: false,
+            fixing_calendar_id: None,
             forward_curve_id: CurveId::new("3M-SOFR"),
             discount_curve_id: CurveId::new("OIS"),
             start: start_date,
@@ -1069,7 +1086,9 @@ mod tests {
             reset_lag_days: 0,
             compounding: Default::default(),
         };
-        let reference_leg = BasisSwapLeg {
+        let reference_leg = FloatLegSpec {
+            end_of_month: false,
+            fixing_calendar_id: None,
             forward_curve_id: CurveId::new("6M-SOFR"),
             discount_curve_id: CurveId::new("OIS"),
             start: start_date,
@@ -1130,7 +1149,9 @@ mod tests {
             .insert(forward_3m)
             .insert(forward_6m);
 
-        let primary_leg_no_lag = BasisSwapLeg {
+        let primary_leg_no_lag = FloatLegSpec {
+            end_of_month: false,
+            fixing_calendar_id: None,
             forward_curve_id: CurveId::new("3M-SOFR"),
             discount_curve_id: CurveId::new("OIS"),
             start: start_date,
@@ -1145,12 +1166,14 @@ mod tests {
             reset_lag_days: 0,
             compounding: Default::default(),
         };
-        let primary_leg_with_lag = BasisSwapLeg {
+        let primary_leg_with_lag = FloatLegSpec {
             payment_lag_days: 10,
             ..primary_leg_no_lag.clone()
         };
 
-        let reference_leg = BasisSwapLeg {
+        let reference_leg = FloatLegSpec {
+            end_of_month: false,
+            fixing_calendar_id: None,
             forward_curve_id: CurveId::new("6M-SOFR"),
             discount_curve_id: CurveId::new("OIS"),
             start: start_date,
@@ -1199,7 +1222,9 @@ mod tests {
 
     #[test]
     fn test_basis_swap_rejects_invalid_dates() {
-        let base_leg = BasisSwapLeg {
+        let base_leg = FloatLegSpec {
+            end_of_month: false,
+            fixing_calendar_id: None,
             forward_curve_id: CurveId::new("3M-SOFR"),
             discount_curve_id: CurveId::new("OIS"),
             start: date(2024, 1, 3),
@@ -1216,12 +1241,12 @@ mod tests {
         };
 
         // Test start == end (equal dates)
-        let primary_eq = BasisSwapLeg {
+        let primary_eq = FloatLegSpec {
             start: date(2024, 1, 3),
             end: date(2024, 1, 3),
             ..base_leg.clone()
         };
-        let reference_eq = BasisSwapLeg {
+        let reference_eq = FloatLegSpec {
             forward_curve_id: CurveId::new("6M-SOFR"),
             ..primary_eq.clone()
         };
@@ -1238,12 +1263,12 @@ mod tests {
         );
 
         // Test start > end (inverted dates)
-        let primary_inv = BasisSwapLeg {
+        let primary_inv = FloatLegSpec {
             start: date(2025, 1, 3),
             end: date(2024, 1, 3),
             ..base_leg
         };
-        let reference_inv = BasisSwapLeg {
+        let reference_inv = FloatLegSpec {
             forward_curve_id: CurveId::new("6M-SOFR"),
             ..primary_inv.clone()
         };
@@ -1262,7 +1287,9 @@ mod tests {
 
     #[test]
     fn test_basis_swap_rejects_same_curve_by_default() {
-        let leg = BasisSwapLeg {
+        let leg = FloatLegSpec {
+            end_of_month: false,
+            fixing_calendar_id: None,
             forward_curve_id: CurveId::new("USD-SOFR-3M"),
             discount_curve_id: CurveId::new("OIS"),
             start: date(2024, 1, 3),
@@ -1282,7 +1309,7 @@ mod tests {
             "SAME_CURVE",
             Money::from((1_000_000_i64, Currency::USD)),
             leg.clone(),
-            BasisSwapLeg {
+            FloatLegSpec {
                 spread_bp: Decimal::ZERO,
                 ..leg
             },
@@ -1312,7 +1339,9 @@ mod tests {
 
         let context = MarketContext::new().insert(discount_curve).insert(forward);
 
-        let leg = BasisSwapLeg {
+        let leg = FloatLegSpec {
+            end_of_month: false,
+            fixing_calendar_id: None,
             forward_curve_id: CurveId::new("USD-SOFR-3M"),
             discount_curve_id: CurveId::new("OIS"),
             start: date(2024, 1, 3),
@@ -1333,7 +1362,7 @@ mod tests {
             "SAME_CURVE_OK",
             Money::from((1_000_000_i64, Currency::USD)),
             leg.clone(),
-            BasisSwapLeg {
+            FloatLegSpec {
                 spread_bp: Decimal::ZERO,
                 ..leg
             },
@@ -1386,7 +1415,9 @@ mod tests {
             .insert(forward_6m);
 
         // Create swap with zero spread initially
-        let primary_leg = BasisSwapLeg {
+        let primary_leg = FloatLegSpec {
+            end_of_month: false,
+            fixing_calendar_id: None,
             forward_curve_id: CurveId::new("3M-SOFR"),
             discount_curve_id: CurveId::new("OIS"),
             start: start_date,
@@ -1402,7 +1433,9 @@ mod tests {
             compounding: Default::default(),
         };
 
-        let reference_leg = BasisSwapLeg {
+        let reference_leg = FloatLegSpec {
+            end_of_month: false,
+            fixing_calendar_id: None,
             forward_curve_id: CurveId::new("6M-SOFR"),
             discount_curve_id: CurveId::new("OIS"),
             start: start_date,
@@ -1442,7 +1475,7 @@ mod tests {
             .expect("should have par spread");
 
         // Create a new swap with the par spread applied
-        let primary_leg_at_par = BasisSwapLeg {
+        let primary_leg_at_par = FloatLegSpec {
             spread_bp: Decimal::try_from(par_spread_bp).expect("metric result is finite"),
             ..primary_leg
         };
@@ -1471,7 +1504,9 @@ mod tests {
 
     #[test]
     fn test_basis_swap_rejects_negative_lags() {
-        let valid_leg = BasisSwapLeg {
+        let valid_leg = FloatLegSpec {
+            end_of_month: false,
+            fixing_calendar_id: None,
             forward_curve_id: CurveId::new("3M-SOFR"),
             discount_curve_id: CurveId::new("OIS"),
             start: date(2024, 1, 3),
@@ -1486,13 +1521,13 @@ mod tests {
             reset_lag_days: 0,
             compounding: Default::default(),
         };
-        let reference_leg = BasisSwapLeg {
+        let reference_leg = FloatLegSpec {
             forward_curve_id: CurveId::new("6M-SOFR"),
             ..valid_leg.clone()
         };
 
         // Test negative payment_lag_days on primary leg
-        let primary_neg_payment = BasisSwapLeg {
+        let primary_neg_payment = FloatLegSpec {
             payment_lag_days: -1,
             ..valid_leg.clone()
         };
@@ -1510,7 +1545,7 @@ mod tests {
         );
 
         // Test negative reset_lag_days on primary leg
-        let primary_neg_reset = BasisSwapLeg {
+        let primary_neg_reset = FloatLegSpec {
             reset_lag_days: -1,
             ..valid_leg.clone()
         };
@@ -1528,7 +1563,7 @@ mod tests {
         );
 
         // Test negative payment_lag_days on reference leg
-        let ref_neg_payment = BasisSwapLeg {
+        let ref_neg_payment = FloatLegSpec {
             payment_lag_days: -2,
             ..reference_leg.clone()
         };
@@ -1546,7 +1581,7 @@ mod tests {
         );
 
         // Test negative reset_lag_days on reference leg
-        let ref_neg_reset = BasisSwapLeg {
+        let ref_neg_reset = FloatLegSpec {
             reset_lag_days: -3,
             ..reference_leg
         };
@@ -1589,7 +1624,9 @@ mod tests {
             .insert(forward_3m)
             .insert(forward_6m);
 
-        let primary_leg = BasisSwapLeg {
+        let primary_leg = FloatLegSpec {
+            end_of_month: false,
+            fixing_calendar_id: None,
             forward_curve_id: CurveId::new("3M-SOFR"),
             discount_curve_id: CurveId::new("OIS"),
             start: start_date,
@@ -1604,7 +1641,7 @@ mod tests {
             reset_lag_days: 0,
             compounding: Default::default(),
         };
-        let reference_leg = BasisSwapLeg {
+        let reference_leg = FloatLegSpec {
             forward_curve_id: CurveId::new("6M-SOFR"),
             frequency: Tenor::semi_annual(),
             ..primary_leg.clone()
@@ -1657,7 +1694,9 @@ mod tests {
             .insert(ois.clone())
             .insert(term);
 
-        let primary = BasisSwapLeg {
+        let primary = FloatLegSpec {
+            end_of_month: false,
+            fixing_calendar_id: None,
             forward_curve_id: CurveId::new("USD-SOFR-OIS"),
             discount_curve_id: CurveId::new("USD-OIS"),
             start,
@@ -1672,7 +1711,7 @@ mod tests {
             reset_lag_days: 0,
             compounding: FloatingLegCompounding::CompoundedInArrears { lookback_days: 0 },
         };
-        let reference = BasisSwapLeg {
+        let reference = FloatLegSpec {
             forward_curve_id: CurveId::new("USD-SOFR-3M"),
             compounding: FloatingLegCompounding::Simple,
             ..primary.clone()
@@ -1766,7 +1805,9 @@ mod tests {
             .build()
             .expect("term forward");
         let market = MarketContext::new().insert(disc).insert(ois).insert(term);
-        let primary = BasisSwapLeg {
+        let primary = FloatLegSpec {
+            end_of_month: false,
+            fixing_calendar_id: None,
             forward_curve_id: CurveId::new("USD-SOFR-OIS"),
             discount_curve_id: CurveId::new("USD-OIS"),
             start,
@@ -1781,7 +1822,7 @@ mod tests {
             reset_lag_days: 0,
             compounding: FloatingLegCompounding::CompoundedInArrears { lookback_days: 0 },
         };
-        let reference = BasisSwapLeg {
+        let reference = FloatLegSpec {
             forward_curve_id: CurveId::new("USD-SOFR-3M"),
             compounding: FloatingLegCompounding::Simple,
             ..primary.clone()
@@ -1872,7 +1913,9 @@ mod tests {
     fn validate_rejects_simple_compounding_on_overnight_index() {
         let start = date(2025, 1, 2);
         let end = date(2026, 1, 2);
-        let overnight = BasisSwapLeg {
+        let overnight = FloatLegSpec {
+            end_of_month: false,
+            fixing_calendar_id: None,
             forward_curve_id: CurveId::new("USD-SOFR-OIS"),
             discount_curve_id: CurveId::new("USD-OIS"),
             start,
@@ -1887,7 +1930,7 @@ mod tests {
             reset_lag_days: 0,
             compounding: crate::instruments::rates::irs::FloatingLegCompounding::Simple,
         };
-        let term = BasisSwapLeg {
+        let term = FloatLegSpec {
             forward_curve_id: CurveId::new("USD-SOFR-3M"),
             ..overnight.clone()
         };

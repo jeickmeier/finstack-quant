@@ -1,3 +1,5 @@
+use finstack_quant_core::math::Compounding;
+
 /// Quote input for the bond quote engine.
 ///
 /// All spreads are expressed in **decimal** (`0.01 = 100bp`).
@@ -73,7 +75,8 @@ pub struct BondQuoteSet {
 /// Yield Compounding enumeration.
 ///
 /// Defines how yield-to-maturity is compounded when calculating present values.
-/// Different markets and instrument types use different conventions.
+/// Plain rate bases reuse the canonical core [`Compounding`]; the remaining
+/// variants are schedule-aware bond conventions core cannot express.
 ///
 /// # Market Standard Conventions
 ///
@@ -81,25 +84,14 @@ pub struct BondQuoteSet {
 /// |------------|----------|---------|
 /// | `Street` | Most secondary market trading | `(1 + y/f)^(-f*t)` |
 /// | `TreasuryActual` | US Treasury new issues with stubs | Simple interest for first period |
-/// | `Simple` | Money market instruments | `1/(1 + y*t)` |
-/// | `Continuous` | Theoretical/academic | `exp(-y*t)` |
+/// | `Rate(Simple)` | Money market instruments | `1/(1 + y*t)` |
+/// | `Rate(Annual)` | Annual bond yields | `(1 + y)^(-t)` |
+/// | `Rate(Periodic(m))` | Explicit periods per year | `(1 + y/m)^(-m*t)` |
+/// | `Rate(Continuous)` | Theoretical/academic | `exp(-y*t)` |
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum YieldCompounding {
-    /// Simple interest: `DF = 1 / (1 + y * t)`
-    ///
-    /// Used for money market instruments and short-dated securities.
-    Simple,
-
-    /// Annual compounding: `DF = (1 + y)^(-t)`
-    Annual,
-
-    /// Periodic compounding with explicit periods per year: `DF = (1 + y/m)^(-m*t)`
-    Periodic(u32),
-
-    /// Continuous compounding: `DF = exp(-y * t)`
-    ///
-    /// Used in theoretical models and some derivative pricing.
-    Continuous,
+    /// A plain rate basis from the canonical core [`Compounding`].
+    Rate(Compounding),
 
     /// Street convention: periodic compounding aligned with bond's coupon frequency.
     ///

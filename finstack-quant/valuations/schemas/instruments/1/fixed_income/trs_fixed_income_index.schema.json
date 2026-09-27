@@ -224,13 +224,13 @@
     },
     "FIIndexTotalReturnSwap": {
       "additionalProperties": false,
-      "description": "Fixed-income index total-return swap priced with a carry analytic.\n\nFor each scheduled period, the total-return leg uses\n`exp(y × accrual_fraction) - 1`, where `y` is an annual continuously\ncompounded decimal yield and the accrual fraction uses the schedule day\ncount. Both legs are discounted with `financing.discount_curve_id`; the\nfinancing leg projects `financing.forward_curve_id` plus `spread_bp`.\nReceive-total-return value is `PV(total return) - PV(financing)`;\npay-total-return value reverses that sign.\n\n# Model limitations\n\nThis deterministic carry analytic omits roll-down, underlying rate/spread\nmark-to-market, stochastic credit, constituent decomposition, early\ntermination, and bespoke fees. The period in progress on the valuation\ndate is valued from the live index level (`underlying.index_id`) against\n`initial_level`, then carried at the index yield to period end; a period\nthat has ended but is not yet paid stays in the PV at its projected carry.\nCashflow-schedule APIs\nreturn payment dates with zero amounts; use\n[`Self::pv_total_return_leg`] and [`Self::pv_financing_leg`] for projected\nleg values.\n\n# Construction\n\n```\nuse finstack_quant_core::{\n    currency::Currency, dates::DayCount, money::Money, types::InstrumentId,\n};\nuse finstack_quant_cashflows::builder::ScheduleParams;\nuse finstack_quant_valuations::instruments::{\n    Attributes, FinancingLegSpec, IndexUnderlyingParams, PayReceive,\n};\nuse finstack_quant_valuations::instruments::fixed_income::fi_trs::FIIndexTotalReturnSwap;\nuse finstack_quant_valuations::instruments::fixed_income::fi_trs::{\n    TrsScheduleSpec,\n};\nuse rust_decimal::Decimal;\nuse time::macros::date;\n\n# fn main() -> finstack_quant_core::Result<()> {\nlet trs = FIIndexTotalReturnSwap::builder()\n    .id(InstrumentId::new(\"CORP-TRS\"))\n    .notional(Money::from((10_000_000_i64, Currency::USD)))\n    .underlying(\n        IndexUnderlyingParams::new(\"US-CORP\", Currency::USD)\n            .with_yield(\"US-CORP-YIELD\")\n            .with_duration(\"US-CORP-DURATION\"),\n    )\n    .financing(FinancingLegSpec::new(\n        \"USD-OIS\", \"USD-SOFR-3M\", Decimal::from(35), DayCount::Act360,\n    ))\n    .schedule(TrsScheduleSpec::from_params(\n        date!(2026 - 01 - 02),\n        date!(2027 - 01 - 02),\n        ScheduleParams::quarterly_act360(),\n    ))\n    .side(PayReceive::Receive)\n    .initial_level_opt(None)\n    .attributes(Attributes::new())\n    .build()?;\nassert_eq!(trs.notional.currency(), Currency::USD);\n# Ok(())\n# }\n```",
+      "description": "Fixed-income index total-return swap priced with a carry analytic.\n\nFor each scheduled period, the total-return leg uses\n`exp(y × accrual_fraction) - 1`, where `y` is an annual continuously\ncompounded decimal yield and the accrual fraction uses the schedule day\ncount. Both legs are discounted with `financing.discount_curve_id`; the\nfinancing leg projects `financing.forward_curve_id` plus `spread_bp`.\nReceive-total-return value is `PV(total return) - PV(financing)`;\npay-total-return value reverses that sign.\n\n# Model limitations\n\nThis deterministic carry analytic omits roll-down, underlying rate/spread\nmark-to-market, stochastic credit, constituent decomposition, early\ntermination, and bespoke fees. The period in progress on the valuation\ndate is valued from the live index level (`underlying.index_id`) against\n`initial_level`, then carried at the index yield to period end; a period\nthat has ended but is not yet paid stays in the PV at its projected carry.\nCashflow-schedule APIs\nreturn payment dates with zero amounts; use\n[`Self::pv_total_return_leg`] and [`Self::pv_financing_leg`] for projected\nleg values.\n\n# Construction\n\n```\nuse finstack_quant_core::{\n    currency::Currency, dates::DayCount, money::Money, types::InstrumentId,\n};\nuse finstack_quant_cashflows::builder::ScheduleParams;\nuse finstack_quant_valuations::instruments::{\n    Attributes, FinancingLegSpec, IndexUnderlyingParams, PayReceive,\n};\nuse finstack_quant_valuations::instruments::fixed_income::fi_trs::FIIndexTotalReturnSwap;\nuse finstack_quant_valuations::instruments::fixed_income::fi_trs::{\n    TrsScheduleSpec,\n};\nuse rust_decimal::Decimal;\nuse time::macros::date;\n\n# fn main() -> finstack_quant_core::Result<()> {\nlet trs = FIIndexTotalReturnSwap::builder()\n    .id(InstrumentId::new(\"CORP-TRS\"))\n    .notional(Money::from((10_000_000_i64, Currency::USD)))\n    .underlying(\n        IndexUnderlyingParams::new(\"US-CORP\", Currency::USD)\n            .with_yield(\"US-CORP-YIELD\")\n            .with_duration(\"US-CORP-DURATION\"),\n    )\n    .financing_leg(FinancingLegSpec::new(\n        \"USD-OIS\", \"USD-SOFR-3M\", Decimal::from(35), DayCount::Act360,\n    ))\n    .schedule(TrsScheduleSpec::from_params(\n        date!(2026 - 01 - 02),\n        date!(2027 - 01 - 02),\n        ScheduleParams::quarterly_act360(),\n    ))\n    .side(PayReceive::Receive)\n    .initial_level_opt(None)\n    .attributes(Attributes::new())\n    .build()?;\nassert_eq!(trs.notional.currency(), Currency::USD);\n# Ok(())\n# }\n```",
       "properties": {
         "attributes": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/attributes.schema.json",
           "description": "Attributes for scenario selection and tagging"
         },
-        "financing": {
+        "financing_leg": {
           "$ref": "#/$defs/FinancingLegSpec",
           "description": "Financing leg specification (curves, spread, day count)."
         },
@@ -290,7 +290,7 @@
         "id",
         "notional",
         "underlying",
-        "financing",
+        "financing_leg",
         "schedule",
         "side",
         "attributes"
@@ -302,9 +302,9 @@
       "description": "Specification for TRS financing legs",
       "properties": {
         "compounding": {
-          "$ref": "#/$defs/FinancingRateCompounding",
-          "default": "term_rate",
-          "description": "Rate-compounding convention (term-rate vs overnight-compounded).\n\nDefaults to [`FinancingRateCompounding::TermRate`]. Set to\n[`FinancingRateCompounding::OvernightCompounded`] for SOFR/SONIA/€STR\novernight-funded TRS so the financing rate captures daily-compounding\nconvexity."
+          "$ref": "#/$defs/FloatingLegCompounding",
+          "default": "simple",
+          "description": "Rate-compounding convention of the financing rate.\n\nDefaults to `simple` (one term forward per period, e.g. 3M Term SOFR or\nEURIBOR). Use a `compounded_*` variant for SOFR/SONIA/€STR\novernight-funded TRS so the financing rate captures the daily\ncompounding convexity (typically 12–15 bp of rate on an upward curve).\n`simple_average` is rejected."
         },
         "day_count": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/day_count.schema.json",
@@ -331,18 +331,96 @@
       ],
       "type": "object"
     },
-    "FinancingRateCompounding": {
-      "description": "Rate-compounding convention for a TRS financing leg.\n\nDistinguishes how each accrual period's floating rate is projected from the\nforward curve. The two conventions differ by the daily-compounding convexity\n— typically 12–15 bp of rate at current levels on an upward-sloping curve.",
+    "FloatingLegCompounding": {
+      "description": "How the fixings of one accrual period combine into the period rate.\n\nOne canonical enum for every floating leg and coupon: swaps, basis and\ncross-currency legs, TRS financing, IR futures, FRN / loan / structured\ncredit coupons.\n\n| Variant | Period rate | Typical use |\n|---------|-------------|-------------|\n| `simple` | One term fixing / forward over the period | EURIBOR, Term SOFR, legacy IBOR |\n| `simple_average` | `(Σ rᵢ·dᵢ) / D` of daily overnight fixings | Averaged overnight loans, Fed-Funds futures |\n| `compounded_in_arrears` | `[∏(1 + rᵢ·dᵢ/B) − 1]·B/D` | SOFR / SONIA / €STR / TONA OIS (lookback 0) |\n| `compounded_with_observation_shift` | as above, observations and weights shifted | ISDA 2021 observation shift |\n| `compounded_with_rate_cutoff` | as above, last fixings frozen | ARRC lockout / SWPM \"Rate Cut-Off Days\" |\n\nDay counts are business days and must be non-negative.\n\n# References\n\n- ISDA 2021 Definitions, compounded RFR conventions `docs/REFERENCES.md#isda-2021-definitions`\n- ARRC (2020). \"SOFR: A User's Guide.\" `docs/REFERENCES.md#arrc-sofr-users-guide`\n- BoE SONIA conventions `docs/REFERENCES.md#boe-sonia-key-features`\n\n# Examples\n\n```\nuse finstack_quant_cashflows::builder::FloatingLegCompounding;\n\nassert_eq!(FloatingLegCompounding::default(), FloatingLegCompounding::Simple);\nassert_eq!(\n    FloatingLegCompounding::sofr(),\n    FloatingLegCompounding::CompoundedInArrears { lookback_days: 0 }\n);\n```",
       "oneOf": [
         {
-          "const": "term_rate",
-          "description": "Term-rate financing (e.g. 3M Term SOFR, EURIBOR): the period rate is the\nsimple arithmetic-average forward over the accrual period. This is the\ndefault and matches a conventional term-rate-funded TRS.",
+          "const": "simple",
+          "description": "Simple term-rate projection: one fixing or forward over the period.\n\n`Coupon = Notional × (Forward_Rate + Spread) × DCF`. This is the\ndefault; a registered overnight RFR index rejects it.",
           "type": "string"
         },
         {
-          "const": "overnight_compounded",
-          "description": "Overnight-indexed (OIS / RFR) financing — SOFR, SONIA, €STR, TONA: the\nperiod rate daily-compounds the overnight forward,\n`R = (∏(1 + rᵢ·dᵢ) − 1) / τ`, picking up the compounding convexity that\nthe simple arithmetic average drops.",
+          "const": "simple_average",
+          "description": "Arithmetic average of daily overnight fixings weighted by accrual days,\n`Rate = (Σ rᵢ·dᵢ) / D`, for instruments that contractually specify a\nsimple-average overnight index.",
           "type": "string"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Compounded in arrears (overnight RFR rates).\n\n`Coupon = Notional × [∏(1 + rᵢ·dᵢ/B) − 1]` over the daily observations\nof the accrual period.",
+          "properties": {
+            "compounded_in_arrears": {
+              "additionalProperties": false,
+              "properties": {
+                "lookback_days": {
+                  "description": "Business days by which observation dates move backward while the\nday-count weights stay on the original accrual dates (\"lookback\nwithout observation shift\", ISDA 2021 / ARRC). `0` is plain\nin-arrears, the cleared-OIS convention.",
+                  "format": "uint32",
+                  "maximum": 31,
+                  "minimum": 0,
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "lookback_days"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "compounded_in_arrears"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Compounded in arrears with ISDA 2021 observation shift: both the\nobservation dates and their day-count weights move back\n(ISDA 2021 Definitions Section 4.5(c)).",
+          "properties": {
+            "compounded_with_observation_shift": {
+              "additionalProperties": false,
+              "properties": {
+                "shift_days": {
+                  "description": "Business days to shift both observation dates and weights.",
+                  "format": "uint32",
+                  "maximum": 31,
+                  "minimum": 0,
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "shift_days"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "compounded_with_observation_shift"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Compounded in arrears with a rate cut-off near the period end.\n\nThe last `cutoff_days` business-day observations are frozen at the\nfixing immediately preceding them: for fixings `b_1..b_n` the source is\n`b_{n-cutoff}`, so a positive cut-off must leave a preceding fixing.\nReference: ARRC, December 3, 2021 Statement, Appendix A (\"Lockout\").",
+          "properties": {
+            "compounded_with_rate_cutoff": {
+              "additionalProperties": false,
+              "properties": {
+                "cutoff_days": {
+                  "description": "Business days before period end over which the rate is frozen.",
+                  "format": "uint32",
+                  "maximum": 31,
+                  "minimum": 0,
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "cutoff_days"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "compounded_with_rate_cutoff"
+          ],
+          "type": "object"
         }
       ]
     },
@@ -813,8 +891,8 @@
       "instrument": {
         "spec": {
           "attributes": {},
-          "financing": {
-            "compounding": "term_rate",
+          "financing_leg": {
+            "compounding": "simple",
             "day_count": "act_360",
             "discount_curve_id": "USD-OIS",
             "forward_curve_id": "USD-SOFR-3M",

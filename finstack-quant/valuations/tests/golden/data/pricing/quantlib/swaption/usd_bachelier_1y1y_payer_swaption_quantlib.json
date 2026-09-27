@@ -27,7 +27,6 @@
         "settlement": "physical",
         "underlying_fixed_leg": {
           "calendar_id": "weekends_only",
-          "compounding_simple": true,
           "day_count": "act_365f",
           "discount_curve_id": "USD-OIS",
           "end": "2028-04-30",

@@ -637,8 +637,8 @@ fn knobs() -> Vec<Knob> {
                     PayReceive::Pay,
                 )
                 .expect("swap");
-                swap.fixed.frequency = Tenor::quarterly();
-                swap.float.frequency = Tenor::quarterly();
+                swap.fixed_leg.frequency = Tenor::quarterly();
+                swap.float_leg.frequency = Tenor::quarterly();
                 d.hedge_swaps.push(HedgeSwap::new(swap).on_tranche_par("A"));
             },
         },

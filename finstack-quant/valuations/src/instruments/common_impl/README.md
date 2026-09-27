@@ -40,7 +40,7 @@ numeric-serde helpers that keep instrument invariants uniform.
 
 | File | Contents |
 |------|----------|
-| `legs.rs` | `PayReceive`, `ParRateMethod`, `FixedLegSpec`, `FloatLegSpec`, `BasisSwapLeg`, `PremiumLegSpec`, `ProtectionLegSpec`, `FinancingLegSpec`, `FinancingRateCompounding`, `TotalReturnLegSpec` |
+| `legs.rs` | `PayReceive`, `ParRateMethod`, `FixedLegSpec`, `FloatLegSpec`, `PremiumLegSpec`, `ProtectionLegSpec`, `FinancingLegSpec`, `TotalReturnLegSpec` |
 | `underlying.rs` | `FxUnderlyingParams`, `EquityUnderlyingParams`, `CommodityUnderlyingParams`, `IndexUnderlyingParams` |
 | `market.rs` | `OptionType`, `ExerciseStyle`, `SettlementType`, `CreditParams` |
 | `conventions.rs` | `BondConvention`, `CommodityConvention` |
@@ -56,7 +56,7 @@ canonical owner.
 
 | File | Visibility | Contents |
 |------|-----------|----------|
-| `swap_legs.rs` | `pub` (reachable as `instruments::pricing::swap_legs`) | `pv_floating_leg`, `pv_fixed_leg`, `add_payment_delay`, `FloatingLegParams`, `FixedLegParams`, `LegPeriod`, `CompoundingMethod` |
+| `swap_legs.rs` | `pub` (reachable as `instruments::pricing::swap_legs`) | `pv_floating_leg`, `pv_fixed_leg`, `add_payment_delay`, `FloatingLegParams`, `FixedLegParams`, `LegPeriod` |
 | `time.rs` | `pub` | Curve-consistent time mapping: `relative_df_discount_curve`, `relative_df_discounting`, `curve_time`, `rate_between_on_dates`, `rate_period_on_dates` |
 | `variance_replication.rs` | `pub` | `carr_madan_forward_variance` — shared by equity and FX variance swaps |
 | `generic.rs` | private module, `GenericInstrumentPricer` re-exported `#[doc(hidden)]` | Downcasts and calls `Instrument::base_value`; the registry applies scenario shocks around it |
@@ -77,9 +77,9 @@ Everything below is re-exported by `instruments/mod.rs`; the module paths under
   `TrsReturnModel`, `TotalReturnLegParams`; `TrsScheduleSpec`;
   `fx_spot_date_for_pair`, `add_joint_business_days`, `adjust_joint_calendar`,
   `ResolvedCalendarPair`; and the `parameters` subset listed in
-  `instruments/mod.rs` (`FixedLegSpec`, `FloatLegSpec`, `BasisSwapLeg`,
+  `instruments/mod.rs` (`FixedLegSpec`, `FloatLegSpec`,
   `PremiumLegSpec`, `ProtectionLegSpec`, `FinancingLegSpec`,
-  `FinancingRateCompounding`, `TotalReturnLegSpec`, `PayReceive`,
+  `TotalReturnLegSpec`, `PayReceive`,
   `ParRateMethod`, `OptionType`, `ExerciseStyle`, `SettlementType`,
   `CreditParams`, `OptionMarketParams`, `ScheduleSpec`,
   `BondConvention` and the four `*UnderlyingParams`).

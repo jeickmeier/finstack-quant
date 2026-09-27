@@ -6,7 +6,6 @@ use crate::spec::{Compounding, RateBindingSpec};
 use crate::warning::Warning;
 use finstack_quant_core::dates::{BusinessDayConvention, HolidayCalendar, Tenor};
 use finstack_quant_core::market_data::context::MarketContext;
-use finstack_quant_core::math::Compounding as CoreCompounding;
 use finstack_quant_statements::evaluator::Evaluator;
 use finstack_quant_statements::types::{AmountOrScalar, NodeId};
 use finstack_quant_statements::FinancialModelSpec;
@@ -245,10 +244,10 @@ pub fn update_rate_from_binding(
                 BusinessDayConvention::ModifiedFollowing,
                 effective_day_count,
             )?;
-        let forward_continuous = CoreCompounding::Simple.convert_rate(
+        let forward_continuous = Compounding::Simple.convert_rate(
             forward_simple,
             accrual_years,
-            &CoreCompounding::Continuous,
+            &Compounding::Continuous,
         );
         let converted = convert_continuous_rate(
             forward_continuous * accrual_years / output_accrual,
@@ -274,16 +273,11 @@ fn convert_continuous_rate(
         )));
     }
 
-    let to: CoreCompounding = match comp {
-        Compounding::Continuous => return Ok(continuous_rate),
-        Compounding::Simple => CoreCompounding::Simple,
-        Compounding::Annual => CoreCompounding::Annual,
-        Compounding::SemiAnnual => CoreCompounding::SEMI_ANNUAL,
-        Compounding::Quarterly => CoreCompounding::QUARTERLY,
-        Compounding::Monthly => CoreCompounding::MONTHLY,
-    };
+    if comp == Compounding::Continuous {
+        return Ok(continuous_rate);
+    }
 
-    Ok(CoreCompounding::Continuous.convert_rate(continuous_rate, year_fraction, &to))
+    Ok(Compounding::Continuous.convert_rate(continuous_rate, year_fraction, &comp))
 }
 
 /// Re-evaluate the financial model to propagate scenario changes.

@@ -253,7 +253,7 @@ pub fn build_cds_instrument(quote: &CdsQuote, ctx: &BuildCtx) -> Result<Box<dyn 
         // Calibration instruments buy protection and pay premium.
         side: PayReceive::Pay,
         convention: conv.family,
-        premium: PremiumLegSpec {
+        premium_leg: PremiumLegSpec {
             roll_rule: finstack_quant_cashflows::builder::specs::RollRule::CdsImm,
             start: dates.start,
             end: dates.maturity,
@@ -270,7 +270,7 @@ pub fn build_cds_instrument(quote: &CdsQuote, ctx: &BuildCtx) -> Result<Box<dyn 
             })?,
             discount_curve_id: CurveId::new(discount_id),
         },
-        protection: ProtectionLegSpec {
+        protection_leg: ProtectionLegSpec {
             credit_curve_id: CurveId::new(credit_id),
             recovery_rate,
             settlement_delay: conv.settlement_days,
@@ -345,12 +345,12 @@ mod tests {
         // The maturity should be June 20, 2026 (the IMM date), NOT September 20, 2026
         // next_cds_date(June 19) returns June 20
         assert_eq!(
-            cds.premium.end.month(),
+            cds.premium_leg.end.month(),
             Month::June,
             "CDS maturity should be in June, not jumped to September"
         );
         assert_eq!(
-            cds.premium.end, explicit_maturity,
+            cds.premium_leg.end, explicit_maturity,
             "CDS maturity should be exactly 2026-06-20"
         );
 
@@ -384,14 +384,14 @@ mod tests {
             .expect("Expected CreditDefaultSwap");
 
         assert_eq!(
-            cds.premium.end.day(),
+            cds.premium_leg.end.day(),
             20,
             "CDS maturity should be on the 20th"
         );
         assert!(
-            matches!(cds.premium.end.month(), Month::June | Month::December),
+            matches!(cds.premium_leg.end.month(), Month::June | Month::December),
             "on-the-run CDS maturity must be 20-Jun or 20-Dec, got {:?}",
-            cds.premium.end.month()
+            cds.premium_leg.end.month()
         );
 
         Ok(())
@@ -439,9 +439,9 @@ mod tests {
             let expected =
                 Date::from_calendar_date(ey, em, ed).expect("valid expected CDS maturity");
             assert_eq!(
-                cds.premium.end, expected,
+                cds.premium_leg.end, expected,
                 "trade {as_of}: expected 5Y maturity {expected}, got {}",
-                cds.premium.end
+                cds.premium_leg.end
             );
         }
 
@@ -477,7 +477,7 @@ mod tests {
             .expect("Expected CreditDefaultSwap");
 
         assert_eq!(
-            cds.premium.end,
+            cds.premium_leg.end,
             Date::from_calendar_date(2031, Month::June, 20).expect("valid expected CDS maturity")
         );
 

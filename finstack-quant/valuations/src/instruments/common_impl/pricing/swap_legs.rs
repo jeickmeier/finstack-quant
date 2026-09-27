@@ -14,6 +14,7 @@
 
 use crate::cashflow::builder::rate_helpers::FloatingRateParams;
 use crate::instruments::common_impl::pricing::time::relative_df_discount_curve;
+use crate::instruments::rates::irs::FloatingLegCompounding;
 use finstack_quant_core::dates::{calendar_by_id, HolidayCalendar};
 use finstack_quant_core::dates::{Date, DateExt, DayCount, DayCountContext};
 use finstack_quant_core::market_data::scalars::ScalarTimeSeries;
@@ -21,99 +22,6 @@ use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::market_data::term_structures::ForwardCurve;
 use finstack_quant_core::math::NeumaierAccumulator;
 use finstack_quant_core::Result;
-
-use serde::{Deserialize, Serialize};
-
-/// Compounding method for floating rate legs.
-///
-/// Determines how the floating rate is calculated from underlying index fixings.
-///
-/// # Market Standards
-///
-/// | Method | Index Type | Example | Formula |
-/// |--------|------------|---------|---------|
-/// | Simple | Term IBOR | EURIBOR 6M | rate = fixing |
-/// | Compounded | OIS | SOFR, SONIA | rate = (∏(1 + r_i × d_i) - 1) / τ |
-/// | CompoundedWithShift | OIS + lookback | SOFR (standard) | Same, with observation shift |
-/// | Average | OIS (legacy) | Fed Funds | rate = Σ(r_i × d_i) / τ |
-///
-/// # ISDA Standard
-///
-/// The ISDA 2021 definitions specify "Overnight Rate Compounding" with
-/// optional observation shift (lookback) as the standard for RFR swaps.
-///
-/// # References
-///
-/// - ISDA IBOR Fallbacks Protocol (2021)
-/// - ARRC SOFR Conventions (2020) `docs/REFERENCES.md#arrc-sofr-users-guide`
-/// - Bank of England SONIA Conventions (2019)
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
-#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(rename_all = "snake_case")]
-#[non_exhaustive]
-pub enum CompoundingMethod {
-    /// Simple rate - no compounding within the accrual period.
-    ///
-    /// Used for term rates like EURIBOR, Term SOFR, and legacy LIBOR.
-    /// The rate is simply the single fixing at the reset date.
-    ///
-    /// ```text
-    /// rate = index_fixing
-    /// ```
-    #[default]
-    Simple,
-
-    /// Daily compounded rate without observation shift.
-    ///
-    /// Each daily fixing is compounded to produce the period rate.
-    /// Rarely used in practice (most OIS use lookback).
-    ///
-    /// ```text
-    /// rate = (∏(1 + r_i × d_i/day_count_basis) - 1) × day_count_basis / D
-    /// ```
-    ///
-    /// where:
-    /// - r_i = overnight rate for day i
-    /// - d_i = 1 for weekdays, 3 for Mondays (weekend)
-    /// - D = total accrual days
-    Compounded,
-
-    /// Daily compounded rate with observation shift (lookback).
-    ///
-    /// This is the standard for RFR swaps (SOFR, ESTR, SONIA).
-    /// Rates are observed with a lookback to allow payment calculation
-    /// before the payment date.
-    ///
-    /// ```text
-    /// rate = (∏(1 + r_{i-shift} × d_i/360) - 1) × 360 / D
-    /// ```
-    ///
-    /// # Observation Shift
-    ///
-    /// The `observation_shift_days` field in [`FloatingLegParams`] specifies
-    /// the lookback period:
-    /// - **2 days**: USD SOFR, EUR ESTR, JPY TONAR (standard)
-    /// - **5 days**: Some legacy SOFR conventions
-    /// - **0 days**: GBP SONIA (uses payment delay instead)
-    ///
-    /// # Example
-    ///
-    /// For a SOFR swap with 2-day lookback:
-    /// - Accrual period: Jan 15 to Jan 22 (7 days)
-    /// - Observation period: Jan 13 to Jan 20 (shifted back 2 days)
-    /// - Rate is compounded from fixings observed Jan 13-20
-    CompoundedWithShift,
-
-    /// Simple average of daily rates (non-compounded).
-    ///
-    /// Used for some legacy overnight index averages. Less common
-    /// than compounded rates.
-    ///
-    /// ```text
-    /// rate = Σ(r_i × d_i) / D
-    /// ```
-    Average,
-}
 
 /// Minimum threshold for annuity values to avoid divide-by-zero in par spread calculations.
 ///
@@ -309,7 +217,7 @@ pub(crate) fn compounded_forward_projection(
     index_floor: Option<f64>,
     index_cap: Option<f64>,
     // When `true`, accumulate the day-count-weighted **arithmetic** average
-    // `Σ(rᵢ·dᵢ)/τ` (`CompoundingMethod::Average`, e.g. Fed-Funds-average swaps)
+    // `Σ(rᵢ·dᵢ)/τ` (`SimpleAverage`, e.g. Fed-Funds-average swaps)
     // instead of the geometric daily compound `(∏(1+rᵢ·dᵢ)−1)/τ`.
     arithmetic_average: bool,
 ) -> Result<f64> {
@@ -489,7 +397,7 @@ pub(crate) fn compounded_spliced_projection(
     index_floor: Option<f64>,
     index_cap: Option<f64>,
     // When `true`, accumulate the day-count-weighted **arithmetic** average
-    // `Σ(rᵢ·dᵢ)/τ` (`CompoundingMethod::Average`) over the spliced
+    // `Σ(rᵢ·dᵢ)/τ` (`SimpleAverage`) over the spliced
     // realized/projected daily fixings instead of the geometric daily compound.
     arithmetic_average: bool,
 ) -> Result<f64> {
@@ -614,15 +522,17 @@ pub(crate) fn compounded_spliced_projection(
 /// This struct wraps [`FloatingRateParams`] and adds swap-specific fields for
 /// payment delay, calendar handling, and compounding method. Use this for swap leg pricing.
 ///
-/// # Compounding Methods
+/// # Compounding
 ///
-/// The `compounding_method` field controls how the floating rate is calculated:
+/// The `compounding` field controls how the floating rate is calculated:
 ///
-/// - [`CompoundingMethod::Simple`]: Single fixing at reset date (IBOR, Term SOFR)
-/// - [`CompoundingMethod::CompoundedWithShift`]: Daily compounding with lookback (OIS standard)
+/// - `Simple`: single fixing at reset date (IBOR, Term SOFR)
+/// - `CompoundedInArrears { lookback_days }`: daily compounding with a lookback
+///   (observations shifted, weights on the accrual dates)
+/// - `SimpleAverage`: day-weighted arithmetic average of daily fixings
 ///
-/// For OIS swaps, set `compounding_method` to [`CompoundingMethod::CompoundedWithShift`]
-/// and populate `observation_shift_days`.
+/// Observation shift and rate cut-off are rejected by
+/// [`validate()`](Self::validate).
 ///
 /// # Validation
 ///
@@ -631,7 +541,7 @@ pub(crate) fn compounded_spliced_projection(
 /// - Valid spread and gearing (finite, gearing > 0)
 /// - Consistent floor/cap ordering (floor <= cap)
 /// - Valid payment delay (non-negative for practical use)
-/// - Consistent compounding settings (shift only for CompoundedWithShift)
+/// - A compounding convention this projector implements
 #[derive(Debug, Clone, Default)]
 pub struct FloatingLegParams {
     /// Core rate parameters (spread, gearing, floors, caps).
@@ -640,20 +550,8 @@ pub struct FloatingLegParams {
     pub payment_lag_days: i32,
     /// Optional calendar ID for payment date adjustments.
     pub calendar_id: Option<finstack_quant_core::types::CalendarId>,
-    /// Compounding method for calculating the period rate.
-    ///
-    /// Defaults to [`CompoundingMethod::Simple`] for IBOR-style rates.
-    /// Set to [`CompoundingMethod::CompoundedWithShift`] for OIS swaps.
-    pub compounding_method: CompoundingMethod,
-    /// Observation shift (lookback) in business days for OIS compounding.
-    ///
-    /// Only used when `compounding_method` is [`CompoundingMethod::CompoundedWithShift`].
-    ///
-    /// # Market Standards
-    ///
-    /// - **2 days**: USD SOFR, EUR ESTR, JPY TONAR
-    /// - **0 days**: GBP SONIA (uses payment delay instead)
-    pub observation_shift_days: i32,
+    /// Compounding convention for the period rate (default `Simple`).
+    pub compounding: FloatingLegCompounding,
 }
 
 impl FloatingLegParams {
@@ -682,8 +580,7 @@ impl FloatingLegParams {
             },
             payment_lag_days,
             calendar_id,
-            compounding_method: CompoundingMethod::Simple,
-            observation_shift_days: 0,
+            compounding: FloatingLegCompounding::Simple,
         }
     }
 
@@ -701,18 +598,32 @@ impl FloatingLegParams {
     pub fn validate(&self) -> Result<()> {
         self.rate_params.validate()?;
 
-        // Warn if observation shift is set but compounding doesn't use it
-        if self.observation_shift_days != 0
-            && !matches!(
-                self.compounding_method,
-                CompoundingMethod::CompoundedWithShift
-            )
-        {
-            // Not an error, but the shift will be ignored
-            // Could add logging here if needed
-        }
-
+        self.observation_shift_days()?;
         Ok(())
+    }
+
+    /// Lookback in business days applied by the compounded projector
+    /// (observations shift back, day-count weights stay on the accrual dates).
+    ///
+    /// # Errors
+    ///
+    /// Returns a validation error for an observation shift or a rate cut-off,
+    /// which this projector does not implement.
+    fn observation_shift_days(&self) -> Result<i32> {
+        match self.compounding {
+            FloatingLegCompounding::Simple | FloatingLegCompounding::SimpleAverage => Ok(0),
+            FloatingLegCompounding::CompoundedInArrears { lookback_days } => {
+                i32::try_from(lookback_days).map_err(|_| {
+                    finstack_quant_core::Error::Validation(format!(
+                        "lookback_days = {lookback_days} exceeds i32::MAX"
+                    ))
+                })
+            }
+            other => Err(finstack_quant_core::Error::Validation(format!(
+                "swap-leg projector does not implement {other:?}; use simple, \
+                 simple_average or compounded_in_arrears"
+            ))),
+        }
     }
 }
 
@@ -793,7 +704,8 @@ where
     // projection, so they are stripped from the rate params used for the all-in
     // rate. That stripped copy is loop-invariant, so build it once here rather
     // than cloning `params.rate_params` on every compounded period.
-    let compounded_rate_params = if matches!(params.compounding_method, CompoundingMethod::Simple) {
+    let observation_shift_days = params.observation_shift_days()?;
+    let compounded_rate_params = if matches!(params.compounding, FloatingLegCompounding::Simple) {
         None
     } else {
         Some(crate::cashflow::builder::rate_helpers::FloatingRateParams {
@@ -826,7 +738,7 @@ where
         // `calculate_floating_rate` to avoid applying them a second time to the
         // period-average rate. Term-rate (`Simple`) legs keep the original
         // single-fixing floor/cap path.
-        let is_compounded = !matches!(params.compounding_method, CompoundingMethod::Simple);
+        let is_compounded = !matches!(params.compounding, FloatingLegCompounding::Simple);
 
         // Pre-compute per-fixing floor/cap decimals used by the compounded paths.
         // These are stripped from the `calculate_floating_rate` call below for
@@ -886,11 +798,11 @@ where
                 period.accrual_end,
                 as_of,
                 period.year_fraction,
-                params.observation_shift_days,
+                observation_shift_days,
                 params.calendar_id.as_deref(),
                 index_floor_decimal,
                 index_cap_decimal,
-                matches!(params.compounding_method, CompoundingMethod::Average),
+                matches!(params.compounding, FloatingLegCompounding::SimpleAverage),
             )?
         } else if reset_date < as_of {
             // Past reset, term-rate (`Simple`) leg: require a single historical
@@ -911,7 +823,7 @@ where
                 as_of,
             )?
         } else if !is_compounded {
-            // Future reset, term-rate leg (`CompoundingMethod::Simple`, e.g.
+            // Future reset, term-rate leg (`Simple`, e.g.
             // EURIBOR-6M): the rate is *set* at `reset_date` as the index-tenor
             // forward observed on that date. The forward curve's `rate(t)` is
             // exactly "the forward starting at time `t` for the curve's tenor",
@@ -928,8 +840,8 @@ where
             };
             fwd.rate(t_reset)
         } else {
-            // Future reset, OIS / genuinely-compounding leg (`Compounded`,
-            // `CompoundedWithShift`, `Average`) whose accrual period is entirely
+            // Future reset, OIS / genuinely-compounding leg (compounded
+            // in arrears / observation shift / `SimpleAverage`) whose accrual period is entirely
             // in the future. `Compounded`/`CompoundedWithShift` use true daily
             // compounding `(∏(1+rᵢ·dᵢ)−1)/τ`; `Average` uses the day-count-
             // weighted arithmetic mean `Σ(rᵢ·dᵢ)/τ` (Fed-Funds-average style),
@@ -943,11 +855,11 @@ where
                 period.accrual_start,
                 period.accrual_end,
                 period.year_fraction,
-                params.observation_shift_days,
+                observation_shift_days,
                 params.calendar_id.as_deref(),
                 index_floor_decimal,
                 index_cap_decimal,
-                matches!(params.compounding_method, CompoundingMethod::Average),
+                matches!(params.compounding, FloatingLegCompounding::SimpleAverage),
             )?
         };
 
@@ -1118,17 +1030,18 @@ mod tests {
             rate_params: FloatingRateParams::with_spread(spread_bp),
             payment_lag_days,
             calendar_id: None,
-            compounding_method: CompoundingMethod::CompoundedWithShift,
-            observation_shift_days,
+            compounding: FloatingLegCompounding::CompoundedInArrears {
+                lookback_days: u32::try_from(observation_shift_days).unwrap_or(0),
+            },
         }
     }
 
-    /// Test-only floating-leg params using [`CompoundingMethod::Compounded`]
+    /// Test-only floating-leg params using zero-lookback compounded in arrears
     /// (daily compounding, no observation shift).
     fn float_compounded(spread_bp: f64) -> FloatingLegParams {
         FloatingLegParams {
             rate_params: FloatingRateParams::with_spread(spread_bp),
-            compounding_method: CompoundingMethod::Compounded,
+            compounding: FloatingLegCompounding::CompoundedInArrears { lookback_days: 0 },
             ..Default::default()
         }
     }
@@ -1577,7 +1490,7 @@ mod tests {
 
         // No spread/gearing so all_in_rate == index_rate.
         let params = FloatingLegParams::default();
-        assert_eq!(params.compounding_method, CompoundingMethod::Simple);
+        assert_eq!(params.compounding, FloatingLegCompounding::Simple);
 
         let pv = pv_floating_leg(
             periods.into_iter(),
@@ -2054,8 +1967,7 @@ mod tests {
             },
             payment_lag_days: 0,
             calendar_id: None,
-            compounding_method: CompoundingMethod::Compounded,
-            observation_shift_days: 0,
+            compounding: FloatingLegCompounding::CompoundedInArrears { lookback_days: 0 },
         };
 
         let pv = pv_floating_leg(

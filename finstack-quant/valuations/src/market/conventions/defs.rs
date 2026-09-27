@@ -297,7 +297,7 @@ pub struct IrFutureConventions {
     /// Underlying rate index identifier.
     pub index_id: IndexId,
     /// Exchange-defined averaging or fixing method for final settlement.
-    pub rate_averaging: crate::instruments::RateAveragingMethod,
+    pub compounding: crate::instruments::rates::irs::FloatingLegCompounding,
     /// Rule used to derive the rate reference period from the quoted expiry.
     pub reference_period: IrFutureReferencePeriod,
     /// Calendar for business day adjustments.

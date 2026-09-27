@@ -67,7 +67,7 @@ fn create_monthly_swap(tenor_years: i32) -> InterestRateSwap {
         .id(format!("IRS-{}Y-Monthly", tenor_years).into())
         .notional(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
         .side(PayReceive::Pay)
-        .fixed(FixedLegSpec {
+        .fixed_leg(FixedLegSpec {
             discount_curve_id: disc_id.clone(),
             rate: dec!(0.04),
             frequency: Tenor::new(1, TenorUnit::Months).expect("valid tenor fixture"), // Monthly fixed
@@ -79,11 +79,10 @@ fn create_monthly_swap(tenor_years: i32) -> InterestRateSwap {
             start,
             end,
             par_method: None,
-            compounding_simple: true,
             payment_lag_days: 0,
             end_of_month: false,
         })
-        .float(FloatLegSpec {
+        .float_leg(FloatLegSpec {
             discount_curve_id: disc_id,
             forward_curve_id: fwd_id,
             spread_bp: dec!(0.0),
@@ -117,7 +116,7 @@ fn create_ois_swap(tenor_years: i32) -> InterestRateSwap {
         .id(format!("OIS-{}Y", tenor_years).into())
         .notional(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
         .side(PayReceive::Pay)
-        .fixed(FixedLegSpec {
+        .fixed_leg(FixedLegSpec {
             discount_curve_id: disc_id.clone(),
             rate: dec!(0.04),
             frequency: Tenor::new(1, TenorUnit::Years).expect("valid tenor fixture"), // Annual fixed
@@ -129,11 +128,10 @@ fn create_ois_swap(tenor_years: i32) -> InterestRateSwap {
             start,
             end,
             par_method: None,
-            compounding_simple: true,
             payment_lag_days: 2,
             end_of_month: false,
         })
-        .float(FloatLegSpec {
+        .float_leg(FloatLegSpec {
             discount_curve_id: disc_id.clone(),
             forward_curve_id: disc_id, // Single-curve OIS
             spread_bp: dec!(0.0),

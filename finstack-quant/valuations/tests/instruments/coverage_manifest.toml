@@ -105,19 +105,19 @@ rationale = "The complete persisted dollar_roll spec implements PartialEq; regis
 tag = "interest_rate_swap"
 fixture = "json_examples/interest_rate_swap.json"
 lossless = false
-partial_eq_blocker = "InterestRateSwap.fixed: FixedLegSpec"
+partial_eq_blocker = "InterestRateSwap.fixed_leg: FixedLegSpec"
 required_keys = ["id"]
 no_market_dependencies = false
-rationale = "InterestRateSwap.fixed: FixedLegSpec lacks PartialEq across schedule and coupon conventions."
+rationale = "InterestRateSwap.fixed_leg: FixedLegSpec lacks PartialEq across schedule and coupon conventions."
 
 [[instrument]]
 tag = "basis_swap"
 fixture = "json_examples/basis_swap.json"
 lossless = false
-partial_eq_blocker = "BasisSwap.primary_leg: BasisSwapLeg"
+partial_eq_blocker = "BasisSwap.primary_leg: FloatLegSpec"
 required_keys = ["id"]
 no_market_dependencies = false
-rationale = "BasisSwap.primary_leg: BasisSwapLeg lacks PartialEq across floating-leg schedule conventions."
+rationale = "BasisSwap.primary_leg: FloatLegSpec lacks PartialEq across floating-leg schedule conventions."
 
 [[instrument]]
 tag = "xccy_swap"
@@ -271,19 +271,19 @@ rationale = "The complete persisted repo spec implements PartialEq; registry cov
 tag = "credit_default_swap"
 fixture = "json_examples/credit_default_swap.json"
 lossless = false
-partial_eq_blocker = "CreditDefaultSwap.premium: PremiumLegSpec"
+partial_eq_blocker = "CreditDefaultSwap.premium_leg: PremiumLegSpec"
 required_keys = ["id"]
 no_market_dependencies = false
-rationale = "CreditDefaultSwap.premium: PremiumLegSpec lacks PartialEq across accrual-on-default conventions."
+rationale = "CreditDefaultSwap.premium_leg: PremiumLegSpec lacks PartialEq across accrual-on-default conventions."
 
 [[instrument]]
 tag = "cds_index"
 fixture = "json_examples/cds_index.json"
 lossless = false
-partial_eq_blocker = "CDSIndex.premium: PremiumLegSpec"
+partial_eq_blocker = "CDSIndex.premium_leg: PremiumLegSpec"
 required_keys = ["id"]
 no_market_dependencies = false
-rationale = "CDSIndex.premium: PremiumLegSpec lacks PartialEq across index premium schedule conventions."
+rationale = "CDSIndex.premium_leg: PremiumLegSpec lacks PartialEq across index premium schedule conventions."
 
 [[instrument]]
 tag = "cds_tranche"

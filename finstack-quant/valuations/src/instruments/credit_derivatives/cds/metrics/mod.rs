@@ -58,7 +58,7 @@ pub(crate) fn deal_quote_override(
         return None;
     }
     Some(crate::recalibration::DealCdsQuoteOverride {
-        contract_end: cds.premium.end,
+        contract_end: cds.premium_leg.end,
         spread_bp: quote_bp,
     })
 }
@@ -155,7 +155,7 @@ mod tests {
         let mut cds = CreditDefaultSwap::example();
         cds.instrument_pricing_overrides.market_quotes.cds_quote_bp = Some(321.0);
         let request = deal_quote_override(&cds).expect("deal quote override");
-        assert_eq!(request.contract_end, cds.premium.end);
+        assert_eq!(request.contract_end, cds.premium_leg.end);
         assert_eq!(request.spread_bp, 321.0);
     }
 }

@@ -2,7 +2,8 @@ use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::math::{BrentSolver, Solver};
 use finstack_quant_core::{Error, Result};
 
-use super::{ShortRateTree, TreeCalibrationResult, TreeCompounding};
+use super::{ShortRateTree, TreeCalibrationResult, TreeDiscounting};
+use finstack_quant_core::math::Compounding;
 
 impl ShortRateTree {
     /// Calibrate Ho-Lee model parameters.
@@ -42,10 +43,10 @@ impl ShortRateTree {
         let comp = self.config.compounding;
 
         // Initialize first step with current short rate: r0 satisfies
-        // comp.df(r0, T1) = P(0, T1) under the configured convention.
+        // comp.tree_df(r0, T1) = P(0, T1) under the configured convention.
         // `calibrate` guarantees steps >= 1 and a positive horizon, so T1 > 0.
         let t1 = self.time_steps[1];
-        let r0 = comp.rate_from_df(discount_curve.df(t1), t1);
+        let r0 = comp.tree_rate_from_df(discount_curve.df(t1), t1);
 
         rates[0] = vec![r0];
 
@@ -73,7 +74,7 @@ impl ShortRateTree {
 
             for (i, &current_rate) in rates[step].iter().enumerate() {
                 let q = state_prices[i];
-                let df = comp.df(current_rate, dt);
+                let df = comp.tree_df(current_rate, dt);
 
                 let r_up_base = current_rate + sigma * dt.sqrt();
                 if i + 1 < next_nodes {
@@ -102,7 +103,7 @@ impl ShortRateTree {
                 let mut p_model_base_cont = 0.0;
                 for (j, &q_next) in next_state_prices.iter().enumerate() {
                     let r_base = next_rates_base[j];
-                    p_model_base += q_next * comp.df(r_base, dt);
+                    p_model_base += q_next * comp.tree_df(r_base, dt);
                     p_model_base_cont += q_next * (-r_base * dt).exp();
                 }
 
@@ -112,13 +113,13 @@ impl ShortRateTree {
                     } else {
                         0.0
                     };
-                    if comp == TreeCompounding::Continuous {
+                    if comp == Compounding::Continuous {
                         theta_cont
                     } else {
                         let objective = |theta: f64| -> f64 {
                             let mut p_model = 0.0;
                             for (j, &q_next) in next_state_prices.iter().enumerate() {
-                                p_model += q_next * comp.df(next_rates_base[j] + theta, dt);
+                                p_model += q_next * comp.tree_df(next_rates_base[j] + theta, dt);
                             }
                             p_model - p_target
                         };
@@ -160,7 +161,7 @@ impl ShortRateTree {
                 let next_nodes = step + 2;
                 next_q[..next_nodes].fill(0.0);
                 for (i, &rate_i) in rates_step.iter().enumerate() {
-                    let df_i = comp.df(rate_i, dt);
+                    let df_i = comp.tree_df(rate_i, dt);
                     if i + 1 < next_nodes {
                         next_q[i + 1] += q[i] * df_i * 0.5;
                     }
@@ -199,7 +200,7 @@ impl ShortRateTree {
         const MIN_NODE_DISCOUNT_FACTOR: f64 = 1.0e-30;
         for (step, rates_step) in rates.iter().enumerate() {
             for (node, &rate) in rates_step.iter().enumerate() {
-                let node_df = comp.df(rate, dt);
+                let node_df = comp.tree_df(rate, dt);
                 // `contains` is `false` for a `NaN` node_df, so the negation
                 // correctly flags non-finite values as pathological too.
                 let df_in_range =

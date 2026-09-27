@@ -114,7 +114,6 @@ fn build_swap_internal(
         start: start_date,
         end: maturity_date,
         par_method: None,
-        compounding_simple: true,
         payment_lag_days: 0,
         end_of_month: false,
     };
@@ -141,8 +140,8 @@ fn build_swap_internal(
         .id(InstrumentId::new(id_str))
         .notional(notional)
         .side(PayReceive::Pay)
-        .fixed(fixed)
-        .float(float)
+        .fixed_leg(fixed)
+        .float_leg(float)
         .build()?)
 }
 

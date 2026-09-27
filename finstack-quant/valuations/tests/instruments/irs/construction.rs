@@ -29,12 +29,12 @@ fn test_irs_standard_construction() {
     assert_eq!(swap.id.as_str(), "IRS-5Y");
     assert_eq!(swap.notional.amount(), 1_000_000.0);
     assert_eq!(
-        swap.fixed.rate,
+        swap.fixed_leg.rate,
         rust_decimal::Decimal::try_from(0.05).expect("valid")
     );
     assert_eq!(swap.side, PayReceive::Pay);
-    assert_eq!(swap.fixed.discount_curve_id.as_ref(), "USD-OIS");
-    assert_eq!(swap.float.forward_curve_id.as_ref(), "USD-SOFR-3M");
+    assert_eq!(swap.fixed_leg.discount_curve_id.as_ref(), "USD-OIS");
+    assert_eq!(swap.float_leg.forward_curve_id.as_ref(), "USD-SOFR-3M");
 }
 
 #[test]
@@ -44,7 +44,7 @@ fn test_irs_builder_pattern() {
         .id("IRS-CUSTOM".into())
         .notional(Money::new(5_000_000.0, Currency::USD).expect("valid money fixture"))
         .side(PayReceive::Receive)
-        .fixed(finstack_quant_valuations::instruments::FixedLegSpec {
+        .fixed_leg(finstack_quant_valuations::instruments::FixedLegSpec {
             discount_curve_id: "USD_OIS".into(),
             rate: rust_decimal::Decimal::try_from(0.0325).expect("valid"),
             frequency: Tenor::semi_annual(),
@@ -55,11 +55,10 @@ fn test_irs_builder_pattern() {
             start: date!(2024 - 01 - 15),
             end: date!(2034 - 01 - 15),
             par_method: None,
-            compounding_simple: true,
             payment_lag_days: 0,
             end_of_month: false,
         })
-        .float(finstack_quant_valuations::instruments::FloatLegSpec {
+        .float_leg(finstack_quant_valuations::instruments::FloatLegSpec {
             discount_curve_id: "USD_OIS".into(),
             forward_curve_id: "USD_LIBOR_3M".into(),
             spread_bp: rust_decimal::Decimal::try_from(25.0).expect("valid"),
@@ -83,15 +82,15 @@ fn test_irs_builder_pattern() {
     assert_eq!(swap.id.as_str(), "IRS-CUSTOM");
     assert_eq!(swap.notional.amount(), 5_000_000.0);
     assert_eq!(
-        swap.fixed.rate,
+        swap.fixed_leg.rate,
         rust_decimal::Decimal::try_from(0.0325).expect("valid")
     );
     assert_eq!(
-        swap.float.spread_bp,
+        swap.float_leg.spread_bp,
         rust_decimal::Decimal::try_from(25.0).expect("valid")
     );
-    assert_eq!(swap.fixed.frequency, Tenor::semi_annual());
-    assert_eq!(swap.float.frequency, Tenor::quarterly());
+    assert_eq!(swap.fixed_leg.frequency, Tenor::semi_annual());
+    assert_eq!(swap.float_leg.frequency, Tenor::quarterly());
 }
 
 #[test]
@@ -118,7 +117,7 @@ fn test_irs_receive_vs_pay() {
     assert_eq!(swap_pay.side, PayReceive::Pay);
 
     // Same parameters except direction
-    assert_eq!(swap_receive.fixed.rate, swap_pay.fixed.rate);
+    assert_eq!(swap_receive.fixed_leg.rate, swap_pay.fixed_leg.rate);
     assert_eq!(swap_receive.notional, swap_pay.notional);
 }
 
@@ -136,7 +135,7 @@ fn test_irs_short_maturity() {
     .unwrap();
 
     assert_eq!(swap.id.as_str(), "IRS-6M");
-    assert!(swap.fixed.end.year() - swap.fixed.start.year() < 1);
+    assert!(swap.fixed_leg.end.year() - swap.fixed_leg.start.year() < 1);
 }
 
 #[test]
@@ -153,7 +152,7 @@ fn test_irs_long_maturity() {
     .unwrap();
 
     assert_eq!(swap.id.as_str(), "IRS-30Y");
-    assert_eq!(swap.fixed.end.year() - swap.fixed.start.year(), 30);
+    assert_eq!(swap.fixed_leg.end.year() - swap.fixed_leg.start.year(), 30);
 }
 
 #[test]
@@ -168,7 +167,7 @@ fn test_irs_zero_spread() {
     )
     .unwrap();
 
-    assert_eq!(swap.float.spread_bp, rust_decimal::Decimal::ZERO);
+    assert_eq!(swap.float_leg.spread_bp, rust_decimal::Decimal::ZERO);
 }
 
 #[test]
@@ -183,10 +182,10 @@ fn test_irs_with_spread() {
     )
     .unwrap();
 
-    swap.float.spread_bp = rust_decimal::Decimal::try_from(50.0).expect("valid");
+    swap.float_leg.spread_bp = rust_decimal::Decimal::try_from(50.0).expect("valid");
 
     assert_eq!(
-        swap.float.spread_bp,
+        swap.float_leg.spread_bp,
         rust_decimal::Decimal::try_from(50.0).expect("valid")
     );
 }
@@ -198,7 +197,7 @@ fn test_irs_different_leg_frequencies() {
         .id("IRS-DIFF-FREQ".into())
         .notional(Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"))
         .side(PayReceive::Receive)
-        .fixed(finstack_quant_valuations::instruments::FixedLegSpec {
+        .fixed_leg(finstack_quant_valuations::instruments::FixedLegSpec {
             discount_curve_id: "USD_OIS".into(),
             rate: rust_decimal::Decimal::try_from(0.05).expect("valid"),
             frequency: Tenor::semi_annual(),
@@ -209,11 +208,10 @@ fn test_irs_different_leg_frequencies() {
             start: date!(2024 - 01 - 01),
             end: date!(2029 - 01 - 01),
             par_method: None,
-            compounding_simple: true,
             payment_lag_days: 0,
             end_of_month: false,
         })
-        .float(finstack_quant_valuations::instruments::FloatLegSpec {
+        .float_leg(finstack_quant_valuations::instruments::FloatLegSpec {
             discount_curve_id: "USD_OIS".into(),
             forward_curve_id: "USD_LIBOR_3M".into(),
             spread_bp: rust_decimal::Decimal::try_from(0.0).expect("valid"),
@@ -233,8 +231,8 @@ fn test_irs_different_leg_frequencies() {
         .build()
         .unwrap();
 
-    assert_eq!(swap.fixed.frequency, Tenor::semi_annual());
-    assert_eq!(swap.float.frequency, Tenor::quarterly());
+    assert_eq!(swap.fixed_leg.frequency, Tenor::semi_annual());
+    assert_eq!(swap.float_leg.frequency, Tenor::quarterly());
 }
 
 #[test]
@@ -270,7 +268,7 @@ fn test_irs_calendar_specification() {
         .id("IRS-CAL".into())
         .notional(Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"))
         .side(PayReceive::Receive)
-        .fixed(finstack_quant_valuations::instruments::FixedLegSpec {
+        .fixed_leg(finstack_quant_valuations::instruments::FixedLegSpec {
             discount_curve_id: "USD_OIS".into(),
             rate: rust_decimal::Decimal::try_from(0.05).expect("valid"),
             frequency: Tenor::semi_annual(),
@@ -281,11 +279,10 @@ fn test_irs_calendar_specification() {
             start: date!(2024 - 01 - 01),
             end: date!(2029 - 01 - 01),
             par_method: None,
-            compounding_simple: true,
             payment_lag_days: 0,
             end_of_month: false,
         })
-        .float(finstack_quant_valuations::instruments::FloatLegSpec {
+        .float_leg(finstack_quant_valuations::instruments::FloatLegSpec {
             discount_curve_id: "USD_OIS".into(),
             forward_curve_id: "USD_LIBOR_3M".into(),
             spread_bp: rust_decimal::Decimal::try_from(0.0).expect("valid"),
@@ -305,8 +302,8 @@ fn test_irs_calendar_specification() {
         .build()
         .unwrap();
 
-    assert_eq!(swap.fixed.calendar_id, Some("usny".into()));
-    assert_eq!(swap.float.calendar_id, Some("usny".into()));
+    assert_eq!(swap.fixed_leg.calendar_id, Some("usny".into()));
+    assert_eq!(swap.float_leg.calendar_id, Some("usny".into()));
 }
 
 #[test]
@@ -315,7 +312,7 @@ fn test_irs_stub_specification() {
         .id("IRS-STUB".into())
         .notional(Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"))
         .side(PayReceive::Receive)
-        .fixed(finstack_quant_valuations::instruments::FixedLegSpec {
+        .fixed_leg(finstack_quant_valuations::instruments::FixedLegSpec {
             discount_curve_id: "USD_OIS".into(),
             rate: rust_decimal::Decimal::try_from(0.05).expect("valid"),
             frequency: Tenor::semi_annual(),
@@ -326,11 +323,10 @@ fn test_irs_stub_specification() {
             start: date!(2024 - 01 - 15),
             end: date!(2029 - 01 - 01),
             par_method: None,
-            compounding_simple: true,
             payment_lag_days: 0,
             end_of_month: false,
         })
-        .float(finstack_quant_valuations::instruments::FloatLegSpec {
+        .float_leg(finstack_quant_valuations::instruments::FloatLegSpec {
             discount_curve_id: "USD_OIS".into(),
             forward_curve_id: "USD_LIBOR_3M".into(),
             spread_bp: rust_decimal::Decimal::try_from(0.0).expect("valid"),
@@ -350,6 +346,6 @@ fn test_irs_stub_specification() {
         .build()
         .unwrap();
 
-    assert_eq!(swap.fixed.stub, StubKind::ShortFront);
-    assert_eq!(swap.float.stub, StubKind::ShortFront);
+    assert_eq!(swap.fixed_leg.stub, StubKind::ShortFront);
+    assert_eq!(swap.float_leg.stub, StubKind::ShortFront);
 }

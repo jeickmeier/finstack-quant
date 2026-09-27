@@ -4,8 +4,9 @@ use super::utils::*;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::DayCount;
 use finstack_quant_valuations::instruments::rates::ir_future::{
-    FutureContractSpecs, InterestRateFuture, RateAveragingMethod,
+    FutureContractSpecs, InterestRateFuture,
 };
+use finstack_quant_valuations::instruments::rates::irs::FloatingLegCompounding;
 use finstack_quant_valuations::instruments::Position;
 
 #[test]
@@ -80,7 +81,7 @@ fn test_multiple_contracts() {
         contract_specs: FutureContractSpecs::default(),
         discount_curve_id: "USD_OIS".into(),
         forward_curve_id: "USD_LIBOR_3M".into(),
-        rate_averaging: RateAveragingMethod::Term,
+        compounding: FloatingLegCompounding::Simple,
         index_id: None,
         fixing_calendar_id: None,
         vol_surface_id: None,
@@ -111,7 +112,7 @@ fn test_different_day_counts() {
             contract_specs: FutureContractSpecs::default(),
             discount_curve_id: "USD_OIS".into(),
             forward_curve_id: "USD_LIBOR_3M".into(),
-            rate_averaging: RateAveragingMethod::Term,
+            compounding: FloatingLegCompounding::Simple,
             index_id: None,
             fixing_calendar_id: None,
             vol_surface_id: None,

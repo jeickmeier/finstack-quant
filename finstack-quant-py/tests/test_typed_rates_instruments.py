@@ -106,7 +106,7 @@ def _payer_swap_hand_written_json() -> str:
                 "id": "IRS-1",
                 "notional": {"amount": "10000000", "currency": "USD"},
                 "side": "pay",
-                "fixed": {
+                "fixed_leg": {
                     "discount_curve_id": "USD-OIS",
                     "rate": "0.04",
                     "frequency": {"count": 6, "unit": "months"},
@@ -117,11 +117,10 @@ def _payer_swap_hand_written_json() -> str:
                     "start": "2024-01-15",
                     "end": "2029-01-15",
                     "par_method": None,
-                    "compounding_simple": False,
                     "payment_lag_days": 0,
                     "end_of_month": False,
                 },
-                "float": {
+                "float_leg": {
                     "discount_curve_id": "USD-OIS",
                     "forward_curve_id": "USD-SOFR-3M",
                     "spread_bp": "0",
@@ -201,7 +200,6 @@ class TestInterestRateSwapTyped:
             DayCount.THIRTY_360,
             start,
             end,
-            compounding_simple=False,
         )
         float_leg = FloatLegSpec("USD-OIS", "USD-SOFR-3M", 0.0, Tenor.quarterly(), DayCount.ACT_360, start, end)
         swap = (
@@ -210,8 +208,8 @@ class TestInterestRateSwapTyped:
             .id(value="IRS-KW")
             .notional(value=Money(10_000_000.0, Currency("USD")))
             .side(value="pay")
-            .fixed(value=fixed)
-            .float(value=float_leg)
+            .fixed_leg(value=fixed)
+            .float_leg(value=float_leg)
             .build()
         )
         assert swap.id == "IRS-KW"
@@ -230,7 +228,6 @@ class TestFixedLegSpecTyped:
             business_day_convention="modified_following",
             calendar_id=None,
             stub="short_front",
-            compounding_simple=False,
             payment_lag_days=0,
             end_of_month=False,
         )
@@ -247,7 +244,6 @@ class TestFixedLegSpecTyped:
             datetime.date(2024, 1, 15),
             datetime.date(2029, 1, 15),
             business_day_convention=business_day_convention,
-            compounding_simple=False,
         )
         assert "0.04" in repr(leg)
 
@@ -262,7 +258,6 @@ class TestFixedLegSpecTyped:
             datetime.date(2024, 1, 15),
             datetime.date(2029, 1, 15),
             stub=stub,
-            compounding_simple=False,
         )
         assert "0.04" in repr(leg)
 

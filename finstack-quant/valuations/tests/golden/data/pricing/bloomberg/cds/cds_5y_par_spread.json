@@ -603,7 +603,7 @@
         },
         "side": "pay",
         "convention": "isda_na",
-        "premium": {
+        "premium_leg": {
           "start": "2026-03-20",
           "end": "2031-06-20",
           "frequency": {
@@ -616,7 +616,7 @@
           "discount_curve_id": "USD-S531-SWAP",
           "roll_rule": "cds_imm"
         },
-        "protection": {
+        "protection_leg": {
           "credit_curve_id": "IBM-USD-SENIOR",
           "recovery_rate": 0.4,
           "settlement_delay": 2

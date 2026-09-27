@@ -1,11 +1,11 @@
 //! Pricing-engine components for fixed-income bonds.
 //!
 use super::super::super::super::types::Bond;
-use crate::instruments::pricing_overrides::{OasPriceBasis, OasQuoteCompounding};
+use crate::instruments::pricing_overrides::OasPriceBasis;
 use crate::instruments::rates::hw1f::{resolve_hw1f_params, Hw1fParamFamily};
 use finstack_quant_core::market_data::context::MarketContext;
+use finstack_quant_core::math::Compounding;
 use finstack_quant_core::types::CurveId;
-use finstack_quant_models::trees::TreeCompounding;
 
 /// Choice of short-rate model for the bond pricing tree.
 ///
@@ -184,11 +184,11 @@ pub struct TreePricerConfig {
     /// Optional discount curve used only for tree/OAS calibration.
     pub tree_discount_curve_id: Option<CurveId>,
     /// Quote convention used for OAS inputs and outputs.
-    pub oas_quote_compounding: OasQuoteCompounding,
+    pub oas_quote_compounding: Compounding,
     /// Price/accrual target convention for OAS inversion.
     pub oas_price_basis: OasPriceBasis,
     /// Per-node compounding convention for the short-rate tree.
-    pub tree_compounding: TreeCompounding,
+    pub tree_compounding: Compounding,
 }
 
 impl Default for TreePricerConfig {
@@ -206,9 +206,9 @@ impl Default for TreePricerConfig {
             initial_bracket_size_bp: Some(1000.0),
             tree_model: TreeModelChoice::default(),
             tree_discount_curve_id: None,
-            oas_quote_compounding: OasQuoteCompounding::Continuous,
+            oas_quote_compounding: Compounding::Continuous,
             oas_price_basis: OasPriceBasis::SettlementDirty,
-            tree_compounding: TreeCompounding::default(),
+            tree_compounding: Compounding::default(),
         }
     }
 }
@@ -364,9 +364,9 @@ fn deterministic_hull_white(bond: &Bond) -> finstack_quant_core::Result<TreeMode
 fn tree_config_with_model(bond: &Bond, tree_model: TreeModelChoice) -> TreePricerConfig {
     let model = &bond.instrument_pricing_overrides.model_config;
     let tree_compounding = if matches!(&tree_model, TreeModelChoice::BlackDermanToy { .. }) {
-        TreeCompounding::Simple
+        Compounding::Simple
     } else {
-        TreeCompounding::default()
+        Compounding::default()
     };
     TreePricerConfig {
         tree_steps: model.tree_steps.unwrap_or(100),
@@ -419,7 +419,7 @@ mod tests {
         let config = bond_tree_config(&bond, &MarketContext::new())
             .expect("explicit vol should produce a config");
 
-        assert_eq!(config.tree_compounding, TreeCompounding::Simple);
+        assert_eq!(config.tree_compounding, Compounding::Simple);
         assert!(matches!(
             config.tree_model,
             TreeModelChoice::BlackDermanToy { sigma, .. } if (sigma - 0.20).abs() < 1e-12

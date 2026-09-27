@@ -2,8 +2,8 @@
 
 use finstack_quant_cashflows::builder::{
     AmortizationSpec, CouponType, DefaultModelSpec, FeeAccrualBasis, FeeBase, FeeSpec,
-    FixedCouponSpec, FloatingCouponSpec, FloatingRateFallback, FloatingRateSpec, Notional,
-    OvernightCompoundingMethod, OvernightIndexConstraintApplication, PrepaymentModelSpec,
+    FixedCouponSpec, FloatingCouponSpec, FloatingLegCompounding, FloatingRateFallback,
+    FloatingRateSpec, Notional, OvernightIndexConstraintApplication, PrepaymentModelSpec,
     PrincipalExchange, RecoveryModelSpec, RollRule, ScheduleParams, StepUpCouponSpec,
 };
 use finstack_quant_cashflows::serde_defaults;
@@ -357,15 +357,18 @@ impl PyCouponType {
     }
 }
 
-/// Overnight-index compounding convention for RFR legs.
+/// How the fixings of one accrual period combine into the period rate.
+///
+/// ``SIMPLE`` projects one term forward; the other variants build the period
+/// rate from daily overnight fixings. Day counts are business days.
 ///
 /// Examples
 /// --------
-/// >>> from finstack_quant.cashflows.builder import OvernightCompoundingMethod
-/// >>> OvernightCompoundingMethod.compounded_with_lookback(5)
-/// OvernightCompoundingMethod.compounded_with_lookback(lookback_days=5)
+/// >>> from finstack_quant.cashflows.builder import FloatingLegCompounding
+/// >>> FloatingLegCompounding.compounded_in_arrears(5)
+/// FloatingLegCompounding.compounded_in_arrears(lookback_days=5)
 #[pyclass(
-    name = "OvernightCompoundingMethod",
+    name = "FloatingLegCompounding",
     module = "finstack_quant.cashflows.builder",
     frozen,
     eq,
@@ -373,56 +376,58 @@ impl PyCouponType {
     skip_from_py_object
 )]
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub struct PyOvernightCompoundingMethod {
-    /// Inner compounding method.
-    pub(crate) inner: OvernightCompoundingMethod,
+pub struct PyFloatingLegCompounding {
+    /// Inner compounding convention.
+    pub(crate) inner: FloatingLegCompounding,
 }
 
 #[pymethods]
-impl PyOvernightCompoundingMethod {
+impl PyFloatingLegCompounding {
+    /// Simple term-rate projection (one forward per period; the default).
+    #[classattr]
+    const SIMPLE: PyFloatingLegCompounding = PyFloatingLegCompounding {
+        inner: FloatingLegCompounding::Simple,
+    };
     /// Arithmetic average of daily fixings weighted by accrual days.
     #[classattr]
-    const SIMPLE_AVERAGE: PyOvernightCompoundingMethod = PyOvernightCompoundingMethod {
-        inner: OvernightCompoundingMethod::SimpleAverage,
-    };
-    /// Compounded in arrears (ISDA 2021 standard; default).
-    #[classattr]
-    const COMPOUNDED_IN_ARREARS: PyOvernightCompoundingMethod = PyOvernightCompoundingMethod {
-        inner: OvernightCompoundingMethod::CompoundedInArrears,
+    const SIMPLE_AVERAGE: PyFloatingLegCompounding = PyFloatingLegCompounding {
+        inner: FloatingLegCompounding::SimpleAverage,
     };
 
-    /// Compounded in arrears with a lookback of ``lookback_days`` business days.
+    /// Compounded in arrears with a lookback of ``lookback_days`` business
+    /// days (``0`` is plain in-arrears, the cleared-OIS convention).
     #[staticmethod]
-    #[pyo3(text_signature = "(lookback_days)")]
-    fn compounded_with_lookback(lookback_days: u32) -> Self {
+    #[pyo3(signature = (lookback_days = 0), text_signature = "(lookback_days=0)")]
+    fn compounded_in_arrears(lookback_days: u32) -> Self {
         Self {
-            inner: OvernightCompoundingMethod::CompoundedWithLookback { lookback_days },
+            inner: FloatingLegCompounding::CompoundedInArrears { lookback_days },
         }
     }
 
-    /// Freeze the last ``lockout_days`` business-day observations at the fixing
-    /// immediately preceding them (ARRC convention). Zero disables lockout;
-    /// schedule construction rejects a window with no preceding fixing.
-    #[staticmethod]
-    #[pyo3(text_signature = "(lockout_days)")]
-    fn compounded_with_lockout(lockout_days: u32) -> Self {
-        Self {
-            inner: OvernightCompoundingMethod::CompoundedWithLockout { lockout_days },
-        }
-    }
-
-    /// Compounded in arrears with an observation shift of ``shift_days`` business days.
+    /// Compounded in arrears with an ISDA 2021 observation shift of
+    /// ``shift_days`` business days (observations and weights shift).
     #[staticmethod]
     #[pyo3(text_signature = "(shift_days)")]
     fn compounded_with_observation_shift(shift_days: u32) -> Self {
         Self {
-            inner: OvernightCompoundingMethod::CompoundedWithObservationShift { shift_days },
+            inner: FloatingLegCompounding::CompoundedWithObservationShift { shift_days },
+        }
+    }
+
+    /// Freeze the last ``cutoff_days`` business-day observations at the fixing
+    /// immediately preceding them (ARRC lockout). Zero disables the cut-off;
+    /// schedule construction rejects a window with no preceding fixing.
+    #[staticmethod]
+    #[pyo3(text_signature = "(cutoff_days)")]
+    fn compounded_with_rate_cutoff(cutoff_days: u32) -> Self {
+        Self {
+            inner: FloatingLegCompounding::CompoundedWithRateCutoff { cutoff_days },
         }
     }
 
     /// Python-style representation.
     fn __repr__(&self) -> String {
-        enum_repr("OvernightCompoundingMethod", &self.inner)
+        enum_repr("FloatingLegCompounding", &self.inner)
     }
 }
 
@@ -890,8 +895,10 @@ impl PyFixedCouponSpec {
 ///     Fixing lag in business days (non-negative).
 /// fixing_calendar_id : str, optional
 ///     Calendar for fixing-date rolls.
-/// overnight_compounding : OvernightCompoundingMethod, optional
-///     Compounding method for overnight indices.
+/// compounding : FloatingLegCompounding, optional
+///     How each period's fixings combine into the rate. ``None`` lets the
+///     pricing instrument resolve it from the rate-index registry (the bare
+///     cashflow builder then projects one term forward).
 /// overnight_basis : DayCount, optional
 ///     Day count for overnight compounding.
 /// fallback : FloatingRateFallback, optional
@@ -921,8 +928,8 @@ impl PyFloatingRateSpec {
     /// Construct a floating-rate spec; see the class docstring for parameters.
     #[new]
     #[pyo3(
-        signature = (forward_curve_id, spread_bp, reset_frequency, gearing=None, gearing_includes_spread=true, index_floor_bp=None, all_in_floor_bp=None, all_in_cap_bp=None, index_cap_bp=None, overnight_index_constraints=None, index_tenor=None, reset_lag_days=2, fixing_calendar_id=None, overnight_compounding=None, overnight_basis=None, fallback=None),
-        text_signature = "(forward_curve_id, spread_bp, reset_frequency, gearing=None, gearing_includes_spread=True, index_floor_bp=None, all_in_floor_bp=None, all_in_cap_bp=None, index_cap_bp=None, overnight_index_constraints=None, index_tenor=None, reset_lag_days=2, fixing_calendar_id=None, overnight_compounding=None, overnight_basis=None, fallback=None)"
+        signature = (forward_curve_id, spread_bp, reset_frequency, gearing=None, gearing_includes_spread=true, index_floor_bp=None, all_in_floor_bp=None, all_in_cap_bp=None, index_cap_bp=None, overnight_index_constraints=None, index_tenor=None, reset_lag_days=2, fixing_calendar_id=None, compounding=None, overnight_basis=None, fallback=None),
+        text_signature = "(forward_curve_id, spread_bp, reset_frequency, gearing=None, gearing_includes_spread=True, index_floor_bp=None, all_in_floor_bp=None, all_in_cap_bp=None, index_cap_bp=None, overnight_index_constraints=None, index_tenor=None, reset_lag_days=2, fixing_calendar_id=None, compounding=None, overnight_basis=None, fallback=None)"
     )]
     #[allow(clippy::too_many_arguments)]
     fn new(
@@ -939,7 +946,7 @@ impl PyFloatingRateSpec {
         index_tenor: Option<&Bound<'_, PyAny>>,
         reset_lag_days: i32,
         fixing_calendar_id: Option<String>,
-        overnight_compounding: Option<PyRef<'_, PyOvernightCompoundingMethod>>,
+        compounding: Option<PyRef<'_, PyFloatingLegCompounding>>,
         overnight_basis: Option<PyRef<'_, PyDayCount>>,
         fallback: Option<PyRef<'_, PyFloatingRateFallback>>,
     ) -> PyResult<Self> {
@@ -959,7 +966,7 @@ impl PyFloatingRateSpec {
                 index_tenor: index_tenor.map(extract_tenor).transpose()?,
                 reset_lag_days,
                 fixing_calendar_id: fixing_calendar_id.map(Into::into),
-                overnight_compounding: overnight_compounding.map(|m| m.inner),
+                compounding: compounding.map(|m| m.inner),
                 overnight_basis: overnight_basis.map(|d| d.inner),
                 fallback: fallback.map_or(FloatingRateFallback::Error, |f| f.inner.clone()),
             },
@@ -1094,12 +1101,12 @@ impl PyFloatingRateSpec {
             .map(ToString::to_string)
     }
 
-    /// Overnight compounding method, if set.
+    /// Period-rate compounding convention, or ``None`` when unset.
     #[getter]
-    fn overnight_compounding(&self) -> Option<PyOvernightCompoundingMethod> {
+    fn compounding(&self) -> Option<PyFloatingLegCompounding> {
         self.inner
-            .overnight_compounding
-            .map(|inner| PyOvernightCompoundingMethod { inner })
+            .compounding
+            .map(|inner| PyFloatingLegCompounding { inner })
     }
 
     /// Overnight compounding day count, if set.
@@ -2273,7 +2280,7 @@ pub(crate) fn add_classes(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_class::<PyRollRule>()?;
     module.add_class::<PyPrincipalExchange>()?;
     module.add_class::<PyCouponType>()?;
-    module.add_class::<PyOvernightCompoundingMethod>()?;
+    module.add_class::<PyFloatingLegCompounding>()?;
     module.add_class::<PyOvernightIndexConstraintApplication>()?;
     module.add_class::<PyFloatingRateFallback>()?;
     module.add_class::<PyFeeAccrualBasis>()?;

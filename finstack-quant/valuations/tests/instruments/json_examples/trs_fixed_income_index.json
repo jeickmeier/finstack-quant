@@ -2,8 +2,8 @@
   "instrument": {
     "spec": {
       "attributes": {},
-      "financing": {
-        "compounding": "term_rate",
+      "financing_leg": {
+        "compounding": "simple",
         "day_count": "act_360",
         "discount_curve_id": "USD-OIS",
         "forward_curve_id": "USD-SOFR-3M",

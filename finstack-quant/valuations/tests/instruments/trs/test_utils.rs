@@ -229,7 +229,7 @@ impl TestEquityTrsBuilder {
             .id(self.id.into())
             .notional(self.notional)
             .underlying(underlying)
-            .financing(financing)
+            .financing_leg(financing)
             .schedule(schedule)
             .side(self.side)
             .dividend_settlement(
@@ -346,7 +346,7 @@ impl TestFIIndexTrsBuilder {
             .id(self.id.into())
             .notional(self.notional)
             .underlying(underlying)
-            .financing(financing)
+            .financing_leg(financing)
             .schedule(schedule)
             .side(self.side);
 

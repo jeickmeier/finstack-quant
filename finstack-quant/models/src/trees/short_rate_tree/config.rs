@@ -1,3 +1,4 @@
+use finstack_quant_core::math::Compounding;
 use finstack_quant_core::Result;
 
 /// Default normal (absolute) volatility for Ho-Lee model.
@@ -9,103 +10,82 @@ pub const DEFAULT_NORMAL_VOL: f64 = 0.01; // 100 bp/yr
 /// Default maximum initial-curve repricing error for calibrated trees, in basis points.
 pub const DEFAULT_CURVE_FIT_TOLERANCE_BP: f64 = 0.1;
 
-/// Compounding convention for per-node discount factors in the short-rate tree.
+/// Per-node discount-factor conventions of the short-rate trees, expressed
+/// over the canonical core [`Compounding`].
 ///
 /// | Convention | Formula | Use Case |
 /// |------------|---------|----------|
 /// | `Continuous` | `exp(-r * dt)` | Default; matches continuous short-rate dynamics |
 /// | `Simple` | `1 / (1 + r * dt)` | Money-market / Bloomberg BDT convention |
-/// | `SemiAnnual` | `(1 + r/2)^(-2 * dt)` | US bond market convention |
-/// | `Quarterly` | `(1 + r/4)^(-4 * dt)` | Quarterly compounding |
-/// | `Monthly` | `(1 + r/12)^(-12 * dt)` | Monthly compounding |
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-pub enum TreeCompounding {
-    /// Continuous compounding: `df = exp(-r * dt)`.
-    #[default]
-    Continuous,
-    /// Simple (money-market) compounding: `df = 1 / (1 + r * dt)`.
-    Simple,
-    /// Semi-annual compounding: `df = (1 + r/2)^(-2 * dt)`.
-    SemiAnnual,
-    /// Quarterly compounding: `df = (1 + r/4)^(-4 * dt)`.
-    Quarterly,
-    /// Monthly compounding: `df = (1 + r/12)^(-12 * dt)`.
-    Monthly,
+/// | `Annual` / `Periodic(n)` | `(1 + r/n)^(-n * dt)` | Bond-market conventions (`n = 2` US) |
+///
+/// The bases are clamped to a small positive floor so that pathological
+/// inputs (deeply negative rates) never produce negative or NaN factors.
+pub trait TreeDiscounting: Copy {
+    /// Per-step discount factor for `rate` over the year-fraction step `dt`.
+    fn tree_df(self, rate: f64, dt: f64) -> f64;
+
+    /// Invert [`tree_df`](Self::tree_df): the per-step rate reproducing `df`
+    /// over `dt`. Returns `0.0` (with a warning) for `dt ≈ 0` or `df <= 0`.
+    fn tree_rate_from_df(self, df: f64, dt: f64) -> f64;
+
+    /// Continuous rate `r_cont` with `exp(-r_cont * dt) = tree_df(rate, dt)`.
+    fn tree_to_continuous(self, rate: f64, dt: f64) -> f64;
 }
 
-impl TreeCompounding {
-    /// Compute the per-step discount factor for a given rate and time step.
-    ///
-    /// Returns a positive discount factor. For pathological inputs (e.g.,
-    /// deeply negative rates with simple compounding where `1 + r*dt <= 0`),
-    /// the base is clamped to a small positive value to avoid negative or
-    /// NaN discount factors.
-    ///
-    /// # Arguments
-    ///
-    /// * `rate` - Rate applied by the operation; representation and compounding follow the receiving type convention.
-    /// * `dt` - Positive time-step width in year-fraction units.
+/// Compounding periods per year for the periodic conventions (`Annual` = 1).
+fn periods(comp: Compounding) -> Option<f64> {
+    match comp {
+        Compounding::Continuous | Compounding::Simple => None,
+        Compounding::Annual => Some(1.0),
+        Compounding::Periodic(n) => Some(f64::from(n.get())),
+    }
+}
+
+impl TreeDiscounting for Compounding {
     #[inline]
-    pub fn df(self, rate: f64, dt: f64) -> f64 {
+    fn tree_df(self, rate: f64, dt: f64) -> f64 {
         const FLOOR: f64 = 1e-15;
-        match self {
-            Self::Continuous => (-rate * dt).exp(),
-            Self::Simple => {
+        match (self, periods(self)) {
+            (_, Some(n)) => {
+                let base = (1.0 + rate / n).max(FLOOR);
+                base.powf(-n * dt)
+            }
+            (Compounding::Simple, None) => {
                 let denom = 1.0 + rate * dt;
                 1.0 / denom.max(FLOOR)
             }
-            Self::SemiAnnual => {
-                let base = (1.0 + rate / 2.0).max(FLOOR);
-                base.powf(-2.0 * dt)
-            }
-            Self::Quarterly => {
-                let base = (1.0 + rate / 4.0).max(FLOOR);
-                base.powf(-4.0 * dt)
-            }
-            Self::Monthly => {
-                let base = (1.0 + rate / 12.0).max(FLOOR);
-                base.powf(-12.0 * dt)
-            }
+            _ => (-rate * dt).exp(),
         }
     }
 
-    /// Invert [`df`](Self::df): the per-step rate under this convention that
-    /// reproduces the given discount factor over `dt`.
-    ///
-    /// Returns `rate` such that `self.df(rate, dt) = df`. For `dt ≈ 0` or a
-    /// non-positive `df` the continuous-equivalent fallback is used.
     #[inline]
-    pub fn rate_from_df(self, df: f64, dt: f64) -> f64 {
+    fn tree_rate_from_df(self, df: f64, dt: f64) -> f64 {
         if dt.abs() < f64::EPSILON || df <= 0.0 {
             tracing::warn!(
-                "TreeCompounding::rate_from_df: degenerate input df={df:.6e}, dt={dt}, \
+                "tree_rate_from_df: degenerate input df={df:.6e}, dt={dt}, \
                  convention={self:?}; returning 0"
             );
             return 0.0;
         }
-        match self {
-            Self::Continuous => -df.ln() / dt,
-            Self::Simple => (1.0 / df - 1.0) / dt,
-            Self::SemiAnnual => 2.0 * (df.powf(-1.0 / (2.0 * dt)) - 1.0),
-            Self::Quarterly => 4.0 * (df.powf(-1.0 / (4.0 * dt)) - 1.0),
-            Self::Monthly => 12.0 * (df.powf(-1.0 / (12.0 * dt)) - 1.0),
+        match (self, periods(self)) {
+            (_, Some(n)) => n * (df.powf(-1.0 / (n * dt)) - 1.0),
+            (Compounding::Simple, None) => (1.0 / df - 1.0) / dt,
+            _ => -df.ln() / dt,
         }
     }
 
-    /// Convert a rate under this convention to the equivalent continuous rate.
-    ///
-    /// Returns `r_cont` such that `exp(-r_cont * dt) = self.df(rate, dt)`.
     #[inline]
-    pub fn to_continuous(self, rate: f64, dt: f64) -> f64 {
+    fn tree_to_continuous(self, rate: f64, dt: f64) -> f64 {
         if dt.abs() < f64::EPSILON {
             return rate;
         }
-        let d = self.df(rate, dt);
+        let d = self.tree_df(rate, dt);
         if d > 0.0 {
             -d.ln() / dt
         } else {
             tracing::warn!(
-                "TreeCompounding::to_continuous: non-positive DF {d:.6e} for rate={rate}, \
+                "tree_to_continuous: non-positive DF {d:.6e} for rate={rate}, \
                  dt={dt}, convention={self:?}; falling back to raw rate"
             );
             rate
@@ -244,7 +224,7 @@ pub struct ShortRateTreeConfig {
     /// Controls whether calibration and pricing use continuous `exp(-r*dt)` or
     /// simple `1/(1+r*dt)` compounding. Bloomberg's lognormal OAS model uses
     /// simple compounding; the default is continuous compounding.
-    pub compounding: TreeCompounding,
+    pub compounding: Compounding,
 
     /// Maximum permitted initial-curve repricing error, in basis points.
     ///
@@ -282,7 +262,7 @@ impl ShortRateTreeConfig {
             model: ShortRateModel::HoLee,
             volatility: normal_vol,
             mean_reversion: 0.0,
-            compounding: TreeCompounding::default(),
+            compounding: Compounding::default(),
             curve_fit_tolerance_bp: DEFAULT_CURVE_FIT_TOLERANCE_BP,
         }
     }
@@ -311,14 +291,14 @@ impl ShortRateTreeConfig {
             model: ShortRateModel::BlackDermanToy,
             volatility: lognormal_vol,
             mean_reversion,
-            compounding: TreeCompounding::default(),
+            compounding: Compounding::default(),
             curve_fit_tolerance_bp: DEFAULT_CURVE_FIT_TOLERANCE_BP,
         }
     }
 
     /// Set the per-node compounding convention.
     #[must_use]
-    pub fn with_compounding(mut self, compounding: TreeCompounding) -> Self {
+    pub fn with_compounding(mut self, compounding: Compounding) -> Self {
         self.compounding = compounding;
         self
     }

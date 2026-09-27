@@ -50,7 +50,7 @@
 //! term vs overnight from the index and `FloatingRateSpec`:
 //! - term indices such as `USD-SOFR-3M` project a single forward
 //! - registered overnight RFR indices such as `USD-SOFR-OIS`, or an explicit
-//!   `overnight_compounding` method, compound daily fixings in arrears
+//!   `compounding` method, compound daily fixings in arrears
 //! - reset lag is applied when building the reset grid
 //!
 //! # Numerical Constants

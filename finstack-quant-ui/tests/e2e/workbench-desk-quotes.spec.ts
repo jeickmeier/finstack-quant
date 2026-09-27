@@ -15,13 +15,13 @@ const cases = [
     type: "interest_rate_swap",
     label: "Fixed coupon",
     value: "0.045",
-    path: ["fixed", "rate"],
+    path: ["fixed_leg", "rate"],
   },
   {
     type: "credit_default_swap",
     label: "Running coupon",
     value: "110",
-    path: ["premium", "coupon_bp"],
+    path: ["premium_leg", "coupon_bp"],
   },
   {
     type: "equity_option",

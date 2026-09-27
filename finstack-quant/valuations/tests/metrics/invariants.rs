@@ -487,7 +487,7 @@ mod cds_invariants {
 
             // Override recovery rate
             let mut cds_with_recovery = cds;
-            cds_with_recovery.protection.recovery_rate = recovery;
+            cds_with_recovery.protection_leg.recovery_rate = recovery;
 
             let market = MarketContext::new()
                 .insert(disc)
@@ -527,8 +527,8 @@ mod cds_invariants {
 
             // Set different recovery rates
             let mut cds_low = cds_low_recovery;
-            cds_low.protection.recovery_rate = 0.30; // Low recovery = high LGD
-            cds_high_recovery.protection.recovery_rate = 0.50; // High recovery = low LGD
+            cds_low.protection_leg.recovery_rate = 0.30; // Low recovery = high LGD
+            cds_high_recovery.protection_leg.recovery_rate = 0.50; // High recovery = low LGD
 
             // Each trade needs a hazard curve whose bootstrap recovery matches
             // its own recovery (ISDA same-R-in-both-legs guard). The λ knots

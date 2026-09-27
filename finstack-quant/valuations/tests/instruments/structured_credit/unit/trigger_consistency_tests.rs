@@ -112,8 +112,8 @@ fn hedged(deal: StructuredCredit) -> StructuredCredit {
         PayReceive::Pay,
     )
     .expect("swap");
-    swap.fixed.frequency = Tenor::quarterly();
-    swap.float.frequency = Tenor::quarterly();
+    swap.fixed_leg.frequency = Tenor::quarterly();
+    swap.float_leg.frequency = Tenor::quarterly();
     deal.with_hedge_swap(HedgeSwap::new(swap).on_tranche_par("A"))
 }
 

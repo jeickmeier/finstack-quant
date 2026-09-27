@@ -921,7 +921,6 @@ mod tests {
         let schema = serde_json::to_value(schemars::schema_for!(InstrumentEnvelope))
             .expect("instrument envelope schema");
         for definition in [
-            "BasisSwapLeg",
             "CallPut",
             "CallPutSchedule",
             "CmoTranche",
@@ -1316,7 +1315,9 @@ mod tests {
         let start = Date::from_calendar_date(2024, Month::January, 1).expect("Valid test date");
         let end = Date::from_calendar_date(2025, Month::January, 1).expect("Valid test date");
 
-        let primary_leg = BasisSwapLeg {
+        let primary_leg = FloatLegSpec {
+            end_of_month: false,
+            fixing_calendar_id: None,
             forward_curve_id: CurveId::new("USD-SOFR-3M"),
             discount_curve_id: CurveId::new("USD-OIS"),
             start,
@@ -1332,7 +1333,9 @@ mod tests {
             compounding: Default::default(),
         };
 
-        let reference_leg = BasisSwapLeg {
+        let reference_leg = FloatLegSpec {
+            end_of_month: false,
+            fixing_calendar_id: None,
             forward_curve_id: CurveId::new("USD-SOFR-1M"),
             discount_curve_id: CurveId::new("USD-OIS"),
             start,
@@ -1445,7 +1448,9 @@ mod tests {
         let start = Date::from_calendar_date(2026, Month::January, 1).expect("Valid test date");
         let end = Date::from_calendar_date(2027, Month::January, 1).expect("Valid test date");
 
-        let primary_leg = BasisSwapLeg {
+        let primary_leg = FloatLegSpec {
+            end_of_month: false,
+            fixing_calendar_id: None,
             forward_curve_id: CurveId::new("USD-SOFR-3M"),
             discount_curve_id: CurveId::new("USD-OIS"),
             start,
@@ -1460,7 +1465,9 @@ mod tests {
             reset_lag_days: 0,
             compounding: Default::default(),
         };
-        let reference_leg = BasisSwapLeg {
+        let reference_leg = FloatLegSpec {
+            end_of_month: false,
+            fixing_calendar_id: None,
             forward_curve_id: CurveId::new("USD-SOFR-1M"),
             discount_curve_id: CurveId::new("USD-OIS"),
             start,

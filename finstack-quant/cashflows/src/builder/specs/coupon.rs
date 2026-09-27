@@ -133,82 +133,172 @@ impl From<RawFixedCouponSpec> for FixedCouponSpec {
     }
 }
 
-/// Compounding method for overnight rate indices (SOFR, ESTR, SONIA).
+/// How the fixings of one accrual period combine into the period rate.
 ///
-/// Controls how daily overnight fixings are aggregated into a period rate
-/// for floating rate coupons. The choice of compounding method affects both
-/// the accrued amount and the payment timing/certainty.
+/// One canonical enum for every floating leg and coupon: swaps, basis and
+/// cross-currency legs, TRS financing, IR futures, FRN / loan / structured
+/// credit coupons.
 ///
-/// # Market Conventions
+/// | Variant | Period rate | Typical use |
+/// |---------|-------------|-------------|
+/// | `simple` | One term fixing / forward over the period | EURIBOR, Term SOFR, legacy IBOR |
+/// | `simple_average` | `(Σ rᵢ·dᵢ) / D` of daily overnight fixings | Averaged overnight loans, Fed-Funds futures |
+/// | `compounded_in_arrears` | `[∏(1 + rᵢ·dᵢ/B) − 1]·B/D` | SOFR / SONIA / €STR / TONA OIS (lookback 0) |
+/// | `compounded_with_observation_shift` | as above, observations and weights shifted | ISDA 2021 observation shift |
+/// | `compounded_with_rate_cutoff` | as above, last fixings frozen | ARRC lockout / SWPM "Rate Cut-Off Days" |
 ///
-/// | Index | Standard Method | Lookback | Reference |
-/// |-------|----------------|----------|-----------|
-/// | USD SOFR | CompoundedInArrears | 2 BD | ISDA 2021 |
-/// | EUR €STR | CompoundedWithObservationShift | 2 BD | ECB |
-/// | GBP SONIA | CompoundedWithObservationShift | 5 BD | BoE |
-/// | JPY TONA | CompoundedInArrears | 2 BD | BoJ |
+/// Day counts are business days and must be non-negative.
 ///
-/// # Reference
+/// # References
 ///
-/// - ISDA (2021). "IBOR Fallbacks Supplement." Section 7.
-/// - ARRC (2020). "SOFR: A User's Guide." Federal Reserve Bank of New York. `docs/REFERENCES.md#arrc-sofr-users-guide`
-/// - `docs/REFERENCES.md#andersen-piterbarg-interest-rate-modeling`
-/// - `docs/REFERENCES.md#isda-2006-definitions`
+/// - ISDA 2021 Definitions, compounded RFR conventions `docs/REFERENCES.md#isda-2021-definitions`
+/// - ARRC (2020). "SOFR: A User's Guide." `docs/REFERENCES.md#arrc-sofr-users-guide`
+/// - BoE SONIA conventions `docs/REFERENCES.md#boe-sonia-key-features`
+///
+/// # Examples
+///
+/// ```
+/// use finstack_quant_cashflows::builder::FloatingLegCompounding;
+///
+/// assert_eq!(FloatingLegCompounding::default(), FloatingLegCompounding::Simple);
+/// assert_eq!(
+///     FloatingLegCompounding::sofr(),
+///     FloatingLegCompounding::CompoundedInArrears { lookback_days: 0 }
+/// );
+/// ```
 #[derive(
     Debug, Clone, Copy, Default, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize,
 )]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 #[serde(rename_all = "snake_case")]
-pub enum OvernightCompoundingMethod {
-    /// Arithmetic (non-compounded) average of daily overnight fixings,
-    /// weighted by accrual days: `Rate = (Σ rᵢ·dᵢ) / D`.
+pub enum FloatingLegCompounding {
+    /// Simple term-rate projection: one fixing or forward over the period.
     ///
-    /// This is a fully supported convention. It is the correct choice for
-    /// instruments that contractually specify a simple-average overnight
-    /// index (some bilateral loans and older FRNs) rather than the
-    /// compounded ISDA 2021 convention. Use [`Self::CompoundedInArrears`]
-    /// for standard SOFR/ESTR/TONA legs.
+    /// `Coupon = Notional × (Forward_Rate + Spread) × DCF`. This is the
+    /// default; a registered overnight RFR index rejects it.
+    #[default]
+    Simple,
+
+    /// Arithmetic average of daily overnight fixings weighted by accrual days,
+    /// `Rate = (Σ rᵢ·dᵢ) / D`, for instruments that contractually specify a
+    /// simple-average overnight index.
     SimpleAverage,
 
-    /// Compounded in arrears with daily compounding (ISDA 2021 standard).
+    /// Compounded in arrears (overnight RFR rates).
     ///
-    /// ```text
-    /// Rate = [∏(1 + r_i × d_i/360) - 1] × 360/D
-    /// ```
-    #[default]
-    CompoundedInArrears,
-
-    /// Compounded in arrears with lookback (shift observation period).
-    ///
-    /// Uses rates from `lookback_days` business days before each accrual date.
-    CompoundedWithLookback {
-        /// Number of business days to look back for rate observations.
+    /// `Coupon = Notional × [∏(1 + rᵢ·dᵢ/B) − 1]` over the daily observations
+    /// of the accrual period.
+    CompoundedInArrears {
+        /// Business days by which observation dates move backward while the
+        /// day-count weights stay on the original accrual dates ("lookback
+        /// without observation shift", ISDA 2021 / ARRC). `0` is plain
+        /// in-arrears, the cleared-OIS convention.
+        #[cfg_attr(feature = "json-schema", schemars(range(min = 0, max = 31)))]
         lookback_days: u32,
     },
 
-    /// Compounded in arrears with lockout (rate cut-off near end of period).
-    ///
-    /// Freeze the last `lockout_days` business-day observations at the fixing
-    /// immediately preceding those days. For fixings `b_1..b_n`, the source is
-    /// `b_{n-lockout}`. A positive lockout must leave a preceding fixing.
-    ///
-    /// Reference: ARRC, December 3, 2021 Statement, Appendix A, definition of
-    /// "Lockout": <https://www.newyorkfed.org/medialibrary/Microsites/arrc/files/2021/ARRC-Statement-LIBOR-tenors-Legislation.pdf>.
-    CompoundedWithLockout {
-        /// Number of business days before period end to freeze the rate.
-        lockout_days: u32,
-    },
-
-    /// Compounded in arrears with observation shift.
-    ///
-    /// Both observation dates AND weights are shifted back by `shift_days`
-    /// business days. This is the ISDA 2021 recommended convention for SOFR
-    /// and the standard for GBP SONIA and EUR €STR.
+    /// Compounded in arrears with ISDA 2021 observation shift: both the
+    /// observation dates and their day-count weights move back
+    /// (ISDA 2021 Definitions Section 4.5(c)).
     CompoundedWithObservationShift {
-        /// Number of business days to shift observations.
+        /// Business days to shift both observation dates and weights.
+        #[cfg_attr(feature = "json-schema", schemars(range(min = 0, max = 31)))]
         shift_days: u32,
     },
+
+    /// Compounded in arrears with a rate cut-off near the period end.
+    ///
+    /// The last `cutoff_days` business-day observations are frozen at the
+    /// fixing immediately preceding them: for fixings `b_1..b_n` the source is
+    /// `b_{n-cutoff}`, so a positive cut-off must leave a preceding fixing.
+    /// Reference: ARRC, December 3, 2021 Statement, Appendix A ("Lockout").
+    CompoundedWithRateCutoff {
+        /// Business days before period end over which the rate is frozen.
+        #[cfg_attr(feature = "json-schema", schemars(range(min = 0, max = 31)))]
+        cutoff_days: u32,
+    },
+}
+
+/// Market-standard compounding presets for common RFR **swaps** (cleared OIS).
+///
+/// Cleared OIS compounds the overnight rate plain in arrears with only a
+/// payment delay. The ARRC 2-business-day and BoE 5-business-day lookbacks
+/// are FRN coupon conventions; use
+/// [`FloatingLegCompounding::CompoundedInArrears`] with an explicit lookback or
+/// the `*_observation_shift` presets for them. The presets set only the
+/// compounding method: the leg's day count (ACT/360 for SOFR / EFFR / €STR /
+/// SARON, ACT/365F for SONIA and TONA) is configured separately.
+impl FloatingLegCompounding {
+    /// USD SOFR OIS convention (plain compounded in arrears).
+    pub fn sofr() -> Self {
+        Self::CompoundedInArrears { lookback_days: 0 }
+    }
+
+    /// USD Fed Funds / EFFR OIS convention (no lookback).
+    pub fn fedfunds() -> Self {
+        Self::CompoundedInArrears { lookback_days: 0 }
+    }
+
+    /// GBP SONIA OIS convention (plain compounded in arrears).
+    pub fn sonia() -> Self {
+        Self::CompoundedInArrears { lookback_days: 0 }
+    }
+
+    /// EUR €STR OIS convention (plain compounded in arrears).
+    pub fn estr() -> Self {
+        Self::CompoundedInArrears { lookback_days: 0 }
+    }
+
+    /// JPY TONA OIS convention (plain compounded in arrears).
+    pub fn tona() -> Self {
+        Self::CompoundedInArrears { lookback_days: 0 }
+    }
+
+    /// CHF SARON OIS convention (plain compounded in arrears).
+    pub fn saron() -> Self {
+        Self::CompoundedInArrears { lookback_days: 0 }
+    }
+
+    /// USD SOFR with ISDA 2021 observation shift (2-day shift).
+    pub fn sofr_observation_shift() -> Self {
+        Self::CompoundedWithObservationShift { shift_days: 2 }
+    }
+
+    /// GBP SONIA with ISDA 2021 observation shift (5-day shift).
+    pub fn sonia_observation_shift() -> Self {
+        Self::CompoundedWithObservationShift { shift_days: 5 }
+    }
+
+    /// Compounded RFR with an end-of-period rate cut-off.
+    ///
+    /// # Arguments
+    ///
+    /// * `cutoff_days` - Business days before period end over which the
+    ///   overnight rate is frozen.
+    pub fn rate_cutoff(cutoff_days: u32) -> Self {
+        Self::CompoundedWithRateCutoff { cutoff_days }
+    }
+
+    /// Whether the period rate is built from daily overnight fixings (every
+    /// variant except [`Self::Simple`]).
+    pub fn is_overnight(&self) -> bool {
+        !matches!(self, Self::Simple)
+    }
+}
+
+impl std::fmt::Display for FloatingLegCompounding {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Simple => write!(f, "simple"),
+            Self::SimpleAverage => write!(f, "simple_average"),
+            Self::CompoundedInArrears { .. } => write!(f, "compounded_in_arrears"),
+            Self::CompoundedWithObservationShift { .. } => {
+                write!(f, "compounded_observation_shift")
+            }
+            Self::CompoundedWithRateCutoff { .. } => write!(f, "compounded_rate_cutoff"),
+        }
+    }
 }
 
 /// Default gearing for floating rates.
@@ -376,7 +466,7 @@ impl OvernightIndexConstraintApplication {
 ///     index_tenor: None,
 ///     reset_lag_days: 2,
 ///     fixing_calendar_id: None,
-///     overnight_compounding: None,
+///     compounding: None,
 ///     overnight_basis: None,
 ///     fallback: Default::default(),
 /// };
@@ -497,15 +587,15 @@ pub struct FloatingRateSpec {
     #[serde(default)]
     pub fixing_calendar_id: Option<finstack_quant_core::types::CalendarId>,
 
-    /// Overnight compounding method for overnight rate indices (SOFR, ESTR, SONIA).
+    /// How each accrual period's fixings combine into the period rate.
     ///
-    /// When set to `Some(method)`, the rate for each accrual period is computed
-    /// by compounding daily overnight fixings according to the specified method,
-    /// rather than looking up a single forward rate for the period.
-    ///
-    /// Leave as `None` for term rates (e.g., 3M EURIBOR, 6M LIBOR).
+    /// An overnight variant (anything but `simple`) computes the period rate
+    /// from daily overnight fixings. `simple` projects one term forward over
+    /// the period. `None` leaves the choice to the instrument: pricers that
+    /// know the index resolve it from the rate-index convention registry, and
+    /// the bare cashflow builder treats it as `simple`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub overnight_compounding: Option<OvernightCompoundingMethod>,
+    pub compounding: Option<FloatingLegCompounding>,
 
     /// Day-count basis for the overnight compounding denominator.
     ///
@@ -513,11 +603,11 @@ pub struct FloatingRateSpec {
     /// overnight fixings (e.g., 360 for SOFR/€STR/TONA, 365 for SONIA).
     /// It is independent of the leg's accrual day count when set explicitly.
     ///
-    /// When `None` and `overnight_compounding` is set, the coupon
+    /// When `None` and `compounding` is an overnight variant, the coupon
     /// `schedule.day_count` is used if it is `Act360` or `Act365F`. Other
     /// coupon day counts (for example `Thirty360`) error unless an explicit
     /// `Act360` or `Act365F` basis is supplied. Ignored when
-    /// `overnight_compounding` is `None`.
+    /// `compounding` is not an overnight variant.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub overnight_basis: Option<DayCount>,
 
@@ -602,7 +692,7 @@ impl FloatingRateSpec {
             index_tenor,
             reset_lag_days,
             fixing_calendar_id: Some(fixing_calendar_id.into()),
-            overnight_compounding: None,
+            compounding: None,
             overnight_basis: None,
             fallback: FloatingRateFallback::Error,
         }
@@ -623,12 +713,12 @@ impl FloatingRateSpec {
     /// # Examples
     ///
     /// ```rust
-    /// use finstack_quant_cashflows::builder::{FloatingRateSpec, OvernightCompoundingMethod};
+    /// use finstack_quant_cashflows::builder::{FloatingLegCompounding, FloatingRateSpec};
     /// use rust_decimal_macros::dec;
     ///
     /// let spec = FloatingRateSpec::sofr(dec!(50));
     /// assert_eq!(spec.forward_curve_id.as_str(), "USD-SOFR");
-    /// assert_eq!(spec.overnight_compounding, Some(OvernightCompoundingMethod::CompoundedInArrears));
+    /// assert_eq!(spec.compounding, Some(FloatingLegCompounding::sofr()));
     /// assert!(spec.validate().is_ok());
     /// ```
     ///
@@ -637,7 +727,7 @@ impl FloatingRateSpec {
     /// - `docs/REFERENCES.md#arrc-sofr-users-guide`
     pub fn sofr(spread_bp: Decimal) -> Self {
         Self {
-            overnight_compounding: Some(OvernightCompoundingMethod::CompoundedInArrears),
+            compounding: Some(FloatingLegCompounding::sofr()),
             overnight_basis: Some(DayCount::Act360),
             ..Self::preset("USD-SOFR", spread_bp, Tenor::quarterly(), None, 0, "usny")
         }
@@ -668,7 +758,7 @@ impl FloatingRateSpec {
     /// ```
     pub fn sonia(spread_bp: Decimal) -> Self {
         Self {
-            overnight_compounding: Some(OvernightCompoundingMethod::CompoundedInArrears),
+            compounding: Some(FloatingLegCompounding::sofr()),
             overnight_basis: Some(DayCount::Act365F),
             ..Self::preset("GBP-SONIA", spread_bp, Tenor::annual(), None, 0, "gblo")
         }

@@ -96,13 +96,20 @@ typed_or_label!(
     "TimeRollMode",
     "business_days, calendar_days, approximate"
 );
-typed_or_label!(
-    extract_compounding,
-    PyCompounding,
-    Compounding,
-    "Compounding",
-    "simple, continuous, annual, semi_annual, quarterly, monthly"
-);
+/// Accept the typed `Compounding` wrapper or its canonical label.
+pub(super) fn extract_compounding(obj: &Bound<'_, PyAny>) -> PyResult<Compounding> {
+    if let Ok(typed) = obj.cast::<PyCompounding>() {
+        return Ok(typed.borrow().inner);
+    }
+    let label: String = obj.extract().map_err(|_| {
+        crate::errors::value_error(format!(
+            "Compounding must be a Compounding or one of: {}; got {}",
+            super::kinds::COMPOUNDING_LABELS,
+            obj.get_type()
+        ))
+    })?;
+    super::kinds::parse_compounding(&label)
+}
 
 /// Accept `Mapping[str, str]` or `Sequence[tuple[str, str]]`, preserving
 /// insertion order.

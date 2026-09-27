@@ -44,13 +44,13 @@ fn test_build_cds_par_spread() {
 
     if let Some(cds) = instrument.as_any().downcast_ref::<CreditDefaultSwap>() {
         assert_eq!(cds.notional.currency(), Currency::USD);
-        assert_eq!(cds.premium.coupon_bp, Decimal::from(120));
-        assert_eq!(cds.protection.recovery_rate, 0.40);
+        assert_eq!(cds.premium_leg.coupon_bp, Decimal::from(120));
+        assert_eq!(cds.protection_leg.recovery_rate, 0.40);
         assert_eq!(cds.convention, CdsConvention::IsdaNa);
         assert_eq!(cds.doc_clause, Some(CdsDocClause::IsdaNa));
         // Verify discount/credit curve ids come from BuildCtx role mappings
-        assert_eq!(cds.premium.discount_curve_id.as_str(), "USD-OIS");
-        assert_eq!(cds.protection.credit_curve_id.as_str(), "XYZ-CORP-SNR");
+        assert_eq!(cds.premium_leg.discount_curve_id.as_str(), "USD-OIS");
+        assert_eq!(cds.protection_leg.credit_curve_id.as_str(), "XYZ-CORP-SNR");
     } else {
         panic!("Expected CreditDefaultSwap");
     }
@@ -83,15 +83,15 @@ fn test_build_cds_upfront() {
     let instrument = build_cds_instrument(&quote, &ctx).expect("build cds upfront");
 
     if let Some(cds) = instrument.as_any().downcast_ref::<CreditDefaultSwap>() {
-        assert_eq!(cds.premium.coupon_bp, Decimal::from(100)); // Running
+        assert_eq!(cds.premium_leg.coupon_bp, Decimal::from(100)); // Running
         assert!(cds.upfront.is_some());
         assert_eq!(cds.convention, CdsConvention::IsdaNa);
         assert_eq!(cds.doc_clause, Some(CdsDocClause::IsdaNa));
         if let Some((_dt, amount)) = cds.upfront {
             assert_eq!(amount.amount(), 20_000.0); // 2% of 1M
         }
-        assert_eq!(cds.premium.discount_curve_id.as_str(), "USD-OIS");
-        assert_eq!(cds.protection.credit_curve_id.as_str(), "XYZ-CREDIT");
+        assert_eq!(cds.premium_leg.discount_curve_id.as_str(), "USD-OIS");
+        assert_eq!(cds.protection_leg.credit_curve_id.as_str(), "XYZ-CREDIT");
     } else {
         panic!("Expected CreditDefaultSwap");
     }

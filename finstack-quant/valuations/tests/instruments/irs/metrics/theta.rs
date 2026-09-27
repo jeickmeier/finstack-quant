@@ -52,7 +52,7 @@ fn create_swap(as_of: Date, end: Date, fixed_rate: rust_decimal::Decimal) -> Int
         id: "IRS_THETA_TEST".into(),
         notional: Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         side: PayReceive::Receive,
-        fixed: finstack_quant_valuations::instruments::FixedLegSpec {
+        fixed_leg: finstack_quant_valuations::instruments::FixedLegSpec {
             discount_curve_id: "USD_OIS".into(),
             rate: fixed_rate,
             frequency: Tenor::quarterly(),
@@ -61,13 +61,12 @@ fn create_swap(as_of: Date, end: Date, fixed_rate: rust_decimal::Decimal) -> Int
             calendar_id: None,
             stub: StubKind::None,
             par_method: None,
-            compounding_simple: true,
             payment_lag_days: 0,
             end_of_month: false,
             start: as_of,
             end,
         },
-        float: finstack_quant_valuations::instruments::FloatLegSpec {
+        float_leg: finstack_quant_valuations::instruments::FloatLegSpec {
             discount_curve_id: "USD_OIS".into(),
             forward_curve_id: "USD_LIBOR_3M".into(),
             spread_bp: rust_decimal::Decimal::try_from(0.0).expect("valid"),

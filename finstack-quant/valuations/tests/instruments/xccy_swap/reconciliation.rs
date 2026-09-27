@@ -59,7 +59,7 @@ fn coupon_schedule_reconciles_with_priced_pv_unlagged() {
     let maturity = d(2027, 1, 2);
 
     let mut eur_leg = leg_eur_pay(base, maturity);
-    eur_leg.spread_bp = rust_decimal::Decimal::new(25, 0); // 25 bp
+    eur_leg.leg.spread_bp = rust_decimal::Decimal::new(25, 0); // 25 bp
 
     let swap = XccySwap::new(
         "XCCY-RECON",
@@ -94,10 +94,10 @@ fn coupon_schedule_reconciles_with_priced_pv_with_reset_lag_and_fixing() {
     let maturity = d(2027, 1, 2);
 
     let mut usd_leg = leg_usd_receive(base, maturity);
-    usd_leg.reset_lag_days = Some(2);
+    usd_leg.leg.reset_lag_days = 2;
     let mut eur_leg = leg_eur_pay(base, maturity);
-    eur_leg.reset_lag_days = Some(2);
-    eur_leg.spread_bp = rust_decimal::Decimal::new(25, 0);
+    eur_leg.leg.reset_lag_days = 2;
+    eur_leg.leg.spread_bp = rust_decimal::Decimal::new(25, 0);
 
     let swap = XccySwap::new("XCCY-RECON-LAG", usd_leg, eur_leg, Currency::USD)
         .with_notional_exchange(NotionalExchange::None);

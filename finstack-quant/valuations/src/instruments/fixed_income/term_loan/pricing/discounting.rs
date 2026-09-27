@@ -595,7 +595,7 @@ mod tests {
             index_tenor: None,
             reset_lag_days: 0,
             fixing_calendar_id: None,
-            overnight_compounding: None,
+            compounding: None,
             overnight_basis: None,
             fallback: Default::default(),
         };

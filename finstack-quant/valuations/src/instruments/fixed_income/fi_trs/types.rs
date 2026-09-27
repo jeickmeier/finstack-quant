@@ -69,7 +69,7 @@ use rust_decimal::Decimal;
 ///             .with_yield("US-CORP-YIELD")
 ///             .with_duration("US-CORP-DURATION"),
 ///     )
-///     .financing(FinancingLegSpec::new(
+///     .financing_leg(FinancingLegSpec::new(
 ///         "USD-OIS", "USD-SOFR-3M", Decimal::from(35), DayCount::Act360,
 ///     ))
 ///     .schedule(TrsScheduleSpec::from_params(
@@ -102,7 +102,7 @@ pub struct FIIndexTotalReturnSwap {
     /// Underlying index parameters (index ID, yield, duration, base currency).
     pub underlying: IndexUnderlyingParams,
     /// Financing leg specification (curves, spread, day count).
-    pub financing: FinancingLegSpec,
+    pub financing_leg: FinancingLegSpec,
     /// Schedule specification (payment dates and frequency).
     pub schedule: TrsScheduleSpec,
     /// Trade side: `receive` receives the total-return leg and pays financing;
@@ -190,7 +190,7 @@ impl FIIndexTotalReturnSwap {
             )));
         }
         self.underlying.validate(&context)?;
-        self.financing.validate(&context)?;
+        self.financing_leg.validate(&context)?;
         self.schedule.validate(&context)?;
         if let Some(level) = self.initial_level {
             if !level.is_finite() || level <= 0.0 {
@@ -233,7 +233,7 @@ impl FIIndexTotalReturnSwap {
             .id(InstrumentId::new("TRS-US-CORP-1Y"))
             .notional(Money::from((5_000_000_i64, Currency::USD)))
             .underlying(underlying)
-            .financing(financing)
+            .financing_leg(financing)
             .schedule(sched)
             .side(PayReceive::Receive)
             .initial_level_opt(None)
@@ -277,7 +277,7 @@ impl FIIndexTotalReturnSwap {
             .id(InstrumentId::new(format!("TRS-{}", etf_ticker)))
             .notional(notional)
             .underlying(underlying)
-            .financing(financing)
+            .financing_leg(financing)
             .schedule(schedule)
             .side(PayReceive::Receive)
             .initial_level_opt(None)
@@ -310,7 +310,7 @@ impl FIIndexTotalReturnSwap {
         self.validate()?;
         use crate::instruments::common_impl::pricing::TrsEngine;
         TrsEngine::pv_financing_leg(
-            &self.financing,
+            &self.financing_leg,
             &self.schedule,
             self.notional,
             curves,
@@ -330,7 +330,7 @@ impl FIIndexTotalReturnSwap {
         self.validate()?;
         use crate::instruments::common_impl::pricing::TrsEngine;
         TrsEngine::financing_annuity(
-            &self.financing,
+            &self.financing_leg,
             &self.schedule,
             self.notional,
             curves,
@@ -352,8 +352,8 @@ impl crate::instruments::common_impl::traits::Instrument for FIIndexTotalReturnS
         crate::instruments::common_impl::dependencies::MarketDependencies,
     > {
         let mut deps = crate::instruments::common_impl::dependencies::MarketDependencies::new();
-        deps.add_discount_curve(self.financing.discount_curve_id.clone());
-        deps.add_forward_curve(self.financing.forward_curve_id.clone());
+        deps.add_discount_curve(self.financing_leg.discount_curve_id.clone());
+        deps.add_forward_curve(self.financing_leg.forward_curve_id.clone());
         if let Some(yield_id) = &self.underlying.yield_id {
             deps.add_market_scalar_id(yield_id);
         }
@@ -422,7 +422,7 @@ impl finstack_quant_cashflows::CashflowScheduleSource for FIIndexTotalReturnSwap
         let schedule = crate::cashflow::traits::schedule_from_dated_flows(
             flows,
             crate::cashflow::primitives::CFKind::Fixed,
-            self.financing.day_count,
+            self.financing_leg.day_count,
             crate::cashflow::traits::ScheduleBuildOpts {
                 notional_hint: self.notional()?,
                 meta: crate::cashflow::builder::CashFlowMeta {

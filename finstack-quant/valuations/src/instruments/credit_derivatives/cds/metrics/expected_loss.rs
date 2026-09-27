@@ -23,10 +23,10 @@ impl MetricCalculator for ExpectedLossCalculator {
 
         let hazard = context
             .curves
-            .get_hazard(cds.protection.credit_curve_id.as_str())?;
+            .get_hazard(cds.protection_leg.credit_curve_id.as_str())?;
 
         // If already at/after maturity, no forward expected loss (under deterministic recovery).
-        if as_of >= cds.premium.end {
+        if as_of >= cds.premium_leg.end {
             return Ok(0.0);
         }
 
@@ -35,7 +35,7 @@ impl MetricCalculator for ExpectedLossCalculator {
         let base_date = hazard.base_date();
         let t_asof = day_count.year_fraction(base_date, as_of, DayCountContext::default())?;
         let t_maturity =
-            day_count.year_fraction(base_date, cds.premium.end, DayCountContext::default())?;
+            day_count.year_fraction(base_date, cds.premium_leg.end, DayCountContext::default())?;
 
         // Conditional survival to maturity given survival to as_of.
         let sp_asof = hazard.sp(t_asof);
@@ -49,7 +49,7 @@ impl MetricCalculator for ExpectedLossCalculator {
         let default_prob = (1.0 - survival_cond).clamp(0.0, 1.0);
 
         // Loss given default
-        let lgd = 1.0 - cds.protection.recovery_rate;
+        let lgd = 1.0 - cds.protection_leg.recovery_rate;
 
         // Expected loss in currency units
         let expected_loss = cds.notional.amount() * default_prob * lgd;

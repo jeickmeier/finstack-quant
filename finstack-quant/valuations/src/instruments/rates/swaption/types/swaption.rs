@@ -164,7 +164,6 @@ pub(super) fn vanilla_underlier(
         start: underlier.underlying_start_date,
         end: underlier.underlying_maturity,
         par_method: None,
-        compounding_simple: true,
         payment_lag_days: 0,
         end_of_month: false,
     };
@@ -499,8 +498,8 @@ impl Swaption {
             .id(InstrumentId::new(format!("{}:UNDERLIER", self.id.as_str())))
             .notional(self.notional)
             .side(side)
-            .fixed(fixed)
-            .float(float)
+            .fixed_leg(fixed)
+            .float_leg(float)
             .build()?;
         irs.validate()?;
         Ok(irs)

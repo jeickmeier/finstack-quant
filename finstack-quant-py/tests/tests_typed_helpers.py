@@ -64,9 +64,7 @@ def canonical_structured_credit_json(*, calendar_id: str = "nyse") -> str:
 def irs_legs() -> tuple[FixedLegSpec, FloatLegSpec]:
     start = datetime.date(2024, 1, 15)
     end = datetime.date(2029, 1, 15)
-    fixed = FixedLegSpec(
-        "USD-OIS", 0.04, Tenor.semi_annual(), DayCount.THIRTY_360, start, end, compounding_simple=False
-    )
+    fixed = FixedLegSpec("USD-OIS", 0.04, Tenor.semi_annual(), DayCount.THIRTY_360, start, end)
     float_leg = FloatLegSpec("USD-OIS", "USD-SOFR-3M", 0.0, Tenor.quarterly(), DayCount.ACT_360, start, end)
     return fixed, float_leg
 
@@ -79,8 +77,8 @@ def build_irs() -> InterestRateSwap:
         .id("IRS-1")
         .notional(Money(10_000_000.0, Currency("USD")))
         .side("pay")
-        .fixed(fixed)
-        .float(float_leg)
+        .fixed_leg(fixed)
+        .float_leg(float_leg)
         .build()
     )
 
@@ -89,7 +87,7 @@ def swaption_legs() -> tuple[FixedLegSpec, FloatLegSpec]:
     start = datetime.date(2025, 1, 15)
     end = datetime.date(2030, 1, 15)
     return (
-        FixedLegSpec("USD-OIS", 0.04, Tenor.semi_annual(), DayCount.THIRTY_360, start, end, compounding_simple=False),
+        FixedLegSpec("USD-OIS", 0.04, Tenor.semi_annual(), DayCount.THIRTY_360, start, end),
         FloatLegSpec("USD-OIS", "USD-SOFR-3M", 0.0, Tenor.quarterly(), DayCount.ACT_360, start, end),
     )
 
@@ -169,8 +167,8 @@ def build_cds() -> CreditDefaultSwap:
         .notional(Money(10_000_000.0, Currency("USD")))
         .side("pay")
         .convention("isda_na")
-        .premium(premium)
-        .protection(protection)
+        .premium_leg(premium)
+        .protection_leg(protection)
         .build()
     )
 
@@ -188,8 +186,8 @@ def build_cds_index() -> CDSIndex:
         .index_factor(1.0)
         .side("pay")
         .convention("isda_na")
-        .premium(premium)
-        .protection(protection)
+        .premium_leg(premium)
+        .protection_leg(protection)
         .pricing("single_curve")
         .num_constituents(125)
         .build()

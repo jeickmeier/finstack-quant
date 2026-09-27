@@ -8,7 +8,7 @@
         "amount": "10000000",
         "currency": "USD"
       },
-      "premium": {
+      "premium_leg": {
         "business_day_convention": "modified_following",
         "calendar_id": "nyse",
         "coupon_bp": "100",
@@ -23,7 +23,7 @@
         "start": "2024-03-20",
         "stub": "short_front"
       },
-      "protection": {
+      "protection_leg": {
         "credit_curve_id": "CORP-HAZARD",
         "recovery_rate": 0.4,
         "settlement_delay": 3

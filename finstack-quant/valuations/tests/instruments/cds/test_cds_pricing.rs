@@ -344,7 +344,7 @@ fn test_par_spread_gives_zero_npv() {
     let par_spread = metric_value(&cds, &market, as_of, MetricId::ParSpread);
 
     // Set spread to par (convert f64 to Decimal)
-    cds.premium.coupon_bp = Decimal::try_from(par_spread).expect("valid par_spread");
+    cds.premium_leg.coupon_bp = Decimal::try_from(par_spread).expect("valid par_spread");
 
     // NPV should be near zero; f64→Decimal rounding introduces ~0.07bp on spread → ~$350 residual on $10M
     let npv = cds.value(&market, as_of).unwrap();
@@ -448,17 +448,17 @@ fn test_schedule_generation_isda() {
         schedule_dates.len() >= 2,
         "Schedule should have at least start and end"
     );
-    assert_eq!(schedule_dates[0], cds.premium.start);
+    assert_eq!(schedule_dates[0], cds.premium_leg.start);
 
     // The maturity date may be adjusted to a business day via Modified Following
     // so we just check it's on or after the original maturity
     let last_date = schedule_dates[schedule_dates.len() - 1];
     assert!(
-        last_date >= cds.premium.end.saturating_sub(time::Duration::days(3))
-            && last_date <= cds.premium.end.saturating_add(time::Duration::days(3)),
+        last_date >= cds.premium_leg.end.saturating_sub(time::Duration::days(3))
+            && last_date <= cds.premium_leg.end.saturating_add(time::Duration::days(3)),
         "Last date should be near maturity date (got {} vs expected ~{})",
         last_date,
-        cds.premium.end
+        cds.premium_leg.end
     );
 
     // Interior dates should be near the 20th (ISDA standard)
@@ -586,7 +586,7 @@ fn test_higher_recovery_decreases_protection_value() {
             "CORP",
         )
         .expect("CDS construction should succeed");
-        cds.protection.recovery_rate = recovery;
+        cds.protection_leg.recovery_rate = recovery;
 
         let protection_pv = metric_value(&cds, &market, as_of, MetricId::ProtectionLegPv);
         protection_pvs.push((recovery, protection_pv));
@@ -661,10 +661,10 @@ fn test_settlement_delay_reduces_protection_pv() {
         "CORP",
     )
     .expect("CDS construction should succeed");
-    cds_no_delay.protection.settlement_delay = 0;
+    cds_no_delay.protection_leg.settlement_delay = 0;
 
     let mut cds_with_delay = cds_no_delay.clone();
-    cds_with_delay.protection.settlement_delay = 20;
+    cds_with_delay.protection_leg.settlement_delay = 20;
 
     let pv_no_delay = metric_value(&cds_no_delay, &market, as_of, MetricId::ProtectionLegPv);
     let pv_with_delay = metric_value(&cds_with_delay, &market, as_of, MetricId::ProtectionLegPv);
@@ -694,10 +694,10 @@ fn test_aod_uses_default_settlement_timing() {
         "CORP",
     )
     .expect("CDS construction should succeed");
-    cds_no_delay.protection.settlement_delay = 0;
+    cds_no_delay.protection_leg.settlement_delay = 0;
 
     let mut cds_with_delay = cds_no_delay.clone();
-    cds_with_delay.protection.settlement_delay = 60;
+    cds_with_delay.protection_leg.settlement_delay = 60;
 
     let pv_no_delay = metric_value(&cds_no_delay, &market, as_of, MetricId::PremiumLegPv);
     let pv_with_delay = metric_value(&cds_with_delay, &market, as_of, MetricId::PremiumLegPv);

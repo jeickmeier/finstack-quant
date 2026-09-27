@@ -678,7 +678,12 @@ impl CompiledCashFlowPlan {
             ) else {
                 continue;
             };
-            if schedule.spec.rate_spec.overnight_compounding.is_some() {
+            if schedule
+                .spec
+                .rate_spec
+                .compounding
+                .is_some_and(|c| c.is_overnight())
+            {
                 continue;
             }
             let spec_years = spec_tenor.to_years();

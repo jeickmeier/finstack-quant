@@ -319,7 +319,7 @@ fn production_structured_metrics_discount_margin_settles_clean_price_at_quote_da
         index_tenor: None,
         reset_lag_days: 0,
         fixing_calendar_id: None,
-        overnight_compounding: None,
+        compounding: None,
         overnight_basis: None,
         fallback: Default::default(),
     });

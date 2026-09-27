@@ -51,7 +51,7 @@ pub(crate) fn params_from_spec(spec: &FloatingRateSpec) -> FloatingRateParams {
 /// because the leg applies them daily inside an overnight-compounded
 /// window (mirrors the emission's `period_rate_params_for_overnight`).
 pub(crate) fn strips_index_constraints(spec: &FloatingRateSpec) -> bool {
-    spec.overnight_compounding.is_some()
+    spec.compounding.is_some()
         && spec.overnight_index_constraints == OvernightIndexConstraintApplication::Daily
 }
 

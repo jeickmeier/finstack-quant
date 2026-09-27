@@ -147,9 +147,9 @@ pub struct InterestRateSwap {
     /// Direction of the swap (Pay or Receive).
     pub side: PayReceive,
     /// Fixed leg specification.
-    pub fixed: FixedLegSpec,
+    pub fixed_leg: FixedLegSpec,
     /// Floating leg specification.
-    pub float: FloatLegSpec,
+    pub float_leg: FloatLegSpec,
     /// Optional OTC margin specification for VM/IM.
     ///
     /// When present, enables margin calculation using SIMM or schedule-based
@@ -236,7 +236,7 @@ impl InterestRateSwap {
             .id(id)
             .notional(notional)
             .side(side)
-            .fixed(FixedLegSpec {
+            .fixed_leg(FixedLegSpec {
                 discount_curve_id: CurveId::new(discount_curve_id),
                 rate: finstack_quant_core::decimal::f64_to_decimal(fixed_rate)?,
                 frequency: conv.fixed_frequency,
@@ -247,11 +247,10 @@ impl InterestRateSwap {
                 start,
                 end,
                 par_method: None,
-                compounding_simple: true,
                 payment_lag_days: conv.payment_lag_days,
                 end_of_month: false,
             })
-            .float(FloatLegSpec {
+            .float_leg(FloatLegSpec {
                 discount_curve_id: CurveId::new(discount_curve_id),
                 forward_curve_id: CurveId::new(forward_curve_id),
                 spread_bp: Decimal::ZERO,
@@ -298,7 +297,7 @@ impl InterestRateSwap {
         &self,
     ) -> finstack_quant_core::Result<Option<crate::market::conventions::RateIndexConventions>> {
         let registry = ConventionRegistry::try_global()?;
-        let idx = IndexId::new(self.float.forward_curve_id.as_str());
+        let idx = IndexId::new(self.float_leg.forward_curve_id.as_str());
         Ok(registry.require_rate_index(&idx).ok().cloned())
     }
 
@@ -307,7 +306,7 @@ impl InterestRateSwap {
     /// registry cannot provide a default — previously this silently left the sentinel
     /// in place, producing wildly wrong schedules downstream.
     pub(crate) fn resolved_fixed_leg(&self) -> finstack_quant_core::Result<FixedLegSpec> {
-        let mut fixed = self.fixed.clone();
+        let mut fixed = self.fixed_leg.clone();
         let is_eom_swap =
             fixed.start.end_of_month() == fixed.start && fixed.end.end_of_month() == fixed.end;
         if is_eom_swap && !fixed.end_of_month {
@@ -322,7 +321,7 @@ impl InterestRateSwap {
                 finstack_quant_core::Error::Validation(format!(
                     "IRS '{}': fixed-leg payment_lag_days sentinel {} requires resolution \
                      but rate index '{}' is not registered in the convention registry",
-                    self.id, fixed.payment_lag_days, self.float.forward_curve_id
+                    self.id, fixed.payment_lag_days, self.float_leg.forward_curve_id
                 ))
             })?;
             fixed.payment_lag_days = conv.default_payment_lag_days;
@@ -333,7 +332,7 @@ impl InterestRateSwap {
     /// Resolve the float leg, applying convention defaults for any sentinel values.
     /// Errors loudly if a sentinel can't be resolved — see [`Self::resolved_fixed_leg`].
     pub(crate) fn resolved_float_leg(&self) -> finstack_quant_core::Result<FloatLegSpec> {
-        let mut float = self.float.clone();
+        let mut float = self.float_leg.clone();
         let is_eom_swap =
             float.start.end_of_month() == float.start && float.end.end_of_month() == float.end;
         if is_eom_swap && !float.end_of_month {
@@ -349,7 +348,7 @@ impl InterestRateSwap {
                     self.id,
                     float.reset_lag_days,
                     float.payment_lag_days,
-                    self.float.forward_curve_id
+                    self.float_leg.forward_curve_id
                 ))
             })?;
             if float.reset_lag_days < 0 {
@@ -395,7 +394,7 @@ impl InterestRateSwap {
         // meaning fixing_date = accrual_start - 2 business days.
         // Small negative values (e.g., -1) are allowed as sentinels for "use convention default".
         // Guard only against absurd magnitudes that indicate unit mistakes.
-        if self.float.reset_lag_days.abs() > 31 {
+        if self.float_leg.reset_lag_days.abs() > 31 {
             return Err(finstack_quant_core::Error::Validation(
                 "Invalid floating reset lag: absolute value too large (expected a small number of business days)."
                     .into(),
@@ -404,33 +403,19 @@ impl InterestRateSwap {
         // Payment delay validation: large negative values are rejected (likely unit mistakes).
         // Small negative values (e.g., -1) are allowed as sentinels for "use convention default".
         // Zero and positive values are explicit delays.
-        if self.fixed.payment_lag_days < -31 || self.float.payment_lag_days < -31 {
+        if self.fixed_leg.payment_lag_days < -31 || self.float_leg.payment_lag_days < -31 {
             return Err(finstack_quant_core::Error::Validation(
                 "Invalid payment delay: value too negative (use small negative like -1 for convention default)."
                     .into(),
             ));
         }
         overnight_conventions::reject_simple_overnight(
-            self.float.forward_curve_id.as_str(),
-            &self.float.compounding,
+            self.float_leg.forward_curve_id.as_str(),
+            &self.float_leg.compounding,
         )?;
-        if let FloatingLegCompounding::CompoundedInArrears { lookback_days } =
-            self.float.compounding
-        {
-            if lookback_days < 0 {
-                return Err(finstack_quant_core::Error::Validation(
-                    "Invalid RFR lookback: must be non-negative (business days).".into(),
-                ));
-            }
-        }
         if let FloatingLegCompounding::CompoundedWithObservationShift { shift_days } =
-            self.float.compounding
+            self.float_leg.compounding
         {
-            if shift_days < 0 {
-                return Err(finstack_quant_core::Error::Validation(
-                    "Invalid observation shift days: must be non-negative.".into(),
-                ));
-            }
             if shift_days > 31 {
                 return Err(finstack_quant_core::Error::Validation(
                     "Invalid observation shift days: too large.".into(),
@@ -438,13 +423,8 @@ impl InterestRateSwap {
             }
         }
         if let FloatingLegCompounding::CompoundedWithRateCutoff { cutoff_days } =
-            self.float.compounding
+            self.float_leg.compounding
         {
-            if cutoff_days < 0 {
-                return Err(finstack_quant_core::Error::Validation(
-                    "Invalid rate cut-off days: must be non-negative.".into(),
-                ));
-            }
             if cutoff_days > 31 {
                 return Err(finstack_quant_core::Error::Validation(
                     "Invalid rate cut-off days: too large.".into(),
@@ -453,8 +433,8 @@ impl InterestRateSwap {
         }
 
         validation::validate_date_range_strict_with(
-            self.fixed.start,
-            self.fixed.end,
+            self.fixed_leg.start,
+            self.fixed_leg.end,
             |start, end| {
                 format!(
                     "Invalid fixed leg date range: end ({}) must be after start ({})",
@@ -464,8 +444,8 @@ impl InterestRateSwap {
         )?;
 
         validation::validate_date_range_strict_with(
-            self.float.start,
-            self.float.end,
+            self.float_leg.start,
+            self.float_leg.end,
             |start, end| {
                 format!(
                     "Invalid floating leg date range: end ({}) must be after start ({})",
@@ -476,12 +456,12 @@ impl InterestRateSwap {
 
         // Only single-curve (CSA OIS) discounting is supported: both legs must
         // use the same discount curve. Dual-curve discounting is not implemented.
-        if self.float.discount_curve_id != self.fixed.discount_curve_id {
+        if self.float_leg.discount_curve_id != self.fixed_leg.discount_curve_id {
             return Err(finstack_quant_core::Error::Validation(format!(
                 "Dual-curve discounting is not supported: fixed leg discount curve '{}' \
                  differs from floating leg discount curve '{}'. \
                  Use the same CSA OIS curve for both legs.",
-                self.fixed.discount_curve_id, self.float.discount_curve_id
+                self.fixed_leg.discount_curve_id, self.float_leg.discount_curve_id
             )));
         }
 
@@ -494,7 +474,7 @@ impl InterestRateSwap {
         })?;
 
         // Validate fixed rate is within reasonable bounds
-        let rate_f64 = decimal_to_f64(self.fixed.rate, "fixed rate")?;
+        let rate_f64 = decimal_to_f64(self.fixed_leg.rate, "fixed rate")?;
         validation::validate_rate_magnitude(
             rate_f64,
             MAX_RATE_MAGNITUDE,
@@ -505,12 +485,13 @@ impl InterestRateSwap {
         )?;
 
         // Warn-level check: legs should typically have matching date ranges
-        if self.fixed.start != self.float.start || self.fixed.end != self.float.end {
+        if self.fixed_leg.start != self.float_leg.start || self.fixed_leg.end != self.float_leg.end
+        {
             tracing::warn!(
                 swap_id = %self.id,
                 "IRS legs have mismatched date ranges: fixed ({} to {}), float ({} to {}). \
                  This may be intentional for complex structures.",
-                self.fixed.start, self.fixed.end, self.float.start, self.float.end
+                self.fixed_leg.start, self.fixed_leg.end, self.float_leg.start, self.float_leg.end
             );
         }
 
@@ -540,7 +521,7 @@ impl InterestRateSwap {
             .id(InstrumentId::new("IRS-5Y-USD-STD"))
             .notional(Money::from((10_000_000_i64, Currency::USD)))
             .side(PayReceive::Pay)
-            .fixed(crate::instruments::common_impl::parameters::FixedLegSpec {
+            .fixed_leg(crate::instruments::common_impl::parameters::FixedLegSpec {
                 discount_curve_id: CurveId::new("USD-OIS"),
                 rate: Decimal::try_from(0.04_f64).expect("valid literal"),
                 frequency: Tenor::semi_annual(),
@@ -551,11 +532,10 @@ impl InterestRateSwap {
                 start,
                 end,
                 par_method: None,
-                compounding_simple: true,
                 payment_lag_days: 0,
                 end_of_month: false,
             })
-            .float(crate::instruments::common_impl::parameters::FloatLegSpec {
+            .float_leg(crate::instruments::common_impl::parameters::FloatLegSpec {
                 discount_curve_id: CurveId::new("USD-OIS"),
                 forward_curve_id: CurveId::new("USD-SOFR-3M"),
                 spread_bp: Decimal::ZERO,
@@ -640,11 +620,11 @@ impl crate::instruments::common_impl::traits::Instrument for InterestRateSwap {
     }
 
     fn expiry(&self) -> Option<finstack_quant_core::dates::Date> {
-        Some(self.fixed.end)
+        Some(self.fixed_leg.end)
     }
 
     fn effective_start_date(&self) -> Option<finstack_quant_core::dates::Date> {
-        Some(self.fixed.start)
+        Some(self.fixed_leg.start)
     }
 
     crate::impl_focused_pricing_overrides!();
@@ -655,13 +635,13 @@ impl crate::instruments::common_impl::traits::Instrument for InterestRateSwap {
         crate::instruments::common_impl::dependencies::MarketDependencies,
     > {
         let mut deps = crate::instruments::common_impl::dependencies::MarketDependencies::new();
-        deps.add_discount_curve(self.fixed.discount_curve_id.clone());
-        deps.add_discount_curve(self.float.discount_curve_id.clone());
+        deps.add_discount_curve(self.fixed_leg.discount_curve_id.clone());
+        deps.add_discount_curve(self.float_leg.discount_curve_id.clone());
         if !self.is_single_curve_ois() {
-            deps.add_forward_curve(self.float.forward_curve_id.clone());
+            deps.add_forward_curve(self.float_leg.forward_curve_id.clone());
         }
         deps.add_series_id(finstack_quant_core::market_data::fixings::fixing_series_id(
-            self.float.forward_curve_id.as_str(),
+            self.float_leg.forward_curve_id.as_str(),
         ));
         Ok(deps)
     }
@@ -701,12 +681,12 @@ mod tests {
             .id(InstrumentId::new("IRS-MISSING-FLOAT"))
             .notional(example.notional)
             .side(PayReceive::Pay)
-            .fixed(example.fixed.clone())
+            .fixed_leg(example.fixed_leg.clone())
             .build()
             .expect_err("missing float leg must fail");
         let message = err.to_string();
         assert!(
-            message.contains("InterestRateSwapBuilder") && message.contains("'float'"),
+            message.contains("InterestRateSwapBuilder") && message.contains("'float_leg'"),
             "error must name builder and field: {message}"
         );
 
@@ -738,18 +718,18 @@ mod tests {
         assert_eq!(
             deps.curves.discount_curves.as_slice(),
             &[
-                swap.fixed.discount_curve_id.clone(),
-                swap.float.discount_curve_id.clone(),
+                swap.fixed_leg.discount_curve_id.clone(),
+                swap.float_leg.discount_curve_id.clone(),
             ][..deps.curves.discount_curves.len()]
         );
         assert_eq!(
             deps.curves.forward_curves.as_slice(),
-            std::slice::from_ref(&swap.float.forward_curve_id)
+            std::slice::from_ref(&swap.float_leg.forward_curve_id)
         );
         assert_eq!(
             deps.series_ids,
             vec![finstack_quant_core::market_data::fixings::fixing_series_id(
-                swap.float.forward_curve_id.as_str()
+                swap.float_leg.forward_curve_id.as_str()
             )]
         );
     }
@@ -757,7 +737,7 @@ mod tests {
     #[test]
     fn validate_rejects_extreme_fixed_rate_without_silent_default() {
         let mut swap = InterestRateSwap::example_standard().expect("example swap");
-        swap.fixed.rate = Decimal::MAX;
+        swap.fixed_leg.rate = Decimal::MAX;
 
         let err = swap
             .validate()
@@ -772,14 +752,14 @@ mod tests {
     #[test]
     fn builder_rejects_invalid_swap_economics() {
         let mut swap = InterestRateSwap::example_standard().expect("example swap");
-        swap.fixed.rate = Decimal::MAX;
+        swap.fixed_leg.rate = Decimal::MAX;
 
         let error = InterestRateSwap::builder()
             .id(swap.id)
             .notional(swap.notional)
             .side(swap.side)
-            .fixed(swap.fixed)
-            .float(swap.float)
+            .fixed_leg(swap.fixed_leg)
+            .float_leg(swap.float_leg)
             .attributes(swap.attributes)
             .build()
             .expect_err("an extreme fixed rate must fail at the builder boundary");
@@ -791,7 +771,7 @@ mod tests {
     fn validate_allows_small_negative_as_convention_sentinel() {
         // Small negative values (like -1) are allowed as sentinels for "use convention default"
         let mut swap = InterestRateSwap::example_standard().expect("example swap");
-        swap.fixed.payment_lag_days = -1;
+        swap.fixed_leg.payment_lag_days = -1;
         assert!(
             swap.validate().is_ok(),
             "small negative payment delay (-1) should be allowed as convention sentinel"
@@ -802,7 +782,7 @@ mod tests {
     fn validate_rejects_large_negative_payment_delay() {
         // Large negative values are rejected as likely unit mistakes
         let mut swap = InterestRateSwap::example_standard().expect("example swap");
-        swap.fixed.payment_lag_days = -100;
+        swap.fixed_leg.payment_lag_days = -100;
         assert!(
             swap.validate().is_err(),
             "large negative payment delay must be rejected"
@@ -825,7 +805,7 @@ mod tests {
         .expect("OIS swap from conventions");
 
         assert!(
-            !matches!(swap.float.compounding, FloatingLegCompounding::Simple),
+            !matches!(swap.float_leg.compounding, FloatingLegCompounding::Simple),
             "overnight RFR swaps must not silently default to simple compounding"
         );
     }
@@ -855,8 +835,8 @@ mod tests {
     #[test]
     fn validate_rejects_simple_compounding_on_overnight_index() {
         let mut swap = InterestRateSwap::example_standard().expect("example swap");
-        swap.float.forward_curve_id = CurveId::new("USD-SOFR-OIS");
-        swap.float.compounding = FloatingLegCompounding::Simple;
+        swap.float_leg.forward_curve_id = CurveId::new("USD-SOFR-OIS");
+        swap.float_leg.compounding = FloatingLegCompounding::Simple;
         let err = swap
             .validate()
             .expect_err("hand-built OIS with Simple must fail");

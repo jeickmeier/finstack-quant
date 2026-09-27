@@ -10,7 +10,11 @@
       ],
       "record": {
         "index_id": "USD-SOFR-3M",
-        "rate_averaging": "compounded_overnight",
+        "compounding": {
+          "compounded_in_arrears": {
+            "lookback_days": 0
+          }
+        },
         "reference_period": "imm_quarter_in_arrears",
         "calendar_id": "usny",
         "settlement_days": 0,
@@ -28,7 +32,7 @@
       ],
       "record": {
         "index_id": "USD-LIBOR-3M",
-        "rate_averaging": "term",
+        "compounding": "simple",
         "reference_period": "forward_starting",
         "calendar_id": "usny",
         "settlement_days": 2,
@@ -46,7 +50,7 @@
       ],
       "record": {
         "index_id": "USD-SOFR",
-        "rate_averaging": "arithmetic_average",
+        "compounding": "simple_average",
         "reference_period": "calendar_month_in_arrears",
         "calendar_id": "usny",
         "settlement_days": 0,
@@ -64,7 +68,7 @@
       ],
       "record": {
         "index_id": "USD-FEDFUNDS",
-        "rate_averaging": "arithmetic_average",
+        "compounding": "simple_average",
         "reference_period": "calendar_month_in_arrears",
         "calendar_id": "usny",
         "settlement_days": 0,
@@ -82,7 +86,11 @@
       ],
       "record": {
         "index_id": "CAD-CORRA",
-        "rate_averaging": "compounded_overnight",
+        "compounding": {
+          "compounded_in_arrears": {
+            "lookback_days": 0
+          }
+        },
         "reference_period": "business_month_in_arrears",
         "calendar_id": "cato",
         "settlement_days": 0,
@@ -100,7 +108,11 @@
       ],
       "record": {
         "index_id": "CAD-CORRA",
-        "rate_averaging": "compounded_overnight",
+        "compounding": {
+          "compounded_in_arrears": {
+            "lookback_days": 0
+          }
+        },
         "reference_period": "imm_quarter_in_arrears",
         "calendar_id": "cato",
         "settlement_days": 0,
@@ -119,7 +131,7 @@
       ],
       "record": {
         "index_id": "EUR-EURIBOR-3M",
-        "rate_averaging": "term",
+        "compounding": "simple",
         "reference_period": "forward_starting",
         "calendar_id": "target2",
         "settlement_days": 2,

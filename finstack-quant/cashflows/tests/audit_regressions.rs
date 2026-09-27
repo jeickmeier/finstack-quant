@@ -1,6 +1,6 @@
 //! Economic regression cases from the cashflow pipeline audit.
 use cf::builder::{
-    CashFlowSchedule, OvernightCompoundingMethod, OvernightObservationSchedule,
+    CashFlowSchedule, FloatingLegCompounding, OvernightObservationSchedule,
     OvernightRateConstraints,
 };
 use cf::primitives::CFKind;
@@ -113,7 +113,7 @@ fn b14_overnight_principal_events_preserve_cumulative_rate_clock() {
         .remove("rate");
     v["coupon_program"][0]["spec"]["rate_spec"] = json!({
         "forward_curve_id":"RFR", "spread_bp":"0", "reset_frequency":{"count":3,"unit":"months"},
-        "reset_lag_days":0, "overnight_compounding":"compounded_in_arrears"
+        "reset_lag_days":0, "compounding":{"compounded_in_arrears":{"lookback_days":0}}
     });
     v["principal_events"] = json!([{
         "date":"2025-01-07", "payment_date":"2025-01-07", "kind":"amortization",
@@ -292,7 +292,7 @@ fn overnight_replay_is_independent_of_weekend_checkpoints() {
     let on = OvernightObservationSchedule::compile(
         date("2025-01-03"),
         date("2025-01-07"),
-        OvernightCompoundingMethod::CompoundedInArrears,
+        FloatingLegCompounding::CompoundedInArrears { lookback_days: 0 },
         cal,
     )
     .expect("schedule");
@@ -324,7 +324,9 @@ fn lockout_requires_a_preceding_fixing() {
         assert!(OvernightObservationSchedule::compile(
             date("2025-01-06"),
             date("2025-01-13"),
-            OvernightCompoundingMethod::CompoundedWithLockout { lockout_days },
+            FloatingLegCompounding::CompoundedWithRateCutoff {
+                cutoff_days: lockout_days
+            },
             cal
         )
         .is_err());
@@ -332,7 +334,7 @@ fn lockout_requires_a_preceding_fixing() {
     let schedule = OvernightObservationSchedule::compile(
         date("2025-01-06"),
         date("2025-01-13"),
-        OvernightCompoundingMethod::CompoundedWithLockout { lockout_days: 1 },
+        FloatingLegCompounding::CompoundedWithRateCutoff { cutoff_days: 1 },
         cal,
     )
     .expect("one-day lockout");

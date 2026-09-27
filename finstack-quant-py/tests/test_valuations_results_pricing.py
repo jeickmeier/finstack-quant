@@ -76,7 +76,6 @@ def _swap() -> InterestRateSwap:
         DayCount.THIRTY_360,
         start,
         end,
-        compounding_simple=False,
     )
     floating = FloatLegSpec(
         "USD-OIS",
@@ -93,8 +92,8 @@ def _swap() -> InterestRateSwap:
         .id("SWP-5Y")
         .notional(Money(10_000_000.0, Currency("USD")))
         .side("pay")
-        .fixed(fixed)
-        .float(floating)
+        .fixed_leg(fixed)
+        .float_leg(floating)
         .build()
     )
 
@@ -228,7 +227,7 @@ def test_validation_failure_raises_value_error() -> None:
         .id("SWP-SEASONED")
         .notional(Money(1_000_000.0, Currency("USD")))
         .side("pay")
-        .fixed(
+        .fixed_leg(
             FixedLegSpec(
                 "USD-OIS",
                 0.04,
@@ -236,10 +235,9 @@ def test_validation_failure_raises_value_error() -> None:
                 DayCount.THIRTY_360,
                 start,
                 end,
-                compounding_simple=False,
             )
         )
-        .float(
+        .float_leg(
             FloatLegSpec(
                 "USD-OIS",
                 "USD-SOFR-3M",

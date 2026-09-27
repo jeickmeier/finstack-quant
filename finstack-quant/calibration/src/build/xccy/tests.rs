@@ -39,42 +39,42 @@ fn test_build_xccy_basis_swap() {
         .as_any()
         .downcast_ref::<XccySwap>()
         .expect("Expected XccySwap");
-    assert_eq!(swap.leg1.currency, Currency::EUR);
-    assert_eq!(swap.leg2.currency, Currency::USD);
+    assert_eq!(swap.leg1.notional.currency(), Currency::EUR);
+    assert_eq!(swap.leg2.notional.currency(), Currency::USD);
     assert_eq!(swap.reporting_currency, Currency::USD);
     assert!((swap.leg2.notional.amount() - 10_000_000.0).abs() < 1e-8);
     assert!((swap.leg1.notional.amount() - (10_000_000.0 / 1.10)).abs() < 1e-8);
-    assert_eq!(swap.leg1.payment_lag_days, 2);
-    assert_eq!(swap.leg2.payment_lag_days, 2);
-    assert_eq!(swap.leg1.reset_lag_days, Some(0));
-    assert_eq!(swap.leg2.reset_lag_days, Some(0));
-    assert!(swap.leg2.end > swap.leg2.start);
+    assert_eq!(swap.leg1.leg.payment_lag_days, 2);
+    assert_eq!(swap.leg2.leg.payment_lag_days, 2);
+    assert_eq!(swap.leg1.leg.reset_lag_days, 0);
+    assert_eq!(swap.leg2.leg.reset_lag_days, 0);
+    assert!(swap.leg2.leg.end > swap.leg2.leg.start);
 
     assert_eq!(
-        swap.leg1.spread_bp,
+        swap.leg1.leg.spread_bp,
         rust_decimal::Decimal::try_from(-15.0).expect("valid decimal"),
         "basis spread must sit on the base-currency (EUR) leg"
     );
     assert_eq!(
-        swap.leg2.spread_bp,
+        swap.leg2.leg.spread_bp,
         rust_decimal::Decimal::ZERO,
         "USD quote-currency leg must pay its index flat"
     );
     assert!(
         matches!(
-            swap.leg1.compounding,
+            swap.leg1.leg.compounding,
             finstack_quant_valuations::instruments::rates::irs::FloatingLegCompounding::CompoundedInArrears { .. }
         ),
         "EUR contractual ESTR-OIS must compound in arrears, got {:?}",
-        swap.leg1.compounding
+        swap.leg1.leg.compounding
     );
     assert!(
         matches!(
-            swap.leg2.compounding,
+            swap.leg2.leg.compounding,
             finstack_quant_valuations::instruments::rates::irs::FloatingLegCompounding::CompoundedInArrears { .. }
         ),
         "USD contractual SOFR-OIS must compound in arrears, got {:?}",
-        swap.leg2.compounding
+        swap.leg2.leg.compounding
     );
 }
 
@@ -105,14 +105,17 @@ fn unregistered_forward_override_keeps_contractual_overnight_compounding() {
         .as_any()
         .downcast_ref::<XccySwap>()
         .expect("Expected XccySwap");
-    assert_eq!(swap.leg2.forward_curve_id.as_str(), "USD-SOFR-OIS-ALIAS");
+    assert_eq!(
+        swap.leg2.leg.forward_curve_id.as_str(),
+        "USD-SOFR-OIS-ALIAS"
+    );
     assert!(
         matches!(
-            swap.leg2.compounding,
+            swap.leg2.leg.compounding,
             finstack_quant_valuations::instruments::rates::irs::FloatingLegCompounding::CompoundedInArrears { .. }
         ),
         "unregistered forward alias must keep contractual overnight compounding, got {:?}",
-        swap.leg2.compounding
+        swap.leg2.leg.compounding
     );
 }
 

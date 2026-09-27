@@ -4,7 +4,7 @@ use finstack_quant_core::{Error, Result};
 
 use crate::trees::hull_white_tree::HullWhiteTree;
 
-use super::{ShortRateTree, TreeCalibrationResult};
+use super::{ShortRateTree, TreeCalibrationResult, TreeDiscounting};
 
 /// Calibrated Black-Karasinski trinomial lattice data (κ ≠ 0).
 ///
@@ -98,14 +98,14 @@ impl ShortRateTree {
                 let mut model_df = 0.0;
                 for (j, &qj) in q.iter().enumerate() {
                     let x_j = (j as i32 - curr_j_max as i32) as f64 * dx;
-                    model_df += qj * comp.df((a + x_j).exp(), dt);
+                    model_df += qj * comp.tree_df((a + x_j).exp(), dt);
                 }
                 model_df - target_df
             };
             // Initial guess: log of the period forward rate.
             let prev_df = discount_curve.df(self.time_steps[step]);
             let fwd = if prev_df > 0.0 && target_df > 0.0 {
-                comp.rate_from_df(target_df / prev_df, dt)
+                comp.tree_rate_from_df(target_df / prev_df, dt)
             } else {
                 0.03
             };
@@ -136,7 +136,7 @@ impl ShortRateTree {
             for (j, &qj) in q.iter().enumerate() {
                 let j_signed = j as i32 - curr_j_max as i32;
                 let r_j = (a + j_signed as f64 * dx).exp();
-                let contribution = qj * comp.df(r_j, dt);
+                let contribution = qj * comp.tree_df(r_j, dt);
                 for (offset, probability) in
                     HullWhiteTree::transition_offsets(j_signed, boundary_j_max, step_probs[j])
                 {

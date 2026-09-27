@@ -31,7 +31,7 @@ fn test_fi_index_trs_currency_mismatch_validation() {
         .id("TRS-MISMATCH".into())
         .notional(notional) // USD notional
         .underlying(underlying) // EUR index
-        .financing(FinancingLegSpec::new(
+        .financing_leg(FinancingLegSpec::new(
             "USD-OIS",
             "USD-SOFR-3M",
             Decimal::from(100),
@@ -134,7 +134,7 @@ fn test_fi_index_trs_builder_validation() {
         .id("TRS-NO-YIELD".into())
         .notional(Money::new(10_000_000.0, USD).expect("valid money fixture"))
         .underlying(underlying)
-        .financing(FinancingLegSpec::new(
+        .financing_leg(FinancingLegSpec::new(
             "USD-OIS",
             "USD-SOFR-3M",
             Decimal::from(100),
@@ -366,7 +366,7 @@ fn test_equity_trs_with_past_start_date() {
         .id("TRS-PAST-START".into())
         .notional(Money::new(10_000_000.0, USD).expect("valid money fixture"))
         .underlying(underlying)
-        .financing(FinancingLegSpec::new(
+        .financing_leg(FinancingLegSpec::new(
             "USD-OIS",
             "USD-SOFR-3M",
             Decimal::from(25),
@@ -407,7 +407,7 @@ fn test_equity_trs_with_very_short_tenor_1_day() {
         .id("TRS-1DAY".into())
         .notional(Money::new(10_000_000.0, USD).expect("valid money fixture"))
         .underlying(underlying)
-        .financing(FinancingLegSpec::new(
+        .financing_leg(FinancingLegSpec::new(
             "USD-OIS",
             "USD-SOFR-3M",
             Decimal::from(25),
@@ -448,7 +448,7 @@ fn test_fi_index_trs_maturity_equals_valuation_date() {
         .id("TRS-MATURE".into())
         .notional(Money::new(10_000_000.0, USD).expect("valid money fixture"))
         .underlying(underlying)
-        .financing(FinancingLegSpec::new(
+        .financing_leg(FinancingLegSpec::new(
             "USD-OIS",
             "USD-SOFR-3M",
             Decimal::from(100),
@@ -530,7 +530,7 @@ fn test_equity_trs_with_zero_contract_size() {
         .id("TRS-ZERO-CONTRACT".into())
         .notional(Money::new(10_000_000.0, USD).expect("valid money fixture"))
         .underlying(underlying)
-        .financing(FinancingLegSpec::new(
+        .financing_leg(FinancingLegSpec::new(
             "USD-OIS",
             "USD-SOFR-3M",
             Decimal::from(25),
@@ -576,7 +576,7 @@ fn test_equity_trs_with_fractional_contract_size() {
         .id("TRS-MINI".into())
         .notional(Money::new(10_000_000.0, USD).expect("valid money fixture"))
         .underlying(underlying)
-        .financing(FinancingLegSpec::new(
+        .financing_leg(FinancingLegSpec::new(
             "USD-OIS",
             "USD-SOFR-3M",
             Decimal::from(25),

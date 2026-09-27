@@ -46,7 +46,7 @@ fn test_equity_trs_builder_custom_params() {
     // Assert
     assert_eq!(trs.id.as_str(), "CUSTOM-TRS-001");
     assert_eq!(trs.notional.amount(), 5_000_000.0);
-    assert_eq!(trs.financing.spread_bp, Decimal::from(50));
+    assert_eq!(trs.financing_leg.spread_bp, Decimal::from(50));
     assert_eq!(trs.side, PayReceive::Pay);
     assert_eq!(trs.initial_level, Some(5100.0));
 }
@@ -145,7 +145,7 @@ fn completed_period_remains_valued_until_lagged_payment_date() {
             EquityUnderlyingParams::new("SPX", "SPX-SPOT", USD)
                 .with_dividend_yield(PriceId::new("SPX-DIV-YIELD")),
         )
-        .financing(FinancingLegSpec::new(
+        .financing_leg(FinancingLegSpec::new(
             "USD-OIS",
             "USD-SOFR-3M",
             Decimal::ZERO,
@@ -224,7 +224,7 @@ fn test_equity_trs_discrete_dividends_preserve_small_amounts_after_large_amounts
         .notional(Money::new(1.0, USD).expect("valid money fixture"))
         .initial_level(100.0)
         .build();
-    trs.financing.discount_curve_id = CurveId::new("DISC");
+    trs.financing_leg.discount_curve_id = CurveId::new("DISC");
     trs.underlying.div_yield_id = None;
     trs.discrete_dividends = vec![
         (d(2025, 1, 10), 1e16),
@@ -280,7 +280,7 @@ fn test_equity_trs_cashflow_provider_emits_financing_flows() {
 ///
 /// Since the engine unification, `pv_financing_leg` prices through
 /// `TrsEngine` (the same engine as the par-spread/annuity metrics, honoring
-/// `FinancingRateCompounding`), while the exported schedule keeps the
+/// `FloatingLegCompounding`), while the exported schedule keeps the
 /// cashflow-builder convention (term-index fixing at the reset date). The two
 /// projection conventions — index fixing at reset vs discrete forward over
 /// the accrual period — differ by curve-shape detail only (~$40 on a $260k
@@ -302,7 +302,7 @@ fn test_equity_trs_financing_leg_matches_provider_schedule() {
         .cashflow_schedule(&market, as_of)
         .expect("financing schedule should build");
     let discount = market
-        .get_discount(trs.financing.discount_curve_id.as_str())
+        .get_discount(trs.financing_leg.discount_curve_id.as_str())
         .expect("discount curve");
     let payment_dates = trs.schedule.period_schedule().expect("period schedule");
     let mut expected_pv = 0.0;

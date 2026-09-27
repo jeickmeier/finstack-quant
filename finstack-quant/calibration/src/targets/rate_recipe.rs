@@ -147,7 +147,7 @@ pub(crate) fn recipe_ois_compounding(
                 cutoff_days: *cutoff_days,
             })
         }
-        _ => Err(finstack_quant_core::Error::Validation(
+        FloatingLegCompounding::SimpleAverage => Err(finstack_quant_core::Error::Validation(
             "unsupported floating-leg compounding for calibration replay".to_string(),
         )),
     }

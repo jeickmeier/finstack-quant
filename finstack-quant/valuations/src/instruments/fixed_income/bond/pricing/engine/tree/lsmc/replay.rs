@@ -527,7 +527,7 @@ impl ReplayTemplate {
         let mut params = floating_spec
             .map(|spec| params_from_spec(&spec.rate_spec))
             .unwrap_or_default();
-        if floating_spec.is_some_and(|spec| spec.rate_spec.overnight_compounding.is_some()) {
+        if floating_spec.is_some_and(|spec| spec.rate_spec.compounding.is_some()) {
             params.index_floor_bp = None;
             params.index_cap_bp = None;
         }
@@ -579,7 +579,7 @@ impl ReplayTemplate {
                     bond.id.as_str(), start, end
                 ))
             })?;
-            let (rate_model, observation) = if spec.rate_spec.overnight_compounding.is_some() {
+            let (rate_model, observation) = if spec.rate_spec.compounding.is_some() {
                 let (overnight_model, overnight_observation) = build_overnight_coupon(
                     tree,
                     market,

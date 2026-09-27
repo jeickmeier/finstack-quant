@@ -203,7 +203,7 @@ def _definition_terms(definition: dict[str, Any]) -> list[list[tuple[str, str]]]
             ],
         ]
     if itype == "credit_default_swap":
-        prem, prot = spec.get("premium", {}), spec.get("protection", {})
+        prem, prot = spec.get("premium_leg", {}), spec.get("protection_leg", {})
         return [
             [
                 ("Reference", spec.get("id", "")),

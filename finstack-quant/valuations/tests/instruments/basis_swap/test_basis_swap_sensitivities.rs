@@ -9,7 +9,8 @@ use finstack_quant_core::market_data::term_structures::{DiscountCurve, ForwardCu
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::CurveId;
 use finstack_quant_core::{currency::Currency::USD, math::interp::InterpStyle};
-use finstack_quant_valuations::instruments::rates::basis_swap::{BasisSwap, BasisSwapLeg};
+use finstack_quant_valuations::instruments::rates::basis_swap::BasisSwap;
+use finstack_quant_valuations::instruments::FloatLegSpec;
 use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::metrics::MetricId;
 use rust_decimal::Decimal;
@@ -61,8 +62,10 @@ fn market() -> MarketContext {
     MarketContext::new().insert(disc).insert(f3m).insert(f1m)
 }
 
-fn make_leg(forward_curve: &str, start: Date, end: Date, spread_bp: Decimal) -> BasisSwapLeg {
-    BasisSwapLeg {
+fn make_leg(forward_curve: &str, start: Date, end: Date, spread_bp: Decimal) -> FloatLegSpec {
+    FloatLegSpec {
+        end_of_month: false,
+        fixing_calendar_id: None,
         forward_curve_id: CurveId::new(forward_curve),
         discount_curve_id: CurveId::new("USD-OIS"),
         start,
@@ -419,11 +422,11 @@ fn annuity_with_payment_lag_differs_from_no_lag() {
     )
     .expect("swap construction");
 
-    let primary_with_lag = BasisSwapLeg {
+    let primary_with_lag = FloatLegSpec {
         payment_lag_days: 10,
         ..make_leg("USD-SOFR-3M", d(2025, 1, 2), d(2027, 1, 2), Decimal::ZERO)
     };
-    let reference_with_lag = BasisSwapLeg {
+    let reference_with_lag = FloatLegSpec {
         payment_lag_days: 10,
         ..make_leg("USD-SOFR-1M", d(2025, 1, 2), d(2027, 1, 2), Decimal::ZERO)
     };

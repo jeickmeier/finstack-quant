@@ -223,7 +223,7 @@ impl Marginable for InterestRateSwap {
         let currency = self.notional.currency();
         let mut sens = SimmSensitivities::new(currency);
 
-        let days_to_maturity = (self.float.end - as_of).whole_days().max(0) as f64;
+        let days_to_maturity = (self.float_leg.end - as_of).whole_days().max(0) as f64;
         let years_to_maturity = days_to_maturity / CALENDAR_DAYS_PER_YEAR;
 
         if years_to_maturity <= 0.0 {
@@ -343,7 +343,7 @@ impl Marginable for CreditDefaultSwap {
         let currency = self.notional.currency();
         let mut sens = SimmSensitivities::new(currency);
 
-        let days_to_maturity = (self.premium.end - as_of).whole_days().max(0) as f64;
+        let days_to_maturity = (self.premium_leg.end - as_of).whole_days().max(0) as f64;
         let years_to_maturity = days_to_maturity / CALENDAR_DAYS_PER_YEAR;
         let years_to_maturity = if years_to_maturity <= 0.0 {
             STANDARD_CDS_MATURITY_YEARS
@@ -351,7 +351,7 @@ impl Marginable for CreditDefaultSwap {
             years_to_maturity
         };
 
-        let ref_entity = extract_reference_entity(self.protection.credit_curve_id.as_str())?;
+        let ref_entity = extract_reference_entity(self.protection_leg.credit_curve_id.as_str())?;
         let tenor = assign_credit_tenor_bucket(years_to_maturity);
 
         // Preferred path: repriced CS01 (respects the survival curve, discount
@@ -376,7 +376,7 @@ impl Marginable for CreditDefaultSwap {
              CS01 unavailable (missing survival curve?)"
         );
         let risky_duration = years_to_maturity
-            * (1.0 - self.protection.recovery_rate)
+            * (1.0 - self.protection_leg.recovery_rate)
             * DURATION_APPROXIMATION_FACTOR;
         let cs01 = self.notional.amount().abs() * risky_duration * ONE_BP;
         let signed_cs01 = match self.side {
@@ -397,8 +397,8 @@ impl Marginable for CreditDefaultSwap {
     fn mtm_for_vm(&self, market: &MarketContext, as_of: Date) -> Result<Money> {
         use crate::instruments::credit_derivatives::cds::pricing::CDSPricer;
 
-        let disc = market.get_discount(self.premium.discount_curve_id.as_str())?;
-        let surv = market.get_hazard(self.protection.credit_curve_id.as_str())?;
+        let disc = market.get_discount(self.premium_leg.discount_curve_id.as_str())?;
+        let surv = market.get_hazard(self.protection_leg.credit_curve_id.as_str())?;
 
         let pricer = CDSPricer::new();
         let pv_prot = pricer.pv_protection_leg(self, disc.as_ref(), surv.as_ref(), as_of)?;
@@ -435,7 +435,7 @@ impl Marginable for CDSIndex {
         let currency = self.notional.currency();
         let mut sens = SimmSensitivities::new(currency);
 
-        let days_to_maturity = (self.premium.end - as_of).whole_days().max(0) as f64;
+        let days_to_maturity = (self.premium_leg.end - as_of).whole_days().max(0) as f64;
         let years_to_maturity = days_to_maturity / CALENDAR_DAYS_PER_YEAR;
         let years_to_maturity = if years_to_maturity <= 0.0 {
             STANDARD_CDS_MATURITY_YEARS
@@ -464,7 +464,7 @@ impl Marginable for CDSIndex {
             "SIMM credit delta falling back to risky-duration proxy: repriced \
              CS01 unavailable (missing survival curve?)"
         );
-        let recovery_rate = self.protection.recovery_rate;
+        let recovery_rate = self.protection_leg.recovery_rate;
         let risky_duration =
             years_to_maturity * (1.0 - recovery_rate) * DURATION_APPROXIMATION_FACTOR;
         let cs01 = self.notional.amount().abs() * risky_duration * ONE_BP;
@@ -847,7 +847,7 @@ mod tests {
                     sector: SimmCreditSector::HighYieldFinancial,
                 }),
         );
-        let as_of = cds.premium.start;
+        let as_of = cds.premium_leg.start;
 
         let sensitivities = cds
             .simm_sensitivities(&MarketContext::new(), as_of)

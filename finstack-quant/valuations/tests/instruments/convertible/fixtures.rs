@@ -301,7 +301,7 @@ pub fn create_floating_convertible() -> ConvertibleBond {
             index_tenor: None,
             reset_lag_days: 2,
             fixing_calendar_id: None,
-            overnight_compounding: None,
+            compounding: None,
             overnight_basis: None,
             fallback: finstack_quant_cashflows::builder::FloatingRateFallback::SpreadOnly,
         },

@@ -1156,30 +1156,10 @@ impl RateBindingSpec {
     }
 }
 
-/// Compounding convention for rate conversions.
-///
-/// Used when extracting rates from curves to convert between
-/// different quoting conventions (for example from continuous zeros to annual
-/// or simple statement rates). The output remains a decimal annualized rate;
-/// only the compounding basis changes.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
-#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(rename_all = "snake_case")]
-pub enum Compounding {
-    /// Simple interest (no compounding).
-    Simple,
-    /// Continuous compounding (default).
-    #[default]
-    Continuous,
-    /// Annual compounding (1 per year).
-    Annual,
-    /// Semi-annual compounding (2 per year).
-    SemiAnnual,
-    /// Quarterly compounding (4 per year).
-    Quarterly,
-    /// Monthly compounding (12 per year).
-    Monthly,
-}
+/// Compounding convention for rate conversions: the canonical core
+/// [`finstack_quant_core::math::Compounding`] (wire `continuous`, `simple`,
+/// `annual`, or `{"periodic": n}`), re-exported for scenario authoring.
+pub use finstack_quant_core::math::Compounding;
 
 impl ScenarioSpec {
     /// Validate the scenario specification for consistency.

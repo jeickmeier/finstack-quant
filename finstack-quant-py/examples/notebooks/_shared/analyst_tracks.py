@@ -189,7 +189,7 @@ def structured_index_inputs() -> dict[str, dict[str, Any]]:
     """
     _, index = cds_index(0)
     index["spec"].update({"id": "ANALYST-CDX", "series": 43, "notional": {"amount": "1000000", "currency": "USD"}})
-    index["spec"]["premium"].update({"start": "2024-12-20", "end": "2029-12-20", "coupon_bp": "100"})
+    index["spec"]["premium_leg"].update({"start": "2024-12-20", "end": "2029-12-20", "coupon_bp": "100"})
     tranche = {
         "type": "cds_tranche",
         "spec": {

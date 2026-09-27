@@ -27,7 +27,6 @@ const SCHEDULE = new Set([
   "ex_coupon_days",
   "reset_lag_days",
   "index_lag_days",
-  "compounding_simple",
   "accrual_method",
   "roll_rule",
   "protection_start_convention",

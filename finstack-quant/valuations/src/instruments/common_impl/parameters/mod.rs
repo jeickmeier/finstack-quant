@@ -21,8 +21,8 @@ pub use contract::ScheduleSpec;
 pub use conventions::{BondConvention, CommodityConvention};
 pub use finstack_quant_models::types::OptionMarketParams;
 pub use legs::{
-    BasisSwapLeg, FinancingLegSpec, FinancingRateCompounding, FixedLegSpec, FloatLegSpec,
-    ParRateMethod, PayReceive, PremiumLegSpec, ProtectionLegSpec, TotalReturnLegSpec,
+    FinancingLegSpec, FixedLegSpec, FloatLegSpec, ParRateMethod, PayReceive, PremiumLegSpec,
+    ProtectionLegSpec, TotalReturnLegSpec,
 };
 pub use market::{CreditParams, ExerciseStyle, OptionType, SettlementType};
 pub use monitoring::Monitoring;

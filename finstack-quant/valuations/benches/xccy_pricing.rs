@@ -27,6 +27,7 @@ use finstack_quant_core::types::CurveId;
 use finstack_quant_valuations::instruments::rates::xccy_swap::{
     NotionalExchange, XccySwap, XccySwapLeg,
 };
+use finstack_quant_valuations::instruments::FloatLegSpec;
 use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::instruments::PayReceive;
 use rust_decimal::Decimal;
@@ -102,46 +103,53 @@ fn make_xccy(base: Date, maturity: Date, exchange: NotionalExchange) -> XccySwap
     let eur_notional = usd_notional / 1.08;
 
     let leg_usd = XccySwapLeg {
-        currency: Currency::USD,
         notional: Money::new(usd_notional, Currency::USD).expect("valid money fixture"),
         side: PayReceive::Receive,
-        forward_curve_id: CurveId::from("USD-SOFR-3M"),
-        discount_curve_id: CurveId::from("USD-OIS"),
-        start: base,
-        end: maturity,
-        frequency: Tenor::quarterly(),
-        day_count: DayCount::Act360,
-        business_day_convention: BusinessDayConvention::ModifiedFollowing,
-        stub: StubKind::ShortFront,
-        spread_bp: Decimal::ZERO,
-        payment_lag_days: 0,
-        calendar_id: None,
-        reset_lag_days: None,
-        allow_calendar_fallback: true,
-        compounding: Default::default(),
+        leg: FloatLegSpec {
+            forward_curve_id: CurveId::from("USD-SOFR-3M"),
+            discount_curve_id: CurveId::from("USD-OIS"),
+            start: base,
+            end: maturity,
+            frequency: Tenor::quarterly(),
+            day_count: DayCount::Act360,
+            business_day_convention: BusinessDayConvention::ModifiedFollowing,
+            stub: StubKind::ShortFront,
+            spread_bp: Decimal::ZERO,
+            payment_lag_days: 0,
+            calendar_id: None,
+            reset_lag_days: 0,
+            compounding: Default::default(),
+            fixing_calendar_id: None,
+            end_of_month: false,
+        },
     };
 
     let leg_eur = XccySwapLeg {
-        currency: Currency::EUR,
         notional: Money::new(eur_notional, Currency::EUR).expect("valid money fixture"),
         side: PayReceive::Pay,
-        forward_curve_id: CurveId::from("EUR-EURIBOR-3M"),
-        discount_curve_id: CurveId::from("EUR-OIS"),
-        start: base,
-        end: maturity,
-        frequency: Tenor::quarterly(),
-        day_count: DayCount::Act360,
-        business_day_convention: BusinessDayConvention::ModifiedFollowing,
-        stub: StubKind::ShortFront,
-        spread_bp: Decimal::ZERO,
-        payment_lag_days: 0,
-        calendar_id: None,
-        reset_lag_days: None,
-        allow_calendar_fallback: true,
-        compounding: Default::default(),
+        leg: FloatLegSpec {
+            forward_curve_id: CurveId::from("EUR-EURIBOR-3M"),
+            discount_curve_id: CurveId::from("EUR-OIS"),
+            start: base,
+            end: maturity,
+            frequency: Tenor::quarterly(),
+            day_count: DayCount::Act360,
+            business_day_convention: BusinessDayConvention::ModifiedFollowing,
+            stub: StubKind::ShortFront,
+            spread_bp: Decimal::ZERO,
+            payment_lag_days: 0,
+            calendar_id: None,
+            reset_lag_days: 0,
+            compounding: Default::default(),
+            fixing_calendar_id: None,
+            end_of_month: false,
+        },
     };
 
-    XccySwap::new("XCCY-BENCH", leg_usd, leg_eur, Currency::USD).with_notional_exchange(exchange)
+    let mut swap = XccySwap::new("XCCY-BENCH", leg_usd, leg_eur, Currency::USD)
+        .with_notional_exchange(exchange);
+    swap.allow_calendar_fallback = true;
+    swap
 }
 
 // Benchmark: tenor scaling (InitialAndFinal exchange)

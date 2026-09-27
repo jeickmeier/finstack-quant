@@ -18,6 +18,7 @@ use finstack_quant_core::types::CurveId;
 use finstack_quant_valuations::instruments::rates::xccy_swap::{
     NotionalExchange, ResettingSide, XccySwap, XccySwapLeg,
 };
+use finstack_quant_valuations::instruments::FloatLegSpec;
 use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::instruments::PayReceive;
 use rust_decimal::Decimal;
@@ -88,46 +89,52 @@ fn build_swap(notional_exchange: NotionalExchange, spread_bp: Decimal) -> XccySw
     let start = base_date();
     let end = end_date();
     let eur_leg = XccySwapLeg {
-        currency: Currency::EUR,
         notional: Money::new(N_EUR_INITIAL, Currency::EUR).expect("valid money fixture"),
         side: PayReceive::Receive,
-        forward_curve_id: CurveId::new("EUR-EURIBOR-3M"),
-        discount_curve_id: CurveId::new("EUR-OIS"),
-        start,
-        end,
-        frequency: Tenor::quarterly(),
-        day_count: DayCount::Act360,
-        business_day_convention: BusinessDayConvention::ModifiedFollowing,
-        stub: StubKind::ShortFront,
-        spread_bp,
-        payment_lag_days: 0,
-        calendar_id: None,
-        reset_lag_days: None,
-        allow_calendar_fallback: true,
-        compounding: Default::default(),
+        leg: FloatLegSpec {
+            forward_curve_id: CurveId::new("EUR-EURIBOR-3M"),
+            discount_curve_id: CurveId::new("EUR-OIS"),
+            start,
+            end,
+            frequency: Tenor::quarterly(),
+            day_count: DayCount::Act360,
+            business_day_convention: BusinessDayConvention::ModifiedFollowing,
+            stub: StubKind::ShortFront,
+            spread_bp,
+            payment_lag_days: 0,
+            calendar_id: None,
+            reset_lag_days: 0,
+            compounding: Default::default(),
+            fixing_calendar_id: None,
+            end_of_month: false,
+        },
     };
     let usd_leg = XccySwapLeg {
-        currency: Currency::USD,
         notional: Money::new(N_USD, Currency::USD).expect("valid money fixture"),
         side: PayReceive::Pay,
-        forward_curve_id: CurveId::new("USD-SOFR-3M"),
-        discount_curve_id: CurveId::new("USD-OIS"),
-        start,
-        end,
-        frequency: Tenor::quarterly(),
-        day_count: DayCount::Act360,
-        business_day_convention: BusinessDayConvention::ModifiedFollowing,
-        stub: StubKind::ShortFront,
-        spread_bp: Decimal::ZERO,
-        payment_lag_days: 0,
-        calendar_id: None,
-        reset_lag_days: None,
-        allow_calendar_fallback: true,
-        compounding: Default::default(),
+        leg: FloatLegSpec {
+            forward_curve_id: CurveId::new("USD-SOFR-3M"),
+            discount_curve_id: CurveId::new("USD-OIS"),
+            start,
+            end,
+            frequency: Tenor::quarterly(),
+            day_count: DayCount::Act360,
+            business_day_convention: BusinessDayConvention::ModifiedFollowing,
+            stub: StubKind::ShortFront,
+            spread_bp: Decimal::ZERO,
+            payment_lag_days: 0,
+            calendar_id: None,
+            reset_lag_days: 0,
+            compounding: Default::default(),
+            fixing_calendar_id: None,
+            end_of_month: false,
+        },
     };
 
-    XccySwap::new("MTM-TEST", eur_leg, usd_leg, Currency::USD)
-        .with_notional_exchange(notional_exchange)
+    let mut swap = XccySwap::new("MTM-TEST", eur_leg, usd_leg, Currency::USD)
+        .with_notional_exchange(notional_exchange);
+    swap.allow_calendar_fallback = true;
+    swap
 }
 
 /// CIP invariance with `as_of` STRICTLY AFTER the curve base date.
@@ -552,7 +559,7 @@ fn mtm_schedule_applies_leg_specific_coupon_frequencies() {
         },
         Decimal::ZERO,
     );
-    swap.leg2.frequency = Tenor::semi_annual();
+    swap.leg2.leg.frequency = Tenor::semi_annual();
     swap.validate().expect("leg-specific schedules are valid");
 
     let schedule = swap

@@ -69,7 +69,6 @@ def _fixed_leg(**overrides: object) -> FixedLegSpec:
         "day_count": DayCount.THIRTY_360,
         "start": AS_OF,
         "end": END,
-        "compounding_simple": True,
     }
     kwargs.update(overrides)
     return FixedLegSpec(**kwargs)  # type: ignore[arg-type]
@@ -99,11 +98,11 @@ def test_swap_from_legs_prices_on_start_date_without_fixings() -> None:
         .id("IRS-SPOT")
         .notional(10_000_000.0, currency="USD")
         .side("pay")
-        .fixed(_fixed_leg())
-        .float(_float_leg())
+        .fixed_leg(_fixed_leg())
+        .float_leg(_float_leg())
         .build()
     )
-    assert swap.float.reset_lag_days == 0
+    assert swap.float_leg.reset_lag_days == 0
     result = swap.price(_market(), AS_OF, metrics=["dv01"])
     assert isinstance(result, ValuationResult)
     assert result.currency == "USD"
@@ -128,9 +127,9 @@ def test_swap_from_conventions_prices_on_start_date_without_fixings() -> None:
         currency="USD",
     )
     assert swap.side == "pay"
-    assert swap.float.reset_lag_days == 0
-    assert swap.float.compounding != "simple"
-    assert swap.fixed.rate == pytest.approx(0.035)
+    assert swap.float_leg.reset_lag_days == 0
+    assert swap.float_leg.compounding != "simple"
+    assert swap.fixed_leg.rate == pytest.approx(0.035)
     result = swap.price(_market(), AS_OF)
     assert result.currency == "USD"
 
@@ -168,13 +167,13 @@ def test_swap_getters_return_typed_values() -> None:
     assert isinstance(swap.notional, Money)
     assert swap.notional.amount == pytest.approx(10_000_000.0)
     assert swap.side == "pay"
-    assert isinstance(swap.fixed, FixedLegSpec)
-    assert isinstance(swap.float, FloatLegSpec)
-    assert isinstance(swap.fixed.start, datetime.date)
-    assert isinstance(swap.fixed.frequency, Tenor)
-    assert isinstance(swap.fixed.day_count, DayCount)
-    assert isinstance(swap.fixed.stub, StubKind)
-    assert swap.float.reset_lag_days == 2
+    assert isinstance(swap.fixed_leg, FixedLegSpec)
+    assert isinstance(swap.float_leg, FloatLegSpec)
+    assert isinstance(swap.fixed_leg.start, datetime.date)
+    assert isinstance(swap.fixed_leg.frequency, Tenor)
+    assert isinstance(swap.fixed_leg.day_count, DayCount)
+    assert isinstance(swap.fixed_leg.stub, StubKind)
+    assert swap.float_leg.reset_lag_days == 2
     assert swap.margin_spec is None
     assert isinstance(swap.attributes, Attributes)
     assert swap.default_model == "discounting"
@@ -192,8 +191,8 @@ def test_swap_builder_margin_spec_and_attributes() -> None:
         .id("IRS-ATTR")
         .notional(Money(1_000_000.0, Currency("USD")))
         .side("receive")
-        .fixed(_fixed_leg())
-        .float(_float_leg())
+        .fixed_leg(_fixed_leg())
+        .float_leg(_float_leg())
         .attributes({"desk": "rates", "tags": ["hedge"]})
         .build()
     )
@@ -209,8 +208,8 @@ def test_builder_build_does_not_run_pricing_validation() -> None:
         .id("IRS-NO-PRICING-CHECK")
         .notional(1_000_000.0, currency="USD")
         .side("pay")
-        .fixed(_fixed_leg())
-        .float(_float_leg())
+        .fixed_leg(_fixed_leg())
+        .float_leg(_float_leg())
         .build()
     )
     assert swap.id == "IRS-NO-PRICING-CHECK"
@@ -224,7 +223,7 @@ def test_builder_names_missing_field() -> None:
             .id("IRS-MISSING")
             .notional(1_000_000.0, currency="USD")
             .side("pay")
-            .fixed(_fixed_leg())
+            .fixed_leg(_fixed_leg())
             .build()
         )
     with pytest.raises(ValueError, match="missing required field 'id'"):
@@ -294,7 +293,7 @@ def test_leg_specs_accept_iso_string_dates_and_stub_names() -> None:
 def test_leg_spec_repr_is_python_style() -> None:
     text = repr(_fixed_leg())
     assert text.startswith("FixedLegSpec(")
-    assert "compounding_simple=True" in text
+    assert "end_of_month=False" in text
     assert "calendar_id=None" in text
     assert 'discount_curve_id="USD-OIS"' in text
     assert "0.04" in text
@@ -626,7 +625,7 @@ def test_cap_floor_example_getters_and_new_setters() -> None:
         .notional(5_000_000.0, currency="USD")
         .strike(Rate(0.02))
         .spread_bp(0.0)
-        .premium("2025-01-20", 10_000.0, currency="USD")
+        .premium_leg("2025-01-20", 10_000.0, currency="USD")
         .start_date("2025-01-15")
         .maturity("2028-01-15")
         .frequency(Tenor.quarterly())
@@ -669,8 +668,8 @@ def test_metric_keys_are_human_readable_not_escaped() -> None:
         .id("IRS-KEYS")
         .notional(10_000_000.0, currency="USD")
         .side("pay")
-        .fixed(_fixed_leg())
-        .float(_float_leg())
+        .fixed_leg(_fixed_leg())
+        .float_leg(_float_leg())
         .build()
     )
     result = swap.price(_market(), AS_OF, metrics=["pv01", "bucketed_dv01"])

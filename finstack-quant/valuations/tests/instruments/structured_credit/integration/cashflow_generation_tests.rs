@@ -110,7 +110,7 @@ fn create_test_tranches() -> TrancheStructure {
             index_tenor: None,
             reset_lag_days: 2,
             fixing_calendar_id: None,
-            overnight_compounding: None,
+            compounding: None,
             overnight_basis: None,
             fallback: Default::default(),
         }),

@@ -99,7 +99,7 @@ def _floating_cashflow_spec() -> str:
                         "reset_frequency": {"count": 3, "unit": "months"},
                         "reset_lag_days": 0,
                         "fixing_calendar_id": None,
-                        "overnight_compounding": None,
+                        "compounding": None,
                         "overnight_basis": None,
                     },
                     "coupon_type": "cash",

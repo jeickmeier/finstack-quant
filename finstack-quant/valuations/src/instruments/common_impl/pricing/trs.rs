@@ -17,14 +17,16 @@
 //!
 //! [`TrsEngine::pv_financing_leg`] and [`TrsEngine::pv_financing_float_only`]
 //! project each period's floating rate according to the financing leg's
-//! `FinancingRateCompounding` setting:
+//! `FinancingLegSpec.compounding` setting:
 //!
-//! - `TermRate` — the **discount-factor-implied simple forward** over the accrual
+//! - `simple` — the **discount-factor-implied simple forward** over the accrual
 //!   period ([`rate_between_on_dates`]), correct for a term-rate-financed TRS
 //!   (e.g. 3M Term SOFR) where the period length matches the index tenor.
-//! - `OvernightCompounded` — **daily-compounds** the overnight forward via
+//! - `compounded_*` — **daily-compounds** the overnight forward via
 //!   [`crate::instruments::common_impl::pricing::overnight::project_overnight_coupon`]
-//!   with `CompoundedInArrears { lookback_days: 0 }` (cleared-OIS style).
+//!   with the leg's lookback / observation shift / rate cut-off
+//!   (`compounded_in_arrears` with zero lookback is cleared-OIS style).
+//! - `simple_average` — rejected.
 //!   The simple average would drop the daily-compounding convexity (~12–15 bp
 //!   of rate at current levels).
 //!
@@ -32,9 +34,7 @@
 //! legs use the schedule year fraction; overnight legs use the projector
 //! year fraction so `pv_financing_leg = pv_financing_float_only + spread × annuity`.
 
-use crate::instruments::common_impl::parameters::legs::{
-    FinancingLegSpec, FinancingRateCompounding,
-};
+use crate::instruments::common_impl::parameters::legs::FinancingLegSpec;
 use crate::instruments::common_impl::parameters::trs_common::TrsScheduleSpec;
 use finstack_quant_core::dates::{BusinessDayConvention, Date, DayCount, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
@@ -69,12 +69,12 @@ fn signed_year_fraction(
 
 /// Project one financing-leg accrual period's floating rate, excluding spread.
 ///
-/// `TermRate` legs use the discount-factor-implied simple forward over the period;
-/// `OvernightCompounded` (OIS / RFR) legs daily-compound the overnight forward
+/// `simple` legs use the discount-factor-implied simple forward over the period;
+/// compounded (OIS / RFR) legs daily-compound the overnight forward
 /// and return the equivalent simple rate `(∏(1+rᵢ·dᵢ)−1)/τ`, capturing the
 /// daily-compounding convexity the arithmetic average drops.
 ///
-/// For `OvernightCompounded` periods that have already started
+/// For compounded periods that have already started
 /// (`period_start <= as_of < period_end`), the function splices realized daily
 /// fixings (from `fixings`) with projected overnight forwards, matching the
 /// behaviour of `compounded_spliced_projection` used by `pv_floating_leg`.
@@ -131,7 +131,12 @@ fn financing_period_projection(
     currency: Currency,
 ) -> finstack_quant_core::Result<FinancingPeriodProjection> {
     match financing.compounding {
-        FinancingRateCompounding::TermRate => {
+        FloatingLegCompounding::SimpleAverage => Err(finstack_quant_core::Error::Validation(
+            "financing_leg.compounding = simple_average is not supported; use simple or a \
+             compounded_* variant"
+                .to_string(),
+        )),
+        FloatingLegCompounding::Simple => {
             let rate = if period_start <= as_of {
                 finstack_quant_core::market_data::fixings::require_fixing_value_exact(
                     fixings,
@@ -148,7 +153,9 @@ fn financing_period_projection(
                 1.0 + rate * period_year_fraction,
             )
         }
-        FinancingRateCompounding::OvernightCompounded => {
+        compounding @ (FloatingLegCompounding::CompoundedInArrears { .. }
+        | FloatingLegCompounding::CompoundedWithObservationShift { .. }
+        | FloatingLegCompounding::CompoundedWithRateCutoff { .. }) => {
             let calendar: &dyn finstack_quant_core::dates::HolidayCalendar =
                 if calendar_id.is_empty() {
                     super::overnight::resolve_overnight_fixing_calendar(
@@ -165,7 +172,6 @@ fn financing_period_projection(
                         "TRS financing",
                     )?
                 };
-            let compounding = FloatingLegCompounding::CompoundedInArrears { lookback_days: 0 };
             let (accrual_start, accrual_end) = adjust_overnight_accrual_boundaries(
                 period_start,
                 period_end,
@@ -399,7 +405,7 @@ impl TrsEngine {
     ) -> finstack_quant_core::Result<Money> {
         let disc = context.get_discount(financing.discount_curve_id.as_str())?;
         let fwd = context.get_forward(financing.forward_curve_id.as_str())?;
-        // For OvernightCompounded legs, realized fixings for in-progress periods
+        // For compounded legs, realized fixings for in-progress periods
         // are sourced from MarketContext using the canonical `FIXING:{forward_curve_id}`
         // key.  The same pattern is used by `basis_swap` / `pv_floating_leg`.
         // `get_fixing_series` returns `None` (not an error) when absent; the
@@ -628,14 +634,13 @@ mod tests {
         TrsReturnModel,
     };
     use crate::cashflow::builder::ScheduleParams;
-    use crate::instruments::common_impl::parameters::legs::{
-        FinancingLegSpec, FinancingRateCompounding,
-    };
+    use crate::instruments::common_impl::parameters::legs::FinancingLegSpec;
     use crate::instruments::common_impl::parameters::trs_common::TrsScheduleSpec;
     use crate::instruments::common_impl::pricing::swap_legs;
     use crate::instruments::common_impl::pricing::time::{
         rate_between_on_dates, relative_df_discount_curve,
     };
+    use crate::instruments::rates::irs::FloatingLegCompounding;
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::{
         BusinessDayConvention, Date, DateExt, DayCount, DayCountContext, StubKind, Tenor,
@@ -860,7 +865,7 @@ mod tests {
             forward_curve_id: CurveId::new("FWD"),
             spread_bp: Decimal::ZERO,
             day_count: DayCount::Act365F,
-            compounding: FinancingRateCompounding::TermRate,
+            compounding: FloatingLegCompounding::Simple,
         };
 
         let pv = TrsEngine::pv_financing_leg(
@@ -913,7 +918,7 @@ mod tests {
         );
     }
 
-    /// Regression test: an in-progress `OvernightCompounded` financing period that
+    /// Regression test: an in-progress compounded financing period that
     /// straddles `as_of` must splice realized daily fixings (period_start → as_of)
     /// with projected forwards (as_of → period_end), NOT project the whole period
     /// from the forward curve. This test verifies that the spliced result differs
@@ -990,7 +995,7 @@ mod tests {
             forward_curve_id: CurveId::new("SOFR"),
             spread_bp: Decimal::ZERO,
             day_count: DayCount::Act360,
-            compounding: FinancingRateCompounding::OvernightCompounded,
+            compounding: FloatingLegCompounding::CompoundedInArrears { lookback_days: 0 },
         };
 
         let notional = Money::from((1_000_000_i64, Currency::USD));
@@ -1105,7 +1110,7 @@ mod tests {
             forward_curve_id: CurveId::new("USD-TERM-3M"),
             spread_bp: Decimal::ZERO,
             day_count: DayCount::Act360,
-            compounding: FinancingRateCompounding::TermRate,
+            compounding: FloatingLegCompounding::Simple,
         };
         let year_fraction = DayCount::Act360
             .year_fraction(period_start, period_end, DayCountContext::default())
@@ -1161,7 +1166,7 @@ mod tests {
     fn trs_financing_leg_overnight_compounding_exceeds_term_rate_on_upward_curve() {
         // On an upward-sloping forward curve, daily-compounding an OIS financing
         // leg picks up positive convexity that the simple term-rate average
-        // drops. A `TermRate` and an `OvernightCompounded` leg over the same
+        // drops. A `simple` and a compounded leg over the same
         // curves must therefore price differently, with OIS strictly higher.
         let as_of = date(2024, 12, 31);
         let start = date(2025, 1, 1);
@@ -1203,7 +1208,7 @@ mod tests {
         let term = FinancingLegSpec::new("DISC", "FWD", Decimal::ZERO, DayCount::Act365F);
         let ois = term
             .clone()
-            .with_compounding(FinancingRateCompounding::OvernightCompounded);
+            .with_compounding(FloatingLegCompounding::CompoundedInArrears { lookback_days: 0 });
 
         let pv_term = TrsEngine::pv_financing_leg(&term, &schedule, notional, &ctx, as_of)
             .expect("term-rate financing pv");
@@ -1248,7 +1253,7 @@ mod tests {
             forward_curve_id: CurveId::new("USD-SOFR-OIS"),
             spread_bp: Decimal::ZERO,
             day_count: DayCount::Act360,
-            compounding: FinancingRateCompounding::OvernightCompounded,
+            compounding: FloatingLegCompounding::CompoundedInArrears { lookback_days: 0 },
         };
         let yf = DayCount::Act360
             .year_fraction(start, end, DayCountContext::default())

@@ -92,12 +92,15 @@ impl MetricCalculator for ParRateCalculator {
 
     fn calculate(&self, context: &mut MetricContext) -> finstack_quant_core::Result<f64> {
         let irs: &InterestRateSwap = context.instrument_as()?;
-        let method = irs.fixed.par_method.unwrap_or(ParRateMethod::ForwardBased);
+        let method = irs
+            .fixed_leg
+            .par_method
+            .unwrap_or(ParRateMethod::ForwardBased);
 
         // For compounded swaps, we always use the forward-based (PV-based) method
         // to ensure all RFR-specific conventions (lookback, shift) are captured.
         if matches!(
-            irs.float.compounding,
+            irs.float_leg.compounding,
             FloatingLegCompounding::CompoundedInArrears { .. }
                 | FloatingLegCompounding::CompoundedWithObservationShift { .. }
                 | FloatingLegCompounding::CompoundedWithRateCutoff { .. }
@@ -113,7 +116,9 @@ impl MetricCalculator for ParRateCalculator {
                     // Safer default: fall back to PV-based par rate when identity prerequisites do not hold.
                     return par_rate_pv_based(irs, context);
                 }
-                let disc = context.curves.get_discount(&irs.fixed.discount_curve_id)?;
+                let disc = context
+                    .curves
+                    .get_discount(&irs.fixed_leg.discount_curve_id)?;
                 let fixed = irs.resolved_fixed_leg()?;
                 let periods = crate::cashflow::builder::periods::build_periods(
                     crate::cashflow::builder::periods::BuildPeriodsParams {
@@ -229,7 +234,7 @@ mod tests {
             .id(InstrumentId::new("IRS"))
             .notional(Money::from((1_000_000_i64, Currency::USD)))
             .side(crate::instruments::rates::irs::PayReceive::Pay)
-            .fixed(
+            .fixed_leg(
                 crate::instruments::common_impl::parameters::legs::FixedLegSpec {
                     discount_curve_id: disc.clone(),
                     rate: rust_decimal::Decimal::try_from(0.03).expect("valid"),
@@ -241,12 +246,11 @@ mod tests {
                     start,
                     end,
                     par_method: Some(ParRateMethod::DiscountRatio),
-                    compounding_simple: true,
                     payment_lag_days: 0,
                     end_of_month: false,
                 },
             )
-            .float(
+            .float_leg(
                 crate::instruments::common_impl::parameters::legs::FloatLegSpec {
                     discount_curve_id: disc.clone(),
                     forward_curve_id: fwd, // multi-curve
@@ -274,15 +278,15 @@ mod tests {
         );
 
         let mut irs2 = irs.clone();
-        irs2.float.forward_curve_id = disc.clone();
+        irs2.float_leg.forward_curve_id = disc.clone();
         assert!(discount_ratio_allowed(&irs2, as_of), "single-curve allowed");
 
-        irs2.float.spread_bp = rust_decimal::Decimal::try_from(5.0).expect("valid");
+        irs2.float_leg.spread_bp = rust_decimal::Decimal::try_from(5.0).expect("valid");
         assert!(!discount_ratio_allowed(&irs2, as_of), "spread disallowed");
 
         let mut irs3 = irs2;
-        irs3.float.spread_bp = rust_decimal::Decimal::ZERO;
-        irs3.float.payment_lag_days = 2;
+        irs3.float_leg.spread_bp = rust_decimal::Decimal::ZERO;
+        irs3.float_leg.payment_lag_days = 2;
         assert!(
             !discount_ratio_allowed(&irs3, as_of),
             "payment delay disallowed"
@@ -290,7 +294,7 @@ mod tests {
 
         let seasoned_as_of = date(2024, 2, 1);
         let mut irs4 = irs;
-        irs4.float.forward_curve_id = disc;
+        irs4.float_leg.forward_curve_id = disc;
         assert!(
             !discount_ratio_allowed(&irs4, seasoned_as_of),
             "seasoned disallowed"

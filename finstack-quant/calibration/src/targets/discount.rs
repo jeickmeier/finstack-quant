@@ -337,7 +337,7 @@ Global solve requires strictly increasing times.",
             discount_and_forward_curve_ids(discount_id.as_ref(), forward_id.as_ref()),
             Some(curve_day_count),
             residual_notional,
-            params.conventions.ois_compounding.clone(),
+            params.conventions.ois_compounding,
         )?;
         let prepared_quotes = prepared.quotes;
 
@@ -528,7 +528,7 @@ Global solve requires strictly increasing times.",
             Some(FloatingLegCompounding::CompoundedWithRateCutoff { cutoff_days })
                 if *cutoff_days > 0 =>
             {
-                Some(*cutoff_days)
+                i32::try_from(*cutoff_days).ok()
             }
             _ => None,
         }

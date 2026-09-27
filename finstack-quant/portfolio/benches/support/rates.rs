@@ -37,7 +37,6 @@ pub fn usd_irs_swap(
         start,
         end,
         par_method: None,
-        compounding_simple: true,
         payment_lag_days: 0,
         end_of_month: false,
     };
@@ -64,8 +63,8 @@ pub fn usd_irs_swap(
         .id(id.into())
         .notional(notional)
         .side(side)
-        .fixed(fixed)
-        .float(float)
+        .fixed_leg(fixed)
+        .float_leg(float)
         .build()?;
 
     swap.validate()?;

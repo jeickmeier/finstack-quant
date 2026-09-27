@@ -85,9 +85,6 @@ impl PyFixedLegSpec {
     ///     Start date of the fixed leg (ISO 8601 strings accepted).
     /// end : datetime.date | datetime.datetime | pandas.Timestamp | str
     ///     End date of the fixed leg (ISO 8601 strings accepted).
-    /// compounding_simple : bool
-    ///     If true, use simple interest on the accrual fraction. Required:
-    ///     the canonical Rust ``FixedLegSpec`` field has no default.
     /// business_day_convention : str, default "modified_following"
     ///     Business day convention for payment dates.
     /// calendar_id : str, optional
@@ -122,17 +119,17 @@ impl PyFixedLegSpec {
     /// >>> from finstack_quant.valuations.instruments import FixedLegSpec
     /// >>> leg = FixedLegSpec(
     /// ...     "USD-OIS", 0.04, Tenor.semi_annual(), DayCount.THIRTY_360,
-    /// ...     "2024-01-15", "2029-01-15", compounding_simple=False,
+    /// ...     "2024-01-15", "2029-01-15",
     /// ... )
     /// >>> leg.rate
     /// 0.04
     #[new]
     #[pyo3(signature = (discount_curve_id, rate, frequency, day_count, start, end, *,
-                        compounding_simple, business_day_convention = "modified_following", calendar_id = None,
+                        business_day_convention = "modified_following", calendar_id = None,
                         stub = None, par_method = None, payment_lag_days = 0, end_of_month = false))]
     #[pyo3(
         text_signature = "(discount_curve_id, rate, frequency, day_count, start, end, *, \
-compounding_simple, business_day_convention='modified_following', calendar_id=None, stub='short_front', \
+business_day_convention='modified_following', calendar_id=None, stub='short_front', \
 par_method=None, payment_lag_days=0, end_of_month=False)"
     )]
     // PyO3 binding: the argument list mirrors the Python keyword-argument API.
@@ -144,7 +141,6 @@ par_method=None, payment_lag_days=0, end_of_month=False)"
         day_count: PyRef<'_, PyDayCount>,
         start: &Bound<'_, PyAny>,
         end: &Bound<'_, PyAny>,
-        compounding_simple: bool,
         business_day_convention: &str,
         calendar_id: Option<String>,
         stub: Option<&Bound<'_, PyAny>>,
@@ -171,7 +167,6 @@ par_method=None, payment_lag_days=0, end_of_month=False)"
             par_method: par_method
                 .map(|value| enum_from_str(value, "par_method"))
                 .transpose()?,
-            compounding_simple,
             payment_lag_days,
             end_of_month,
         };
@@ -292,12 +287,6 @@ par_method=None, payment_lag_days=0, end_of_month=False)"
             .transpose()
     }
 
-    /// Whether simple interest is used on the accrual fraction.
-    #[getter]
-    fn compounding_simple(&self) -> bool {
-        self.inner.compounding_simple
-    }
-
     /// Payment lag in business days after period end.
     #[getter]
     fn payment_lag_days(&self) -> i32 {
@@ -314,7 +303,7 @@ par_method=None, payment_lag_days=0, end_of_month=False)"
     pub(crate) fn __repr__(&self) -> String {
         format!(
             "FixedLegSpec(discount_curve_id={:?}, rate={}, frequency={}, day_count={}, start={}, end={}, \
-compounding_simple={}, business_day_convention={:?}, calendar_id={}, stub={:?}, par_method={}, \
+business_day_convention={:?}, calendar_id={}, stub={:?}, par_method={}, \
 payment_lag_days={}, end_of_month={})",
             self.inner.discount_curve_id.as_str(),
             decimal_repr(self.inner.rate),
@@ -322,7 +311,6 @@ payment_lag_days={}, end_of_month={})",
             self.inner.day_count,
             self.inner.start,
             self.inner.end,
-            super::convert::bool_repr(self.inner.compounding_simple),
             enum_to_py_string(&self.inner.business_day_convention).unwrap_or_default(),
             opt_repr(self.inner.calendar_id.as_ref().map(|c| format!("{c:?}"))),
             enum_to_py_string(&self.inner.stub).unwrap_or_default(),
@@ -641,7 +629,7 @@ reset_lag_days=0, fixing_calendar_id=None, compounding='simple', payment_lag_day
 
     /// Return ``repr(self)``.
     pub(crate) fn __repr__(&self) -> String {
-        let compounding = serde_json::to_value(&self.inner.compounding)
+        let compounding = serde_json::to_value(self.inner.compounding)
             .map(|v| match v {
                 serde_json::Value::String(s) => format!("{s:?}"),
                 other => other.to_string(),

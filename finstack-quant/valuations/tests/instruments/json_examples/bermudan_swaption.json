@@ -35,7 +35,6 @@
       "underlying_fixed_leg": {
         "business_day_convention": "modified_following",
         "calendar_id": null,
-        "compounding_simple": true,
         "day_count": "30_360",
         "discount_curve_id": "USD-OIS",
         "end": "2037-01-17",

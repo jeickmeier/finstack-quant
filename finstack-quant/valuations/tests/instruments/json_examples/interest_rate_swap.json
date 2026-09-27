@@ -2,10 +2,9 @@
   "instrument": {
     "spec": {
       "attributes": {},
-      "fixed": {
+      "fixed_leg": {
         "business_day_convention": "modified_following",
         "calendar_id": "usny",
-        "compounding_simple": true,
         "day_count": "30_360",
         "discount_curve_id": "USD-OIS",
         "end": "2029-01-02",
@@ -20,7 +19,7 @@
         "start": "2024-01-02",
         "stub": "short_front"
       },
-      "float": {
+      "float_leg": {
         "business_day_convention": "modified_following",
         "calendar_id": "usny",
         "compounding": "simple",

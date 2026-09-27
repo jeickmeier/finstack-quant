@@ -6,8 +6,9 @@ use finstack_quant_core::market_data::term_structures::{DiscountCurve, ForwardCu
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::CurveId;
 use finstack_quant_core::{currency::Currency::USD, math::interp::InterpStyle};
-use finstack_quant_valuations::instruments::rates::basis_swap::{BasisSwap, BasisSwapLeg};
+use finstack_quant_valuations::instruments::rates::basis_swap::BasisSwap;
 use finstack_quant_valuations::instruments::rates::irs::FloatingLegCompounding;
+use finstack_quant_valuations::instruments::FloatLegSpec;
 use finstack_quant_valuations::instruments::Instrument;
 use rust_decimal::Decimal;
 use time::Month;
@@ -38,8 +39,10 @@ fn market() -> MarketContext {
     MarketContext::new().insert(disc).insert(ois).insert(term)
 }
 
-fn term_leg(curve: &str, compounding: FloatingLegCompounding) -> BasisSwapLeg {
-    BasisSwapLeg {
+fn term_leg(curve: &str, compounding: FloatingLegCompounding) -> FloatLegSpec {
+    FloatLegSpec {
+        end_of_month: false,
+        fixing_calendar_id: None,
         forward_curve_id: CurveId::new(curve),
         discount_curve_id: CurveId::new("USD-OIS"),
         start: d(2025, 1, 2),

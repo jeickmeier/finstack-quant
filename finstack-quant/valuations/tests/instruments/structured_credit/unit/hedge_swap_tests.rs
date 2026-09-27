@@ -63,7 +63,7 @@ fn floating(spread_bp: f64) -> FloatingRateSpec {
         index_tenor: None,
         reset_lag_days: 0,
         fixing_calendar_id: None,
-        overnight_compounding: None,
+        compounding: None,
         overnight_basis: None,
         fallback: Default::default(),
     }
@@ -123,8 +123,8 @@ fn abs(hedged: bool) -> StructuredCredit {
             PayReceive::Pay,
         )
         .expect("swap");
-        swap.fixed.frequency = Tenor::monthly();
-        swap.float.frequency = Tenor::monthly();
+        swap.fixed_leg.frequency = Tenor::monthly();
+        swap.float_leg.frequency = Tenor::monthly();
         deal = deal.with_hedge_swap(HedgeSwap::new(swap).on_tranche_par("A"));
     }
     deal

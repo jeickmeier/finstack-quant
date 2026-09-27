@@ -292,7 +292,7 @@ fn test_expired_swap_handling() {
         id: InstrumentId::new("EXPIRED_SWAP"),
         notional: Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         side: PayReceive::Receive,
-        fixed: FixedLegSpec {
+        fixed_leg: FixedLegSpec {
             discount_curve_id: "USD-OIS".into(),
             rate: rust_decimal::Decimal::try_from(0.05).expect("valid"),
             frequency: Tenor::quarterly(),
@@ -301,13 +301,12 @@ fn test_expired_swap_handling() {
             calendar_id: None,
             stub: StubKind::None,
             par_method: None,
-            compounding_simple: true,
             payment_lag_days: 0,
             end_of_month: false,
             start,
             end,
         },
-        float: FloatLegSpec {
+        float_leg: FloatLegSpec {
             discount_curve_id: "USD-OIS".into(),
             forward_curve_id: "USD-SOFR-3M".into(),
             spread_bp: rust_decimal::Decimal::try_from(0.0).expect("valid"),
@@ -373,7 +372,7 @@ fn test_very_short_swap_1_month() {
         id: InstrumentId::new("SHORT_SWAP"),
         notional: Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         side: PayReceive::Receive,
-        fixed: FixedLegSpec {
+        fixed_leg: FixedLegSpec {
             discount_curve_id: "USD-OIS".into(),
             rate: rust_decimal::Decimal::try_from(0.05).expect("valid"),
             frequency: Tenor::monthly(),
@@ -382,13 +381,12 @@ fn test_very_short_swap_1_month() {
             calendar_id: None,
             stub: StubKind::None,
             par_method: None,
-            compounding_simple: true,
             payment_lag_days: 0,
             end_of_month: false,
             start: as_of,
             end,
         },
-        float: FloatLegSpec {
+        float_leg: FloatLegSpec {
             discount_curve_id: "USD-OIS".into(),
             forward_curve_id: "USD-SOFR-3M".into(),
             spread_bp: rust_decimal::Decimal::try_from(0.0).expect("valid"),

@@ -209,8 +209,8 @@ pub use fixed_income::{
 pub use rates::{
     BasisSwap, BermudanSwaption, CapFloor, CmsOption, CmsSpreadOption, CmsSwap, CollateralSpec,
     CollateralType, Deposit, ForwardRateAgreement, InflationCapFloor, InflationSwap,
-    InterestRateFuture, InterestRateSwap, RateAveragingMethod, RateOptionType, Repo, RepoType,
-    Swaption, XccySwap, YoYInflationSwap,
+    InterestRateFuture, InterestRateSwap, RateOptionType, Repo, RepoType, Swaption, XccySwap,
+    YoYInflationSwap,
 };
 
 pub use credit_derivatives::{CDSIndex, CDSOption, CDSTranche, CreditDefaultSwap};
@@ -269,11 +269,11 @@ pub use common_impl::traits::{
 };
 
 pub use common_impl::parameters::{
-    BasisSwapLeg, BondConvention, CommodityUnderlyingParams, CreditParams, EquityUnderlyingParams,
-    ExerciseStyle, FinancingLegSpec, FinancingRateCompounding, FixedLegSpec, FloatLegSpec,
-    FxUnderlyingParams, IndexUnderlyingParams, Monitoring, OptionMarketParams, OptionType,
-    ParRateMethod, PayReceive, PremiumLegSpec, ProtectionLegSpec, QuantoSpec, ScheduleSpec,
-    SettlementType, TotalReturnLegSpec, VolatilityModel,
+    BondConvention, CommodityUnderlyingParams, CreditParams, EquityUnderlyingParams, ExerciseStyle,
+    FinancingLegSpec, FixedLegSpec, FloatLegSpec, FxUnderlyingParams, IndexUnderlyingParams,
+    Monitoring, OptionMarketParams, OptionType, ParRateMethod, PayReceive, PremiumLegSpec,
+    ProtectionLegSpec, QuantoSpec, ScheduleSpec, SettlementType, TotalReturnLegSpec,
+    VolatilityModel,
 };
 
 pub use common_impl::parameters::trs_common::TrsScheduleSpec;

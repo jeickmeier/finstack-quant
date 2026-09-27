@@ -620,7 +620,7 @@ enum PreparedTree {
 pub(crate) struct OasPricer<'a> {
     market: &'a MarketContext,
     as_of: Date,
-    quote_compounding: crate::instruments::pricing_overrides::OasQuoteCompounding,
+    quote_compounding: finstack_quant_core::math::Compounding,
     bond: Bond,
     model: PreparedTree,
 }
@@ -633,10 +633,10 @@ impl OasPricer<'_> {
     /// * `oas_bp` - OAS in basis points on the configured quote compounding;
     ///   it is converted to a continuous shift of the short rate.
     pub(crate) fn price(&self, oas_bp: f64) -> Result<TreePriceOutcome> {
-        let oas = self
-            .quote_compounding
-            .continuous_from_quote_decimal(oas_bp / 10_000.0)
-            * 10_000.0;
+        let oas = crate::instruments::pricing_overrides::oas_continuous_from_quote_decimal(
+            self.quote_compounding,
+            oas_bp / 10_000.0,
+        )? * 10_000.0;
         let amount = match &self.model {
             PreparedTree::Zero => 0.0,
             PreparedTree::Deterministic(valuator) => {

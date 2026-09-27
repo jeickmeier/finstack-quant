@@ -495,7 +495,9 @@ fn bench_build_floating(c: &mut Criterion) {
             fixtures::build_overnight(
                 black_box(base),
                 5,
-                finstack_quant_cashflows::builder::OvernightCompoundingMethod::CompoundedInArrears,
+                finstack_quant_cashflows::builder::FloatingLegCompounding::CompoundedInArrears {
+                    lookback_days: 0,
+                },
                 black_box(&market),
             )
         });
@@ -505,7 +507,7 @@ fn bench_build_floating(c: &mut Criterion) {
             fixtures::build_overnight(
                 black_box(base),
                 5,
-                finstack_quant_cashflows::builder::OvernightCompoundingMethod::CompoundedWithLookback {
+                finstack_quant_cashflows::builder::FloatingLegCompounding::CompoundedInArrears {
                     lookback_days: 5,
                 },
                 black_box(&market),

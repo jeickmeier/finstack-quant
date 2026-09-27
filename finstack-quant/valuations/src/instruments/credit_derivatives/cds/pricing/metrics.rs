@@ -38,11 +38,11 @@ pub(crate) enum AccrualDayCountPolicy {
 impl CDSPricer {
     /// Generate contractual accrual and payment dates from the premium terms.
     fn premium_schedule(&self, cds: &CreditDefaultSwap) -> Result<Schedule> {
-        let mut builder = ScheduleBuilder::new(cds.premium.start, cds.premium.end)?;
-        builder = match cds.premium.roll_rule {
+        let mut builder = ScheduleBuilder::new(cds.premium_leg.start, cds.premium_leg.end)?;
+        builder = match cds.premium_leg.roll_rule {
             RollRule::CdsImm => {
-                if cds.premium.frequency != Tenor::quarterly()
-                    || cds.premium.stub != StubKind::ShortFront
+                if cds.premium_leg.frequency != Tenor::quarterly()
+                    || cds.premium_leg.stub != StubKind::ShortFront
                 {
                     return Err(Error::Validation(
                         "premium.roll_rule = cds_imm requires quarterly frequency and \
@@ -54,29 +54,29 @@ impl CDSPricer {
                 builder.cds_imm()
             }
             RollRule::None => builder
-                .frequency(cds.premium.frequency)
-                .stub_rule(cds.premium.stub),
+                .frequency(cds.premium_leg.frequency)
+                .stub_rule(cds.premium_leg.stub),
             other => {
                 return Err(Error::Validation(format!(
                     "premium.roll_rule must be cds_imm or none for CDS premium legs, got {other:?}"
                 )));
             }
         };
-        if let Some(calendar_id) = cds.premium.calendar_id.as_deref() {
-            builder = builder.adjust_with_id(cds.premium.business_day_convention, calendar_id);
+        if let Some(calendar_id) = cds.premium_leg.calendar_id.as_deref() {
+            builder = builder.adjust_with_id(cds.premium_leg.business_day_convention, calendar_id);
         }
         let mut schedule = builder.build()?;
         // The standard grid includes the previous roll date. The explicit
         // premium start remains the contractual first accrual boundary.
         if let Some(first) = schedule.dates.first_mut() {
-            *first = cds.premium.start;
+            *first = cds.premium_leg.start;
         }
         Ok(schedule)
     }
 
     pub(crate) fn generate_isda_schedule(&self, cds: &CreditDefaultSwap) -> Result<Vec<Date>> {
         let schedule = self.premium_schedule(cds)?;
-        let mut dates = vec![cds.premium.start];
+        let mut dates = vec![cds.premium_leg.start];
         dates.extend(schedule.payment_dates);
         Ok(dates)
     }
@@ -86,7 +86,7 @@ impl CDSPricer {
         cds: &CreditDefaultSwap,
         _as_of: Date,
     ) -> Result<Vec<CouponPeriod>> {
-        if cds.premium.start >= cds.premium.end {
+        if cds.premium_leg.start >= cds.premium_leg.end {
             return Ok(Vec::new());
         }
         let schedule = self.premium_schedule(cds)?;
@@ -121,7 +121,7 @@ impl CDSPricer {
         // its end date. Production CDS pricing uses the standard Bloomberg
         // CDSW rule below.
         if cds.valuation_convention.act360_includes_last_day()
-            && cds.premium.day_count == finstack_quant_core::dates::DayCount::Act360
+            && cds.premium_leg.day_count == finstack_quant_core::dates::DayCount::Act360
             && period.accrual_end > period.accrual_start
         {
             let days = finstack_quant_core::dates::DayCount::calendar_days(
@@ -140,16 +140,16 @@ impl CDSPricer {
         // their underlying CDS as Bloomberg-clean so they pick up this rule
         // automatically.
         //
-        // The `payment_date == cds.premium.end` guard avoids double-counting
+        // The `payment_date == cds.premium_leg.end` guard avoids double-counting
         // when business-day adjustment has already pushed the final accrual
         // boundary past the unadjusted maturity (e.g. a Sunday IMM rolling
         // forward to Monday). In that case the BDA shift already accounts
         // for the extra calendar day(s) and the +1-day rule must not apply
         // on top of it.
         if cds.uses_adjusted_premium_accrual_dates()
-            && cds.premium.day_count == finstack_quant_core::dates::DayCount::Act360
+            && cds.premium_leg.day_count == finstack_quant_core::dates::DayCount::Act360
             && period.is_final
-            && period.payment_date == cds.premium.end
+            && period.payment_date == cds.premium_leg.end
             && period.accrual_end > period.accrual_start
         {
             let days = finstack_quant_core::dates::DayCount::calendar_days(
@@ -160,7 +160,7 @@ impl CDSPricer {
         }
 
         year_fraction(
-            cds.premium.day_count,
+            cds.premium_leg.day_count,
             period.accrual_start,
             period.accrual_end,
         )
@@ -199,12 +199,12 @@ impl CDSPricer {
         as_of: Date,
         policy: AccrualDayCountPolicy,
     ) -> Result<f64> {
-        if as_of <= cds.premium.start || as_of >= cds.premium.end {
+        if as_of <= cds.premium_leg.start || as_of >= cds.premium_leg.end {
             return Ok(0.0);
         }
 
         let schedule = self.generate_isda_schedule(cds)?;
-        let mut last_coupon = cds.premium.start;
+        let mut last_coupon = cds.premium_leg.start;
         for &coupon_date in &schedule {
             if coupon_date <= as_of {
                 last_coupon = coupon_date;
@@ -214,13 +214,13 @@ impl CDSPricer {
         }
 
         if matches!(policy, AccrualDayCountPolicy::CdswInclusive)
-            && cds.premium.day_count == finstack_quant_core::dates::DayCount::Act360
+            && cds.premium_leg.day_count == finstack_quant_core::dates::DayCount::Act360
         {
             let days = finstack_quant_core::dates::DayCount::calendar_days(last_coupon, as_of) + 1;
             return Ok((days.max(0) as f64) / 360.0);
         }
 
-        year_fraction(cds.premium.day_count, last_coupon, as_of)
+        year_fraction(cds.premium_leg.day_count, last_coupon, as_of)
     }
 
     fn clean_par_spread_denominator(
@@ -286,7 +286,7 @@ impl CDSPricer {
         if self.config.par_spread_uses_full_premium {
             let periods = self.coupon_periods(cds, as_of)?;
             let calendar = cds
-                .premium
+                .premium_leg
                 .calendar_id
                 .as_deref()
                 .and_then(finstack_quant_core::dates::calendar::calendar_by_id);
@@ -316,7 +316,7 @@ impl CDSPricer {
                     },
                     start_date: start_date.max(as_of),
                     end_date,
-                    settlement_delay: cds.protection.settlement_delay,
+                    settlement_delay: cds.protection_leg.settlement_delay,
                     calendar,
                     as_of,
                     disc,
@@ -373,7 +373,7 @@ impl CDSPricer {
     ) -> Result<f64> {
         let periods = self.coupon_periods(cds, as_of)?;
         let calendar = cds
-            .premium
+            .premium_leg
             .calendar_id
             .as_deref()
             .and_then(finstack_quant_core::dates::calendar::calendar_by_id);
@@ -439,7 +439,7 @@ impl CDSPricer {
                     },
                     start_date: start_date.max(as_of),
                     end_date,
-                    settlement_delay: cds.protection.settlement_delay,
+                    settlement_delay: cds.protection_leg.settlement_delay,
                     calendar,
                     as_of,
                     disc,
@@ -572,7 +572,7 @@ impl CDSPricer {
         if cds.uses_clean_price() {
             let accrual_fraction =
                 self.coupon_accrued_fraction(cds, as_of, AccrualDayCountPolicy::CdswInclusive)?;
-            let spread = cds.premium.coupon_bp.to_f64().ok_or_else(|| {
+            let spread = cds.premium_leg.coupon_bp.to_f64().ok_or_else(|| {
                 Error::Validation("premium.coupon_bp cannot be represented as f64".into())
             })? / BASIS_POINTS_PER_UNIT;
             let accrued = cds.notional.amount() * spread * accrual_fraction;

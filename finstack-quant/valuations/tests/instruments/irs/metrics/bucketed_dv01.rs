@@ -61,7 +61,7 @@ fn create_swap(as_of: Date, end: Date) -> InterestRateSwap {
         id: "IRS_BUCKETED_DV01_TEST".into(),
         notional: Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         side: PayReceive::Receive,
-        fixed: finstack_quant_valuations::instruments::FixedLegSpec {
+        fixed_leg: finstack_quant_valuations::instruments::FixedLegSpec {
             discount_curve_id: "USD_OIS".into(),
             rate: rust_decimal::Decimal::try_from(0.05).expect("valid"),
             frequency: Tenor::quarterly(),
@@ -70,13 +70,12 @@ fn create_swap(as_of: Date, end: Date) -> InterestRateSwap {
             calendar_id: None,
             stub: StubKind::None,
             par_method: None,
-            compounding_simple: true,
             payment_lag_days: 0,
             end_of_month: false,
             start: as_of,
             end,
         },
-        float: finstack_quant_valuations::instruments::FloatLegSpec {
+        float_leg: finstack_quant_valuations::instruments::FloatLegSpec {
             discount_curve_id: "USD_OIS".into(),
             forward_curve_id: "USD_LIBOR_3M".into(),
             spread_bp: rust_decimal::Decimal::try_from(0.0).expect("valid"),
@@ -112,8 +111,8 @@ fn test_bucketed_vs_parallel_dv01_sanity() {
     // curve; this keeps bucketed vs parallel DV01 comparable in a single-curve
     // setting, which is what this sanity check is targeting.
     // Use lookback=0 to avoid requiring historical fixings at as_of for the first coupon.
-    swap.float.compounding = FloatingLegCompounding::fedfunds();
-    swap.float.forward_curve_id = "USD_OIS".into();
+    swap.float_leg.compounding = FloatingLegCompounding::fedfunds();
+    swap.float_leg.forward_curve_id = "USD_OIS".into();
 
     let disc_curve = build_flat_discount_curve(0.05, as_of);
     let market = MarketContext::new().insert(disc_curve);

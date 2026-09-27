@@ -33,7 +33,9 @@ impl MetricCalculator for FixedLegPvCalculator {
     fn calculate(&self, context: &mut MetricContext) -> finstack_quant_core::Result<f64> {
         let irs: &InterestRateSwap = context.instrument_as()?;
         let as_of = context.as_of;
-        let disc = context.curves.get_discount(&irs.fixed.discount_curve_id)?;
+        let disc = context
+            .curves
+            .get_discount(&irs.fixed_leg.discount_curve_id)?;
 
         let pv = irs.pv_fixed_leg(&disc, as_of)?;
         Ok(pv)

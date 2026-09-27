@@ -7,6 +7,7 @@ use finstack_quant_core::market_data::term_structures::{DiscountCurve, ForwardCu
 use finstack_quant_core::math::interp::InterpStyle;
 use finstack_quant_core::money::fx::FxMatrix;
 use finstack_quant_core::money::fx::SimpleFxProvider;
+use finstack_quant_valuations::instruments::FloatLegSpec;
 pub use finstack_quant_valuations::instruments::Instrument;
 use rust_decimal::Decimal;
 use std::sync::Arc;
@@ -105,24 +106,26 @@ pub fn leg_usd_receive(
     end: Date,
 ) -> finstack_quant_valuations::instruments::rates::xccy_swap::XccySwapLeg {
     finstack_quant_valuations::instruments::rates::xccy_swap::XccySwapLeg {
-        currency: Currency::USD,
         notional: finstack_quant_core::money::Money::new(1_000_000.0, Currency::USD)
             .expect("valid money fixture"),
         side: finstack_quant_valuations::instruments::PayReceive::Receive,
-        forward_curve_id: finstack_quant_core::types::CurveId::new("USD-SOFR-3M"),
-        discount_curve_id: finstack_quant_core::types::CurveId::new("USD-OIS"),
-        start,
-        end,
-        frequency: Tenor::quarterly(),
-        day_count: DayCount::Act360,
-        business_day_convention: BusinessDayConvention::ModifiedFollowing,
-        stub: StubKind::ShortFront,
-        spread_bp: Decimal::ZERO,
-        payment_lag_days: 0,
-        calendar_id: Some(USD_CAL.into()),
-        allow_calendar_fallback: false,
-        reset_lag_days: None,
-        compounding: Default::default(),
+        leg: FloatLegSpec {
+            forward_curve_id: finstack_quant_core::types::CurveId::new("USD-SOFR-3M"),
+            discount_curve_id: finstack_quant_core::types::CurveId::new("USD-OIS"),
+            start,
+            end,
+            frequency: Tenor::quarterly(),
+            day_count: DayCount::Act360,
+            business_day_convention: BusinessDayConvention::ModifiedFollowing,
+            stub: StubKind::ShortFront,
+            spread_bp: Decimal::ZERO,
+            payment_lag_days: 0,
+            calendar_id: Some(USD_CAL.into()),
+            reset_lag_days: 0,
+            compounding: Default::default(),
+            fixing_calendar_id: None,
+            end_of_month: false,
+        },
     }
 }
 
@@ -131,24 +134,26 @@ pub fn leg_eur_pay(
     end: Date,
 ) -> finstack_quant_valuations::instruments::rates::xccy_swap::XccySwapLeg {
     finstack_quant_valuations::instruments::rates::xccy_swap::XccySwapLeg {
-        currency: Currency::EUR,
         notional: finstack_quant_core::money::Money::new(900_000.0, Currency::EUR)
             .expect("valid money fixture"),
         side: finstack_quant_valuations::instruments::PayReceive::Pay,
-        forward_curve_id: finstack_quant_core::types::CurveId::new("EUR-EURIBOR-3M"),
-        discount_curve_id: finstack_quant_core::types::CurveId::new("EUR-OIS"),
-        start,
-        end,
-        frequency: Tenor::quarterly(),
-        day_count: DayCount::Act360,
-        business_day_convention: BusinessDayConvention::ModifiedFollowing,
-        stub: StubKind::ShortFront,
-        spread_bp: Decimal::ZERO,
-        payment_lag_days: 0,
-        calendar_id: Some(EUR_CAL.into()),
-        allow_calendar_fallback: false,
-        reset_lag_days: None,
-        compounding: Default::default(),
+        leg: FloatLegSpec {
+            forward_curve_id: finstack_quant_core::types::CurveId::new("EUR-EURIBOR-3M"),
+            discount_curve_id: finstack_quant_core::types::CurveId::new("EUR-OIS"),
+            start,
+            end,
+            frequency: Tenor::quarterly(),
+            day_count: DayCount::Act360,
+            business_day_convention: BusinessDayConvention::ModifiedFollowing,
+            stub: StubKind::ShortFront,
+            spread_bp: Decimal::ZERO,
+            payment_lag_days: 0,
+            calendar_id: Some(EUR_CAL.into()),
+            reset_lag_days: 0,
+            compounding: Default::default(),
+            fixing_calendar_id: None,
+            end_of_month: false,
+        },
     }
 }
 

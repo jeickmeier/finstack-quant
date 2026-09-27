@@ -123,7 +123,7 @@ fn test_par_spread_approximation() {
         "CORP_HAZARD",
     )
     .expect("CDS construction should succeed");
-    cds.protection.recovery_rate = recovery;
+    cds.protection_leg.recovery_rate = recovery;
 
     let result = cds
         .price_with_metrics(
@@ -255,7 +255,7 @@ fn test_risky_pv01_market_standard() {
         "CORP_HAZARD",
     )
     .expect("CDS construction should succeed");
-    cds.protection.recovery_rate = 0.40;
+    cds.protection_leg.recovery_rate = 0.40;
 
     let result = cds
         .price_with_metrics(
@@ -303,7 +303,7 @@ fn test_cs01_positive_for_protection_buyer() {
         "CORP_HAZARD",
     )
     .expect("CDS construction should succeed");
-    cds.protection.recovery_rate = 0.40;
+    cds.protection_leg.recovery_rate = 0.40;
 
     let result = cds
         .price_with_metrics(
@@ -355,7 +355,7 @@ fn test_hazard_rate_sensitivity_monotonic() {
             "CORP_HAZARD",
         )
         .expect("CDS construction should succeed");
-        cds.protection.recovery_rate = 0.40;
+        cds.protection_leg.recovery_rate = 0.40;
 
         let npv = cds.value(&market, as_of).unwrap();
         npvs.push((hazard_rate, npv.amount()));
@@ -400,7 +400,7 @@ fn test_recovery_rate_sensitivity_monotonic() {
             "CORP_HAZARD",
         )
         .expect("CDS construction should succeed");
-        cds.protection.recovery_rate = recovery;
+        cds.protection_leg.recovery_rate = recovery;
 
         let npv = cds.value(&market, as_of).unwrap();
         npvs.push((recovery, npv.amount()));
@@ -454,7 +454,7 @@ fn test_expected_loss_formula_validation() {
         "CORP_HAZARD",
     )
     .expect("CDS construction should succeed");
-    cds.protection.recovery_rate = recovery;
+    cds.protection_leg.recovery_rate = recovery;
 
     let result = cds
         .price_with_metrics(
@@ -522,7 +522,7 @@ fn test_jump_to_default_equals_lgd_times_notional() {
         "CORP_HAZARD",
     )
     .expect("CDS construction should succeed");
-    cds.protection.recovery_rate = recovery;
+    cds.protection_leg.recovery_rate = recovery;
 
     let result = cds
         .price_with_metrics(
@@ -568,7 +568,7 @@ fn test_survival_probability_decreases_over_time() {
         "CORP_HAZARD",
     )
     .expect("CDS construction should succeed");
-    cds.protection.recovery_rate = 0.40;
+    cds.protection_leg.recovery_rate = 0.40;
 
     let result_t0 = cds
         .price_with_metrics(
@@ -625,7 +625,7 @@ fn test_standard_tenors_reasonable_par_spreads() {
             "CORP_HAZARD",
         )
         .expect("CDS construction should succeed");
-        cds.protection.recovery_rate = recovery;
+        cds.protection_leg.recovery_rate = recovery;
 
         let result = cds
             .price_with_metrics(
@@ -675,7 +675,7 @@ fn test_term_structure_upward_sloping_spreads() {
             "CORP_HAZARD",
         )
         .expect("CDS construction should succeed");
-        cds.protection.recovery_rate = recovery;
+        cds.protection_leg.recovery_rate = recovery;
 
         let result = cds
             .price_with_metrics(

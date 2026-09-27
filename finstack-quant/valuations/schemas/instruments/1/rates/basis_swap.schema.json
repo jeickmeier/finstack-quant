@@ -2,7 +2,7 @@
   "$defs": {
     "BasisSwap": {
       "additionalProperties": false,
-      "description": "Basis swap instrument that exchanges two floating rate payments with different tenors.\n\nA basis swap allows parties to exchange floating rate payments based on different\nreference rates (e.g., 3M SOFR vs 6M SOFR) plus an optional spread on one leg.\nThe primary leg typically receives the spread, while the reference leg pays flat.\n\nEach leg owns its own dates, discount curve, calendar, and stub conventions,\nfollowing the IRS leg-centric pattern.\n\n# Cross-Currency (XCCY) Basis Swaps\n\n**Important**: This implementation supports **single-currency** basis swaps only.\nFor cross-currency basis swaps, use `XccySwap` instead.\n\n# Examples\n```rust\nuse finstack_quant_core::{dates::*, money::Money, currency::Currency, types::CurveId};\nuse finstack_quant_valuations::instruments::rates::basis_swap::{BasisSwap, BasisSwapLeg};\nuse time::Month;\n\nlet start = Date::from_calendar_date(2024, Month::January, 3).expect(\"valid date\");\nlet end = Date::from_calendar_date(2025, Month::January, 3).expect(\"valid date\");\n\nlet primary_leg = BasisSwapLeg {\n    forward_curve_id: CurveId::new(\"3M-SOFR\"),\n    discount_curve_id: CurveId::new(\"OIS\"),\n    start,\n    end,\n    frequency: Tenor::quarterly(),\n    day_count: DayCount::Act360,\n    business_day_convention: BusinessDayConvention::ModifiedFollowing,\n    calendar_id: None,\n    stub: StubKind::ShortFront,\n    spread_bp: rust_decimal::Decimal::from(5),\n    payment_lag_days: 0,\n    reset_lag_days: 0,\n    compounding: Default::default(),\n};\n\nlet reference_leg = BasisSwapLeg {\n    forward_curve_id: CurveId::new(\"6M-SOFR\"),\n    discount_curve_id: CurveId::new(\"OIS\"),\n    start,\n    end,\n    frequency: Tenor::semi_annual(),\n    day_count: DayCount::Act360,\n    business_day_convention: BusinessDayConvention::ModifiedFollowing,\n    calendar_id: None,\n    stub: StubKind::ShortFront,\n    spread_bp: rust_decimal::Decimal::ZERO,\n    payment_lag_days: 0,\n    reset_lag_days: 0,\n    compounding: Default::default(),\n};\n\nlet swap = BasisSwap::new(\n    \"BASIS_SWAP_001\",\n    Money::from((1_000_000_i64, Currency::USD)),\n    primary_leg,\n    reference_leg,\n);\n```",
+      "description": "Basis swap instrument that exchanges two floating rate payments with different tenors.\n\nA basis swap allows parties to exchange floating rate payments based on different\nreference rates (e.g., 3M SOFR vs 6M SOFR) plus an optional spread on one leg.\nThe primary leg typically receives the spread, while the reference leg pays flat.\n\nEach leg owns its own dates, discount curve, calendar, and stub conventions,\nfollowing the IRS leg-centric pattern.\n\n# Cross-Currency (XCCY) Basis Swaps\n\n**Important**: This implementation supports **single-currency** basis swaps only.\nFor cross-currency basis swaps, use `XccySwap` instead.\n\n# Examples\n```rust\nuse finstack_quant_core::{dates::*, money::Money, currency::Currency, types::CurveId};\nuse finstack_quant_valuations::instruments::rates::basis_swap::BasisSwap;\nuse time::Month;\n\nlet start = Date::from_calendar_date(2024, Month::January, 3).expect(\"valid date\");\nlet end = Date::from_calendar_date(2025, Month::January, 3).expect(\"valid date\");\n\nlet primary_leg = FloatLegSpec {\n    forward_curve_id: CurveId::new(\"3M-SOFR\"),\n    discount_curve_id: CurveId::new(\"OIS\"),\n    start,\n    end,\n    frequency: Tenor::quarterly(),\n    day_count: DayCount::Act360,\n    business_day_convention: BusinessDayConvention::ModifiedFollowing,\n    calendar_id: None,\n    stub: StubKind::ShortFront,\n    spread_bp: rust_decimal::Decimal::from(5),\n    payment_lag_days: 0,\n    reset_lag_days: 0,\n    compounding: Default::default(),\n};\n\nlet reference_leg = FloatLegSpec {\n    forward_curve_id: CurveId::new(\"6M-SOFR\"),\n    discount_curve_id: CurveId::new(\"OIS\"),\n    start,\n    end,\n    frequency: Tenor::semi_annual(),\n    day_count: DayCount::Act360,\n    business_day_convention: BusinessDayConvention::ModifiedFollowing,\n    calendar_id: None,\n    stub: StubKind::ShortFront,\n    spread_bp: rust_decimal::Decimal::ZERO,\n    payment_lag_days: 0,\n    reset_lag_days: 0,\n    compounding: Default::default(),\n};\n\nlet swap = BasisSwap::new(\n    \"BASIS_SWAP_001\",\n    Money::from((1_000_000_i64, Currency::USD)),\n    primary_leg,\n    reference_leg,\n);\n```",
       "properties": {
         "allow_calendar_fallback": {
           "default": false,
@@ -35,11 +35,11 @@
           "description": "Notional amount for both legs."
         },
         "primary_leg": {
-          "$ref": "#/$defs/BasisSwapLeg",
+          "$ref": "#/$defs/FloatLegSpec",
           "description": "Primary leg that typically receives the spread."
         },
         "reference_leg": {
-          "$ref": "#/$defs/BasisSwapLeg",
+          "$ref": "#/$defs/FloatLegSpec",
           "description": "Reference leg that typically pays flat."
         },
         "scenario_pricing_overrides": {
@@ -56,14 +56,14 @@
       ],
       "type": "object"
     },
-    "BasisSwapLeg": {
+    "FloatLegSpec": {
       "additionalProperties": false,
-      "description": "Specification for basis swap legs (floating vs floating)\n\nA basis swap leg represents one side of a floating-for-floating interest rate swap,\nwhere two parties exchange payments linked to different floating rate indices\n(e.g., 3M SOFR vs 6M SOFR).\n\nEach leg owns its own dates, discount curve, schedule conventions, and calendar,\nfollowing the IRS leg-centric pattern used by `FixedLegSpec` and `FloatLegSpec`.",
+      "description": "Specification for floating rate legs in interest rate swaps",
       "properties": {
         "business_day_convention": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/business_day_convention.schema.json",
           "default": "modified_following",
-          "description": "Business day convention for date adjustments"
+          "description": "Business day convention for payment dates"
         },
         "calendar_id": {
           "anyOf": [
@@ -74,52 +74,69 @@
               "type": "null"
             }
           ],
-          "description": "Optional calendar identifier for business day adjustments"
+          "description": "Optional calendar for business day adjustments"
         },
         "compounding": {
           "$ref": "#/$defs/FloatingLegCompounding",
           "default": "simple",
-          "description": "Overnight vs term compounding for this floating leg.\n\nDefaults to [`crate::instruments::rates::irs::FloatingLegCompounding::Simple`] so tenor-basis swaps\n(3s1s, EURIBOR 6s3s) keep term projection. Set a compounded variant\nfor an overnight RFR leg such as SOFR OIS or €STR."
+          "description": "Compounding method for floating coupons.\n\nDetermines how floating rate coupons are calculated:\n- `simple` (default): one term forward per period\n- `compounded_*`: SOFR/SONIA-style daily compounding\n- `simple_average` is rejected by [`Self::validate`]\n\n# Implementation Notes\n\nCompounded-in-arrears is implemented for IRS pricing in `instruments::irs` with\nsupport for lookback and observation shift conventions. For seasoned (already\nstarted) compounded swaps, pricing requires explicit fixings for observation\ndates prior to `as_of`."
         },
         "day_count": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/day_count.schema.json",
-          "description": "Day count convention for accrual calculations"
+          "description": "Day count convention for accrual"
         },
         "discount_curve_id": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
-          "description": "Discount curve identifier for present value calculations"
+          "description": "Discount curve identifier for pricing"
         },
         "end": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
-          "description": "End date of the leg"
+          "description": "End date of the floating leg"
+        },
+        "end_of_month": {
+          "default": false,
+          "description": "End-of-month roll convention (default: false).\n\nWhen `true`, if the start date falls on the last business day of a month,\nall subsequent roll dates will also fall on the last business day of their\nrespective months. This matches QuantLib's `MakeOIS` default behavior.\n\n# Market Standard\n\nPer ISDA 2006 Definitions Section 4.18, the End-of-Month convention should\nbe applied when the effective date is the last business day of a month.\nMost professional systems (QuantLib, Bloomberg SWDF) default to `true`.",
+          "type": "boolean"
+        },
+        "fixing_calendar_id": {
+          "anyOf": [
+            {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Optional calendar for rate fixing (reset lag)"
         },
         "forward_curve_id": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
-          "description": "Forward curve identifier for this leg"
+          "description": "Forward curve identifier for rate projections"
         },
         "frequency": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/tenor.schema.json",
-          "description": "Payment frequency for the leg"
+          "description": "Payment frequency"
         },
         "payment_lag_days": {
           "default": 0,
-          "description": "Payment lag in business days after period end (default: 0).\n\nE.g., `payment_lag_days: 2` means payment occurs 2 business days after the\naccrual period end date.",
+          "description": "Payment lag in business days after period end (default: 0).\n\nBloomberg OIS swaps typically use 2 business days payment lag.\nThe actual payment date is adjusted from the period end date by\nthis many business days using the leg's calendar.",
           "format": "int32",
           "type": "integer"
         },
         "reset_lag_days": {
           "default": 0,
-          "description": "Reset lag in business days before period start (default: 0).\n\nE.g., `reset_lag_days: 2` means the rate fixing occurs 2 business days before\nthe accrual period start date. This follows standard market convention where\nfixing typically precedes the accrual period.",
+          "description": "Reset lag in business days for floating rate fixing (default: 0).\n\n- **0** (default): fixing on the accrual start date. A swap whose first\n  accrual period starts on or after the valuation date then prices off\n  the forward curve without historical fixings.\n- **Positive** (e.g., 2): T-2 fixing (2 business days before accrual\n  start). Use `RateIndexConventions::default_reset_lag_days` (or\n  `InterestRateSwap::from_conventions`) for the market default of a\n  given index.\n- **Negative** (e.g., -1): resolved at pricing time to the registered\n  index convention default; rejected when the forward curve id is not a\n  registered rate index.",
           "format": "int32",
           "type": "integer"
         },
         "spread_bp": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/decimal.schema.json",
-          "description": "Spread added to the floating rate, in **basis points**.\n\n# Units\n\n- `Decimal::from(5)` represents 5 basis points (5bp)\n- `Decimal::from(100)` represents 100 basis points (1%)\n- `Decimal::from(-10)` represents -10 basis points\n\nThis is consistent with `FloatLegSpec::spread_bp` and `PremiumLegSpec::spread_bp`.\n\n# Typical Market Range\n\nBasis spreads in liquid markets typically range from -50bp to +50bp.\nValues outside ±5000bp are considered extreme and\nwill trigger a validation warning during pricing."
+          "description": "Spread in basis points added to the forward rate"
         },
         "start": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
-          "description": "Start date of the leg"
+          "description": "Start date of the floating leg"
         },
         "stub": {
           "$ref": "#/$defs/StubKind",
@@ -128,33 +145,39 @@
         }
       },
       "required": [
-        "forward_curve_id",
         "discount_curve_id",
-        "start",
-        "end",
+        "forward_curve_id",
+        "spread_bp",
         "frequency",
         "day_count",
-        "spread_bp"
+        "start",
+        "end"
       ],
       "type": "object"
     },
     "FloatingLegCompounding": {
-      "description": "Method for calculating floating leg coupon payments.\n\nDifferent reference rates require different compounding conventions:\n- **Term rates (SOFR 3M, EURIBOR, historical LIBOR)**: Simple interest\n- **Overnight rates (SOFR, SONIA, €STR, TONA)**: Compounded in arrears\n\n# Market Standards\n\n## Simple term-rate coupons\n- **Formula**: `Coupon = Notional × (Forward_Rate + Spread) × DCF`\n- **Use for**: current term-rate indices and legacy IBOR transactions\n- **Standard**: ISDA 2021 Definitions; ISDA 2006 for legacy transactions\n\n## Compounded In Arrears (RFR-style)\n- **Formula**: `Coupon = Notional × [∏(1 + r_i × dcf_i) - 1]`\n- **Use for**: USD SOFR, GBP SONIA, EUR €STR, JPY TONA\n- **Standard**: ISDA 2021 Definitions\n- **Observation convention**: plain in-arrears for standard OIS presets;\n  lookback, observation shift, and cutoff are explicit contract variants\n\n# Examples\n\n```\nuse finstack_quant_valuations::instruments::rates::irs::FloatingLegCompounding;\n\n// LIBOR-style swap (simple compounding)\nlet simple = FloatingLegCompounding::Simple;\nassert_eq!(simple, FloatingLegCompounding::default());\n\n// SOFR OIS swap: plain compounded in arrears (no lookback)\nlet sofr = FloatingLegCompounding::CompoundedInArrears { lookback_days: 0 };\nassert_eq!(sofr, FloatingLegCompounding::sofr());\n\n// SONIA FRN-style leg with the BoE 5-day lookback (explicit, not the OIS preset)\nlet sonia_frn = FloatingLegCompounding::CompoundedInArrears { lookback_days: 5 };\nassert_ne!(sonia_frn, FloatingLegCompounding::sonia());\n```\n\n# References\n\n- **ISDA 2021 Definitions**: Compounded RFR conventions `docs/REFERENCES.md#isda-2021-definitions`\n- **ARRC** (Alternative Reference Rates Committee): SOFR conventions `docs/REFERENCES.md#arrc-sofr-users-guide`\n- **BoE** (Bank of England): SONIA conventions `docs/REFERENCES.md#boe-sonia-key-features`\n- **ECB**: €STR conventions `docs/REFERENCES.md#ecb-estr-methodology`\n\nIn the IRS instrument implementation, the RFR-style variant\n(`CompoundedInArrears`) is also used to classify swaps as OIS for\ndiscount-only float-leg pricing; see `InterestRateSwap::is_single_curve_ois` for details.",
+      "description": "How the fixings of one accrual period combine into the period rate.\n\nOne canonical enum for every floating leg and coupon: swaps, basis and\ncross-currency legs, TRS financing, IR futures, FRN / loan / structured\ncredit coupons.\n\n| Variant | Period rate | Typical use |\n|---------|-------------|-------------|\n| `simple` | One term fixing / forward over the period | EURIBOR, Term SOFR, legacy IBOR |\n| `simple_average` | `(Σ rᵢ·dᵢ) / D` of daily overnight fixings | Averaged overnight loans, Fed-Funds futures |\n| `compounded_in_arrears` | `[∏(1 + rᵢ·dᵢ/B) − 1]·B/D` | SOFR / SONIA / €STR / TONA OIS (lookback 0) |\n| `compounded_with_observation_shift` | as above, observations and weights shifted | ISDA 2021 observation shift |\n| `compounded_with_rate_cutoff` | as above, last fixings frozen | ARRC lockout / SWPM \"Rate Cut-Off Days\" |\n\nDay counts are business days and must be non-negative.\n\n# References\n\n- ISDA 2021 Definitions, compounded RFR conventions `docs/REFERENCES.md#isda-2021-definitions`\n- ARRC (2020). \"SOFR: A User's Guide.\" `docs/REFERENCES.md#arrc-sofr-users-guide`\n- BoE SONIA conventions `docs/REFERENCES.md#boe-sonia-key-features`\n\n# Examples\n\n```\nuse finstack_quant_cashflows::builder::FloatingLegCompounding;\n\nassert_eq!(FloatingLegCompounding::default(), FloatingLegCompounding::Simple);\nassert_eq!(\n    FloatingLegCompounding::sofr(),\n    FloatingLegCompounding::CompoundedInArrears { lookback_days: 0 }\n);\n```",
       "oneOf": [
         {
           "const": "simple",
-          "description": "Simple interest compounding (term-rate style).\n\nCoupon = Notional × (Forward_Rate + Spread) × Day_Count_Fraction\n\nUse for:\n- Current fixed-tenor term-rate indices\n- Legacy USD/EUR/GBP LIBOR swaps\n\nThis is the generic vanilla-IRS default; the rate-index convention\nregistry selects compounded RFR terms for overnight indices.",
+          "description": "Simple term-rate projection: one fixing or forward over the period.\n\n`Coupon = Notional × (Forward_Rate + Spread) × DCF`. This is the\ndefault; a registered overnight RFR index rejects it.",
+          "type": "string"
+        },
+        {
+          "const": "simple_average",
+          "description": "Arithmetic average of daily overnight fixings weighted by accrual days,\n`Rate = (Σ rᵢ·dᵢ) / D`, for instruments that contractually specify a\nsimple-average overnight index.",
           "type": "string"
         },
         {
           "additionalProperties": false,
-          "description": "Compounded in arrears (overnight RFR rates).\n\nCoupon = Notional × [∏(1 + r_i × dcf_i) - 1] where the product\nis taken over daily observations in the accrual period.\n\nUse for:\n- USD SOFR (Secured Overnight Financing Rate)\n- GBP SONIA (Sterling Overnight Index Average)\n- EUR €STR (Euro Short-Term Rate)\n- JPY TONA (Tokyo Overnight Average Rate)\n\n# Fields\n\n- `lookback_days`: Business days by which observation dates move\n  backward while accrual day-count weights remain unshifted.\n\nStandard cleared OIS presets use zero lookback. Non-zero lookbacks are\nexplicit contractual variants, commonly used for RFR-linked notes.",
+          "description": "Compounded in arrears (overnight RFR rates).\n\n`Coupon = Notional × [∏(1 + rᵢ·dᵢ/B) − 1]` over the daily observations\nof the accrual period.",
           "properties": {
             "compounded_in_arrears": {
+              "additionalProperties": false,
               "properties": {
                 "lookback_days": {
-                  "description": "Number of business days to shift observation dates back from the accrual\nperiod (lookback).  Typically 2–5 days depending on market convention.\n\nThe observation dates are shifted while the day-count-fraction (DCF)\nweights remain anchored to the **original** accrual period dates.\nThis is consistent with \"lookback without observation shift\" as\ndescribed in the ISDA 2021 Definitions and ARRC SOFR conventions.",
-                  "format": "int32",
+                  "description": "Business days by which observation dates move backward while the\nday-count weights stay on the original accrual dates (\"lookback\nwithout observation shift\", ISDA 2021 / ARRC). `0` is plain\nin-arrears, the cleared-OIS convention.",
+                  "format": "uint32",
                   "maximum": 31,
                   "minimum": 0,
                   "type": "integer"
@@ -173,13 +196,14 @@
         },
         {
           "additionalProperties": false,
-          "description": "Compounded in arrears with true ISDA 2021 observation shift.\n\nUnlike `CompoundedInArrears` (lookback semantics), this variant shifts\n**both** the observation dates AND the day-count-fraction (DCF) weights.\nThis matches ISDA 2021 Definitions Section 4.5(c).\n\n```text\nLookback:           DCF(d, d+1)           × rate(d - shift, d+1 - shift)\nObservation Shift:  DCF(d - shift, d+1 - shift) × rate(d - shift, d+1 - shift)\n```",
+          "description": "Compounded in arrears with ISDA 2021 observation shift: both the\nobservation dates and their day-count weights move back\n(ISDA 2021 Definitions Section 4.5(c)).",
           "properties": {
             "compounded_with_observation_shift": {
+              "additionalProperties": false,
               "properties": {
                 "shift_days": {
-                  "description": "Number of business days to shift both observation dates and DCF weights.",
-                  "format": "int32",
+                  "description": "Business days to shift both observation dates and weights.",
+                  "format": "uint32",
                   "maximum": 31,
                   "minimum": 0,
                   "type": "integer"
@@ -198,13 +222,14 @@
         },
         {
           "additionalProperties": false,
-          "description": "Compounded in arrears with a rate cut-off near the period end.\n\nThis freezes the last observed overnight rate for the final `cutoff_days`\nbusiness days of the accrual period. Bloomberg SWPM labels this\nconvention as \"Rate Cut-Off Days\".",
+          "description": "Compounded in arrears with a rate cut-off near the period end.\n\nThe last `cutoff_days` business-day observations are frozen at the\nfixing immediately preceding them: for fixings `b_1..b_n` the source is\n`b_{n-cutoff}`, so a positive cut-off must leave a preceding fixing.\nReference: ARRC, December 3, 2021 Statement, Appendix A (\"Lockout\").",
           "properties": {
             "compounded_with_rate_cutoff": {
+              "additionalProperties": false,
               "properties": {
                 "cutoff_days": {
-                  "description": "Number of business days before period end to freeze the overnight rate.",
-                  "format": "int32",
+                  "description": "Business days before period end over which the rate is frozen.",
+                  "format": "uint32",
                   "maximum": 31,
                   "minimum": 0,
                   "type": "integer"
@@ -299,6 +324,8 @@
             "day_count": "act_360",
             "discount_curve_id": "USD-OIS",
             "end": "2029-01-03",
+            "end_of_month": false,
+            "fixing_calendar_id": null,
             "forward_curve_id": "USD-SOFR-3M",
             "frequency": {
               "count": 3,
@@ -317,6 +344,8 @@
             "day_count": "act_360",
             "discount_curve_id": "USD-OIS",
             "end": "2029-01-03",
+            "end_of_month": false,
+            "fixing_calendar_id": null,
             "forward_curve_id": "USD-SOFR-1M",
             "frequency": {
               "count": 1,

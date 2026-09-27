@@ -223,7 +223,7 @@ pub fn cds_buy_protection(
         .notional(notional)
         .side(PayReceive::Pay)
         .convention(convention)
-        .premium(PremiumLegSpec {
+        .premium_leg(PremiumLegSpec {
             roll_rule: finstack_quant_cashflows::builder::specs::RollRule::CdsImm,
             start,
             end: maturity,
@@ -235,7 +235,7 @@ pub fn cds_buy_protection(
             coupon_bp: spread_bp_decimal,
             discount_curve_id: discount_curve_id.into(),
         })
-        .protection(ProtectionLegSpec {
+        .protection_leg(ProtectionLegSpec {
             credit_curve_id: credit_curve_id.into(),
             recovery_rate: STANDARD_RECOVERY_SENIOR,
             settlement_delay: convention.settlement_delay(),
@@ -277,7 +277,7 @@ pub fn cds_sell_protection(
         .notional(notional)
         .side(PayReceive::Receive)
         .convention(convention)
-        .premium(PremiumLegSpec {
+        .premium_leg(PremiumLegSpec {
             roll_rule: finstack_quant_cashflows::builder::specs::RollRule::CdsImm,
             start,
             end: maturity,
@@ -289,7 +289,7 @@ pub fn cds_sell_protection(
             coupon_bp: spread_bp_decimal,
             discount_curve_id: discount_curve_id.into(),
         })
-        .protection(ProtectionLegSpec {
+        .protection_leg(ProtectionLegSpec {
             credit_curve_id: credit_curve_id.into(),
             recovery_rate: STANDARD_RECOVERY_SENIOR,
             settlement_delay: convention.settlement_delay(),

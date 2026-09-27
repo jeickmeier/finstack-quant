@@ -199,6 +199,7 @@ DIRECT_CONSUMER_FORBIDDEN = (
             r"fixed_coupon|floating_coupon|percent_per_period|percent_of_original_notional|fixing_source_enum|"
             r"irr_basis|catchup_mode|acquisition_cost|exit_date|hurdle|"
             r"is_defaulted|credit_quality|factor_sensitivity|default_factor_sensitivity|hotel_mortgage|exposure_report|"
+            r"compounding_simple|overnight_compounding|rate_averaging|"
             r"[A-Za-z][A-Za-z0-9_]*_(?:ccy|bps))"
             r'(?:"|\\")\s*:'
         ),

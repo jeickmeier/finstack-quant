@@ -81,7 +81,7 @@ fn test_recovery01_at_lower_boundary() {
 
     // Override recovery rate
     let mut cds_test = cds;
-    cds_test.protection.recovery_rate = recovery;
+    cds_test.protection_leg.recovery_rate = recovery;
 
     let market = MarketContext::new()
         .insert(create_discount_curve(base))
@@ -133,7 +133,7 @@ fn test_recovery01_at_upper_boundary() {
 
     // Override recovery rate
     let mut cds_test = cds;
-    cds_test.protection.recovery_rate = recovery;
+    cds_test.protection_leg.recovery_rate = recovery;
 
     let market = MarketContext::new()
         .insert(create_discount_curve(base))
@@ -178,7 +178,7 @@ fn test_recovery01_symmetry() {
     .unwrap();
 
     let mut cds_test = cds;
-    cds_test.protection.recovery_rate = recovery;
+    cds_test.protection_leg.recovery_rate = recovery;
 
     let market = MarketContext::new()
         .insert(create_discount_curve(base))
@@ -224,7 +224,7 @@ fn test_expected_loss_distressed_credit() {
     .unwrap();
 
     let mut cds_test = cds;
-    cds_test.protection.recovery_rate = recovery;
+    cds_test.protection_leg.recovery_rate = recovery;
 
     let market = MarketContext::new()
         .insert(create_discount_curve(base))
@@ -286,7 +286,7 @@ fn test_par_spread_npv_consistency() {
     .unwrap();
 
     let mut cds_test = cds;
-    cds_test.protection.recovery_rate = recovery;
+    cds_test.protection_leg.recovery_rate = recovery;
 
     let disc = create_discount_curve(base);
     let hazard = create_hazard_curve(base, recovery);
@@ -307,7 +307,7 @@ fn test_par_spread_npv_consistency() {
 
     // Clone the CDS and update only the spread (preserving schedule)
     let mut cds_at_par = cds_test;
-    cds_at_par.premium.coupon_bp = Decimal::try_from(par_spread).expect("valid par_spread");
+    cds_at_par.premium_leg.coupon_bp = Decimal::try_from(par_spread).expect("valid par_spread");
 
     // NPV at par spread should be approximately zero
     let npv_at_par = cds_at_par
@@ -347,7 +347,7 @@ fn test_jtd_recovery_sensitivity() {
         .unwrap();
 
         let mut cds_test = cds.clone();
-        cds_test.protection.recovery_rate = recovery;
+        cds_test.protection_leg.recovery_rate = recovery;
 
         let market = MarketContext::new()
             .insert(create_discount_curve(base))
@@ -417,7 +417,7 @@ fn test_recovery01_ignores_unreplayable_par_spread_sidecar() {
     )
     .unwrap();
     let mut cds_test = cds;
-    cds_test.protection.recovery_rate = recovery;
+    cds_test.protection_leg.recovery_rate = recovery;
 
     let market = MarketContext::new()
         .insert(create_discount_curve(base))
@@ -442,12 +442,12 @@ fn test_recovery01_ignores_unreplayable_par_spread_sidecar() {
     // is still the pure LGD-only sensitivity.
     let bump = 0.01;
     let mut cds_up = cds_test.clone();
-    cds_up.protection.recovery_rate = recovery + bump;
+    cds_up.protection_leg.recovery_rate = recovery + bump;
     let market_up = MarketContext::new()
         .insert(create_discount_curve(base))
         .insert(make_hazard(recovery + bump));
     let mut cds_down = cds_test;
-    cds_down.protection.recovery_rate = recovery - bump;
+    cds_down.protection_leg.recovery_rate = recovery - bump;
     let market_down = MarketContext::new()
         .insert(create_discount_curve(base))
         .insert(make_hazard(recovery - bump));

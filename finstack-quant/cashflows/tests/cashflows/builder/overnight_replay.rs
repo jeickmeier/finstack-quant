@@ -1,5 +1,5 @@
 use finstack_quant_cashflows::builder::{
-    OvernightCompoundingMethod, OvernightIndexConstraintApplication, OvernightObservationSchedule,
+    FloatingLegCompounding, OvernightIndexConstraintApplication, OvernightObservationSchedule,
     OvernightRateConstraints,
 };
 use finstack_quant_core::dates::{Date, DateExt, WEEKENDS_ONLY};
@@ -21,7 +21,7 @@ fn in_arrears_compiles_business_observations_with_weekend_weight() {
     let schedule = OvernightObservationSchedule::compile(
         start,
         end,
-        OvernightCompoundingMethod::CompoundedInArrears,
+        FloatingLegCompounding::CompoundedInArrears { lookback_days: 0 },
         &WEEKENDS_ONLY,
     )
     .expect("in-arrears observations compile");
@@ -66,7 +66,7 @@ fn lookback_moves_observations_and_keeps_accrual_weights() {
     let schedule = OvernightObservationSchedule::compile(
         start,
         end,
-        OvernightCompoundingMethod::CompoundedWithLookback { lookback_days: 2 },
+        FloatingLegCompounding::CompoundedInArrears { lookback_days: 2 },
         &WEEKENDS_ONLY,
     )
     .expect("lookback observations compile");
@@ -96,7 +96,7 @@ fn lockout_freezes_only_from_the_contractual_cutoff() {
     let schedule = OvernightObservationSchedule::compile(
         start,
         end,
-        OvernightCompoundingMethod::CompoundedWithLockout { lockout_days: 2 },
+        FloatingLegCompounding::CompoundedWithRateCutoff { cutoff_days: 2 },
         &WEEKENDS_ONLY,
     )
     .expect("lockout observations compile");
@@ -133,7 +133,7 @@ fn observation_shift_moves_rates_weights_and_partial_cutoff() {
     let schedule = OvernightObservationSchedule::compile(
         start,
         end,
-        OvernightCompoundingMethod::CompoundedWithObservationShift { shift_days },
+        FloatingLegCompounding::CompoundedWithObservationShift { shift_days },
         &WEEKENDS_ONLY,
     )
     .expect("observation-shift schedule compiles");
@@ -176,7 +176,7 @@ fn daily_and_period_index_bounds_apply_at_different_levels() {
     let schedule = OvernightObservationSchedule::compile(
         start,
         end,
-        OvernightCompoundingMethod::SimpleAverage,
+        FloatingLegCompounding::SimpleAverage,
         &WEEKENDS_ONLY,
     )
     .expect("simple-average observations compile");
@@ -223,7 +223,7 @@ fn partial_replay_clips_weekend_weight_without_changing_fixing_tenor() {
     let schedule = OvernightObservationSchedule::compile(
         start,
         end,
-        OvernightCompoundingMethod::CompoundedInArrears,
+        FloatingLegCompounding::CompoundedInArrears { lookback_days: 0 },
         &WEEKENDS_ONLY,
     )
     .expect("in-arrears observations compile");

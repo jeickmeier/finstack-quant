@@ -1220,14 +1220,16 @@ class IrFutureConventions:
         ...
 
     @property
-    def rate_averaging(self) -> str:
+    def compounding(self) -> str:
         """
-        Rate averaging method over the reference period (serde string).
+        Reference-rate compounding over the reference period.
 
         Returns
         -------
         str
-            Serde variant of ``RateAveragingMethod``.
+            ``"simple"``, ``"simple_average"``, or the JSON text of a
+            compounded ``FloatingLegCompounding`` variant such as
+            ``{"compounded_in_arrears":{"lookback_days":0}}``.
 
         This accessor does not raise; it returns the stored convention value.
         """

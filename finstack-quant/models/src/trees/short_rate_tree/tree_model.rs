@@ -8,7 +8,7 @@ use crate::trees::tree_framework::{
 };
 
 use super::black_karasinski::BkTrinomialLattice;
-use super::{short_rate_keys, ShortRateTree};
+use super::{short_rate_keys, ShortRateTree, TreeDiscounting};
 
 impl ShortRateTree {
     /// Backward induction over the Black-Karasinski trinomial lattice.
@@ -86,7 +86,7 @@ impl ShortRateTree {
                 }
 
                 let r = self.rates[step][j];
-                let continuation = expected_value * comp.df(r, dt) * (-oas_shift * dt).exp();
+                let continuation = expected_value * comp.tree_df(r, dt) * (-oas_shift * dt).exp();
                 let state = NodeState::with_cached(
                     step,
                     time_t,
@@ -169,7 +169,7 @@ impl TreeModel for ShortRateTree {
                 } else {
                     return 0.0;
                 };
-                compounding.to_continuous(r, dt_pricing) + oas / 10000.0
+                compounding.tree_to_continuous(r, dt_pricing) + oas / 10000.0
             });
 
         // Ho-Lee and binomial BDT lattices are calibrated with equal

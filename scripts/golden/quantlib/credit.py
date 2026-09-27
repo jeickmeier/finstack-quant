@@ -148,7 +148,7 @@ def build_single_name_cds() -> dict[str, Any]:
                 "notional": {"amount": "10000000", "currency": "USD"},
                 "side": "pay",
                 "convention": "isda_na",
-                "premium": {
+                "premium_leg": {
                     "start": "2025-09-22",
                     "end": "2030-12-20",
                     "frequency": {"count": 3, "unit": "months"},
@@ -158,7 +158,7 @@ def build_single_name_cds() -> dict[str, Any]:
                     "coupon_bp": "100.0",
                     "discount_curve_id": "USD-FLAT-2PCT",
                 },
-                "protection": {
+                "protection_leg": {
                     "credit_curve_id": "QL-FLAT-HAZARD",
                     "recovery_rate": RECOVERY,
                     "settlement_delay": 0,

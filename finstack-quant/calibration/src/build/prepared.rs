@@ -154,7 +154,7 @@ fn xccy_quote_pillar_date(quote: &XccyQuote, instrument: &dyn Instrument) -> Res
                 quote.id().as_str()
             ))
         })?;
-    Ok(swap.leg1.end)
+    Ok(swap.leg1.leg.end)
 }
 
 /// Prepare a CDS quote into an instrument + pillar time.

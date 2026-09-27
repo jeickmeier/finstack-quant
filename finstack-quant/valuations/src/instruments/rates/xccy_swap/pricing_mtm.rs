@@ -38,20 +38,21 @@ use finstack_quant_core::Result;
 /// the field-by-field mapping from a leg into `BuildPeriodsParams` so the two
 /// paths can never drift (e.g. one forgetting to disable `adjust_accrual_dates`).
 fn build_xccy_mtm_periods(
+    swap: &XccySwap,
     leg: &crate::instruments::rates::xccy_swap::XccySwapLeg,
 ) -> Result<Vec<crate::cashflow::builder::periods::SchedulePeriod>> {
-    let cal_id = super::XccySwap::resolve_leg_calendar_id(leg)?;
+    let cal_id = swap.resolve_leg_calendar_id(leg)?;
     build_periods(BuildPeriodsParams {
-        start: leg.start,
-        end: leg.end,
-        frequency: leg.frequency,
-        stub: leg.stub,
-        business_day_convention: leg.business_day_convention,
+        start: leg.leg.start,
+        end: leg.leg.end,
+        frequency: leg.leg.frequency,
+        stub: leg.leg.stub,
+        business_day_convention: leg.leg.business_day_convention,
         calendar_id: cal_id,
-        end_of_month: false,
-        day_count: leg.day_count,
-        payment_lag_days: leg.payment_lag_days,
-        reset_lag_days: leg.reset_lag_days,
+        end_of_month: leg.leg.end_of_month,
+        day_count: leg.leg.day_count,
+        payment_lag_days: leg.leg.payment_lag_days,
+        reset_lag_days: leg.period_reset_lag(),
         adjust_accrual_dates: false,
         roll_rule: crate::cashflow::builder::specs::RollRule::None,
     })
@@ -107,10 +108,10 @@ pub(crate) fn pv_mtm_reset(
 ) -> Result<Money> {
     let (constant_leg, resetting_leg) = swap.partition_legs(resetting_side)?;
 
-    let disc_c = context.get_discount(&constant_leg.discount_curve_id)?;
-    let disc_r = context.get_discount(&resetting_leg.discount_curve_id)?;
-    let fwd_c = context.get_forward(&constant_leg.forward_curve_id)?;
-    let fwd_r = context.get_forward(&resetting_leg.forward_curve_id)?;
+    let disc_c = context.get_discount(&constant_leg.leg.discount_curve_id)?;
+    let disc_r = context.get_discount(&resetting_leg.leg.discount_curve_id)?;
+    let fwd_c = context.get_forward(&constant_leg.leg.forward_curve_id)?;
+    let fwd_r = context.get_forward(&resetting_leg.leg.forward_curve_id)?;
 
     let fx = context.fx().ok_or_else(|| {
         finstack_quant_core::Error::Validation(format!(
@@ -127,8 +128,8 @@ pub(crate) fn pv_mtm_reset(
     // spec's `X_0` is this value at the swap's start date, NOT necessarily spot.
     let spot_x_at_as_of = fx
         .rate(FxQuery::new(
-            resetting_leg.currency,
-            constant_leg.currency,
+            resetting_leg.notional.currency(),
+            constant_leg.notional.currency(),
             as_of,
         ))?
         .rate;
@@ -136,8 +137,8 @@ pub(crate) fn pv_mtm_reset(
     // Each leg owns its contractual schedule conventions. Notional resets are
     // driven by the resetting leg; constant-leg coupons retain their own day
     // count, calendar, BDC, stub, reset lag, and payment lag.
-    let constant_periods = build_xccy_mtm_periods(constant_leg)?;
-    let resetting_periods = build_xccy_mtm_periods(resetting_leg)?;
+    let constant_periods = build_xccy_mtm_periods(swap, constant_leg)?;
+    let resetting_periods = build_xccy_mtm_periods(swap, resetting_leg)?;
 
     if constant_periods.is_empty() && resetting_periods.is_empty() {
         return Ok(Money::from((0_i64, reporting_currency)));
@@ -165,12 +166,12 @@ pub(crate) fn pv_mtm_reset(
     // per-period loop. Distinct from `n_c / spot_x_at_as_of` for forward-starting swaps.
     // Uses relative DFs from `as_of` so the CIP forward FX is anchored at the same time
     // as `spot_x_at_as_of`.
-    let n_r_initial = if constant_leg.start < as_of {
+    let n_r_initial = if constant_leg.leg.start < as_of {
         let historical_fx = require_historical_fx_reset(
             context,
-            resetting_leg.currency,
-            constant_leg.currency,
-            constant_leg.start,
+            resetting_leg.notional.currency(),
+            constant_leg.notional.currency(),
+            constant_leg.leg.start,
             as_of,
         )?;
         require_positive_finite(
@@ -184,7 +185,7 @@ pub(crate) fn pv_mtm_reset(
             n_c,
             spot_x_at_as_of,
             as_of,
-            constant_leg.start,
+            constant_leg.leg.start,
             disc_c.as_ref(),
             disc_r.as_ref(),
             &swap.id,
@@ -193,10 +194,10 @@ pub(crate) fn pv_mtm_reset(
     };
 
     let fixing_id_c = finstack_quant_core::market_data::fixings::fixing_series_id(
-        constant_leg.forward_curve_id.as_str(),
+        constant_leg.leg.forward_curve_id.as_str(),
     );
     let fixing_id_r = finstack_quant_core::market_data::fixings::fixing_series_id(
-        resetting_leg.forward_curve_id.as_str(),
+        resetting_leg.leg.forward_curve_id.as_str(),
     );
     let fixings_c = context.get_series(&fixing_id_c).ok();
     let fixings_r = context.get_series(&fixing_id_r).ok();
@@ -205,24 +206,26 @@ pub(crate) fn pv_mtm_reset(
     // existing fixed-notional path does (`pv_leg_in_reporting_currency`): a `Receive` leg's
     // initial sign is -1, which yields a negative-PV cashflow (the leg "pays out" notional
     // at start). The resetting-leg notional at start is `N_0^R = N_C / X_0`.
-    if constant_leg.start > as_of {
-        let df_c0 = relative_df_discount_curve(disc_c.as_ref(), as_of, constant_leg.start)?;
-        let df_r0 = relative_df_discount_curve(disc_r.as_ref(), as_of, resetting_leg.start)?;
+    if constant_leg.leg.start > as_of {
+        let df_c0 = relative_df_discount_curve(disc_c.as_ref(), as_of, constant_leg.leg.start)?;
+        let df_r0 = relative_df_discount_curve(disc_r.as_ref(), as_of, resetting_leg.leg.start)?;
 
         let cf_c = initial_principal_sign(constant_leg.side) * n_c * df_c0;
-        pv.add(convert(cf_c, constant_leg.currency)?);
+        pv.add(convert(cf_c, constant_leg.notional.currency())?);
 
         let cf_r = initial_principal_sign(resetting_leg.side) * n_r_initial * df_r0;
-        pv.add(convert(cf_r, resetting_leg.currency)?);
+        pv.add(convert(cf_r, resetting_leg.notional.currency())?);
     }
 
-    let spread_c =
-        decimal_to_f64(constant_leg.spread_bp, "XccySwap constant leg spread_bp")? / 10_000.0;
+    let spread_c = decimal_to_f64(
+        constant_leg.leg.spread_bp,
+        "XccySwap constant leg spread_bp",
+    )? / 10_000.0;
     for period in &constant_periods {
         if period.payment_date <= as_of {
             continue;
         }
-        let projected = super::XccySwap::projected_leg_period(
+        let projected = swap.projected_leg_period(
             constant_leg,
             fwd_c.as_ref(),
             fixings_c,
@@ -233,7 +236,7 @@ pub(crate) fn pv_mtm_reset(
         let df = relative_df_discount_curve(disc_c.as_ref(), as_of, period.payment_date)?;
         let df = require_positive_df(df, &swap.id, "constant-leg", period.payment_date)?;
         let coupon = constant_leg.side.sign() * projected.unsigned_coupon(n_c, spread_c) * df;
-        pv.add(convert(coupon, constant_leg.currency)?);
+        pv.add(convert(coupon, constant_leg.notional.currency())?);
     }
 
     // Resetting-leg per-period loop. For each accrual period [T_j, T_{j+1}]:
@@ -261,8 +264,8 @@ pub(crate) fn pv_mtm_reset(
         } else if period.accrual_start < as_of {
             let historical_fx = require_historical_fx_reset(
                 context,
-                resetting_leg.currency,
-                constant_leg.currency,
+                resetting_leg.notional.currency(),
+                constant_leg.notional.currency(),
                 period.accrual_start,
                 as_of,
             )?;
@@ -292,7 +295,7 @@ pub(crate) fn pv_mtm_reset(
 
         // Resetting-leg floating coupon on N_j^R (notional captured at this period's start,
         //    NOT n_r_prev which is the prior period's notional). Includes the basis spread.
-        let projected_r = super::XccySwap::projected_leg_period(
+        let projected_r = swap.projected_leg_period(
             resetting_leg,
             fwd_r.as_ref(),
             fixings_r,
@@ -300,12 +303,14 @@ pub(crate) fn pv_mtm_reset(
             as_of,
             None,
         )?;
-        let spread_decimal =
-            decimal_to_f64(resetting_leg.spread_bp, "XccySwap resetting leg spread_bp")? / 10_000.0;
+        let spread_decimal = decimal_to_f64(
+            resetting_leg.leg.spread_bp,
+            "XccySwap resetting leg spread_bp",
+        )? / 10_000.0;
         let coupon_r = resetting_leg.side.sign()
             * projected_r.unsigned_coupon(n_r_j, spread_decimal)
             * df_r_pay;
-        pv.add(convert(coupon_r, resetting_leg.currency)?);
+        pv.add(convert(coupon_r, resetting_leg.notional.currency())?);
 
         // Rebalancing on the resetting leg only, at the START of this period (T_j).
         //    Skip the very first period — no rebalancing before initial exchange.
@@ -332,24 +337,26 @@ pub(crate) fn pv_mtm_reset(
             })?;
             let delta_n_r = n_r_j - n_r_prev;
             let rebal_r = initial_principal_sign(resetting_leg.side) * delta_n_r * df_r_reset;
-            pv.add(convert(rebal_r, resetting_leg.currency)?);
+            pv.add(convert(rebal_r, resetting_leg.notional.currency())?);
         }
 
         n_r_prev = n_r_j;
     }
 
     // Final principal exchanges are settled once the leg end date has passed.
-    if constant_leg.end > as_of {
-        let df_c_end = relative_df_discount_curve(disc_c.as_ref(), as_of, constant_leg.end)?;
-        let df_c_end = require_positive_df(df_c_end, &swap.id, "constant-leg", constant_leg.end)?;
-        let df_r_end = relative_df_discount_curve(disc_r.as_ref(), as_of, resetting_leg.end)?;
-        let df_r_end = require_positive_df(df_r_end, &swap.id, "resetting-leg", resetting_leg.end)?;
+    if constant_leg.leg.end > as_of {
+        let df_c_end = relative_df_discount_curve(disc_c.as_ref(), as_of, constant_leg.leg.end)?;
+        let df_c_end =
+            require_positive_df(df_c_end, &swap.id, "constant-leg", constant_leg.leg.end)?;
+        let df_r_end = relative_df_discount_curve(disc_r.as_ref(), as_of, resetting_leg.leg.end)?;
+        let df_r_end =
+            require_positive_df(df_r_end, &swap.id, "resetting-leg", resetting_leg.leg.end)?;
 
         let cf_c_final = constant_leg.side.sign() * n_c * df_c_end;
-        pv.add(convert(cf_c_final, constant_leg.currency)?);
+        pv.add(convert(cf_c_final, constant_leg.notional.currency())?);
 
         let cf_r_final = resetting_leg.side.sign() * n_r_prev * df_r_end;
-        pv.add(convert(cf_r_final, resetting_leg.currency)?);
+        pv.add(convert(cf_r_final, resetting_leg.notional.currency())?);
     }
 
     Money::new(pv.total(), reporting_currency)
@@ -385,15 +392,15 @@ pub(crate) fn mtm_cashflow_schedule(
 
     let (constant_leg, resetting_leg) = swap.partition_legs(resetting_side)?;
 
-    let disc_c = context.get_discount(&constant_leg.discount_curve_id)?;
-    let disc_r = context.get_discount(&resetting_leg.discount_curve_id)?;
-    let fwd_c = context.get_forward(&constant_leg.forward_curve_id)?;
-    let fwd_r = context.get_forward(&resetting_leg.forward_curve_id)?;
+    let disc_c = context.get_discount(&constant_leg.leg.discount_curve_id)?;
+    let disc_r = context.get_discount(&resetting_leg.leg.discount_curve_id)?;
+    let fwd_c = context.get_forward(&constant_leg.leg.forward_curve_id)?;
+    let fwd_r = context.get_forward(&resetting_leg.leg.forward_curve_id)?;
     let fixing_id_c = finstack_quant_core::market_data::fixings::fixing_series_id(
-        constant_leg.forward_curve_id.as_str(),
+        constant_leg.leg.forward_curve_id.as_str(),
     );
     let fixing_id_r = finstack_quant_core::market_data::fixings::fixing_series_id(
-        resetting_leg.forward_curve_id.as_str(),
+        resetting_leg.leg.forward_curve_id.as_str(),
     );
     let fixings_c = context.get_series(&fixing_id_c).ok();
     let fixings_r = context.get_series(&fixing_id_r).ok();
@@ -408,26 +415,26 @@ pub(crate) fn mtm_cashflow_schedule(
     let n_c = constant_leg.notional.amount();
     let spot_x_at_as_of = fx
         .rate(FxQuery::new(
-            resetting_leg.currency,
-            constant_leg.currency,
+            resetting_leg.notional.currency(),
+            constant_leg.notional.currency(),
             as_of,
         ))?
         .rate;
 
-    let constant_periods = build_xccy_mtm_periods(constant_leg)?;
-    let resetting_periods = build_xccy_mtm_periods(resetting_leg)?;
+    let constant_periods = build_xccy_mtm_periods(swap, constant_leg)?;
+    let resetting_periods = build_xccy_mtm_periods(swap, resetting_leg)?;
 
     let mut flows: Vec<CashFlow> =
         Vec::with_capacity(constant_periods.len() + resetting_periods.len() * 2 + 4);
     let mut projected_fixings = Vec::new();
 
     // Per-period notional at T_start — also drives the initial principal cashflow.
-    let n_r_initial = if constant_leg.start < as_of {
+    let n_r_initial = if constant_leg.leg.start < as_of {
         let historical_fx = require_historical_fx_reset(
             context,
-            resetting_leg.currency,
-            constant_leg.currency,
-            constant_leg.start,
+            resetting_leg.notional.currency(),
+            constant_leg.notional.currency(),
+            constant_leg.leg.start,
             as_of,
         )?;
         require_positive_finite(
@@ -441,7 +448,7 @@ pub(crate) fn mtm_cashflow_schedule(
             n_c,
             spot_x_at_as_of,
             as_of,
-            constant_leg.start,
+            constant_leg.leg.start,
             disc_c.as_ref(),
             disc_r.as_ref(),
             &swap.id,
@@ -451,11 +458,11 @@ pub(crate) fn mtm_cashflow_schedule(
 
     // Initial principal exchanges.
     flows.push(CashFlow::new(
-        constant_leg.start,
+        constant_leg.leg.start,
         None,
         Money::new(
             initial_principal_sign(constant_leg.side) * n_c,
-            constant_leg.currency,
+            constant_leg.notional.currency(),
         )?,
         CFKind::Notional,
         0.0,
@@ -463,21 +470,23 @@ pub(crate) fn mtm_cashflow_schedule(
     ));
     let cf_initial_amount = initial_principal_sign(resetting_leg.side) * n_r_initial;
     flows.push(CashFlow::new(
-        resetting_leg.start,
+        resetting_leg.leg.start,
         None,
-        Money::new(cf_initial_amount, resetting_leg.currency)?,
+        Money::new(cf_initial_amount, resetting_leg.notional.currency())?,
         CFKind::Notional,
         0.0,
         None,
     ));
 
-    let spread_c =
-        decimal_to_f64(constant_leg.spread_bp, "XccySwap constant leg spread_bp")? / 10_000.0;
+    let spread_c = decimal_to_f64(
+        constant_leg.leg.spread_bp,
+        "XccySwap constant leg spread_bp",
+    )? / 10_000.0;
     for period in &constant_periods {
         if period.payment_date <= as_of {
             continue;
         }
-        let projected = super::XccySwap::projected_leg_period(
+        let projected = swap.projected_leg_period(
             constant_leg,
             fwd_c.as_ref(),
             fixings_c,
@@ -491,7 +500,7 @@ pub(crate) fn mtm_cashflow_schedule(
             projected.fixing_date.or(period.reset_date),
             Money::new(
                 constant_leg.side.sign() * projected.unsigned_coupon(n_c, spread_c),
-                constant_leg.currency,
+                constant_leg.notional.currency(),
             )?,
             CFKind::FloatReset,
             projected.year_fraction,
@@ -499,8 +508,10 @@ pub(crate) fn mtm_cashflow_schedule(
         ));
     }
 
-    let spread_decimal =
-        decimal_to_f64(resetting_leg.spread_bp, "XccySwap resetting leg spread_bp")? / 10_000.0;
+    let spread_decimal = decimal_to_f64(
+        resetting_leg.leg.spread_bp,
+        "XccySwap resetting leg spread_bp",
+    )? / 10_000.0;
 
     let mut n_r_prev = n_r_initial;
     for (j, period) in resetting_periods.iter().enumerate() {
@@ -509,8 +520,8 @@ pub(crate) fn mtm_cashflow_schedule(
         } else if period.accrual_start < as_of {
             let historical_fx = require_historical_fx_reset(
                 context,
-                resetting_leg.currency,
-                constant_leg.currency,
+                resetting_leg.notional.currency(),
+                constant_leg.notional.currency(),
                 period.accrual_start,
                 as_of,
             )?;
@@ -531,14 +542,17 @@ pub(crate) fn mtm_cashflow_schedule(
 
         if j > 0 {
             projected_fixings.push(crate::cashflow::fixings::ProjectedFixing {
-                series_id: mtm_fx_fixing_series_id(resetting_leg.currency, constant_leg.currency),
+                series_id: mtm_fx_fixing_series_id(
+                    resetting_leg.notional.currency(),
+                    constant_leg.notional.currency(),
+                ),
                 date: period.accrual_start,
                 value: Some(n_c / n_r_j),
             });
         }
         // Coupon at payment date on the period-start notional N_j^R.
         if period.payment_date > as_of {
-            let projected_r = super::XccySwap::projected_leg_period(
+            let projected_r = swap.projected_leg_period(
                 resetting_leg,
                 fwd_r.as_ref(),
                 fixings_r,
@@ -551,7 +565,7 @@ pub(crate) fn mtm_cashflow_schedule(
             flows.push(CashFlow::new(
                 period.payment_date,
                 projected_r.fixing_date.or(period.reset_date),
-                Money::new(coupon_amount, resetting_leg.currency)?,
+                Money::new(coupon_amount, resetting_leg.notional.currency())?,
                 CFKind::FloatReset,
                 projected_r.year_fraction,
                 Some(projected_r.all_in_rate(spread_decimal)),
@@ -566,7 +580,7 @@ pub(crate) fn mtm_cashflow_schedule(
                 flows.push(CashFlow::new(
                     period.accrual_start,
                     None,
-                    Money::new(rebal_amount, resetting_leg.currency)?,
+                    Money::new(rebal_amount, resetting_leg.notional.currency())?,
                     CFKind::Notional,
                     0.0,
                     None,
@@ -579,18 +593,21 @@ pub(crate) fn mtm_cashflow_schedule(
 
     // Final principal exchanges; the resetting leg uses its last marked notional.
     flows.push(CashFlow::new(
-        constant_leg.end,
+        constant_leg.leg.end,
         None,
-        Money::new(constant_leg.side.sign() * n_c, constant_leg.currency)?,
+        Money::new(
+            constant_leg.side.sign() * n_c,
+            constant_leg.notional.currency(),
+        )?,
         CFKind::Notional,
         0.0,
         None,
     ));
     let cf_final_amount = resetting_leg.side.sign() * n_r_prev;
     flows.push(CashFlow::new(
-        resetting_leg.end,
+        resetting_leg.leg.end,
         None,
-        Money::new(cf_final_amount, resetting_leg.currency)?,
+        Money::new(cf_final_amount, resetting_leg.notional.currency())?,
         CFKind::Notional,
         0.0,
         None,
@@ -598,11 +615,11 @@ pub(crate) fn mtm_cashflow_schedule(
 
     Ok(crate::cashflow::traits::schedule_from_classified_flows(
         flows,
-        resetting_leg.day_count,
+        resetting_leg.leg.day_count,
         crate::cashflow::traits::ScheduleBuildOpts {
             notional_hint: Some(Money::new(
                 resetting_leg.notional.amount(),
-                resetting_leg.currency,
+                resetting_leg.notional.currency(),
             )?),
             meta: crate::cashflow::builder::CashFlowMeta {
                 projected_fixings,

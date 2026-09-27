@@ -97,7 +97,7 @@ def _cds_hand_written_json() -> str:
                 "notional": {"amount": "10000000", "currency": "USD"},
                 "side": "pay",
                 "convention": "isda_na",
-                "premium": {
+                "premium_leg": {
                     "roll_rule": "cds_imm",
                     "start": "2024-03-20",
                     "end": "2029-06-20",
@@ -109,7 +109,7 @@ def _cds_hand_written_json() -> str:
                     "coupon_bp": "100",
                     "discount_curve_id": "USD-OIS",
                 },
-                "protection": {
+                "protection_leg": {
                     "credit_curve_id": "ACME-CDS",
                     "recovery_rate": 0.4,
                     "settlement_delay": 3,
@@ -159,8 +159,8 @@ class TestCreditDefaultSwapTyped:
             .notional(Money(1_000_000.0, Currency("USD")))
             .side(value)
             .convention("isda_na")
-            .premium(premium)
-            .protection(protection)
+            .premium_leg(premium)
+            .protection_leg(protection)
             .build()
         )
         assert cds.id == "CDS-SIDE"
@@ -175,8 +175,8 @@ class TestCreditDefaultSwapTyped:
             .notional(Money(1_000_000.0, Currency("USD")))
             .side("pay")
             .convention(value)
-            .premium(premium)
-            .protection(protection)
+            .premium_leg(premium)
+            .protection_leg(protection)
             .build()
         )
         assert cds.id == "CDS-CONV"
@@ -194,8 +194,8 @@ class TestCreditDefaultSwapTyped:
             .notional(Money(1_000_000.0, Currency("USD")))
             .side("pay")
             .convention("isda_na")
-            .premium(premium)
-            .protection(protection)
+            .premium_leg(premium)
+            .protection_leg(protection)
             .doc_clause(value)
             .build()
         )
@@ -223,8 +223,8 @@ class TestCreditDefaultSwapTyped:
             .notional(Money(1_000_000.0, Currency("USD")))
             .side("pay")
             .convention("isda_na")
-            .premium(premium)
-            .protection(protection)
+            .premium_leg(premium)
+            .protection_leg(protection)
             .protection_effective_date(datetime.date(2024, 6, 20))
             .build()
         )
@@ -241,8 +241,8 @@ class TestCreditDefaultSwapTyped:
             .notional(value=Money(1_000_000.0, Currency("USD")))
             .side(value="pay")
             .convention(value="isda_na")
-            .premium(value=premium)
-            .protection(value=protection)
+            .premium_leg(value=premium)
+            .protection_leg(value=protection)
             .build()
         )
         assert cds.id == "CDS-KW"
@@ -292,8 +292,8 @@ class TestCDSIndexTyped:
             .index_factor(1.0)
             .side("pay")
             .convention("isda_na")
-            .premium(premium)
-            .protection(protection)
+            .premium_leg(premium)
+            .protection_leg(protection)
             .pricing("single_curve")
             .num_constituents(125)
             .build()
@@ -316,8 +316,8 @@ class TestCDSIndexTyped:
             .index_factor(1.0)
             .side("pay")
             .convention(value)
-            .premium(premium)
-            .protection(protection)
+            .premium_leg(premium)
+            .protection_leg(protection)
             .pricing("single_curve")
             .num_constituents(125)
             .build()
@@ -338,8 +338,8 @@ class TestCDSIndexTyped:
             .index_factor(1.0)
             .side("pay")
             .convention("isda_na")
-            .premium(premium)
-            .protection(protection)
+            .premium_leg(premium)
+            .protection_leg(protection)
             .pricing(value)
         )
         if value == "constituents":
@@ -390,8 +390,8 @@ class TestCDSIndexTyped:
             .index_factor(value=1.0)
             .side(value="pay")
             .convention(value="isda_na")
-            .premium(value=premium)
-            .protection(value=protection)
+            .premium_leg(value=premium)
+            .protection_leg(value=protection)
             .pricing(value="single_curve")
             .num_constituents(value=125)
             .build()

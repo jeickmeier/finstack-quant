@@ -188,7 +188,7 @@
       "finstack_quant.cashflows.builder.CashFlowSchedule",
       "finstack_quant.cashflows.builder.FloatingCouponSpec",
       "finstack_quant.cashflows.builder.FloatingRateSpec",
-      "finstack_quant.cashflows.builder.OvernightCompoundingMethod",
+      "finstack_quant.cashflows.builder.FloatingLegCompounding",
       "finstack_quant.cashflows.builder.ScheduleParams",
       "finstack_quant.core.dates.DayCount",
       "finstack_quant.core.market_data.DiscountCurve",

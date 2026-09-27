@@ -246,8 +246,11 @@ fn test_to_synthetic_cds_conversion() {
     assert_eq!(cds.notional, idx.notional);
     assert_eq!(cds.side, idx.side);
     assert_eq!(cds.convention, idx.convention);
-    assert_eq!(cds.premium.coupon_bp, idx.premium.coupon_bp);
-    assert_eq!(cds.protection.recovery_rate, idx.protection.recovery_rate);
+    assert_eq!(cds.premium_leg.coupon_bp, idx.premium_leg.coupon_bp);
+    assert_eq!(
+        cds.protection_leg.recovery_rate,
+        idx.protection_leg.recovery_rate
+    );
 }
 
 #[test]

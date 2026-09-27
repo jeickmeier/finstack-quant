@@ -127,7 +127,7 @@ let swap = InterestRateSwap::builder()
     .id(InstrumentId::new("IRS-5Y-USD"))
     .notional(Money::new(10_000_000.0, Currency::USD)?)
     .side(PayReceive::Pay)
-    .fixed(FixedLegSpec {
+    .fixed_leg(FixedLegSpec {
         discount_curve_id: CurveId::new("USD-OIS"),
         rate: Decimal::try_from(0.04)?,
         frequency: Tenor::semi_annual(),
@@ -138,11 +138,10 @@ let swap = InterestRateSwap::builder()
         start,
         end,
         par_method: None,
-        compounding_simple: true,
         payment_lag_days: 0,
         end_of_month: false,
     })
-    .float(FloatLegSpec {
+    .float_leg(FloatLegSpec {
         discount_curve_id: CurveId::new("USD-OIS"),
         forward_curve_id: CurveId::new("USD-SOFR-3M"),
         spread_bp: Decimal::ZERO,

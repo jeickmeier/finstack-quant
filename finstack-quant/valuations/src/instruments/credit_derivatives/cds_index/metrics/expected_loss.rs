@@ -22,7 +22,7 @@ impl MetricCalculator for ExpectedLossCalculator {
         let as_of = context.as_of;
 
         // If already at/after maturity, no forward expected loss.
-        if as_of >= index.premium.end {
+        if as_of >= index.premium_leg.end {
             return Ok(0.0);
         }
 
@@ -54,7 +54,7 @@ impl MetricCalculator for ExpectedLossCalculator {
                     day_count.year_fraction(base_date, as_of, DayCountContext::default())?;
                 let t_maturity = day_count.year_fraction(
                     base_date,
-                    index.premium.end,
+                    index.premium_leg.end,
                     DayCountContext::default(),
                 )?;
 
@@ -78,12 +78,15 @@ impl MetricCalculator for ExpectedLossCalculator {
         // Index-level expected loss using the index hazard curve and recovery.
         let hazard = context
             .curves
-            .get_hazard(index.protection.credit_curve_id.as_str())?;
+            .get_hazard(index.protection_leg.credit_curve_id.as_str())?;
         let day_count = hazard.day_count();
         let base_date = hazard.base_date();
         let t_asof = day_count.year_fraction(base_date, as_of, DayCountContext::default())?;
-        let t_maturity =
-            day_count.year_fraction(base_date, index.premium.end, DayCountContext::default())?;
+        let t_maturity = day_count.year_fraction(
+            base_date,
+            index.premium_leg.end,
+            DayCountContext::default(),
+        )?;
 
         let sp_asof = hazard.sp(t_asof);
         let sp_maturity = hazard.sp(t_maturity);
@@ -95,7 +98,7 @@ impl MetricCalculator for ExpectedLossCalculator {
         };
 
         let default_prob = (1.0 - survival_cond).clamp(0.0, 1.0);
-        let lgd = 1.0 - index.protection.recovery_rate;
+        let lgd = 1.0 - index.protection_leg.recovery_rate;
 
         Ok(notional * default_prob * lgd)
     }

@@ -17,7 +17,6 @@ True
 
 from __future__ import annotations
 
-import builtins
 import datetime
 from typing import Any, Literal
 
@@ -3776,7 +3775,6 @@ class FixedLegSpec:
     ...     DayCount.THIRTY_360,
     ...     "2024-01-15",
     ...     "2029-01-15",
-    ...     compounding_simple=False,
     ... )
     >>> leg.rate
     0.04
@@ -3791,7 +3789,6 @@ class FixedLegSpec:
         start: datetime.date | datetime.datetime | pd.Timestamp | str,
         end: datetime.date | datetime.datetime | pd.Timestamp | str,
         *,
-        compounding_simple: bool,
         business_day_convention: str = "modified_following",
         calendar_id: str | None = None,
         stub: StubKind | Literal["none", "short_front", "long_front", "short_back", "long_back"] = "short_front",
@@ -3816,9 +3813,6 @@ class FixedLegSpec:
             Start date of the fixed leg (ISO 8601 strings accepted).
         end : datetime.date | datetime.datetime | pd.Timestamp | str
             End date of the fixed leg.
-        compounding_simple : bool
-            If true, use simple interest on the accrual fraction. Required:
-            the canonical Rust ``FixedLegSpec`` field has no default.
         business_day_convention : str, default "modified_following"
             Business day convention for payment dates.
         calendar_id : str, optional
@@ -3853,9 +3847,8 @@ class FixedLegSpec:
         ...     DayCount.THIRTY_360,
         ...     "2024-01-15",
         ...     "2029-01-15",
-        ...     compounding_simple=False,
         ... )
-        >>> leg.compounding_simple
+        >>> leg.end_of_month
         False
         """
         ...
@@ -3892,7 +3885,6 @@ class FixedLegSpec:
         ...     DayCount.THIRTY_360,
         ...     "2024-01-15",
         ...     "2029-01-15",
-        ...     compounding_simple=False,
         ... )
         >>> FixedLegSpec.from_json(leg.to_json()).rate
         0.04
@@ -4087,21 +4079,6 @@ class FixedLegSpec:
         -------
         str | None
             ``"forward_based"``, ``"discount_ratio"`` or ``None``.
-
-        Notes
-        -----
-        This accessor does not raise; it returns the stored value.
-        """
-        ...
-    @property
-    def compounding_simple(self) -> bool:
-        """
-        Whether simple interest is used on the accrual fraction.
-
-        Returns
-        -------
-        bool
-            ``True`` for simple accrual, ``False`` for compounded accrual.
 
         Notes
         -----
@@ -5098,7 +5075,7 @@ class InterestRateSwap:
     ...     "USD-SOFR",
     ...     currency="USD",
     ... )
-    >>> (swap.side, swap.float.reset_lag_days)
+    >>> (swap.side, swap.float_leg.reset_lag_days)
     ('pay', 0)
     """
 
@@ -5127,9 +5104,9 @@ class InterestRateSwap:
     @staticmethod
     def from_conventions(
         id: str,
-        notional: Money | builtins.float,
+        notional: Money | float,
         side: Literal["pay", "receive"],
-        fixed_rate: builtins.float | Rate,
+        fixed_rate: float | Rate,
         start_date: datetime.date | datetime.datetime | pd.Timestamp | str,
         maturity: datetime.date | datetime.datetime | pd.Timestamp | str,
         index_id: str,
@@ -5199,7 +5176,7 @@ class InterestRateSwap:
         ...     "USD-SOFR",
         ...     currency="USD",
         ... )
-        >>> (swap.side, swap.float.reset_lag_days)
+        >>> (swap.side, swap.float_leg.reset_lag_days)
         ('pay', 0)
         """
         ...
@@ -5223,7 +5200,7 @@ class InterestRateSwap:
         Examples
         --------
         >>> from finstack_quant.valuations.instruments import InterestRateSwap
-        >>> InterestRateSwap.example_standard().float.reset_lag_days
+        >>> InterestRateSwap.example_standard().float_leg.reset_lag_days
         2
         """
         ...
@@ -5346,7 +5323,7 @@ class InterestRateSwap:
         as_of: datetime.date | datetime.datetime | pd.Timestamp | str,
         metric_id: str,
         model: str = "default",
-    ) -> builtins.float:
+    ) -> float:
         """
         Compute one scalar metric for this swap (e.g. ``"dv01"``).
 
@@ -5440,7 +5417,7 @@ class InterestRateSwap:
         """
         ...
     @property
-    def fixed(self) -> FixedLegSpec:
+    def fixed_leg(self) -> FixedLegSpec:
         """
         Fixed leg specification.
 
@@ -5455,7 +5432,7 @@ class InterestRateSwap:
         """
         ...
     @property
-    def float(self) -> FloatLegSpec:
+    def float_leg(self) -> FloatLegSpec:
         """
         Floating leg specification.
 
@@ -5550,7 +5527,6 @@ class InterestRateSwapBuilder:
     ...     DayCount.THIRTY_360,
     ...     "2025-01-15",
     ...     "2030-01-15",
-    ...     compounding_simple=True,
     ... )
     >>> floating = FloatLegSpec(
     ...     "USD-OIS",
@@ -5567,8 +5543,8 @@ class InterestRateSwapBuilder:
     ...     .id("IRS-1")
     ...     .notional(10_000_000.0, currency="USD")
     ...     .side("pay")
-    ...     .fixed(fixed)
-    ...     .float(floating)
+    ...     .fixed_leg(fixed)
+    ...     .float_leg(floating)
     ...     .build()
     ... )
     >>> swap.notional.amount
@@ -5595,7 +5571,7 @@ class InterestRateSwapBuilder:
             If the builder was already consumed by ``build()``.
         """
         ...
-    def notional(self, value: Money | builtins.float, currency: str | None = None) -> InterestRateSwapBuilder:
+    def notional(self, value: Money | float, currency: str | None = None) -> InterestRateSwapBuilder:
         """
         Set the notional shared by both legs.
 
@@ -5637,7 +5613,7 @@ class InterestRateSwapBuilder:
             If the builder was already consumed by ``build()`` or ``value`` is not a recognized name.
         """
         ...
-    def fixed(self, value: FixedLegSpec) -> InterestRateSwapBuilder:
+    def fixed_leg(self, value: FixedLegSpec) -> InterestRateSwapBuilder:
         """
         Set the fixed leg specification.
 
@@ -5657,7 +5633,7 @@ class InterestRateSwapBuilder:
             If the builder was already consumed by ``build()``.
         """
         ...
-    def float(self, value: FloatLegSpec) -> InterestRateSwapBuilder:
+    def float_leg(self, value: FloatLegSpec) -> InterestRateSwapBuilder:
         """
         Set the floating leg specification.
 
@@ -6305,7 +6281,6 @@ class SwaptionBuilder:
     ...     DayCount.THIRTY_360,
     ...     "2025-01-15",
     ...     "2030-01-15",
-    ...     compounding_simple=False,
     ... )
     >>> floating = FloatLegSpec(
     ...     "USD-OIS",
@@ -8054,7 +8029,7 @@ class CreditDefaultSwap:
         Examples
         --------
         >>> from finstack_quant.valuations.instruments import CreditDefaultSwap
-        >>> CreditDefaultSwap.example().protection.credit_curve_id
+        >>> CreditDefaultSwap.example().protection_leg.credit_curve_id
         'CORP-HAZARD'
         """
         ...
@@ -8133,7 +8108,7 @@ class CreditDefaultSwap:
         """
         ...
     @property
-    def premium(self) -> PremiumLegSpec:
+    def premium_leg(self) -> PremiumLegSpec:
         """
         Premium (fixed coupon) leg specification.
 
@@ -8148,7 +8123,7 @@ class CreditDefaultSwap:
         """
         ...
     @property
-    def protection(self) -> ProtectionLegSpec:
+    def protection_leg(self) -> ProtectionLegSpec:
         """
         Protection (default-contingent) leg specification.
 
@@ -8337,8 +8312,8 @@ class CreditDefaultSwapBuilder:
     ...     .notional(Money(10_000_000.0, Currency("USD")))
     ...     .side("pay")
     ...     .convention("isda_na")
-    ...     .premium(premium)
-    ...     .protection(protection)
+    ...     .premium_leg(premium)
+    ...     .protection_leg(protection)
     ...     .upfront((datetime.date(2024, 6, 25), Money(-250_000.0, Currency("USD"))))
     ...     .build()
     ... )
@@ -8426,7 +8401,7 @@ class CreditDefaultSwapBuilder:
             If the builder was already consumed by ``build()`` or ``value`` is not one of the accepted strings (the message lists them).
         """
         ...
-    def premium(self, value: PremiumLegSpec) -> CreditDefaultSwapBuilder:
+    def premium_leg(self, value: PremiumLegSpec) -> CreditDefaultSwapBuilder:
         """
         Set the premium leg specification.
 
@@ -8446,7 +8421,7 @@ class CreditDefaultSwapBuilder:
             If the builder was already consumed by ``build()``.
         """
         ...
-    def protection(self, value: ProtectionLegSpec) -> CreditDefaultSwapBuilder:
+    def protection_leg(self, value: ProtectionLegSpec) -> CreditDefaultSwapBuilder:
         """
         Set the protection leg specification.
 
@@ -8913,7 +8888,7 @@ class CDSIndex:
         Examples
         --------
         >>> from finstack_quant.valuations.instruments import CDSIndex
-        >>> CDSIndex.example().protection.credit_curve_id
+        >>> CDSIndex.example().protection_leg.credit_curve_id
         'CDX.NA.IG.HAZARD'
         """
         ...
@@ -9185,7 +9160,7 @@ class CDSIndex:
         """
         ...
     @property
-    def premium(self) -> PremiumLegSpec:
+    def premium_leg(self) -> PremiumLegSpec:
         """
         Premium leg specification.
 
@@ -9200,7 +9175,7 @@ class CDSIndex:
         """
         ...
     @property
-    def protection(self) -> ProtectionLegSpec:
+    def protection_leg(self) -> ProtectionLegSpec:
         """
         Protection leg specification.
 
@@ -9363,8 +9338,8 @@ class CDSIndexBuilder:
     ...     .index_factor(1.0)
     ...     .side("pay")
     ...     .convention("isda_na")
-    ...     .premium(premium)
-    ...     .protection(ProtectionLegSpec("CDX-IG-42-HZD", 0.4, 3))
+    ...     .premium_leg(premium)
+    ...     .protection_leg(ProtectionLegSpec("CDX-IG-42-HZD", 0.4, 3))
     ...     .pricing("single_curve")
     ...     .num_constituents(125)
     ...     .build()
@@ -9533,7 +9508,7 @@ class CDSIndexBuilder:
             If the builder was already consumed by ``build()`` or ``value`` is not one of the accepted strings (the message lists them).
         """
         ...
-    def premium(self, value: PremiumLegSpec) -> CDSIndexBuilder:
+    def premium_leg(self, value: PremiumLegSpec) -> CDSIndexBuilder:
         """
         Set the premium leg specification.
 
@@ -9553,7 +9528,7 @@ class CDSIndexBuilder:
             If the builder was already consumed by ``build()``.
         """
         ...
-    def protection(self, value: ProtectionLegSpec) -> CDSIndexBuilder:
+    def protection_leg(self, value: ProtectionLegSpec) -> CDSIndexBuilder:
         """
         Set the protection leg specification.
 

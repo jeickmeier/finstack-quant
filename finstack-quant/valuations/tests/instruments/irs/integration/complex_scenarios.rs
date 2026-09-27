@@ -64,7 +64,7 @@ fn create_swap(as_of: Date, end: Date, fixed_rate: f64, side: PayReceive) -> Int
         id: "IRS_INTEGRATION_TEST".into(),
         notional: Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         side,
-        fixed: finstack_quant_valuations::instruments::FixedLegSpec {
+        fixed_leg: finstack_quant_valuations::instruments::FixedLegSpec {
             discount_curve_id: "USD-OIS".into(),
             rate: rust_decimal::Decimal::try_from(fixed_rate).expect("valid"),
             frequency: Tenor::quarterly(),
@@ -73,13 +73,12 @@ fn create_swap(as_of: Date, end: Date, fixed_rate: f64, side: PayReceive) -> Int
             calendar_id: None,
             stub: StubKind::None,
             par_method: None,
-            compounding_simple: true,
             payment_lag_days: 0,
             end_of_month: false,
             start: as_of,
             end,
         },
-        float: finstack_quant_valuations::instruments::FloatLegSpec {
+        float_leg: finstack_quant_valuations::instruments::FloatLegSpec {
             discount_curve_id: "USD-OIS".into(),
             forward_curve_id: "USD-SOFR-3M".into(),
             spread_bp: rust_decimal::Decimal::ZERO,
@@ -176,7 +175,7 @@ fn test_forward_starting_swap() {
         id: "FORWARD_START".into(),
         notional: Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         side: PayReceive::Receive,
-        fixed: finstack_quant_valuations::instruments::FixedLegSpec {
+        fixed_leg: finstack_quant_valuations::instruments::FixedLegSpec {
             discount_curve_id: "USD-OIS".into(),
             rate: rust_decimal::Decimal::try_from(0.05).expect("valid"),
             frequency: Tenor::quarterly(),
@@ -185,13 +184,12 @@ fn test_forward_starting_swap() {
             calendar_id: None,
             stub: StubKind::None,
             par_method: None,
-            compounding_simple: true,
             payment_lag_days: 0,
             end_of_month: false,
             start, // Forward start
             end,
         },
-        float: finstack_quant_valuations::instruments::FloatLegSpec {
+        float_leg: finstack_quant_valuations::instruments::FloatLegSpec {
             discount_curve_id: "USD-OIS".into(),
             forward_curve_id: "USD-SOFR-3M".into(),
             spread_bp: rust_decimal::Decimal::try_from(0.0).expect("valid"),
@@ -233,7 +231,7 @@ fn test_swap_with_large_spread() {
     let end = date!(2029 - 01 - 01);
 
     let mut swap = create_swap(as_of, end, 0.05, PayReceive::Receive);
-    swap.float.spread_bp = rust_decimal::Decimal::try_from(200.0).expect("valid"); // 200bp spread
+    swap.float_leg.spread_bp = rust_decimal::Decimal::try_from(200.0).expect("valid"); // 200bp spread
 
     let market = build_flat_curves(0.05, 0.05, as_of);
 
@@ -300,7 +298,7 @@ fn test_swap_seasoned() {
         id: "SEASONED_SWAP".into(),
         notional: Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         side: PayReceive::Receive,
-        fixed: finstack_quant_valuations::instruments::FixedLegSpec {
+        fixed_leg: finstack_quant_valuations::instruments::FixedLegSpec {
             discount_curve_id: "USD-OIS".into(),
             rate: rust_decimal::Decimal::try_from(0.04).expect("valid"), // Old rate from 2023
             frequency: Tenor::quarterly(),
@@ -309,13 +307,12 @@ fn test_swap_seasoned() {
             calendar_id: None,
             stub: StubKind::None,
             par_method: None,
-            compounding_simple: true,
             payment_lag_days: 0,
             end_of_month: false,
             start,
             end,
         },
-        float: finstack_quant_valuations::instruments::FloatLegSpec {
+        float_leg: finstack_quant_valuations::instruments::FloatLegSpec {
             discount_curve_id: "USD-OIS".into(),
             forward_curve_id: "USD-SOFR-3M".into(),
             spread_bp: rust_decimal::Decimal::try_from(0.0).expect("valid"),

@@ -8,7 +8,7 @@
 use finstack_quant_core::dates::{Date, DateExt, HolidayCalendar};
 use finstack_quant_core::{Error, Result};
 
-use super::specs::{OvernightCompoundingMethod, OvernightIndexConstraintApplication};
+use super::specs::{FloatingLegCompounding, OvernightIndexConstraintApplication};
 
 /// One dated observation and the calendar-day interval that it weights.
 ///
@@ -101,7 +101,7 @@ struct AccumulatedSlice {
 /// deterministic projections and stochastic paths.
 #[derive(Debug, Clone)]
 pub struct OvernightObservationSchedule {
-    method: OvernightCompoundingMethod,
+    method: FloatingLegCompounding,
     accrual_start: Date,
     accrual_end: Date,
     observation_start: Date,
@@ -140,7 +140,7 @@ impl OvernightObservationSchedule {
     pub fn compile(
         accrual_start: Date,
         accrual_end: Date,
-        method: OvernightCompoundingMethod,
+        method: FloatingLegCompounding,
         calendar: &dyn HolidayCalendar,
     ) -> Result<Self> {
         if accrual_end < accrual_start {
@@ -148,9 +148,16 @@ impl OvernightObservationSchedule {
                 "overnight accrual end {accrual_end} precedes start {accrual_start}"
             )));
         }
+        if !method.is_overnight() {
+            return Err(Error::Validation(
+                "overnight observation schedule requires an overnight compounding \
+                 method, got simple"
+                    .to_string(),
+            ));
+        }
 
         let observation_shift = match method {
-            OvernightCompoundingMethod::CompoundedWithObservationShift { shift_days } => {
+            FloatingLegCompounding::CompoundedWithObservationShift { shift_days } => {
                 i32::try_from(shift_days).map_err(|_| {
                     Error::Validation(format!(
                         "observation shift_days = {shift_days} exceeds i32::MAX"
@@ -163,14 +170,14 @@ impl OvernightObservationSchedule {
         let observation_end = shift_back(accrual_end, observation_shift, calendar)?;
 
         let lookback_days = match method {
-            OvernightCompoundingMethod::CompoundedWithLookback { lookback_days } => lookback_days,
+            FloatingLegCompounding::CompoundedInArrears { lookback_days } => lookback_days,
             _ => 0,
         };
         let (mut observations, mut tenor_tracks_weight) =
             compile_window(observation_start, observation_end, lookback_days, calendar)?;
 
-        if let OvernightCompoundingMethod::CompoundedWithLockout { lockout_days } = method {
-            apply_lockout(&mut observations, &mut tenor_tracks_weight, lockout_days)?;
+        if let FloatingLegCompounding::CompoundedWithRateCutoff { cutoff_days } = method {
+            apply_lockout(&mut observations, &mut tenor_tracks_weight, cutoff_days)?;
         }
 
         let accrual_days = non_negative_days(accrual_start, accrual_end, "accrual period")?;
@@ -245,19 +252,14 @@ impl OvernightObservationSchedule {
             weight_end: self.observation_start,
             day_count_basis,
             constraints,
-            is_simple: matches!(self.method, OvernightCompoundingMethod::SimpleAverage),
-            projected_accumulator: if matches!(
-                self.method,
-                OvernightCompoundingMethod::SimpleAverage
-            ) {
+            is_simple: matches!(self.method, FloatingLegCompounding::SimpleAverage),
+            projected_accumulator: if matches!(self.method, FloatingLegCompounding::SimpleAverage) {
                 0.0
             } else {
                 1.0
             },
-            constrained_accumulator: if matches!(
-                self.method,
-                OvernightCompoundingMethod::SimpleAverage
-            ) {
+            constrained_accumulator: if matches!(self.method, FloatingLegCompounding::SimpleAverage)
+            {
                 0.0
             } else {
                 1.0

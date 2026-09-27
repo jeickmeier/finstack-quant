@@ -49,17 +49,22 @@ impl MetricCalculator for FloatLegPvCalculator {
         let as_of = context.as_of;
 
         // Use the same discount curve as the main IRS pricer (fixed-leg curve)
-        let disc = context.curves.get_discount(&irs.fixed.discount_curve_id)?;
+        let disc = context
+            .curves
+            .get_discount(&irs.fixed_leg.discount_curve_id)?;
 
         // Look up historical fixings for seasoned swaps
         let fixings = finstack_quant_core::market_data::fixings::get_fixing_series(
             &context.curves,
-            irs.float.forward_curve_id.as_str(),
+            irs.float_leg.forward_curve_id.as_str(),
         )
         .ok();
 
-        let pv_money = match irs.float.compounding {
+        let pv_money = match irs.float_leg.compounding {
             FloatingLegCompounding::Simple => irs.pv_float_leg(&context.curves, as_of)?,
+            FloatingLegCompounding::SimpleAverage => {
+                return Err(super::super::simple_average_unsupported());
+            }
             FloatingLegCompounding::CompoundedInArrears { .. }
             | FloatingLegCompounding::CompoundedWithObservationShift { .. }
             | FloatingLegCompounding::CompoundedWithRateCutoff { .. } => {
@@ -68,9 +73,16 @@ impl MetricCalculator for FloatLegPvCalculator {
                 // In single-curve setups the forward curve may not be loaded; in that case
                 // the pricer derives implied overnight forwards from the discount curve.
                 let proj = if irs.is_single_curve_ois() {
-                    context.curves.get_forward(&irs.float.forward_curve_id).ok()
+                    context
+                        .curves
+                        .get_forward(&irs.float_leg.forward_curve_id)
+                        .ok()
                 } else {
-                    Some(context.curves.get_forward(&irs.float.forward_curve_id)?)
+                    Some(
+                        context
+                            .curves
+                            .get_forward(&irs.float_leg.forward_curve_id)?,
+                    )
                 };
                 irs.pv_compounded_float_leg(&disc, proj.as_deref(), as_of, fixings)?
             }

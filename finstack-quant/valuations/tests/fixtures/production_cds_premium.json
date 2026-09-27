@@ -11,7 +11,7 @@
           "amount": "1000",
           "currency": "USD"
         },
-        "premium": {
+        "premium_leg": {
           "business_day_convention": "modified_following",
           "calendar_id": null,
           "day_count": "act_360",
@@ -26,7 +26,7 @@
           "stub": "short_front",
           "roll_rule": "none"
         },
-        "protection": {
+        "protection_leg": {
           "credit_curve_id": "HZ",
           "recovery_rate": 0.4,
           "settlement_delay": 3

@@ -2,7 +2,7 @@ use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::math::{BrentSolver, Solver};
 use finstack_quant_core::{Error, Result};
 
-use super::{ShortRateTree, TreeCalibrationResult};
+use super::{ShortRateTree, TreeCalibrationResult, TreeDiscounting};
 
 impl ShortRateTree {
     /// Calibrate the standard (κ = 0) Black-Derman-Toy model using
@@ -97,7 +97,7 @@ impl ShortRateTree {
                 for (j, &state_price) in current_state_prices.iter().enumerate().take(num_nodes) {
                     let rate = alpha * u.powf(num_nodes as f64 - 1.0 - 2.0 * j as f64);
                     let rate_clamped = rate.clamp(alpha_lb, alpha_ub);
-                    model_price += state_price * comp.df(rate_clamped, dt);
+                    model_price += state_price * comp.tree_df(rate_clamped, dt);
                 }
 
                 model_price - target_df
@@ -138,7 +138,7 @@ impl ShortRateTree {
             let model_df = {
                 let mut model_price = 0.0;
                 for (j, &state_price) in current_state_prices.iter().enumerate().take(num_nodes) {
-                    model_price += state_price * comp.df(current_step_rates[j], dt);
+                    model_price += state_price * comp.tree_df(current_step_rates[j], dt);
                 }
                 model_price
             };
@@ -175,7 +175,7 @@ impl ShortRateTree {
             let mut next_state_prices = vec![0.0; next_nodes];
 
             for (j, &state_price) in current_state_prices.iter().enumerate().take(num_nodes) {
-                let discount_factor = comp.df(current_step_rates[j], dt);
+                let discount_factor = comp.tree_df(current_step_rates[j], dt);
                 let state_price_contribution = state_price * discount_factor;
 
                 if j + 1 < next_nodes {

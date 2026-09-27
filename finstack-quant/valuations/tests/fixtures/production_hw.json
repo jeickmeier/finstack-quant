@@ -28,7 +28,6 @@
           "start": "2026-01-01",
           "end": "2028-01-01",
           "par_method": null,
-          "compounding_simple": true,
           "payment_lag_days": 0,
           "end_of_month": false
         },

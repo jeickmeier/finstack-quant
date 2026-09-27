@@ -291,8 +291,14 @@ fn build_envelope(
             Some(swap.quote_currency),
         )
     } else if let Some(swap) = instrument.as_any().downcast_ref::<XccySwap>() {
-        currency_discount_curves.insert(swap.leg1.currency, swap.leg1.discount_curve_id.clone());
-        currency_discount_curves.insert(swap.leg2.currency, swap.leg2.discount_curve_id.clone());
+        currency_discount_curves.insert(
+            swap.leg1.notional.currency(),
+            swap.leg1.leg.discount_curve_id.clone(),
+        );
+        currency_discount_curves.insert(
+            swap.leg2.notional.currency(),
+            swap.leg2.leg.discount_curve_id.clone(),
+        );
         let primary = currency_discount_curves
             .get(&swap.reporting_currency)
             .cloned()

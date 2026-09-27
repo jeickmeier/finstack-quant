@@ -425,7 +425,6 @@ def _bermudan_swaption_json() -> str:
                 "payment_lag_days": 0,
                 "calendar_id": None,
                 "discount_curve_id": "USD-OIS",
-                "compounding_simple": True,
                 "par_method": None,
             },
             "underlying_float_leg": {

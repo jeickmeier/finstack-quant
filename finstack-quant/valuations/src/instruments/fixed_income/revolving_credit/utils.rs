@@ -297,7 +297,7 @@ pub(super) struct RevolverFloatingProjection<'a> {
 
 /// Resolve overnight compounding for a revolver floating spec.
 ///
-/// Explicit `overnight_compounding` wins. Otherwise a registered overnight RFR
+/// Explicit `compounding` wins. Otherwise a registered overnight RFR
 /// index (for example `USD-SOFR-OIS`) selects compounded-in-arrears. Term
 /// indices such as `USD-SOFR-3M` stay on the simple term path.
 pub(super) fn resolved_overnight_compounding(
@@ -305,7 +305,7 @@ pub(super) fn resolved_overnight_compounding(
 ) -> Result<Option<FloatingLegCompounding>> {
     overnight_conventions::resolved_overnight_compounding(
         spec.forward_curve_id.as_str(),
-        spec.overnight_compounding.as_ref(),
+        spec.compounding.as_ref(),
     )
 }
 
@@ -626,7 +626,7 @@ mod tests {
                 index_tenor: None,
                 reset_lag_days: 2,
                 fixing_calendar_id: None,
-                overnight_compounding: None,
+                compounding: None,
                 overnight_basis: None,
                 fallback: Default::default(),
             }),
@@ -660,7 +660,7 @@ mod tests {
             index_tenor: None,
             reset_lag_days: 0,
             fixing_calendar_id: None,
-            overnight_compounding: None,
+            compounding: None,
             overnight_basis: None,
             fallback: Default::default(),
         };
@@ -704,7 +704,7 @@ mod tests {
             index_tenor: None,
             reset_lag_days: 0,
             fixing_calendar_id: Some("usny".into()),
-            overnight_compounding: None,
+            compounding: None,
             overnight_basis: None,
             fallback: Default::default(),
         };
@@ -764,7 +764,7 @@ mod tests {
     #[test]
     fn overnight_index_floor_applies_daily_or_per_period() {
         use crate::cashflow::builder::{
-            OvernightCompoundingMethod, OvernightIndexConstraintApplication,
+            FloatingLegCompounding, OvernightIndexConstraintApplication,
         };
         use finstack_quant_core::dates::{calendar_by_id, DateExt};
         use finstack_quant_core::market_data::scalars::ScalarTimeSeries;
@@ -827,7 +827,7 @@ mod tests {
                 index_tenor: None,
                 reset_lag_days: 0,
                 fixing_calendar_id: Some("usny".into()),
-                overnight_compounding: Some(OvernightCompoundingMethod::CompoundedInArrears),
+                compounding: Some(FloatingLegCompounding::CompoundedInArrears { lookback_days: 0 }),
                 overnight_basis: Some(DayCount::Act360),
                 fallback: Default::default(),
             };

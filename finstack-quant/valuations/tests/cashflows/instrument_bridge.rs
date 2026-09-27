@@ -16,6 +16,7 @@ use finstack_quant_valuations::instruments::fixed_income::{
 use finstack_quant_valuations::instruments::fx::fx_forward::FxForward;
 use finstack_quant_valuations::instruments::fx::fx_swap::FxSwap;
 use finstack_quant_valuations::instruments::fx::ndf::Ndf;
+use finstack_quant_valuations::instruments::FloatLegSpec;
 use finstack_quant_valuations::instruments::Position;
 fn assert_provider<T: CashflowProvider>(_instrument: &T) {}
 use finstack_quant_valuations::instruments::rates::basis_swap::BasisSwap;
@@ -138,7 +139,9 @@ fn basis_swap_exposes_cashflow_provider_bridge() {
 
     let start = Date::from_calendar_date(2024, Month::January, 3).expect("valid date");
     let end = Date::from_calendar_date(2025, Month::January, 3).expect("valid date");
-    let primary_leg = finstack_quant_valuations::instruments::rates::basis_swap::BasisSwapLeg {
+    let primary_leg = finstack_quant_valuations::instruments::FloatLegSpec {
+        end_of_month: false,
+        fixing_calendar_id: None,
         forward_curve_id: CurveId::new("3M-SOFR"),
         discount_curve_id: CurveId::new("OIS"),
         start,
@@ -153,7 +156,7 @@ fn basis_swap_exposes_cashflow_provider_bridge() {
         reset_lag_days: 0,
         compounding: Default::default(),
     };
-    let reference_leg = finstack_quant_valuations::instruments::rates::basis_swap::BasisSwapLeg {
+    let reference_leg = finstack_quant_valuations::instruments::FloatLegSpec {
         forward_curve_id: CurveId::new("6M-SOFR"),
         ..primary_leg.clone()
     };
@@ -180,44 +183,49 @@ fn xccy_swap_exposes_cashflow_provider_bridge() {
     let start = Date::from_calendar_date(2025, Month::January, 2).expect("valid date");
     let end = Date::from_calendar_date(2026, Month::January, 2).expect("valid date");
     let leg1 = finstack_quant_valuations::instruments::rates::xccy_swap::XccySwapLeg {
-        currency: Currency::USD,
         notional: Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         side: finstack_quant_valuations::instruments::PayReceive::Receive,
-        forward_curve_id: CurveId::new("USD-SOFR-3M"),
-        discount_curve_id: CurveId::new("USD-OIS"),
-        start,
-        end,
-        frequency: Tenor::quarterly(),
-        day_count: DayCount::Act360,
-        business_day_convention: BusinessDayConvention::ModifiedFollowing,
-        stub: StubKind::ShortFront,
-        spread_bp: Decimal::ZERO,
-        payment_lag_days: 0,
-        calendar_id: None,
-        reset_lag_days: None,
-        allow_calendar_fallback: true,
-        compounding: Default::default(),
+        leg: FloatLegSpec {
+            forward_curve_id: CurveId::new("USD-SOFR-3M"),
+            discount_curve_id: CurveId::new("USD-OIS"),
+            start,
+            end,
+            frequency: Tenor::quarterly(),
+            day_count: DayCount::Act360,
+            business_day_convention: BusinessDayConvention::ModifiedFollowing,
+            stub: StubKind::ShortFront,
+            spread_bp: Decimal::ZERO,
+            payment_lag_days: 0,
+            calendar_id: None,
+            reset_lag_days: 0,
+            compounding: Default::default(),
+            fixing_calendar_id: None,
+            end_of_month: false,
+        },
     };
     let leg2 = finstack_quant_valuations::instruments::rates::xccy_swap::XccySwapLeg {
-        currency: Currency::EUR,
         notional: Money::new(900_000.0, Currency::EUR).expect("valid money fixture"),
         side: finstack_quant_valuations::instruments::PayReceive::Pay,
-        forward_curve_id: CurveId::new("EUR-EURIBOR-3M"),
-        discount_curve_id: CurveId::new("EUR-OIS"),
-        start,
-        end,
-        frequency: Tenor::quarterly(),
-        day_count: DayCount::Act360,
-        business_day_convention: BusinessDayConvention::ModifiedFollowing,
-        stub: StubKind::ShortFront,
-        spread_bp: Decimal::ZERO,
-        payment_lag_days: 0,
-        calendar_id: None,
-        reset_lag_days: None,
-        allow_calendar_fallback: true,
-        compounding: Default::default(),
+        leg: FloatLegSpec {
+            forward_curve_id: CurveId::new("EUR-EURIBOR-3M"),
+            discount_curve_id: CurveId::new("EUR-OIS"),
+            start,
+            end,
+            frequency: Tenor::quarterly(),
+            day_count: DayCount::Act360,
+            business_day_convention: BusinessDayConvention::ModifiedFollowing,
+            stub: StubKind::ShortFront,
+            spread_bp: Decimal::ZERO,
+            payment_lag_days: 0,
+            calendar_id: None,
+            reset_lag_days: 0,
+            compounding: Default::default(),
+            fixing_calendar_id: None,
+            end_of_month: false,
+        },
     };
-    let swap = XccySwap::new("XCCY-BRIDGE", leg1, leg2, Currency::USD);
+    let mut swap = XccySwap::new("XCCY-BRIDGE", leg1, leg2, Currency::USD);
+    swap.allow_calendar_fallback = true;
 
     assert_provider(&swap);
 }

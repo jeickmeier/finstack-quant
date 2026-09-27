@@ -3,7 +3,6 @@
 //! IRS, revolvers, basis swaps, XCCY, and TRS use this module so an overnight
 //! RFR index cannot silently price as a term fixing.
 
-use crate::cashflow::builder::OvernightCompoundingMethod;
 use crate::instruments::rates::irs::FloatingLegCompounding;
 use crate::market::conventions::{ConventionRegistry, RateIndexConventions, RateIndexKind};
 use finstack_quant_core::types::IndexId;
@@ -48,7 +47,7 @@ pub fn compounding_from_conventions(
     match rate_conv.kind {
         RateIndexKind::Term => Ok(FloatingLegCompounding::Simple),
         RateIndexKind::OvernightRfr => {
-            let compounding = rate_conv.ois_compounding.clone().ok_or_else(|| {
+            let compounding = rate_conv.ois_compounding.ok_or_else(|| {
                 finstack_quant_core::Error::Validation(
                     "Overnight RFR index conventions must specify `ois_compounding`".to_string(),
                 )
@@ -116,127 +115,55 @@ fn reject_simple_overnight_kind(
     Ok(())
 }
 
-/// Map IRS compounding onto the cashflow-builder overnight method.
+/// Map leg compounding onto the cashflow builder's optional coupon method.
+///
+/// `Simple` projects one term forward, which the builder expresses as `None`;
+/// every overnight variant passes through unchanged.
 ///
 /// # Arguments
 ///
-/// * `compounding` - Canonical IRS/OIS compounding enum.
-///
-/// # Errors
-///
-/// Returns a validation error when lookback, shift, or cutoff days are
-/// negative (they cannot be stored on the builder's `u32` fields).
+/// * `compounding` - Canonical floating-leg compounding of the leg.
 pub(crate) fn builder_overnight_method(
     compounding: FloatingLegCompounding,
-) -> Result<Option<OvernightCompoundingMethod>> {
-    Ok(match compounding {
-        FloatingLegCompounding::Simple => None,
-        FloatingLegCompounding::CompoundedInArrears { lookback_days } => {
-            if lookback_days == 0 {
-                Some(OvernightCompoundingMethod::CompoundedInArrears)
-            } else {
-                Some(OvernightCompoundingMethod::CompoundedWithLookback {
-                    lookback_days: u32_days(lookback_days, "lookback")?,
-                })
-            }
-        }
-        FloatingLegCompounding::CompoundedWithObservationShift { shift_days } => {
-            Some(OvernightCompoundingMethod::CompoundedWithObservationShift {
-                shift_days: u32_days(shift_days, "observation shift")?,
-            })
-        }
-        FloatingLegCompounding::CompoundedWithRateCutoff { cutoff_days } => {
-            Some(OvernightCompoundingMethod::CompoundedWithLockout {
-                lockout_days: u32_days(cutoff_days, "rate cut-off")?,
-            })
-        }
-    })
-}
-
-/// Map a cashflow-builder overnight method onto IRS compounding.
-///
-/// # Arguments
-///
-/// * `method` - Builder-side overnight convention stored on `FloatingRateSpec`.
-///
-/// # Errors
-///
-/// Returns a validation error for `SimpleAverage` (the shared overnight
-/// projector compounds; it does not arithmetic-average) or when lookback,
-/// shift, or lockout days overflow `i32`.
-pub(crate) fn compounding_from_builder_method(
-    method: &OvernightCompoundingMethod,
-) -> Result<FloatingLegCompounding> {
-    Ok(match method {
-        OvernightCompoundingMethod::SimpleAverage => {
-            return Err(finstack_quant_core::Error::Validation(
-                "SimpleAverage overnight coupons are not supported by the shared \
-                 compounded-in-arrears projector"
-                    .to_string(),
-            ));
-        }
-        OvernightCompoundingMethod::CompoundedInArrears => {
-            FloatingLegCompounding::CompoundedInArrears { lookback_days: 0 }
-        }
-        OvernightCompoundingMethod::CompoundedWithLookback { lookback_days } => {
-            FloatingLegCompounding::CompoundedInArrears {
-                lookback_days: i32_days(*lookback_days, "lookback")?,
-            }
-        }
-        OvernightCompoundingMethod::CompoundedWithObservationShift { shift_days } => {
-            FloatingLegCompounding::CompoundedWithObservationShift {
-                shift_days: i32_days(*shift_days, "observation shift")?,
-            }
-        }
-        OvernightCompoundingMethod::CompoundedWithLockout { lockout_days } => {
-            FloatingLegCompounding::CompoundedWithRateCutoff {
-                cutoff_days: i32_days(*lockout_days, "rate cut-off")?,
-            }
-        }
-    })
+) -> Option<FloatingLegCompounding> {
+    compounding.is_overnight().then_some(compounding)
 }
 
 /// Resolve overnight compounding from an explicit spec field or the registry.
 ///
-/// An explicit `overnight_compounding` wins. Otherwise a registered overnight
-/// RFR index supplies its OIS convention. Term and unknown ids return `None`
-/// so the caller keeps term-style projection.
+/// An explicit `compounding` wins (`simple` keeps term projection). Otherwise
+/// a registered overnight RFR index supplies its OIS convention. Term and
+/// unknown ids return `None` so the caller keeps term-style projection.
 ///
 /// # Arguments
 ///
 /// * `index_id` - Index or forward-curve identifier.
-/// * `explicit` - Optional builder-side overnight method from the instrument.
+/// * `explicit` - Optional `FloatingRateSpec.compounding` from the instrument.
 ///
 /// # Errors
 ///
-/// Propagates registry and overnight-method mapping errors.
+/// Returns a validation error for `simple_average` (the shared overnight
+/// projector compounds; it does not arithmetic-average) and propagates
+/// registry errors.
 pub(crate) fn resolved_overnight_compounding(
     index_id: &str,
-    explicit: Option<&OvernightCompoundingMethod>,
+    explicit: Option<&FloatingLegCompounding>,
 ) -> Result<Option<FloatingLegCompounding>> {
     if let Some(method) = explicit {
-        return Ok(Some(compounding_from_builder_method(method)?));
+        return match method {
+            FloatingLegCompounding::SimpleAverage => Err(finstack_quant_core::Error::Validation(
+                "SimpleAverage overnight coupons are not supported by the shared \
+                 compounded-in-arrears projector"
+                    .to_string(),
+            )),
+            FloatingLegCompounding::Simple => Ok(None),
+            other => Ok(Some(*other)),
+        };
     }
     match compounding_from_index_id(index_id)? {
         Some(FloatingLegCompounding::Simple) | None => Ok(None),
         Some(compounding) => Ok(Some(compounding)),
     }
-}
-
-fn i32_days(days: u32, label: &str) -> Result<i32> {
-    i32::try_from(days).map_err(|_| {
-        finstack_quant_core::Error::Validation(format!(
-            "Overnight {label} days overflow i32, got {days}"
-        ))
-    })
-}
-
-fn u32_days(days: i32, label: &str) -> Result<u32> {
-    u32::try_from(days).map_err(|_| {
-        finstack_quant_core::Error::Validation(format!(
-            "Overnight {label} days must be non-negative, got {days}"
-        ))
-    })
 }
 
 #[cfg(test)]
@@ -306,7 +233,7 @@ mod tests {
     fn explicit_lookback_wins_over_term_index() {
         let compounding = resolved_overnight_compounding(
             "USD-SOFR-3M",
-            Some(&OvernightCompoundingMethod::CompoundedWithLookback { lookback_days: 5 }),
+            Some(&FloatingLegCompounding::CompoundedInArrears { lookback_days: 5 }),
         )
         .expect("explicit method")
         .expect("overnight");
@@ -328,11 +255,10 @@ mod tests {
     fn rate_cutoff_maps_to_overnight_lockout() {
         let method = builder_overnight_method(FloatingLegCompounding::CompoundedWithRateCutoff {
             cutoff_days: 1,
-        })
-        .expect("rate cut-off is a supported convention");
+        });
         assert_eq!(
             method,
-            Some(OvernightCompoundingMethod::CompoundedWithLockout { lockout_days: 1 })
+            Some(FloatingLegCompounding::CompoundedWithRateCutoff { cutoff_days: 1 })
         );
     }
 }

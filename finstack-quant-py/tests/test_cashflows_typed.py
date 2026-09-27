@@ -294,7 +294,7 @@ class TestBuilderSpecs:
         paths with the same optional fields omitted and assert byte-for-byte
         equality.
 
-        This is a term-rate leg (no `overnight_compounding`), so the
+        This is a term-rate leg (no `compounding`), so the
         `overnight_index_constraints` default is inert here -- it only
         affects overnight-compounded legs. See
         `test_overnight_index_constraints_default_matches_json` below, which
@@ -371,7 +371,7 @@ class TestBuilderSpecs:
         """Pin `FloatingRateSpec.overnight_index_constraints` (default: Daily).
 
         `overnight_index_constraints` only affects the result on an
-        overnight-*compounded* leg (`overnight_compounding` set) with an
+        overnight-*compounded* leg (`compounding` set) with an
         `index_floor_bp`/`index_cap_bp`: `Daily` clamps each sampled daily
         fixing before compounding, `Period` compounds the raw daily fixings
         first and clamps once at the end. The two only diverge when the
@@ -389,8 +389,8 @@ class TestBuilderSpecs:
         from finstack_quant.cashflows.builder import (
             CashFlowSchedule,
             FloatingCouponSpec,
+            FloatingLegCompounding,
             FloatingRateSpec,
-            OvernightCompoundingMethod,
             OvernightIndexConstraintApplication,
             ScheduleParams,
         )
@@ -414,7 +414,7 @@ class TestBuilderSpecs:
                 spread_bp=Decimal("0"),
                 reset_frequency="3M",
                 index_floor_bp=Decimal("300"),
-                overnight_compounding=OvernightCompoundingMethod.COMPOUNDED_IN_ARREARS,
+                compounding=FloatingLegCompounding.compounded_in_arrears(),
                 **kwargs,
             )
             return (
@@ -447,7 +447,7 @@ class TestBuilderSpecs:
                             "spread_bp": "0",
                             "reset_frequency": {"count": 3, "unit": "months"},
                             "index_floor_bp": "300",
-                            "overnight_compounding": "compounded_in_arrears",
+                            "compounding": {"compounded_in_arrears": {"lookback_days": 0}},
                         },
                         "frequency": {"count": 3, "unit": "months"},
                         "day_count": "act_360",
@@ -1265,15 +1265,15 @@ class TestTypedTwinsAndWire:
         from finstack_quant.cashflows.builder import (
             FeeBase,
             FeeSpec,
+            FloatingLegCompounding,
             FloatingRateSpec,
             Notional,
-            OvernightCompoundingMethod,
         )
         from finstack_quant.core.dates import DayCount
 
         sofr = FloatingRateSpec.sofr(50)
         assert sofr.forward_curve_id == "USD-SOFR"
-        assert sofr.overnight_compounding == OvernightCompoundingMethod.COMPOUNDED_IN_ARREARS
+        assert sofr.compounding == FloatingLegCompounding.compounded_in_arrears()
         assert sofr.overnight_basis == DayCount.ACT_360
         assert sofr.reset_lag_days == 0
         assert FloatingRateSpec.sonia(10).forward_curve_id == "GBP-SONIA"

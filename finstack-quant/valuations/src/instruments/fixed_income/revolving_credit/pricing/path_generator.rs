@@ -134,7 +134,7 @@ pub fn generate_three_factor_paths(
         RateSpec::Floating(spec) => {
             let overnight = crate::instruments::common_impl::pricing::overnight_conventions::resolved_overnight_compounding(
                 spec.forward_curve_id.as_str(),
-                spec.overnight_compounding.as_ref(),
+                spec.compounding.as_ref(),
             )?;
             if overnight.is_some()
                 && matches!(

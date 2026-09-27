@@ -112,7 +112,7 @@ fn build_spot_cds(_as_of: Date) -> CreditDefaultSwap {
         "CDX-NA-IG-46-CBBT",
     )
     .expect("spot CDS");
-    cds.protection.recovery_rate = 0.4;
+    cds.protection_leg.recovery_rate = 0.4;
     cds.valuation_convention = CdsValuationConvention::BloombergCdswClean;
     let _ = (PayReceive::Pay, CdsConvention::IsdaNa, Decimal::ZERO);
     cds
@@ -134,12 +134,14 @@ fn diag_cdx_ig_46_spot_cds_reconciliation() {
 
     // Inspect the bumped hazard curve so we can isolate "are we bumping
     // by the right amount?" from "is the price sensitivity right?".
-    let hazard_curve_base = market.get_hazard(&cds.protection.credit_curve_id).unwrap();
+    let hazard_curve_base = market
+        .get_hazard(&cds.protection_leg.credit_curve_id)
+        .unwrap();
     let hazard_bumped = bump_hazard_spreads(
         hazard_curve_base.as_ref(),
         &market,
         &QuoteBump::ParallelBp(1.0),
-        Some(&cds.premium.discount_curve_id),
+        Some(&cds.premium_leg.discount_curve_id),
         None,
         None,
     )
@@ -170,7 +172,7 @@ fn diag_cdx_ig_46_spot_cds_reconciliation() {
             hazard_curve_base.as_ref(),
             &market,
             &QuoteBump::ParallelBp(bump_bp),
-            Some(&cds.premium.discount_curve_id),
+            Some(&cds.premium_leg.discount_curve_id),
             None,
             None,
         )
@@ -198,7 +200,7 @@ fn diag_cdx_ig_46_spot_cds_reconciliation() {
     eprintln!(
         "\n=== CDX.NA.IG.46 5Y SPOT CDS (PayProtection 100MM, coupon 100bp, traded 53.6264bp) ===\n\
          As-of: {as_of}  premium.start={}  maturity={}\n",
-        cds.premium.start, cds.premium.end
+        cds.premium_leg.start, cds.premium_leg.end
     );
     eprintln!(
         "  finstack RPV01           = {rpv01:.6}  Bloomberg-implied = {:.6}",
@@ -250,7 +252,7 @@ fn diag_cdx_ig_46_spot_cds_reconciliation() {
             hazard_curve_base.as_ref(),
             &market,
             &QuoteBump::ParallelBp(0.0),
-            Some(&cds.premium.discount_curve_id),
+            Some(&cds.premium_leg.discount_curve_id),
             None,
             None,
         )
@@ -303,7 +305,7 @@ fn diag_cdx_ig_46_spot_cds_reconciliation() {
         "CDX-NA-IG-46-CBBT",
     )
     .expect("par CDS");
-    par_cds.protection.recovery_rate = 0.4;
+    par_cds.protection_leg.recovery_rate = 0.4;
     par_cds.valuation_convention = CdsValuationConvention::BloombergCdswClean;
 
     let npv_at_par = par_cds.value_raw(&market, as_of).unwrap();

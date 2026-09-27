@@ -423,8 +423,8 @@ fn hedge_pricing_validates_nested_swap_before_market_access() {
     let mut swap =
         finstack_quant_valuations::instruments::rates::irs::InterestRateSwap::example_standard()
             .expect("example hedge swap");
-    swap.fixed.end = swap.fixed.start;
-    swap.float.end = swap.float.start;
+    swap.fixed_leg.end = swap.fixed_leg.start;
+    swap.float_leg.end = swap.float_leg.start;
     let sc = build_sc("ABS-INVALID-HEDGE", 1_000_000.0).with_hedge_swap(HedgeSwap::new(swap));
 
     let err = sc

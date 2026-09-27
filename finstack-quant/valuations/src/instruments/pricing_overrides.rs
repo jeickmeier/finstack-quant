@@ -1,5 +1,6 @@
 //! Pricing overrides for market-quoted instruments.
 
+use finstack_quant_core::math::Compounding;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::CurveId;
 use finstack_quant_models::credit::pool::PoolGranularity;
@@ -68,26 +69,41 @@ pub enum VolSurfaceExtrapolation {
     LinearInVariance,
 }
 
-/// Quote convention used when reporting or consuming OAS values.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(rename_all = "snake_case")]
-pub enum OasQuoteCompounding {
-    /// Continuous additive spread, matching the tree's internal short-rate shift.
-    #[default]
-    Continuous,
-    /// Semiannual bond-equivalent OAS quote.
-    SemiAnnual,
+/// Wire path of the OAS quote-compounding field, quoted in errors.
+const OAS_QUOTE_COMPOUNDING_PATH: &str =
+    "instrument_pricing_overrides.model_config.oas_quote_compounding";
+
+/// Convert a quoted OAS in decimal form to the internal continuous convention.
+///
+/// # Arguments
+///
+/// * `compounding` - OAS quote basis from `model_config.oas_quote_compounding`;
+///   only `continuous` (the tree's internal short-rate shift) and
+///   `{"periodic": 2}` (semiannual bond-equivalent) are supported.
+/// * `spread` - Quoted OAS as a decimal (0.01 = 100bp).
+///
+/// # Errors
+///
+/// Returns a validation error for any other compounding basis.
+pub(crate) fn oas_continuous_from_quote_decimal(
+    compounding: Compounding,
+    spread: f64,
+) -> finstack_quant_core::Result<f64> {
+    validate_oas_quote_compounding(compounding)?;
+    Ok(match compounding {
+        Compounding::Continuous => spread,
+        _ => 2.0 * (1.0 + spread / 2.0).ln(),
+    })
 }
 
-impl OasQuoteCompounding {
-    /// Convert a quoted spread in decimal form to the internal continuous convention.
-    pub(crate) fn continuous_from_quote_decimal(self, spread: f64) -> f64 {
-        match self {
-            Self::Continuous => spread,
-            Self::SemiAnnual => 2.0 * (1.0 + spread / 2.0).ln(),
-        }
+/// Reject OAS quote bases other than continuous and semiannual.
+fn validate_oas_quote_compounding(compounding: Compounding) -> finstack_quant_core::Result<()> {
+    if compounding == Compounding::Continuous || compounding == Compounding::SEMI_ANNUAL {
+        return Ok(());
     }
+    Err(finstack_quant_core::Error::Validation(format!(
+        "{OAS_QUOTE_COMPOUNDING_PATH} must be \"continuous\" or {{\"periodic\": 2}}, got {compounding}"
+    )))
 }
 
 /// Price/accrual convention used for OAS inversion targets.
@@ -589,7 +605,7 @@ pub struct ModelConfig {
     pub asw_forward_curve_id: Option<CurveId>,
     /// Quote compounding convention for OAS inputs and outputs.
     #[serde(default)]
-    pub oas_quote_compounding: OasQuoteCompounding,
+    pub oas_quote_compounding: Compounding,
     /// Price/accrual target convention for OAS inversion.
     #[serde(default)]
     pub oas_price_basis: OasPriceBasis,
@@ -682,6 +698,7 @@ impl ModelConfig {
                 )));
             }
         }
+        validate_oas_quote_compounding(self.oas_quote_compounding)?;
         if let Some(rho) = self.rate_credit_correlation {
             if !rho.is_finite() || !(-1.0..=1.0).contains(&rho) {
                 return Err(finstack_quant_core::Error::Validation(format!(

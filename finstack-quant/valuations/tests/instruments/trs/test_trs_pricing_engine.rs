@@ -17,9 +17,14 @@ fn test_financing_leg_pv_with_zero_spread() {
     let trs = TestEquityTrsBuilder::new().spread_bp(0.0).build();
 
     // Act
-    let fin_pv =
-        TrsEngine::pv_financing_leg(&trs.financing, &trs.schedule, trs.notional, &market, as_of)
-            .unwrap();
+    let fin_pv = TrsEngine::pv_financing_leg(
+        &trs.financing_leg,
+        &trs.schedule,
+        trs.notional,
+        &market,
+        as_of,
+    )
+    .unwrap();
 
     // Assert - With zero spread, financing leg PV = PV of forward rates only
     assert_eq!(fin_pv.currency(), USD);
@@ -41,7 +46,7 @@ fn test_financing_leg_pv_increases_with_spread() {
 
     // Act
     let pv_low = TrsEngine::pv_financing_leg(
-        &trs_low.financing,
+        &trs_low.financing_leg,
         &trs_low.schedule,
         trs_low.notional,
         &market,
@@ -50,7 +55,7 @@ fn test_financing_leg_pv_increases_with_spread() {
     .unwrap();
 
     let pv_high = TrsEngine::pv_financing_leg(
-        &trs_high.financing,
+        &trs_high.financing_leg,
         &trs_high.schedule,
         trs_high.notional,
         &market,
@@ -81,7 +86,7 @@ fn test_financing_leg_pv_scales_with_notional() {
 
     // Act
     let pv_1m = TrsEngine::pv_financing_leg(
-        &trs_1m.financing,
+        &trs_1m.financing_leg,
         &trs_1m.schedule,
         trs_1m.notional,
         &market,
@@ -90,7 +95,7 @@ fn test_financing_leg_pv_scales_with_notional() {
     .unwrap();
 
     let pv_5m = TrsEngine::pv_financing_leg(
-        &trs_5m.financing,
+        &trs_5m.financing_leg,
         &trs_5m.schedule,
         trs_5m.notional,
         &market,
@@ -119,7 +124,7 @@ fn test_financing_leg_pv_increases_with_tenor() {
 
     // Act
     let pv_6m = TrsEngine::pv_financing_leg(
-        &trs_6m.financing,
+        &trs_6m.financing_leg,
         &trs_6m.schedule,
         trs_6m.notional,
         &market,
@@ -128,7 +133,7 @@ fn test_financing_leg_pv_increases_with_tenor() {
     .unwrap();
 
     let pv_24m = TrsEngine::pv_financing_leg(
-        &trs_24m.financing,
+        &trs_24m.financing_leg,
         &trs_24m.schedule,
         trs_24m.notional,
         &market,
@@ -153,9 +158,14 @@ fn test_financing_annuity_positive() {
     let trs = TestEquityTrsBuilder::new().build();
 
     // Act
-    let annuity =
-        TrsEngine::financing_annuity(&trs.financing, &trs.schedule, trs.notional, &market, as_of)
-            .unwrap();
+    let annuity = TrsEngine::financing_annuity(
+        &trs.financing_leg,
+        &trs.schedule,
+        trs.notional,
+        &market,
+        as_of,
+    )
+    .unwrap();
 
     // Assert
     assert!(annuity > 0.0, "Financing annuity should be positive");
@@ -177,7 +187,7 @@ fn test_financing_annuity_scales_with_notional() {
 
     // Act
     let annuity_1m = TrsEngine::financing_annuity(
-        &trs_1m.financing,
+        &trs_1m.financing_leg,
         &trs_1m.schedule,
         trs_1m.notional,
         &market,
@@ -186,7 +196,7 @@ fn test_financing_annuity_scales_with_notional() {
     .unwrap();
 
     let annuity_10m = TrsEngine::financing_annuity(
-        &trs_10m.financing,
+        &trs_10m.financing_leg,
         &trs_10m.schedule,
         trs_10m.notional,
         &market,
@@ -215,7 +225,7 @@ fn test_financing_annuity_independent_of_spread() {
 
     // Act
     let annuity_low = TrsEngine::financing_annuity(
-        &trs_low.financing,
+        &trs_low.financing_leg,
         &trs_low.schedule,
         trs_low.notional,
         &market,
@@ -224,7 +234,7 @@ fn test_financing_annuity_independent_of_spread() {
     .unwrap();
 
     let annuity_high = TrsEngine::financing_annuity(
-        &trs_high.financing,
+        &trs_high.financing_leg,
         &trs_high.schedule,
         trs_high.notional,
         &market,
@@ -255,7 +265,7 @@ fn test_financing_annuity_increases_with_tenor() {
 
     // Act
     let annuity_3m = TrsEngine::financing_annuity(
-        &trs_3m.financing,
+        &trs_3m.financing_leg,
         &trs_3m.schedule,
         trs_3m.notional,
         &market,
@@ -264,7 +274,7 @@ fn test_financing_annuity_increases_with_tenor() {
     .unwrap();
 
     let annuity_12m = TrsEngine::financing_annuity(
-        &trs_12m.financing,
+        &trs_12m.financing_leg,
         &trs_12m.schedule,
         trs_12m.notional,
         &market,
@@ -273,7 +283,7 @@ fn test_financing_annuity_increases_with_tenor() {
     .unwrap();
 
     let annuity_36m = TrsEngine::financing_annuity(
-        &trs_36m.financing,
+        &trs_36m.financing_leg,
         &trs_36m.schedule,
         trs_36m.notional,
         &market,
@@ -300,9 +310,14 @@ fn test_financing_annuity_bounded() {
         .build();
 
     // Act
-    let annuity =
-        TrsEngine::financing_annuity(&trs.financing, &trs.schedule, trs.notional, &market, as_of)
-            .unwrap();
+    let annuity = TrsEngine::financing_annuity(
+        &trs.financing_leg,
+        &trs.schedule,
+        trs.notional,
+        &market,
+        as_of,
+    )
+    .unwrap();
 
     // Assert - Annuity should be less than notional * tenor (with margin for discounting)
     assert!(
@@ -325,19 +340,29 @@ fn test_financing_leg_pv_equals_annuity_times_rate_plus_spread() {
     let trs = TestEquityTrsBuilder::new().spread_bp(spread_bp).build();
 
     // Act
-    let fin_pv =
-        TrsEngine::pv_financing_leg(&trs.financing, &trs.schedule, trs.notional, &market, as_of)
-            .unwrap();
+    let fin_pv = TrsEngine::pv_financing_leg(
+        &trs.financing_leg,
+        &trs.schedule,
+        trs.notional,
+        &market,
+        as_of,
+    )
+    .unwrap();
 
-    let annuity =
-        TrsEngine::financing_annuity(&trs.financing, &trs.schedule, trs.notional, &market, as_of)
-            .unwrap();
+    let annuity = TrsEngine::financing_annuity(
+        &trs.financing_leg,
+        &trs.schedule,
+        trs.notional,
+        &market,
+        as_of,
+    )
+    .unwrap();
 
     // Also compute PV with zero spread to get forward rate component
     let trs_zero = TestEquityTrsBuilder::new().spread_bp(0.0).build();
 
     let fin_pv_zero = TrsEngine::pv_financing_leg(
-        &trs_zero.financing,
+        &trs_zero.financing_leg,
         &trs_zero.schedule,
         trs_zero.notional,
         &market,
@@ -369,9 +394,14 @@ fn test_financing_leg_with_very_small_notional() {
         .build();
 
     // Act
-    let fin_pv =
-        TrsEngine::pv_financing_leg(&trs.financing, &trs.schedule, trs.notional, &market, as_of)
-            .unwrap();
+    let fin_pv = TrsEngine::pv_financing_leg(
+        &trs.financing_leg,
+        &trs.schedule,
+        trs.notional,
+        &market,
+        as_of,
+    )
+    .unwrap();
 
     // Assert
     assert!(fin_pv.amount() > 0.0);
@@ -391,9 +421,14 @@ fn test_financing_leg_with_large_notional() {
         .build();
 
     // Act
-    let fin_pv =
-        TrsEngine::pv_financing_leg(&trs.financing, &trs.schedule, trs.notional, &market, as_of)
-            .unwrap();
+    let fin_pv = TrsEngine::pv_financing_leg(
+        &trs.financing_leg,
+        &trs.schedule,
+        trs.notional,
+        &market,
+        as_of,
+    )
+    .unwrap();
 
     // Assert
     assert!(fin_pv.amount().is_finite());
@@ -411,9 +446,14 @@ fn test_financing_annuity_with_short_tenor() {
     let trs = TestEquityTrsBuilder::new().tenor_months(1).build();
 
     // Act
-    let annuity =
-        TrsEngine::financing_annuity(&trs.financing, &trs.schedule, trs.notional, &market, as_of)
-            .unwrap();
+    let annuity = TrsEngine::financing_annuity(
+        &trs.financing_leg,
+        &trs.schedule,
+        trs.notional,
+        &market,
+        as_of,
+    )
+    .unwrap();
 
     // Assert
     assert!(annuity > 0.0);
@@ -433,9 +473,14 @@ fn test_financing_annuity_with_long_tenor() {
         .build();
 
     // Act
-    let annuity =
-        TrsEngine::financing_annuity(&trs.financing, &trs.schedule, trs.notional, &market, as_of)
-            .unwrap();
+    let annuity = TrsEngine::financing_annuity(
+        &trs.financing_leg,
+        &trs.schedule,
+        trs.notional,
+        &market,
+        as_of,
+    )
+    .unwrap();
 
     // Assert
     assert!(annuity > 0.0);

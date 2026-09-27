@@ -16,6 +16,7 @@
             "quantlib"
           ]
         },
+        "compounding": "simple",
         "contract_specs": {
           "convexity_adjustment": 0.0,
           "delivery_months": 3,
@@ -29,7 +30,6 @@
         "id": "SOFR-3M-QUARTERLY-QUANTLIB",
         "period_end": "2026-09-18",
         "period_start": "2026-06-19",
-        "rate_averaging": "term",
         "terms": {
           "contracts": 10.0,
           "currency": "USD",

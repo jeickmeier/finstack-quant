@@ -133,7 +133,7 @@ fn ytm_accretion_factor(context: &MetricContext, ytm: f64, rolled_date: Date) ->
             )
         } else {
             (
-                YieldCompounding::Annual,
+                YieldCompounding::Rate(Compounding::Annual),
                 Tenor::annual(),
                 context.day_count.unwrap_or(DayCount::Act365F),
             )

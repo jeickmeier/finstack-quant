@@ -485,7 +485,7 @@ def test_bespoke_cds_frequency_and_stub_price_the_configured_payments() -> None:
         ("short_front", [date(2025, 4, 1), date(2025, 10, 1), date(2026, 4, 1)]),
         ("long_front", [date(2025, 10, 1), date(2026, 4, 1)]),
     ]:
-        premium = f["instrument"]["instrument"]["spec"]["premium"]
+        premium = f["instrument"]["instrument"]["spec"]["premium_leg"]
         premium["stub"] = stub
         assert PremiumLegSpec.from_json(json.dumps(premium)).roll_rule == RollRule.NONE
         value = price_instrument(

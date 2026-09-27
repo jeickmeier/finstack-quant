@@ -574,10 +574,12 @@ impl PyIrFutureConventions {
         self.inner.index_id.to_string()
     }
 
-    /// Rate averaging method over the reference period (serde name).
+    /// Reference-rate compounding over the reference period: ``"simple"``,
+    /// ``"simple_average"``, or the JSON text of a compounded variant such as
+    /// ``{"compounded_in_arrears":{"lookback_days":0}}``.
     #[getter]
-    fn rate_averaging(&self) -> PyResult<String> {
-        enum_to_py_string(&self.inner.rate_averaging)
+    fn compounding(&self) -> PyResult<String> {
+        enum_to_py_string(&self.inner.compounding)
     }
 
     /// Reference-period placement relative to expiry (serde name).

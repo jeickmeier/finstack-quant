@@ -727,7 +727,7 @@ fn floating_facility_interest_is_tagged_float_reset() {
         index_tenor: None,
         reset_lag_days: 0,
         fixing_calendar_id: None,
-        overnight_compounding: None,
+        compounding: None,
         overnight_basis: None,
         fallback: Default::default(),
     });

@@ -792,7 +792,7 @@ fn test_expected_loss_formula() {
     let recovery = 0.40;
 
     let mut cds = create_test_cds(as_of, maturity);
-    cds.protection.recovery_rate = recovery;
+    cds.protection_leg.recovery_rate = recovery;
 
     let market = MarketContext::new()
         .insert(build_test_discount(0.05, as_of, "USD_OIS"))
@@ -831,7 +831,7 @@ fn test_expected_loss_conditions_on_as_of() {
     let lgd = 1.0 - recovery;
 
     let mut cds = create_test_cds(base, maturity);
-    cds.protection.recovery_rate = recovery;
+    cds.protection_leg.recovery_rate = recovery;
 
     // Curves can be based at `base` (safer for df_on_date_curve on older dates).
     let market = MarketContext::new()
@@ -932,7 +932,7 @@ fn test_jump_to_default_magnitude() {
     let maturity = date!(2029 - 01 - 01);
 
     let mut cds = create_test_cds(as_of, maturity);
-    cds.protection.recovery_rate = 0.40;
+    cds.protection_leg.recovery_rate = 0.40;
 
     let market = create_test_market(as_of);
 
@@ -973,7 +973,7 @@ fn test_jump_to_default_uses_adjusted_coupon_schedule_for_accrued() {
         "CORP",
     )
     .expect("CDS construction should succeed");
-    cds.protection.recovery_rate = 0.40;
+    cds.protection_leg.recovery_rate = 0.40;
 
     // Market is required to compute base_value for the valuation result, even though JTD itself
     // is curve-independent.
@@ -991,7 +991,7 @@ fn test_jump_to_default_uses_adjusted_coupon_schedule_for_accrued() {
     // Expected last coupon is adjusted from 2027-03-20 (Sat) to 2027-03-22 (Mon)
     let last_coupon = date!(2027 - 03 - 22);
     let accrual_fraction = cds
-        .premium
+        .premium_leg
         .day_count
         .year_fraction(
             last_coupon,
@@ -1002,7 +1002,7 @@ fn test_jump_to_default_uses_adjusted_coupon_schedule_for_accrued() {
     let spread_decimal = 100.0 / 10_000.0;
     let accrued = notional.amount() * spread_decimal * accrual_fraction;
 
-    let lgd = 1.0 - cds.protection.recovery_rate;
+    let lgd = 1.0 - cds.protection_leg.recovery_rate;
     let expected = notional.amount() * lgd - accrued;
 
     let tol = 1e-6_f64.max(1e-6 * expected.abs());

@@ -81,7 +81,7 @@ fn test_zero_recovery_cds() {
         "HAZARD",
     )
     .expect("CDS construction should succeed");
-    cds.protection.recovery_rate = 0.0;
+    cds.protection_leg.recovery_rate = 0.0;
 
     let disc_curve = DiscountCurve::builder("USD-OIS")
         .base_date(as_of)

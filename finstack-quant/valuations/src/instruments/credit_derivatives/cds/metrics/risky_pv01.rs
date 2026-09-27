@@ -15,8 +15,10 @@ impl MetricCalculator for RiskyPv01Calculator {
         let cds: &CreditDefaultSwap = context.instrument_as()?;
         let disc = context
             .curves
-            .get_discount(&cds.premium.discount_curve_id)?;
-        let surv = context.curves.get_hazard(&cds.protection.credit_curve_id)?;
+            .get_discount(&cds.premium_leg.discount_curve_id)?;
+        let surv = context
+            .curves
+            .get_hazard(&cds.protection_leg.credit_curve_id)?;
         CDSPricer::new().risky_pv01(cds, disc.as_ref(), surv.as_ref(), context.as_of)
     }
 }

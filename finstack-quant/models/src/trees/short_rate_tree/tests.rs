@@ -5,6 +5,7 @@ use crate::volatility::{convert_atm_volatility, VolatilityConvention};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::math::interp::InterpStyle;
+use finstack_quant_core::math::Compounding;
 use finstack_quant_core::{Error, HashMap, Result};
 use time::Month;
 
@@ -120,10 +121,10 @@ fn ho_lee_stored_lattice_prices_zero_coupon_to_calibration_curve() {
 #[test]
 fn ho_lee_noncontinuous_compounding_reprices_curve() {
     for compounding in [
-        TreeCompounding::Simple,
-        TreeCompounding::SemiAnnual,
-        TreeCompounding::Quarterly,
-        TreeCompounding::Monthly,
+        Compounding::Simple,
+        Compounding::SEMI_ANNUAL,
+        Compounding::QUARTERLY,
+        Compounding::MONTHLY,
     ] {
         let steps = 24;
         let maturity = 2.0;
@@ -162,16 +163,16 @@ fn ho_lee_noncontinuous_compounding_reprices_curve() {
 #[test]
 fn tree_compounding_rate_from_df_inverts_df() {
     for compounding in [
-        TreeCompounding::Continuous,
-        TreeCompounding::Simple,
-        TreeCompounding::SemiAnnual,
-        TreeCompounding::Quarterly,
-        TreeCompounding::Monthly,
+        Compounding::Continuous,
+        Compounding::Simple,
+        Compounding::SEMI_ANNUAL,
+        Compounding::QUARTERLY,
+        Compounding::MONTHLY,
     ] {
         for rate in [-0.01, 0.0, 0.025, 0.10] {
             let dt = 0.25;
-            let df = compounding.df(rate, dt);
-            let recovered = compounding.rate_from_df(df, dt);
+            let df = compounding.tree_df(rate, dt);
+            let recovered = compounding.tree_rate_from_df(df, dt);
             assert!(
                 (recovered - rate).abs() < 1e-12,
                 "{compounding:?}: rate_from_df(df({rate})) = {recovered}"
@@ -673,13 +674,13 @@ fn test_calibration_result_quality_helpers_cover_thresholds() {
 #[test]
 fn compounding_conventions_stay_finite_for_deeply_negative_rates() {
     for compounding in [
-        TreeCompounding::Simple,
-        TreeCompounding::SemiAnnual,
-        TreeCompounding::Quarterly,
-        TreeCompounding::Monthly,
+        Compounding::Simple,
+        Compounding::SEMI_ANNUAL,
+        Compounding::QUARTERLY,
+        Compounding::MONTHLY,
     ] {
-        let df = compounding.df(-100.0, 0.5);
-        let continuous = compounding.to_continuous(-100.0, 0.5);
+        let df = compounding.tree_df(-100.0, 0.5);
+        let continuous = compounding.tree_to_continuous(-100.0, 0.5);
         assert!(
             df.is_finite() && df > 0.0,
             "{compounding:?} discount factor should stay positive and finite, got {df}"
@@ -841,7 +842,7 @@ fn test_ho_lee_rejects_nonzero_mean_reversion() {
         model: ShortRateModel::HoLee,
         volatility: 0.01,
         mean_reversion: 0.05,
-        compounding: TreeCompounding::default(),
+        compounding: Compounding::default(),
         curve_fit_tolerance_bp: DEFAULT_CURVE_FIT_TOLERANCE_BP,
     };
     let mut tree = ShortRateTree::new(config);
@@ -862,7 +863,7 @@ fn test_ho_lee_allows_zero_mean_reversion() {
         model: ShortRateModel::HoLee,
         volatility: 0.01,
         mean_reversion: 0.0,
-        compounding: TreeCompounding::default(),
+        compounding: Compounding::default(),
         curve_fit_tolerance_bp: DEFAULT_CURVE_FIT_TOLERANCE_BP,
     };
     let mut tree = ShortRateTree::new(config);

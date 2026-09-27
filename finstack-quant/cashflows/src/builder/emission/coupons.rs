@@ -4,6 +4,7 @@
 //! `CashFlow` values. Index projection and ratio logic belong in the instrument
 //! layer that supplies those tuples.
 
+use crate::builder::FloatingLegCompounding;
 use crate::primitives::{CFKind, CashFlow};
 use finstack_quant_core::cashflow::CashFlowAccrual;
 use finstack_quant_core::currency::Currency;
@@ -457,7 +458,11 @@ pub(crate) fn emit_float_coupons_on(
                 let pik_fraction_f64 = decimal_to_f64(pik_fraction)?;
                 let base_out_f64 = decimal_to_f64(base_out)?;
 
-                let observation = if let Some(method) = spec.rate_spec.overnight_compounding {
+                let observation = if let Some(method) = spec
+                    .rate_spec
+                    .compounding
+                    .filter(FloatingLegCompounding::is_overnight)
+                {
                     let overnight_basis = spec
                         .rate_spec
                         .overnight_basis
@@ -742,7 +747,7 @@ pub(crate) fn emit_float_coupons_on(
 mod tests {
     use super::*;
     use crate::builder::calendar::resolve_calendar_strict;
-    use crate::builder::OvernightCompoundingMethod;
+    use crate::builder::FloatingLegCompounding;
     use time::Month;
 
     #[test]
@@ -788,7 +793,7 @@ mod tests {
         let observations = OvernightObservationSchedule::compile(
             base,
             end,
-            OvernightCompoundingMethod::CompoundedInArrears,
+            FloatingLegCompounding::CompoundedInArrears { lookback_days: 0 },
             calendar,
         )
         .expect("observation schedule");
@@ -827,7 +832,7 @@ mod tests {
         let observations = OvernightObservationSchedule::compile(
             start,
             end,
-            OvernightCompoundingMethod::CompoundedWithLookback { lookback_days: 1 },
+            FloatingLegCompounding::CompoundedInArrears { lookback_days: 1 },
             calendar,
         )
         .expect("observation schedule");

@@ -9,7 +9,7 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::Result;
 use finstack_quant_models::trees::hull_white_tree::HullWhiteTree;
 use finstack_quant_models::trees::two_factor_rates_credit::RatesCreditTree;
-use finstack_quant_models::{NodeState, TreeValuator};
+use finstack_quant_models::{NodeState, TreeDiscounting, TreeValuator};
 
 /// Bond valuator for tree-based pricing of callable/putable bonds.
 ///
@@ -999,7 +999,7 @@ impl BondValuator {
             // The HW tree's backward_induction already discounts by the short
             // rate r(step, node). Apply the OAS as additional discounting
             // over this step's (possibly non-uniform) interval.
-            let oas_adjusted = continuation * comp.df(oas_rate, hw_tree.dt_at_step(step));
+            let oas_adjusted = continuation * comp.tree_df(oas_rate, hw_tree.dt_at_step(step));
 
             self.cashflow_at_oas(step, oas_rate) + self.apply_exercise(step, oas_adjusted)
         })

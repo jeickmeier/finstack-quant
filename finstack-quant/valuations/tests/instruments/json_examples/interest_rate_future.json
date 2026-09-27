@@ -2,6 +2,7 @@
   "instrument": {
     "spec": {
       "attributes": {},
+      "compounding": "simple",
       "contract_specs": {
         "convexity_adjustment": 0.0,
         "delivery_months": 3,
@@ -15,7 +16,6 @@
       "id": "IRF-ED-3M-MAR25",
       "period_end": "2025-06-18",
       "period_start": "2025-03-19",
-      "rate_averaging": "term",
       "terms": {
         "contracts": 1.0,
         "currency": "USD",

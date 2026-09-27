@@ -63,7 +63,7 @@ pub enum TrsDividendSettlement {
 ///         EquityUnderlyingParams::new("SPX", "SPX-SPOT", Currency::USD)
 ///             .with_dividend_yield("SPX-DIV"),
 ///     )
-///     .financing(FinancingLegSpec::new(
+///     .financing_leg(FinancingLegSpec::new(
 ///         "USD-OIS", "USD-SOFR-3M", Decimal::from(50), DayCount::Act360,
 ///     ))
 ///     .schedule(TrsScheduleSpec::from_params(
@@ -98,7 +98,7 @@ pub struct EquityTotalReturnSwap {
     /// Underlying equity parameters (spot ID, dividend yield, contract size).
     pub underlying: EquityUnderlyingParams,
     /// Financing leg specification (curves, spread, day count).
-    pub financing: FinancingLegSpec,
+    pub financing_leg: FinancingLegSpec,
     /// Schedule specification (payment dates and frequency).
     pub schedule: TrsScheduleSpec,
     /// Trade side: `receive` receives the total-return leg and pays financing;
@@ -203,7 +203,7 @@ struct EquityTotalReturnSwapUnchecked {
     /// Underlying equity parameters (spot ID, dividend yield, contract size).
     underlying: EquityUnderlyingParams,
     /// Financing leg specification (curves, spread, day count).
-    financing: FinancingLegSpec,
+    financing_leg: FinancingLegSpec,
     /// Schedule specification (payment dates and frequency).
     schedule: TrsScheduleSpec,
     /// Trade side (receive/pay total return).
@@ -284,7 +284,7 @@ impl TryFrom<EquityTotalReturnSwapUnchecked> for EquityTotalReturnSwap {
             id: value.id,
             notional: value.notional,
             underlying: value.underlying,
-            financing: value.financing,
+            financing_leg: value.financing_leg,
             schedule: value.schedule,
             side: value.side,
             initial_level: value.initial_level,
@@ -318,7 +318,7 @@ impl EquityTotalReturnSwap {
                 contract_size: 1.0,
                 currency: Currency::USD,
             })
-            .financing(FinancingLegSpec::new(
+            .financing_leg(FinancingLegSpec::new(
                 "USD-OIS",
                 "USD-SOFR-3M",
                 Decimal::from(75),
@@ -392,7 +392,7 @@ impl EquityTotalReturnSwap {
             .id(InstrumentId::new(format!("TRS-{}", etf_ticker)))
             .notional(notional)
             .underlying(underlying)
-            .financing(financing)
+            .financing_leg(financing)
             .schedule(schedule)
             .side(PayReceive::Receive)
             .dividend_settlement(TrsDividendSettlement::OnDividendDate)
@@ -425,7 +425,7 @@ impl EquityTotalReturnSwap {
             )));
         }
         self.underlying.validate(&context)?;
-        self.financing.validate(&context)?;
+        self.financing_leg.validate(&context)?;
         self.schedule.validate(&context)?;
         if let Some(level) = self.initial_level {
             if !level.is_finite() || level <= 0.0 {
@@ -529,7 +529,7 @@ impl EquityTotalReturnSwap {
     /// `financing.compounding` (term-rate vs SOFR-style overnight-compounded)
     /// is honored and the reported par spread reprices `base_value` to ~0.
     /// (The former cashflow-builder path hard-coded a simple term-rate
-    /// projection, silently ignoring `FinancingRateCompounding` and drifting
+    /// projection, silently ignoring `FinancingLegSpec.compounding` and drifting
     /// from the metrics engine.)
     ///
     /// # Arguments
@@ -542,7 +542,7 @@ impl EquityTotalReturnSwap {
         self.validate()?;
         use crate::instruments::common_impl::pricing::TrsEngine;
         TrsEngine::pv_financing_leg(
-            &self.financing,
+            &self.financing_leg,
             &self.schedule,
             self.notional,
             curves,
@@ -562,7 +562,7 @@ impl EquityTotalReturnSwap {
         self.validate()?;
         use crate::instruments::common_impl::pricing::TrsEngine;
         TrsEngine::financing_annuity(
-            &self.financing,
+            &self.financing_leg,
             &self.schedule,
             self.notional,
             curves,
@@ -584,8 +584,8 @@ impl crate::instruments::common_impl::traits::Instrument for EquityTotalReturnSw
         crate::instruments::common_impl::dependencies::MarketDependencies,
     > {
         let mut deps = crate::instruments::common_impl::dependencies::MarketDependencies::new();
-        deps.add_discount_curve(self.financing.discount_curve_id.clone());
-        deps.add_forward_curve(self.financing.forward_curve_id.clone());
+        deps.add_discount_curve(self.financing_leg.discount_curve_id.clone());
+        deps.add_forward_curve(self.financing_leg.forward_curve_id.clone());
         deps.add_market_scalar_id(self.underlying.spot_id.as_str());
         if let Some(dividend_yield) = &self.underlying.div_yield_id {
             deps.add_market_scalar_id(dividend_yield.as_str());
@@ -639,8 +639,8 @@ impl finstack_quant_cashflows::CashflowScheduleSource for EquityTotalReturnSwap 
             .principal(self.notional, self.schedule.start, self.schedule.end)
             .floating_cf(crate::cashflow::builder::FloatingCouponSpec {
                 rate_spec: crate::cashflow::builder::FloatingRateSpec {
-                    forward_curve_id: self.financing.forward_curve_id.clone(),
-                    spread_bp: self.financing.spread_bp,
+                    forward_curve_id: self.financing_leg.forward_curve_id.clone(),
+                    spread_bp: self.financing_leg.spread_bp,
                     gearing: Decimal::ONE,
                     gearing_includes_spread: true,
                     index_floor_bp: None,
@@ -652,14 +652,14 @@ impl finstack_quant_cashflows::CashflowScheduleSource for EquityTotalReturnSwap 
                     index_tenor: None,
                     reset_lag_days: 0,
                     fixing_calendar_id: None,
-                    overnight_compounding: None,
+                    compounding: None,
                     overnight_basis: None,
                     fallback: crate::cashflow::builder::FloatingRateFallback::Error,
                 },
                 coupon_type: crate::cashflow::builder::CouponType::Cash,
                 schedule: finstack_quant_cashflows::builder::ScheduleParams {
                     frequency: self.schedule.params.frequency,
-                    day_count: self.financing.day_count,
+                    day_count: self.financing_leg.day_count,
                     business_day_convention: self.schedule.params.business_day_convention,
                     calendar_id: self.schedule.params.calendar_id.clone(),
                     stub: self.schedule.params.stub,
@@ -697,11 +697,11 @@ mod validation_tests {
 
         assert_eq!(
             deps.curves.discount_curves.as_slice(),
-            std::slice::from_ref(&trs.financing.discount_curve_id)
+            std::slice::from_ref(&trs.financing_leg.discount_curve_id)
         );
         assert_eq!(
             deps.curves.forward_curves.as_slice(),
-            std::slice::from_ref(&trs.financing.forward_curve_id)
+            std::slice::from_ref(&trs.financing_leg.forward_curve_id)
         );
         let mut expected_spots = vec![trs.underlying.spot_id.as_str().to_string()];
         expected_spots.extend(

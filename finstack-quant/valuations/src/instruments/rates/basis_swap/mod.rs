@@ -47,10 +47,10 @@
 //! # See Also
 //!
 //! - [`BasisSwap`] for instrument struct
-//! - `BasisSwapLeg` for leg specification
+//! - `FloatLegSpec` for leg specification
 //! - Multi-curve construction in the calibration crate
 
 pub(crate) mod metrics;
 mod types;
 
-pub use types::{BasisSwap, BasisSwapLeg};
+pub use types::BasisSwap;

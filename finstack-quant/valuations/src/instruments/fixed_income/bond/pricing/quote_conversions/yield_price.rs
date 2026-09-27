@@ -11,6 +11,7 @@ use crate::instruments::fixed_income::bond::Bond;
 use finstack_quant_core::dates::{Date, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::math::summation::NeumaierAccumulator;
+use finstack_quant_core::math::Compounding;
 use finstack_quant_core::money::Money;
 use rust_decimal::prelude::ToPrimitive;
 
@@ -71,7 +72,7 @@ pub fn df_from_yield(
     }
 
     Ok(match comp {
-        YieldCompounding::Simple => {
+        YieldCompounding::Rate(Compounding::Simple) => {
             let denom = 1.0 + ytm * t;
             // Check for non-positive denominator which would give invalid discount factor
             if denom <= 0.0 {
@@ -82,7 +83,7 @@ pub fn df_from_yield(
             }
             1.0 / denom
         }
-        YieldCompounding::Annual => {
+        YieldCompounding::Rate(Compounding::Annual) => {
             let base = 1.0 + ytm;
             if base <= 0.0 {
                 return Err(finstack_quant_core::Error::Validation(format!(
@@ -92,8 +93,8 @@ pub fn df_from_yield(
             }
             base.powf(-t)
         }
-        YieldCompounding::Periodic(m) => {
-            let m = m as f64;
+        YieldCompounding::Rate(Compounding::Periodic(m)) => {
+            let m = f64::from(m.get());
             let base = 1.0 + ytm / m;
             if base <= 0.0 {
                 return Err(finstack_quant_core::Error::Validation(format!(
@@ -103,7 +104,7 @@ pub fn df_from_yield(
             }
             base.powf(-m * t)
         }
-        YieldCompounding::Continuous => (-ytm * t).exp(),
+        YieldCompounding::Rate(Compounding::Continuous) => (-ytm * t).exp(),
         YieldCompounding::Street => {
             let m = periods_per_year(bond_frequency)?.max(1.0);
             let base = 1.0 + ytm / m;

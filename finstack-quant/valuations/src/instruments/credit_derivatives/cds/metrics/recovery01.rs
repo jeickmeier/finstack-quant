@@ -65,10 +65,10 @@ fn price_at_bumped_recovery(
 ) -> Result<f64> {
     let base_market = context.curves.as_ref();
     let mut bumped_cds = cds.clone();
-    bumped_cds.protection.recovery_rate = new_recovery;
+    bumped_cds.protection_leg.recovery_rate = new_recovery;
 
-    let credit_id = cds.protection.credit_curve_id.as_str();
-    let discount_id = cds.premium.discount_curve_id.clone();
+    let credit_id = cds.protection_leg.credit_curve_id.as_str();
+    let discount_id = cds.premium_leg.discount_curve_id.clone();
     let hazard = base_market.get_hazard(credit_id)?;
 
     // If the curve was built from par-spread quotes we re-bootstrap it under
@@ -121,7 +121,7 @@ impl MetricCalculator for Recovery01Calculator {
         let as_of = context.as_of;
         let market = context.curves.as_ref();
 
-        let base_recovery = cds.protection.recovery_rate;
+        let base_recovery = cds.protection_leg.recovery_rate;
 
         let bumped_up = (base_recovery + RECOVERY_BUMP).clamp(0.0, 1.0);
         let bumped_down = (base_recovery - RECOVERY_BUMP).clamp(0.0, 1.0);

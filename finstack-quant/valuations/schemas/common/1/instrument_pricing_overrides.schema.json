@@ -249,6 +249,41 @@
         }
       ]
     },
+    "Compounding": {
+      "description": "Compounding convention for interest rates.\n\nUsed to specify how interest rates should be quoted or converted.\nAll variants produce mathematically equivalent discount factors when\napplied consistently.\n\n# Relationship Between Conventions\n\nFor a given discount factor DF at time t, the rates under different\nconventions are related by:\n\n```text\nDF = e^(-r_cc × t)                    [Continuous]\n   = (1 + r_ann)^(-t)                 [Annual]\n   = (1 + r_per/n)^(-n×t)             [Periodic(n)]\n   = 1 / (1 + r_simple × t)           [Simple]\n```\n\n# Ordering of Rates\n\nFor positive rates and t > 0: `r_simple > r_annual > r_continuous`\n(less frequent compounding requires a higher quoted rate for the same DF).",
+      "oneOf": [
+        {
+          "const": "continuous",
+          "description": "Continuous compounding: r = -ln(DF) / t\n\nMost common for internal calculations, curve construction, and\nquantitative finance models. Provides the simplest mathematical\nproperties (additive over time).",
+          "type": "string"
+        },
+        {
+          "const": "annual",
+          "description": "Annual compounding: r = DF^(-1/t) - 1\n\nStandard for many bond markets, particularly UK gilts and\nEuropean government bonds. Also common for Bloomberg zero rate display.",
+          "type": "string"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Periodic compounding with n periods per year: r = n × (DF^(-1/(n×t)) - 1)\n\nCommon values:\n- n=2: Semi-annual (US Treasury, corporate bonds)\n- n=4: Quarterly (some FRNs)\n- n=12: Monthly (rare, some retail products)\n\nNote: Uses [`NonZeroU32`] to prevent division by zero at compile time.",
+          "properties": {
+            "periodic": {
+              "format": "uint32",
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "periodic"
+          ],
+          "type": "object"
+        },
+        {
+          "const": "simple",
+          "description": "Simple interest (no compounding): r = (1/DF - 1) / t\n\nUsed for money market instruments with maturity < 1 year, including:\n- Interbank deposits\n- T-bills and commercial paper\n- SOFR, SONIA, €STR fixings\n\nTypically paired with ACT/360 (USD, EUR) or ACT/365F (GBP) day counts.",
+          "type": "string"
+        }
+      ]
+    },
     "CreditStateVariable": {
       "description": "Which credit metric drives the toggle decision.",
       "oneOf": [
@@ -908,7 +943,7 @@
           "description": "Price/accrual target convention for OAS inversion."
         },
         "oas_quote_compounding": {
-          "$ref": "#/$defs/OasQuoteCompounding",
+          "$ref": "#/$defs/Compounding",
           "default": "continuous",
           "description": "Quote compounding convention for OAS inputs and outputs."
         },
@@ -982,21 +1017,6 @@
         {
           "const": "forward_accrued_clean",
           "description": "Target clean price plus only the forward accrued amount from valuation to settlement.",
-          "type": "string"
-        }
-      ]
-    },
-    "OasQuoteCompounding": {
-      "description": "Quote convention used when reporting or consuming OAS values.",
-      "oneOf": [
-        {
-          "const": "continuous",
-          "description": "Continuous additive spread, matching the tree's internal short-rate shift.",
-          "type": "string"
-        },
-        {
-          "const": "semi_annual",
-          "description": "Semiannual bond-equivalent OAS quote.",
           "type": "string"
         }
       ]

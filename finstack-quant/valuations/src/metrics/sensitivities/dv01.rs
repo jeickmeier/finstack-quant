@@ -548,7 +548,7 @@ mod tests {
 
         // Self-discounting swap: projection curve id == discount curve id.
         let mut swap = InterestRateSwap::example_standard().expect("valid example swap");
-        swap.float.forward_curve_id = CurveId::new("USD-OIS");
+        swap.float_leg.forward_curve_id = CurveId::new("USD-OIS");
 
         let curve = DiscountCurve::builder("USD-OIS")
             .base_date(date!(2024 - 01 - 02))

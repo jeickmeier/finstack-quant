@@ -41,7 +41,6 @@ fn test_forward_swap_rate_includes_first_multicurve_float_period() {
         start: swap_start,
         end: swap_end,
         par_method: None,
-        compounding_simple: true,
         payment_lag_days: 0,
         end_of_month: false,
     };
@@ -70,8 +69,8 @@ fn test_forward_swap_rate_includes_first_multicurve_float_period() {
                     .expect("valid money fixture"),
             )
             .side(PayReceive::Receive)
-            .fixed(fixed(rate))
-            .float(float.clone())
+            .fixed_leg(fixed(rate))
+            .float_leg(float.clone())
             .build()
             .unwrap()
             .value(&market, as_of)

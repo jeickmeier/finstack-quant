@@ -9,7 +9,8 @@ use finstack_quant_core::market_data::term_structures::{DiscountCurve, ForwardCu
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::CurveId;
 use finstack_quant_core::{currency::Currency::USD, math::interp::InterpStyle};
-use finstack_quant_valuations::instruments::rates::basis_swap::{BasisSwap, BasisSwapLeg};
+use finstack_quant_valuations::instruments::rates::basis_swap::BasisSwap;
+use finstack_quant_valuations::instruments::FloatLegSpec;
 use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::metrics::MetricId;
 use rust_decimal::Decimal;
@@ -53,7 +54,9 @@ fn par_spread_zeros_npv() {
     let swap = BasisSwap::new(
         "PAR-TEST",
         Money::new(10_000_000.0, USD).expect("valid money fixture"),
-        BasisSwapLeg {
+        FloatLegSpec {
+            end_of_month: false,
+            fixing_calendar_id: None,
             forward_curve_id: CurveId::new("USD-SOFR-3M"),
             discount_curve_id: CurveId::new("USD-OIS"),
             start: d(2025, 1, 2),
@@ -68,7 +71,9 @@ fn par_spread_zeros_npv() {
             reset_lag_days: 0,
             compounding: Default::default(),
         },
-        BasisSwapLeg {
+        FloatLegSpec {
+            end_of_month: false,
+            fixing_calendar_id: None,
             forward_curve_id: CurveId::new("USD-SOFR-1M"),
             discount_curve_id: CurveId::new("USD-OIS"),
             start: d(2025, 1, 2),
@@ -101,7 +106,9 @@ fn par_spread_zeros_npv() {
     let swap_at_par = BasisSwap::new(
         "PAR-TEST-APPLIED",
         Money::new(10_000_000.0, USD).expect("valid money fixture"),
-        BasisSwapLeg {
+        FloatLegSpec {
+            end_of_month: false,
+            fixing_calendar_id: None,
             forward_curve_id: CurveId::new("USD-SOFR-3M"),
             discount_curve_id: CurveId::new("USD-OIS"),
             start: d(2025, 1, 2),
@@ -116,7 +123,9 @@ fn par_spread_zeros_npv() {
             reset_lag_days: 0,
             compounding: Default::default(),
         },
-        BasisSwapLeg {
+        FloatLegSpec {
+            end_of_month: false,
+            fixing_calendar_id: None,
             forward_curve_id: CurveId::new("USD-SOFR-1M"),
             discount_curve_id: CurveId::new("USD-OIS"),
             start: d(2025, 1, 2),
@@ -153,7 +162,9 @@ fn par_spread_formula_validation() {
     let swap = BasisSwap::new(
         "FORMULA-TEST",
         Money::new(5_000_000.0, USD).expect("valid money fixture"),
-        BasisSwapLeg {
+        FloatLegSpec {
+            end_of_month: false,
+            fixing_calendar_id: None,
             forward_curve_id: CurveId::new("USD-SOFR-3M"),
             discount_curve_id: CurveId::new("USD-OIS"),
             start: d(2025, 1, 2),
@@ -168,7 +179,9 @@ fn par_spread_formula_validation() {
             reset_lag_days: 0,
             compounding: Default::default(),
         },
-        BasisSwapLeg {
+        FloatLegSpec {
+            end_of_month: false,
+            fixing_calendar_id: None,
             forward_curve_id: CurveId::new("USD-SOFR-1M"),
             discount_curve_id: CurveId::new("USD-OIS"),
             start: d(2025, 1, 2),
@@ -228,7 +241,9 @@ fn par_spread_with_existing_spread() {
     let swap = BasisSwap::new(
         "EXISTING-SPREAD-TEST",
         Money::new(10_000_000.0, USD).expect("valid money fixture"),
-        BasisSwapLeg {
+        FloatLegSpec {
+            end_of_month: false,
+            fixing_calendar_id: None,
             forward_curve_id: CurveId::new("USD-SOFR-3M"),
             discount_curve_id: CurveId::new("USD-OIS"),
             start: d(2025, 1, 2),
@@ -243,7 +258,9 @@ fn par_spread_with_existing_spread() {
             reset_lag_days: 0,
             compounding: Default::default(),
         },
-        BasisSwapLeg {
+        FloatLegSpec {
+            end_of_month: false,
+            fixing_calendar_id: None,
             forward_curve_id: CurveId::new("USD-SOFR-1M"),
             discount_curve_id: CurveId::new("USD-OIS"),
             start: d(2025, 1, 2),
@@ -303,7 +320,9 @@ fn par_spread_inverted_curves() {
     let swap = BasisSwap::new(
         "INVERTED-TEST",
         Money::new(10_000_000.0, USD).expect("valid money fixture"),
-        BasisSwapLeg {
+        FloatLegSpec {
+            end_of_month: false,
+            fixing_calendar_id: None,
             forward_curve_id: CurveId::new("USD-SOFR-3M"),
             discount_curve_id: CurveId::new("USD-OIS"),
             start: d(2025, 1, 2),
@@ -318,7 +337,9 @@ fn par_spread_inverted_curves() {
             reset_lag_days: 0,
             compounding: Default::default(),
         },
-        BasisSwapLeg {
+        FloatLegSpec {
+            end_of_month: false,
+            fixing_calendar_id: None,
             forward_curve_id: CurveId::new("USD-SOFR-1M"),
             discount_curve_id: CurveId::new("USD-OIS"),
             start: d(2025, 1, 2),
@@ -360,7 +381,9 @@ fn par_spread_long_maturity() {
     let swap = BasisSwap::new(
         "LONG-MAT-TEST",
         Money::new(10_000_000.0, USD).expect("valid money fixture"),
-        BasisSwapLeg {
+        FloatLegSpec {
+            end_of_month: false,
+            fixing_calendar_id: None,
             forward_curve_id: CurveId::new("USD-SOFR-3M"),
             discount_curve_id: CurveId::new("USD-OIS"),
             start: d(2025, 1, 2),
@@ -375,7 +398,9 @@ fn par_spread_long_maturity() {
             reset_lag_days: 0,
             compounding: Default::default(),
         },
-        BasisSwapLeg {
+        FloatLegSpec {
+            end_of_month: false,
+            fixing_calendar_id: None,
             forward_curve_id: CurveId::new("USD-SOFR-1M"),
             discount_curve_id: CurveId::new("USD-OIS"),
             start: d(2025, 1, 2),
@@ -420,7 +445,9 @@ fn par_spread_sign_convention() {
     let swap = BasisSwap::new(
         "SIGN-TEST",
         Money::new(10_000_000.0, USD).expect("valid money fixture"),
-        BasisSwapLeg {
+        FloatLegSpec {
+            end_of_month: false,
+            fixing_calendar_id: None,
             forward_curve_id: CurveId::new("USD-SOFR-3M"),
             discount_curve_id: CurveId::new("USD-OIS"),
             start: d(2025, 1, 2),
@@ -435,7 +462,9 @@ fn par_spread_sign_convention() {
             reset_lag_days: 0,
             compounding: Default::default(),
         },
-        BasisSwapLeg {
+        FloatLegSpec {
+            end_of_month: false,
+            fixing_calendar_id: None,
             forward_curve_id: CurveId::new("USD-SOFR-1M"),
             discount_curve_id: CurveId::new("USD-OIS"),
             start: d(2025, 1, 2),
@@ -498,7 +527,9 @@ fn incremental_par_spread_sign_convention() {
     let zero_spread_swap = BasisSwap::new(
         "INC-SIGN-ZERO",
         Money::new(10_000_000.0, USD).expect("valid money fixture"),
-        BasisSwapLeg {
+        FloatLegSpec {
+            end_of_month: false,
+            fixing_calendar_id: None,
             forward_curve_id: CurveId::new("USD-SOFR-3M"),
             discount_curve_id: CurveId::new("USD-OIS"),
             start: d(2025, 1, 2),
@@ -513,7 +544,9 @@ fn incremental_par_spread_sign_convention() {
             reset_lag_days: 0,
             compounding: Default::default(),
         },
-        BasisSwapLeg {
+        FloatLegSpec {
+            end_of_month: false,
+            fixing_calendar_id: None,
             forward_curve_id: CurveId::new("USD-SOFR-1M"),
             discount_curve_id: CurveId::new("USD-OIS"),
             start: d(2025, 1, 2),
@@ -547,7 +580,9 @@ fn incremental_par_spread_sign_convention() {
     let swap_below_par = BasisSwap::new(
         "INC-SIGN-BELOW",
         Money::new(10_000_000.0, USD).expect("valid money fixture"),
-        BasisSwapLeg {
+        FloatLegSpec {
+            end_of_month: false,
+            fixing_calendar_id: None,
             forward_curve_id: CurveId::new("USD-SOFR-3M"),
             discount_curve_id: CurveId::new("USD-OIS"),
             start: d(2025, 1, 2),
@@ -562,7 +597,9 @@ fn incremental_par_spread_sign_convention() {
             reset_lag_days: 0,
             compounding: Default::default(),
         },
-        BasisSwapLeg {
+        FloatLegSpec {
+            end_of_month: false,
+            fixing_calendar_id: None,
             forward_curve_id: CurveId::new("USD-SOFR-1M"),
             discount_curve_id: CurveId::new("USD-OIS"),
             start: d(2025, 1, 2),
@@ -608,7 +645,9 @@ fn incremental_par_spread_sign_convention() {
     let swap_above_par = BasisSwap::new(
         "INC-SIGN-ABOVE",
         Money::new(10_000_000.0, USD).expect("valid money fixture"),
-        BasisSwapLeg {
+        FloatLegSpec {
+            end_of_month: false,
+            fixing_calendar_id: None,
             forward_curve_id: CurveId::new("USD-SOFR-3M"),
             discount_curve_id: CurveId::new("USD-OIS"),
             start: d(2025, 1, 2),
@@ -623,7 +662,9 @@ fn incremental_par_spread_sign_convention() {
             reset_lag_days: 0,
             compounding: Default::default(),
         },
-        BasisSwapLeg {
+        FloatLegSpec {
+            end_of_month: false,
+            fixing_calendar_id: None,
             forward_curve_id: CurveId::new("USD-SOFR-1M"),
             discount_curve_id: CurveId::new("USD-OIS"),
             start: d(2025, 1, 2),
@@ -667,7 +708,9 @@ fn incremental_par_spread_sign_convention() {
     let swap_at_par = BasisSwap::new(
         "INC-SIGN-AT-PAR",
         Money::new(10_000_000.0, USD).expect("valid money fixture"),
-        BasisSwapLeg {
+        FloatLegSpec {
+            end_of_month: false,
+            fixing_calendar_id: None,
             forward_curve_id: CurveId::new("USD-SOFR-3M"),
             discount_curve_id: CurveId::new("USD-OIS"),
             start: d(2025, 1, 2),
@@ -682,7 +725,9 @@ fn incremental_par_spread_sign_convention() {
             reset_lag_days: 0,
             compounding: Default::default(),
         },
-        BasisSwapLeg {
+        FloatLegSpec {
+            end_of_month: false,
+            fixing_calendar_id: None,
             forward_curve_id: CurveId::new("USD-SOFR-1M"),
             discount_curve_id: CurveId::new("USD-OIS"),
             start: d(2025, 1, 2),
@@ -719,7 +764,9 @@ fn incremental_par_spread_sign_convention() {
 
 #[test]
 fn zero_notional_par_spread_is_rejected_at_construction() {
-    let leg = |forward_curve_id: &str| BasisSwapLeg {
+    let leg = |forward_curve_id: &str| FloatLegSpec {
+        end_of_month: false,
+        fixing_calendar_id: None,
         forward_curve_id: CurveId::new(forward_curve_id),
         discount_curve_id: CurveId::new("USD-OIS"),
         start: d(2025, 1, 2),

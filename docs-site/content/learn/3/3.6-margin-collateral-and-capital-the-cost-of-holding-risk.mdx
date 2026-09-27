@@ -164,7 +164,7 @@ cds_base=price_instrument(cds,credit_market,AS_OF).value.amount
 # Add a synthetic par quote from the existing curve, retaining every original quote.
 roll=prev_cds_semiannual_roll(AS_OF)
 two_year=copy.deepcopy(instruments("base")["ACME-CDS"])
-two_year["instrument"]["spec"]["premium"].update({"start":prev_cds_date(AS_OF).isoformat(),"end":next_semiannual_cds_maturity(date(roll.year+2,roll.month,roll.day)).isoformat()})
+two_year["instrument"]["spec"]["premium_leg"].update({"start":prev_cds_date(AS_OF).isoformat(),"end":next_semiannual_cds_maturity(date(roll.year+2,roll.month,roll.day)).isoformat()})
 synthetic_2y=price_instrument(json.dumps(two_year),credit_market,AS_OF,metrics=["par_spread"]).get_metric("par_spread")
 credit_plan=calibration_envelope("base")
 quote=copy.deepcopy(next(q for q in credit_plan["market_data"] if q["kind"]=="cds_quote"))
@@ -173,7 +173,7 @@ credit_plan["market_data"].append(quote);credit_plan["plan"]["quote_sets"]["issu
 grid_credit=calibrate(credit_plan).market
 grid_pv=price_instrument(cds,grid_credit,AS_OF).value.amount
 # Quote construction/calibration approximation is separate from finite-difference error.
-print({"synthetic_2Y_spread_bp":synthetic_2y,"maturity":two_year["instrument"]["spec"]["premium"]["end"],"grid_base_drift_usd":grid_pv-cds_base})
+print({"synthetic_2Y_spread_bp":synthetic_2y,"maturity":two_year["instrument"]["spec"]["premium_leg"]["end"],"grid_base_drift_usd":grid_pv-cds_base})
 credit_rows=[]
 for year in [1,2,3,5,10]:
  values=[]
@@ -229,7 +229,7 @@ ngr=max(net_mtm,0)/gross_positive if gross_positive>0 else 0.0
 schedule=margin_api.ScheduleImCalculator.bcbs_standard()
 swap_contract=json.loads(swap)["instrument"]["spec"]
 cds_contract=json.loads(cds)["instrument"]["spec"]
-trade_terms=[{"position":"USD-PAYER-IRS","asset_class":"interest_rate","notional_usd":float(swap_contract["notional"]["amount"]),"start":swap_contract["fixed"]["start"],"end":swap_contract["fixed"]["end"]},{"position":"ACME-CDS","asset_class":"credit","notional_usd":float(cds_contract["notional"]["amount"]),"start":cds_contract["premium"]["start"],"end":cds_contract["premium"]["end"]}]
+trade_terms=[{"position":"USD-PAYER-IRS","asset_class":"interest_rate","notional_usd":float(swap_contract["notional"]["amount"]),"start":swap_contract["fixed_leg"]["start"],"end":swap_contract["fixed_leg"]["end"]},{"position":"ACME-CDS","asset_class":"credit","notional_usd":float(cds_contract["notional"]["amount"]),"start":cds_contract["premium_leg"]["start"],"end":cds_contract["premium_leg"]["end"]}]
 schedule_rows=[{**terms,"maturity_years":(date.fromisoformat(terms["end"])-AS_OF).days/365} for terms in trade_terms]
 
 for row in schedule_rows:row["gross_schedule_im_usd"]=schedule.calculate_for_notional(row["notional_usd"],"USD",row["asset_class"],row["maturity_years"],AS_OF).amount

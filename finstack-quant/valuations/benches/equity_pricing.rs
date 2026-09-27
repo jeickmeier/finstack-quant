@@ -162,7 +162,7 @@ fn equity_trs(tenor_years: i32) -> EquityTotalReturnSwap {
         .id(format!("EQ-TRS-{tenor_years}Y").into())
         .notional(notional)
         .underlying(underlying)
-        .financing(financing)
+        .financing_leg(financing)
         .schedule(schedule)
         .side(PayReceive::Receive)
         .dividend_settlement(

@@ -37,9 +37,10 @@
 //! - Hull, J. (2018). *Options, Futures, and Other Derivatives*, 10th ed.
 //!   Chapter 31: Interest Rate Derivatives: Models of the Short Rate `docs/REFERENCES.md#hull-options-futures`
 
-use super::short_rate_tree::TreeCompounding;
+use super::short_rate_tree::TreeDiscounting;
 use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::math::piecewise::PiecewiseConstantCurve;
+use finstack_quant_core::math::Compounding;
 use finstack_quant_core::validation;
 use finstack_quant_core::{Error, Result};
 
@@ -82,7 +83,7 @@ pub struct HullWhiteTreeConfig {
     ///
     /// Controls whether calibration and backward induction use continuous
     /// `exp(-r*dt)` or periodic compounding. Default: `Continuous`.
-    pub compounding: TreeCompounding,
+    pub compounding: Compounding,
 }
 
 impl Default for HullWhiteTreeConfig {
@@ -92,7 +93,7 @@ impl Default for HullWhiteTreeConfig {
             sigma: 0.01,
             steps: 100,
             max_nodes: None,
-            compounding: TreeCompounding::default(),
+            compounding: Compounding::default(),
         }
     }
 }
@@ -105,7 +106,7 @@ impl HullWhiteTreeConfig {
             sigma,
             steps,
             max_nodes: None,
-            compounding: TreeCompounding::default(),
+            compounding: Compounding::default(),
         }
     }
 
@@ -389,7 +390,7 @@ impl HullWhiteTree {
             for (idx, &(center, (p_up, p_mid, p_down))) in step_branches.iter().enumerate() {
                 let j = j_min + idx as i32;
                 let r_j = j as f64 * dx_curr + alpha[step];
-                let contribution = state_prices[step][idx] * config.compounding.df(r_j, dt_i);
+                let contribution = state_prices[step][idx] * config.compounding.tree_df(r_j, dt_i);
                 next_q[center + 1] += contribution * p_up;
                 next_q[center] += contribution * p_mid;
                 next_q[center - 1] += contribution * p_down;
@@ -640,17 +641,17 @@ impl HullWhiteTree {
     ///
     /// For periodic compounding, a numerical root-find is used since α
     /// enters nonlinearly into the per-node discount factor
-    /// `comp.df(x_j + α, dt)`.
+    /// `comp.tree_df(x_j + α, dt)`.
     fn calibrate_alpha(
         curr_state_prices: &[f64],
         j_min: i32,
         dx: f64,
         dt: f64,
         target_df: f64,
-        compounding: TreeCompounding,
+        compounding: Compounding,
     ) -> Result<f64> {
         match compounding {
-            TreeCompounding::Continuous => {
+            Compounding::Continuous => {
                 let mut weighted_sum = 0.0;
                 for (idx, &q) in curr_state_prices.iter().enumerate() {
                     let j = j_min + idx as i32;
@@ -671,7 +672,7 @@ impl HullWhiteTree {
                     for (idx, &q) in curr_state_prices.iter().enumerate() {
                         let j = j_min + idx as i32;
                         let x_j = j as f64 * dx;
-                        model_df += q * compounding.df(x_j + alpha, dt);
+                        model_df += q * compounding.tree_df(x_j + alpha, dt);
                     }
                     model_df - target_df
                 };
@@ -1015,7 +1016,7 @@ impl HullWhiteTree {
                 let expected_value = p_up * values[center + 1]
                     + p_mid * values[center]
                     + p_down * values[center - 1];
-                let discounted = expected_value * comp.df(r_j, dt_i);
+                let discounted = expected_value * comp.tree_df(r_j, dt_i);
 
                 *scratch_j = intermediate_value_fn(step, idx, discounted);
             }

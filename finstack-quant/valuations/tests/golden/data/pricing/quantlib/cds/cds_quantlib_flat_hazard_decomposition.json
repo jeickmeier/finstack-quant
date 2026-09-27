@@ -35,7 +35,7 @@
           "amount": "10000000",
           "currency": "USD"
         },
-        "premium": {
+        "premium_leg": {
           "calendar_id": "weekends_only",
           "coupon_bp": "100.0",
           "day_count": "act_360",
@@ -48,12 +48,12 @@
           "roll_rule": "cds_imm",
           "start": "2025-09-22"
         },
-        "protection": {
+        "protection_effective_date": "2026-01-05",
+        "protection_leg": {
           "credit_curve_id": "QL-FLAT-HAZARD",
           "recovery_rate": 0.4,
           "settlement_delay": 0
         },
-        "protection_effective_date": "2026-01-05",
         "side": "pay",
         "valuation_convention": "quant_lib_isda_parity"
       },

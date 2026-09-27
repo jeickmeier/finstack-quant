@@ -13,8 +13,9 @@ use finstack_quant_core::{Error, InputError, Result};
 use finstack_quant_valuations::instruments::rates::deposit::Deposit;
 use finstack_quant_valuations::instruments::rates::fra::ForwardRateAgreement;
 use finstack_quant_valuations::instruments::rates::ir_future::{
-    FutureContractSpecs, InterestRateFuture, RateAveragingMethod,
+    FutureContractSpecs, InterestRateFuture,
 };
+use finstack_quant_valuations::instruments::rates::irs::FloatingLegCompounding;
 use finstack_quant_valuations::instruments::rates::irs::{InterestRateSwap, IrsLegConventions};
 use finstack_quant_valuations::instruments::{
     FixedLegSpec, FloatLegSpec, Instrument, ListedFutureTerms, PayReceive, Position,
@@ -292,9 +293,7 @@ pub(crate) fn resolve_rate_quote_dates(
                     )
                 }
             };
-            let fixing = if fut_conv.rate_averaging
-                == finstack_quant_valuations::instruments::RateAveragingMethod::Term
-            {
+            let fixing = if fut_conv.compounding == FloatingLegCompounding::Simple {
                 resolve_fixing_date(period_start, idx_conv)?
             } else {
                 period_end - time::Duration::days(1)
@@ -465,8 +464,8 @@ fn build_future(
     };
     // Term-rate contracts stop carrying value after the last trading day;
     // in-arrears overnight contracts settle at the reference-period end.
-    let settlement_date = match fut_conv.rate_averaging {
-        RateAveragingMethod::Term => expiry_date,
+    let settlement_date = match fut_conv.compounding {
+        FloatingLegCompounding::Simple => expiry_date,
         _ => period_end,
     };
     let terms = ListedFutureTerms::new(
@@ -489,7 +488,7 @@ fn build_future(
         .contract_specs(contract_specs)
         .discount_curve_id(CurveId::new(ctx.require_curve_id("discount")?.to_string()))
         .forward_curve_id(CurveId::new(ctx.require_curve_id("forward")?.to_string()))
-        .rate_averaging(fut_conv.rate_averaging)
+        .compounding(fut_conv.compounding)
         .index_id_opt(Some(fut_conv.index_id.clone()))
         .fixing_calendar_id_opt(Some(fut_conv.calendar_id.clone().into()))
         .attributes(Default::default())
@@ -543,16 +542,14 @@ fn build_swap(
     let rate_decimal = Decimal::try_from(*rate)
         .map_err(|_| finstack_quant_core::InputError::ConversionOverflow)?;
     let compounding = match conv.kind {
-        RateIndexKind::Term => {
-            finstack_quant_valuations::instruments::rates::irs::FloatingLegCompounding::Simple
-        }
+        RateIndexKind::Term => FloatingLegCompounding::Simple,
         RateIndexKind::OvernightRfr => match ctx.ois_compounding_override() {
             // Step-level override takes precedence over the per-index registry
             // default. This lets a calibration step match a vendor-specific
             // convention (e.g. Bloomberg SWPM SOFR uses CompoundedWithRateCutoff)
             // without changing the global registry.
-            Some(override_compounding) => override_compounding.clone(),
-            None => conv.ois_compounding.clone().ok_or_else(|| {
+            Some(override_compounding) => *override_compounding,
+            None => conv.ois_compounding.ok_or_else(|| {
                 Error::Validation(
                     "Overnight RFR index conventions must specify `ois_compounding`".to_string(),
                 )
@@ -561,10 +558,7 @@ fn build_swap(
     };
 
     if matches!(conv.kind, RateIndexKind::OvernightRfr)
-        && matches!(
-            compounding,
-            finstack_quant_valuations::instruments::rates::irs::FloatingLegCompounding::Simple
-        )
+        && matches!(compounding, FloatingLegCompounding::Simple)
     {
         return Err(Error::Validation(
             "OIS swap requires compounded-in-arrears floating compounding".to_string(),
@@ -584,7 +578,6 @@ fn build_swap(
         start,
         end: maturity,
         par_method: None,
-        compounding_simple: true,
         payment_lag_days: leg_conv.payment_lag_days,
         end_of_month,
     };
@@ -611,8 +604,8 @@ fn build_swap(
         .id(InstrumentId::new(id.as_str()))
         .notional(Money::new(ctx.notional(), conv.currency)?)
         .side(PayReceive::Pay)
-        .fixed(fixed)
-        .float(float)
+        .fixed_leg(fixed)
+        .float_leg(float)
         .build()?;
 
     apply_swap_spread(&mut swap, spread_decimal)?;
@@ -636,7 +629,7 @@ fn apply_swap_spread(swap: &mut InterestRateSwap, spread_decimal: &Option<f64>) 
         };
         return Err(finstack_quant_core::InputError::NonFiniteValue { kind }.into());
     }
-    swap.float.spread_bp = Decimal::try_from(spread_bp_f64)
+    swap.float_leg.spread_bp = Decimal::try_from(spread_bp_f64)
         .map_err(|_| finstack_quant_core::InputError::ConversionOverflow)?;
     Ok(())
 }
@@ -695,7 +688,7 @@ mod tests {
 
         // Verify spread_decimal (0.0010) was converted to spread_bp (10.0)
         assert_eq!(
-            swap.float.spread_bp,
+            swap.float_leg.spread_bp,
             rust_decimal::Decimal::try_from(10.0).expect("valid"),
             "Expected spread_decimal of 0.0010 to convert to 10.0 basis points"
         );
@@ -733,7 +726,7 @@ mod tests {
 
         // Default spread_bp should be 0.0
         assert_eq!(
-            swap.float.spread_bp,
+            swap.float_leg.spread_bp,
             rust_decimal::Decimal::ZERO,
             "Expected default spread_bp to be 0.0"
         );
@@ -778,7 +771,7 @@ mod tests {
                 .expect("Expected InterestRateSwap");
 
             assert_eq!(
-                swap.float.spread_bp,
+                swap.float_leg.spread_bp,
                 rust_decimal::Decimal::try_from(expected_bp).expect("valid"),
                 "spread_decimal {} should convert to {} basis points",
                 spread_decimal,
@@ -939,11 +932,11 @@ mod tests {
             .expect("Expected InterestRateSwap");
 
         assert_eq!(
-            swap.fixed.stub,
+            swap.fixed_leg.stub,
             finstack_quant_core::dates::StubKind::ShortFront
         );
         assert_eq!(
-            swap.float.stub,
+            swap.float_leg.stub,
             finstack_quant_core::dates::StubKind::ShortFront
         );
 
@@ -980,9 +973,12 @@ mod tests {
             .downcast_ref::<InterestRateSwap>()
             .expect("Expected InterestRateSwap");
 
-        assert!(swap.fixed.start.month() == time::Month::January && swap.fixed.start.day() == 31);
-        assert!(swap.fixed.end_of_month);
-        assert!(swap.float.end_of_month);
+        assert!(
+            swap.fixed_leg.start.month() == time::Month::January
+                && swap.fixed_leg.start.day() == 31
+        );
+        assert!(swap.fixed_leg.end_of_month);
+        assert!(swap.float_leg.end_of_month);
 
         Ok(())
     }

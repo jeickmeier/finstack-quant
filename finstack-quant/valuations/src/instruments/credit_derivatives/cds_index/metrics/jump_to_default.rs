@@ -152,7 +152,7 @@ impl MetricCalculator for JumpToDefaultCalculator {
             let num_constituents =
                 resolve_constituent_count(index.num_constituents, &index.index_name)?;
             let avg_weight = 1.0 / num_constituents;
-            let lgd = 1.0 - index.protection.recovery_rate;
+            let lgd = 1.0 - index.protection_leg.recovery_rate;
 
             // Single name default impact
             let single_name_jtd = avg_weight * index.notional.amount() * lgd;

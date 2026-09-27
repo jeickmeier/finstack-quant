@@ -56,7 +56,7 @@ impl MetricCalculator for ParSpreadCalculator {
         let tr_pv = trs.pv_total_return_leg(curves, as_of)?;
 
         let float_pv = TrsEngine::pv_financing_float_only(
-            &trs.financing,
+            &trs.financing_leg,
             &trs.schedule,
             trs.notional,
             curves,

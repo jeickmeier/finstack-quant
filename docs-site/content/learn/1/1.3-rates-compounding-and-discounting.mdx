@@ -15,7 +15,7 @@ api:
 - finstack_quant.cashflows.builder.CashFlowSchedule
 - finstack_quant.cashflows.builder.FloatingCouponSpec
 - finstack_quant.cashflows.builder.FloatingRateSpec
-- finstack_quant.cashflows.builder.OvernightCompoundingMethod
+- finstack_quant.cashflows.builder.FloatingLegCompounding
 - finstack_quant.cashflows.builder.ScheduleParams
 - finstack_quant.core.dates.DayCount
 - finstack_quant.core.market_data.DiscountCurve
@@ -135,7 +135,7 @@ The historical fixing series already belongs to the foundation market. The hand 
 import json, math
 from datetime import date
 from decimal import Decimal
-from finstack_quant.cashflows.builder import CashFlowSchedule, FloatingCouponSpec, FloatingRateSpec, OvernightCompoundingMethod, ScheduleParams
+from finstack_quant.cashflows.builder import CashFlowSchedule, FloatingCouponSpec, FloatingRateSpec, FloatingLegCompounding, ScheduleParams
 from finstack_quant.core.dates import DayCount
 from finstack_quant.core.market_data import ForwardCurve, MarketContext
 from finstack_quant.core.money import Money
@@ -144,7 +144,7 @@ from _shared.analyst_book import build_market
 overnight_market = build_market('foundations')
 floating_rate = FloatingRateSpec(forward_curve_id='USD-SOFR', spread_bp=Decimal('0'), reset_frequency='1W',
     reset_lag_days=0, fixing_calendar_id='weekends_only', overnight_basis=DayCount.ACT_360,
-    overnight_compounding=OvernightCompoundingMethod.COMPOUNDED_IN_ARREARS)
+    compounding=FloatingLegCompounding.compounded_in_arrears())
 schedule = (CashFlowSchedule.builder().principal(Money(1_000_000.0, 'USD'), date(2025, 1, 6), date(2025, 1, 13))
     .floating_cf(FloatingCouponSpec(rate_spec=floating_rate,
         schedule=ScheduleParams(frequency='1W', day_count=DayCount.ACT_360, calendar_id='weekends_only')))

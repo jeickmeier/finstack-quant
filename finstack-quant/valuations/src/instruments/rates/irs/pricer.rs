@@ -45,11 +45,11 @@ impl InterestRateSwap {
     /// and observation shift can still require full daily compounding logic.
     pub(crate) fn is_single_curve_ois(&self) -> bool {
         matches!(
-            self.float.compounding,
+            self.float_leg.compounding,
             FloatingLegCompounding::CompoundedInArrears { .. }
                 | FloatingLegCompounding::CompoundedWithObservationShift { .. }
                 | FloatingLegCompounding::CompoundedWithRateCutoff { .. }
-        ) && self.float.forward_curve_id == self.fixed.discount_curve_id
+        ) && self.float_leg.forward_curve_id == self.fixed_leg.discount_curve_id
     }
 
     /// Compute PV of an overnight-indexed (compounded-in-arrears) floating leg.
@@ -142,10 +142,10 @@ impl InterestRateSwap {
             });
 
         let params = crate::instruments::common_impl::pricing::swap_legs::FixedLegParams {
-            rate: decimal_to_f64(self.fixed.rate, "fixed leg rate")?,
-            day_count: self.fixed.day_count,
+            rate: decimal_to_f64(self.fixed_leg.rate, "fixed leg rate")?,
+            day_count: self.fixed_leg.day_count,
             payment_lag_days: 0,
-            calendar_id: self.fixed.calendar_id.clone(),
+            calendar_id: self.fixed_leg.calendar_id.clone(),
         };
 
         // Use shared pricing function
@@ -210,7 +210,7 @@ impl InterestRateSwap {
         // `index_tenor` is diagnostic error-context only, not a FRA window.
         use finstack_quant_core::cashflow::CFKind;
 
-        let disc = context.get_discount(self.fixed.discount_curve_id.as_ref())?;
+        let disc = context.get_discount(self.fixed_leg.discount_curve_id.as_ref())?;
         let float_sched =
             crate::instruments::rates::irs::cashflow::float_leg_schedule_with_curves_as_of(
                 self,
@@ -298,24 +298,25 @@ pub(crate) fn compute_pv_raw(
     context: &MarketContext,
     as_of: Date,
 ) -> Result<f64> {
-    let disc = context.get_discount(irs.fixed.discount_curve_id.as_ref())?;
+    let disc = context.get_discount(irs.fixed_leg.discount_curve_id.as_ref())?;
     let fixings = finstack_quant_core::market_data::fixings::get_fixing_series(
         context,
-        irs.float.forward_curve_id.as_str(),
+        irs.float_leg.forward_curve_id.as_str(),
     )
     .ok();
     let pv_fixed = irs.pv_fixed_leg(disc.as_ref(), as_of)?;
-    let pv_float = match irs.float.compounding {
+    let pv_float = match irs.float_leg.compounding {
         FloatingLegCompounding::Simple => irs.pv_float_leg(context, as_of)?,
+        FloatingLegCompounding::SimpleAverage => return Err(super::simple_average_unsupported()),
         FloatingLegCompounding::CompoundedInArrears { .. }
         | FloatingLegCompounding::CompoundedWithObservationShift { .. }
         | FloatingLegCompounding::CompoundedWithRateCutoff { .. } => {
             let proj = if irs.is_single_curve_ois() {
                 context
-                    .get_forward(irs.float.forward_curve_id.as_ref())
+                    .get_forward(irs.float_leg.forward_curve_id.as_ref())
                     .ok()
             } else {
-                Some(context.get_forward(irs.float.forward_curve_id.as_ref())?)
+                Some(context.get_forward(irs.float_leg.forward_curve_id.as_ref())?)
             };
             irs.pv_compounded_float_leg(disc.as_ref(), proj.as_deref(), as_of, fixings)?
         }
@@ -356,8 +357,8 @@ mod tests {
 
         // Turn it into an OIS-style swap: use overnight compounding and align
         // the floating index with the fixed-leg discount curve.
-        irs.float.compounding = FloatingLegCompounding::sofr();
-        irs.float.forward_curve_id = irs.fixed.discount_curve_id.clone();
+        irs.float_leg.compounding = FloatingLegCompounding::sofr();
+        irs.float_leg.forward_curve_id = irs.fixed_leg.discount_curve_id.clone();
 
         assert!(
             irs.is_single_curve_ois(),
@@ -376,7 +377,7 @@ mod tests {
         ctx: &MarketContext,
         as_of: Date,
     ) -> Result<f64> {
-        let disc = ctx.get_discount(swap.fixed.discount_curve_id.as_ref())?;
+        let disc = ctx.get_discount(swap.fixed_leg.discount_curve_id.as_ref())?;
         let schedule = full_signed_schedule_with_curves(swap, Some(ctx))?;
         schedule.get_flows().iter().try_fold(0.0, |acc, flow| {
             let payment_date = flow.date;
@@ -434,7 +435,7 @@ mod tests {
             .id(InstrumentId::new("OIS-SEASONED"))
             .notional(Money::from((1_000_000_i64, Currency::USD)))
             .side(crate::instruments::rates::irs::PayReceive::Pay)
-            .fixed(
+            .fixed_leg(
                 crate::instruments::common_impl::parameters::legs::FixedLegSpec {
                     discount_curve_id: disc_id.clone(),
                     rate: rust_decimal::Decimal::ZERO,
@@ -446,12 +447,11 @@ mod tests {
                     start,
                     end,
                     par_method: None,
-                    compounding_simple: true,
                     payment_lag_days: 0,
                     end_of_month: false,
                 },
             )
-            .float(
+            .float_leg(
                 crate::instruments::common_impl::parameters::legs::FloatLegSpec {
                     discount_curve_id: disc_id,
                     forward_curve_id: fwd_id,
@@ -522,7 +522,7 @@ mod tests {
             .id(InstrumentId::new("OIS-NO-LOOKBACK"))
             .notional(Money::from((10_000_000_i64, Currency::USD)))
             .side(crate::instruments::rates::irs::PayReceive::Pay)
-            .fixed(
+            .fixed_leg(
                 crate::instruments::common_impl::parameters::legs::FixedLegSpec {
                     discount_curve_id: disc_id.clone(),
                     rate: rust_decimal::Decimal::try_from(0.03).expect("valid"),
@@ -535,12 +535,11 @@ mod tests {
                     start,
                     end,
                     par_method: None,
-                    compounding_simple: true,
                     payment_lag_days: 0,
                     end_of_month: false,
                 },
             )
-            .float(
+            .float_leg(
                 crate::instruments::common_impl::parameters::legs::FloatLegSpec {
                     discount_curve_id: disc_id.clone(),
                     forward_curve_id: disc_id, // single-curve: same id as discount
@@ -568,7 +567,7 @@ mod tests {
         // Cleared-OIS presets (sofr/sonia/...) are plain in-arrears with no
         // lookback; use an explicit FRN-style 2-day lookback to exercise the
         // lookback path without a forward curve.
-        swap_lookback.float.compounding =
+        swap_lookback.float_leg.compounding =
             FloatingLegCompounding::CompoundedInArrears { lookback_days: 2 };
 
         // Both should price without a forward curve present.
@@ -610,7 +609,7 @@ mod tests {
             .id(InstrumentId::new("OIS-MISSING-CAL"))
             .notional(Money::from((10_000_000_i64, Currency::USD)))
             .side(crate::instruments::rates::irs::PayReceive::Pay)
-            .fixed(
+            .fixed_leg(
                 crate::instruments::common_impl::parameters::legs::FixedLegSpec {
                     discount_curve_id: disc_id.clone(),
                     rate: rust_decimal::Decimal::try_from(0.03).expect("valid"),
@@ -623,12 +622,11 @@ mod tests {
                     start,
                     end,
                     par_method: None,
-                    compounding_simple: true,
                     payment_lag_days: 0,
                     end_of_month: false,
                 },
             )
-            .float(
+            .float_leg(
                 crate::instruments::common_impl::parameters::legs::FloatLegSpec {
                     discount_curve_id: disc_id.clone(),
                     forward_curve_id: disc_id,
@@ -693,7 +691,7 @@ mod tests {
             .id(InstrumentId::new("OIS-NO-CALENDAR"))
             .notional(Money::from((10_000_000_i64, Currency::USD)))
             .side(crate::instruments::rates::irs::PayReceive::Pay)
-            .fixed(
+            .fixed_leg(
                 crate::instruments::common_impl::parameters::legs::FixedLegSpec {
                     discount_curve_id: disc_id.clone(),
                     rate: rust_decimal::Decimal::try_from(0.03).expect("valid"),
@@ -706,12 +704,11 @@ mod tests {
                     start,
                     end,
                     par_method: None,
-                    compounding_simple: true,
                     payment_lag_days: 0,
                     end_of_month: false,
                 },
             )
-            .float(
+            .float_leg(
                 crate::instruments::common_impl::parameters::legs::FloatLegSpec {
                     discount_curve_id: disc_id.clone(),
                     forward_curve_id: disc_id,
@@ -781,7 +778,7 @@ mod tests {
             .id(InstrumentId::new("OIS-VALUE-RAW-NO-FWD"))
             .notional(Money::from((10_000_000_i64, Currency::USD)))
             .side(crate::instruments::rates::irs::PayReceive::Pay)
-            .fixed(
+            .fixed_leg(
                 crate::instruments::common_impl::parameters::legs::FixedLegSpec {
                     discount_curve_id: disc_id.clone(),
                     rate: rust_decimal::Decimal::try_from(0.03).expect("valid"),
@@ -793,12 +790,11 @@ mod tests {
                     start,
                     end,
                     par_method: None,
-                    compounding_simple: true,
                     payment_lag_days: 0,
                     end_of_month: false,
                 },
             )
-            .float(
+            .float_leg(
                 crate::instruments::common_impl::parameters::legs::FloatLegSpec {
                     discount_curve_id: disc_id.clone(),
                     forward_curve_id: disc_id,
@@ -854,7 +850,7 @@ mod tests {
             .id(InstrumentId::new("OIS-SCHEDULE-NO-FWD"))
             .notional(Money::from((10_000_000_i64, Currency::USD)))
             .side(crate::instruments::rates::irs::PayReceive::Pay)
-            .fixed(
+            .fixed_leg(
                 crate::instruments::common_impl::parameters::legs::FixedLegSpec {
                     discount_curve_id: disc_id.clone(),
                     rate: rust_decimal::Decimal::try_from(0.03).expect("valid"),
@@ -866,12 +862,11 @@ mod tests {
                     start,
                     end,
                     par_method: None,
-                    compounding_simple: true,
                     payment_lag_days: 0,
                     end_of_month: false,
                 },
             )
-            .float(
+            .float_leg(
                 crate::instruments::common_impl::parameters::legs::FloatLegSpec {
                     discount_curve_id: disc_id.clone(),
                     forward_curve_id: disc_id,
@@ -947,7 +942,7 @@ mod tests {
             .id(InstrumentId::new("OIS-SCHEDULE-SEASONED"))
             .notional(Money::from((1_000_000_i64, Currency::USD)))
             .side(crate::instruments::rates::irs::PayReceive::Pay)
-            .fixed(
+            .fixed_leg(
                 crate::instruments::common_impl::parameters::legs::FixedLegSpec {
                     discount_curve_id: disc_id.clone(),
                     rate: rust_decimal::Decimal::ZERO,
@@ -959,12 +954,11 @@ mod tests {
                     start,
                     end,
                     par_method: None,
-                    compounding_simple: true,
                     payment_lag_days: 0,
                     end_of_month: false,
                 },
             )
-            .float(
+            .float_leg(
                 crate::instruments::common_impl::parameters::legs::FloatLegSpec {
                     discount_curve_id: disc_id,
                     forward_curve_id: fwd_id,
@@ -1036,7 +1030,7 @@ mod tests {
             .id(InstrumentId::new("OIS-IDENTITY-TEST"))
             .notional(Money::from((10_000_000_i64, Currency::USD)))
             .side(crate::instruments::rates::irs::PayReceive::Pay)
-            .fixed(
+            .fixed_leg(
                 crate::instruments::common_impl::parameters::legs::FixedLegSpec {
                     discount_curve_id: disc_id.clone(),
                     rate: rust_decimal::Decimal::ZERO, // Zero fixed rate for this test
@@ -1048,12 +1042,11 @@ mod tests {
                     start,
                     end,
                     par_method: None,
-                    compounding_simple: true,
                     payment_lag_days: 0, // No payment delay for exact identity
                     end_of_month: false,
                 },
             )
-            .float(
+            .float_leg(
                 crate::instruments::common_impl::parameters::legs::FloatLegSpec {
                     discount_curve_id: disc_id.clone(),
                     forward_curve_id: disc_id, // Single-curve: forward = discount

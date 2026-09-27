@@ -232,7 +232,7 @@ pub(crate) fn pv_total_return_leg(
     let params = TotalReturnLegParams {
         schedule: &trs.schedule,
         notional: trs.notional,
-        discount_curve_id: trs.financing.discount_curve_id.as_str(),
+        discount_curve_id: trs.financing_leg.discount_curve_id.as_str(),
         // The notional alone sizes both legs of an FI index TRS.
         contract_size: 1.0,
         initial_level: trs.initial_level,

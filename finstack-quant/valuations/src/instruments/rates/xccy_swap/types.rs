@@ -16,6 +16,7 @@ use crate::cashflow::builder::{schedule::merge_cashflow_schedules, CashFlowSched
 use crate::cashflow::primitives::CFKind;
 use crate::impl_instrument_base;
 use crate::instruments::common_impl::numeric::decimal_to_f64;
+use crate::instruments::common_impl::parameters::legs::FloatLegSpec;
 use crate::instruments::common_impl::pricing::time::relative_df_discount_curve;
 use crate::instruments::PayReceive;
 use finstack_quant_core::currency::Currency;
@@ -172,75 +173,28 @@ impl std::str::FromStr for ResettingSide {
 
 /// One floating leg of an XCCY swap.
 ///
-/// Each leg owns its own dates, discount curve, calendar, and stub conventions,
-/// following the IRS leg-centric pattern.
+/// The leg's schedule, curves, spread, lags and compounding are a canonical
+/// [`FloatLegSpec`]; the leg currency is `notional`'s currency. A reset lag of
+/// `0` fixes on the accrual start; negative reset lags are rejected.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct XccySwapLeg {
-    /// Leg currency.
-    pub currency: Currency,
-    /// Leg notional (in leg currency).
+    /// Leg notional in the leg currency.
     pub notional: Money,
     /// Pay/receive direction for this leg.
     pub side: PayReceive,
-    /// Projection forward curve.
-    pub forward_curve_id: CurveId,
-    /// Discount curve for PV in leg currency.
-    pub discount_curve_id: CurveId,
-    /// Start date of the leg.
-    #[serde(with = "finstack_quant_core::wire::date")]
-    #[cfg_attr(
-        feature = "json-schema",
-        schemars(with = "finstack_quant_core::wire::DateWire")
-    )]
-    pub start: Date,
-    /// End date of the leg.
-    #[serde(with = "finstack_quant_core::wire::date")]
-    #[cfg_attr(
-        feature = "json-schema",
-        schemars(with = "finstack_quant_core::wire::DateWire")
-    )]
-    pub end: Date,
-    /// Coupon frequency.
-    pub frequency: Tenor,
-    /// Accrual day count.
-    pub day_count: DayCount,
-    /// Business day convention for schedule dates.
-    #[serde(default = "crate::serde_defaults::bdc_modified_following")]
-    pub business_day_convention: BusinessDayConvention,
-    /// Stub period handling rule.
-    #[serde(default = "crate::serde_defaults::stub_short_front")]
-    pub stub: StubKind,
-    /// Spread in basis points (e.g. `Decimal::from(5)` = 5bp).
-    #[serde(default)]
-    #[serde(with = "finstack_quant_core::wire::decimal")]
-    #[cfg_attr(
-        feature = "json-schema",
-        schemars(with = "finstack_quant_core::wire::DecimalWire")
-    )]
-    pub spread_bp: Decimal,
-    /// Payment lag in business days after period end (default: 0).
-    #[serde(default)]
-    pub payment_lag_days: i32,
-    /// Calendar identifier for schedule generation and lags.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub calendar_id: Option<finstack_quant_core::types::CalendarId>,
-    /// Reset lag in business days before the accrual start (e.g. 2 for T-2 fixing).
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub reset_lag_days: Option<i32>,
-    /// Allow calendar-day fallback when the calendar cannot be resolved.
-    ///
-    /// When `false` (default), missing calendars are treated as input errors.
-    #[serde(default)]
-    pub allow_calendar_fallback: bool,
-    /// Overnight vs term compounding for this floating leg.
-    ///
-    /// Defaults to Simple (term EURIBOR / term SOFR). Set a compounded
-    /// variant when the forward curve is an overnight RFR such as €STR or
-    /// SOFR OIS.
-    #[serde(default)]
-    pub compounding: crate::instruments::rates::irs::FloatingLegCompounding,
+    /// Floating-leg terms (curves, dates, frequency, spread in bp, lags,
+    /// calendars, compounding).
+    pub leg: FloatLegSpec,
+}
+
+impl XccySwapLeg {
+    /// Reset lag handed to the period builder: `0` fixes on the accrual start
+    /// and is passed as "no separate reset date".
+    pub(crate) fn period_reset_lag(&self) -> Option<i32> {
+        (self.leg.reset_lag_days != 0).then_some(self.leg.reset_lag_days)
+    }
 }
 
 /// Cross-currency floating-for-floating swap.
@@ -268,6 +222,13 @@ pub struct XccySwap {
     pub notional_exchange: NotionalExchange,
     /// PV reporting currency (output currency of `value`/`npv`).
     pub reporting_currency: Currency,
+    /// Allow a weekends-only calendar when either leg's `leg.calendar_id` is
+    /// missing or cannot be resolved.
+    ///
+    /// When `false` (default), missing calendars are treated as input errors.
+    #[builder(default)]
+    #[serde(default)]
+    pub allow_calendar_fallback: bool,
     /// Instrument-owned pricing inputs.
     #[builder(default)]
     #[serde(
@@ -309,6 +270,7 @@ impl XccySwap {
             leg2,
             notional_exchange: NotionalExchange::InitialAndFinal,
             reporting_currency,
+            allow_calendar_fallback: false,
             instrument_pricing_overrides: Default::default(),
             metric_pricing_overrides: Default::default(),
             scenario_pricing_overrides: Default::default(),
@@ -328,46 +290,52 @@ impl XccySwap {
         let end = Date::from_calendar_date(2029, Month::January, 3).expect("Valid example date");
 
         let usd_leg = XccySwapLeg {
-            currency: Currency::USD,
             notional: Money::from((10_000_000_i64, Currency::USD)),
             side: PayReceive::Receive,
-            forward_curve_id: CurveId::new("USD-SOFR-3M"),
-            discount_curve_id: CurveId::new("USD-OIS"),
-            start,
-            end,
-            frequency: Tenor::quarterly(),
-            day_count: DayCount::Act360,
-            business_day_convention: BusinessDayConvention::ModifiedFollowing,
-            stub: StubKind::ShortFront,
-            spread_bp: Decimal::ZERO,
-            payment_lag_days: 0,
-            calendar_id: None,
-            reset_lag_days: None,
-            allow_calendar_fallback: true,
-            compounding: Default::default(),
+            leg: FloatLegSpec {
+                discount_curve_id: CurveId::new("USD-OIS"),
+                forward_curve_id: CurveId::new("USD-SOFR-3M"),
+                spread_bp: Decimal::ZERO,
+                frequency: Tenor::quarterly(),
+                day_count: DayCount::Act360,
+                business_day_convention: BusinessDayConvention::ModifiedFollowing,
+                calendar_id: None,
+                stub: StubKind::ShortFront,
+                reset_lag_days: 0,
+                fixing_calendar_id: None,
+                start,
+                end,
+                compounding: Default::default(),
+                payment_lag_days: 0,
+                end_of_month: false,
+            },
         };
 
         let eur_leg = XccySwapLeg {
-            currency: Currency::EUR,
             notional: Money::from((9_200_000_i64, Currency::EUR)),
             side: PayReceive::Pay,
-            forward_curve_id: CurveId::new("EUR-EURIBOR-3M"),
-            discount_curve_id: CurveId::new("EUR-OIS"),
-            start,
-            end,
-            frequency: Tenor::quarterly(),
-            day_count: DayCount::Act360,
-            business_day_convention: BusinessDayConvention::ModifiedFollowing,
-            stub: StubKind::ShortFront,
-            spread_bp: Decimal::from(10),
-            payment_lag_days: 0,
-            calendar_id: None,
-            reset_lag_days: None,
-            allow_calendar_fallback: true,
-            compounding: Default::default(),
+            leg: FloatLegSpec {
+                discount_curve_id: CurveId::new("EUR-OIS"),
+                forward_curve_id: CurveId::new("EUR-EURIBOR-3M"),
+                spread_bp: Decimal::from(10),
+                frequency: Tenor::quarterly(),
+                day_count: DayCount::Act360,
+                business_day_convention: BusinessDayConvention::ModifiedFollowing,
+                calendar_id: None,
+                stub: StubKind::ShortFront,
+                reset_lag_days: 0,
+                fixing_calendar_id: None,
+                start,
+                end,
+                compounding: Default::default(),
+                payment_lag_days: 0,
+                end_of_month: false,
+            },
         };
 
-        Self::new("XCCY-USDEUR-5Y", usd_leg, eur_leg, Currency::USD)
+        let mut swap = Self::new("XCCY-USDEUR-5Y", usd_leg, eur_leg, Currency::USD);
+        swap.allow_calendar_fallback = true;
+        swap
     }
 
     /// Set notional exchange convention.
@@ -387,10 +355,10 @@ impl XccySwap {
             ResettingSide::Leg1 => (&self.leg2, &self.leg1),
             ResettingSide::Leg2 => (&self.leg1, &self.leg2),
         };
-        if constant.currency == resetting.currency {
+        if constant.notional.currency() == resetting.notional.currency() {
             return Err(finstack_quant_core::Error::Validation(format!(
                 "XccySwap '{}': MtM-reset partition requires different currencies on the two legs; both are {}",
-                self.id, constant.currency
+                self.id, constant.notional.currency()
             )));
         }
         Ok((constant, resetting))
@@ -419,23 +387,28 @@ impl XccySwap {
         // MtM notional exchanges require aligned contractual start/end dates;
         // coupon schedules remain leg-specific.
         crate::instruments::common_impl::pricing::overnight_conventions::reject_simple_overnight(
-            self.leg1.forward_curve_id.as_str(),
-            &self.leg1.compounding,
+            self.leg1.leg.forward_curve_id.as_str(),
+            &self.leg1.leg.compounding,
         )?;
         crate::instruments::common_impl::pricing::overnight_conventions::reject_simple_overnight(
-            self.leg2.forward_curve_id.as_str(),
-            &self.leg2.compounding,
+            self.leg2.leg.forward_curve_id.as_str(),
+            &self.leg2.leg.compounding,
         )?;
 
         if let NotionalExchange::MtmResetting { resetting_side } = &self.notional_exchange {
             // Confirm resetting_side resolves and yields different currencies.
             self.partition_legs(*resetting_side)?;
 
-            if self.leg1.start != self.leg2.start || self.leg1.end != self.leg2.end {
+            if self.leg1.leg.start != self.leg2.leg.start || self.leg1.leg.end != self.leg2.leg.end
+            {
                 return Err(finstack_quant_core::Error::Validation(format!(
                     "XccySwap '{}': MtmResetting requires both legs to share start and end \
                      dates (schedule alignment), got leg1=[{}, {}] leg2=[{}, {}]",
-                    self.id, self.leg1.start, self.leg1.end, self.leg2.start, self.leg2.end
+                    self.id,
+                    self.leg1.leg.start,
+                    self.leg1.leg.end,
+                    self.leg2.leg.start,
+                    self.leg2.leg.end
                 )));
             }
         }
@@ -459,8 +432,8 @@ impl XccySwap {
         &self,
         market: &finstack_quant_core::market_data::context::MarketContext,
     ) -> Result<()> {
-        let needs_fx = self.leg1.currency != self.reporting_currency
-            || self.leg2.currency != self.reporting_currency;
+        let needs_fx = self.leg1.notional.currency() != self.reporting_currency
+            || self.leg2.notional.currency() != self.reporting_currency;
         if !needs_fx {
             return Ok(());
         }
@@ -468,30 +441,30 @@ impl XccySwap {
             finstack_quant_core::Error::Validation(format!(
                 "XccySwap '{}' requires fx_matrix in market context: leg1={} leg2={} reporting={}",
                 self.id.as_str(),
-                self.leg1.currency,
-                self.leg2.currency,
+                self.leg1.notional.currency(),
+                self.leg2.notional.currency(),
                 self.reporting_currency,
             ))
         })?;
 
         for (label, leg) in [("leg1", &self.leg1), ("leg2", &self.leg2)] {
-            if leg.currency == self.reporting_currency {
+            if leg.notional.currency() == self.reporting_currency {
                 continue;
             }
             // Probe FX with a representative payment date (leg.start). Reachability
             // failure here will surface as a precise currency-pair error rather than
             // a generic NotFound from the inner cashflow loop.
             fx.rate(FxQuery::new(
-                leg.currency,
+                leg.notional.currency(),
                 self.reporting_currency,
-                leg.start,
+                leg.leg.start,
             ))
             .map_err(|err| {
                 finstack_quant_core::Error::Validation(format!(
                     "XccySwap '{}' FX path unreachable for {}: {}->{} ({})",
                     self.id.as_str(),
                     label,
-                    leg.currency,
+                    leg.notional.currency(),
                     self.reporting_currency,
                     err,
                 ))
@@ -501,11 +474,21 @@ impl XccySwap {
     }
 
     fn validate_leg(&self, leg: &XccySwapLeg) -> Result<()> {
-        if leg.notional.currency() != leg.currency {
-            return Err(finstack_quant_core::Error::CurrencyMismatch {
-                expected: leg.currency,
-                actual: leg.notional.currency(),
-            });
+        if leg.leg.compounding
+            == crate::instruments::rates::irs::FloatingLegCompounding::SimpleAverage
+        {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "XccySwap '{}' leg.compounding = simple_average is not supported; \
+                 use simple or a compounded_* variant",
+                self.id
+            )));
+        }
+        if leg.leg.fixing_calendar_id.is_some() {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "XccySwap '{}' leg.fixing_calendar_id is not supported; the reset lag \
+                 rolls on leg.calendar_id",
+                self.id
+            )));
         }
         if !leg.notional.amount().is_finite() {
             return Err(finstack_quant_core::Error::Validation(
@@ -517,23 +500,23 @@ impl XccySwap {
                 "XccySwap leg notional must be positive".to_string(),
             ));
         }
-        if leg.payment_lag_days < 0 {
+        if leg.leg.payment_lag_days < 0 {
             return Err(finstack_quant_core::Error::Validation(
                 "XccySwap payment lag must be non-negative".to_string(),
             ));
         }
-        if leg.reset_lag_days.is_some_and(|lag| lag < 0) {
+        if leg.leg.reset_lag_days < 0 {
             return Err(finstack_quant_core::Error::Validation(
                 "XccySwap reset lag must be non-negative".to_string(),
             ));
         }
-        let calendar_resolves = leg.calendar_id.as_deref().is_some_and(|id| {
+        let calendar_resolves = leg.leg.calendar_id.as_deref().is_some_and(|id| {
             crate::cashflow::builder::calendar::resolve_calendar_strict(id).is_ok()
         });
-        if !calendar_resolves && !leg.allow_calendar_fallback {
+        if !calendar_resolves && !self.allow_calendar_fallback {
             return Err(finstack_quant_core::Error::Validation(format!(
                 "XccySwap '{}' leg {} requires a resolvable calendar_id; set allow_calendar_fallback=true to opt into weekends_only",
-                self.id, leg.currency
+                self.id, leg.notional.currency()
             )));
         }
         // Decimal is always finite; no NaN/infinity check required.
@@ -545,20 +528,21 @@ impl XccySwap {
     ///
     /// # Arguments
     ///
-    /// * `leg` - XCCY leg whose `calendar_id` and fallback flag are consulted.
-    pub(crate) fn resolve_leg_calendar_id(leg: &XccySwapLeg) -> Result<&str> {
-        match leg.calendar_id.as_deref() {
+    /// * `leg` - XCCY leg whose `calendar_id` is resolved; the swap-level
+    ///   `allow_calendar_fallback` decides whether an unresolved ID falls back.
+    pub(crate) fn resolve_leg_calendar_id<'a>(&self, leg: &'a XccySwapLeg) -> Result<&'a str> {
+        match leg.leg.calendar_id.as_deref() {
             Some(id)
                 if crate::cashflow::builder::calendar::resolve_calendar_strict(id).is_ok() =>
             {
                 Ok(id)
             }
-            _ if leg.allow_calendar_fallback => {
+            _ if self.allow_calendar_fallback => {
                 Ok(crate::cashflow::builder::calendar::WEEKENDS_ONLY_ID)
             }
             _ => Err(finstack_quant_core::Error::Validation(format!(
                 "XccySwap leg {} requires a resolvable calendar_id; set allow_calendar_fallback=true to opt into weekends_only",
-                leg.currency
+                leg.notional.currency()
             ))),
         }
     }
@@ -569,11 +553,12 @@ impl XccySwap {
     ///
     /// * `leg` - XCCY leg whose resolved calendar ID is turned into a calendar.
     fn resolve_leg_calendar(
+        &self,
         leg: &XccySwapLeg,
     ) -> Result<&'static dyn finstack_quant_core::dates::HolidayCalendar> {
-        crate::cashflow::builder::calendar::resolve_calendar_strict(Self::resolve_leg_calendar_id(
-            leg,
-        )?)
+        crate::cashflow::builder::calendar::resolve_calendar_strict(
+            self.resolve_leg_calendar_id(leg)?,
+        )
     }
 
     /// Build one leg's accrual periods. Single source for both the pricing
@@ -587,16 +572,16 @@ impl XccySwap {
     ) -> Result<Vec<crate::cashflow::builder::periods::SchedulePeriod>> {
         crate::cashflow::builder::periods::build_periods(
             crate::cashflow::builder::periods::BuildPeriodsParams {
-                start: leg.start,
-                end: leg.end,
-                frequency: leg.frequency,
-                stub: leg.stub,
-                business_day_convention: leg.business_day_convention,
+                start: leg.leg.start,
+                end: leg.leg.end,
+                frequency: leg.leg.frequency,
+                stub: leg.leg.stub,
+                business_day_convention: leg.leg.business_day_convention,
                 calendar_id,
-                end_of_month: false,
-                day_count: leg.day_count,
-                payment_lag_days: leg.payment_lag_days,
-                reset_lag_days: leg.reset_lag_days,
+                end_of_month: leg.leg.end_of_month,
+                day_count: leg.leg.day_count,
+                payment_lag_days: leg.leg.payment_lag_days,
+                reset_lag_days: leg.period_reset_lag(),
                 adjust_accrual_dates: false,
                 roll_rule: crate::cashflow::builder::specs::RollRule::None,
             },
@@ -617,6 +602,7 @@ impl XccySwap {
     /// * `projected_fixings` - Optional schedule sink for raw rate observations;
     ///   cashflow construction supplies it, while pure PV calls use `None`.
     pub(crate) fn projected_leg_period(
+        &self,
         leg: &XccySwapLeg,
         fwd: &finstack_quant_core::market_data::term_structures::ForwardCurve,
         fixings: Option<&finstack_quant_core::market_data::scalars::ScalarTimeSeries>,
@@ -631,12 +617,12 @@ impl XccySwap {
         use crate::instruments::common_impl::pricing::time::rate_between_on_dates;
         use crate::instruments::rates::irs::FloatingLegCompounding;
 
-        let projected = if !matches!(leg.compounding, FloatingLegCompounding::Simple) {
-            let calendar = Self::resolve_leg_calendar(leg)?;
+        let projected = if !matches!(leg.leg.compounding, FloatingLegCompounding::Simple) {
+            let calendar = self.resolve_leg_calendar(leg)?;
             let (accrual_start, accrual_end) = adjust_overnight_accrual_boundaries(
                 period.accrual_start,
                 period.accrual_end,
-                leg.business_day_convention,
+                leg.leg.business_day_convention,
                 calendar,
             )?;
             if accrual_end <= accrual_start {
@@ -650,13 +636,13 @@ impl XccySwap {
                 let projection = project_overnight_coupon(OvernightCouponProjectionInput {
                     curve: OvernightProjectionCurve::Forward(fwd),
                     fixings,
-                    fixing_id: leg.forward_curve_id.as_str(),
+                    fixing_id: leg.leg.forward_curve_id.as_str(),
                     as_of,
                     accrual_start,
                     accrual_end,
-                    day_count: leg.day_count,
-                    coupon_frequency: Some(leg.frequency),
-                    compounding: &leg.compounding,
+                    day_count: leg.leg.day_count,
+                    coupon_frequency: Some(leg.leg.frequency),
+                    compounding: &leg.leg.compounding,
                     fixing_calendar: calendar,
                     compounded_spread: 0.0,
                     need_observation_exposures: projected_fixings.is_some(),
@@ -664,7 +650,7 @@ impl XccySwap {
                 if let Some(out) = projected_fixings {
                     out.extend(projection.observation_exposures.iter().map(|observation| {
                         crate::cashflow::fixings::ProjectedFixing {
-                            series_id: format!("FIXING:{}", leg.forward_curve_id),
+                            series_id: format!("FIXING:{}", leg.leg.forward_curve_id),
                             date: observation.observation_start,
                             value: Some(observation.projected_rate),
                         }
@@ -682,7 +668,7 @@ impl XccySwap {
             let forward_rate = if fixing_date < as_of {
                 finstack_quant_core::market_data::fixings::require_fixing_value_exact(
                     fixings,
-                    leg.forward_curve_id.as_str(),
+                    leg.leg.forward_curve_id.as_str(),
                     fixing_date,
                     as_of,
                 )?
@@ -691,7 +677,7 @@ impl XccySwap {
             };
             if let Some(out) = projected_fixings {
                 out.push(crate::cashflow::fixings::ProjectedFixing {
-                    series_id: format!("FIXING:{}", leg.forward_curve_id),
+                    series_id: format!("FIXING:{}", leg.leg.forward_curve_id),
                     date: fixing_date,
                     value: Some(forward_rate),
                 });
@@ -723,19 +709,19 @@ impl XccySwap {
         market: &MarketContext,
         as_of: Date,
     ) -> Result<CashFlowSchedule> {
-        let calendar_id = Self::resolve_leg_calendar_id(leg)?;
+        let calendar_id = self.resolve_leg_calendar_id(leg)?;
         let periods = self.leg_build_periods(leg, calendar_id)?;
-        let fwd = market.get_forward(&leg.forward_curve_id)?;
+        let fwd = market.get_forward(&leg.leg.forward_curve_id)?;
         let fixing_series_id = finstack_quant_core::market_data::fixings::fixing_series_id(
-            leg.forward_curve_id.as_str(),
+            leg.leg.forward_curve_id.as_str(),
         );
         let fixings = market.get_series(&fixing_series_id).ok();
-        let spread = decimal_to_f64(leg.spread_bp, "XccySwap leg spread_bp")? / 10_000.0;
+        let spread = decimal_to_f64(leg.leg.spread_bp, "XccySwap leg spread_bp")? / 10_000.0;
 
         let mut flows = Vec::with_capacity(periods.len());
         let mut projected_fixings = Vec::new();
         for period in &periods {
-            let projected = Self::projected_leg_period(
+            let projected = self.projected_leg_period(
                 leg,
                 fwd.as_ref(),
                 fixings,
@@ -748,7 +734,7 @@ impl XccySwap {
             flows.push(crate::cashflow::primitives::CashFlow::new(
                 period.payment_date,
                 projected.fixing_date.or(period.reset_date),
-                Money::new(amount, leg.currency)?,
+                Money::new(amount, leg.notional.currency())?,
                 crate::cashflow::primitives::CFKind::FloatReset,
                 projected.year_fraction,
                 Some(all_in),
@@ -756,7 +742,7 @@ impl XccySwap {
         }
         Ok(crate::cashflow::traits::schedule_from_classified_flows(
             flows,
-            leg.day_count,
+            leg.leg.day_count,
             crate::cashflow::traits::ScheduleBuildOpts {
                 notional_hint: Some(leg.notional),
                 meta: crate::cashflow::builder::CashFlowMeta {
@@ -769,7 +755,11 @@ impl XccySwap {
 
     fn leg_principal_schedule(&self, leg: &XccySwapLeg, anchor: Date) -> Result<CashFlowSchedule> {
         let mut builder = CashFlowSchedule::builder();
-        let _ = builder.principal(Money::from((0_i64, leg.currency)), anchor, leg.end);
+        let _ = builder.principal(
+            Money::from((0_i64, leg.notional.currency())),
+            anchor,
+            leg.leg.end,
+        );
         // MtmResetting also requires initial AND final exchange; this arm makes the helper non-panicky if accidentally called on an MtM swap. `base_value` dispatches MtmResetting to `pricing_mtm::pv_mtm_reset` before this method is reached.
         if matches!(
             self.notional_exchange,
@@ -777,10 +767,10 @@ impl XccySwap {
         ) {
             let initial_amount = initial_principal_sign(leg.side) * leg.notional.amount();
             let _ = builder.add_principal_event(
-                leg.start,
-                leg.start,
-                Money::from((0_i64, leg.currency)),
-                Some(Money::new(-initial_amount, leg.currency)?),
+                leg.leg.start,
+                leg.leg.start,
+                Money::from((0_i64, leg.notional.currency())),
+                Some(Money::new(-initial_amount, leg.notional.currency())?),
                 CFKind::Notional,
             );
         }
@@ -793,16 +783,17 @@ impl XccySwap {
         ) {
             let final_amount = leg.side.sign() * leg.notional.amount();
             let _ = builder.add_principal_event(
-                leg.end,
-                leg.end,
-                Money::from((0_i64, leg.currency)),
-                Some(Money::new(-final_amount, leg.currency)?),
+                leg.leg.end,
+                leg.leg.end,
+                Money::from((0_i64, leg.notional.currency())),
+                Some(Money::new(-final_amount, leg.notional.currency())?),
                 CFKind::Notional,
             );
         }
-        Ok(builder
-            .build(None)?
-            .with_notional(Notional::par(leg.notional.amount(), leg.currency)?))
+        Ok(builder.build(None)?.with_notional(Notional::par(
+            leg.notional.amount(),
+            leg.notional.currency(),
+        )?))
     }
 
     /// Calculate the present value of a leg and convert that PV at valuation-date spot.
@@ -825,7 +816,7 @@ impl XccySwap {
     ) -> Result<Money> {
         self.validate_leg(leg)?;
 
-        let calendar_id = Self::resolve_leg_calendar_id(leg)?;
+        let calendar_id = self.resolve_leg_calendar_id(leg)?;
         let periods = self.leg_build_periods(leg, calendar_id)?;
 
         if periods.is_empty() {
@@ -838,21 +829,21 @@ impl XccySwap {
         let unsettled_initial = matches!(
             self.notional_exchange,
             NotionalExchange::InitialAndFinal | NotionalExchange::MtmResetting { .. }
-        ) && leg.start > as_of;
+        ) && leg.leg.start > as_of;
         let unsettled_final = matches!(
             self.notional_exchange,
             NotionalExchange::Final
                 | NotionalExchange::InitialAndFinal
                 | NotionalExchange::MtmResetting { .. }
-        ) && leg.end > as_of;
+        ) && leg.leg.end > as_of;
         if !unsettled_coupon && !unsettled_initial && !unsettled_final {
             return Ok(Money::from((0_i64, self.reporting_currency)));
         }
 
-        let disc = context.get_discount(&leg.discount_curve_id)?;
-        let fwd = context.get_forward(&leg.forward_curve_id)?;
+        let disc = context.get_discount(&leg.leg.discount_curve_id)?;
+        let fwd = context.get_forward(&leg.leg.forward_curve_id)?;
         let fixing_series_id = finstack_quant_core::market_data::fixings::fixing_series_id(
-            leg.forward_curve_id.as_str(),
+            leg.leg.forward_curve_id.as_str(),
         );
         let fixings = context.get_series(&fixing_series_id).ok();
         let fx = context.fx();
@@ -861,7 +852,7 @@ impl XccySwap {
 
         // Convert an already-discounted leg-currency PV at valuation-date spot.
         let convert_pv = |amount: f64| -> Result<f64> {
-            if leg.currency == self.reporting_currency {
+            if leg.notional.currency() == self.reporting_currency {
                 return Ok(amount);
             }
             let fx_matrix = fx.ok_or_else(|| {
@@ -871,7 +862,11 @@ impl XccySwap {
             })?;
 
             let rate = fx_matrix
-                .rate(FxQuery::new(leg.currency, self.reporting_currency, as_of))?
+                .rate(FxQuery::new(
+                    leg.notional.currency(),
+                    self.reporting_currency,
+                    as_of,
+                ))?
                 .rate;
             Ok(amount * rate)
         };
@@ -882,9 +877,9 @@ impl XccySwap {
         if matches!(
             self.notional_exchange,
             NotionalExchange::InitialAndFinal | NotionalExchange::MtmResetting { .. }
-        ) && leg.start > as_of
+        ) && leg.leg.start > as_of
         {
-            let df = relative_df_discount_curve(disc.as_ref(), as_of, leg.start)?;
+            let df = relative_df_discount_curve(disc.as_ref(), as_of, leg.leg.start)?;
             let cf_leg_currency = initial_principal_sign(leg.side) * leg.notional.amount() * df;
             let cf_rep = convert_pv(cf_leg_currency)?;
             pv.add(cf_rep);
@@ -896,9 +891,9 @@ impl XccySwap {
             NotionalExchange::Final
                 | NotionalExchange::InitialAndFinal
                 | NotionalExchange::MtmResetting { .. }
-        ) && leg.end > as_of
+        ) && leg.leg.end > as_of
         {
-            let df = relative_df_discount_curve(disc.as_ref(), as_of, leg.end)?;
+            let df = relative_df_discount_curve(disc.as_ref(), as_of, leg.leg.end)?;
             let cf_leg_currency = leg.side.sign() * leg.notional.amount() * df;
             let cf_rep = convert_pv(cf_leg_currency)?;
             pv.add(cf_rep);
@@ -911,7 +906,7 @@ impl XccySwap {
             }
 
             let projected =
-                Self::projected_leg_period(leg, fwd.as_ref(), fixings, &period, as_of, None)?;
+                self.projected_leg_period(leg, fwd.as_ref(), fixings, &period, as_of, None)?;
             // Warn about extremely negative forward rates which may indicate curve issues.
             // Even in negative rate environments (JPY/CHF/EUR), rates below -5% are unusual.
             if projected.rate < EXTREME_NEGATIVE_RATE_THRESHOLD {
@@ -925,7 +920,7 @@ impl XccySwap {
                 );
             }
 
-            let spread = decimal_to_f64(leg.spread_bp, "XccySwap leg spread_bp")? / 10_000.0;
+            let spread = decimal_to_f64(leg.leg.spread_bp, "XccySwap leg spread_bp")? / 10_000.0;
             let coupon = leg.side.sign() * projected.unsigned_coupon(leg.notional.amount(), spread);
 
             // Use relative date-based discounting for numerical stability.
@@ -971,28 +966,28 @@ impl crate::instruments::common_impl::traits::Instrument for XccySwap {
         crate::instruments::common_impl::dependencies::MarketDependencies,
     > {
         let mut deps = crate::instruments::common_impl::dependencies::MarketDependencies::new();
-        deps.add_discount_curve(self.leg1.discount_curve_id.clone());
-        deps.add_discount_curve(self.leg2.discount_curve_id.clone());
-        deps.add_forward_curve(self.leg1.forward_curve_id.clone());
-        deps.add_forward_curve(self.leg2.forward_curve_id.clone());
-        if self.leg1.currency != self.reporting_currency {
-            deps.add_fx_pair(self.leg1.currency, self.reporting_currency);
+        deps.add_discount_curve(self.leg1.leg.discount_curve_id.clone());
+        deps.add_discount_curve(self.leg2.leg.discount_curve_id.clone());
+        deps.add_forward_curve(self.leg1.leg.forward_curve_id.clone());
+        deps.add_forward_curve(self.leg2.leg.forward_curve_id.clone());
+        if self.leg1.notional.currency() != self.reporting_currency {
+            deps.add_fx_pair(self.leg1.notional.currency(), self.reporting_currency);
         }
-        if self.leg2.currency != self.reporting_currency {
-            deps.add_fx_pair(self.leg2.currency, self.reporting_currency);
+        if self.leg2.notional.currency() != self.reporting_currency {
+            deps.add_fx_pair(self.leg2.notional.currency(), self.reporting_currency);
         }
         deps.add_series_id(finstack_quant_core::market_data::fixings::fixing_series_id(
-            self.leg1.forward_curve_id.as_str(),
+            self.leg1.leg.forward_curve_id.as_str(),
         ));
         deps.add_series_id(finstack_quant_core::market_data::fixings::fixing_series_id(
-            self.leg2.forward_curve_id.as_str(),
+            self.leg2.leg.forward_curve_id.as_str(),
         ));
         if let NotionalExchange::MtmResetting { resetting_side } = self.notional_exchange {
             let (constant_leg, resetting_leg) = self.partition_legs(resetting_side)?;
             deps.add_series_id(
                 crate::instruments::rates::xccy_swap::pricing_mtm::mtm_fx_fixing_series_id(
-                    resetting_leg.currency,
-                    constant_leg.currency,
+                    resetting_leg.notional.currency(),
+                    constant_leg.notional.currency(),
                 ),
             );
         }
@@ -1007,11 +1002,11 @@ impl crate::instruments::common_impl::traits::Instrument for XccySwap {
         self.validate_leg(&self.leg1)?;
         self.validate_leg(&self.leg2)?;
 
-        if self.leg1.currency == self.leg2.currency {
+        if self.leg1.notional.currency() == self.leg2.notional.currency() {
             return Err(finstack_quant_core::Error::Validation(format!(
                 "XccySwap legs must have different currencies; both are {}. \
                  Use BasisSwap for same-currency basis trades.",
-                self.leg1.currency
+                self.leg1.notional.currency()
             )));
         }
 
@@ -1041,7 +1036,7 @@ impl crate::instruments::common_impl::traits::Instrument for XccySwap {
     }
 
     fn effective_start_date(&self) -> Option<finstack_quant_core::dates::Date> {
-        Some(self.leg1.start)
+        Some(self.leg1.leg.start)
     }
 
     crate::impl_focused_pricing_overrides!();
@@ -1056,10 +1051,10 @@ impl finstack_quant_cashflows::CashflowScheduleSource for XccySwap {
         self.validate_leg(&self.leg1)?;
         self.validate_leg(&self.leg2)?;
 
-        let anchor = if as_of < self.leg1.start {
+        let anchor = if as_of < self.leg1.leg.start {
             as_of
         } else {
-            self.leg1.start - time::Duration::days(1)
+            self.leg1.leg.start - time::Duration::days(1)
         };
 
         // MtM-reset path: constant leg behaves like a vanilla fixed-notional leg; the
@@ -1088,7 +1083,7 @@ impl finstack_quant_cashflows::CashflowScheduleSource for XccySwap {
         Ok(merge_cashflow_schedules(
             [leg1_schedule, leg1_principal, leg2_schedule, leg2_principal],
             Notional::par(0.0, self.reporting_currency)?,
-            self.leg1.day_count,
+            self.leg1.leg.day_count,
         )
         .with_representation(crate::cashflow::builder::CashflowRepresentation::Projected))
     }
@@ -1101,6 +1096,12 @@ mod tests {
     use crate::instruments::common_impl::traits::Instrument;
     use finstack_quant_core::market_data::term_structures::{DiscountCurve, ForwardCurve};
     use time::Month;
+
+    fn no_fallback_swap() -> XccySwap {
+        let mut swap = XccySwap::example();
+        swap.allow_calendar_fallback = false;
+        swap
+    }
 
     fn date(year: i32, month: Month, day: u8) -> Date {
         Date::from_calendar_date(year, month, day).expect("valid test date")
@@ -1141,48 +1142,53 @@ mod tests {
 
         let start = date(2025, Month::January, 2);
         let end = date(2026, Month::January, 2);
-        let swap = XccySwap::new(
+        let mut swap = XccySwap::new(
             "XCCY-CF",
             XccySwapLeg {
-                currency: Currency::USD,
                 notional: Money::from((1_000_000_i64, Currency::USD)),
                 side: PayReceive::Receive,
-                forward_curve_id: CurveId::new("USD-SOFR-3M"),
-                discount_curve_id: CurveId::new("USD-OIS"),
-                start,
-                end,
-                frequency: Tenor::quarterly(),
-                day_count: DayCount::Act360,
-                business_day_convention: BusinessDayConvention::ModifiedFollowing,
-                stub: StubKind::ShortFront,
-                spread_bp: Decimal::ZERO,
-                payment_lag_days: 0,
-                calendar_id: None,
-                reset_lag_days: None,
-                allow_calendar_fallback: true,
-                compounding: Default::default(),
+                leg: FloatLegSpec {
+                    forward_curve_id: CurveId::new("USD-SOFR-3M"),
+                    discount_curve_id: CurveId::new("USD-OIS"),
+                    start,
+                    end,
+                    frequency: Tenor::quarterly(),
+                    day_count: DayCount::Act360,
+                    business_day_convention: BusinessDayConvention::ModifiedFollowing,
+                    stub: StubKind::ShortFront,
+                    spread_bp: Decimal::ZERO,
+                    payment_lag_days: 0,
+                    calendar_id: None,
+                    reset_lag_days: 0,
+                    compounding: Default::default(),
+                    fixing_calendar_id: None,
+                    end_of_month: false,
+                },
             },
             XccySwapLeg {
-                currency: Currency::EUR,
                 notional: Money::from((900_000_i64, Currency::EUR)),
                 side: PayReceive::Pay,
-                forward_curve_id: CurveId::new("EUR-EURIBOR-3M"),
-                discount_curve_id: CurveId::new("EUR-OIS"),
-                start,
-                end,
-                frequency: Tenor::quarterly(),
-                day_count: DayCount::Act360,
-                business_day_convention: BusinessDayConvention::ModifiedFollowing,
-                stub: StubKind::ShortFront,
-                spread_bp: Decimal::ZERO,
-                payment_lag_days: 0,
-                calendar_id: None,
-                reset_lag_days: None,
-                allow_calendar_fallback: true,
-                compounding: Default::default(),
+                leg: FloatLegSpec {
+                    forward_curve_id: CurveId::new("EUR-EURIBOR-3M"),
+                    discount_curve_id: CurveId::new("EUR-OIS"),
+                    start,
+                    end,
+                    frequency: Tenor::quarterly(),
+                    day_count: DayCount::Act360,
+                    business_day_convention: BusinessDayConvention::ModifiedFollowing,
+                    stub: StubKind::ShortFront,
+                    spread_bp: Decimal::ZERO,
+                    payment_lag_days: 0,
+                    calendar_id: None,
+                    reset_lag_days: 0,
+                    compounding: Default::default(),
+                    fixing_calendar_id: None,
+                    end_of_month: false,
+                },
             },
             Currency::USD,
         );
+        swap.allow_calendar_fallback = true;
 
         let flows = swap
             .dated_cashflows(&market, as_of)
@@ -1240,48 +1246,53 @@ mod tests {
 
         let start = date(2025, Month::January, 2);
         let end = date(2026, Month::January, 2);
-        let swap = XccySwap::new(
+        let mut swap = XccySwap::new(
             "XCCY-NOFX",
             XccySwapLeg {
-                currency: Currency::USD,
                 notional: Money::from((1_000_000_i64, Currency::USD)),
                 side: PayReceive::Receive,
-                forward_curve_id: CurveId::new("USD-SOFR-3M"),
-                discount_curve_id: CurveId::new("USD-OIS"),
-                start,
-                end,
-                frequency: Tenor::quarterly(),
-                day_count: DayCount::Act360,
-                business_day_convention: BusinessDayConvention::ModifiedFollowing,
-                stub: StubKind::ShortFront,
-                spread_bp: Decimal::ZERO,
-                payment_lag_days: 0,
-                calendar_id: None,
-                reset_lag_days: None,
-                allow_calendar_fallback: true,
-                compounding: Default::default(),
+                leg: FloatLegSpec {
+                    forward_curve_id: CurveId::new("USD-SOFR-3M"),
+                    discount_curve_id: CurveId::new("USD-OIS"),
+                    start,
+                    end,
+                    frequency: Tenor::quarterly(),
+                    day_count: DayCount::Act360,
+                    business_day_convention: BusinessDayConvention::ModifiedFollowing,
+                    stub: StubKind::ShortFront,
+                    spread_bp: Decimal::ZERO,
+                    payment_lag_days: 0,
+                    calendar_id: None,
+                    reset_lag_days: 0,
+                    compounding: Default::default(),
+                    fixing_calendar_id: None,
+                    end_of_month: false,
+                },
             },
             XccySwapLeg {
-                currency: Currency::EUR,
                 notional: Money::from((900_000_i64, Currency::EUR)),
                 side: PayReceive::Pay,
-                forward_curve_id: CurveId::new("EUR-EURIBOR-3M"),
-                discount_curve_id: CurveId::new("EUR-OIS"),
-                start,
-                end,
-                frequency: Tenor::quarterly(),
-                day_count: DayCount::Act360,
-                business_day_convention: BusinessDayConvention::ModifiedFollowing,
-                stub: StubKind::ShortFront,
-                spread_bp: Decimal::ZERO,
-                payment_lag_days: 0,
-                calendar_id: None,
-                reset_lag_days: None,
-                allow_calendar_fallback: true,
-                compounding: Default::default(),
+                leg: FloatLegSpec {
+                    forward_curve_id: CurveId::new("EUR-EURIBOR-3M"),
+                    discount_curve_id: CurveId::new("EUR-OIS"),
+                    start,
+                    end,
+                    frequency: Tenor::quarterly(),
+                    day_count: DayCount::Act360,
+                    business_day_convention: BusinessDayConvention::ModifiedFollowing,
+                    stub: StubKind::ShortFront,
+                    spread_bp: Decimal::ZERO,
+                    payment_lag_days: 0,
+                    calendar_id: None,
+                    reset_lag_days: 0,
+                    compounding: Default::default(),
+                    fixing_calendar_id: None,
+                    end_of_month: false,
+                },
             },
             Currency::EUR, // reporting != either leg directly
         );
+        swap.allow_calendar_fallback = true;
 
         let err = swap
             .base_value(&market, as_of)
@@ -1295,6 +1306,17 @@ mod tests {
             msg.contains("fx_matrix") || msg.contains("FX path"),
             "error must explain that FX is required, got: {msg}"
         );
+    }
+
+    #[test]
+    // schema-rejection-test: leg-level allow_calendar_fallback moved to XccySwap.
+    fn xccy_leg_rejects_leg_level_allow_calendar_fallback() {
+        let swap = XccySwap::example();
+        let mut json = serde_json::to_value(&swap.leg1).expect("serialize leg");
+        json["allow_calendar_fallback"] = serde_json::Value::Bool(true);
+        let err = serde_json::from_value::<XccySwapLeg>(json)
+            .expect_err("leg-level allow_calendar_fallback must be rejected");
+        assert!(err.to_string().contains("allow_calendar_fallback"), "{err}");
     }
 
     #[test]
@@ -1330,15 +1352,15 @@ mod tests {
         let (constant, resetting) = swap
             .partition_legs(ResettingSide::Leg2)
             .expect("partition succeeds");
-        assert_eq!(constant.currency, Currency::USD);
-        assert_eq!(resetting.currency, Currency::EUR);
+        assert_eq!(constant.notional.currency(), Currency::USD);
+        assert_eq!(resetting.notional.currency(), Currency::EUR);
 
         // Symmetrically, when leg1 resets, leg2 (EUR) is constant.
         let (constant_l1, resetting_l1) = swap
             .partition_legs(ResettingSide::Leg1)
             .expect("partition succeeds");
-        assert_eq!(constant_l1.currency, Currency::EUR);
-        assert_eq!(resetting_l1.currency, Currency::USD);
+        assert_eq!(constant_l1.notional.currency(), Currency::EUR);
+        assert_eq!(resetting_l1.notional.currency(), Currency::USD);
     }
 
     #[test]
@@ -1348,7 +1370,6 @@ mod tests {
         // pins the guard at the helper level since `partition_legs` is the primary
         // contract used by Task 7's PV path.
         let mut swap = XccySwap::example();
-        swap.leg2.currency = Currency::USD;
         swap.leg2.notional = finstack_quant_core::money::Money::from((1_i64, Currency::USD));
 
         let err = swap
@@ -1371,36 +1392,38 @@ mod tests {
             Date::from_calendar_date(2025, time::Month::February, 3).expect("valid date");
 
         let leg1 = XccySwapLeg {
-            currency: Currency::EUR,
             notional: Money::from((9_200_000_i64, Currency::EUR)),
             side: PayReceive::Receive,
-            forward_curve_id: CurveId::new("EUR-EURIBOR-3M"),
-            discount_curve_id: CurveId::new("EUR-OIS"),
-            start,
-            end,
-            frequency: Tenor::quarterly(),
-            day_count: DayCount::Act360,
-            business_day_convention: BusinessDayConvention::ModifiedFollowing,
-            stub: StubKind::ShortFront,
-            spread_bp: Decimal::ZERO,
-            payment_lag_days: 0,
-            calendar_id: None,
-            reset_lag_days: None,
-            allow_calendar_fallback: true,
-            compounding: Default::default(),
+            leg: FloatLegSpec {
+                forward_curve_id: CurveId::new("EUR-EURIBOR-3M"),
+                discount_curve_id: CurveId::new("EUR-OIS"),
+                start,
+                end,
+                frequency: Tenor::quarterly(),
+                day_count: DayCount::Act360,
+                business_day_convention: BusinessDayConvention::ModifiedFollowing,
+                stub: StubKind::ShortFront,
+                spread_bp: Decimal::ZERO,
+                payment_lag_days: 0,
+                calendar_id: None,
+                reset_lag_days: 0,
+                compounding: Default::default(),
+                fixing_calendar_id: None,
+                end_of_month: false,
+            },
         };
         let mut leg2 = leg1.clone();
-        leg2.currency = Currency::USD;
         leg2.notional = Money::from((10_000_000_i64, Currency::USD));
         leg2.side = PayReceive::Pay;
-        leg2.forward_curve_id = CurveId::new("USD-SOFR-3M");
-        leg2.discount_curve_id = CurveId::new("USD-OIS");
-        leg2.start = start_off; // misaligned start
+        leg2.leg.forward_curve_id = CurveId::new("USD-SOFR-3M");
+        leg2.leg.discount_curve_id = CurveId::new("USD-OIS");
+        leg2.leg.start = start_off; // misaligned start
 
-        let swap = XccySwap::new("MTM-MISALIGNED", leg1, leg2, Currency::USD)
+        let mut swap = XccySwap::new("MTM-MISALIGNED", leg1, leg2, Currency::USD)
             .with_notional_exchange(NotionalExchange::MtmResetting {
                 resetting_side: ResettingSide::Leg1,
             });
+        swap.allow_calendar_fallback = true;
 
         let err = swap
             .validate()
@@ -1420,37 +1443,39 @@ mod tests {
         let end = Date::from_calendar_date(2030, time::Month::January, 2).expect("valid date");
 
         let leg1 = XccySwapLeg {
-            currency: Currency::EUR,
             notional: Money::from((9_200_000_i64, Currency::EUR)),
             side: PayReceive::Receive,
-            forward_curve_id: CurveId::new("EUR-EURIBOR-3M"),
-            discount_curve_id: CurveId::new("EUR-OIS"),
-            start,
-            end,
-            frequency: Tenor::quarterly(),
-            day_count: DayCount::Act360,
-            business_day_convention: BusinessDayConvention::ModifiedFollowing,
-            stub: StubKind::ShortFront,
-            spread_bp: Decimal::ZERO,
-            payment_lag_days: 0,
-            calendar_id: None,
-            reset_lag_days: None,
-            allow_calendar_fallback: true,
-            compounding: Default::default(),
+            leg: FloatLegSpec {
+                forward_curve_id: CurveId::new("EUR-EURIBOR-3M"),
+                discount_curve_id: CurveId::new("EUR-OIS"),
+                start,
+                end,
+                frequency: Tenor::quarterly(),
+                day_count: DayCount::Act360,
+                business_day_convention: BusinessDayConvention::ModifiedFollowing,
+                stub: StubKind::ShortFront,
+                spread_bp: Decimal::ZERO,
+                payment_lag_days: 0,
+                calendar_id: None,
+                reset_lag_days: 0,
+                compounding: Default::default(),
+                fixing_calendar_id: None,
+                end_of_month: false,
+            },
         };
         let mut leg2 = leg1.clone();
-        leg2.currency = Currency::USD;
         leg2.notional = Money::from((10_000_000_i64, Currency::USD));
         leg2.side = PayReceive::Pay;
-        leg2.forward_curve_id = CurveId::new("USD-SOFR-3M");
-        leg2.discount_curve_id = CurveId::new("USD-OIS");
-        leg2.frequency = Tenor::semi_annual();
+        leg2.leg.forward_curve_id = CurveId::new("USD-SOFR-3M");
+        leg2.leg.discount_curve_id = CurveId::new("USD-OIS");
+        leg2.leg.frequency = Tenor::semi_annual();
 
-        let swap = XccySwap::new("MTM-FREQ", leg1, leg2, Currency::USD).with_notional_exchange(
+        let mut swap = XccySwap::new("MTM-FREQ", leg1, leg2, Currency::USD).with_notional_exchange(
             NotionalExchange::MtmResetting {
                 resetting_side: ResettingSide::Leg1,
             },
         );
+        swap.allow_calendar_fallback = true;
 
         swap.validate()
             .expect("each MtM leg owns its coupon frequency");
@@ -1617,27 +1642,30 @@ mod tests {
             unadjusted_end: end,
         };
         let leg = XccySwapLeg {
-            currency: Currency::EUR,
             notional: Money::from((1_000_000_i64, Currency::EUR)),
             side: PayReceive::Pay,
-            forward_curve_id: CurveId::new("EUR-ESTR-OIS"),
-            discount_curve_id: CurveId::new("EUR-OIS"),
-            start,
-            end,
-            frequency: Tenor::quarterly(),
-            day_count: DayCount::Act360,
-            business_day_convention: BusinessDayConvention::ModifiedFollowing,
-            stub: StubKind::ShortFront,
-            spread_bp: Decimal::ZERO,
-            payment_lag_days: 0,
-            calendar_id: Some("target2".into()),
-            reset_lag_days: None,
-            allow_calendar_fallback: false,
-            compounding: compounding.clone(),
+            leg: FloatLegSpec {
+                forward_curve_id: CurveId::new("EUR-ESTR-OIS"),
+                discount_curve_id: CurveId::new("EUR-OIS"),
+                start,
+                end,
+                frequency: Tenor::quarterly(),
+                day_count: DayCount::Act360,
+                business_day_convention: BusinessDayConvention::ModifiedFollowing,
+                stub: StubKind::ShortFront,
+                spread_bp: Decimal::ZERO,
+                payment_lag_days: 0,
+                calendar_id: Some("target2".into()),
+                reset_lag_days: 0,
+                compounding,
+                fixing_calendar_id: None,
+                end_of_month: false,
+            },
         };
         let mut mismatched = period;
         mismatched.accrual_year_fraction = 0.50;
-        let projected = XccySwap::projected_leg_period(&leg, &fwd, None, &mismatched, start, None)
+        let projected = no_fallback_swap()
+            .projected_leg_period(&leg, &fwd, None, &mismatched, start, None)
             .expect("overnight xccy period");
         let calendar = calendar_by_id("target2").expect("target2");
         let expected = project_overnight_coupon(OvernightCouponProjectionInput {
@@ -1696,25 +1724,28 @@ mod tests {
             unadjusted_end: end,
         };
         let mut leg = XccySwapLeg {
-            currency: Currency::EUR,
             notional: Money::from((1_000_000_i64, Currency::EUR)),
             side: PayReceive::Pay,
-            forward_curve_id: CurveId::new("EUR-ESTR-OIS"),
-            discount_curve_id: CurveId::new("EUR-OIS"),
-            start,
-            end,
-            frequency: Tenor::quarterly(),
-            day_count: DayCount::Act360,
-            business_day_convention: BusinessDayConvention::ModifiedFollowing,
-            stub: StubKind::ShortFront,
-            spread_bp: Decimal::ZERO,
-            payment_lag_days: 0,
-            calendar_id: Some("not-a-calendar".into()),
-            reset_lag_days: None,
-            allow_calendar_fallback: false,
-            compounding: FloatingLegCompounding::CompoundedInArrears { lookback_days: 0 },
+            leg: FloatLegSpec {
+                forward_curve_id: CurveId::new("EUR-ESTR-OIS"),
+                discount_curve_id: CurveId::new("EUR-OIS"),
+                start,
+                end,
+                frequency: Tenor::quarterly(),
+                day_count: DayCount::Act360,
+                business_day_convention: BusinessDayConvention::ModifiedFollowing,
+                stub: StubKind::ShortFront,
+                spread_bp: Decimal::ZERO,
+                payment_lag_days: 0,
+                calendar_id: Some("not-a-calendar".into()),
+                reset_lag_days: 0,
+                compounding: FloatingLegCompounding::CompoundedInArrears { lookback_days: 0 },
+                fixing_calendar_id: None,
+                end_of_month: false,
+            },
         };
-        let err = XccySwap::projected_leg_period(&leg, &fwd, None, &period, start, None)
+        let err = no_fallback_swap()
+            .projected_leg_period(&leg, &fwd, None, &period, start, None)
             .expect_err("unresolvable calendar must fail");
         assert!(
             err.to_string().contains("calendar"),
@@ -1732,12 +1763,11 @@ mod tests {
             "EUR-OIS-BAD-CAL",
             leg.clone(),
             {
-                leg.currency = Currency::USD;
                 leg.notional = Money::from((1_000_000_i64, Currency::USD));
-                leg.forward_curve_id = CurveId::new("USD-SOFR-3M");
-                leg.discount_curve_id = CurveId::new("USD-OIS");
-                leg.compounding = FloatingLegCompounding::Simple;
-                leg.calendar_id = Some("usny".into());
+                leg.leg.forward_curve_id = CurveId::new("USD-SOFR-3M");
+                leg.leg.discount_curve_id = CurveId::new("USD-OIS");
+                leg.leg.compounding = FloatingLegCompounding::Simple;
+                leg.leg.calendar_id = Some("usny".into());
                 leg
             },
             Currency::USD,
@@ -1754,8 +1784,8 @@ mod tests {
     #[test]
     fn validate_rejects_simple_compounding_on_overnight_index() {
         let mut swap = XccySwap::example();
-        swap.leg1.forward_curve_id = CurveId::new("USD-SOFR-OIS");
-        swap.leg1.compounding = crate::instruments::rates::irs::FloatingLegCompounding::Simple;
+        swap.leg1.leg.forward_curve_id = CurveId::new("USD-SOFR-OIS");
+        swap.leg1.leg.compounding = crate::instruments::rates::irs::FloatingLegCompounding::Simple;
         let err = swap
             .validate()
             .expect_err("Simple on USD-SOFR-OIS must fail");

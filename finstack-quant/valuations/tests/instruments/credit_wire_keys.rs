@@ -49,7 +49,9 @@ fn assert_rejects_at<T: Serialize + DeserializeOwned>(
 fn cds_premium_retired_coupon_and_imm_keys_are_rejected() {
     let cds = CreditDefaultSwap::example();
     let mut json = serde_json::to_value(&cds).expect("serialize");
-    let premium = json["premium"].as_object_mut().expect("premium object");
+    let premium = json["premium_leg"]
+        .as_object_mut()
+        .expect("premium_leg object");
     let coupon = premium.remove("coupon_bp").expect("coupon_bp present");
     premium.insert("spread_bp".to_string(), coupon);
     let err = serde_json::from_value::<CreditDefaultSwap>(json).expect_err("spread_bp retired");
@@ -57,7 +59,7 @@ fn cds_premium_retired_coupon_and_imm_keys_are_rejected() {
 
     assert_rejects_at(
         &cds,
-        "/premium",
+        "/premium_leg",
         "standard_imm_dates",
         serde_json::json!(true),
     );
@@ -119,7 +121,7 @@ fn structured_credit_tranche_retired_bounds_are_rejected() {
 #[test]
 fn cds_premium_rejects_futures_imm_roll_rule() {
     let mut cds = CreditDefaultSwap::example();
-    cds.premium.roll_rule = RollRule::Imm;
+    cds.premium_leg.roll_rule = RollRule::Imm;
     let err = cds
         .isda_coupon_schedule()
         .expect_err("imm roll grid is not a CDS grid");

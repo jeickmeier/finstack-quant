@@ -61,7 +61,7 @@ pub use closed_form::{
 pub use trees::{
     short_rate_keys, single_factor_equity_state, state_keys, BinomialTree, EvolutionParams,
     HullWhiteTree, HullWhiteTreeConfig, NodeState, ShortRateTree, ShortRateTreeConfig,
-    TreeCompounding, TreeGreeks, TreeModel, TreeValuator,
+    TreeDiscounting, TreeGreeks, TreeModel, TreeValuator,
 };
 pub use types::{ExerciseStyle, OptionMarketParams, OptionType};
 pub use volatility::{

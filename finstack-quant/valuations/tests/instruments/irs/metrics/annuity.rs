@@ -55,7 +55,7 @@ fn create_standard_swap(as_of: Date, end: Date) -> InterestRateSwap {
         id: "IRS_ANNUITY_TEST".into(),
         notional: Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         side: PayReceive::Receive,
-        fixed: finstack_quant_valuations::instruments::FixedLegSpec {
+        fixed_leg: finstack_quant_valuations::instruments::FixedLegSpec {
             discount_curve_id: "USD_OIS".into(),
             rate: rust_decimal::Decimal::try_from(0.05).expect("valid"),
             frequency: Tenor::quarterly(),
@@ -64,13 +64,12 @@ fn create_standard_swap(as_of: Date, end: Date) -> InterestRateSwap {
             calendar_id: None,
             stub: StubKind::None,
             par_method: None,
-            compounding_simple: true,
             payment_lag_days: 0,
             end_of_month: false,
             start: as_of,
             end,
         },
-        float: finstack_quant_valuations::instruments::FloatLegSpec {
+        float_leg: finstack_quant_valuations::instruments::FloatLegSpec {
             discount_curve_id: "USD_OIS".into(),
             forward_curve_id: "USD_LIBOR_3M".into(),
             spread_bp: rust_decimal::Decimal::try_from(0.0).expect("valid"),
@@ -315,7 +314,7 @@ fn test_annuity_semiannual_vs_quarterly() {
     let swap_quarterly = create_standard_swap(as_of, end);
 
     let mut swap_semiannual = create_standard_swap(as_of, end);
-    swap_semiannual.fixed.frequency = Tenor::semi_annual();
+    swap_semiannual.fixed_leg.frequency = Tenor::semi_annual();
 
     let annuity_quarterly = *swap_quarterly
         .price_with_metrics(

@@ -308,7 +308,7 @@
       "type": "basis_swap",
       "instrumentSource": {
         "path": "finstack-quant/valuations/tests/instruments/json_examples/basis_swap.json",
-        "sha256": "e7f3ff9e34e05d7197a9eb3e2f34cabd757d38f81b0ae5f4b329b497e2ec1cc7",
+        "sha256": "63204d6e442e17edc2dd002cb27de1cb19e4457a3f271a24dcc23ae29b3fe5a2",
         "pointer": []
       },
       "instrumentPatches": [],
@@ -384,13 +384,13 @@
       "type": "bermudan_swaption",
       "instrumentSource": {
         "path": "finstack-quant/valuations/tests/fixtures/production_hw.json",
-        "sha256": "dd3700e38f9e26aac495f8255fcdbde029e03d1b0a119af276a8bca8faf43fd5",
+        "sha256": "f5038c3a27c631fa66930e6c7e70e638d8d2f5986af691577b184fa9fac7393e",
         "pointer": ["instrument"]
       },
       "instrumentPatches": [],
       "marketSource": {
         "path": "finstack-quant/valuations/tests/fixtures/production_hw.json",
-        "sha256": "dd3700e38f9e26aac495f8255fcdbde029e03d1b0a119af276a8bca8faf43fd5",
+        "sha256": "f5038c3a27c631fa66930e6c7e70e638d8d2f5986af691577b184fa9fac7393e",
         "pointer": ["market"]
       },
       "marketPatches": [],
@@ -622,7 +622,7 @@
       "type": "cds_index",
       "instrumentSource": {
         "path": "finstack-quant/valuations/tests/instruments/json_examples/cds_index.json",
-        "sha256": "8dd4355609d725430f93d176873439518a28237ab5ccf39bcc30d1d756048e10",
+        "sha256": "a7dbc7382f096a833276718288c8d909d5a3090639801de8a8f6c9fbf9d58674",
         "pointer": []
       },
       "instrumentPatches": [],
@@ -1285,7 +1285,7 @@
       "type": "credit_default_swap",
       "instrumentSource": {
         "path": "finstack-quant/valuations/tests/instruments/json_examples/credit_default_swap.json",
-        "sha256": "60d217f5531cc9ecbc2f3e082303c6cd551fdec34bace3e19936ac655201e57b",
+        "sha256": "2ccaf96011be18f5e48d4dc04a424596a06a0d39cd40e9890b111d96287fa376",
         "pointer": []
       },
       "instrumentPatches": [],
@@ -2164,7 +2164,7 @@
       "type": "interest_rate_future",
       "instrumentSource": {
         "path": "finstack-quant/valuations/tests/instruments/json_examples/interest_rate_future.json",
-        "sha256": "9527ab640857bfe4330888870e3c9573d069f8e139195df50a28de1a66f0b4dc",
+        "sha256": "b697d8a04fb3fb09f680c6f930c3a2586731344b6f25791b4ad9e8c30835fa02",
         "pointer": []
       },
       "instrumentPatches": [],
@@ -2240,7 +2240,7 @@
       "type": "interest_rate_swap",
       "instrumentSource": {
         "path": "finstack-quant/valuations/tests/instruments/json_examples/interest_rate_swap.json",
-        "sha256": "bf2e65a50eeb2cfd7ef593360b04bd95ff6f3ddce2f787756fc3d7df4d9f66af",
+        "sha256": "3e8200638c8e1314619b12e381920cdda0845d92e1b71160e46bfadddd0b23a2",
         "pointer": []
       },
       "instrumentPatches": [],
@@ -2717,7 +2717,7 @@
       "type": "swaption",
       "instrumentSource": {
         "path": "finstack-quant/valuations/tests/instruments/json_examples/swaption.json",
-        "sha256": "13e3087eb5452b2779b8e3ea8e5cd20a97f782897c180a5514769c1d8ad57ef8",
+        "sha256": "bb6c4c8188f0fa04f95748e0be455ccd9bb9c8298964e47b5c15d985b9d37643",
         "pointer": []
       },
       "instrumentPatches": [],
@@ -2843,7 +2843,7 @@
       "type": "trs_equity",
       "instrumentSource": {
         "path": "finstack-quant/valuations/tests/instruments/json_examples/trs_equity.json",
-        "sha256": "f6713a6b200a5317972378814ec41b3d608b19c8b92fe2a3267d9f1d7fc23aa3",
+        "sha256": "f71b1ab6602609d598ed25f7479ee5394e3a3a251454c6f0fc7cab0806176e77",
         "pointer": []
       },
       "instrumentPatches": [],
@@ -2881,7 +2881,7 @@
       "type": "trs_fixed_income_index",
       "instrumentSource": {
         "path": "finstack-quant/valuations/tests/instruments/json_examples/trs_fixed_income_index.json",
-        "sha256": "4b6394a0edd9a5efe25a6d1d54d831b9d5c55b8141ad7a83507b6fdac786b80d",
+        "sha256": "8876f21c0839eb98fe8ecdfd022289a78cfdd0d9fc3b69ea450fc9558f215c05",
         "pointer": []
       },
       "instrumentPatches": [],
@@ -3033,7 +3033,7 @@
       "type": "xccy_swap",
       "instrumentSource": {
         "path": "finstack-quant/valuations/tests/instruments/json_examples/xccy_swap.json",
-        "sha256": "0c2256ac2c615aad8e10a10773a746096303e12ac1551e69dace9a6ad740e5de",
+        "sha256": "2f371805375b4b767e0058c879ee7eab6241c2cd5c4204544bd8e2d064789b2f",
         "pointer": []
       },
       "instrumentPatches": [],
@@ -3051,10 +3051,10 @@
         "marketHistory": null
       },
       "edit": {
-        "path": ["instrument", "spec", "leg2", "spread_bp"],
+        "path": ["instrument", "spec", "leg2", "leg", "spread_bp"],
         "from": "10",
         "to": "20",
-        "description": "Change leg2.spread_bp from 10 to 20; native present value must change."
+        "description": "Change leg2.leg.spread_bp from 10 to 20; native present value must change."
       },
       "reference": {
         "baseline": {

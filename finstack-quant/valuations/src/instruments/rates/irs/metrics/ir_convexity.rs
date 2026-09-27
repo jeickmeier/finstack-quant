@@ -123,12 +123,12 @@ impl MetricCalculator for CrossGammaCalculator {
         )?
         .rate_bump_bp;
 
-        if irs.fixed.discount_curve_id == irs.float.forward_curve_id {
+        if irs.fixed_leg.discount_curve_id == irs.float_leg.forward_curve_id {
             return Ok(0.0);
         }
 
-        let disc_id = &irs.fixed.discount_curve_id;
-        let fwd_id = &irs.float.forward_curve_id;
+        let disc_id = &irs.fixed_leg.discount_curve_id;
+        let fwd_id = &irs.float_leg.forward_curve_id;
 
         let disc_exists = context.curves.get_discount(disc_id.as_str()).is_ok();
         let fwd_exists = context.curves.get_forward(fwd_id.as_str()).is_ok();

@@ -60,14 +60,14 @@ const promotedTerms: Record<string, PromotedTerm> = {
     kind: "market-quote",
   },
   credit_default_swap: {
-    path: "instrument.spec.premium.coupon_bp",
+    path: "instrument.spec.premium_leg.coupon_bp",
     label: "Running coupon",
     unit: "bp",
     hint: "Contract premium; par spread appears in Results.",
     kind: "contract-term",
   },
   interest_rate_swap: {
-    path: "instrument.spec.fixed.rate",
+    path: "instrument.spec.fixed_leg.rate",
     label: "Fixed coupon",
     unit: "decimal rate",
     hint: "0.04 = 4%; par rate appears in Results.",
@@ -82,7 +82,7 @@ const promotedTerms: Record<string, PromotedTerm> = {
     kind: "nullable-term",
   },
   xccy_swap: {
-    path: "instrument.spec.leg2.spread_bp",
+    path: "instrument.spec.leg2.leg.spread_bp",
     label: "Leg 2 spread",
     unit: "bp",
     hint: "Contract spread on the second leg.",

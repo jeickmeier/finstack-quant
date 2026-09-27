@@ -61,8 +61,8 @@ pub(super) fn vector_at(
 
 pub use amortization::{AmortizationSpec, Notional};
 pub use coupon::{
-    CouponType, FixedCouponSpec, FloatingCouponSpec, FloatingRateFallback, FloatingRateSpec,
-    OvernightCompoundingMethod, OvernightIndexConstraintApplication, StepUpCouponSpec,
+    CouponType, FixedCouponSpec, FloatingCouponSpec, FloatingLegCompounding, FloatingRateFallback,
+    FloatingRateSpec, OvernightIndexConstraintApplication, StepUpCouponSpec,
 };
 pub use default::{DefaultCurve, DefaultModelSpec};
 pub use fees::{evaluate_fee_tiers, FeeAccrualBasis, FeeBase, FeeSpec, FeeTier};

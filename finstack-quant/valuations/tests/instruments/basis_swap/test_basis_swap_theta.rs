@@ -8,7 +8,8 @@ use finstack_quant_core::market_data::term_structures::{DiscountCurve, ForwardCu
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::CurveId;
 use finstack_quant_core::{currency::Currency::USD, math::interp::InterpStyle};
-use finstack_quant_valuations::instruments::rates::basis_swap::{BasisSwap, BasisSwapLeg};
+use finstack_quant_valuations::instruments::rates::basis_swap::BasisSwap;
+use finstack_quant_valuations::instruments::FloatLegSpec;
 use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::metrics::MetricId;
 use rust_decimal::Decimal;
@@ -109,7 +110,9 @@ fn make_swap(id: &str, start: Date, end: Date, spread_bp: Decimal) -> BasisSwap 
     BasisSwap::new(
         id,
         Money::new(10_000_000.0, USD).expect("valid money fixture"),
-        BasisSwapLeg {
+        FloatLegSpec {
+            end_of_month: false,
+            fixing_calendar_id: None,
             forward_curve_id: CurveId::new("USD-SOFR-3M"),
             discount_curve_id: CurveId::new("USD-OIS"),
             start,
@@ -124,7 +127,9 @@ fn make_swap(id: &str, start: Date, end: Date, spread_bp: Decimal) -> BasisSwap 
             reset_lag_days: 0,
             compounding: Default::default(),
         },
-        BasisSwapLeg {
+        FloatLegSpec {
+            end_of_month: false,
+            fixing_calendar_id: None,
             forward_curve_id: CurveId::new("USD-SOFR-1M"),
             discount_curve_id: CurveId::new("USD-OIS"),
             start,

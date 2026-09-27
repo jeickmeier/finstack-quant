@@ -763,17 +763,17 @@ impl PyCDSIndex {
 
     /// Premium leg specification.
     #[getter]
-    fn premium(&self) -> PyPremiumLegSpec {
+    fn premium_leg(&self) -> PyPremiumLegSpec {
         PyPremiumLegSpec {
-            inner: self.inner.premium.clone(),
+            inner: self.inner.premium_leg.clone(),
         }
     }
 
     /// Protection leg specification.
     #[getter]
-    fn protection(&self) -> PyProtectionLegSpec {
+    fn protection_leg(&self) -> PyProtectionLegSpec {
         PyProtectionLegSpec {
-            inner: self.inner.protection.clone(),
+            inner: self.inner.protection_leg.clone(),
         }
     }
 
@@ -837,8 +837,8 @@ impl PyCDSIndex {
             self.inner.series,
             enum_to_py_string(&self.inner.side).unwrap_or_default(),
             money_repr(self.inner.notional),
-            opt_repr(self.inner.premium.coupon_bp.to_f64()),
-            date_repr(self.inner.premium.end),
+            opt_repr(self.inner.premium_leg.coupon_bp.to_f64()),
+            date_repr(self.inner.premium_leg.end),
             enum_to_py_string(&self.inner.pricing).unwrap_or_default(),
         )
     }
@@ -1067,7 +1067,7 @@ impl PyCDSIndexBuilder {
     /// CDSIndexBuilder
     ///     ``self``, for chaining.
     #[pyo3(text_signature = "($self, value)")]
-    fn premium<'py>(
+    fn premium_leg<'py>(
         mut slf: PyRefMut<'py, Self>,
         value: PyRef<'_, PyPremiumLegSpec>,
     ) -> PyResult<PyRefMut<'py, Self>> {
@@ -1078,8 +1078,8 @@ impl PyCDSIndexBuilder {
             date_repr(leg.start),
             date_repr(leg.end)
         );
-        cds_index_set!(slf, premium, shown, |b: CdsIndexBuilderInner| b
-            .premium(leg))
+        cds_index_set!(slf, premium_leg, shown, |b: CdsIndexBuilderInner| b
+            .premium_leg(leg))
     }
 
     /// Set the protection leg specification.
@@ -1094,7 +1094,7 @@ impl PyCDSIndexBuilder {
     /// CDSIndexBuilder
     ///     ``self``, for chaining.
     #[pyo3(text_signature = "($self, value)")]
-    fn protection<'py>(
+    fn protection_leg<'py>(
         mut slf: PyRefMut<'py, Self>,
         value: PyRef<'_, PyProtectionLegSpec>,
     ) -> PyResult<PyRefMut<'py, Self>> {
@@ -1104,8 +1104,8 @@ impl PyCDSIndexBuilder {
             leg.credit_curve_id.as_str(),
             leg.recovery_rate
         );
-        cds_index_set!(slf, protection, shown, |b: CdsIndexBuilderInner| b
-            .protection(leg))
+        cds_index_set!(slf, protection_leg, shown, |b: CdsIndexBuilderInner| b
+            .protection_leg(leg))
     }
 
     /// Set the pricing aggregation mode.

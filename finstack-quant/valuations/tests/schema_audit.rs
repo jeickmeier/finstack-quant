@@ -781,10 +781,10 @@ mod generated_schema_contract {
             .expect("compile instrument union schema");
 
         for (fixture, pointer) in [
-            ("interest_rate_swap", "/instrument/spec/fixed"),
-            ("interest_rate_swap", "/instrument/spec/float"),
-            ("credit_default_swap", "/instrument/spec/premium"),
-            ("credit_default_swap", "/instrument/spec/protection"),
+            ("interest_rate_swap", "/instrument/spec/fixed_leg"),
+            ("interest_rate_swap", "/instrument/spec/float_leg"),
+            ("credit_default_swap", "/instrument/spec/premium_leg"),
+            ("credit_default_swap", "/instrument/spec/protection_leg"),
             ("convertible_bond", "/instrument/spec/conversion"),
             ("commodity_forward", "/instrument/spec"),
         ] {

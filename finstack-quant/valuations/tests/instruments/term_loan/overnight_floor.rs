@@ -5,7 +5,7 @@
 
 use finstack_quant_cashflows::builder::specs::CouponType;
 use finstack_quant_cashflows::builder::{
-    FloatingRateSpec, OvernightCompoundingMethod, OvernightIndexConstraintApplication,
+    FloatingLegCompounding, FloatingRateSpec, OvernightIndexConstraintApplication,
 };
 use finstack_quant_cashflows::CashflowProvider;
 use finstack_quant_core::cashflow::CFKind;
@@ -64,7 +64,7 @@ fn spec(application: OvernightIndexConstraintApplication) -> FloatingRateSpec {
         index_tenor: None,
         reset_lag_days: 0,
         fixing_calendar_id: Some("usny".into()),
-        overnight_compounding: Some(OvernightCompoundingMethod::CompoundedInArrears),
+        compounding: Some(FloatingLegCompounding::CompoundedInArrears { lookback_days: 0 }),
         overnight_basis: Some(DayCount::Act360),
         fallback: Default::default(),
     }

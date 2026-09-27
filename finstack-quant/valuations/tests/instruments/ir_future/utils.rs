@@ -5,8 +5,9 @@ use finstack_quant_core::dates::{Date, DayCount};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::{DiscountCurve, ForwardCurve};
 use finstack_quant_valuations::instruments::rates::ir_future::{
-    FutureContractSpecs, InterestRateFuture, RateAveragingMethod,
+    FutureContractSpecs, InterestRateFuture,
 };
+use finstack_quant_valuations::instruments::rates::irs::FloatingLegCompounding;
 pub use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::instruments::{ListedFutureTerms, Position};
 use time::macros::date;
@@ -79,7 +80,7 @@ pub fn create_standard_future(start: Date, end: Date) -> InterestRateFuture {
         },
         discount_curve_id: "USD_OIS".into(),
         forward_curve_id: "USD_LIBOR_3M".into(),
-        rate_averaging: RateAveragingMethod::Term,
+        compounding: FloatingLegCompounding::Simple,
         index_id: None,
         fixing_calendar_id: None,
         vol_surface_id: None,
@@ -113,7 +114,7 @@ pub fn create_custom_future(
         },
         discount_curve_id: "USD_OIS".into(),
         forward_curve_id: "USD_LIBOR_3M".into(),
-        rate_averaging: RateAveragingMethod::Term,
+        compounding: FloatingLegCompounding::Simple,
         index_id: None,
         fixing_calendar_id: None,
         vol_surface_id: None,

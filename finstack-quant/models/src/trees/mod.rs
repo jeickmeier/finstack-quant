@@ -18,7 +18,7 @@ pub mod two_factor_rates_credit;
 pub use binomial_tree::{BinomialTree, TreeType};
 pub use hull_white_tree::{HullWhiteTree, HullWhiteTreeConfig};
 pub use short_rate_tree::{
-    short_rate_keys, ShortRateModel, ShortRateTree, ShortRateTreeConfig, TreeCompounding,
+    short_rate_keys, ShortRateModel, ShortRateTree, ShortRateTreeConfig, TreeDiscounting,
     DEFAULT_NORMAL_VOL,
 };
 pub use tree_framework::{

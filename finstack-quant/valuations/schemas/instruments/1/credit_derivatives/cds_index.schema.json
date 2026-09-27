@@ -66,7 +66,7 @@
             "null"
           ]
         },
-        "premium": {
+        "premium_leg": {
           "$ref": "#/$defs/PremiumLegSpec",
           "description": "Premium leg specification (coupon schedule and discounting)"
         },
@@ -74,7 +74,7 @@
           "$ref": "#/$defs/IndexPricing",
           "description": "Pricing aggregation mode"
         },
-        "protection": {
+        "protection_leg": {
           "$ref": "#/$defs/ProtectionLegSpec",
           "description": "Protection leg specification (credit curve and settlement)"
         },
@@ -127,8 +127,8 @@
         "index_factor",
         "side",
         "convention",
-        "premium",
-        "protection",
+        "premium_leg",
+        "protection_leg",
         "pricing",
         "constituents"
       ],
@@ -1001,7 +1001,7 @@
             "currency": "USD"
           },
           "num_constituents": 125,
-          "premium": {
+          "premium_leg": {
             "business_day_convention": "modified_following",
             "calendar_id": "nyse",
             "coupon_bp": "60",
@@ -1017,7 +1017,7 @@
             "stub": "short_front"
           },
           "pricing": "single_curve",
-          "protection": {
+          "protection_leg": {
             "credit_curve_id": "CDX.NA.IG.HAZARD",
             "recovery_rate": 0.4,
             "settlement_delay": 3

@@ -351,7 +351,7 @@
         },
         "side": "pay",
         "convention": "isda_na",
-        "premium": {
+        "premium_leg": {
           "start": "2026-04-30",
           "end": "2031-04-30",
           "frequency": {
@@ -364,7 +364,7 @@
           "discount_curve_id": "USD-OIS",
           "roll_rule": "cds_imm"
         },
-        "protection": {
+        "protection_leg": {
           "credit_curve_id": "ACME-HZD",
           "recovery_rate": 0.4,
           "settlement_delay": 2

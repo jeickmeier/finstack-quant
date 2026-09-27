@@ -408,7 +408,7 @@ pub(crate) fn generate_cashflows(
                     index_tenor: spec.index_tenor,
                     reset_lag_days: spec.reset_lag_days,
                     fixing_calendar_id: spec.fixing_calendar_id.clone(),
-                    overnight_compounding: spec.overnight_compounding,
+                    compounding: spec.compounding,
                     overnight_basis: spec.overnight_basis,
                     fallback: spec.fallback.clone(),
                 },

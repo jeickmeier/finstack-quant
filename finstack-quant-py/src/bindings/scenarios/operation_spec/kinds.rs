@@ -132,28 +132,126 @@ scenario_enum!(
     }
 );
 
-scenario_enum!(
-    /// Compounding convention for rate-extraction operations.
-    ///
-    /// Examples
-    /// --------
-    /// >>> from finstack_quant.scenarios import Compounding
-    /// >>> Compounding("annual") == Compounding.annual()
-    /// True
-    "Compounding", PyCompounding, Compounding,
-    "simple, continuous, annual, semi_annual, quarterly, monthly",
-    {
-        /// Simple interest (no compounding).
-        simple => Simple,
-        /// Continuous compounding (default).
-        continuous => Continuous,
-        /// Annual compounding.
-        annual => Annual,
-        /// Semi-annual compounding.
-        semi_annual => SemiAnnual,
-        /// Quarterly compounding.
-        quarterly => Quarterly,
-        /// Monthly compounding.
-        monthly => Monthly,
+/// Accepted compounding labels, as parsed by core `Compounding::from_str`.
+pub(super) const COMPOUNDING_LABELS: &str =
+    "simple, continuous, annual, semi_annual, quarterly, monthly";
+
+/// Parse a compounding label via the canonical core `FromStr`.
+pub(super) fn parse_compounding(label: &str) -> PyResult<Compounding> {
+    label.parse::<Compounding>().map_err(|_| {
+        crate::errors::value_error(format!(
+            "Unknown Compounding label {label:?}; expected one of: {COMPOUNDING_LABELS}"
+        ))
+    })
+}
+
+/// Compounding convention for rate-extraction operations.
+///
+/// Wraps the canonical core ``Compounding`` (the scenario wire form is
+/// ``"continuous"``, ``"simple"``, ``"annual"`` or ``{"periodic": n}``).
+///
+/// Examples
+/// --------
+/// >>> from finstack_quant.scenarios import Compounding
+/// >>> Compounding("annual") == Compounding.annual()
+/// True
+#[pyclass(
+    name = "Compounding",
+    module = "finstack_quant.scenarios",
+    eq,
+    hash,
+    frozen,
+    from_py_object
+)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub struct PyCompounding {
+    pub(crate) inner: Compounding,
+}
+
+#[pymethods]
+impl PyCompounding {
+    #[new]
+    fn new(label: &str) -> PyResult<Self> {
+        Ok(Self {
+            inner: parse_compounding(label)?,
+        })
     }
-);
+
+    /// Simple interest (no compounding).
+    #[classmethod]
+    fn simple(_cls: &Bound<'_, PyType>) -> Self {
+        Self {
+            inner: Compounding::Simple,
+        }
+    }
+
+    /// Continuous compounding (default).
+    #[classmethod]
+    fn continuous(_cls: &Bound<'_, PyType>) -> Self {
+        Self {
+            inner: Compounding::Continuous,
+        }
+    }
+
+    /// Annual compounding.
+    #[classmethod]
+    fn annual(_cls: &Bound<'_, PyType>) -> Self {
+        Self {
+            inner: Compounding::Annual,
+        }
+    }
+
+    /// Semi-annual compounding.
+    #[classmethod]
+    fn semi_annual(_cls: &Bound<'_, PyType>) -> Self {
+        Self {
+            inner: Compounding::SEMI_ANNUAL,
+        }
+    }
+
+    /// Quarterly compounding.
+    #[classmethod]
+    fn quarterly(_cls: &Bound<'_, PyType>) -> Self {
+        Self {
+            inner: Compounding::QUARTERLY,
+        }
+    }
+
+    /// Monthly compounding.
+    #[classmethod]
+    fn monthly(_cls: &Bound<'_, PyType>) -> Self {
+        Self {
+            inner: Compounding::MONTHLY,
+        }
+    }
+
+    /// Variant name, e.g. ``"SemiAnnual"``.
+    #[getter]
+    fn name(&self) -> String {
+        compounding_name(self.inner)
+    }
+
+    /// Canonical label, e.g. ``"semi_annual"``.
+    #[getter]
+    fn value(&self) -> String {
+        self.inner.to_string()
+    }
+
+    fn __repr__(&self) -> String {
+        format!("Compounding.{}", compounding_name(self.inner))
+    }
+}
+
+fn compounding_name(value: Compounding) -> String {
+    match value {
+        Compounding::Simple => "Simple".to_string(),
+        Compounding::Continuous => "Continuous".to_string(),
+        Compounding::Annual => "Annual".to_string(),
+        Compounding::Periodic(n) => match n.get() {
+            2 => "SemiAnnual".to_string(),
+            4 => "Quarterly".to_string(),
+            12 => "Monthly".to_string(),
+            other => format!("Periodic({other})"),
+        },
+    }
+}

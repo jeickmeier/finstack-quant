@@ -40,7 +40,7 @@ fn test_fi_index_trs_builder_custom_params() {
     // Assert
     assert_eq!(trs.id.as_str(), "CUSTOM-FI-TRS-001");
     assert_eq!(trs.notional.amount(), 25_000_000.0);
-    assert_eq!(trs.financing.spread_bp, Decimal::from(150));
+    assert_eq!(trs.financing_leg.spread_bp, Decimal::from(150));
     assert_eq!(trs.side, PayReceive::Pay);
 }
 
@@ -872,7 +872,7 @@ fn seasoned_fi_trs(
         .id("SEASONED-FI-TRS".into())
         .notional(Money::new(10_000_000.0, USD).expect("money"))
         .underlying(IndexUnderlyingParams::new("HY-INDEX", USD).with_yield("HY-INDEX-YIELD"))
-        .financing(FinancingLegSpec::new(
+        .financing_leg(FinancingLegSpec::new(
             "USD-FLAT",
             "USD-SOFR-3M",
             Decimal::ZERO,

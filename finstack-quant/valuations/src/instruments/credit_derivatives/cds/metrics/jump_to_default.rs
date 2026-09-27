@@ -45,7 +45,7 @@ impl MetricCalculator for JumpToDefaultCalculator {
         let as_of = context.as_of;
 
         // Loss given default (protection payout)
-        let lgd = 1.0 - cds.protection.recovery_rate;
+        let lgd = 1.0 - cds.protection_leg.recovery_rate;
         let protection_payout = cds.notional.amount() * lgd;
 
         // Calculate accrued premium from last coupon date to as_of
@@ -92,7 +92,7 @@ impl MetricCalculator for DefaultExposureCalculator {
 }
 
 fn signed_lgd_payout(cds: &CreditDefaultSwap) -> f64 {
-    let lgd = 1.0 - cds.protection.recovery_rate;
+    let lgd = 1.0 - cds.protection_leg.recovery_rate;
     let payout = cds.notional.amount() * lgd;
     match cds.side {
         PayReceive::Pay => payout,
@@ -115,7 +115,7 @@ fn calculate_accrued_premium(
         as_of,
         AccrualDayCountPolicy::IsdaStandard,
     )?;
-    let spread = cds.premium.coupon_bp.to_f64().ok_or_else(|| {
+    let spread = cds.premium_leg.coupon_bp.to_f64().ok_or_else(|| {
         finstack_quant_core::Error::Validation(
             "premium.coupon_bp cannot be represented as f64".to_string(),
         )

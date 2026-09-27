@@ -88,7 +88,6 @@ def test_swaption_builder_setters_accept_keyword_value() -> None:
         day_count=DayCount.THIRTY_360,
         start=start,
         end=end,
-        compounding_simple=False,
     )
     float_leg = FloatLegSpec(
         discount_curve_id="USD-OIS",

@@ -39,20 +39,19 @@ use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, IndexId, InstrumentId, Rate};
 use time::macros::date;
 
+use crate::instruments::rates::irs::FloatingLegCompounding;
 use crate::instruments::Position;
 
-/// Exchange settlement method for the reference rate underlying a listed future.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(rename_all = "snake_case")]
-#[non_exhaustive]
-pub enum RateAveragingMethod {
-    /// One term fixing or forward rate over the contractual reference period.
-    Term,
-    /// Calendar-day-weighted arithmetic average of overnight observations.
-    ArithmeticAverage,
-    /// Daily compounded overnight observations over the reference period.
-    CompoundedOvernight,
+/// Error for an IR future `compounding` outside the exchange reference-rate
+/// methods (`simple`, `simple_average`, zero-lookback `compounded_in_arrears`).
+fn unsupported_future_compounding(
+    context: &str,
+    compounding: &FloatingLegCompounding,
+) -> finstack_quant_core::Error {
+    finstack_quant_core::Error::Validation(format!(
+        "{context} compounding = {compounding:?} is not an exchange reference-rate method; \
+         use simple, simple_average or compounded_in_arrears with lookback_days = 0"
+    ))
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -126,8 +125,13 @@ pub struct InterestRateFuture {
     pub discount_curve_id: CurveId,
     /// Forward curve identifier
     pub forward_curve_id: CurveId,
-    /// Rate settlement method defined by the exchange contract.
-    pub rate_averaging: RateAveragingMethod,
+    /// Reference-rate method defined by the exchange contract: `simple` (one
+    /// term fixing, e.g. EURIBOR / 3M Term), `simple_average` (calendar-day
+    /// weighted arithmetic average of overnight fixings, e.g. CME 1M SOFR /
+    /// Fed Funds) or `compounded_in_arrears` with zero lookback (daily
+    /// compounded overnight fixings, e.g. CME 3M SOFR). Other variants are
+    /// rejected by validation.
+    pub compounding: FloatingLegCompounding,
     /// Optional rate-index identity keying the historical fixing series.
     ///
     /// When omitted, historical fixings use `forward_curve_id`. Fixing series
@@ -261,20 +265,24 @@ impl InterestRateFuture {
         self.terms.validate()?;
         self.contract_specs.validate(&context)?;
         let (fixing, period_start, period_end) = self.resolve_dates()?;
-        match self.rate_averaging {
-            RateAveragingMethod::Term if period_start < fixing => {
+        match self.compounding {
+            FloatingLegCompounding::Simple if period_start < fixing => {
                 return Err(finstack_quant_core::Error::Validation(format!(
                     "{context} term-rate period_start cannot precede fixing_date"
                 )));
             }
-            RateAveragingMethod::ArithmeticAverage | RateAveragingMethod::CompoundedOvernight
+            FloatingLegCompounding::SimpleAverage
+            | FloatingLegCompounding::CompoundedInArrears { lookback_days: 0 }
                 if fixing < period_start || fixing > period_end =>
             {
                 return Err(finstack_quant_core::Error::Validation(format!(
                     "{context} overnight final fixing date must lie within the reference period"
                 )));
             }
-            _ => {}
+            FloatingLegCompounding::Simple
+            | FloatingLegCompounding::SimpleAverage
+            | FloatingLegCompounding::CompoundedInArrears { lookback_days: 0 } => {}
+            other => return Err(unsupported_future_compounding(&context, &other)),
         }
         if period_end <= period_start {
             return Err(finstack_quant_core::Error::Validation(format!(
@@ -366,7 +374,7 @@ impl InterestRateFuture {
             })
             .discount_curve_id(CurveId::new("USD-OIS"))
             .forward_curve_id(CurveId::new("USD-SOFR-3M"))
-            .rate_averaging(RateAveragingMethod::Term)
+            .compounding(FloatingLegCompounding::Simple)
             .attributes(Attributes::new())
             .build()
     }
@@ -433,11 +441,9 @@ impl InterestRateFuture {
         let (fixing_date, period_start, period_end) = self.resolve_dates()?;
         let fwd = context.get_forward(&self.forward_curve_id)?;
         let fixing_id = self.resolved_index_id();
-        let fixings_required = match self.rate_averaging {
-            RateAveragingMethod::Term => fixing_date < as_of,
-            RateAveragingMethod::ArithmeticAverage | RateAveragingMethod::CompoundedOvernight => {
-                period_start < as_of
-            }
+        let fixings_required = match self.compounding {
+            FloatingLegCompounding::Simple => fixing_date < as_of,
+            _ => period_start < as_of,
         };
         let fixings = if fixings_required {
             Some(get_fixing_series(context, fixing_id)?)
@@ -445,8 +451,8 @@ impl InterestRateFuture {
             None
         };
 
-        match self.rate_averaging {
-            RateAveragingMethod::Term => {
+        match self.compounding {
+            FloatingLegCompounding::Simple => {
                 if fixing_date < as_of {
                     Ok(RateFutureProjection {
                         rate: require_fixing_value_exact(fixings, fixing_id, fixing_date, as_of)?,
@@ -464,7 +470,7 @@ impl InterestRateFuture {
                     })
                 }
             }
-            RateAveragingMethod::ArithmeticAverage => {
+            FloatingLegCompounding::SimpleAverage => {
                 let calendar = resolve_overnight_fixing_calendar(
                     self.fixing_calendar_id.as_deref(),
                     self.terms.currency,
@@ -486,13 +492,12 @@ impl InterestRateFuture {
                     parallel_forward_sensitivity: projection.parallel_forward_sensitivity,
                 })
             }
-            RateAveragingMethod::CompoundedOvernight => {
+            compounding @ FloatingLegCompounding::CompoundedInArrears { lookback_days: 0 } => {
                 let calendar = resolve_overnight_fixing_calendar(
                     self.fixing_calendar_id.as_deref(),
                     self.terms.currency,
                     &format!("IR future '{}'", self.id),
                 )?;
-                let compounding = FloatingLegCompounding::CompoundedInArrears { lookback_days: 0 };
                 let projection = project_overnight_coupon(OvernightCouponProjectionInput {
                     curve: OvernightProjectionCurve::Forward(fwd.as_ref()),
                     fixings,
@@ -512,6 +517,10 @@ impl InterestRateFuture {
                     parallel_forward_sensitivity: projection.parallel_forward_sensitivity,
                 })
             }
+            other => Err(unsupported_future_compounding(
+                &format!("IR future '{}'", self.id.as_str()),
+                &other,
+            )),
         }
     }
 
@@ -929,7 +938,7 @@ mod tests {
             .contract_specs(FutureContractSpecs::default())
             .discount_curve_id(CurveId::new("USD-OIS"))
             .forward_curve_id(CurveId::new("USD-SOFR-3M"))
-            .rate_averaging(RateAveragingMethod::Term)
+            .compounding(FloatingLegCompounding::Simple)
             .attributes(Attributes::new())
             .build()
             .expect("build");
@@ -954,7 +963,7 @@ mod tests {
             .contract_specs(FutureContractSpecs::default())
             .discount_curve_id(CurveId::new("USD-OIS"))
             .forward_curve_id(CurveId::new("USD-SOFR-3M"))
-            .rate_averaging(RateAveragingMethod::Term)
+            .compounding(FloatingLegCompounding::Simple)
             .attributes(Attributes::new())
             .build()
             .expect("build");
@@ -976,7 +985,7 @@ mod tests {
     #[test]
     fn in_arrears_future_uses_official_settlement_after_last_trading_date() {
         let mut future = InterestRateFuture::example().expect("example future");
-        future.rate_averaging = RateAveragingMethod::CompoundedOvernight;
+        future.compounding = FloatingLegCompounding::CompoundedInArrears { lookback_days: 0 };
         future.fixing_date = future.period_end;
         future.terms.settlement_date = future.period_end.expect("period end");
         future.terms.settlement_price = Some(96.0);
@@ -1011,7 +1020,7 @@ mod tests {
             })
             .discount_curve_id(CurveId::new("USD-OIS"))
             .forward_curve_id(CurveId::new("USD-SOFR"))
-            .rate_averaging(RateAveragingMethod::ArithmeticAverage)
+            .compounding(FloatingLegCompounding::SimpleAverage)
             .index_id_opt(Some(IndexId::new("USD-SOFR")))
             .attributes(Attributes::new())
             .build()
@@ -1156,7 +1165,7 @@ mod tests {
             })
             .discount_curve_id(CurveId::new("USD-OIS"))
             .forward_curve_id(CurveId::new("USD-SOFR-3M"))
-            .rate_averaging(RateAveragingMethod::Term)
+            .compounding(FloatingLegCompounding::Simple)
             .attributes(Attributes::new())
             .build()
             .expect("future");

@@ -2,6 +2,68 @@
 
 ## [Unreleased]
 
+### Compounding and leg specs (2026-09-24)
+
+#### Changed (BREAKING)
+
+- `FloatingLegCompounding` is now defined once in `finstack_quant_cashflows::builder`
+  (re-exported at `finstack_quant_valuations::instruments::rates::irs`) with the
+  variants `simple`, `simple_average`, `compounded_in_arrears{lookback_days}`,
+  `compounded_with_observation_shift{shift_days}` and
+  `compounded_with_rate_cutoff{cutoff_days}`; day counts are `u32` (Rust, Python,
+  JSON). Swap-family float legs, TRS financing legs and cross-currency legs reject
+  `simple_average`.
+- `FloatingRateSpec.overnight_compounding` (now `compounding:
+  Option<FloatingLegCompounding>`) on every bond / loan / structured-credit coupon
+  (Rust, Python, JSON). `compounded_in_arrears` (now
+  `{"compounded_in_arrears": {"lookback_days": 0}}`),
+  `compounded_with_lookback{lookback_days}` (now `compounded_in_arrears{lookback_days}`),
+  `compounded_with_lockout{lockout_days}` (now `compounded_with_rate_cutoff{cutoff_days}`);
+  `simple` keeps term projection and `None` still resolves from the index registry.
+  Python `OvernightCompoundingMethod` (now `finstack_quant.cashflows.builder.FloatingLegCompounding`
+  with `SIMPLE`, `SIMPLE_AVERAGE`, `compounded_in_arrears(lookback_days=0)`,
+  `compounded_with_observation_shift(...)`, `compounded_with_rate_cutoff(...)`).
+- `FinancingLegSpec.compounding` is now `FloatingLegCompounding` (Rust, JSON):
+  `term_rate` (now `simple`), `overnight_compounded` (now
+  `{"compounded_in_arrears": {"lookback_days": 0}}`); lookback, observation-shift
+  and rate-cut-off financing legs are now expressible.
+- `InterestRateFuture.rate_averaging` (now `compounding: FloatingLegCompounding`),
+  also on the IR-future market conventions (Rust, Python `IrFutureConventions.compounding`,
+  JSON): `term` (now `simple`), `arithmetic_average` (now `simple_average`),
+  `compounded_overnight` (now `{"compounded_in_arrears": {"lookback_days": 0}}`);
+  other variants are rejected.
+- `InterestRateSwap.fixed` / `.float` (now `fixed_leg` / `float_leg`),
+  `CreditDefaultSwap.premium` / `.protection` and `CDSIndex.premium` / `.protection`
+  (now `premium_leg` / `protection_leg`), `EquityTotalReturnSwap.financing` and
+  `FIIndexTotalReturnSwap.financing` (now `financing_leg`) (Rust fields and builder
+  setters, Python getters and builder methods, JSON). The Python IRS stub no longer
+  needs `builtins.float`.
+- `BasisSwapLeg` (now `FloatLegSpec`) for `BasisSwap.primary_leg` / `reference_leg`
+  (Rust, JSON; keys unchanged, `fixing_calendar_id` and `end_of_month` are now honoured).
+- `XccySwapLeg` is now `{notional, side, leg: FloatLegSpec}` and
+  `XccySwapLeg.allow_calendar_fallback` (now `XccySwap.allow_calendar_fallback`,
+  instrument level like `BasisSwap`) (Rust, JSON): the flat float-leg fields move under `leg`, the redundant `currency`
+  is removed (it is `notional`'s currency) and `reset_lag_days` is an `i32`
+  defaulting to `0`; `leg.fixing_calendar_id` is rejected.
+- `YieldCompounding` is now `{Rate(Compounding), Street, TreasuryActual, Moosmuller}`
+  over core `Compounding`, so a zero-frequency periodic basis is unrepresentable
+  (Rust only).
+- `ModelConfig.oas_quote_compounding` is core `Compounding` (Rust, JSON):
+  `semi_annual` (now `{"periodic": 2}`); only `continuous` and `{"periodic": 2}`
+  validate.
+- `finstack_quant_scenarios::spec::Compounding` is core `Compounding` (Rust, JSON):
+  `semi_annual` / `quarterly` / `monthly` (now `{"periodic": 2|4|12}`); the Python
+  `finstack_quant.scenarios.Compounding` class keeps its constructors and labels.
+
+#### Removed
+
+- `FixedLegSpec.compounding_simple` (Rust, Python, JSON): no pricing path read it;
+  fixed legs accrue simple interest.
+- `OvernightCompoundingMethod`, `FinancingRateCompounding`, `RateAveragingMethod`,
+  `swap_legs::CompoundingMethod` (with `FloatingLegParams.observation_shift_days`),
+  `OasQuoteCompounding` and the models `TreeCompounding` enum (tree discounting is
+  the `TreeDiscounting` extension trait over core `Compounding`).
+
 ### Option and direction enums (2026-09-24)
 
 #### Changed (BREAKING)

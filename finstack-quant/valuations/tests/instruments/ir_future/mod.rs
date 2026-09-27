@@ -13,5 +13,5 @@ mod test_edge_cases;
 mod test_market_standard;
 mod test_metrics;
 mod test_pricing;
-mod test_rate_averaging;
+mod test_reference_compounding;
 mod utils;

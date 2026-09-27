@@ -136,7 +136,7 @@ fn test_par_rate_discount_ratio_matches_forward_for_new_swap() {
     )
     .unwrap();
     let mut swap_discount = swap_forward.clone();
-    swap_discount.fixed.par_method = Some(ParRateMethod::DiscountRatio);
+    swap_discount.fixed_leg.par_method = Some(ParRateMethod::DiscountRatio);
 
     let par_forward = swap_forward
         .price_with_metrics(
@@ -207,7 +207,7 @@ fn test_par_rate_discount_ratio_rejects_seasoned_swap() {
         PayReceive::Receive,
     )
     .unwrap();
-    swap.fixed.par_method = Some(ParRateMethod::DiscountRatio);
+    swap.fixed_leg.par_method = Some(ParRateMethod::DiscountRatio);
 
     let par_forward = swap
         .price_with_metrics(
@@ -380,7 +380,6 @@ fn test_irs_receive_vs_pay_fixed() {
         calendar_id: None,
         stub: StubKind::None,
         par_method: None,
-        compounding_simple: true,
         payment_lag_days: 0,
         end_of_month: false,
         start: as_of,
@@ -409,8 +408,8 @@ fn test_irs_receive_vs_pay_fixed() {
         id: "SWAP_RECEIVE".into(),
         notional: Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         side: PayReceive::Receive,
-        fixed: fixed_leg.clone(),
-        float: float_leg.clone(),
+        fixed_leg: fixed_leg.clone(),
+        float_leg: float_leg.clone(),
         margin_spec: None,
         instrument_pricing_overrides: Default::default(),
         metric_pricing_overrides: Default::default(),
@@ -422,8 +421,8 @@ fn test_irs_receive_vs_pay_fixed() {
         id: "SWAP_PAY".into(),
         notional: Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         side: PayReceive::Pay,
-        fixed: fixed_leg,
-        float: float_leg,
+        fixed_leg,
+        float_leg,
         margin_spec: None,
         instrument_pricing_overrides: Default::default(),
         metric_pricing_overrides: Default::default(),
@@ -473,7 +472,6 @@ fn test_irs_rate_sensitivity() {
         calendar_id: None,
         stub: StubKind::None,
         par_method: None,
-        compounding_simple: true,
         payment_lag_days: 0,
         end_of_month: false,
         start: as_of,
@@ -502,8 +500,8 @@ fn test_irs_rate_sensitivity() {
         id: "SWAP_RATE_SENS".into(),
         notional: Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         side: PayReceive::Receive,
-        fixed: fixed_leg,
-        float: float_leg,
+        fixed_leg,
+        float_leg,
         margin_spec: None,
         instrument_pricing_overrides: Default::default(),
         metric_pricing_overrides: Default::default(),
@@ -564,7 +562,7 @@ fn test_irs_leg_pvs_consistency() {
         id: "SWAP_LEG_PVS".into(),
         notional: Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         side: PayReceive::Receive,
-        fixed: FixedLegSpec {
+        fixed_leg: FixedLegSpec {
             discount_curve_id: "USD-OIS".into(),
             rate: rust_decimal::Decimal::try_from(0.05).expect("valid"),
             frequency: Tenor::quarterly(),
@@ -573,13 +571,12 @@ fn test_irs_leg_pvs_consistency() {
             calendar_id: None,
             stub: StubKind::None,
             par_method: None,
-            compounding_simple: true,
             payment_lag_days: 0,
             end_of_month: false,
             start: as_of,
             end,
         },
-        float: FloatLegSpec {
+        float_leg: FloatLegSpec {
             discount_curve_id: "USD-OIS".into(),
             forward_curve_id: "USD-SOFR-3M".into(),
             spread_bp: rust_decimal::Decimal::try_from(0.0).expect("valid"),
@@ -642,7 +639,7 @@ fn test_daycount_convention_impact_on_annuity() {
         .id("IRS-ACT360".into())
         .notional(Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"))
         .side(PayReceive::Receive)
-        .fixed(FixedLegSpec {
+        .fixed_leg(FixedLegSpec {
             discount_curve_id: "USD-OIS".into(),
             rate: rust_decimal::Decimal::try_from(0.05).expect("valid"),
             frequency: Tenor::quarterly(),
@@ -651,13 +648,12 @@ fn test_daycount_convention_impact_on_annuity() {
             calendar_id: None,
             stub: StubKind::None,
             par_method: None,
-            compounding_simple: true,
             payment_lag_days: 0,
             end_of_month: false,
             start: as_of,
             end,
         })
-        .float(FloatLegSpec {
+        .float_leg(FloatLegSpec {
             discount_curve_id: "USD-OIS".into(),
             forward_curve_id: "USD-SOFR-3M".into(),
             spread_bp: rust_decimal::Decimal::try_from(0.0).expect("valid"),
@@ -682,7 +678,7 @@ fn test_daycount_convention_impact_on_annuity() {
         .id("IRS-30360".into())
         .notional(Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"))
         .side(PayReceive::Receive)
-        .fixed(FixedLegSpec {
+        .fixed_leg(FixedLegSpec {
             discount_curve_id: "USD-OIS".into(),
             rate: rust_decimal::Decimal::try_from(0.05).expect("valid"),
             frequency: Tenor::quarterly(),
@@ -691,13 +687,12 @@ fn test_daycount_convention_impact_on_annuity() {
             calendar_id: None,
             stub: StubKind::None,
             par_method: None,
-            compounding_simple: true,
             payment_lag_days: 0,
             end_of_month: false,
             start: as_of,
             end,
         })
-        .float(FloatLegSpec {
+        .float_leg(FloatLegSpec {
             discount_curve_id: "USD-OIS".into(),
             forward_curve_id: "USD-SOFR-3M".into(),
             spread_bp: rust_decimal::Decimal::try_from(0.0).expect("valid"),
@@ -820,7 +815,7 @@ fn test_irs_t_minus_2_fixing_calendar_isda_standard() {
         .id("IRS-5Y-USD-T2-FIXING".into())
         .notional(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
         .side(PayReceive::Pay)
-        .fixed(FixedLegSpec {
+        .fixed_leg(FixedLegSpec {
             discount_curve_id: "USD-OIS".into(),
             rate: rust_decimal::Decimal::try_from(0.05).expect("valid"), // 5% fixed rate
             frequency: Tenor::semi_annual(),
@@ -829,13 +824,12 @@ fn test_irs_t_minus_2_fixing_calendar_isda_standard() {
             calendar_id: Some("usny".into()),
             stub: StubKind::None,
             par_method: None,
-            compounding_simple: true,
             payment_lag_days: 0,
             end_of_month: false,
             start,
             end,
         })
-        .float(FloatLegSpec {
+        .float_leg(FloatLegSpec {
             discount_curve_id: "USD-OIS".into(),
             forward_curve_id: "USD-SOFR-3M".into(),
             spread_bp: rust_decimal::Decimal::try_from(0.0).expect("valid"),
@@ -988,7 +982,7 @@ fn test_irs_forward_curve_daycount_used_for_projection() {
         .id("IRS-FWD-365".into())
         .notional(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
         .side(PayReceive::Pay)
-        .fixed(FixedLegSpec {
+        .fixed_leg(FixedLegSpec {
             discount_curve_id: "USD-OIS".into(),
             rate: rust_decimal::Decimal::try_from(0.04).expect("valid"), // Below average forward to create positive NPV
             frequency: Tenor::quarterly(),
@@ -997,13 +991,12 @@ fn test_irs_forward_curve_daycount_used_for_projection() {
             calendar_id: None,
             stub: StubKind::None,
             par_method: None,
-            compounding_simple: true,
             payment_lag_days: 0,
             end_of_month: false,
             start,
             end,
         })
-        .float(FloatLegSpec {
+        .float_leg(FloatLegSpec {
             discount_curve_id: "USD-OIS".into(),
             forward_curve_id: "USD-SOFR-365".into(),
             spread_bp: rust_decimal::Decimal::try_from(0.0).expect("valid"),
@@ -1027,7 +1020,7 @@ fn test_irs_forward_curve_daycount_used_for_projection() {
         .id("IRS-FWD-360".into())
         .notional(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
         .side(PayReceive::Pay)
-        .fixed(FixedLegSpec {
+        .fixed_leg(FixedLegSpec {
             discount_curve_id: "USD-OIS".into(),
             rate: rust_decimal::Decimal::try_from(0.04).expect("valid"), // Below average forward to create positive NPV
             frequency: Tenor::quarterly(),
@@ -1036,13 +1029,12 @@ fn test_irs_forward_curve_daycount_used_for_projection() {
             calendar_id: None,
             stub: StubKind::None,
             par_method: None,
-            compounding_simple: true,
             payment_lag_days: 0,
             end_of_month: false,
             start,
             end,
         })
-        .float(FloatLegSpec {
+        .float_leg(FloatLegSpec {
             discount_curve_id: "USD-OIS".into(),
             forward_curve_id: "USD-SOFR-360".into(),
             spread_bp: rust_decimal::Decimal::try_from(0.0).expect("valid"),
@@ -1123,7 +1115,7 @@ fn test_sofr_ois_par_rate_matches_quantlib_identity() {
         .id("SOFR-OIS-QL-PARITY".into())
         .notional(Money::new(100_000_000.0, Currency::USD).expect("valid money fixture"))
         .side(PayReceive::Pay)
-        .fixed(FixedLegSpec {
+        .fixed_leg(FixedLegSpec {
             discount_curve_id: curve_id.into(),
             rate: rust_decimal::Decimal::ZERO,
             frequency: Tenor::annual(),
@@ -1134,11 +1126,10 @@ fn test_sofr_ois_par_rate_matches_quantlib_identity() {
             start,
             end,
             par_method: None,
-            compounding_simple: true,
             payment_lag_days: 0,
             end_of_month: false,
         })
-        .float(FloatLegSpec {
+        .float_leg(FloatLegSpec {
             discount_curve_id: curve_id.into(),
             forward_curve_id: curve_id.into(),
             spread_bp: rust_decimal::Decimal::ZERO,
@@ -1268,7 +1259,7 @@ fn test_eom_pricer_cashflow_consistency() {
         .id("IRS-EOM-TRUE".into())
         .notional(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
         .side(PayReceive::Pay)
-        .fixed(FixedLegSpec {
+        .fixed_leg(FixedLegSpec {
             discount_curve_id: CurveId::new("USD-OIS"),
             rate: Decimal::try_from(0.04).unwrap(),
             frequency: Tenor::semi_annual(),
@@ -1279,11 +1270,10 @@ fn test_eom_pricer_cashflow_consistency() {
             start,
             end,
             par_method: None,
-            compounding_simple: true,
             payment_lag_days: 0,
             end_of_month: true,
         })
-        .float(FloatLegSpec {
+        .float_leg(FloatLegSpec {
             discount_curve_id: CurveId::new("USD-OIS"),
             forward_curve_id: CurveId::new("USD-SOFR-3M"),
             spread_bp: Decimal::ZERO,
@@ -1308,7 +1298,7 @@ fn test_eom_pricer_cashflow_consistency() {
         .id("IRS-EOM-FALSE".into())
         .notional(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
         .side(PayReceive::Pay)
-        .fixed(FixedLegSpec {
+        .fixed_leg(FixedLegSpec {
             discount_curve_id: CurveId::new("USD-OIS"),
             rate: Decimal::try_from(0.04).unwrap(),
             frequency: Tenor::semi_annual(),
@@ -1319,11 +1309,10 @@ fn test_eom_pricer_cashflow_consistency() {
             start,
             end,
             par_method: None,
-            compounding_simple: true,
             payment_lag_days: 0,
             end_of_month: false,
         })
-        .float(FloatLegSpec {
+        .float_leg(FloatLegSpec {
             discount_curve_id: CurveId::new("USD-OIS"),
             forward_curve_id: CurveId::new("USD-SOFR-3M"),
             spread_bp: Decimal::ZERO,
@@ -1433,7 +1422,7 @@ fn test_ois_identity_with_eom() {
         .id("OIS-EOM-IDENTITY".into())
         .notional(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
         .side(PayReceive::Pay)
-        .fixed(FixedLegSpec {
+        .fixed_leg(FixedLegSpec {
             discount_curve_id: disc_id.clone(),
             rate: Decimal::ZERO,
             frequency: Tenor::quarterly(),
@@ -1446,11 +1435,10 @@ fn test_ois_identity_with_eom() {
             start,
             end,
             par_method: None,
-            compounding_simple: true,
             payment_lag_days: 0,
             end_of_month: true,
         })
-        .float(FloatLegSpec {
+        .float_leg(FloatLegSpec {
             discount_curve_id: disc_id.clone(),
             forward_curve_id: disc_id,
             spread_bp: Decimal::ZERO,

@@ -45,7 +45,7 @@ impl MetricCalculator for Cs01Calculator {
 
 fn index_credit_curve_ids(index: &CDSIndex) -> Result<Vec<CurveId>> {
     match index.pricing {
-        IndexPricing::SingleCurve => Ok(vec![index.protection.credit_curve_id.clone()]),
+        IndexPricing::SingleCurve => Ok(vec![index.protection_leg.credit_curve_id.clone()]),
         IndexPricing::Constituents => {
             let mut curve_ids = Vec::new();
             for constituent in index
@@ -76,7 +76,7 @@ impl MetricCalculator for CdsIndexBucketedCs01Calculator {
         let index: CDSIndex = context.instrument_as::<CDSIndex>()?.clone();
 
         // Expired → zero, no series (mirrors the parallel aggregation path).
-        if context.as_of >= index.premium.end {
+        if context.as_of >= index.premium_leg.end {
             return Ok(0.0);
         }
 
@@ -90,7 +90,7 @@ impl MetricCalculator for CdsIndexBucketedCs01Calculator {
         if credit_ids.is_empty() {
             return Ok(0.0);
         }
-        let discount_id = index.premium.discount_curve_id;
+        let discount_id = index.premium_leg.discount_curve_id;
         let mut total = NeumaierAccumulator::new();
         for credit_id in credit_ids {
             let series_id = MetricId::composite(&MetricId::BucketedCs01, &[credit_id.as_str()]);

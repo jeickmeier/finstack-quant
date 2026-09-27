@@ -8,6 +8,7 @@ use finstack_quant_core::money::Money;
 use finstack_quant_core::types::CurveId;
 use finstack_quant_core::Result;
 use finstack_quant_valuations::instruments::rates::xccy_swap::{XccySwap, XccySwapLeg};
+use finstack_quant_valuations::instruments::FloatLegSpec;
 use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::instruments::PayReceive;
 use finstack_quant_valuations::instruments::{adjust_joint_calendar, fx_spot_date_for_pair};
@@ -104,44 +105,48 @@ pub fn build_xccy_instrument(quote: &XccyQuote, ctx: &BuildCtx) -> Result<Box<dy
 
     // Apply the quoted basis to the base leg; the quote leg is flat.
     let leg1 = XccySwapLeg {
-        currency: conv.base_currency,
         notional: Money::new(base_notional, conv.base_currency)?,
         side: PayReceive::Receive,
-        forward_curve_id: CurveId::new(foreign_forward),
-        discount_curve_id: CurveId::new(foreign_discount),
-        start: spot,
-        end: far,
-        frequency: conv.payment_frequency,
-        day_count: conv.day_count,
-        business_day_convention: conv.business_day_convention,
-        stub: finstack_quant_core::dates::StubKind::ShortFront,
-        spread_bp: Decimal::try_from(basis_spread_bp)
-            .map_err(|_| finstack_quant_core::InputError::ConversionOverflow)?,
-        payment_lag_days: base_index.default_payment_lag_days,
-        calendar_id: Some(conv.base_calendar_id.clone().into()),
-        reset_lag_days: Some(base_index.default_reset_lag_days),
-        allow_calendar_fallback: false,
-        compounding: foreign_compounding,
+        leg: FloatLegSpec {
+            forward_curve_id: CurveId::new(foreign_forward),
+            discount_curve_id: CurveId::new(foreign_discount),
+            start: spot,
+            end: far,
+            frequency: conv.payment_frequency,
+            day_count: conv.day_count,
+            business_day_convention: conv.business_day_convention,
+            stub: finstack_quant_core::dates::StubKind::ShortFront,
+            spread_bp: Decimal::try_from(basis_spread_bp)
+                .map_err(|_| finstack_quant_core::InputError::ConversionOverflow)?,
+            payment_lag_days: base_index.default_payment_lag_days,
+            calendar_id: Some(conv.base_calendar_id.clone().into()),
+            reset_lag_days: base_index.default_reset_lag_days,
+            compounding: foreign_compounding,
+            fixing_calendar_id: None,
+            end_of_month: false,
+        },
     };
 
     let leg2 = XccySwapLeg {
-        currency: conv.quote_currency,
         notional: Money::new(quote_notional, conv.quote_currency)?,
         side: PayReceive::Pay,
-        forward_curve_id: CurveId::new(domestic_forward),
-        discount_curve_id: CurveId::new(domestic_discount),
-        start: spot,
-        end: far,
-        frequency: conv.payment_frequency,
-        day_count: conv.day_count,
-        business_day_convention: conv.business_day_convention,
-        stub: finstack_quant_core::dates::StubKind::ShortFront,
-        spread_bp: Decimal::ZERO,
-        payment_lag_days: quote_index.default_payment_lag_days,
-        calendar_id: Some(conv.quote_calendar_id.clone().into()),
-        reset_lag_days: Some(quote_index.default_reset_lag_days),
-        allow_calendar_fallback: false,
-        compounding: domestic_compounding,
+        leg: FloatLegSpec {
+            forward_curve_id: CurveId::new(domestic_forward),
+            discount_curve_id: CurveId::new(domestic_discount),
+            start: spot,
+            end: far,
+            frequency: conv.payment_frequency,
+            day_count: conv.day_count,
+            business_day_convention: conv.business_day_convention,
+            stub: finstack_quant_core::dates::StubKind::ShortFront,
+            spread_bp: Decimal::ZERO,
+            payment_lag_days: quote_index.default_payment_lag_days,
+            calendar_id: Some(conv.quote_calendar_id.clone().into()),
+            reset_lag_days: quote_index.default_reset_lag_days,
+            compounding: domestic_compounding,
+            fixing_calendar_id: None,
+            end_of_month: false,
+        },
     };
 
     let swap = XccySwap::new(id.as_str(), leg1, leg2, conv.quote_currency)

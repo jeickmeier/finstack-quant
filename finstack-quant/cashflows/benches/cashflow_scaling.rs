@@ -218,7 +218,7 @@ fn bench_build_overnight_scaling(c: &mut Criterion) {
                 fixtures::build_overnight(
                     black_box(base),
                     black_box(y),
-                    finstack_quant_cashflows::builder::OvernightCompoundingMethod::CompoundedInArrears,
+                    finstack_quant_cashflows::builder::FloatingLegCompounding::CompoundedInArrears { lookback_days: 0 },
                     black_box(&market),
                 )
             });

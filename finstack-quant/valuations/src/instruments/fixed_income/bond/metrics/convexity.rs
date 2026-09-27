@@ -6,6 +6,7 @@ use crate::instruments::Bond;
 use crate::instruments::BondRiskBasis;
 use crate::metrics::{MetricCalculator, MetricContext, MetricId};
 use finstack_quant_core::dates::Date;
+use finstack_quant_core::math::Compounding;
 use finstack_quant_core::money::Money;
 use std::borrow::Cow;
 
@@ -150,21 +151,21 @@ fn df_second_derivative(
 
     let df = df_from_yield(ytm, t, comp, frequency)?;
     Ok(match comp {
-        YieldCompounding::Simple => {
+        YieldCompounding::Rate(Compounding::Simple) => {
             let denom = 1.0 + ytm * t;
             2.0 * t * t / (denom * denom * denom)
         }
-        YieldCompounding::Annual => {
+        YieldCompounding::Rate(Compounding::Annual) => {
             let denom = 1.0 + ytm;
             t * (t + 1.0) / (denom * denom) * df
         }
-        YieldCompounding::Periodic(m) => {
-            let m = m as f64;
+        YieldCompounding::Rate(Compounding::Periodic(m)) => {
+            let m = f64::from(m.get());
             let c = m * t;
             let denom = m + ytm;
             c * (c + 1.0) / (denom * denom) * df
         }
-        YieldCompounding::Continuous => t * t * df,
+        YieldCompounding::Rate(Compounding::Continuous) => t * t * df,
         YieldCompounding::Street => {
             let m = periods_per_year(frequency)?.max(1.0);
             let c = m * t;

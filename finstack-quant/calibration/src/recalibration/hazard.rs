@@ -1089,8 +1089,8 @@ mod tests {
     }
 
     fn deal_quote_source_curve(cds: &CreditDefaultSwap) -> HazardCurve {
-        let base_date = cds.premium.start;
-        let pillar_date = cds.premium.end;
+        let base_date = cds.premium_leg.start;
+        let pillar_date = cds.premium_leg.end;
         let pillar_time = finstack_quant_core::dates::DayCount::Act365F
             .year_fraction(
                 base_date,
@@ -1107,7 +1107,7 @@ mod tests {
             },
             pillar: Pillar::Date(pillar_date),
             spread_bp: 150.0,
-            recovery_rate: cds.protection.recovery_rate,
+            recovery_rate: cds.protection_leg.recovery_rate,
         };
         let input = HazardCalibrationInput {
             quote: serde_json::to_value(quote).expect("serialize source quote"),
@@ -1123,7 +1123,7 @@ mod tests {
         .expect("valid deal quote recipe");
         HazardCurve::builder("ACME-HZD")
             .base_date(base_date)
-            .recovery_rate(cds.protection.recovery_rate)
+            .recovery_rate(cds.protection_leg.recovery_rate)
             .knots([(0.0, 0.02), (pillar_time, 0.02)])
             .par_spreads([(pillar_time, 150.0)])
             .hazard_calibration(recipe)
@@ -1147,7 +1147,7 @@ mod tests {
         let low_quote = hazard_with_deal_quote_override(
             &source,
             DealCdsQuoteOverride {
-                contract_end: low_deal.premium.end,
+                contract_end: low_deal.premium_leg.end,
                 spread_bp: 100.0,
             },
         )
@@ -1155,7 +1155,7 @@ mod tests {
         let high_quote = hazard_with_deal_quote_override(
             &source,
             DealCdsQuoteOverride {
-                contract_end: high_deal.premium.end,
+                contract_end: high_deal.premium_leg.end,
                 spread_bp: 300.0,
             },
         )

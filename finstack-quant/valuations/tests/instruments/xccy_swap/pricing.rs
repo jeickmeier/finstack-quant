@@ -98,9 +98,9 @@ fn long_back_stub_prices_correctly() {
     let maturity = d(2026, 2, 15); // Creates a long back stub
 
     let mut usd_leg = leg_usd_receive(base, maturity);
-    usd_leg.stub = StubKind::LongBack;
+    usd_leg.leg.stub = StubKind::LongBack;
     let mut eur_leg = leg_eur_pay(base, maturity);
-    eur_leg.stub = StubKind::LongBack;
+    eur_leg.leg.stub = StubKind::LongBack;
 
     let swap = XccySwap::new("XCCY-LONG-STUB", usd_leg, eur_leg, Currency::USD)
         .with_notional_exchange(NotionalExchange::None);
@@ -123,8 +123,7 @@ fn payment_lag_affects_pv() {
 
     let leg_no_lag = leg_usd_receive(base, maturity);
     let mut leg_with_lag = leg_usd_receive(base, maturity);
-    leg_with_lag.payment_lag_days = 2;
-    leg_with_lag.allow_calendar_fallback = true;
+    leg_with_lag.leg.payment_lag_days = 2;
 
     let swap_no_lag = XccySwap::new(
         "XCCY-NO-LAG",
@@ -134,11 +133,12 @@ fn payment_lag_affects_pv() {
     )
     .with_notional_exchange(NotionalExchange::None);
 
-    let mut leg_eur_lag = leg_eur_pay(base, maturity);
-    leg_eur_lag.allow_calendar_fallback = true;
+    let leg_eur_lag = leg_eur_pay(base, maturity);
 
-    let swap_with_lag = XccySwap::new("XCCY-WITH-LAG", leg_with_lag, leg_eur_lag, Currency::USD)
-        .with_notional_exchange(NotionalExchange::None);
+    let mut swap_with_lag =
+        XccySwap::new("XCCY-WITH-LAG", leg_with_lag, leg_eur_lag, Currency::USD)
+            .with_notional_exchange(NotionalExchange::None);
+    swap_with_lag.allow_calendar_fallback = true;
 
     let market = market_with_fx();
     let pv_no_lag = swap_no_lag.value(&market, base).unwrap().amount();
@@ -162,13 +162,12 @@ fn near_expiry_swap_prices_correctly() {
     let start = d(2025, 1, 2);
     let maturity = d(2025, 1, 3); // 1 day maturity
 
-    let mut leg_usd = leg_usd_receive(start, maturity);
-    leg_usd.allow_calendar_fallback = true;
-    let mut leg_eur = leg_eur_pay(start, maturity);
-    leg_eur.allow_calendar_fallback = true;
+    let leg_usd = leg_usd_receive(start, maturity);
+    let leg_eur = leg_eur_pay(start, maturity);
 
-    let swap = XccySwap::new("XCCY-NEAR-EXPIRY", leg_usd, leg_eur, Currency::USD)
+    let mut swap = XccySwap::new("XCCY-NEAR-EXPIRY", leg_usd, leg_eur, Currency::USD)
         .with_notional_exchange(NotionalExchange::InitialAndFinal);
+    swap.allow_calendar_fallback = true;
 
     let market = market_with_fx();
     let pv = swap.value(&market, base).unwrap();
@@ -185,13 +184,12 @@ fn same_day_settled_swap_returns_zero_pv() {
     let start = d(2024, 1, 2);
     let maturity = d(2025, 1, 1);
 
-    let mut leg_usd = leg_usd_receive(start, maturity);
-    leg_usd.allow_calendar_fallback = true;
-    let mut leg_eur = leg_eur_pay(start, maturity);
-    leg_eur.allow_calendar_fallback = true;
+    let leg_usd = leg_usd_receive(start, maturity);
+    let leg_eur = leg_eur_pay(start, maturity);
 
-    let swap = XccySwap::new("XCCY-EXPIRED", leg_usd, leg_eur, Currency::USD)
+    let mut swap = XccySwap::new("XCCY-EXPIRED", leg_usd, leg_eur, Currency::USD)
         .with_notional_exchange(NotionalExchange::None);
+    swap.allow_calendar_fallback = true;
 
     let market = market_with_fx();
     let pv = swap.value(&market, base).unwrap();
@@ -255,7 +253,7 @@ fn rejects_zero_notional() {
 }
 
 // NOTE: NaN/infinite spread values are now rejected at the binding layer (Python/WASM),
-// since BasisSwapLeg::spread_bp is `Decimal` which is always finite by construction.
+// since FloatLegSpec::spread_bp is `Decimal` which is always finite by construction.
 // The test below verifies that extreme but valid spreads are accepted.
 #[test]
 fn accepts_extreme_but_finite_spread() {
@@ -263,7 +261,7 @@ fn accepts_extreme_but_finite_spread() {
     let maturity = d(2026, 1, 2);
 
     let mut leg_usd = leg_usd_receive(base, maturity);
-    leg_usd.spread_bp = Decimal::from(100); // 100bp - large but valid
+    leg_usd.leg.spread_bp = Decimal::from(100); // 100bp - large but valid
 
     let swap = XccySwap::new(
         "XCCY-EXTREME-SPREAD",
@@ -287,7 +285,7 @@ fn spread_affects_pv() {
 
     let leg_no_spread = leg_usd_receive(base, maturity);
     let mut leg_with_spread = leg_usd_receive(base, maturity);
-    leg_with_spread.spread_bp = Decimal::from(50); // 50bp spread
+    leg_with_spread.leg.spread_bp = Decimal::from(50); // 50bp spread
 
     let swap_no_spread = XccySwap::new(
         "XCCY-NO-SPREAD",
@@ -325,7 +323,7 @@ fn negative_spread_decreases_pv() {
 
     let leg_no_spread = leg_usd_receive(base, maturity);
     let mut leg_negative_spread = leg_usd_receive(base, maturity);
-    leg_negative_spread.spread_bp = Decimal::from(-50); // -50bp spread
+    leg_negative_spread.leg.spread_bp = Decimal::from(-50); // -50bp spread
 
     let swap_no_spread = XccySwap::new(
         "XCCY-NO-SPREAD",
@@ -364,13 +362,12 @@ fn long_dated_swap_prices_with_many_periods() {
     let base = d(2025, 1, 2);
     let maturity = d(2035, 1, 2);
 
-    let mut leg_usd = leg_usd_receive(base, maturity);
-    leg_usd.allow_calendar_fallback = true;
-    let mut leg_eur = leg_eur_pay(base, maturity);
-    leg_eur.allow_calendar_fallback = true;
+    let leg_usd = leg_usd_receive(base, maturity);
+    let leg_eur = leg_eur_pay(base, maturity);
 
-    let swap = XccySwap::new("XCCY-10Y", leg_usd, leg_eur, Currency::USD)
+    let mut swap = XccySwap::new("XCCY-10Y", leg_usd, leg_eur, Currency::USD)
         .with_notional_exchange(NotionalExchange::InitialAndFinal);
+    swap.allow_calendar_fallback = true;
 
     let market = market_with_extended_curves();
     let pv = swap.value(&market, base).unwrap();
@@ -471,8 +468,8 @@ fn estr_overnight_versus_euribor_float_leg_prices() {
     let base = d(2025, 1, 2);
     let maturity = d(2026, 1, 2);
     let mut eur = leg_eur_pay(base, maturity);
-    eur.forward_curve_id = finstack_quant_core::types::CurveId::new("EUR-ESTR-OIS");
-    eur.compounding = FloatingLegCompounding::CompoundedInArrears { lookback_days: 0 };
+    eur.leg.forward_curve_id = finstack_quant_core::types::CurveId::new("EUR-ESTR-OIS");
+    eur.leg.compounding = FloatingLegCompounding::CompoundedInArrears { lookback_days: 0 };
     let swap = XccySwap::new(
         "XCCY-ESTR",
         leg_usd_receive(base, maturity),
@@ -503,8 +500,8 @@ fn mtm_reset_still_emits_notional_rebals_with_overnight_leg() {
     let base = d(2025, 1, 2);
     let maturity = d(2027, 1, 2);
     let mut eur = leg_eur_pay(base, maturity);
-    eur.forward_curve_id = finstack_quant_core::types::CurveId::new("EUR-ESTR-OIS");
-    eur.compounding = FloatingLegCompounding::CompoundedInArrears { lookback_days: 0 };
+    eur.leg.forward_curve_id = finstack_quant_core::types::CurveId::new("EUR-ESTR-OIS");
+    eur.leg.compounding = FloatingLegCompounding::CompoundedInArrears { lookback_days: 0 };
     let swap = XccySwap::new(
         "XCCY-ESTR-MTM",
         leg_usd_receive(base, maturity),

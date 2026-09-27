@@ -44,6 +44,7 @@ use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::HashSet;
 use finstack_quant_core::Result;
 use finstack_quant_models::rates::clock::{model_time, ModelDiscountCurve};
+use finstack_quant_models::TreeDiscounting;
 
 /// Tree valuator for Bermudan swaption pricing.
 ///
@@ -238,7 +239,7 @@ impl<'a> BermudanSwaptionTreeValuator<'a> {
                     let expected = p_up * cont_values[center + 1]
                         + p_mid * cont_values[center]
                         + p_down * cont_values[center - 1];
-                    expected * comp.df(r_j, dt)
+                    expected * comp.tree_df(r_j, dt)
                 })
                 .collect();
 

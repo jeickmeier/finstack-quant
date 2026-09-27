@@ -38,10 +38,15 @@ use crate::instruments::rates::irs::{FloatingLegCompounding, InterestRateSwap, P
 #[cfg(test)]
 fn compounded_total_shift_days(compounding: FloatingLegCompounding) -> Result<i32> {
     match compounding {
-        FloatingLegCompounding::CompoundedInArrears { lookback_days } => Ok(-lookback_days),
-        FloatingLegCompounding::CompoundedWithObservationShift { shift_days } => Ok(-shift_days),
+        FloatingLegCompounding::CompoundedInArrears { lookback_days } => {
+            Ok(-i32::try_from(lookback_days).unwrap_or(i32::MAX))
+        }
+        FloatingLegCompounding::CompoundedWithObservationShift { shift_days } => {
+            Ok(-i32::try_from(shift_days).unwrap_or(i32::MAX))
+        }
         FloatingLegCompounding::CompoundedWithRateCutoff { .. }
-        | FloatingLegCompounding::Simple => Ok(0),
+        | FloatingLegCompounding::Simple
+        | FloatingLegCompounding::SimpleAverage => Ok(0),
     }
 }
 
@@ -104,14 +109,6 @@ fn adjust_accrual_dates(irs: &InterestRateSwap) -> bool {
     ) || matches!(
         irs.attributes.get_meta("adjust_accrual_dates"),
         Some("true")
-    )
-}
-
-fn builder_overnight_method(
-    compounding: FloatingLegCompounding,
-) -> Result<Option<crate::cashflow::builder::OvernightCompoundingMethod>> {
-    crate::instruments::common_impl::pricing::overnight_conventions::builder_overnight_method(
-        compounding,
     )
 }
 
@@ -376,7 +373,7 @@ pub(crate) fn float_leg_schedule_with_curves_as_of(
             | FloatingLegCompounding::CompoundedWithRateCutoff { .. }
     ) {
         if let Some(market) = curves {
-            let disc = market.get_discount(irs.fixed.discount_curve_id.as_ref())?;
+            let disc = market.get_discount(irs.fixed_leg.discount_curve_id.as_ref())?;
             let proj = if irs.is_single_curve_ois() {
                 market.get_forward(float.forward_curve_id.as_str()).ok()
             } else {
@@ -421,7 +418,9 @@ pub(crate) fn float_leg_schedule_with_curves_as_of(
                 index_tenor: None,
                 reset_lag_days: float.reset_lag_days,
                 fixing_calendar_id: float.fixing_calendar_id.clone(),
-                overnight_compounding: builder_overnight_method(float.compounding.clone())?,
+                compounding: crate::instruments::common_impl::pricing::overnight_conventions::builder_overnight_method(
+                    float.compounding,
+                ),
                 overnight_basis: None,
                 fallback: if curves.is_some() {
                     crate::cashflow::builder::FloatingRateFallback::Error
@@ -485,7 +484,7 @@ pub(crate) fn full_signed_schedule_with_curves_as_of(
             float_sched.scale_amounts(floating_sign)?,
         ],
         Notional::par(irs.notional.amount(), irs.notional.currency())?,
-        irs.fixed.day_count,
+        irs.fixed_leg.day_count,
     ))
 }
 
@@ -549,36 +548,20 @@ mod tests {
     }
 
     #[test]
-    fn rate_cutoff_maps_to_overnight_lockout() {
-        let method = builder_overnight_method(FloatingLegCompounding::CompoundedWithRateCutoff {
-            cutoff_days: 1,
-        })
-        .expect("rate cut-off is a supported canonical-schedule convention");
-
-        assert_eq!(
-            method,
-            Some(
-                crate::cashflow::builder::OvernightCompoundingMethod::CompoundedWithLockout {
-                    lockout_days: 1
-                }
-            )
-        );
-    }
-
-    #[test]
     fn compounded_irs_spread_uses_holiday_adjusted_accrual_fraction() {
         let as_of = date!(2024 - 12 - 02);
         let mut irs = InterestRateSwap::example_standard().expect("example IRS");
         irs.notional = Money::from((1_000_000_i64, irs.notional.currency()));
-        irs.float.start = date!(2025 - 01 - 02);
-        irs.float.end = date!(2025 - 07 - 04);
-        irs.float.frequency = Tenor::semi_annual();
-        irs.float.day_count = DayCount::Act360;
-        irs.float.business_day_convention = BusinessDayConvention::ModifiedFollowing;
-        irs.float.calendar_id = Some("usny".into());
-        irs.float.forward_curve_id = "USD-SOFR".into();
-        irs.float.spread_bp = Decimal::from(100);
-        irs.float.compounding = FloatingLegCompounding::CompoundedInArrears { lookback_days: 0 };
+        irs.float_leg.start = date!(2025 - 01 - 02);
+        irs.float_leg.end = date!(2025 - 07 - 04);
+        irs.float_leg.frequency = Tenor::semi_annual();
+        irs.float_leg.day_count = DayCount::Act360;
+        irs.float_leg.business_day_convention = BusinessDayConvention::ModifiedFollowing;
+        irs.float_leg.calendar_id = Some("usny".into());
+        irs.float_leg.forward_curve_id = "USD-SOFR".into();
+        irs.float_leg.spread_bp = Decimal::from(100);
+        irs.float_leg.compounding =
+            FloatingLegCompounding::CompoundedInArrears { lookback_days: 0 };
         let market = MarketContext::new()
             .insert(
                 DiscountCurve::builder("USD-OIS")
@@ -629,7 +612,7 @@ mod tests {
         // Lookback: backward shift, DCF anchored to the accrual dates.
         let lookback_only = FloatingLegCompounding::CompoundedInArrears { lookback_days: 5 };
         assert_eq!(
-            compounded_total_shift_days(lookback_only.clone()).expect("lookback-only is valid"),
+            compounded_total_shift_days(lookback_only).expect("lookback-only is valid"),
             -5
         );
         assert!(!uses_observation_shift_dcf(lookback_only));
@@ -637,7 +620,7 @@ mod tests {
         // Observation shift: backward shift, DCF follows the observations.
         let shift_only = FloatingLegCompounding::CompoundedWithObservationShift { shift_days: 2 };
         assert_eq!(
-            compounded_total_shift_days(shift_only.clone()).expect("shift-only is valid"),
+            compounded_total_shift_days(shift_only).expect("shift-only is valid"),
             -2
         );
         assert!(uses_observation_shift_dcf(shift_only));
@@ -685,7 +668,7 @@ mod tests {
                 .id(InstrumentId::new(id))
                 .notional(Money::from((10_000_000_i64, Currency::USD)))
                 .side(PayReceive::Pay)
-                .fixed(FixedLegSpec {
+                .fixed_leg(FixedLegSpec {
                     discount_curve_id: disc_id.clone(),
                     rate: Decimal::ZERO,
                     frequency: Tenor::quarterly(),
@@ -696,11 +679,10 @@ mod tests {
                     start,
                     end,
                     par_method: None,
-                    compounding_simple: true,
                     payment_lag_days: 0,
                     end_of_month: false,
                 })
-                .float(FloatLegSpec {
+                .float_leg(FloatLegSpec {
                     discount_curve_id: disc_id.clone(),
                     forward_curve_id: disc_id.clone(), // single-curve OIS
                     spread_bp: Decimal::ZERO,

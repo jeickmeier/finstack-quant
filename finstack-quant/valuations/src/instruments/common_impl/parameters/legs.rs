@@ -140,8 +140,6 @@ pub struct FixedLegSpec {
     pub end: Date,
     /// Optional par-rate calculation method override
     pub par_method: Option<ParRateMethod>,
-    /// If true, use simple interest on accrual fraction
-    pub compounding_simple: bool,
     /// Payment lag in business days after period end (default: 0).
     ///
     /// Bloomberg OIS swaps typically use 2 business days payment lag.
@@ -252,8 +250,9 @@ pub struct FloatLegSpec {
     /// Compounding method for floating coupons.
     ///
     /// Determines how floating rate coupons are calculated:
-    /// - `Simple` (default): LIBOR-style simple interest
-    /// - `CompoundedInArrears`: SOFR/SONIA-style daily compounding
+    /// - `simple` (default): one term forward per period
+    /// - `compounded_*`: SOFR/SONIA-style daily compounding
+    /// - `simple_average` is rejected by [`Self::validate`]
     ///
     /// # Implementation Notes
     ///
@@ -301,100 +300,19 @@ impl FloatLegSpec {
     /// constructor would otherwise guarantee.
     ///
     /// # Errors
-    /// Returns an error stating both dates when `start >= end`.
+    /// Returns an error stating both dates when `start >= end`, and when
+    /// `compounding` is `simple_average`, which swap legs do not implement.
     pub fn validate(&self) -> finstack_quant_core::Result<()> {
+        if self.compounding == crate::instruments::rates::irs::FloatingLegCompounding::SimpleAverage
+        {
+            return Err(crate::instruments::rates::irs::simple_average_unsupported());
+        }
         crate::instruments::common_impl::validation::validate_date_range_strict(
             self.start,
             self.end,
             "FloatLegSpec",
         )
     }
-}
-
-/// Specification for basis swap legs (floating vs floating)
-///
-/// A basis swap leg represents one side of a floating-for-floating interest rate swap,
-/// where two parties exchange payments linked to different floating rate indices
-/// (e.g., 3M SOFR vs 6M SOFR).
-///
-/// Each leg owns its own dates, discount curve, schedule conventions, and calendar,
-/// following the IRS leg-centric pattern used by `FixedLegSpec` and `FloatLegSpec`.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(deny_unknown_fields)]
-pub struct BasisSwapLeg {
-    /// Forward curve identifier for this leg
-    pub forward_curve_id: CurveId,
-    /// Discount curve identifier for present value calculations
-    pub discount_curve_id: CurveId,
-    /// Start date of the leg
-    #[serde(with = "finstack_quant_core::wire::date")]
-    #[cfg_attr(
-        feature = "json-schema",
-        schemars(with = "finstack_quant_core::wire::DateWire")
-    )]
-    pub start: Date,
-    /// End date of the leg
-    #[serde(with = "finstack_quant_core::wire::date")]
-    #[cfg_attr(
-        feature = "json-schema",
-        schemars(with = "finstack_quant_core::wire::DateWire")
-    )]
-    pub end: Date,
-    /// Payment frequency for the leg
-    pub frequency: Tenor,
-    /// Day count convention for accrual calculations
-    pub day_count: DayCount,
-    /// Business day convention for date adjustments
-    #[serde(default = "crate::serde_defaults::bdc_modified_following")]
-    pub business_day_convention: BusinessDayConvention,
-    /// Optional calendar identifier for business day adjustments
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub calendar_id: Option<finstack_quant_core::types::CalendarId>,
-    /// Stub period handling rule
-    #[serde(default = "crate::serde_defaults::stub_short_front")]
-    pub stub: StubKind,
-    /// Spread added to the floating rate, in **basis points**.
-    ///
-    /// # Units
-    ///
-    /// - `Decimal::from(5)` represents 5 basis points (5bp)
-    /// - `Decimal::from(100)` represents 100 basis points (1%)
-    /// - `Decimal::from(-10)` represents -10 basis points
-    ///
-    /// This is consistent with `FloatLegSpec::spread_bp` and `PremiumLegSpec::spread_bp`.
-    ///
-    /// # Typical Market Range
-    ///
-    /// Basis spreads in liquid markets typically range from -50bp to +50bp.
-    /// Values outside ±5000bp are considered extreme and
-    /// will trigger a validation warning during pricing.
-    #[serde(with = "finstack_quant_core::wire::decimal")]
-    #[cfg_attr(
-        feature = "json-schema",
-        schemars(with = "finstack_quant_core::wire::DecimalWire")
-    )]
-    pub spread_bp: Decimal,
-    /// Payment lag in business days after period end (default: 0).
-    ///
-    /// E.g., `payment_lag_days: 2` means payment occurs 2 business days after the
-    /// accrual period end date.
-    #[serde(default)]
-    pub payment_lag_days: i32,
-    /// Reset lag in business days before period start (default: 0).
-    ///
-    /// E.g., `reset_lag_days: 2` means the rate fixing occurs 2 business days before
-    /// the accrual period start date. This follows standard market convention where
-    /// fixing typically precedes the accrual period.
-    #[serde(default)]
-    pub reset_lag_days: i32,
-    /// Overnight vs term compounding for this floating leg.
-    ///
-    /// Defaults to [`crate::instruments::rates::irs::FloatingLegCompounding::Simple`] so tenor-basis swaps
-    /// (3s1s, EURIBOR 6s3s) keep term projection. Set a compounded variant
-    /// for an overnight RFR leg such as SOFR OIS or €STR.
-    #[serde(default)]
-    pub compounding: crate::instruments::rates::irs::FloatingLegCompounding,
 }
 
 /// Specification for CDS premium legs
@@ -522,27 +440,6 @@ impl ProtectionLegSpec {
 // the pricing surface minimal and consistent. If needed, store as metadata in
 // instrument `Attributes`.
 
-/// Rate-compounding convention for a TRS financing leg.
-///
-/// Distinguishes how each accrual period's floating rate is projected from the
-/// forward curve. The two conventions differ by the daily-compounding convexity
-/// — typically 12–15 bp of rate at current levels on an upward-sloping curve.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
-#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(rename_all = "snake_case")]
-pub enum FinancingRateCompounding {
-    /// Term-rate financing (e.g. 3M Term SOFR, EURIBOR): the period rate is the
-    /// simple arithmetic-average forward over the accrual period. This is the
-    /// default and matches a conventional term-rate-funded TRS.
-    #[default]
-    TermRate,
-    /// Overnight-indexed (OIS / RFR) financing — SOFR, SONIA, €STR, TONA: the
-    /// period rate daily-compounds the overnight forward,
-    /// `R = (∏(1 + rᵢ·dᵢ) − 1) / τ`, picking up the compounding convexity that
-    /// the simple arithmetic average drops.
-    OvernightCompounded,
-}
-
 /// Specification for TRS financing legs
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
@@ -561,23 +458,23 @@ pub struct FinancingLegSpec {
     pub spread_bp: Decimal,
     /// Day count convention for accrual calculations
     pub day_count: DayCount,
-    /// Rate-compounding convention (term-rate vs overnight-compounded).
+    /// Rate-compounding convention of the financing rate.
     ///
-    /// Defaults to [`FinancingRateCompounding::TermRate`]. Set to
-    /// [`FinancingRateCompounding::OvernightCompounded`] for SOFR/SONIA/€STR
-    /// overnight-funded TRS so the financing rate captures daily-compounding
-    /// convexity.
+    /// Defaults to `simple` (one term forward per period, e.g. 3M Term SOFR or
+    /// EURIBOR). Use a `compounded_*` variant for SOFR/SONIA/€STR
+    /// overnight-funded TRS so the financing rate captures the daily
+    /// compounding convexity (typically 12–15 bp of rate on an upward curve).
+    /// `simple_average` is rejected.
     #[serde(default)]
-    pub compounding: FinancingRateCompounding,
+    pub compounding: crate::instruments::rates::irs::FloatingLegCompounding,
 }
 
 impl FinancingLegSpec {
     /// Create a new financing leg specification.
     ///
-    /// The compounding convention defaults to [`FinancingRateCompounding::TermRate`]
-    /// for term indices and unknown ids. A registered overnight RFR forward id
-    /// (for example `USD-SOFR-OIS`) is upgraded to
-    /// [`FinancingRateCompounding::OvernightCompounded`]. Use
+    /// The compounding convention defaults to `simple` for term indices and
+    /// unknown ids. A registered overnight RFR forward id (for example
+    /// `USD-SOFR-OIS`) takes its registered OIS convention. Use
     /// [`FinancingLegSpec::with_compounding`] to override.
     ///
     /// # Arguments
@@ -596,10 +493,8 @@ impl FinancingLegSpec {
         let compounding = match crate::instruments::common_impl::pricing::overnight_conventions::compounding_from_index_id(
             forward_curve_id.as_str(),
         ) {
-            Ok(Some(crate::instruments::rates::irs::FloatingLegCompounding::Simple))
-            | Ok(None)
-            | Err(_) => FinancingRateCompounding::TermRate,
-            Ok(Some(_)) => FinancingRateCompounding::OvernightCompounded,
+            Ok(Some(registered)) => registered,
+            Ok(None) | Err(_) => crate::instruments::rates::irs::FloatingLegCompounding::Simple,
         };
         Self {
             discount_curve_id: CurveId::new(discount_curve_id),
@@ -616,7 +511,10 @@ impl FinancingLegSpec {
     ///
     /// * `compounding` - Term-rate versus overnight-compounded convention applied when
     ///   projecting the TRS funding leg.
-    pub fn with_compounding(mut self, compounding: FinancingRateCompounding) -> Self {
+    pub fn with_compounding(
+        mut self,
+        compounding: crate::instruments::rates::irs::FloatingLegCompounding,
+    ) -> Self {
         self.compounding = compounding;
         self
     }
@@ -637,12 +535,17 @@ impl FinancingLegSpec {
                 "{context} requires a non-empty financing forward_curve_id"
             )));
         }
-        if matches!(self.compounding, FinancingRateCompounding::TermRate) {
-            crate::instruments::common_impl::pricing::overnight_conventions::reject_simple_overnight(
-                self.forward_curve_id.as_str(),
-                &crate::instruments::rates::irs::FloatingLegCompounding::Simple,
-            )?;
+        if self.compounding == crate::instruments::rates::irs::FloatingLegCompounding::SimpleAverage
+        {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "{context} financing_leg.compounding = simple_average is not supported; \
+                 use simple or a compounded_* variant"
+            )));
         }
+        crate::instruments::common_impl::pricing::overnight_conventions::reject_simple_overnight(
+            self.forward_curve_id.as_str(),
+            &self.compounding,
+        )?;
         Ok(())
     }
 }
@@ -676,7 +579,6 @@ mod tests {
             start,
             end,
             par_method: None,
-            compounding_simple: true,
             payment_lag_days: 0,
             end_of_month: false,
         }
@@ -768,10 +670,15 @@ mod tests {
         let ois = FinancingLegSpec::new("USD-OIS", "USD-SOFR-OIS", Decimal::ZERO, DayCount::Act360);
         assert_eq!(
             ois.compounding,
-            FinancingRateCompounding::OvernightCompounded
+            crate::instruments::rates::irs::FloatingLegCompounding::CompoundedInArrears {
+                lookback_days: 0
+            }
         );
         let term = FinancingLegSpec::new("USD-OIS", "USD-SOFR-3M", Decimal::ZERO, DayCount::Act360);
-        assert_eq!(term.compounding, FinancingRateCompounding::TermRate);
+        assert_eq!(
+            term.compounding,
+            crate::instruments::rates::irs::FloatingLegCompounding::Simple
+        );
     }
 
     #[test]
@@ -781,14 +688,14 @@ mod tests {
             forward_curve_id: CurveId::new("USD-SOFR-OIS"),
             spread_bp: Decimal::ZERO,
             day_count: DayCount::Act360,
-            compounding: FinancingRateCompounding::TermRate,
+            compounding: crate::instruments::rates::irs::FloatingLegCompounding::Simple,
         };
         let err = spec
             .validate("TRS")
-            .expect_err("TermRate on USD-SOFR-OIS must fail");
+            .expect_err("Simple on USD-SOFR-OIS must fail");
         assert!(
             format!("{err}").contains("Overnight RFR"),
-            "expected overnight/TermRate rejection, got {err}"
+            "expected overnight/simple rejection, got {err}"
         );
     }
 }

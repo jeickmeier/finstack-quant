@@ -138,7 +138,7 @@ fn test_par_spread_calculation() {
         .expect("should succeed");
     assert!(par_spread > 0.0 && par_spread < 2000.0);
     let mut cds_at_par = cds;
-    cds_at_par.premium.coupon_bp = Decimal::try_from(par_spread).expect("valid par_spread");
+    cds_at_par.premium_leg.coupon_bp = Decimal::try_from(par_spread).expect("valid par_spread");
     let npv = pricer
         .npv_full(&cds_at_par, &disc, &credit, as_of)
         .expect("should succeed");
@@ -157,8 +157,8 @@ fn test_settlement_delay_reduces_protection_pv() {
     let as_of = Date::from_calendar_date(2025, time::Month::January, 1).expect("valid date");
     let mut cds0 = create_test_cds("CDS-0D", as_of, as_of.add_months(60), 100.0, 0.40);
     let mut cds20 = cds0.clone();
-    cds0.protection.settlement_delay = 0;
-    cds20.protection.settlement_delay = 20;
+    cds0.protection_leg.settlement_delay = 0;
+    cds20.protection_leg.settlement_delay = 20;
     let pricer = CDSPricer::new();
     let pv0 = pricer
         .pv_protection_leg(&cds0, &disc, &credit, as_of)
@@ -314,7 +314,7 @@ fn test_doc_clause_default_when_omitted() {
         .notional(Money::from((10_000_000_i64, Currency::USD)))
         .side(PayReceive::Pay)
         .convention(crate::instruments::credit_derivatives::cds::CdsConvention::IsdaNa)
-        .premium(
+        .premium_leg(
             crate::instruments::common_impl::parameters::legs::PremiumLegSpec {
                 roll_rule: crate::cashflow::builder::specs::RollRule::CdsImm,
                 start: as_of,
@@ -329,7 +329,7 @@ fn test_doc_clause_default_when_omitted() {
                 discount_curve_id: finstack_quant_core::types::CurveId::new("USD-OIS"),
             },
         )
-        .protection(
+        .protection_leg(
             crate::instruments::common_impl::parameters::legs::ProtectionLegSpec {
                 credit_curve_id: finstack_quant_core::types::CurveId::new("TEST-CREDIT"),
                 recovery_rate: 0.40,
@@ -375,7 +375,7 @@ fn test_schedule_generation_respects_isda_flag_and_calendar_availability() {
         .expect("adjusted ISDA schedule");
 
     let mut cds_no_calendar = cds;
-    cds_no_calendar.premium.calendar_id = None;
+    cds_no_calendar.premium_leg.calendar_id = None;
     let unadjusted_schedule = isda
         .generate_isda_schedule(&cds_no_calendar)
         .expect("unadjusted ISDA schedule");
@@ -770,10 +770,10 @@ fn production_cds_option_audit_premium_frequency_and_stub_are_effective() {
     let start = date!(2025 - 01 - 01);
     let end = date!(2026 - 04 - 01);
     let mut cds = create_test_cds("BESPOKE-SCHEDULE", start, end, 100.0, 0.4);
-    cds.premium.roll_rule = crate::cashflow::builder::specs::RollRule::None;
-    cds.premium.calendar_id = None;
-    cds.premium.frequency = Tenor::semi_annual();
-    cds.premium.stub = StubKind::ShortFront;
+    cds.premium_leg.roll_rule = crate::cashflow::builder::specs::RollRule::None;
+    cds.premium_leg.calendar_id = None;
+    cds.premium_leg.frequency = Tenor::semi_annual();
+    cds.premium_leg.stub = StubKind::ShortFront;
     let pricer = CDSPricer::new();
     let front = pricer.coupon_periods(&cds, start).expect("front schedule");
     let front_ends: Vec<_> = front.iter().map(|p| p.accrual_end).collect();
@@ -781,7 +781,7 @@ fn production_cds_option_audit_premium_frequency_and_stub_are_effective() {
         front_ends,
         vec![date!(2025 - 04 - 01), date!(2025 - 10 - 01), end]
     );
-    cds.premium.stub = StubKind::LongFront;
+    cds.premium_leg.stub = StubKind::LongFront;
     let long = pricer
         .coupon_periods(&cds, start)
         .expect("long front schedule");

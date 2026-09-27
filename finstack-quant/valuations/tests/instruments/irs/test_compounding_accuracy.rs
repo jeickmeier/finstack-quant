@@ -67,7 +67,7 @@ fn test_compounding_lookback_sensitivity() {
         .id("TEST-COMP".into())
         .notional(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
         .side(PayReceive::Receive)
-        .fixed(FixedLegSpec {
+        .fixed_leg(FixedLegSpec {
             discount_curve_id: "DISC".into(),
             rate: rust_decimal::Decimal::try_from(0.05).expect("valid"),
             frequency: Tenor::annual(),
@@ -80,9 +80,8 @@ fn test_compounding_lookback_sensitivity() {
             end_of_month: false,
             stub: finstack_quant_core::dates::StubKind::ShortFront,
             par_method: None,
-            compounding_simple: true,
         })
-        .float(FloatLegSpec {
+        .float_leg(FloatLegSpec {
             discount_curve_id: "DISC".into(),
             forward_curve_id: "FWD".into(),
             frequency: Tenor::annual(),
@@ -108,7 +107,7 @@ fn test_compounding_lookback_sensitivity() {
     // NPV with 2 days lookback
     // Since the curve is increasing, looking back 2 days should use LOWER rates,
     // so the floating leg PV should DECREASE, and NPV (Rec Fixed) should INCREASE.
-    irs.float.compounding = FloatingLegCompounding::CompoundedInArrears { lookback_days: 2 };
+    irs.float_leg.compounding = FloatingLegCompounding::CompoundedInArrears { lookback_days: 2 };
     let npv_lookback = irs.value(&ctx, base).unwrap().amount();
 
     assert!(
@@ -142,7 +141,7 @@ fn test_rate_cutoff_uses_business_day_lockout_over_weekend() {
         .id("TEST-RATE-CUTOFF-BUSINESS-DAY".into())
         .notional(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
         .side(PayReceive::Pay)
-        .fixed(FixedLegSpec {
+        .fixed_leg(FixedLegSpec {
             discount_curve_id: "DISC".into(),
             rate: rust_decimal::Decimal::try_from(0.05).expect("valid"),
             frequency: Tenor::monthly(),
@@ -155,9 +154,8 @@ fn test_rate_cutoff_uses_business_day_lockout_over_weekend() {
             end_of_month: false,
             stub: finstack_quant_core::dates::StubKind::ShortFront,
             par_method: None,
-            compounding_simple: true,
         })
-        .float(FloatLegSpec {
+        .float_leg(FloatLegSpec {
             discount_curve_id: "DISC".into(),
             forward_curve_id: "FWD".into(),
             frequency: Tenor::monthly(),
@@ -178,7 +176,7 @@ fn test_rate_cutoff_uses_business_day_lockout_over_weekend() {
         .unwrap();
 
     let no_cutoff = irs.value(&ctx, base).unwrap().amount();
-    irs.float.compounding = FloatingLegCompounding::CompoundedWithRateCutoff { cutoff_days: 1 };
+    irs.float_leg.compounding = FloatingLegCompounding::CompoundedWithRateCutoff { cutoff_days: 1 };
     let cutoff = irs.value(&ctx, base).unwrap().amount();
 
     assert!(
@@ -255,20 +253,20 @@ fn test_payment_delay_sensitivity() {
         .insert_series(fixings);
 
     let mut irs = InterestRateSwap::example_standard().unwrap();
-    irs.fixed.discount_curve_id = "DISC".into();
-    irs.float.discount_curve_id = "DISC".into();
-    irs.float.forward_curve_id = "FWD".into();
-    irs.float.compounding = FloatingLegCompounding::Simple; // Standard swap
+    irs.fixed_leg.discount_curve_id = "DISC".into();
+    irs.float_leg.discount_curve_id = "DISC".into();
+    irs.float_leg.forward_curve_id = "FWD".into();
+    irs.float_leg.compounding = FloatingLegCompounding::Simple; // Standard swap
 
     // NPV with 0 payment delay
-    irs.fixed.payment_lag_days = 0;
-    irs.float.payment_lag_days = 0;
+    irs.fixed_leg.payment_lag_days = 0;
+    irs.float_leg.payment_lag_days = 0;
     let npv0 = irs.value(&ctx, base).unwrap().amount();
 
     // NPV with 2 days payment delay
     // Delaying payments in a positive rate environment should lower the PV of both legs.
-    irs.fixed.payment_lag_days = 2;
-    irs.float.payment_lag_days = 2;
+    irs.fixed_leg.payment_lag_days = 2;
+    irs.float_leg.payment_lag_days = 2;
     let npv2 = irs.value(&ctx, base).unwrap().amount();
 
     // Since it's a par-like swap, the net effect depends on leg durations.
@@ -303,7 +301,7 @@ fn test_seasoned_compounded_swap_requires_fixings() {
         .id("TEST-SEASONED-COMP".into())
         .notional(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
         .side(PayReceive::Receive)
-        .fixed(FixedLegSpec {
+        .fixed_leg(FixedLegSpec {
             discount_curve_id: "DISC".into(),
             rate: rust_decimal::Decimal::try_from(0.05).expect("valid"),
             frequency: Tenor::annual(),
@@ -316,9 +314,8 @@ fn test_seasoned_compounded_swap_requires_fixings() {
             end_of_month: false,
             stub: finstack_quant_core::dates::StubKind::ShortFront,
             par_method: None,
-            compounding_simple: true,
         })
-        .float(FloatLegSpec {
+        .float_leg(FloatLegSpec {
             discount_curve_id: "DISC".into(),
             forward_curve_id: "FWD".into(),
             frequency: Tenor::annual(),
@@ -387,7 +384,7 @@ fn test_seasoned_compounded_swap_with_fixings_prices() {
         .id("TEST-SEASONED-COMP-WITH-FIX".into())
         .notional(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
         .side(PayReceive::Receive)
-        .fixed(FixedLegSpec {
+        .fixed_leg(FixedLegSpec {
             discount_curve_id: "DISC".into(),
             rate: rust_decimal::Decimal::try_from(0.05).expect("valid"),
             frequency: Tenor::annual(),
@@ -400,9 +397,8 @@ fn test_seasoned_compounded_swap_with_fixings_prices() {
             end_of_month: false,
             stub: finstack_quant_core::dates::StubKind::ShortFront,
             par_method: None,
-            compounding_simple: true,
         })
-        .float(FloatLegSpec {
+        .float_leg(FloatLegSpec {
             discount_curve_id: "DISC".into(),
             forward_curve_id: "FWD".into(),
             frequency: Tenor::annual(),
@@ -466,7 +462,7 @@ fn test_compounded_swap_with_spread_near_zero_rates() {
         .id("TEST-SPREAD-ZERO".into())
         .notional(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
         .side(PayReceive::Pay)
-        .fixed(FixedLegSpec {
+        .fixed_leg(FixedLegSpec {
             discount_curve_id: "DISC".into(),
             rate: rust_decimal::Decimal::try_from(0.005).expect("valid"), // 0.5% fixed
             frequency: Tenor::annual(),
@@ -479,9 +475,8 @@ fn test_compounded_swap_with_spread_near_zero_rates() {
             end_of_month: false,
             stub: finstack_quant_core::dates::StubKind::ShortFront,
             par_method: None,
-            compounding_simple: true,
         })
-        .float(FloatLegSpec {
+        .float_leg(FloatLegSpec {
             discount_curve_id: "DISC".into(),
             forward_curve_id: "FWD".into(),
             frequency: Tenor::annual(),
@@ -559,7 +554,7 @@ fn test_compounded_swap_with_spread_negative_rates() {
         .id("TEST-SPREAD-NEG".into())
         .notional(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
         .side(PayReceive::Pay)
-        .fixed(FixedLegSpec {
+        .fixed_leg(FixedLegSpec {
             discount_curve_id: "DISC".into(),
             rate: rust_decimal::Decimal::try_from(0.005).expect("valid"), // 0.5% fixed
             frequency: Tenor::annual(),
@@ -572,9 +567,8 @@ fn test_compounded_swap_with_spread_negative_rates() {
             end_of_month: false,
             stub: finstack_quant_core::dates::StubKind::ShortFront,
             par_method: None,
-            compounding_simple: true,
         })
-        .float(FloatLegSpec {
+        .float_leg(FloatLegSpec {
             discount_curve_id: "DISC".into(),
             forward_curve_id: "FWD".into(),
             frequency: Tenor::annual(),
@@ -660,7 +654,7 @@ fn test_observation_shift_before_curve_base_date() {
         .id("TEST-OBS-SHIFT".into())
         .notional(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
         .side(PayReceive::Receive)
-        .fixed(FixedLegSpec {
+        .fixed_leg(FixedLegSpec {
             discount_curve_id: "DISC".into(),
             rate: rust_decimal::Decimal::try_from(0.05).expect("valid"),
             frequency: Tenor::monthly(),
@@ -673,9 +667,8 @@ fn test_observation_shift_before_curve_base_date() {
             end_of_month: false,
             stub: finstack_quant_core::dates::StubKind::ShortFront,
             par_method: None,
-            compounding_simple: true,
         })
-        .float(FloatLegSpec {
+        .float_leg(FloatLegSpec {
             discount_curve_id: "DISC".into(),
             forward_curve_id: "FWD".into(),
             frequency: Tenor::monthly(),

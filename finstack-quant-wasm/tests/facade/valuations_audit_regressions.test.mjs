@@ -548,7 +548,7 @@ test('CDS bespoke frequency and stub determine premium cashflow PV', () => {
     ['short_front', ['2025-04-01', '2025-10-01', '2026-04-01']],
     ['long_front', ['2025-10-01', '2026-04-01']],
   ]) {
-    f.instrument.instrument.spec.premium.stub = stub;
+    f.instrument.instrument.spec.premium_leg.stub = stub;
     const actual = valuations.instruments.priceInstrument(
       JSON.stringify(f.instrument),
       JSON.stringify(f.market),

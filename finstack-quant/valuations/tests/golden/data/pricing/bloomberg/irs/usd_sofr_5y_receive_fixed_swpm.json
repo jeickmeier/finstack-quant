@@ -470,7 +470,7 @@
           "currency": "USD"
         },
         "side": "receive",
-        "fixed": {
+        "fixed_leg": {
           "discount_curve_id": "USD-SOFR",
           "rate": "0.035",
           "frequency": {
@@ -483,10 +483,9 @@
           "start": "2026-05-04",
           "end": "2031-05-04",
           "par_method": null,
-          "payment_lag_days": 2,
-          "compounding_simple": true
+          "payment_lag_days": 2
         },
-        "float": {
+        "float_leg": {
           "discount_curve_id": "USD-SOFR",
           "forward_curve_id": "USD-SOFR",
           "spread_bp": "0",

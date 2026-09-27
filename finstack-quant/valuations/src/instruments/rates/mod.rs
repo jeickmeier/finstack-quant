@@ -40,7 +40,7 @@
 //!     .id(InstrumentId::new("IRS-5Y-USD"))
 //!     .notional(Money::from((10_000_000_i64, Currency::USD)))
 //!     .side(PayReceive::Pay)
-//!     .fixed(FixedLegSpec {
+//!     .fixed_leg(FixedLegSpec {
 //!         discount_curve_id: "USD-OIS".into(),
 //!         rate: dec!(0.04),  // 4% fixed rate
 //!         frequency: Tenor::semi_annual(),
@@ -52,10 +52,9 @@
 //!         end: date!(2030-01-15),
 //!         end_of_month: false,
 //!         par_method: None,
-//!         compounding_simple: true,
 //!         payment_lag_days: 0,
 //!     })
-//!     .float(FloatLegSpec {
+//!     .float_leg(FloatLegSpec {
 //!         discount_curve_id: "USD-OIS".into(),
 //!         forward_curve_id: "USD-SOFR-3M".into(),
 //!         spread_bp: dec!(0.0),
@@ -143,7 +142,7 @@ pub use deposit::{ConventionDepositParams, Deposit};
 pub use fra::{ConventionFraParams, ForwardRateAgreement};
 pub use inflation_cap_floor::InflationCapFloor;
 pub use inflation_swap::{InflationSwap, YoYInflationSwap};
-pub use ir_future::{FutureContractSpecs, InterestRateFuture, RateAveragingMethod};
+pub use ir_future::{FutureContractSpecs, InterestRateFuture};
 pub use ir_future_option::InterestRateFutureOption;
 pub use irs::InterestRateSwap;
 pub use repo::{CollateralSpec, CollateralType, Repo, RepoType};

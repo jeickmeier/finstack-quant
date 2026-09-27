@@ -42,7 +42,7 @@ pub(super) fn build_overnight_coupon(
     end: Date,
     spec: &FloatingCouponSpec,
 ) -> Result<(OvernightCoupon, FloatingRateObservation)> {
-    let method = spec.rate_spec.overnight_compounding.ok_or_else(|| {
+    let method = spec.rate_spec.compounding.ok_or_else(|| {
         Error::internal("bond hazard LSMC overnight replay has no compounding method")
     })?;
     let day_count = spec

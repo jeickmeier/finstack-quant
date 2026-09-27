@@ -211,7 +211,7 @@ def cds(idx: int) -> tuple[str, dict]:
             "notional": {"amount": "10000000", "currency": "USD"},
             "side": side,
             "convention": "isda_na",
-            "premium": {
+            "premium_leg": {
                 "roll_rule": "cds_imm",
                 "start": "2025-03-20",
                 "end": f"{mat_year}-03-20",
@@ -223,7 +223,7 @@ def cds(idx: int) -> tuple[str, dict]:
                 "coupon_bp": str(spread),
                 "discount_curve_id": "USD-OIS",
             },
-            "protection": {"credit_curve_id": "CORP-HAZARD", "recovery_rate": 0.4, "settlement_delay": 3},
+            "protection_leg": {"credit_curve_id": "CORP-HAZARD", "recovery_rate": 0.4, "settlement_delay": 3},
             "attributes": {"tags": ["credit"], "meta": {}},
         },
     }
@@ -246,7 +246,7 @@ def cds_index(idx: int) -> tuple[str, dict]:
             "index_factor": 1.0,
             "side": side,
             "convention": "isda_na",
-            "premium": {
+            "premium_leg": {
                 "roll_rule": "cds_imm",
                 "start": "2025-03-20",
                 "end": f"{mat_year}-12-20",
@@ -258,7 +258,7 @@ def cds_index(idx: int) -> tuple[str, dict]:
                 "coupon_bp": str(spread),
                 "discount_curve_id": "USD-OIS",
             },
-            "protection": {"credit_curve_id": "CDX-HAZ", "recovery_rate": 0.4, "settlement_delay": 3},
+            "protection_leg": {"credit_curve_id": "CDX-HAZ", "recovery_rate": 0.4, "settlement_delay": 3},
             "pricing": "single_curve",
             "constituents": [],
             "attributes": {"tags": ["credit-index"], "meta": {}},
@@ -434,7 +434,7 @@ def irs(idx: int) -> tuple[str, dict]:
             "id": iid,
             "notional": {"amount": "10000000", "currency": "USD"},
             "side": side,
-            "fixed": {
+            "fixed_leg": {
                 "discount_curve_id": "USD-OIS",
                 "rate": str(rate),
                 "frequency": {"count": 6, "unit": "months"},
@@ -445,9 +445,8 @@ def irs(idx: int) -> tuple[str, dict]:
                 "start": "2025-04-15",
                 "end": f"{mat_year}-04-15",
                 "par_method": None,
-                "compounding_simple": True,
             },
-            "float": {
+            "float_leg": {
                 "discount_curve_id": "USD-OIS",
                 "forward_curve_id": "USD-SOFR-3M",
                 "spread_bp": "0",
@@ -494,7 +493,6 @@ def swaption(idx: int) -> tuple[str, dict]:
                 "start": "2025-07-17",
                 "end": f"{swap_end_year}-07-17",
                 "par_method": None,
-                "compounding_simple": True,
                 "end_of_month": False,
                 "payment_lag_days": 0,
             },
@@ -564,7 +562,7 @@ def ir_future(idx: int) -> tuple[str, dict]:
             "period_start": f"{y}-{m}-19",
             "period_end": f"{ey}-{em}-18",
             "day_count": "act_360",
-            "rate_averaging": "term",
+            "compounding": "simple",
             "contract_specs": {
                 "face_value": 1000000.0,
                 "tick_size": 0.0025,
@@ -754,14 +752,14 @@ def instrument_description(instrument_spec: dict) -> str:
         return f"Revolver {tenor}Y {drawn:.0f}/{commit:.0f}M"
 
     if itype == "credit_default_swap":
-        tenor = int(s["premium"]["end"][:4]) - ref_year
-        spread = float(s["premium"]["coupon_bp"])
+        tenor = int(s["premium_leg"]["end"][:4]) - ref_year
+        spread = float(s["premium_leg"]["coupon_bp"])
         side = s["side"][:3].title()
         return f"CDS {side} {tenor}Y {spread:.0f}bp"
 
     if itype == "cds_index":
-        tenor = int(s["premium"]["end"][:4]) - ref_year
-        spread = float(s["premium"]["coupon_bp"])
+        tenor = int(s["premium_leg"]["end"][:4]) - ref_year
+        spread = float(s["premium_leg"]["coupon_bp"])
         side = s["side"][:3].title()
         return f"CDX IG {side} {tenor}Y {spread:.0f}bp"
 
@@ -787,8 +785,8 @@ def instrument_description(instrument_spec: dict) -> str:
         return f"{deal} Snr"
 
     if itype == "interest_rate_swap":
-        tenor = int(s["fixed"]["end"][:4]) - ref_year
-        rate = float(s["fixed"]["rate"]) * 100
+        tenor = int(s["fixed_leg"]["end"][:4]) - ref_year
+        rate = float(s["fixed_leg"]["rate"]) * 100
         side = s["side"].title()
         return f"IRS {side} {tenor}Y {rate:.1f}%"
 

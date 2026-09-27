@@ -172,7 +172,7 @@ it.each([
   {
     name: "CDS recovery limit",
     module: cds,
-    path: ["instrument", "spec", "protection", "recovery_rate"],
+    path: ["instrument", "spec", "protection_leg", "recovery_rate"],
     value: 2,
   },
 ])(

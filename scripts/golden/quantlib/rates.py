@@ -232,7 +232,7 @@ def build_irs() -> dict[str, Any]:
                     "id": "USD-SOFR-5Y-QUANTLIB",
                     "notional": {"amount": "10000000", "currency": "USD"},
                     "side": "receive",
-                    "fixed": {
+                    "fixed_leg": {
                         "discount_curve_id": "USD-OIS",
                         "rate": "0.0425",
                         "frequency": {"count": 6, "unit": "months"},
@@ -243,9 +243,8 @@ def build_irs() -> dict[str, Any]:
                         "end": "2031-05-04",
                         "par_method": None,
                         "payment_lag_days": 0,
-                        "compounding_simple": True,
                     },
-                    "float": {
+                    "float_leg": {
                         "discount_curve_id": "USD-OIS",
                         "forward_curve_id": "USD-SOFR-3M",
                         "spread_bp": "0",
@@ -321,7 +320,7 @@ def build_sofr_future() -> dict[str, Any]:
                     "fixing_date": "2026-06-17",
                     "period_start": "2026-06-19",
                     "period_end": "2026-09-18",
-                    "rate_averaging": "term",
+                    "compounding": "simple",
                     "day_count": "act_360",
                     "contract_specs": {
                         "face_value": 1000000.0,

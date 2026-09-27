@@ -149,9 +149,9 @@ pub struct CDSIndex {
     /// Regional ISDA convention
     pub convention: CdsConvention,
     /// Premium leg specification (coupon schedule and discounting)
-    pub premium: PremiumLegSpec,
+    pub premium_leg: PremiumLegSpec,
     /// Protection leg specification (credit curve and settlement)
-    pub protection: ProtectionLegSpec,
+    pub protection_leg: ProtectionLegSpec,
     /// Pricing aggregation mode
     pub pricing: IndexPricing,
     /// Optional list of constituents when using `IndexPricing::Constituents`
@@ -220,7 +220,7 @@ pub struct CDSIndex {
 
 impl CDSIndex {
     fn premium_with_standard_defaults(&self) -> PremiumLegSpec {
-        let mut premium = self.premium.clone();
+        let mut premium = self.premium_leg.clone();
         if premium.calendar_id.is_none() {
             premium.calendar_id = Some(self.convention.default_calendar().into());
         }
@@ -228,7 +228,7 @@ impl CDSIndex {
     }
 
     fn protection_with_standard_defaults(&self) -> ProtectionLegSpec {
-        let mut protection = self.protection.clone();
+        let mut protection = self.protection_leg.clone();
         if protection.settlement_delay == 0 {
             protection.settlement_delay = self.convention.settlement_delay();
         }
@@ -254,7 +254,7 @@ impl CDSIndex {
             index_factor: 1.0,
             side: PayReceive::Pay,
             convention,
-            premium: PremiumLegSpec {
+            premium_leg: PremiumLegSpec {
                 roll_rule: crate::cashflow::builder::specs::RollRule::CdsImm,
                 start: date!(2024 - 03 - 20),
                 end: date!(2029 - 12 - 20),
@@ -266,7 +266,7 @@ impl CDSIndex {
                 coupon_bp: Decimal::from(60),
                 discount_curve_id: CurveId::new("USD-OIS"),
             },
-            protection: ProtectionLegSpec {
+            protection_leg: ProtectionLegSpec {
                 credit_curve_id: CurveId::new("CDX.NA.IG.HAZARD"),
                 recovery_rate: 0.40,
                 settlement_delay: convention.settlement_delay(),
@@ -344,7 +344,7 @@ impl CDSIndex {
             index_factor: 1.0,
             side,
             convention,
-            premium: PremiumLegSpec {
+            premium_leg: PremiumLegSpec {
                 roll_rule: crate::cashflow::builder::specs::RollRule::CdsImm,
                 start,
                 end,
@@ -356,7 +356,7 @@ impl CDSIndex {
                 coupon_bp,
                 discount_curve_id: discount_curve_id.into(),
             },
-            protection: ProtectionLegSpec {
+            protection_leg: ProtectionLegSpec {
                 credit_curve_id: credit_curve_id.into(),
                 recovery_rate,
                 settlement_delay: convention.settlement_delay(),
@@ -441,8 +441,8 @@ impl CDSIndex {
             )?,
             side: self.side,
             convention: self.convention,
-            premium: self.premium_with_standard_defaults(),
-            protection: self.protection_with_standard_defaults(),
+            premium_leg: self.premium_with_standard_defaults(),
+            protection_leg: self.protection_with_standard_defaults(),
             instrument_pricing_overrides: self.instrument_pricing_overrides.clone(),
             metric_pricing_overrides: self.metric_pricing_overrides.clone(),
             scenario_pricing_overrides: self.scenario_pricing_overrides.clone(),
@@ -622,8 +622,8 @@ impl crate::instruments::common_impl::traits::Instrument for CDSIndex {
     }
     fn market_dependencies(&self) -> finstack_quant_core::Result<MarketDependencies> {
         let mut deps = MarketDependencies::new();
-        deps.add_discount_curve(self.premium.discount_curve_id.clone());
-        deps.add_credit_curve(self.protection.credit_curve_id.clone());
+        deps.add_discount_curve(self.premium_leg.discount_curve_id.clone());
+        deps.add_credit_curve(self.protection_leg.credit_curve_id.clone());
         if self.pricing == IndexPricing::Constituents {
             for constituent in &self.constituents {
                 if !constituent.defaulted {
@@ -644,11 +644,11 @@ impl crate::instruments::common_impl::traits::Instrument for CDSIndex {
     }
 
     fn expiry(&self) -> Option<finstack_quant_core::dates::Date> {
-        Some(self.premium.end)
+        Some(self.premium_leg.end)
     }
 
     fn effective_start_date(&self) -> Option<finstack_quant_core::dates::Date> {
-        Some(self.premium.start)
+        Some(self.premium_leg.start)
     }
 
     crate::impl_focused_pricing_overrides!();

@@ -58,9 +58,9 @@ pub mod short_rate_keys;
 mod tree;
 mod tree_model;
 
+pub use config::TreeDiscounting;
 pub use config::{
-    ShortRateModel, ShortRateTreeConfig, TreeCompounding, DEFAULT_CURVE_FIT_TOLERANCE_BP,
-    DEFAULT_NORMAL_VOL,
+    ShortRateModel, ShortRateTreeConfig, DEFAULT_CURVE_FIT_TOLERANCE_BP, DEFAULT_NORMAL_VOL,
 };
 pub use tree::{ShortRateTree, TreeCalibrationResult};
 

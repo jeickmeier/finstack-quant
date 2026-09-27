@@ -293,7 +293,7 @@ pub(crate) fn cds_with_bloomberg_protection_end_extension(
     cds: &CreditDefaultSwap,
 ) -> CreditDefaultSwap {
     let mut extended = cds.clone();
-    extended.premium.end += time::Duration::days(1);
+    extended.premium_leg.end += time::Duration::days(1);
     extended
 }
 

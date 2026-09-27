@@ -2485,7 +2485,8 @@
               "properties": {
                 "lookback_days": {
                   "description": "Business-day lookback applied to rate observations.",
-                  "format": "int32",
+                  "format": "uint32",
+                  "minimum": 0,
                   "type": "integer"
                 }
               },
@@ -2508,7 +2509,8 @@
               "properties": {
                 "shift_days": {
                   "description": "Business days by which observations and accrual weights are shifted.",
-                  "format": "int32",
+                  "format": "uint32",
+                  "minimum": 0,
                   "type": "integer"
                 }
               },
@@ -2531,7 +2533,8 @@
               "properties": {
                 "cutoff_days": {
                   "description": "Number of business days in the rate-cutoff window.",
-                  "format": "int32",
+                  "format": "uint32",
+                  "minimum": 0,
                   "type": "integer"
                 }
               },

@@ -119,7 +119,7 @@ impl CDSPricer {
         // recovery used to bootstrap the hazard curve. The ISDA Standard Model
         // requires the same R in both legs; mismatched recoveries silently
         // mis-scale the protection leg (1 − R) factor.
-        validate_recovery_consistency(cds.protection.recovery_rate, surv)?;
+        validate_recovery_consistency(cds.protection_leg.recovery_rate, surv)?;
 
         // Protection leg covers the period from protection start to premium end.
         // For forward-starting CDS, protection begins at protection_effective_date
@@ -128,7 +128,7 @@ impl CDSPricer {
         //
         // **Audit P3c**: standard CDS (single-name, CDX, iTraxx) terminate
         // protection and premium on the same date, which is why we read
-        // `cds.premium.end` here. `ProtectionLegSpec`
+        // `cds.premium_leg.end` here. `ProtectionLegSpec`
         // (see `common_impl::parameters::legs`) carries no
         // `end_date` field today. Bespoke contracts that need a separate
         // protection termination (contingent CDS, amortising structures
@@ -145,7 +145,7 @@ impl CDSPricer {
                 cds.valuation_convention.protection_step_in_days(),
             );
         let protection_start = step_in.max(cds.protection_start());
-        let protection_end = cds.premium.end;
+        let protection_end = cds.premium_leg.end;
 
         // Expired contract: protection ended on or before the valuation date.
         if protection_end <= as_of {
@@ -167,9 +167,9 @@ impl CDSPricer {
         let t_start = haz_t(surv, protection_start)?;
         let t_end = haz_t(surv, protection_end)?;
 
-        let recovery = cds.protection.recovery_rate;
+        let recovery = cds.protection_leg.recovery_rate;
         let calendar = cds
-            .premium
+            .premium_leg
             .calendar_id
             .as_deref()
             .and_then(finstack_quant_core::dates::calendar::calendar_by_id);
@@ -181,7 +181,7 @@ impl CDSPricer {
             t_start,
             t_end,
             recovery,
-            settlement_delay: cds.protection.settlement_delay,
+            settlement_delay: cds.protection_leg.settlement_delay,
             calendar,
             sp_asof,
             as_of,
@@ -221,12 +221,12 @@ impl CDSPricer {
         as_of: Date,
     ) -> Result<f64> {
         let calendar = cds
-            .premium
+            .premium_leg
             .calendar_id
             .as_deref()
             .and_then(finstack_quant_core::dates::calendar::calendar_by_id);
         let periods = self.coupon_periods(cds, as_of)?;
-        let spread = cds.premium.coupon_bp.to_f64().ok_or_else(|| {
+        let spread = cds.premium_leg.coupon_bp.to_f64().ok_or_else(|| {
             Error::Validation("premium.coupon_bp cannot be represented as f64".into())
         })? / BASIS_POINTS_PER_UNIT;
 
@@ -269,7 +269,7 @@ impl CDSPricer {
                         },
                         start_date: start_date.max(as_of),
                         end_date,
-                        settlement_delay: cds.protection.settlement_delay,
+                        settlement_delay: cds.protection_leg.settlement_delay,
                         calendar,
                         as_of,
                         disc,
@@ -320,7 +320,7 @@ impl CDSPricer {
         // so the linear `tau` interpolation matches QuantLib's
         // `IsdaCdsEngine`.
         let tau_remaining = if inp.cds.valuation_convention.act360_includes_last_day()
-            && inp.cds.premium.day_count == finstack_quant_core::dates::DayCount::Act360
+            && inp.cds.premium_leg.day_count == finstack_quant_core::dates::DayCount::Act360
             && inp.end_date > inp.accrual_start_date
         {
             let days = finstack_quant_core::dates::DayCount::calendar_days(
@@ -330,7 +330,7 @@ impl CDSPricer {
             (days.max(0) as f64) / 360.0
         } else {
             year_fraction(
-                inp.cds.premium.day_count,
+                inp.cds.premium_leg.day_count,
                 inp.accrual_start_date,
                 inp.end_date,
             )?
@@ -400,7 +400,7 @@ impl CDSPricer {
             // both QuantLib knobs are enabled the starting accrual is shifted
             // by one full day.
             let mut bias_days = 0.0;
-            if inp.cds.premium.day_count == finstack_quant_core::dates::DayCount::Act360 {
+            if inp.cds.premium_leg.day_count == finstack_quant_core::dates::DayCount::Act360 {
                 if inp.cds.valuation_convention.act360_includes_last_day() {
                     bias_days += 0.5;
                 }
@@ -470,7 +470,7 @@ impl CdsHazardRepriceCache {
         use rust_decimal::prelude::ToPrimitive;
 
         let pricer = CDSPricer::with_config(CDSPricerConfig::from_cds(cds));
-        let disc = market.get_discount(&cds.premium.discount_curve_id)?;
+        let disc = market.get_discount(&cds.premium_leg.discount_curve_id)?;
         let periods_raw = pricer.coupon_periods(cds, as_of)?;
         let mut periods = Vec::with_capacity(periods_raw.len());
         for period in periods_raw {
@@ -481,7 +481,7 @@ impl CdsHazardRepriceCache {
             let df = disc.as_ref().df_between_dates(as_of, period.payment_date)?;
             periods.push((period, accrual, df));
         }
-        let spread = cds.premium.coupon_bp.to_f64().ok_or_else(|| {
+        let spread = cds.premium_leg.coupon_bp.to_f64().ok_or_else(|| {
             Error::Validation("premium.coupon_bp cannot be represented as f64".into())
         })? / BASIS_POINTS_PER_UNIT;
         let upfront_pv = match cds.upfront {
@@ -527,7 +527,7 @@ impl CdsHazardRepriceCache {
                 .pv_protection_leg_raw(&self.cds, self.disc.as_ref(), surv, self.as_of)?;
         let calendar = self
             .cds
-            .premium
+            .premium_leg
             .calendar_id
             .as_deref()
             .and_then(finstack_quant_core::dates::calendar::calendar_by_id);
@@ -554,7 +554,7 @@ impl CdsHazardRepriceCache {
                             },
                             start_date: period.accrual_start.max(self.as_of),
                             end_date: period.accrual_end,
-                            settlement_delay: self.cds.protection.settlement_delay,
+                            settlement_delay: self.cds.protection_leg.settlement_delay,
                             calendar,
                             as_of: self.as_of,
                             disc: self.disc.as_ref(),
@@ -680,7 +680,7 @@ mod cds_hazard_reprice_cache_tests {
             "CDSPricerConfig::from_cds should enable accrual-on-default"
         );
 
-        let discount = market.get_discount(&cds.premium.discount_curve_id)?;
+        let discount = market.get_discount(&cds.premium_leg.discount_curve_id)?;
         let without_aod = CDSPricer::with_config(CDSPricerConfig {
             include_accrual_on_default: false,
             ..CDSPricerConfig::from_cds(&cds)

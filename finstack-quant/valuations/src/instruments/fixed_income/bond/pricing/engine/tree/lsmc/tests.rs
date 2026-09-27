@@ -142,8 +142,9 @@ fn overnight_pik_test_bond(as_of: Date, maturity: Date) -> Bond {
         unreachable!("floating constructor returned a non-floating specification");
     };
     spec.coupon_type = CouponType::Pik;
-    spec.rate_spec.overnight_compounding =
-        Some(crate::cashflow::builder::OvernightCompoundingMethod::CompoundedInArrears);
+    spec.rate_spec.compounding = Some(
+        crate::cashflow::builder::FloatingLegCompounding::CompoundedInArrears { lookback_days: 0 },
+    );
     spec.rate_spec.overnight_basis = Some(DayCount::Act360);
     spec.rate_spec.fixing_calendar_id = Some("weekends_only".into());
     spec.rate_spec.index_floor_bp = Some(Decimal::from(100));

@@ -499,7 +499,7 @@ fn validate_fraction(value: f64, label: &str) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::builder::specs::{OvernightCompoundingMethod, OvernightIndexConstraintApplication};
+    use crate::builder::specs::{FloatingLegCompounding, OvernightIndexConstraintApplication};
     use finstack_quant_core::dates::WEEKENDS_ONLY;
     use time::macros::date;
 
@@ -587,7 +587,7 @@ mod tests {
         let observations = OvernightObservationSchedule::compile(
             start,
             end,
-            OvernightCompoundingMethod::CompoundedWithLockout { lockout_days: 2 },
+            FloatingLegCompounding::CompoundedWithRateCutoff { cutoff_days: 2 },
             &WEEKENDS_ONLY,
         )
         .expect("overnight observations compile");

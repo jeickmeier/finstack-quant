@@ -152,7 +152,7 @@ impl PyInterestRateSwap {
     /// ...     "IRS-5Y", 10_000_000.0, "pay", 0.035, "2025-01-15", "2030-01-15",
     /// ...     "USD-SOFR", "USD-OIS", "USD-SOFR", currency="USD",
     /// ... )
-    /// >>> swap.float.reset_lag_days
+    /// >>> swap.float_leg.reset_lag_days
     /// 0
     #[staticmethod]
     #[pyo3(signature = (id, notional, side, fixed_rate, start_date, maturity, index_id, discount_curve_id, forward_curve_id, *, currency = None))]
@@ -406,14 +406,14 @@ impl PyInterestRateSwap {
 
     /// Fixed leg specification.
     #[getter]
-    fn fixed(&self) -> PyFixedLegSpec {
-        PyFixedLegSpec::from_inner(self.inner.fixed.clone())
+    fn fixed_leg(&self) -> PyFixedLegSpec {
+        PyFixedLegSpec::from_inner(self.inner.fixed_leg.clone())
     }
 
     /// Floating leg specification.
     #[getter]
-    fn float(&self) -> PyFloatLegSpec {
-        PyFloatLegSpec::from_inner(self.inner.float.clone())
+    fn float_leg(&self) -> PyFloatLegSpec {
+        PyFloatLegSpec::from_inner(self.inner.float_leg.clone())
     }
 
     /// OTC margin (CSA / initial-margin) specification in serde form, or ``None``.
@@ -463,10 +463,10 @@ impl PyInterestRateSwap {
             self.inner.id.as_str(),
             money_repr(self.inner.notional),
             enum_to_py_string(&self.inner.side).unwrap_or_default(),
-            self.inner.fixed.rate,
-            self.inner.fixed.start,
-            self.inner.fixed.end,
-            self.inner.float.forward_curve_id.as_str(),
+            self.inner.fixed_leg.rate,
+            self.inner.fixed_leg.start,
+            self.inner.fixed_leg.end,
+            self.inner.float_leg.forward_curve_id.as_str(),
         )
     }
 }
@@ -583,13 +583,13 @@ impl PyInterestRateSwapBuilder {
     /// InterestRateSwapBuilder
     ///     ``self``, for chaining.
     #[pyo3(text_signature = "($self, value)")]
-    fn fixed<'py>(
+    fn fixed_leg<'py>(
         mut slf: PyRefMut<'py, Self>,
         value: PyRef<'_, PyFixedLegSpec>,
     ) -> PyResult<PyRefMut<'py, Self>> {
         let b = take_irs(&mut slf)?;
-        slf.inner = Some(b.fixed(value.inner.clone()));
-        slf.fields.push(("fixed", value.__repr__()));
+        slf.inner = Some(b.fixed_leg(value.inner.clone()));
+        slf.fields.push(("fixed_leg", value.__repr__()));
         Ok(slf)
     }
 
@@ -605,13 +605,13 @@ impl PyInterestRateSwapBuilder {
     /// InterestRateSwapBuilder
     ///     ``self``, for chaining.
     #[pyo3(text_signature = "($self, value)")]
-    fn float<'py>(
+    fn float_leg<'py>(
         mut slf: PyRefMut<'py, Self>,
         value: PyRef<'_, PyFloatLegSpec>,
     ) -> PyResult<PyRefMut<'py, Self>> {
         let b = take_irs(&mut slf)?;
-        slf.inner = Some(b.float(value.inner.clone()));
-        slf.fields.push(("float", value.__repr__()));
+        slf.inner = Some(b.float_leg(value.inner.clone()));
+        slf.fields.push(("float_leg", value.__repr__()));
         Ok(slf)
     }
 

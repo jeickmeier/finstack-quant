@@ -322,7 +322,6 @@ fn build_irs(
         start,
         end,
         par_method: None,
-        compounding_simple: true,
         payment_lag_days: 0,
         end_of_month: false,
     };
@@ -347,8 +346,8 @@ fn build_irs(
         .id(InstrumentId::new("QL-PARITY-IRS"))
         .notional(Money::new(notional, Currency::USD).expect("valid money fixture"))
         .side(PayReceive::Pay)
-        .fixed(fixed)
-        .float(float)
+        .fixed_leg(fixed)
+        .float_leg(float)
         .build()
         .expect("InterestRateSwap::builder");
     swap.validate().expect("IRS validate");

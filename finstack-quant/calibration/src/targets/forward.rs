@@ -100,7 +100,7 @@ impl ForwardCurveTarget {
             ),
             params.conventions.curve_day_count,
             1_000_000.0,
-            params.conventions.ois_compounding.clone(),
+            params.conventions.ois_compounding,
         )?;
         let prepared_quotes = prepared.quotes;
         let curve_day_count = prepared.curve_day_count;
@@ -284,17 +284,17 @@ impl ForwardCurveTarget {
                     })?;
                 let schedule = finstack_quant_cashflows::builder::periods::build_periods(
                     finstack_quant_cashflows::builder::periods::BuildPeriodsParams {
-                        start: swap.float.start,
-                        end: swap.float.end,
-                        frequency: swap.float.frequency,
-                        stub: swap.float.stub,
-                        business_day_convention: swap.float.business_day_convention,
-                        calendar_id: swap.float.calendar_id.as_deref().unwrap_or(
+                        start: swap.float_leg.start,
+                        end: swap.float_leg.end,
+                        frequency: swap.float_leg.frequency,
+                        stub: swap.float_leg.stub,
+                        business_day_convention: swap.float_leg.business_day_convention,
+                        calendar_id: swap.float_leg.calendar_id.as_deref().unwrap_or(
                             finstack_quant_cashflows::builder::calendar::WEEKENDS_ONLY_ID,
                         ),
-                        end_of_month: swap.float.end_of_month,
+                        end_of_month: swap.float_leg.end_of_month,
                         day_count: finstack_quant_core::dates::DayCount::Act365F,
-                        payment_lag_days: swap.float.payment_lag_days,
+                        payment_lag_days: swap.float_leg.payment_lag_days,
                         reset_lag_days: None,
                         adjust_accrual_dates: false,
                         roll_rule: finstack_quant_cashflows::builder::specs::RollRule::None,

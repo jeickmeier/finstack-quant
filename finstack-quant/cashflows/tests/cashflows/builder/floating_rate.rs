@@ -39,7 +39,7 @@ fn make_float_spec(fallback: FloatingRateFallback, spread_bp: Decimal) -> Floati
             index_tenor: None,
             reset_lag_days: 0,
             fixing_calendar_id: None,
-            overnight_compounding: None,
+            compounding: None,
             overnight_basis: None,
             fallback,
         },
@@ -952,11 +952,11 @@ fn test_floating_rate_all_in_floor() {
     }
 }
 
-use finstack_quant_cashflows::builder::specs::OvernightCompoundingMethod;
+use finstack_quant_cashflows::builder::specs::FloatingLegCompounding;
 
 /// Helper: create a floating coupon spec with overnight compounding enabled.
 fn make_overnight_float_spec(
-    method: OvernightCompoundingMethod,
+    method: FloatingLegCompounding,
     fallback: FloatingRateFallback,
     spread_bp: Decimal,
 ) -> FloatingCouponSpec {
@@ -975,7 +975,7 @@ fn make_overnight_float_spec(
             index_tenor: None,
             reset_lag_days: 0,
             fixing_calendar_id: None,
-            overnight_compounding: Some(method),
+            compounding: Some(method),
             overnight_basis: None,
             fallback,
         },
@@ -1008,7 +1008,7 @@ fn test_overnight_compounding_flat_curve() {
     let init = Money::new(notional, Currency::USD).expect("valid money fixture");
 
     let spec = make_overnight_float_spec(
-        OvernightCompoundingMethod::CompoundedInArrears,
+        FloatingLegCompounding::CompoundedInArrears { lookback_days: 0 },
         FloatingRateFallback::Error,
         dec!(200.0), // 200 bp spread
     );
@@ -1072,7 +1072,7 @@ fn test_overnight_simple_average_flat() {
     let init = Money::new(notional, Currency::USD).expect("valid money fixture");
 
     let spec = make_overnight_float_spec(
-        OvernightCompoundingMethod::SimpleAverage,
+        FloatingLegCompounding::SimpleAverage,
         FloatingRateFallback::Error,
         dec!(200.0), // 200 bp spread
     );
@@ -1123,7 +1123,7 @@ fn test_overnight_lockout_flat_curve() {
     let init = Money::new(notional, Currency::USD).expect("valid money fixture");
 
     let spec = make_overnight_float_spec(
-        OvernightCompoundingMethod::CompoundedWithLockout { lockout_days: 2 },
+        FloatingLegCompounding::CompoundedWithRateCutoff { cutoff_days: 2 },
         FloatingRateFallback::Error,
         dec!(200.0),
     );
@@ -1196,12 +1196,12 @@ fn test_overnight_observation_shift_samples_pre_accrual_window() {
 
     // Zero spread so the emitted rate is exactly the compounded index rate.
     let arrears_spec = make_overnight_float_spec(
-        OvernightCompoundingMethod::CompoundedInArrears,
+        FloatingLegCompounding::CompoundedInArrears { lookback_days: 0 },
         FloatingRateFallback::Error,
         dec!(0.0),
     );
     let shifted_spec = make_overnight_float_spec(
-        OvernightCompoundingMethod::CompoundedWithObservationShift { shift_days: 5 },
+        FloatingLegCompounding::CompoundedWithObservationShift { shift_days: 5 },
         FloatingRateFallback::Error,
         dec!(0.0),
     );
@@ -1290,12 +1290,12 @@ fn test_overnight_lookback_samples_pre_accrual_rates() {
     let market = MarketContext::new().insert(fwd);
 
     let arrears_spec = make_overnight_float_spec(
-        OvernightCompoundingMethod::CompoundedInArrears,
+        FloatingLegCompounding::CompoundedInArrears { lookback_days: 0 },
         FloatingRateFallback::Error,
         dec!(0.0),
     );
     let lookback_spec = make_overnight_float_spec(
-        OvernightCompoundingMethod::CompoundedWithLookback { lookback_days: 5 },
+        FloatingLegCompounding::CompoundedInArrears { lookback_days: 5 },
         FloatingRateFallback::Error,
         dec!(0.0),
     );
@@ -1358,7 +1358,7 @@ fn test_overnight_compounding_no_curve_error_fallback() {
     let init = Money::new(1_000_000.0, Currency::USD).expect("valid money fixture");
 
     let spec = make_overnight_float_spec(
-        OvernightCompoundingMethod::CompoundedInArrears,
+        FloatingLegCompounding::CompoundedInArrears { lookback_days: 0 },
         FloatingRateFallback::Error,
         dec!(200.0),
     );
@@ -1381,7 +1381,7 @@ fn test_overnight_compounding_no_curve_spread_only_fallback() {
     let init = Money::new(1_000_000.0, Currency::USD).expect("valid money fixture");
 
     let spec = make_overnight_float_spec(
-        OvernightCompoundingMethod::CompoundedInArrears,
+        FloatingLegCompounding::CompoundedInArrears { lookback_days: 0 },
         FloatingRateFallback::SpreadOnly,
         dec!(200.0),
     );
@@ -1423,7 +1423,7 @@ fn test_overnight_vs_term_rate_flat_curve_equivalence() {
     let market = make_flat_forward_market(issue, 0.045);
 
     let overnight_spec = make_overnight_float_spec(
-        OvernightCompoundingMethod::SimpleAverage,
+        FloatingLegCompounding::SimpleAverage,
         FloatingRateFallback::Error,
         dec!(200.0),
     );
@@ -1485,7 +1485,7 @@ fn test_overnight_vs_term_rate_flat_curve_equivalence() {
 /// Without the fix, the Saturday-start schedule would lose 2 days of accrual.
 #[test]
 fn test_overnight_compounding_weekend_start_no_lost_days() {
-    use finstack_quant_cashflows::builder::specs::OvernightCompoundingMethod;
+    use finstack_quant_cashflows::builder::specs::FloatingLegCompounding;
     use finstack_quant_core::market_data::context::MarketContext;
     use finstack_quant_core::market_data::term_structures::ForwardCurve;
     use finstack_quant_core::math::interp::InterpStyle;
@@ -1525,7 +1525,7 @@ fn test_overnight_compounding_weekend_start_no_lost_days() {
             index_tenor: None,
             reset_lag_days: 0,
             fixing_calendar_id: None,
-            overnight_compounding: Some(OvernightCompoundingMethod::CompoundedInArrears),
+            compounding: Some(FloatingLegCompounding::CompoundedInArrears { lookback_days: 0 }),
             overnight_basis: None,
             fallback: FloatingRateFallback::Error,
         },
@@ -1638,7 +1638,7 @@ fn test_overnight_empty_fixing_window_errors() {
             index_tenor: None,
             reset_lag_days: 0,
             fixing_calendar_id: None,
-            overnight_compounding: Some(OvernightCompoundingMethod::CompoundedInArrears),
+            compounding: Some(FloatingLegCompounding::CompoundedInArrears { lookback_days: 0 }),
             overnight_basis: None,
             fallback: FloatingRateFallback::Error,
         },
@@ -1769,7 +1769,7 @@ fn test_overnight_sampling_uses_fixing_calendar() {
 
     let build_with_fixing_cal = |fixing_calendar_id: Option<String>| {
         let mut spec = make_overnight_float_spec(
-            OvernightCompoundingMethod::CompoundedInArrears,
+            FloatingLegCompounding::CompoundedInArrears { lookback_days: 0 },
             FloatingRateFallback::Error,
             dec!(0.0),
         );
@@ -1834,7 +1834,7 @@ fn expected_compounded(rates_weights: &[(f64, u32)], total_days: u32) -> f64 {
 /// Helper: single-period overnight schedule [issue, maturity) and the emitted
 /// FloatReset rate.
 fn build_single_overnight_coupon(
-    method: OvernightCompoundingMethod,
+    method: FloatingLegCompounding,
     issue: Date,
     maturity: Date,
     market: &finstack_quant_core::market_data::context::MarketContext,
@@ -1896,7 +1896,7 @@ fn test_seasoned_overnight_coupon_mixes_fixings_and_curve() {
     let market = make_market_with_fixings(curve_base, 0.05, &fixings);
 
     let rate = build_single_overnight_coupon(
-        OvernightCompoundingMethod::CompoundedInArrears,
+        FloatingLegCompounding::CompoundedInArrears { lookback_days: 0 },
         issue,
         maturity,
         &market,
@@ -1983,7 +1983,7 @@ fn test_fully_seasoned_overnight_coupon_from_fixings_only() {
     let market = make_market_with_fixings(curve_base, 0.09, &fixings);
 
     let rate = build_single_overnight_coupon(
-        OvernightCompoundingMethod::CompoundedInArrears,
+        FloatingLegCompounding::CompoundedInArrears { lookback_days: 0 },
         issue,
         maturity,
         &market,
@@ -2063,7 +2063,7 @@ fn test_seasoned_overnight_coupon_rejects_missing_business_day_fixing() {
     let market = make_market_with_fixings(curve_base, 0.09, &fixings);
 
     let err = build_single_overnight_coupon(
-        OvernightCompoundingMethod::CompoundedInArrears,
+        FloatingLegCompounding::CompoundedInArrears { lookback_days: 0 },
         issue,
         maturity,
         &market,
@@ -2113,7 +2113,7 @@ fn test_seasoned_overnight_coupon_prefers_fixing_on_curve_base_date() {
     let market = make_market_with_fixings(curve_base, 0.05, &fixings);
 
     let rate = build_single_overnight_coupon(
-        OvernightCompoundingMethod::CompoundedInArrears,
+        FloatingLegCompounding::CompoundedInArrears { lookback_days: 0 },
         issue,
         maturity,
         &market,
@@ -2150,7 +2150,7 @@ fn test_seasoned_overnight_coupon_prefers_fixing_on_curve_base_date() {
 fn test_seasoned_overnight_lockout_resolves_from_fixings() {
     let issue = Date::from_calendar_date(2025, Month::June, 2).unwrap();
     let maturity = Date::from_calendar_date(2025, Month::June, 16).unwrap();
-    let method = OvernightCompoundingMethod::CompoundedWithLockout { lockout_days: 2 };
+    let method = FloatingLegCompounding::CompoundedWithRateCutoff { cutoff_days: 2 };
 
     // All ten business-day fixings at the constant 4%.
     let fixings: Vec<(Date, f64)> = [2, 3, 4, 5, 6, 9, 10, 11, 12, 13]
@@ -2189,7 +2189,7 @@ fn test_seasoned_overnight_lookback_resolves_from_fixings() {
     let issue = Date::from_calendar_date(2025, Month::June, 2).unwrap();
     let curve_base = Date::from_calendar_date(2025, Month::June, 9).unwrap();
     let maturity = Date::from_calendar_date(2025, Month::June, 16).unwrap();
-    let method = OvernightCompoundingMethod::CompoundedWithLookback { lookback_days: 2 };
+    let method = FloatingLegCompounding::CompoundedInArrears { lookback_days: 2 };
 
     // 2 BD lookback shifts observations back to [Thu 2025-05-29, Wed 2025-06-11];
     // pre-base dates (05-29 .. 06-06) must resolve from fixings.
@@ -2340,7 +2340,7 @@ fn test_overnight_index_floor_defaults_to_daily_fixing_application() {
     let market = make_market_with_fixings(curve_base, 0.00, &fixings);
 
     let mut spec = make_overnight_float_spec(
-        OvernightCompoundingMethod::CompoundedInArrears,
+        FloatingLegCompounding::CompoundedInArrears { lookback_days: 0 },
         FloatingRateFallback::Error,
         dec!(0.0),
     );
@@ -2436,7 +2436,7 @@ fn make_overnight_spec_with_day_count(
     overnight_basis: Option<DayCount>,
 ) -> FloatingCouponSpec {
     let mut spec = make_overnight_float_spec(
-        OvernightCompoundingMethod::CompoundedInArrears,
+        FloatingLegCompounding::CompoundedInArrears { lookback_days: 0 },
         FloatingRateFallback::Error,
         dec!(0.0),
     );

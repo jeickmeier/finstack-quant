@@ -156,9 +156,9 @@ it("adds and removes a flat option volatility quote without duplicating its form
 });
 
 it.each([
-  ["credit_default_swap", "Running coupon", "premium", "coupon_bp", "125"],
-  ["interest_rate_swap", "Fixed coupon", "fixed", "rate", "0.045"],
-  ["xccy_swap", "Leg 2 spread", "leg2", "spread_bp", "15"],
+  ["credit_default_swap", "Running coupon", "premium_leg", "coupon_bp", "125"],
+  ["interest_rate_swap", "Fixed coupon", "fixed_leg", "rate", "0.045"],
+  ["xccy_swap", "Leg 2 spread", "leg2", "leg.spread_bp", "15"],
 ] as const)(
   "keeps the promoted %s deal term in the native instrument JSON",
   async (type, label, branch, key, text) => {
@@ -169,7 +169,12 @@ it.each([
     await canonicalAfter(
       accepted,
       (spec) =>
-        (spec[branch] as Record<string, unknown> | undefined)?.[key] === text,
+        key
+          .split(".")
+          .reduce<unknown>(
+            (node, part) => (node as Record<string, unknown> | undefined)?.[part],
+            spec[branch],
+          ) === text,
     );
   },
 );
