@@ -328,7 +328,7 @@ impl<S: PeriodShockSource> PoolFlowSource for InstrumentPathFlowSource<'_, S> {
         self.alive.clear();
         self.marginal_scratch.clear();
         for (i, schedule) in self.prepared.schedules.iter().enumerate() {
-            let alive = !self.names[i].retired && !request.state.pool_state.is_defaulted[i];
+            let alive = !self.names[i].retired && !request.state.pool_state.defaulted[i];
             let (pd, recovery_rate) = if !alive {
                 (0.0, 0.0)
             } else {

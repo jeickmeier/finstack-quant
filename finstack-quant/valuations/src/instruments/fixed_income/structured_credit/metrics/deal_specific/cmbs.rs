@@ -107,7 +107,7 @@ impl crate::metrics::MetricCalculator for CmbsDscrCalculator {
             let Some(noi) = asset.noi else {
                 continue;
             };
-            if asset.is_defaulted {
+            if asset.defaulted {
                 continue;
             }
             match currency {

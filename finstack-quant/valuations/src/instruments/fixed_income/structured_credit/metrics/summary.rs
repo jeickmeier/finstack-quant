@@ -9,8 +9,8 @@
 use crate::constants::ONE_BASIS_POINT;
 use crate::instruments::fixed_income::loan_terms::RateSpec;
 use crate::instruments::fixed_income::structured_credit::metrics::{
-    calculate_tranche_cs01, calculate_tranche_discount_margin, calculate_tranche_spread_convexity,
-    calculate_tranche_wal, calculate_tranche_z_spread,
+    calculate_tranche_cs01, calculate_tranche_spread_convexity, calculate_tranche_wal,
+    calculate_tranche_z_spread,
 };
 use crate::instruments::fixed_income::structured_credit::pricing::generate_tranche_cashflows;
 use crate::instruments::fixed_income::structured_credit::{
@@ -18,6 +18,7 @@ use crate::instruments::fixed_income::structured_credit::{
     TrancheSeniority,
 };
 use crate::instruments::Instrument;
+use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::bumps::{
     BumpMode, BumpSpec, BumpType, BumpUnits, MarketBump,
@@ -36,7 +37,7 @@ pub struct TrancheMetrics {
     /// Identifier of the tranche.
     pub tranche_id: String,
     /// ISO-4217 code of the currency `pv` and `cs01` are denominated in.
-    pub currency: String,
+    pub currency: Currency,
     /// Present value of the tranche (currency units).
     pub pv: f64,
     /// Model clean settlement price as a percentage of the tranche's CURRENT
@@ -294,7 +295,7 @@ pub fn calculate_tranche_metrics(
             pv += amount.amount() * curve.df_between_dates(as_of, *date)?;
         }
     }
-    let pv_money = Money::new(pv, deal.pool.get_base_currency())?;
+    let pv_money = Money::new(pv, deal.pool.get_currency())?;
     let quote =
         super::quote::SettlementQuote::for_tranche(deal, as_of, current_balance, &cashflows)?;
     let model_dirty = quote.model_dirty(&cashflows.cashflows, curve)?;
@@ -336,12 +337,12 @@ pub fn calculate_tranche_metrics(
     )?;
     let dm_bp = if matches!(tranche.coupon, RateSpec::Floating(_)) {
         Some(
-            calculate_tranche_discount_margin(
+            super::risk::spreads::discount_margin(
                 projection_deal,
                 tranche_id,
                 market,
                 as_of,
-                target_pv,
+                super::risk::spreads::DmTarget::Dirty(target_pv),
             )? / ONE_BASIS_POINT,
         )
     } else {
@@ -375,7 +376,7 @@ pub fn calculate_tranche_metrics(
 
     let metrics = TrancheMetrics {
         tranche_id: tranche_id.to_string(),
-        currency: pv_money.currency().to_string(),
+        currency: pv_money.currency(),
         pv,
         price_pct,
         factor,
@@ -405,7 +406,7 @@ mod currency_stamp_tests {
     fn tranche_metrics_carry_their_currency() {
         let metrics = TrancheMetrics {
             tranche_id: "A".to_string(),
-            currency: "EUR".to_string(),
+            currency: Currency::EUR,
             pv: 1_000.0,
             price_pct: 100.0,
             factor: 1.0,
@@ -429,7 +430,7 @@ mod currency_stamp_tests {
         );
 
         let parsed: TrancheMetrics = serde_json::from_str(&json).expect("deserialize");
-        assert_eq!(parsed.currency, "EUR");
+        assert_eq!(parsed.currency, Currency::EUR);
     }
 
     #[test]
@@ -452,6 +453,33 @@ mod currency_stamp_tests {
             .expect_err("currency is required by the canonical metrics contract");
         assert!(error.to_string().contains("currency"));
     }
+
+    /// The currency stamp is a typed ISO-4217 code: unknown codes fail to load.
+    #[test]
+    fn metrics_reject_unknown_currency_codes() {
+        let mut json = serde_json::to_value(TrancheMetrics {
+            tranche_id: "A".to_string(),
+            currency: Currency::USD,
+            pv: 1_000.0,
+            price_pct: 100.0,
+            factor: 1.0,
+            wal: 3.0,
+            z_spread_bp: 0.0,
+            cs01: -1.0,
+            spread_duration: 3.0,
+            spread_convexity: 12.0,
+            modified_duration: 3.0,
+            convexity: 12.0,
+            target_price_pct: 100.0,
+            wal_to_call: None,
+            z_spread_to_call_bp: None,
+            dm_to_call_bp: None,
+            dm_bp: None,
+        })
+        .expect("serialize");
+        json["currency"] = serde_json::json!("NOT-A-CODE");
+        assert!(serde_json::from_value::<TrancheMetrics>(json).is_err());
+    }
 }
 
 /// Equity analytics from the residual class's projected cashflows.
@@ -462,7 +490,7 @@ pub struct EquityMetrics {
     /// Identifier of the equity tranche.
     pub tranche_id: String,
     /// ISO-4217 code of the currency the amounts are denominated in.
-    pub currency: String,
+    pub currency: Currency,
     /// Cash invested on the valuation date: current balance × purchase price.
     pub invested: f64,
     /// Annualized IRR of `−invested` on the valuation date against every
@@ -549,7 +577,7 @@ pub fn calculate_equity_metrics(
     };
     Ok(EquityMetrics {
         tranche_id: equity.id.to_string(),
-        currency: equity.current_balance.currency().to_string(),
+        currency: equity.current_balance.currency(),
         invested,
         irr,
         moic: if invested > 0.0 {

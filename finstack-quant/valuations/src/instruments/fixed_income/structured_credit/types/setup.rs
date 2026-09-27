@@ -66,25 +66,23 @@ pub struct IncentiveFeeSpec {
 
 impl DealFees {
     /// Create CLO-style fee structure
-    pub fn clo_standard(base_currency: finstack_quant_core::currency::Currency) -> Self {
-        required_assumption(embedded_registry_or_panic().deal_fees("clo_standard", base_currency))
+    pub fn clo_standard(currency: finstack_quant_core::currency::Currency) -> Self {
+        required_assumption(embedded_registry_or_panic().deal_fees("clo_standard", currency))
     }
 
     /// Create ABS-style fee structure
-    pub fn abs_standard(base_currency: finstack_quant_core::currency::Currency) -> Self {
-        required_assumption(
-            embedded_registry_or_panic().deal_fees("abs_auto_standard", base_currency),
-        )
+    pub fn abs_standard(currency: finstack_quant_core::currency::Currency) -> Self {
+        required_assumption(embedded_registry_or_panic().deal_fees("abs_auto_standard", currency))
     }
 
     /// Create CMBS-style fee structure
-    pub fn cmbs_standard(base_currency: finstack_quant_core::currency::Currency) -> Self {
-        required_assumption(embedded_registry_or_panic().deal_fees("cmbs_standard", base_currency))
+    pub fn cmbs_standard(currency: finstack_quant_core::currency::Currency) -> Self {
+        required_assumption(embedded_registry_or_panic().deal_fees("cmbs_standard", currency))
     }
 
     /// Create RMBS-style fee structure
-    pub fn rmbs_standard(base_currency: finstack_quant_core::currency::Currency) -> Self {
-        required_assumption(embedded_registry_or_panic().deal_fees("rmbs_standard", base_currency))
+    pub fn rmbs_standard(currency: finstack_quant_core::currency::Currency) -> Self {
+        required_assumption(embedded_registry_or_panic().deal_fees("rmbs_standard", currency))
     }
 }
 

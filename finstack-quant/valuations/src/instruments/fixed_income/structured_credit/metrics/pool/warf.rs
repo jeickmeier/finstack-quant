@@ -18,13 +18,12 @@ impl crate::metrics::MetricCalculator for CloWarfCalculator {
 
         // Performing par only: defaulted assets are carried at recovery in
         // OC haircuts, not in the rating-factor average.
-        for asset in clo.pool.assets.iter().filter(|a| !a.is_defaulted) {
+        for asset in clo.pool.assets.iter().filter(|a| !a.defaulted) {
             let balance = asset.balance.amount();
             // Assets with no rating use the registry's `NR` (not rated)
             // factor, so the unrated-collateral policy lives in one place
             // (the embedded Moody's table) instead of a hardcoded constant.
-            let rating_factor =
-                moodys_warf_factor(asset.credit_quality.unwrap_or(CreditRating::NR))?;
+            let rating_factor = moodys_warf_factor(asset.rating.unwrap_or(CreditRating::NR))?;
 
             weighted_sum += balance * rating_factor;
             total_balance += balance;

@@ -343,7 +343,7 @@ pub(crate) fn apply_target_oc<S: std::hash::BuildHasher>(
                         let balance = tranche_balances
                             .get(tranche_id.as_str())
                             .copied()
-                            .unwrap_or(Money::from((0_i64, waterfall.base_currency)));
+                            .unwrap_or(Money::from((0_i64, waterfall.currency)));
                         let pay = balance.amount().max(0.0).min(required);
                         required -= pay;
                         *target_balance = Money::new(balance.amount() - pay, balance.currency())

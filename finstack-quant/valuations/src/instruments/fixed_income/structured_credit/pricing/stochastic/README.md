@@ -30,7 +30,7 @@ use finstack_quant_valuations::instruments::fixed_income::structured_credit::Str
 let mut clo = StructuredCredit::example();
 
 // Applies valuation-owned, registry-backed presets for the deal type.
-clo.enable_stochastic_defaults().expect("valid built-in stochastic defaults");
+clo.enable_stochastic().expect("valid built-in stochastic defaults");
 
 // Or supply explicit models-owned specifications.
 clo.with_stochastic_prepay(StochasticPrepaySpec::factor_correlated(

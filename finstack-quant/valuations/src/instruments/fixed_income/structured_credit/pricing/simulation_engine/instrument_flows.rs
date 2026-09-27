@@ -728,7 +728,7 @@ pub(super) fn run_period(
     state: &mut SimulationState<'_>,
     model: PeriodModel<'_>,
 ) -> Result<PoolFlows> {
-    let ccy = state.base_currency;
+    let ccy = state.currency;
     let as_of = prepared.as_of;
     let schedules = &prepared.schedules;
     let k = model.k;
@@ -750,7 +750,7 @@ pub(super) fn run_period(
     // the outstanding at the valuation date.
     if k == 0 {
         for (i, schedule) in schedules.iter().enumerate() {
-            if !state.pool_state.is_defaulted[i] {
+            if !state.pool_state.defaulted[i] {
                 state.pool_state.balances[i] = schedule.opening_balance;
             }
         }
@@ -774,7 +774,7 @@ pub(super) fn run_period(
     }
     for (i, schedule) in schedules.iter().enumerate() {
         let name = &mut names[i];
-        if name.retired || state.pool_state.is_defaulted[i] {
+        if name.retired || state.pool_state.defaulted[i] {
             continue;
         }
         let input = model.names[i];
@@ -839,7 +839,7 @@ pub(super) fn run_period(
         total_default += default_amt;
         total_recovery += default_amt * recovery_rate;
         if pd >= 1.0 - 1e-10 {
-            state.pool_state.is_defaulted[i] = true;
+            state.pool_state.defaulted[i] = true;
             state.pool_state.balances[i] = 0.0;
             name.retired = true;
             name.scale = 0.0;
@@ -1038,7 +1038,7 @@ impl PoolFlowSource for InstrumentScheduleFlowSource {
 
         self.inputs.clear();
         for (i, schedule) in self.prepared.schedules.iter().enumerate() {
-            let alive = !self.names[i].retired && !request.state.pool_state.is_defaulted[i];
+            let alive = !self.names[i].retired && !request.state.pool_state.defaulted[i];
             let (pd, recovery_rate) = if !alive {
                 (0.0, 0.0)
             } else {

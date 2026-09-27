@@ -98,7 +98,7 @@ fn test_pool_stats_default_rate() {
         maturity_date(),
         DayCount::Thirty360,
     );
-    defaulted.is_defaulted = true;
+    defaulted.defaulted = true;
 
     pool.assets.push(defaulted);
     pool.assets.push(PoolAsset::fixed_rate_bond(

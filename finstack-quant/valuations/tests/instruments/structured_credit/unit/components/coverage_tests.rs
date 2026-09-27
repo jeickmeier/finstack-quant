@@ -118,9 +118,9 @@ fn test_oc_test_passing_scenario() {
     let result = test.evaluate(&context).expect("coverage calculation");
 
     // Assert: 125M / 100M = 1.25 (exactly at threshold, should pass)
-    assert!(result.is_passing);
+    assert!(result.passing);
     assert_eq!(result.tranche_id, "SENIOR");
-    assert!((result.current_ratio - 1.25).abs() < 0.01);
+    assert!((result.ratio - 1.25).abs() < 0.01);
 }
 
 #[test]
@@ -212,8 +212,8 @@ fn test_oc_test_failing_scenario() {
     let result = test.evaluate(&context).expect("coverage calculation");
 
     // Assert: 120M / 100M = 1.20 < 1.25 (failing)
-    assert!(!result.is_passing);
-    assert!((result.current_ratio - 1.20).abs() < 0.01);
+    assert!(!result.passing);
+    assert!((result.ratio - 1.20).abs() < 0.01);
 }
 
 #[test]
@@ -266,7 +266,7 @@ fn test_oc_test_with_cash_balance() {
     let result = test.evaluate(&context).expect("coverage calculation");
 
     // Assert: (120M + 5M) / 100M = 1.25 (passing)
-    assert!(result.is_passing);
+    assert!(result.passing);
 }
 
 /// Defaulted collateral is carried at its modeled recovery value until the
@@ -311,8 +311,8 @@ fn oc_numerator_carries_pending_recovery_claims_at_recovery_value() {
     let without_claims = CoverageTestSpec::oc("SENIOR", 1.20)
         .evaluate(&context_for_tranche(&pool, &tranches, zero, zero))
         .expect("coverage calculation");
-    assert!(!without_claims.is_passing);
-    assert!((without_claims.current_ratio - 1.15).abs() < 1e-9);
+    assert!(!without_claims.passing);
+    assert!((without_claims.ratio - 1.15).abs() < 1e-9);
 
     // A 5M pending recovery claim (12.5M defaulted at 40%) is collateral.
     let mut context = context_for_tranche(&pool, &tranches, zero, zero);
@@ -322,11 +322,11 @@ fn oc_numerator_carries_pending_recovery_claims_at_recovery_value() {
         .evaluate(&context)
         .expect("coverage calculation");
     assert!(
-        (with_claims.current_ratio - 1.20).abs() < 1e-9,
+        (with_claims.ratio - 1.20).abs() < 1e-9,
         "pending recovery claims raise the OC numerator by their value: got {}",
-        with_claims.current_ratio
+        with_claims.ratio
     );
-    assert!(with_claims.is_passing);
+    assert!(with_claims.passing);
 }
 
 #[test]
@@ -381,7 +381,7 @@ fn test_oc_test_cure_amount_calculation() {
     // Cure amount = interest diverted to pay down notes; interest is not in
     // the OC numerator, so only the denominator moves:
     // 115M / (100M - X) = 1.25 => X = 8M.
-    assert!(!result.is_passing);
+    assert!(!result.passing);
     assert!(result.cure_amount.is_some());
     assert!((result.cure_amount.unwrap().amount() - 8_000_000.0).abs() < 1.0);
 }
@@ -430,8 +430,8 @@ fn test_ic_test_passing_scenario() {
     let result = test.evaluate(&context).expect("coverage calculation");
 
     // Assert: 1.5M / 1.25M = 1.20 (passing)
-    assert!(result.is_passing);
-    assert!((result.current_ratio - 1.20).abs() < 0.01);
+    assert!(result.passing);
+    assert!((result.ratio - 1.20).abs() < 0.01);
 }
 
 #[test]
@@ -476,7 +476,7 @@ fn test_ic_test_failing_scenario() {
     let result = test.evaluate(&context).expect("coverage calculation");
 
     // Assert: 1M / 1.25M = 0.80 < 1.20 (failing)
-    assert!(!result.is_passing);
+    assert!(!result.passing);
 }
 
 #[test]
@@ -597,8 +597,8 @@ fn test_oc_test_empty_pool() {
     let result = test.evaluate(&context).expect("coverage calculation");
 
     // Assert: Should fail with 0 ratio
-    assert!(!result.is_passing);
-    assert_eq!(result.current_ratio, 0.0);
+    assert!(!result.passing);
+    assert_eq!(result.ratio, 0.0);
 }
 
 #[test]
@@ -643,7 +643,7 @@ fn test_ic_test_no_interest_collections() {
     let result = test.evaluate(&context).expect("coverage calculation");
 
     // Assert: Should fail
-    assert!(!result.is_passing);
+    assert!(!result.passing);
 }
 
 #[test]
@@ -699,8 +699,8 @@ fn test_oc_test_infinity_ratio_zero_debt() {
     let result = test.evaluate(&context).expect("coverage calculation");
 
     // Assert: Should pass with infinite ratio
-    assert!(result.is_passing);
-    assert_eq!(result.current_ratio, f64::INFINITY);
+    assert!(result.passing);
+    assert_eq!(result.ratio, f64::INFINITY);
 }
 
 // IC claims from the waterfall spec (F3)
@@ -755,11 +755,11 @@ fn ic_measures_coverage_of_the_capped_claim() {
 
     // 1.0M collections / 0.5M capped due = 2.0 (passing). The legacy uncapped
     // due of 1.25M would read 0.8 and breach — the structure never owes it.
-    assert!(result.is_passing);
+    assert!(result.passing);
     assert!(
-        (result.current_ratio - 2.0).abs() < 0.01,
+        (result.ratio - 2.0).abs() < 0.01,
         "IC must cover the capped claim, got {}",
-        result.current_ratio
+        result.ratio
     );
 }
 
@@ -784,9 +784,9 @@ fn ic_treats_a_tranche_without_interest_recipient_as_owing_nothing() {
         .evaluate(&context)
         .expect("coverage calculation");
 
-    assert!(result.is_passing);
+    assert!(result.passing);
     assert_eq!(
-        result.current_ratio,
+        result.ratio,
         f64::INFINITY,
         "no claim means nothing to cover"
     );

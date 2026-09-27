@@ -289,9 +289,9 @@ fn public_json_routes_validate_instrument_before_malformed_market() {
         structured_credit_tranche_oas(
             &instrument,
             "missing",
-            f64::NAN,
             market,
             "not-a-date",
+            f64::NAN,
             Some("not-json".to_string()),
         )
         .unwrap_err(),
@@ -418,12 +418,11 @@ fn structured_credit_tranche_metrics_through_json() {
     // Discount margin is only defined for floating-rate tranches; "SR" is
     // fixed-rate, so the binding must surface the validation error rather than
     // silently returning a value (parity with the Python negative test).
-    let dm_err =
-        structured_credit_tranche_discount_margin(&inst, "SR", &mkt, "2024-01-01", 1_000.0)
-            .expect_err("discount margin on a fixed-rate tranche should error");
+    let dm_err = structured_credit_tranche_discount_margin(&inst, "SR", &mkt, "2024-01-01", 100.0)
+        .expect_err("discount margin on a fixed-rate tranche should error");
     assert!(format!("{dm_err:?}").to_lowercase().contains("floating"));
 
-    let oas = structured_credit_tranche_oas(&inst, "SR", 99.0, &mkt, "2024-01-01", None)
+    let oas = structured_credit_tranche_oas(&inst, "SR", &mkt, "2024-01-01", 99.0, None)
         .expect("tranche oas");
     let oas_parsed = js_object_to_json(&oas);
     assert!(oas_parsed["model_price"].as_f64().expect("model_price") > 0.0);

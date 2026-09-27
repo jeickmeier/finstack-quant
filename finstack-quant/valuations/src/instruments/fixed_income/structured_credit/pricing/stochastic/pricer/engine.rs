@@ -1468,7 +1468,7 @@ impl ScenarioCollector {
             ));
         }
         Ok(Self {
-            currency: instrument.pool.get_base_currency(),
+            currency: instrument.pool.get_currency(),
             num_paths,
             antithetic,
             deal_pv_stats: OnlineStats::new(),
@@ -2430,7 +2430,7 @@ mod per_name_copula_tests {
     /// The default-indicator mask is sized by the builder from the
     /// performing-asset count at period start; the asset loop claims one
     /// entry per performing asset in pool-index order. With ≥2 defaults per
-    /// period the loop mutates `is_defaulted` mid-iteration — the alignment
+    /// period the loop mutates `defaulted` mid-iteration — the alignment
     /// must survive that. A misalignment is now a hard `Error` (the engine's
     /// pre-loop length guard), so a successfully-priced, deterministic run
     /// over a high-default scenario proves the mask stays index-aligned.

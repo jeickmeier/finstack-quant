@@ -114,7 +114,7 @@ impl StructuredCredit {
     /// with `annualized: true`. The trustee fee is annual and is divided by
     /// payment periods per year.
     fn template_fees(&self) -> finstack_quant_core::Result<TemplateFees> {
-        let ccy = self.pool.get_base_currency();
+        let ccy = self.pool.get_currency();
         // Reserve replenishment ranks with the junior fees: after every note
         // coupon, ahead of principal. Its target is set per period by the
         // engine from the live pool (`ReserveTarget::resolve`).
@@ -240,6 +240,15 @@ impl StructuredCredit {
         .into_iter()
         .chain(reserve_replenishment)
         .collect();
+        if let Some(spec) = fees.incentive_fee {
+            if !spec.share.is_finite() || !(0.0..=1.0).contains(&spec.share) {
+                return Err(finstack_quant_core::Error::Validation(format!(
+                    "fees.incentive_fee.share must be a decimal fraction in [0, 1] \
+                     (0.2 = 20%), got {}",
+                    spec.share
+                )));
+            }
+        }
         let incentive = fees.incentive_fee.map(|spec| {
             Recipient::new(
                 "incentive_fee",
@@ -274,7 +283,7 @@ impl StructuredCredit {
     /// ```
     #[must_use]
     pub fn with_standard_fees(mut self) -> Self {
-        let ccy = self.pool.get_base_currency();
+        let ccy = self.pool.get_currency();
         self.fees = Some(match self.deal_type {
             DealType::Clo | DealType::Cbo => DealFees::clo_standard(ccy),
             DealType::Cmbs => DealFees::cmbs_standard(ccy),
@@ -473,7 +482,7 @@ impl StructuredCredit {
             None => {
                 // Senior transaction fees, paid ahead of every note.
                 let mut template = Waterfall::standard_sequential(
-                    self.pool.get_base_currency(),
+                    self.pool.get_currency(),
                     &self.tranches,
                     self.template_fees()?,
                     &[],
@@ -563,11 +572,11 @@ impl StructuredCredit {
             ));
         }
 
-        let pool_currency = self.pool.get_base_currency();
-        if waterfall.base_currency != pool_currency {
+        let pool_currency = self.pool.get_currency();
+        if waterfall.currency != pool_currency {
             return Err(invalid(format!(
-                "custom waterfall base_currency {} does not match pool currency {}",
-                waterfall.base_currency, pool_currency
+                "custom waterfall currency {} does not match pool currency {}",
+                waterfall.currency, pool_currency
             )));
         }
 
@@ -738,7 +747,7 @@ impl core::fmt::Display for StructuredCredit {
         let pool_balance = self
             .pool
             .total_balance()
-            .unwrap_or(Money::from((0_i64, self.pool.get_base_currency())));
+            .unwrap_or(Money::from((0_i64, self.pool.get_currency())));
         let tranche_count = self.tranches.tranches.len();
 
         write!(

@@ -81,7 +81,7 @@ impl MetricCalculator for ZSpreadCalculator {
         let spread = calculate_tranche_z_spread(
             flows,
             &curve,
-            Money::new(target, deal.pool.get_base_currency())?,
+            Money::new(target, deal.pool.get_currency())?,
             settlement,
         )? * 1e-4;
         if !(Z_SPREAD_MIN..=Z_SPREAD_MAX).contains(&spread) {
@@ -473,9 +473,9 @@ pub fn calculate_tranche_spread_convexity(
 /// margin. Discounting uses the continuous-compounding spread kernel shared
 /// with the tranche Z-spread solver.
 ///
-/// The returned decimal is zero when `target_pv` equals the model PV. A richer
-/// (higher) target PV produces a negative margin; a cheaper (lower) target PV
-/// produces a positive margin.
+/// The returned decimal is zero when the quoted price equals the model price.
+/// A richer (higher) price produces a negative margin; a cheaper (lower)
+/// price produces a positive margin.
 ///
 /// # Arguments
 ///
@@ -483,13 +483,13 @@ pub fn calculate_tranche_spread_convexity(
 ///   contractual cashflows and discount-curve identifier.
 /// * `tranche_id` - Identifier of the floating-rate tranche whose projected
 ///   cashflows are spread-discounted.
-/// * `context` - Market context supplying the discount curve and any forward
+/// * `market` - Market context supplying the discount curve and any forward
 ///   curves or historical fixings required to project contractual cashflows.
 /// * `as_of` - Valuation date used for cashflow projection and discounting.
-/// * `target_pv` - Dirty settlement value in the tranche's currency, including
-///   accrued interest once. The buyer owns only flows after the deal's
-///   `quote_settlement_date` (valuation date when absent). The sign of
-///   the result is negative above model PV and positive below model PV.
+/// * `market_price_pct` - Clean settlement price as a percent of the
+///   tranche's CURRENT balance (`98.5` = 98.5% of current face). Accrued
+///   interest is added at the deal's `quote_settlement_date` (valuation date
+///   when absent); the buyer owns only flows after that date.
 ///
 /// # Returns
 ///
@@ -498,14 +498,41 @@ pub fn calculate_tranche_spread_convexity(
 /// # Errors
 ///
 /// Returns an error if the deal fails validation, the tranche is missing or is
-/// fixed-rate, required discount/projection market data is unavailable, or the
-/// spread solve fails or exceeds the ±5000 bp bound.
+/// fixed-rate, the price is not finite and positive, required
+/// discount/projection market data is unavailable, or the spread solve fails
+/// or exceeds the ±5000 bp bound.
 pub fn calculate_tranche_discount_margin(
     deal: &StructuredCredit,
     tranche_id: &str,
-    context: &MarketContext,
+    market: &MarketContext,
     as_of: Date,
-    target_pv: Money,
+    market_price_pct: f64,
+) -> Result<f64> {
+    discount_margin(
+        deal,
+        tranche_id,
+        market,
+        as_of,
+        DmTarget::CleanPct(market_price_pct),
+    )
+}
+
+/// Price target for the discount-margin solve.
+pub(crate) enum DmTarget {
+    /// Clean price, percent of current balance; accrued is added.
+    CleanPct(f64),
+    /// Dirty settlement amount in the tranche currency, accrued included.
+    Dirty(Money),
+}
+
+/// Discount-margin solve shared by the public clean-price entry point and the
+/// tranche-metrics summary, which already holds a dirty target.
+pub(crate) fn discount_margin(
+    deal: &StructuredCredit,
+    tranche_id: &str,
+    market: &MarketContext,
+    as_of: Date,
+    target: DmTarget,
 ) -> Result<f64> {
     deal.validate_for_pricing()?;
     let tranche = deal
@@ -529,7 +556,7 @@ pub fn calculate_tranche_discount_margin(
     // spread through the shared z-spread kernel.
     let cashflows =
         crate::instruments::fixed_income::structured_credit::pricing::generate_tranche_cashflows(
-            deal, tranche_id, context, as_of,
+            deal, tranche_id, market, as_of,
         )?;
 
     let quote = super::super::quote::SettlementQuote::for_tranche(
@@ -538,14 +565,23 @@ pub fn calculate_tranche_discount_margin(
         tranche.current_balance.amount(),
         &cashflows,
     )?;
-    if target_pv.currency() != tranche.original_balance.currency() {
-        return Err(finstack_quant_core::Error::Validation(
-            "discount-margin target currency must match the tranche".into(),
-        ));
-    }
-    quote.dirty_target(target_pv.amount())?;
+    let target_pv = match target {
+        DmTarget::CleanPct(pct) => Money::new(
+            quote.clean_target(pct)?,
+            tranche.original_balance.currency(),
+        )?,
+        DmTarget::Dirty(target_pv) => {
+            if target_pv.currency() != tranche.original_balance.currency() {
+                return Err(finstack_quant_core::Error::Validation(
+                    "discount-margin target currency must match the tranche".into(),
+                ));
+            }
+            quote.dirty_target(target_pv.amount())?;
+            target_pv
+        }
+    };
     let disc_curve_id = deal.discount_curve_id.as_str();
-    let discount_curve = context.get_discount(disc_curve_id)?;
+    let discount_curve = market.get_discount(disc_curve_id)?;
 
     let z_spread_bp = calculate_tranche_z_spread(
         &cashflows.cashflows,

@@ -99,7 +99,7 @@ def test_clean_dirty_settlement_target_and_typed_date() -> None:
         "seed": 42,
         "tolerance": 1e-10,
     }
-    oas = structured_credit_tranche_oas(deal, tranche_id, clean, json.dumps(f["market"]), as_of, config)
+    oas = structured_credit_tranche_oas(deal, tranche_id, json.dumps(f["market"]), as_of, clean, config)
     assert abs(oas.oas) < 1e-8
     assert oas.model_price == pytest.approx(clean, abs=1e-8)
     for quote in [{"quoted_clean_price_pct": clean}, {"quoted_dirty_price_currency": dirty}]:

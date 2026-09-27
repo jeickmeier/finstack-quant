@@ -99,20 +99,16 @@ impl HedgeSwap {
         self
     }
 
-    /// Validate the swap for pricing inside a deal in `base_currency` with
+    /// Validate the swap for pricing inside a deal in `currency` with
     /// `tranches`: the swap itself must be priceable, its notional positive
     /// and in the deal currency, and a `TranchePar` reference must name a
     /// note of the deal.
-    pub(crate) fn validate(
-        &self,
-        base_currency: Currency,
-        tranches: &TrancheStructure,
-    ) -> Result<()> {
+    pub(crate) fn validate(&self, currency: Currency, tranches: &TrancheStructure) -> Result<()> {
         self.swap.validate_for_pricing()?;
         let invalid = |msg: String| finstack_quant_core::Error::Validation(msg);
-        if self.swap.notional.currency() != base_currency {
+        if self.swap.notional.currency() != currency {
             return Err(invalid(format!(
-                "hedge swap {} is in {} but the deal is in {base_currency}",
+                "hedge swap {} is in {} but the deal is in {currency}",
                 self.swap.id,
                 self.swap.notional.currency()
             )));

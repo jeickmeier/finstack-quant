@@ -67,8 +67,8 @@ pub(super) fn queue_recoveries(
     pool_flows: &PoolFlows,
     pay_date: Date,
 ) -> Result<()> {
-    let mut workout_recovery = Money::from((0_i64, state.base_currency));
-    let mut workout_par = Money::from((0_i64, state.base_currency));
+    let mut workout_recovery = Money::from((0_i64, state.currency));
+    let mut workout_par = Money::from((0_i64, state.currency));
     for (date, recovery, par) in &pool_flows.workout_claims {
         state.recovery_queue.add_recovery(*date, *recovery, *par);
         workout_recovery = workout_recovery.checked_add(*recovery)?;
@@ -184,7 +184,7 @@ pub(super) fn debt_interest_due(
                         &state.pool,
                         Some(&state.pool_state.balances),
                         Some(special_serviced_open),
-                        state.base_currency,
+                        state.currency,
                     )?,
                 period_start,
                 payment_date: pay_date,
@@ -285,8 +285,8 @@ pub(super) fn apply_excess_spread(
             );
             state.spread_account = state
                 .spread_account
-                .checked_add(Money::new(capture, state.base_currency)?)?;
-            cash.total = Money::new(net_after.max(0.0), state.base_currency)?;
+                .checked_add(Money::new(capture, state.currency)?)?;
+            cash.total = Money::new(net_after.max(0.0), state.currency)?;
             spread_net_capture = capture;
         } else {
             // Draw from the account to cover the interest shortfall (bounded by
@@ -294,14 +294,14 @@ pub(super) fn apply_excess_spread(
             let draw = (debt_interest_due - interest_avail)
                 .min(state.spread_account.amount())
                 .max(0.0);
-            let draw_money = Money::new(draw, state.base_currency)?;
+            let draw_money = Money::new(draw, state.currency)?;
             state.spread_account = state.spread_account.checked_sub(draw_money)?;
             cash.total = cash.total.checked_add(draw_money)?;
             spread_net_capture = -draw;
         }
         cash.interest = cash
             .interest
-            .checked_sub(Money::new(spread_net_capture, state.base_currency)?)?;
+            .checked_sub(Money::new(spread_net_capture, state.currency)?)?;
 
         // Independent reconciliation: the account balance actually moved by
         // exactly the recorded net capture (catches a future edit that updates
@@ -355,7 +355,7 @@ pub(super) fn apply_reserve(
     if let (Some(spec), Some(target)) = (reserve_rules, reserve_target) {
         let excess = state.reserve_balance.amount() - target;
         if spec.release_excess && excess > WRITEDOWN_DE_MINIMIS {
-            let release = Money::new(excess, state.base_currency)?;
+            let release = Money::new(excess, state.currency)?;
             state.reserve_balance = state.reserve_balance.checked_sub(release)?;
             cash.total = cash.total.checked_add(release)?;
             cash.interest = cash.interest.checked_add(release)?;
@@ -372,7 +372,7 @@ pub(super) fn apply_reserve(
         let shortfall = (debt_interest_due - cash.interest.amount()).max(0.0);
         let draw = shortfall.min(state.reserve_balance.amount()).max(0.0);
         if draw > 0.0 {
-            let draw_money = Money::new(draw, state.base_currency)?;
+            let draw_money = Money::new(draw, state.currency)?;
             state.reserve_balance = state.reserve_balance.checked_sub(draw_money)?;
             cash.total = cash.total.checked_add(draw_money)?;
             cash.interest = cash.interest.checked_add(draw_money)?;
@@ -422,7 +422,7 @@ pub(super) fn apply_funding_account(
             let captured = pool_principal.amount().max(0.0);
             state.principal_funding_account = Money::new(
                 state.principal_funding_account.amount() + captured,
-                state.base_currency,
+                state.currency,
             )?;
         } else if (early_amortization || pay_date >= spec.bullet_date)
             && state.principal_funding_account.amount() > 0.0
@@ -437,8 +437,8 @@ pub(super) fn apply_funding_account(
             // mis-states senior WAL, duration and price in exactly the stress
             // scenario the feature models (cash conserved, timing wrong).
             funding_net_release = state.principal_funding_account.amount();
-            state.principal_funding_account = Money::from((0_i64, state.base_currency));
-            let release = Money::new(funding_net_release, state.base_currency)?;
+            state.principal_funding_account = Money::from((0_i64, state.currency));
+            let release = Money::new(funding_net_release, state.currency)?;
             cash.principal = cash.principal.checked_add(release)?;
             cash.total = cash.total.checked_add(release)?;
         }

@@ -323,9 +323,9 @@ fn oas_solves_on_instrument_collateral() {
     let deterministic = calculate_tranche_oas(
         &deal,
         "A",
-        price_pct,
         &market,
         CLOSING,
+        price_pct,
         &OasConfig {
             num_paths: 1,
             stochastic_rates: false,
@@ -343,9 +343,9 @@ fn oas_solves_on_instrument_collateral() {
     let stochastic = calculate_tranche_oas(
         &deal,
         "A",
-        price_pct,
         &market,
         CLOSING,
+        price_pct,
         &OasConfig {
             num_paths: 8,
             stochastic_rates: true,

@@ -44,7 +44,7 @@ impl CoverageTestSpec {
 /// balances (or the closing balances) under `rules.borrowing_base`, the
 /// OC denominator; the cure is the paydown that restores the ratio.
 fn borrowing_base_test(spec: &CoverageTestSpec, context: &TestContext) -> Result<TestResult> {
-    let (test_id, tranche_id, required_ratio) = (
+    let (test_id, tranche_id, trigger_level) = (
         spec.id.clone(),
         spec.tranche_id.as_str(),
         spec.trigger_level,
@@ -101,9 +101,9 @@ fn borrowing_base_test(spec: &CoverageTestSpec, context: &TestContext) -> Result
     } else {
         f64::INFINITY
     };
-    let is_passing = ratio >= required_ratio;
-    let cure_amount = if !is_passing && required_ratio > 0.0 {
-        let paydown = (denominator.amount() - numerator.amount() / required_ratio)
+    let passing = ratio >= trigger_level;
+    let cure_amount = if !passing && trigger_level > 0.0 {
+        let paydown = (denominator.amount() - numerator.amount() / trigger_level)
             .max(0.0)
             .min(denominator.amount());
         Some(Money::new(paydown, denominator.currency())?)
@@ -113,8 +113,8 @@ fn borrowing_base_test(spec: &CoverageTestSpec, context: &TestContext) -> Result
     Ok(TestResult {
         test_id,
         tranche_id: tranche_id.to_string(),
-        current_ratio: ratio,
-        is_passing,
+        ratio,
+        passing,
         cure_amount,
     })
 }
@@ -123,7 +123,7 @@ fn borrowing_base_test(spec: &CoverageTestSpec, context: &TestContext) -> Result
 /// plus the period's principal collections, trust-held cash and defaulted
 /// collateral at its recovery value, over the tested class and its seniors.
 fn oc_test(spec: &CoverageTestSpec, context: &TestContext) -> Result<TestResult> {
-    let (test_id, tranche_id, required_ratio) = (
+    let (test_id, tranche_id, trigger_level) = (
         spec.id.clone(),
         spec.tranche_id.as_str(),
         spec.trigger_level,
@@ -202,18 +202,18 @@ fn oc_test(spec: &CoverageTestSpec, context: &TestContext) -> Result<TestResult>
         f64::INFINITY
     };
 
-    let is_passing = ratio >= required_ratio;
+    let passing = ratio >= trigger_level;
 
     // Note paydown needed to restore OC. The cure is paid from INTEREST
     // proceeds (the executor diverts the interest ranked below the test
     // position), which never enter the OC numerator, so the diversion
     // only shrinks the denominator:
-    //   numerator / (denominator - X) >= required_ratio
-    //   => X >= denominator - numerator / required_ratio
+    //   numerator / (denominator - X) >= trigger_level
+    //   => X >= denominator - numerator / trigger_level
     // A diversion cannot retire more than the OC stack, so cap the cure at
     // the denominator.
-    let cure_amount = if !is_passing && required_ratio > 0.0 {
-        let paydown_needed = denominator.amount() - numerator.amount() / required_ratio;
+    let cure_amount = if !passing && trigger_level > 0.0 {
+        let paydown_needed = denominator.amount() - numerator.amount() / trigger_level;
         let capped = paydown_needed.max(0.0).min(denominator.amount());
         Some(Money::new(capped, denominator.currency())?)
     } else {
@@ -223,8 +223,8 @@ fn oc_test(spec: &CoverageTestSpec, context: &TestContext) -> Result<TestResult>
     Ok(TestResult {
         test_id,
         tranche_id: tranche_id.to_string(),
-        current_ratio: ratio,
-        is_passing,
+        ratio,
+        passing,
         cure_amount,
     })
 }
@@ -232,7 +232,7 @@ fn oc_test(spec: &CoverageTestSpec, context: &TestContext) -> Result<TestResult>
 /// Interest coverage: interest collections net of senior fees over the
 /// interest due to the tested class and its seniors.
 fn ic_test(spec: &CoverageTestSpec, context: &TestContext) -> Result<TestResult> {
-    let (test_id, tranche_id, required_ratio) = (
+    let (test_id, tranche_id, trigger_level) = (
         spec.id.clone(),
         spec.tranche_id.as_str(),
         spec.trigger_level,
@@ -326,18 +326,18 @@ fn ic_test(spec: &CoverageTestSpec, context: &TestContext) -> Result<TestResult>
         f64::INFINITY
     };
 
-    let is_passing = ratio >= required_ratio;
+    let passing = ratio >= trigger_level;
 
     // Size the cure as principal paydown in the diversion tier's recipient
     // order. Every recipient consumes cure cash, while only tested-or-senior
     // notes with positive `rate × accrual` reduce interest due toward
-    // `net_collections / required_ratio`. Exhausted stacks return the
+    // `net_collections / trigger_level`. Exhausted stacks return the
     // principal consumed; an absent payable stack reports the cash shortfall.
-    let cure_amount = if !is_passing {
+    let cure_amount = if !passing {
         let cash_shortfall =
-            (required_ratio * total_interest_due.amount() - net_collections).max(0.0);
-        let cure = if required_ratio > 0.0 {
-            let target_due = net_collections / required_ratio;
+            (trigger_level * total_interest_due.amount() - net_collections).max(0.0);
+        let cure = if trigger_level > 0.0 {
+            let target_due = net_collections / trigger_level;
             let mut remaining_reduction = (total_interest_due.amount() - target_due).max(0.0);
             let mut principal_cure = 0.0;
             let mut found_payable_principal = false;
@@ -386,8 +386,8 @@ fn ic_test(spec: &CoverageTestSpec, context: &TestContext) -> Result<TestResult>
     Ok(TestResult {
         test_id,
         tranche_id: tranche_id.to_string(),
-        current_ratio: ratio,
-        is_passing,
+        ratio,
+        passing,
         cure_amount,
     })
 }
@@ -548,12 +548,12 @@ pub struct TestResult {
     #[serde(default)]
     pub tranche_id: String,
     /// Current calculated ratio.
-    pub current_ratio: f64,
+    pub ratio: f64,
     /// Whether test is currently passing.
-    pub is_passing: bool,
+    pub passing: bool,
     /// Cure amount if failing. For OC tests this is the note paydown, funded
     /// from the interest ranked below the test, that restores the ratio
-    /// (`denominator − numerator / required_ratio`); for IC tests it is the
+    /// (`denominator − numerator / trigger_level`); for IC tests it is the
     /// senior principal paydown needed to reduce the interest denominator
     /// enough for the test to clear.
     pub cure_amount: Option<Money>,
@@ -618,7 +618,7 @@ fn collateral_value(
     let mut ccc_par = 0.0_f64;
     let mut ccc_market_value = 0.0_f64;
     for (index, asset) in pool.assets.iter().enumerate() {
-        if asset.is_defaulted {
+        if asset.defaulted {
             continue;
         }
         let balance = current_balances
@@ -633,7 +633,7 @@ fn collateral_value(
         // unrated by construction (reinvestment purchases, instrument rows).
         let mut carried = balance;
         if let Some(map) = haircuts {
-            let haircut = match asset.credit_quality {
+            let haircut = match asset.rating {
                 Some(rating) => map
                     .get(&rating.bucket())
                     .or_else(|| map.get(&rating))
@@ -654,7 +654,7 @@ fn collateral_value(
                 }
             }
         }
-        if ccc.is_some() && asset.credit_quality.is_some_and(is_ccc_or_below) {
+        if ccc.is_some() && asset.rating.is_some_and(is_ccc_or_below) {
             ccc_par += balance;
             ccc_market_value += balance * asset.market_price_pct.unwrap_or(100.0) / 100.0;
         }
@@ -681,7 +681,7 @@ fn collateral_value(
         }
     }
 
-    Money::new(total.max(0.0), pool.get_base_currency())
+    Money::new(total.max(0.0), pool.get_currency())
 }
 
 #[cfg(test)]
@@ -751,8 +751,8 @@ mod tests {
 
         let result = test.evaluate(&context).expect("calculation should succeed");
 
-        assert_eq!(result.current_ratio, 0.0);
-        assert!(!result.is_passing);
+        assert_eq!(result.ratio, 0.0);
+        assert!(!result.passing);
     }
 
     #[test]
@@ -798,8 +798,8 @@ mod tests {
 
         let result = test.evaluate(&context).expect("calculation should succeed");
 
-        assert!((result.current_ratio - 1.2).abs() < 0.01);
-        assert!(result.is_passing);
+        assert!((result.ratio - 1.2).abs() < 0.01);
+        assert!(result.passing);
     }
 
     /// IC must cover the same claim the waterfall pays: current coupon plus
@@ -853,11 +853,11 @@ mod tests {
         // Collections 1,500 / 2,500 = 0.60, which fails a 1.20 test.
         // Without deferred the ratio would be 1.20 and the test would pass.
         assert!(
-            (result.current_ratio - 0.60).abs() < 0.02,
+            (result.ratio - 0.60).abs() < 0.02,
             "IC must include deferred arrears; got {}",
-            result.current_ratio
+            result.ratio
         );
-        assert!(!result.is_passing);
+        assert!(!result.passing);
     }
 
     /// PIK shortfalls live in balance, not the deferred map. A stale deferred
@@ -910,11 +910,11 @@ mod tests {
         // Coupon ≈ 100k × 5% / 4 = 1,250; stale deferred is ignored.
         // Collections 1,500 / 1,250 = 1.20.
         assert!(
-            (result.current_ratio - 1.20).abs() < 0.02,
+            (result.ratio - 1.20).abs() < 0.02,
             "PIK IC denominator must be coupon only; got {}",
-            result.current_ratio
+            result.ratio
         );
-        assert!(result.is_passing);
+        assert!(result.passing);
     }
 
     /// W-22: the OC cure amount must account for the cash term leaving the
@@ -925,8 +925,8 @@ mod tests {
         // Numerator = collateral (90k, stays) + cash (30k, leaves on diversion).
         // Denominator = 100k. Ratio = 120k / 100k = 1.20, breaches a 1.25 trigger.
         let pool = AssetPool::new("TEST", DealType::Clo, Currency::USD);
-        let required_ratio = 1.25_f64;
-        let test = CoverageTestSpec::oc("SENIOR", required_ratio);
+        let trigger_level = 1.25_f64;
+        let test = CoverageTestSpec::oc("SENIOR", trigger_level);
 
         let tranche = Tranche::new(
             "SENIOR",
@@ -968,10 +968,7 @@ mod tests {
         };
 
         let result = test.evaluate(&context).expect("calculation should succeed");
-        assert!(
-            !result.is_passing,
-            "OC test should breach (ratio 1.20 < 1.25)"
-        );
+        assert!(!result.passing, "OC test should breach (ratio 1.20 < 1.25)");
 
         let cure = result.cure_amount.expect("breach must yield a cure amount");
         let x = cure.amount();
@@ -988,14 +985,14 @@ mod tests {
         // required ratio exactly.
         let cured_ratio = numerator / (denominator - x);
         assert!(
-            (cured_ratio - required_ratio).abs() < 1e-6,
-            "cured ratio {cured_ratio} should equal required {required_ratio}; cure X={x}"
+            (cured_ratio - trigger_level).abs() < 1e-6,
+            "cured ratio {cured_ratio} should equal required {trigger_level}; cure X={x}"
         );
     }
 
     /// Item 11 — a near-1.0 OC trigger must NOT produce an exploding cure.
     ///
-    /// The cure formula carries a `1/(1 − required_ratio)` factor. With a
+    /// The cure formula carries a `1/(1 − trigger_level)` factor. With a
     /// trigger like 1.001 that factor is ~1000×, so an unbounded cure would be
     /// orders of magnitude larger than any principal the structure holds. The
     /// cure must be capped at the OC denominator (test tranche + senior
@@ -1004,8 +1001,8 @@ mod tests {
     fn test_oc_cure_is_capped_at_denominator_for_near_one_trigger() {
         let pool = AssetPool::new("TEST", DealType::Clo, Currency::USD);
         // Trigger just above 1.0 — the pathological regime for the cure.
-        let required_ratio = 1.001_f64;
-        let test = CoverageTestSpec::oc("SENIOR", required_ratio);
+        let trigger_level = 1.001_f64;
+        let test = CoverageTestSpec::oc("SENIOR", trigger_level);
 
         let tranche = Tranche::new(
             "SENIOR",
@@ -1048,10 +1045,7 @@ mod tests {
         };
 
         let result = test.evaluate(&context).expect("calculation should succeed");
-        assert!(
-            !result.is_passing,
-            "OC test must breach (ratio 0.5 < 1.001)"
-        );
+        assert!(!result.passing, "OC test must breach (ratio 0.5 < 1.001)");
 
         let cure = result.cure_amount.expect("breach must yield a cure amount");
         // The raw formula would give a cure of roughly
@@ -1171,8 +1165,8 @@ mod tests {
     #[test]
     fn test_ic_breach_yields_senior_interest_shortfall_cure() {
         let pool = AssetPool::new("TEST", DealType::Clo, Currency::USD);
-        let required_ratio = 1.20_f64;
-        let test = CoverageTestSpec::ic("TEST_TRANCHE", required_ratio);
+        let trigger_level = 1.20_f64;
+        let test = CoverageTestSpec::ic("TEST_TRANCHE", trigger_level);
 
         let tranche = Tranche::new(
             "TEST_TRANCHE",
@@ -1211,7 +1205,7 @@ mod tests {
         };
 
         let result = test.evaluate(&context).expect("calculation should succeed");
-        assert!(!result.is_passing, "IC test should breach");
+        assert!(!result.passing, "IC test should breach");
         let cure = result
             .cure_amount
             .expect("an IC breach must yield a non-None cure amount");
@@ -1258,7 +1252,7 @@ mod haircut_tests {
                 maturity(),
                 DayCount::Thirty360,
             );
-            asset.credit_quality = Some(rating);
+            asset.rating = Some(rating);
             pool.assets.push(asset);
         }
         pool
@@ -1329,7 +1323,7 @@ mod haircut_tests {
             CoverageTestSpec::ic("A", 1.20)
                 .evaluate(&ctx)
                 .expect("ic test")
-                .current_ratio
+                .ratio
         };
 
         let without = ratio_with_fees(0.0);
@@ -1398,7 +1392,7 @@ mod haircut_tests {
         let result = CoverageTestSpec::ic("A", 1.20)
             .evaluate(&ctx)
             .expect("ic test");
-        assert!(!result.is_passing, "the IC test must breach");
+        assert!(!result.passing, "the IC test must breach");
 
         let cure = result
             .cure_amount
@@ -1458,7 +1452,7 @@ mod haircut_tests {
         let tranches =
             TrancheStructure::new(vec![senior, test_tranche]).expect("tranche structure");
         let collections = 100.0;
-        let required_ratio = 1.20;
+        let trigger_level = 1.20;
         let ctx = TestContext {
             pool: &pool,
             tranches: &tranches,
@@ -1483,7 +1477,7 @@ mod haircut_tests {
             deferred_interest: None,
         };
 
-        let result = CoverageTestSpec::ic("B", required_ratio)
+        let result = CoverageTestSpec::ic("B", trigger_level)
             .evaluate(&ctx)
             .expect("IC test");
         let actual = result.cure_amount.expect("breach cure").amount();
@@ -1506,7 +1500,7 @@ mod haircut_tests {
             )
             .expect("junior accrual");
         let total_due = 100_000.0 * 0.04 * senior_tau + 100_000.0 * 0.16 * junior_tau;
-        let target_due = collections / required_ratio;
+        let target_due = collections / trigger_level;
         let reduction_after_senior = total_due - target_due - 100_000.0 * 0.04 * senior_tau;
         let expected = 100_000.0 + reduction_after_senior / (0.16 * junior_tau);
 
@@ -1562,7 +1556,7 @@ mod haircut_tests {
         .expect("floating tranche");
         let tranches = TrancheStructure::new(vec![tranche]).expect("tranche structure");
         let collections = 100.0;
-        let required_ratio = 1.20;
+        let trigger_level = 1.20;
         let ctx = TestContext {
             pool: &pool,
             tranches: &tranches,
@@ -1587,7 +1581,7 @@ mod haircut_tests {
             deferred_interest: None,
         };
 
-        let result = CoverageTestSpec::ic("A", required_ratio)
+        let result = CoverageTestSpec::ic("A", trigger_level)
             .evaluate(&ctx)
             .expect("IC test");
         let actual = result.cure_amount.expect("breach cure").amount();
@@ -1597,7 +1591,7 @@ mod haircut_tests {
             .expect("market-aware coupon");
         let tau = 1.0 / frequency_periods_per_year(tranches.tranches[0].frequency);
         let total_due = 100_000.0 * all_in_rate * tau;
-        let expected = (total_due - collections / required_ratio) / (all_in_rate * tau);
+        let expected = (total_due - collections / trigger_level) / (all_in_rate * tau);
 
         assert!(
             (actual - expected).abs() < 1e-6,
@@ -1613,7 +1607,7 @@ mod haircut_tests {
             period_start: Some(start),
             ..ctx
         };
-        let result = CoverageTestSpec::ic("A", required_ratio)
+        let result = CoverageTestSpec::ic("A", trigger_level)
             .evaluate(&projected)
             .expect("future coverage dates must not require future fixings");
         let rate = tranches.tranches[0]
@@ -1628,15 +1622,15 @@ mod haircut_tests {
                 finstack_quant_core::dates::DayCountContext::default(),
             )
             .unwrap();
-        assert!((result.current_ratio - collections / (100_000.0 * rate * accrual)).abs() < 1e-12);
-        let expected_cure = 100_000.0 - collections / (required_ratio * rate * accrual);
+        assert!((result.ratio - collections / (100_000.0 * rate * accrual)).abs() < 1e-12);
+        let expected_cure = 100_000.0 - collections / (trigger_level * rate * accrual);
         assert!((result.cure_amount.unwrap().amount() - expected_cure).abs() < 1e-6);
 
         let missing_fixing = TestContext {
             valuation_date: start,
             ..projected
         };
-        let error = CoverageTestSpec::ic("A", required_ratio)
+        let error = CoverageTestSpec::ic("A", trigger_level)
             .evaluate(&missing_fixing)
             .expect_err("a reset on the valuation date still requires its exact fixing");
         assert!(error.to_string().contains("2025-05-01"), "{error}");
@@ -1693,14 +1687,14 @@ mod haircut_tests {
         // Haircut factor: (500k + 0.5*500k) / 1,000k = 0.75.
         // Numerator must be 400k * 0.75 = 300k against a 500k tranche => 0.60.
         assert!(
-            (result.current_ratio - 0.60).abs() < 1e-9,
+            (result.ratio - 0.60).abs() < 1e-9,
             "the haircut must scale the CURRENT balance: expected 0.60 \
              (400k x 0.75 / 500k), got {}. A ratio near 1.5 means the numerator \
              is still the frozen closing pool.",
-            result.current_ratio
+            result.ratio
         );
         assert!(
-            !result.is_passing,
+            !result.passing,
             "a 0.60 OC ratio against a 1.0 requirement must breach"
         );
     }
@@ -1745,10 +1739,10 @@ mod haircut_tests {
             .evaluate(&ctx)
             .expect("OC test");
         assert!(
-            (result.current_ratio - 0.50).abs() < 1e-9,
+            (result.ratio - 0.50).abs() < 1e-9,
             "live per-asset haircut should be (100k + 50% × 300k) / 500k = \
              0.50, got {}",
-            result.current_ratio
+            result.ratio
         );
     }
 
@@ -1788,9 +1782,9 @@ mod haircut_tests {
             .evaluate(&ctx)
             .expect("oc test");
         assert!(
-            (result.current_ratio - 0.80).abs() < 1e-9,
+            (result.ratio - 0.80).abs() < 1e-9,
             "without haircuts the ratio is 400k / 500k = 0.80, got {}",
-            result.current_ratio
+            result.ratio
         );
     }
 }

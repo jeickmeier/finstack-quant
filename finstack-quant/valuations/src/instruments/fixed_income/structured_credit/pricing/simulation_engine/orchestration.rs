@@ -26,7 +26,7 @@ fn append_residual_principal(
                 .amount();
             let fee = (amount.amount() - shortfall).max(0.0) * spec.share;
             if fee > 0.0 {
-                let fee = Money::new(fee, state.base_currency)?;
+                let fee = Money::new(fee, state.currency)?;
                 if let Some(last) = state.period_diagnostics.last_mut() {
                     last.fees_paid = last.fees_paid.checked_add(fee)?;
                 }
@@ -85,11 +85,10 @@ fn release_spread_account(
             .map_or(0.0, |amount| amount.amount());
         let interest = remaining.min(deferred).max(0.0);
         if interest > 0.0 {
-            append_terminal_interest(state, &id, Money::new(interest, state.base_currency)?, date)?;
-            state.deferred_interest.insert(
-                id.clone(),
-                Money::new(deferred - interest, state.base_currency)?,
-            );
+            append_terminal_interest(state, &id, Money::new(interest, state.currency)?, date)?;
+            state
+                .deferred_interest
+                .insert(id.clone(), Money::new(deferred - interest, state.currency)?);
             remaining -= interest;
         }
         if trapped {
@@ -99,12 +98,12 @@ fn release_spread_account(
                 append_residual_principal(
                     state,
                     &id,
-                    Money::new(principal, state.base_currency)?,
+                    Money::new(principal, state.currency)?,
                     date,
                 )?;
                 state
                     .tranche_balances
-                    .insert(id, Money::new(balance - principal, state.base_currency)?);
+                    .insert(id, Money::new(balance - principal, state.currency)?);
                 remaining -= principal;
             }
         }
@@ -112,16 +111,11 @@ fn release_spread_account(
     if remaining > 0.0 {
         if let Some(&i) = order.last() {
             let id = state.tranches.tranches[i].id.to_string();
-            append_terminal_interest(
-                state,
-                &id,
-                Money::new(remaining, state.base_currency)?,
-                date,
-            )?;
+            append_terminal_interest(state, &id, Money::new(remaining, state.currency)?, date)?;
         }
     }
-    state.spread_account = Money::from((0_i64, state.base_currency));
-    state.undistributed_interest = Money::from((0_i64, state.base_currency));
+    state.spread_account = Money::from((0_i64, state.currency));
+    state.undistributed_interest = Money::from((0_i64, state.currency));
     Ok(())
 }
 
@@ -154,22 +148,17 @@ fn distribute_terminal_principal(
         let balance = state.tranche_balances[&id].amount();
         let paid = remaining.min(balance).max(0.0);
         if paid > 0.0 {
-            append_residual_principal(state, &id, Money::new(paid, state.base_currency)?, date)?;
+            append_residual_principal(state, &id, Money::new(paid, state.currency)?, date)?;
             state
                 .tranche_balances
-                .insert(id, Money::new(balance - paid, state.base_currency)?);
+                .insert(id, Money::new(balance - paid, state.currency)?);
             remaining -= paid;
         }
     }
     if remaining > 0.0 {
         if let Some(&i) = order.last() {
             let id = state.tranches.tranches[i].id.to_string();
-            append_residual_principal(
-                state,
-                &id,
-                Money::new(remaining, state.base_currency)?,
-                date,
-            )?;
+            append_residual_principal(state, &id, Money::new(remaining, state.currency)?, date)?;
         }
     }
     Ok(())
@@ -193,7 +182,7 @@ fn release_reserve_account(state: &mut SimulationState<'_>) -> Result<()> {
             append_residual_principal(state, &id, state.reserve_balance, date)?;
         }
     }
-    state.reserve_balance = Money::from((0_i64, state.base_currency));
+    state.reserve_balance = Money::from((0_i64, state.currency));
     Ok(())
 }
 
@@ -215,14 +204,14 @@ fn realize_principal_shortfall(state: &mut SimulationState<'_>, date: Date) -> R
         if balance <= WRITEDOWN_DE_MINIMIS {
             continue;
         }
-        let shortfall = Money::new(balance, state.base_currency)?;
+        let shortfall = Money::new(balance, state.currency)?;
         if let Some(res) = state.results.get_mut(&id) {
             res.writedown_flows.push((date, shortfall));
             res.total_writedown = res.total_writedown.checked_add(shortfall)?;
         }
         state
             .tranche_balances
-            .insert(id, Money::from((0_i64, state.base_currency)));
+            .insert(id, Money::from((0_i64, state.currency)));
     }
     Ok(())
 }
@@ -233,8 +222,8 @@ fn release_principal_funding_account(state: &mut SimulationState<'_>) -> Result<
         .principal_funding_account
         .checked_add(state.undistributed_principal)?;
     distribute_terminal_principal(state, amount, state.prev_date.unwrap_or(state.closing_date))?;
-    state.principal_funding_account = Money::from((0_i64, state.base_currency));
-    state.undistributed_principal = Money::from((0_i64, state.base_currency));
+    state.principal_funding_account = Money::from((0_i64, state.currency));
+    state.undistributed_principal = Money::from((0_i64, state.currency));
     Ok(())
 }
 
@@ -250,7 +239,7 @@ fn liquidation_value(
     (0..pool.len())
         .map(|i| {
             let balance = pool.balances[i].max(0.0);
-            if balance <= 0.0 || pool.is_defaulted[i] {
+            if balance <= 0.0 || pool.defaulted[i] {
                 return 0.0;
             }
             if let Some(spec) = pool.liquidation[i] {
@@ -273,7 +262,7 @@ fn redeem(
     redemption_price_pct: f64,
     pay_date: Date,
 ) -> Result<()> {
-    let zero = Money::from((0_i64, state.base_currency));
+    let zero = Money::from((0_i64, state.currency));
     let _ = state.recovery_queue.drain_pending();
     state.principal_funding_account = zero;
     state.reserve_balance = zero;
@@ -324,19 +313,19 @@ fn redeem(
 
         if let Some(res) = state.results.get_mut(tranche_id_str) {
             res.cashflows
-                .push((pay_date, Money::new(redemption_amt, state.base_currency)?));
+                .push((pay_date, Money::new(redemption_amt, state.currency)?));
             if interest_paid > 0.0 {
-                let interest_money = Money::new(interest_paid, state.base_currency)?;
+                let interest_money = Money::new(interest_paid, state.currency)?;
                 res.interest_flows.push((pay_date, interest_money));
                 res.total_interest = res.total_interest.checked_add(interest_money)?;
             }
             if principal_paid > 0.0 {
-                let principal_money = Money::new(principal_paid, state.base_currency)?;
+                let principal_money = Money::new(principal_paid, state.currency)?;
                 res.principal_flows.push((pay_date, principal_money));
                 res.total_principal = res.total_principal.checked_add(principal_money)?;
             }
             if haircut > WRITEDOWN_DE_MINIMIS {
-                let haircut_money = Money::new(haircut, state.base_currency)?;
+                let haircut_money = Money::new(haircut, state.currency)?;
                 res.writedown_flows.push((pay_date, haircut_money));
                 res.total_writedown = res.total_writedown.checked_add(haircut_money)?;
             }
@@ -345,13 +334,13 @@ fn redeem(
         if let Some(def) = state.deferred_interest.get_mut(tranche_id_str) {
             let cured = interest_paid.min(deferred).max(0.0);
             *def = def
-                .checked_sub(Money::new(cured, state.base_currency)?)
+                .checked_sub(Money::new(cured, state.currency)?)
                 .unwrap_or(zero);
         }
         // Principal paid and any call discount retire notional.
         if let Some(bal) = state.tranche_balances.get_mut(tranche_id_str) {
             *bal = bal
-                .checked_sub(Money::new(principal_paid + haircut, state.base_currency)?)
+                .checked_sub(Money::new(principal_paid + haircut, state.currency)?)
                 .unwrap_or(zero);
         }
     }
@@ -366,7 +355,7 @@ fn redeem(
             .max_by_key(|t| t.payment_priority)
             .map(|t| t.id.as_str().to_string());
         if let Some(id) = residual_id {
-            let residual = Money::new(available, state.base_currency)?;
+            let residual = Money::new(available, state.currency)?;
             append_residual_principal(state, &id, residual, pay_date)?;
         }
     }
@@ -442,7 +431,7 @@ pub(crate) fn prepare_deal_simulation(
     // the deal *silently* (the cap/lock-out becomes a no-op). See
     // `WaterfallRules::validate`.
     if let Some(rules) = instrument.waterfall_rules.as_ref() {
-        rules.validate(tranches, instrument.pool.get_base_currency())?;
+        rules.validate(tranches, instrument.pool.get_currency())?;
     }
 
     // A custom waterfall must be structurally valid, reference only real
@@ -679,10 +668,7 @@ pub(crate) fn simulate_prepared<S: PoolFlowSource + ?Sized>(
                     .credit_model
                     .recovery_spec
                     .recovery_rate(seasoning_months),
-            ) + state
-                .recovery_queue
-                .pending_amount(state.base_currency)
-                .amount()
+            ) + state.recovery_queue.pending_amount(state.currency).amount()
                 + state.principal_funding_account.amount()
                 + state.reserve_balance.amount()
                 + state.spread_account.amount()
@@ -781,7 +767,7 @@ pub(crate) fn simulate_instrument_pool(
 ) -> Result<SimulationRun> {
     let resolved = instrument.resolved_for_pricing()?;
     let instrument = &resolved;
-    let currency = instrument.pool.get_base_currency();
+    let currency = instrument.pool.get_currency();
     match prepare_deal_simulation(instrument, as_of)? {
         Some(prepared) => {
             let mut source = super::instrument_flows::InstrumentScheduleFlowSource::prepare(
@@ -816,7 +802,7 @@ pub(crate) fn simulate_with_source<S: PoolFlowSource + ?Sized>(
 ) -> Result<SimulationRun> {
     let resolved = instrument.resolved_for_pricing()?;
     let instrument = &resolved;
-    let currency = instrument.pool.get_base_currency();
+    let currency = instrument.pool.get_currency();
     match prepare_deal_simulation(instrument, as_of)? {
         Some(prepared) => simulate_prepared(instrument, context, &prepared, source),
         // Exhausted pool: nothing to simulate, empty result.

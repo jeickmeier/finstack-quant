@@ -1162,10 +1162,6 @@
           },
           "type": "array"
         },
-        "base_currency": {
-          "$ref": "https://finstack_quant.dev/schemas/common/1/currency.schema.json",
-          "description": "Base currency for every asset and pool-level account."
-        },
         "collection_account": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
           "description": "AssetPool-level accounts\nCollection account balance (collected but not yet distributed)"
@@ -1185,6 +1181,10 @@
         "cumulative_scheduled_amortization": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
           "description": "Cumulative scheduled amortization (level-pay principal for amortizing assets).\n\nPart of the original-balance denominator in\n[`current_loss_percentage`](super::StructuredCredit::current_loss_percentage),\nso it must be stated: omitting it understates the denominator and\noverstates the reported loss rate."
+        },
+        "currency": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/currency.schema.json",
+          "description": "Base currency for every asset and pool-level account."
         },
         "deal_type": {
           "$ref": "#/$defs/DealType",
@@ -1269,7 +1269,7 @@
       "required": [
         "id",
         "deal_type",
-        "base_currency",
+        "currency",
         "assets",
         "cumulative_defaults",
         "cumulative_recoveries",
@@ -1544,7 +1544,7 @@
         },
         {
           "additionalProperties": false,
-          "description": "Hotel property mortgage",
+          "description": "Hospitality (hotel) property mortgage",
           "properties": {
             "ltv": {
               "description": "Ltv.",
@@ -1555,7 +1555,7 @@
               ]
             },
             "type": {
-              "const": "hotel_mortgage",
+              "const": "hospitality_mortgage",
               "type": "string"
             }
           },
@@ -1568,6 +1568,10 @@
           "additionalProperties": false,
           "description": "Other property type mortgage",
           "properties": {
+            "description": {
+              "description": "Free-text description of the property type.",
+              "type": "string"
+            },
             "ltv": {
               "description": "Ltv.",
               "format": "double",
@@ -1576,10 +1580,6 @@
                 "null"
               ]
             },
-            "property_type": {
-              "description": "Property type.",
-              "type": "string"
-            },
             "type": {
               "const": "other_mortgage",
               "type": "string"
@@ -1587,7 +1587,7 @@
           },
           "required": [
             "type",
-            "property_type"
+            "description"
           ],
           "type": "object"
         },
@@ -13012,9 +13012,9 @@
       "additionalProperties": false,
       "description": "Index underlying parameters for total return swaps and index-linked instruments.",
       "properties": {
-        "base_currency": {
+        "currency": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/currency.schema.json",
-          "description": "Base currency of the index"
+          "description": "Currency the index (and so the swap notional) is denominated in."
         },
         "duration_id": {
           "anyOf": [
@@ -13045,7 +13045,7 @@
       },
       "required": [
         "index_id",
-        "base_currency"
+        "currency"
       ],
       "type": "object"
     },
@@ -17493,17 +17493,6 @@
           "default": null,
           "description": "Contractual periodic payment for level-pay assets. Required for exact\nseasoned-loan amortization; when absent it is inferred once from the\ncurrent state and the amortization term (or the remaining contractual\nperiods to maturity)."
         },
-        "credit_quality": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/CreditRating"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "Optional credit-quality classification of the obligor or asset."
-        },
         "day_count": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/day_count.schema.json",
           "description": "Day-count convention used for coupon and accrual calculations."
@@ -17519,6 +17508,11 @@
           ],
           "default": null,
           "description": "Economic default date for the outstanding recovery claim; required for defaulted assets."
+        },
+        "defaulted": {
+          "default": false,
+          "description": "Whether the asset has defaulted (optional on the wire, default `false`).",
+          "type": "boolean"
         },
         "delinquency_buckets": {
           "description": "Delinquent balance per bucket (30, 60, 90 days past due, ...) at the\nvaluation date, in the pool's currency. Requires\n`credit_model.delinquency` with the same number of buckets; the sum\nmust not exceed `balance`. `None` for a fully current asset.",
@@ -17565,10 +17559,6 @@
             "null"
           ]
         },
-        "is_defaulted": {
-          "description": "Whether the asset is currently treated as defaulted by the pool model.",
-          "type": "boolean"
-        },
         "liquidation": {
           "anyOf": [
             {
@@ -17578,7 +17568,7 @@
               "type": "null"
             }
           ],
-          "description": "Non-performing loan resolution: the loan pays nothing until the\nresolution date, where a share liquidates (a default whose recovery\nis the net proceeds) and the rest re-performs. The timeline replaces\nthe default flag: `is_defaulted` stays `false` and\n`recovery_amount`/`default_date` stay unset."
+          "description": "Non-performing loan resolution: the loan pays nothing until the\nresolution date, where a share liquidates (a default whose recovery\nis the net proceeds) and the rest re-performs. The timeline replaces\nthe default flag: `defaulted` stays `false` and\n`recovery_amount`/`default_date` stay unset."
         },
         "market_price_pct": {
           "description": "Market price as percent of par (`60.0` = 60% of par). Read by the\nexcess-CCC coverage rule; an asset without a price is carried at par.",
@@ -17658,6 +17648,17 @@
           "format": "double",
           "type": "number"
         },
+        "rating": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/CreditRating"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Optional agency credit rating of the obligor or asset; drives WARF,\nthe CCC bucket and `CoverageRules.rating_haircuts`."
+        },
         "recovery_amount": {
           "anyOf": [
             {
@@ -17713,7 +17714,6 @@
         "balance",
         "rate",
         "maturity",
-        "is_defaulted",
         "day_count"
       ],
       "type": "object"
@@ -20123,8 +20123,8 @@
               "type": "string"
             },
             "tranche_id": {
-              "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
-              "description": "Identifier of the receiving tranche; must exist in the deal."
+              "description": "Identifier of the receiving tranche; must exist in the deal.",
+              "type": "string"
             }
           },
           "required": [
@@ -21268,7 +21268,7 @@
         },
         {
           "additionalProperties": false,
-          "description": "Intensity process (Cox model) for default.\n\nMean-reverting intensity with factor sensitivity.",
+          "description": "Intensity process (Cox model) for default.\n\nMean-reverting intensity with factor loading.",
           "properties": {
             "base_hazard": {
               "description": "Base annual hazard rate",
@@ -21281,8 +21281,8 @@
               "format": "double",
               "type": "number"
             },
-            "factor_sensitivity": {
-              "description": "Sensitivity to systematic factor",
+            "factor_loading": {
+              "description": "Loading (β) on the systematic factor, clamped to [-1, 1]",
               "format": "double",
               "type": "number"
             },
@@ -21304,7 +21304,7 @@
           "required": [
             "model",
             "base_hazard",
-            "factor_sensitivity",
+            "factor_loading",
             "mean_reversion",
             "volatility"
           ],
@@ -21855,7 +21855,7 @@
               "type": "null"
             }
           ],
-          "description": "Custom payment waterfall used verbatim for pricing.\n\n`None` (the default) synthesizes the canonical sequential template from\nthe tranche structure ([`Waterfall::standard_sequential`]) plus any\n[`Self::fees`]. When set, this waterfall is authoritative:\n[`Self::create_waterfall`] returns it (with deal-level\n[`Self::coverage_triggers`] appended) and no template is synthesized.\n[`Self::waterfall_rules`] overlays (AFC, step-down, shifting interest,\ncontrolled accumulation) still apply — they rewrite tiers generically by\n`payment_type`, so they compose with custom structures.\n\nThe waterfall also **defines each tranche's interest claim** (not just\ncash allocation): an uncapped `TrancheInterest` recipient owes the full\ncoupon accrual, a `CappedTrancheInterest` recipient owes the capped\ncoupon (the capped-off portion is never owed and never defers), and a\ndebt tranche with **no** interest recipient owes nothing (a\nprincipal-only class). Equity is exempt: its interest/principal split\nis a reporting convention driven by the tranche's metadata coupon.\n\nConstraints, enforced by [`Self::with_waterfall`] and re-checked at\npricing time so JSON-supplied deals get identical errors:\n- every tranche referenced by a tier recipient or coverage trigger must\n  exist in `tranches`, and tranche-keyed recipients must not target an\n  equity tranche (the engine records equity flows under\n  [`RecipientType::Equity`], paid via `ResidualCash`);\n- at most one interest-type recipient may name a given tranche (the\n  claim definition must be unambiguous);\n- `fees` must be `None` — senior fees are expressed as *leading*\n  [`PaymentType::Fee`] tiers of the custom waterfall, which then feed\n  the IC numerator and excess-spread/reserve sizing exactly like\n  template fees (fee tiers ranked below note interest are junior fees\n  and are deliberately not netted as senior claims);\n- the waterfall's `base_currency` must match the pool currency."
+          "description": "Custom payment waterfall used verbatim for pricing.\n\n`None` (the default) synthesizes the canonical sequential template from\nthe tranche structure ([`Waterfall::standard_sequential`]) plus any\n[`Self::fees`]. When set, this waterfall is authoritative:\n[`Self::create_waterfall`] returns it (with deal-level\n[`Self::coverage_triggers`] appended) and no template is synthesized.\n[`Self::waterfall_rules`] overlays (AFC, step-down, shifting interest,\ncontrolled accumulation) still apply — they rewrite tiers generically by\n`payment_type`, so they compose with custom structures.\n\nThe waterfall also **defines each tranche's interest claim** (not just\ncash allocation): an uncapped `TrancheInterest` recipient owes the full\ncoupon accrual, a `CappedTrancheInterest` recipient owes the capped\ncoupon (the capped-off portion is never owed and never defers), and a\ndebt tranche with **no** interest recipient owes nothing (a\nprincipal-only class). Equity is exempt: its interest/principal split\nis a reporting convention driven by the tranche's metadata coupon.\n\nConstraints, enforced by [`Self::with_waterfall`] and re-checked at\npricing time so JSON-supplied deals get identical errors:\n- every tranche referenced by a tier recipient or coverage trigger must\n  exist in `tranches`, and tranche-keyed recipients must not target an\n  equity tranche (the engine records equity flows under\n  [`RecipientType::Equity`], paid via `ResidualCash`);\n- at most one interest-type recipient may name a given tranche (the\n  claim definition must be unambiguous);\n- `fees` must be `None` — senior fees are expressed as *leading*\n  [`PaymentType::Fee`] tiers of the custom waterfall, which then feed\n  the IC numerator and excess-spread/reserve sizing exactly like\n  template fees (fee tiers ranked below note interest are junior fees\n  and are deliberately not netted as senior claims);\n- the waterfall's `currency` must match the pool currency."
         },
         "waterfall_rules": {
           "anyOf": [
@@ -23284,10 +23284,6 @@
       "additionalProperties": false,
       "description": "Main waterfall engine with tier-based distribution",
       "properties": {
-        "base_currency": {
-          "$ref": "https://finstack_quant.dev/schemas/common/1/currency.schema.json",
-          "description": "Base currency"
-        },
         "coverage_rules": {
           "anyOf": [
             {
@@ -23299,6 +23295,10 @@
           ],
           "description": "Collateral valuation rules for the OC tests; `None` values collateral\nat par with defaulted assets at recovery."
         },
+        "currency": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/currency.schema.json",
+          "description": "Base currency"
+        },
         "tiers": {
           "description": "Ordered payment tiers, including [`PaymentType::CoverageTest`] positions",
           "items": {
@@ -23309,7 +23309,7 @@
       },
       "required": [
         "tiers",
-        "base_currency"
+        "currency"
       ],
       "type": "object"
     },

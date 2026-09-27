@@ -912,11 +912,11 @@ impl TrancheStructure {
             }
         }
 
-        let base_currency = tranches[0].original_balance.currency();
+        let currency = tranches[0].original_balance.currency();
         for tranche in tranches {
-            if tranche.original_balance.currency() != base_currency {
+            if tranche.original_balance.currency() != currency {
                 return Err(finstack_quant_core::Error::CurrencyMismatch {
-                    expected: base_currency,
+                    expected: currency,
                     actual: tranche.original_balance.currency(),
                 });
             }

@@ -41,7 +41,7 @@ pub(crate) struct RmbsCalibration {
     /// CPR volatility
     pub(crate) cpr_volatility: f64,
     /// Default factor sensitivity (for intensity models)
-    pub(crate) default_factor_sensitivity: f64,
+    pub(crate) default_factor_loading: f64,
     /// Default model mean reversion speed
     pub(crate) default_mean_reversion: f64,
     /// Default model volatility
@@ -79,7 +79,7 @@ pub(crate) struct CloCalibration {
     /// CPR volatility
     pub(crate) cpr_volatility: f64,
     /// Default factor sensitivity
-    pub(crate) default_factor_sensitivity: f64,
+    pub(crate) default_factor_loading: f64,
     /// Default model mean reversion speed
     pub(crate) default_mean_reversion: f64,
     /// Default model volatility

@@ -49,7 +49,7 @@ const WRITEDOWN_EPS_FRACTION: f64 = 1e-4;
 ///
 /// * `deal` - The structured-credit deal owning the tranche.
 /// * `tranche_id` - Identifier of the tranche to solve for.
-/// * `context` - Market context for cashflow projection.
+/// * `market` - Market context for cashflow projection.
 /// * `as_of` - Valuation date used to project the tranche waterfall at each
 ///   probed constant-default-rate assumption.
 ///
@@ -66,7 +66,7 @@ const WRITEDOWN_EPS_FRACTION: f64 = 1e-4;
 pub fn calculate_tranche_breakeven_cdr(
     deal: &StructuredCredit,
     tranche_id: &str,
-    context: &MarketContext,
+    market: &MarketContext,
     as_of: Date,
 ) -> Result<f64> {
     deal.validate_for_pricing()?;
@@ -94,7 +94,7 @@ pub fn calculate_tranche_breakeven_cdr(
         let mut bumped = deal.clone();
         bumped.credit_model.default_spec = DefaultModelSpec::constant_cdr(cdr);
         Ok(
-            generate_tranche_cashflows(&bumped, tranche_id, context, as_of)?
+            generate_tranche_cashflows(&bumped, tranche_id, market, as_of)?
                 .total_writedown
                 .amount(),
         )

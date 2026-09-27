@@ -41,7 +41,7 @@ pub(super) fn fund_collateral_draws(
     requested: Money,
     principal_collections: Money,
 ) -> Result<DrawFunding> {
-    let ccy = state.base_currency;
+    let ccy = state.currency;
     let requested_amt = requested.amount().max(0.0);
     let from_reserve = requested_amt.min(state.reserve_balance.amount().max(0.0));
     let remaining = requested_amt - from_reserve;
@@ -77,7 +77,7 @@ pub(super) fn replenish_reserve_from_repayments(
     state: &mut SimulationState,
     repayments: Money,
 ) -> Result<Money> {
-    let ccy = state.base_currency;
+    let ccy = state.currency;
     let Some(target) = state.pool.reserve_target else {
         return Ok(Money::from((0_i64, ccy)));
     };
@@ -104,11 +104,11 @@ pub(super) fn reserve_interest_amount(
     let rate = state.pool.reserve_account_rate;
     let balance = state.reserve_balance.amount();
     if rate <= 0.0 || balance <= 0.0 || pay_date <= period_start {
-        return Ok(Money::from((0_i64, state.base_currency)));
+        return Ok(Money::from((0_i64, state.currency)));
     }
     let accrual =
         DayCount::Act360.year_fraction(period_start, pay_date, DayCountContext::default())?;
-    Money::new(balance * rate * accrual, state.base_currency)
+    Money::new(balance * rate * accrual, state.currency)
 }
 
 /// Reserve interest routed for one period.
@@ -135,7 +135,7 @@ pub(super) fn route_reserve_interest(
     amount: Money,
     pay_date: Date,
 ) -> Result<ReserveInterest> {
-    let zero = Money::from((0_i64, state.base_currency));
+    let zero = Money::from((0_i64, state.currency));
     if amount.amount() <= 0.0 {
         return Ok(ReserveInterest { to_waterfall: zero });
     }
@@ -169,7 +169,6 @@ mod tests {
     use crate::instruments::fixed_income::structured_credit::{
         AssetPool, DealType, PoolAsset, Tranche, TrancheStructure,
     };
-    use finstack_quant_core::types::InstrumentId;
     use time::macros::date;
 
     fn usd(amount: f64) -> Money {
@@ -328,7 +327,7 @@ mod tests {
                 let collections = flows.scheduled_principal.checked_add(flows.prepayment)?;
                 let funding = fund_collateral_draws(
                     state,
-                    Money::new(self.draw, state.base_currency)?,
+                    Money::new(self.draw, state.currency)?,
                     collections,
                 )?;
                 let funded = funding.from_reserve.checked_add(funding.from_principal)?;
@@ -504,7 +503,7 @@ mod tests {
             .clone();
         let mut direct = quiet_example(5_000_000.0, 0.04);
         direct.pool.reserve_interest_destination = ReserveInterestDestination::Tranche {
-            tranche_id: target.clone(),
+            tranche_id: target.as_str().to_string(),
         };
         let run_direct = super::super::simulate_with_source(
             &direct,
@@ -577,7 +576,7 @@ mod tests {
         // Direct to the equity tranche.
         let mut pool_eq = pool(1_000_000.0, 0.04, None);
         pool_eq.reserve_interest_destination = ReserveInterestDestination::Tranche {
-            tranche_id: InstrumentId::new("EQUITY"),
+            tranche_id: "EQUITY".to_string(),
         };
         let mut state = SimulationState::new(&pool_eq, &tranches, start, start, 6).expect("state");
         let routed = route_reserve_interest(&mut state, amount, pay).expect("route");

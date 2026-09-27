@@ -833,7 +833,7 @@ mod cases {
         ));
         let mut defaulted =
             PoolAsset::fixed_rate_bond("D1", usd(5), 0.12, maturity, DayCount::Thirty360);
-        defaulted.is_defaulted = true;
+        defaulted.defaulted = true;
         pool.assets.push(defaulted);
         let tranche = Tranche::new(
             "AAA",
@@ -1353,10 +1353,10 @@ mod cases {
             forward_curve_id: None,
             index_floor_bp: None,
             maturity,
-            credit_quality: None,
+            rating: None,
             industry: None,
             obligor_id: None,
-            is_defaulted: false,
+            defaulted: false,
             recovery_amount: None,
             default_date: None,
             purchase_price: None,
@@ -1496,10 +1496,10 @@ mod cases {
             forward_curve_id: None,
             index_floor_bp: None,
             maturity,
-            credit_quality: None,
+            rating: None,
             industry: None,
             obligor_id: None,
-            is_defaulted: false,
+            defaulted: false,
             recovery_amount: None,
             default_date: None,
             purchase_price: None,
@@ -2643,10 +2643,10 @@ mod cases {
                 forward_curve_id: None,
                 index_floor_bp: None,
                 maturity,
-                credit_quality: None,
+                rating: None,
                 industry: None,
                 obligor_id: None,
-                is_defaulted: false,
+                defaulted: false,
                 recovery_amount: None,
                 default_date: None,
                 purchase_price: None,

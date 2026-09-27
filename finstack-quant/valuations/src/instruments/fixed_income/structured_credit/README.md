@@ -63,7 +63,7 @@ structured_credit/
 │   ├── instrument.rs / structured_credit_impl.rs  # the StructuredCredit struct and its impls
 │   ├── constructors.rs   # new_abs / new_clo / new_cmbs / new_rmbs / example
 │   ├── pricing_methods.rs# advanced-only value_tranche / price_stochastic; hosts use ModelKey
-│   ├── stochastic.rs     # enable_stochastic_defaults, with_stochastic_* setters
+│   ├── stochastic.rs     # enable_stochastic, with_stochastic_* setters
 │   ├── constants.rs enums.rs pool.rs pool_state.rs tranches.rs waterfall.rs
 │   ├── results.rs setup.rs
 ├── pricing/
@@ -428,7 +428,7 @@ let trigger = CoverageTrigger::new(1.20, TriggerConsequence::DivertCashFlow)
 
 #### Borrowing-base tests
 
-`CoverageTestSpec::borrowing_base(tranche_id, required_ratio)` is a third
+`CoverageTestSpec::borrowing_base(tranche_id, trigger_level)` is a third
 test kind (`CoverageTestType::BorrowingBase`): its numerator is the
 `BorrowingBaseRules` on `CoverageRules.borrowing_base` evaluated on the live
 asset balances (advance rates by `AssetType` wire name or `"*"`, eligibility,
@@ -449,7 +449,7 @@ each rule can also be set individually:
 
 | Rule | Effect on the OC numerator |
 |------|----------------------------|
-| `rating_haircuts` (`CreditRating` → decimal fraction) | Each asset is carried at `par × (1 − haircut)` for its `credit_quality`, looked up by rating bucket (`B+`/`B`/`B-` read the `B` entry). The `NR` entry covers unrated asset rows the caller supplied; reinvestment purchases and materialized instrument collateral are unrated by construction and stay at par. Empty in `clo_standard()`: the indenture par-value test carries performing collateral at par. |
+| `rating_haircuts` (`CreditRating` → decimal fraction) | Each asset is carried at `par × (1 − haircut)` for its `rating`, looked up by rating bucket (`B+`/`B`/`B-` read the `B` entry). The `NR` entry covers unrated asset rows the caller supplied; reinvestment purchases and materialized instrument collateral are unrated by construction and stay at par. Empty in `clo_standard()`: the indenture par-value test carries performing collateral at par. |
 | `defaulted_valuation` | `Recovery` (default) carries pending defaulted par at its modeled recovery; `MarketValue { pct }` carries it at `pct`% of par. |
 | `ccc_bucket { threshold_pct, carry_at_market_value }` | CCC-and-below par above `threshold_pct`% of performing par is carried at the CCC assets' balance-weighted `PoolAsset::market_price_pct` (or excluded). |
 | `discount_obligation { price_threshold_pct }` | An asset whose `purchase_price` is below the threshold (percent of closing par) is carried at that purchase price. |
@@ -649,7 +649,7 @@ ordering, both penalties, the special fee base and the loan-level DSCR.
 
 A non-performing loan carries `liquidation: Option<LiquidationSpec {
 months_to_resolution, proceeds_pct, carry_cost_pct, reperformance_prob,
-modified_rate }>` on its `PoolAsset` and stays `is_defaulted: false` (the
+modified_rate }>` on its `PoolAsset` and stays `defaulted: false` (the
 timeline replaces the default flag; `recovery_amount` / `default_date` must be
 unset). It pays nothing until the first payment date at or after
 `months_to_resolution` months from its origination (`acquisition_date`, else
@@ -825,7 +825,7 @@ Both bindings expose structured credit under their `instruments` namespace:
   `attributes`), `TrancheStructure`, `CallAssumption`, `CoverageRules`,
   `HedgeSwap`, `Waterfall` (`StructuredCredit.create_waterfall()`
   introspection); deal methods `with_standard_fees`,
-  `enable_stochastic_defaults`, `tranche_cashflows` (`TrancheCashflows`),
+  `enable_stochastic`, `tranche_cashflows` (`TrancheCashflows`),
   `equity_metrics` (`EquityMetrics`), `run_simulation_with_diagnostics`
   (`SimulationDiagnostics` with the per-period record and coverage-test
   frame), `price_stochastic`; tranche analytics

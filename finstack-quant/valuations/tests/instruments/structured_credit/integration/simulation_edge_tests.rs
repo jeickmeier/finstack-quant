@@ -2,7 +2,7 @@
 //!
 //! Covers:
 //! - m-FINAL-1: Mid-period maturity interest cap
-//! - is_defaulted skip: Pre-defaulted assets excluded from pool flows
+//! - defaulted skip: Pre-defaulted assets excluded from pool flows
 //! - Reinvestment reconciliation: pool_outstanding snaps to actual balances
 
 use finstack_quant_core::currency::Currency;
@@ -34,7 +34,7 @@ fn legal_maturity() -> Date {
 }
 
 /// Create a single fixed-rate bullet asset with configurable maturity.
-fn make_asset(id: &str, balance: f64, rate: f64, maturity: Date, is_defaulted: bool) -> PoolAsset {
+fn make_asset(id: &str, balance: f64, rate: f64, maturity: Date, defaulted: bool) -> PoolAsset {
     PoolAsset {
         id: InstrumentId::new(id.to_string()),
         asset_type: AssetType::FirstLienLoan {},
@@ -44,13 +44,13 @@ fn make_asset(id: &str, balance: f64, rate: f64, maturity: Date, is_defaulted: b
         forward_curve_id: None,
         index_floor_bp: None,
         maturity,
-        credit_quality: Some(CreditRating::BB),
+        rating: Some(CreditRating::BB),
         industry: Some("Test".to_string()),
         obligor_id: Some(format!("OB_{id}")),
-        is_defaulted,
-        recovery_amount: is_defaulted
+        defaulted,
+        recovery_amount: defaulted
             .then(|| Money::new(0.0, Currency::USD).expect("no outstanding claim")),
-        default_date: is_defaulted.then_some(closing_date()),
+        default_date: defaulted.then_some(closing_date()),
         purchase_price: None,
         acquisition_date: Some(closing_date()),
         origination_date: None,

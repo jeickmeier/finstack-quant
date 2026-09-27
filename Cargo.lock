@@ -712,7 +712,7 @@ checksum = "5baebc0774151f905a1a2cc41989300b1e6fbb29aff0ceffa1064fdd3088d582"
 
 [[package]]
 name = "finstack-quant"
-version = "0.8.0"
+version = "0.9.0"
 dependencies = [
  "finstack-quant-analytics",
  "finstack-quant-attribution",
@@ -734,7 +734,7 @@ dependencies = [
 
 [[package]]
 name = "finstack-quant-analytics"
-version = "0.8.0"
+version = "0.9.0"
 dependencies = [
  "criterion",
  "finstack-quant-core",
@@ -746,7 +746,7 @@ dependencies = [
 
 [[package]]
 name = "finstack-quant-arrow"
-version = "0.8.0"
+version = "0.9.0"
 dependencies = [
  "arrow",
  "finstack-quant-core",
@@ -756,7 +756,7 @@ dependencies = [
 
 [[package]]
 name = "finstack-quant-attribution"
-version = "0.8.0"
+version = "0.9.0"
 dependencies = [
  "criterion",
  "finstack-quant-calibration",
@@ -779,7 +779,7 @@ dependencies = [
 
 [[package]]
 name = "finstack-quant-calibration"
-version = "0.8.0"
+version = "0.9.0"
 dependencies = [
  "criterion",
  "finstack-quant-cashflows",
@@ -803,7 +803,7 @@ dependencies = [
 
 [[package]]
 name = "finstack-quant-cashflows"
-version = "0.8.0"
+version = "0.9.0"
 dependencies = [
  "criterion",
  "finstack-quant-core",
@@ -822,7 +822,7 @@ dependencies = [
 
 [[package]]
 name = "finstack-quant-core"
-version = "0.8.0"
+version = "0.9.0"
 dependencies = [
  "criterion",
  "finstack-quant-test-utils",
@@ -850,7 +850,7 @@ dependencies = [
 
 [[package]]
 name = "finstack-quant-covenants"
-version = "0.8.0"
+version = "0.9.0"
 dependencies = [
  "finstack-quant-core",
  "indexmap",
@@ -863,7 +863,7 @@ dependencies = [
 
 [[package]]
 name = "finstack-quant-features"
-version = "0.8.0"
+version = "0.9.0"
 dependencies = [
  "criterion",
  "finstack-quant-core",
@@ -875,7 +875,7 @@ dependencies = [
 
 [[package]]
 name = "finstack-quant-margin"
-version = "0.8.0"
+version = "0.9.0"
 dependencies = [
  "finstack-quant-core",
  "jsonschema",
@@ -888,7 +888,7 @@ dependencies = [
 
 [[package]]
 name = "finstack-quant-models"
-version = "0.8.0"
+version = "0.9.0"
 dependencies = [
  "criterion",
  "finstack-quant-analytics",
@@ -916,7 +916,7 @@ dependencies = [
 
 [[package]]
 name = "finstack-quant-portfolio"
-version = "0.8.0"
+version = "0.9.0"
 dependencies = [
  "criterion",
  "finstack-quant-attribution",
@@ -946,7 +946,7 @@ dependencies = [
 
 [[package]]
 name = "finstack-quant-py"
-version = "0.8.0"
+version = "0.9.0"
 dependencies = [
  "arrow",
  "finstack-quant",
@@ -980,7 +980,7 @@ dependencies = [
 
 [[package]]
 name = "finstack-quant-scenarios"
-version = "0.8.0"
+version = "0.9.0"
 dependencies = [
  "criterion",
  "finstack-quant-attribution",
@@ -1003,7 +1003,7 @@ dependencies = [
 
 [[package]]
 name = "finstack-quant-statements"
-version = "0.8.0"
+version = "0.9.0"
 dependencies = [
  "criterion",
  "finstack-quant-cashflows",
@@ -1025,7 +1025,7 @@ dependencies = [
 
 [[package]]
 name = "finstack-quant-statements-analytics"
-version = "0.8.0"
+version = "0.9.0"
 dependencies = [
  "finstack-quant-core",
  "finstack-quant-covenants",
@@ -1042,7 +1042,7 @@ dependencies = [
 
 [[package]]
 name = "finstack-quant-test-utils"
-version = "0.8.0"
+version = "0.9.0"
 dependencies = [
  "serde",
  "serde_json",
@@ -1051,7 +1051,7 @@ dependencies = [
 
 [[package]]
 name = "finstack-quant-valuations"
-version = "0.8.0"
+version = "0.9.0"
 dependencies = [
  "criterion",
  "finstack-quant-calibration",
@@ -1082,7 +1082,7 @@ dependencies = [
 
 [[package]]
 name = "finstack-quant-valuations-macros"
-version = "0.8.0"
+version = "0.9.0"
 dependencies = [
  "quote",
  "syn 2.0.119",
@@ -1090,7 +1090,7 @@ dependencies = [
 
 [[package]]
 name = "finstack-quant-wasm"
-version = "0.8.0"
+version = "0.9.0"
 dependencies = [
  "console_error_panic_hook",
  "finstack-quant-analytics",

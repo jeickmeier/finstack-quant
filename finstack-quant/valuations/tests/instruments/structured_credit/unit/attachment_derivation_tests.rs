@@ -300,13 +300,9 @@ fn derived_structure_prices_like_the_declared_one() {
         antithetic: true,
     };
     let mut declared_deal = deal(declared_structure);
-    declared_deal
-        .enable_stochastic_defaults()
-        .expect("stochastic");
+    declared_deal.enable_stochastic().expect("stochastic");
     let mut derived_deal = deal(derived_structure);
-    derived_deal
-        .enable_stochastic_defaults()
-        .expect("stochastic");
+    derived_deal.enable_stochastic().expect("stochastic");
     let declared_result = declared_deal
         .price_stochastic_with_mode(&market, as_of, mode.clone())
         .expect("price");

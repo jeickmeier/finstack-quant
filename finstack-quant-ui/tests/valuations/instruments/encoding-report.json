@@ -2433,7 +2433,7 @@
             "keyword": "anyOf"
           },
           {
-            "pointer": "#/$defs/PoolAsset/properties/credit_quality",
+            "pointer": "#/$defs/PoolAsset/properties/rating",
             "keyword": "anyOf"
           },
           {
@@ -6301,7 +6301,7 @@
             "keyword": "anyOf"
           },
           {
-            "pointer": "#/$defs/PoolAsset/properties/credit_quality",
+            "pointer": "#/$defs/PoolAsset/properties/rating",
             "keyword": "anyOf"
           },
           {
@@ -17787,7 +17787,7 @@
             "keyword": "anyOf"
           },
           {
-            "pointer": "#/$defs/PoolAsset/properties/credit_quality",
+            "pointer": "#/$defs/PoolAsset/properties/rating",
             "keyword": "anyOf"
           },
           {
@@ -36858,7 +36858,7 @@
             "keyword": "anyOf"
           },
           {
-            "pointer": "#/$defs/PoolAsset/properties/credit_quality",
+            "pointer": "#/$defs/PoolAsset/properties/rating",
             "keyword": "anyOf"
           },
           {

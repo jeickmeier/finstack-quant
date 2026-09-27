@@ -197,6 +197,7 @@ DIRECT_CONSUMER_FORBIDDEN = (
             r"accrual_start_date|underlying_effective_date|cds_maturity|swap_start|swap_end|bermudan_schedule|lockout_periods|commitment_date|payment_business_day_convention|"
             r"commitment_amount|drawn_amount|commitment_limit|facility_limit|base_rate_spec|rate_bp|treasury_spread_bp|unused_fee_bp|unused_fees|draw_schedule|"
             r"fixed_coupon|floating_coupon|percent_per_period|percent_of_original_notional|fixing_source_enum|"
+            r"is_defaulted|credit_quality|factor_sensitivity|default_factor_sensitivity|hotel_mortgage|"
             r"[A-Za-z][A-Za-z0-9_]*_(?:ccy|bps))"
             r'(?:"|\\")\s*:'
         ),

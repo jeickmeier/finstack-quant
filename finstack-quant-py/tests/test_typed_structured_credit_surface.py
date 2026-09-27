@@ -129,7 +129,7 @@ def test_pool_asset_rows_round_trip_through_the_typed_pool() -> None:
         0.08,
         MATURITY,
         day_count=DayCount.THIRTY_360,
-        credit_quality="B",
+        rating="B",
         industry="Software",
         obligor_id="OBL-1",
         purchase_price=usd(9_800_000.0),
@@ -145,7 +145,7 @@ def test_pool_asset_rows_round_trip_through_the_typed_pool() -> None:
             "reperformance_prob": 0.2,
         },
     )
-    assert loan.credit_quality == "B"
+    assert loan.rating == "B"
     assert loan.liquidation == {
         "months_to_resolution": 24,
         "proceeds_pct": 55.0,
@@ -175,8 +175,8 @@ def test_pool_asset_rows_round_trip_through_the_typed_pool() -> None:
     assert pool.asset_records[0]["noi"] == {"amount": "1200000", "currency": "USD"}
     with pytest.raises(ValueError, match="assets"):
         AssetPool("P", "cmbs", USD).with_assets(42)
-    with pytest.raises(ValueError, match="credit_quality"):
-        PoolAsset("X", {"type": "high_yield_bond"}, usd(1.0), 0.05, MATURITY, credit_quality="not-a-rating")
+    with pytest.raises(ValueError, match="rating"):
+        PoolAsset("X", {"type": "high_yield_bond"}, usd(1.0), 0.05, MATURITY, rating="not-a-rating")
 
     seasoned = pool.with_accounts(cumulative_defaults=usd(8_000_000.0), collection_account=usd(250_000.0))
     assert seasoned.cumulative_defaults == usd(8_000_000.0)
@@ -207,7 +207,7 @@ def test_npl_liquidation_terms_replace_the_default_flag() -> None:
     resolved = next(period for period in periods if period["payment_date"] >= "2026-01-01")
     assert float(resolved["defaults"]["amount"]) == pytest.approx(80_000_000.0)
 
-    npl["is_defaulted"] = True
+    npl["defaulted"] = True
     npl["default_date"] = "2023-06-01"
     npl["recovery_amount"] = {"amount": "40000000", "currency": "USD"}
     with pytest.raises(ValueError, match="liquidation"):
@@ -287,7 +287,7 @@ def test_deal_builder_setters_land_in_the_wire_form_and_getters() -> None:
     assert deal.waterfall is None
     assert deal.hedge_swaps == []
     assert deal.with_standard_fees().fees["special_servicer_fee_bp"] is None
-    assert deal.enable_stochastic_defaults().stochastic_prepay_spec is not None
+    assert deal.enable_stochastic().stochastic_prepay_spec is not None
     assert StructuredCredit.from_json(deal.to_json()).to_dict() == deal.to_dict()
 
 
@@ -373,7 +373,7 @@ def test_waterfall_introspection_and_custom_waterfall_round_trip() -> None:
     deal = _clo()
     waterfall = deal.create_waterfall()
     assert isinstance(waterfall, Waterfall)
-    assert waterfall.base_currency == "USD"
+    assert waterfall.currency == "USD"
     assert [test["id"] for test in waterfall.coverage_tests()] == ["OC_A"]
     assert waterfall.coverage_rules.ccc_bucket["threshold_pct"] == 7.5
     assert Waterfall.from_json(waterfall.to_json()).to_dict() == waterfall.to_dict()
@@ -594,10 +594,10 @@ def _typed_deal_from_golden(spec: dict) -> StructuredCredit:
                 day_count=DayCount.parse(row["day_count"]),
                 spread_bp=row.get("spread_bp"),
                 forward_curve_id=row.get("forward_curve_id"),
-                credit_quality=row.get("credit_quality"),
+                rating=row.get("rating"),
                 industry=row.get("industry"),
                 obligor_id=row.get("obligor_id"),
-                is_defaulted=row.get("is_defaulted", False),
+                defaulted=row.get("defaulted", False),
                 recovery_amount=_money(row["recovery_amount"]) if row.get("recovery_amount") else None,
                 default_date=_date(row["default_date"]) if row.get("default_date") else None,
                 purchase_price=_money(row["purchase_price"]) if row.get("purchase_price") else None,

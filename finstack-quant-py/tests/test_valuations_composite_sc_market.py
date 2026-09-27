@@ -235,7 +235,7 @@ def test_tranche_structure_rep_line_and_asset_pool_contracts() -> None:
     assert repr(line).startswith("RepLine(id='LINE-1', balance=80")
 
     pool = AssetPool("POOL-1", "abs", "USD").with_rep_lines([line])
-    assert pool.base_currency == "USD"
+    assert pool.currency == "USD"
     assert pool.deal_type == "abs"
     assert [rl.id for rl in pool.rep_lines] == ["LINE-1"]
     assert pool.asset_records == []

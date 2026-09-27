@@ -144,7 +144,7 @@ mod tests {
         for asset in &pool.assets {
             let balance = asset.balance.amount();
             let rating_factor = asset
-                .credit_quality
+                .rating
                 .map(moodys_warf_factor)
                 .transpose()
                 .expect("rating factor lookup should succeed")
@@ -281,7 +281,7 @@ mod tests {
         for asset in &pool.assets {
             let bal = asset.balance.amount();
             let factor = asset
-                .credit_quality
+                .rating
                 .map(moodys_warf_factor)
                 .transpose()
                 .expect("rating factor lookup should succeed")

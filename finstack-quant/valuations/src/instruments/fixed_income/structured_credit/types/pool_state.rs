@@ -22,7 +22,7 @@ pub(crate) struct PoolState {
     /// Day count conventions
     pub(crate) day_counts: Vec<DayCount>,
     /// Default status
-    pub(crate) is_defaulted: Vec<bool>,
+    pub(crate) defaulted: Vec<bool>,
     /// SMM overrides
     pub(crate) smm_overrides: Vec<Option<f64>>,
     /// MDR overrides
@@ -106,7 +106,7 @@ impl PoolState {
         self.spread_bp.push(asset.spread_bp);
         self.maturities.push(asset.maturity);
         self.day_counts.push(asset.day_count);
-        self.is_defaulted.push(asset.is_defaulted);
+        self.defaulted.push(asset.defaulted);
         self.smm_overrides.push(asset.smm_override);
         self.mdr_overrides.push(asset.mdr_override);
         self.recovery_rates.push(asset.recovery_rate);
@@ -158,7 +158,7 @@ impl PoolState {
         let mut index_ids = Vec::with_capacity(n);
         let mut maturities = Vec::with_capacity(n);
         let mut day_counts: Vec<DayCount> = Vec::with_capacity(n);
-        let mut is_defaulted = Vec::with_capacity(n);
+        let mut defaulted = Vec::with_capacity(n);
         let mut smm_overrides = Vec::with_capacity(n);
         let mut mdr_overrides = Vec::with_capacity(n);
         let mut recovery_rates = Vec::with_capacity(n);
@@ -177,7 +177,7 @@ impl PoolState {
 
         for asset in &pool.assets {
             ids.push(asset.id.to_string());
-            balances.push(if asset.is_defaulted {
+            balances.push(if asset.defaulted {
                 0.0
             } else {
                 asset.balance.amount()
@@ -187,7 +187,7 @@ impl PoolState {
             index_ids.push(asset.forward_curve_id.clone());
             maturities.push(asset.maturity);
             day_counts.push(asset.day_count);
-            is_defaulted.push(asset.is_defaulted);
+            defaulted.push(asset.defaulted);
             smm_overrides.push(asset.smm_override);
             mdr_overrides.push(asset.mdr_override);
             recovery_rates.push(asset.recovery_rate);
@@ -237,7 +237,7 @@ impl PoolState {
             spread_bp,
             maturities,
             day_counts,
-            is_defaulted,
+            defaulted,
             smm_overrides,
             mdr_overrides,
             recovery_rates,

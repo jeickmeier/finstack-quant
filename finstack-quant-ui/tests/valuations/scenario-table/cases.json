@@ -24,7 +24,7 @@
             "pool": {
               "id": "POOL-1",
               "deal_type": "clo",
-              "base_currency": "USD",
+              "currency": "USD",
               "assets": [
                 {
                   "id": "COLLATERAL-1",
@@ -39,10 +39,10 @@
                   "spread_bp": null,
                   "forward_curve_id": null,
                   "maturity": "2034-01-01",
-                  "credit_quality": null,
+                  "rating": null,
                   "industry": null,
                   "obligor_id": null,
-                  "is_defaulted": false,
+                  "defaulted": false,
                   "recovery_amount": null,
                   "default_date": null,
                   "purchase_price": null,
@@ -274,7 +274,7 @@
             "pool": {
               "id": "POOL-1",
               "deal_type": "clo",
-              "base_currency": "USD",
+              "currency": "USD",
               "assets": [
                 {
                   "id": "COLLATERAL-1",
@@ -289,10 +289,10 @@
                   "spread_bp": null,
                   "forward_curve_id": null,
                   "maturity": "2034-01-01",
-                  "credit_quality": null,
+                  "rating": null,
                   "industry": null,
                   "obligor_id": null,
-                  "is_defaulted": false,
+                  "defaulted": false,
                   "recovery_amount": null,
                   "default_date": null,
                   "purchase_price": null,

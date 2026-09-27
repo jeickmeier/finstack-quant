@@ -258,7 +258,7 @@ fn reserve_interest_destination_must_name_an_existing_tranche() {
     pool.reserve_account = usd(5_000_000.0);
     pool.reserve_account_rate = 0.04;
     pool.reserve_interest_destination = ReserveInterestDestination::Tranche {
-        tranche_id: InstrumentId::new("MEZZ"),
+        tranche_id: "MEZZ".to_string(),
     };
     let err = pool
         .validate_reserve_config(&tranches())
@@ -266,7 +266,7 @@ fn reserve_interest_destination_must_name_an_existing_tranche() {
     assert!(err.to_string().contains("MEZZ"), "{err}");
 
     pool.reserve_interest_destination = ReserveInterestDestination::Tranche {
-        tranche_id: InstrumentId::new("EQUITY"),
+        tranche_id: "EQUITY".to_string(),
     };
     pool.validate_reserve_config(&tranches())
         .expect("equity tranche exists");

@@ -459,7 +459,7 @@ pub struct StructuredCredit {
     ///   the IC numerator and excess-spread/reserve sizing exactly like
     ///   template fees (fee tiers ranked below note interest are junior fees
     ///   and are deliberately not netted as senior claims);
-    /// - the waterfall's `base_currency` must match the pool currency.
+    /// - the waterfall's `currency` must match the pool currency.
     #[builder(default)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub waterfall: Option<Waterfall>,

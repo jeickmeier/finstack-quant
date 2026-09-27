@@ -105,7 +105,7 @@ fn extract_index_level(trs: &FIIndexTotalReturnSwap, context: &MarketContext) ->
     })?;
     let level = crate::instruments::common_impl::helpers::scalar_price_amount(
         scalar,
-        trs.underlying.base_currency,
+        trs.underlying.currency,
     )?;
     if !level.is_finite() || level <= 0.0 {
         return Err(finstack_quant_core::Error::Validation(format!(

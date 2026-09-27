@@ -38,13 +38,13 @@ pub(super) fn record_tranche_flows(
             .tranche_balances
             .get(tranche_id_str)
             .copied()
-            .unwrap_or(Money::from((0_i64, state.base_currency)));
+            .unwrap_or(Money::from((0_i64, state.currency)));
 
         let existing_deferred = state
             .deferred_interest
             .get(tranche_id_str)
             .copied()
-            .unwrap_or(Money::from((0_i64, state.base_currency)));
+            .unwrap_or(Money::from((0_i64, state.currency)));
 
         // Current-period interest due on post-writedown balance, as the
         // waterfall spec defines the claim (`claim_caps`, F3): uncapped
@@ -57,10 +57,10 @@ pub(super) fn record_tranche_flows(
         // Equity receives residual interest; its metadata coupon creates no
         // separate debt claim or deferred-interest balance.
         let current_interest_due = if tranche.seniority == TrancheSeniority::Equity {
-            Money::from((0_i64, state.base_currency))
+            Money::from((0_i64, state.currency))
         } else {
             match claim_caps.get(tranche_id_str) {
-                None => Money::from((0_i64, state.base_currency)),
+                None => Money::from((0_i64, state.currency)),
                 Some(cap) => Money::new(
                     tranche_period_interest_due(
                         tranche,
@@ -75,7 +75,7 @@ pub(super) fn record_tranche_flows(
                         cap.is_some(),
                         state.floating_rate_shift,
                     )?,
-                    state.base_currency,
+                    state.currency,
                 )?,
             }
         };
@@ -94,7 +94,7 @@ pub(super) fn record_tranche_flows(
                 })
                 .map(|record| record.paid_amount.amount())
                 .sum::<f64>(),
-            state.base_currency,
+            state.currency,
         )?;
         let total_interest_claim = if tranche.pik_enabled {
             current_interest_due
@@ -107,7 +107,7 @@ pub(super) fn record_tranche_flows(
             .distributions
             .get(recipient_key)
             .copied()
-            .unwrap_or(Money::from((0_i64, state.base_currency)));
+            .unwrap_or(Money::from((0_i64, state.currency)));
 
         // Take the waterfall's OWN interest/principal classification
         // rather than re-deriving it from the aggregate.
@@ -134,17 +134,17 @@ pub(super) fn record_tranche_flows(
             .principal_distributions
             .get(recipient_key)
             .copied()
-            .unwrap_or(Money::from((0_i64, state.base_currency)));
+            .unwrap_or(Money::from((0_i64, state.currency)));
         let principal_classified = Money::new(
             principal_from_waterfall
                 .amount()
                 .min(payment_received.amount())
                 .max(0.0),
-            state.base_currency,
+            state.currency,
         )?;
         let interest_portion = payment_received
             .checked_sub(principal_classified)
-            .unwrap_or(Money::from((0_i64, state.base_currency)));
+            .unwrap_or(Money::from((0_i64, state.currency)));
         let interest_paid = if tranche.seniority == TrancheSeniority::Equity {
             interest_portion
         } else if interest_portion.amount() >= total_interest_claim.amount() {
@@ -157,11 +157,11 @@ pub(super) fn record_tranche_flows(
                 .amount()
                 .min(existing_deferred.amount())
                 .max(0.0),
-            state.base_currency,
+            state.currency,
         )?;
         let current_interest_paid = interest_paid
             .checked_sub(deferred_repaid)
-            .unwrap_or(Money::from((0_i64, state.base_currency)));
+            .unwrap_or(Money::from((0_i64, state.currency)));
         // `current_interest_paid` is reconstructed by subtraction, so a coupon
         // paid in full can leave a sub-microcent residue; that is float noise,
         // not a deferral, and must not be booked as one.
@@ -172,7 +172,7 @@ pub(super) fn record_tranche_flows(
             } else {
                 0.0
             },
-            state.base_currency,
+            state.currency,
         )?;
 
         // Only explicitly classified principal retires loss-absorbing capital.
@@ -200,10 +200,10 @@ pub(super) fn record_tranche_flows(
                 let entry = state
                     .carryover_balance
                     .entry(tranche_id_str.to_string())
-                    .or_insert(Money::from((0_i64, state.base_currency)));
+                    .or_insert(Money::from((0_i64, state.currency)));
                 *entry = Money::new(
                     (entry.amount() - carryover_paid.amount() + withheld).max(0.0),
-                    state.base_currency,
+                    state.currency,
                 )?;
             }
         }
@@ -240,11 +240,11 @@ pub(super) fn record_tranche_flows(
         }
 
         let remaining_deferred = if tranche.pik_enabled {
-            Money::from((0_i64, state.base_currency))
+            Money::from((0_i64, state.currency))
         } else {
             existing_deferred
                 .checked_sub(deferred_repaid)
-                .unwrap_or(Money::from((0_i64, state.base_currency)))
+                .unwrap_or(Money::from((0_i64, state.currency)))
                 .checked_add(current_interest_shortfall)?
         };
         state
@@ -269,7 +269,7 @@ pub(super) fn record_tranche_flows(
             // zero so a negative balance never propagates into later periods'
             // interest accrual and coverage tests.
             let after_principal = if after_principal.amount() < 0.0 {
-                Money::from((0_i64, state.base_currency))
+                Money::from((0_i64, state.currency))
             } else {
                 after_principal
             };

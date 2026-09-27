@@ -119,7 +119,7 @@ pub(super) fn simulate_period(
         .as_ref()
         .filter(|_| state.card_flow_base.is_none())
         .map(|card| -> Result<Vec<f64>> {
-            card.investor_flow_base(&state.pool_state.balances, state.base_currency)
+            card.investor_flow_base(&state.pool_state.balances, state.currency)
         })
         .transpose()?;
     if let Some(base) = card_opening_balances.as_ref() {
@@ -211,7 +211,7 @@ pub(super) fn simulate_period(
     let (released_recoveries, released_par) = state.recovery_queue.release_matured(
         pay_date,
         state.recovery_lag_months,
-        state.base_currency,
+        state.currency,
     )?;
 
     // ── Step 2: Loss allocation through capital structure ────────────
@@ -355,13 +355,13 @@ pub(super) fn simulate_period(
         // Preserve the exact decimal cash budget. Converting the whole account
         // to f64 and back can spend a fraction more than the available cash.
         let budget = if required_paydown >= recyclable.amount() {
-            Money::from((0_i64, state.base_currency))
+            Money::from((0_i64, state.currency))
         } else {
-            recyclable.checked_sub(Money::new(required_paydown, state.base_currency)?)?
+            recyclable.checked_sub(Money::new(required_paydown, state.currency)?)?
         };
         recycle_reinvestment_principal(state, budget, price / 100.0, pay_date, context)?
     } else {
-        Money::from((0_i64, state.base_currency))
+        Money::from((0_i64, state.currency))
     };
 
     // ── Step 3: Prepare waterfall inputs ─────────────────────────────
@@ -447,7 +447,7 @@ pub(super) fn simulate_period(
     // Canonical asset balances already reflect amortization, defaults, and
     // any par purchased with reinvested cash. Restricted cash is passed once.
     let coverage_test_pool_balance =
-        Money::new(state.pool_state.balances.iter().sum(), state.base_currency)?;
+        Money::new(state.pool_state.balances.iter().sum(), state.currency)?;
 
     // Equity's cash to date for the incentive-fee hurdle: capital at closing
     // against every recorded equity distribution (waterfall payments and
@@ -505,8 +505,7 @@ pub(super) fn simulate_period(
         record::record_tranche_flows(state, &inputs, &waterfall_result, afc_carryover)?;
 
     // Asset state is authoritative, including par bought away from par.
-    state.pool_outstanding =
-        Money::new(state.pool_state.balances.iter().sum(), state.base_currency)?;
+    state.pool_outstanding = Money::new(state.pool_state.balances.iter().sum(), state.currency)?;
 
     // Realized excess spread this period, annualized on the opening pool
     // balance: interest collections less the debt coupons due, the fees paid
@@ -610,14 +609,14 @@ pub(super) fn simulate_period(
             defaults: pool_flows.default,
             recoveries: released_recoveries,
             reinvested_par: reinvested_cash,
-            fees_paid: Money::new(fees_paid, state.base_currency)?,
+            fees_paid: Money::new(fees_paid, state.currency)?,
             reserve_balance: state.reserve_balance,
             spread_account: state.spread_account,
             funding_account: state.principal_funding_account,
-            delinquent_balance: Money::new(delinquent, state.base_currency)?,
+            delinquent_balance: Money::new(delinquent, state.currency)?,
             servicer_advances_outstanding: Money::new(
                 state.servicer_advances_outstanding(),
-                state.base_currency,
+                state.currency,
             )?,
             excess_spread: state.excess_spread_history.last().copied().unwrap_or(0.0),
             coverage_tests,
@@ -677,7 +676,7 @@ fn apply_tranche_draws(
                 if headroom > 1.0 {
                     draws.push((
                         readvance.tranche_id.clone(),
-                        Money::new(headroom, state.base_currency)?,
+                        Money::new(headroom, state.currency)?,
                     ));
                 }
             }

@@ -91,7 +91,7 @@ fn test_fi_index_trs_currency_consistency() {
         .build();
 
     // Assert - Index base currency should match notional currency
-    assert_eq!(trs.notional.currency(), trs.underlying.base_currency);
+    assert_eq!(trs.notional.currency(), trs.underlying.currency);
 }
 
 // NPV and Pricing Tests

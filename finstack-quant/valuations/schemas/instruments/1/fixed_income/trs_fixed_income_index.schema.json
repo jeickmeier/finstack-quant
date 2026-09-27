@@ -416,9 +416,9 @@
       "additionalProperties": false,
       "description": "Index underlying parameters for total return swaps and index-linked instruments.",
       "properties": {
-        "base_currency": {
+        "currency": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/currency.schema.json",
-          "description": "Base currency of the index"
+          "description": "Currency the index (and so the swap notional) is denominated in."
         },
         "duration_id": {
           "anyOf": [
@@ -449,7 +449,7 @@
       },
       "required": [
         "index_id",
-        "base_currency"
+        "currency"
       ],
       "type": "object"
     },
@@ -844,7 +844,7 @@
           },
           "side": "receive_total_return",
           "underlying": {
-            "base_currency": "USD",
+            "currency": "USD",
             "duration_id": "US-CORP-DURATION",
             "index_id": "US-CORP-INDEX",
             "yield_id": "US-CORP-YIELD"

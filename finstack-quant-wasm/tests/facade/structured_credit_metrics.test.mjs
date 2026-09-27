@@ -138,9 +138,9 @@ test('clean and dirty targets share coupon-crossing settlement', () => {
   const oas = valuations.instruments.structuredCreditTrancheOas(
     JSON.stringify(f.instrument),
     id,
-    clean,
     JSON.stringify(f.market),
     asOf,
+    clean,
     JSON.stringify(config)
   );
   assert.ok(Math.abs(oas.oas) < 1e-8);

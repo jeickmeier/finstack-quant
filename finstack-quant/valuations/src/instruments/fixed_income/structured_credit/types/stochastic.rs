@@ -77,7 +77,7 @@ impl StructuredCredit {
     /// # Errors
     ///
     /// Returns an error if an embedded deal-type correlation preset is invalid.
-    pub fn enable_stochastic_defaults(&mut self) -> Result<&mut Self> {
+    pub fn enable_stochastic(&mut self) -> Result<&mut Self> {
         let (prepay, default, corr) = match self.deal_type {
             DealType::Rmbs => (
                 // Pool WAC is the coupon side of the Richard-Roll incentive;

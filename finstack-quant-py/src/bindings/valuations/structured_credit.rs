@@ -14,7 +14,6 @@ use crate::bindings::pandas_utils::{
     ColumnSchema,
 };
 use crate::errors::{core_to_py, display_to_py, serde_json_to_py};
-use finstack_quant_core::money::Money;
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
     calculate_tranche_breakeven_cdr, calculate_tranche_discount_margin, calculate_tranche_metrics,
     calculate_tranche_oas, scenario_table, OasConfig, OasResult, ScenarioGrid, ScenarioTable,
@@ -59,8 +58,8 @@ fn extract_structured_credit(
 ///
 /// Contractual cashflows are projected without changing coupon projection, then
 /// a constant additive spread is applied to the discount curve. The result is
-/// zero at model PV, negative for a richer (higher) target PV, and positive for
-/// a cheaper (lower) target PV; it is not the contractual quoted margin.
+/// zero at the model price, negative for a richer (higher) price, and positive
+/// for a cheaper (lower) price; it is not the contractual quoted margin.
 ///
 /// Parameters
 /// ----------
@@ -76,12 +75,11 @@ fn extract_structured_credit(
 /// as_of : datetime.date | str
 ///     Valuation date used for projection and discounting, either a date-like
 ///     object (``datetime.date``, ``pandas.Timestamp``) or an ISO 8601 string.
-/// target_pv : float
-///     Positive dirty settlement value in the tranche's currency, including
-///     accrued interest once. The deal's ``quote_settlement_date`` defaults
-///     to valuation; payments on or before settlement belong to the seller. Values above model PV
-///     produce a negative result; values below model PV produce a positive
-///     result.
+/// market_price_pct : float
+///     Clean settlement price as a percentage of the tranche's current
+///     balance (100.0 = par). Accrued interest is added once at the deal's
+///     ``quote_settlement_date`` (valuation date when omitted); payments on
+///     or before settlement belong to the seller.
 ///
 /// Returns
 /// -------
@@ -92,12 +90,12 @@ fn extract_structured_credit(
 /// ------
 /// ValueError
 ///     If the JSON or date is malformed, the deal is invalid, the tranche is
-///     missing or fixed-rate, ``target_pv`` is not finite, required market data
+///     missing or fixed-rate, ``market_price_pct`` is not finite and positive, required market data
 ///     is unavailable, or the spread solve fails or exceeds ±5000 bp.
 #[pyfunction]
 #[pyo3(
     name = "structured_credit_tranche_discount_margin",
-    text_signature = "(instrument, tranche_id, market, as_of, target_pv)"
+    text_signature = "(instrument, tranche_id, market, as_of, market_price_pct)"
 )]
 fn structured_credit_tranche_discount_margin(
     py: Python<'_>,
@@ -105,15 +103,14 @@ fn structured_credit_tranche_discount_margin(
     tranche_id: &str,
     market: &Bound<'_, PyAny>,
     as_of: &Bound<'_, PyAny>,
-    target_pv: f64,
+    market_price_pct: f64,
 ) -> PyResult<f64> {
     let deal = extract_structured_credit(py, instrument)?;
     let market = extract_market(py, market)?;
     let tranche_id = tranche_id.to_owned();
     let as_of = crate::bindings::date_utils::extract_date(as_of)?;
     py.detach(move || {
-        let target_pv = Money::new(target_pv, deal.tranches.currency())?;
-        calculate_tranche_discount_margin(&deal, &tranche_id, &market, as_of, target_pv)
+        calculate_tranche_discount_margin(&deal, &tranche_id, &market, as_of, market_price_pct)
     })
     .map_err(core_to_py)
 }
@@ -166,15 +163,15 @@ fn structured_credit_tranche_breakeven_cdr(
 ///     ``StructuredCredit`` instance.
 /// tranche_id : str
 ///     Identifier of the tranche.
-/// market_price_pct : float
-///     Clean settlement price as a percentage of current balance (100.0 = par).
-///     Accrued interest is added once at the deal's ``quote_settlement_date``
-///     (valuation date when omitted).
 /// market : MarketContext
 ///     Market context supplying curves and fixings.
 /// as_of : datetime.date | str
 ///     Valuation date, either a date-like object (``datetime.date``,
 ///     ``pandas.Timestamp``) or an ISO 8601 string.
+/// market_price_pct : float
+///     Clean settlement price as a percentage of current balance (100.0 = par).
+///     Accrued interest is added once at the deal's ``quote_settlement_date``
+///     (valuation date when omitted).
 /// config : dict | str, optional
 ///     ``OasConfig`` as a dict or JSON string. All fields are currently
 ///     required when supplied.
@@ -186,16 +183,16 @@ fn structured_credit_tranche_breakeven_cdr(
 #[pyfunction]
 #[pyo3(
     name = "structured_credit_tranche_oas",
-    signature = (instrument, tranche_id, market_price_pct, market, as_of, config=None),
-    text_signature = "(instrument, tranche_id, market_price_pct, market, as_of, config=None)"
+    signature = (instrument, tranche_id, market, as_of, market_price_pct, config=None),
+    text_signature = "(instrument, tranche_id, market, as_of, market_price_pct, config=None)"
 )]
 fn structured_credit_tranche_oas(
     py: Python<'_>,
     instrument: &Bound<'_, PyAny>,
     tranche_id: &str,
-    market_price_pct: f64,
     market: &Bound<'_, PyAny>,
     as_of: &Bound<'_, PyAny>,
+    market_price_pct: f64,
     config: Option<&Bound<'_, PyAny>>,
 ) -> PyResult<PyOasResult> {
     let deal = extract_structured_credit(py, instrument)?;
@@ -215,9 +212,9 @@ fn structured_credit_tranche_oas(
             calculate_tranche_oas(
                 &deal,
                 &tranche_id,
-                market_price_pct,
                 &market,
                 as_of,
+                market_price_pct,
                 &config,
             )
         })

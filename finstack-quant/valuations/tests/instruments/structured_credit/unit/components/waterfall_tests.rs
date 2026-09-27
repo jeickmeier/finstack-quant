@@ -273,7 +273,7 @@ fn test_waterfall_engine_creation() {
         .build()
         .expect("valid waterfall");
 
-    assert_eq!(engine.base_currency, Currency::USD);
+    assert_eq!(engine.currency, Currency::USD);
     assert_eq!(engine.tiers.len(), 0);
     assert_eq!(engine.coverage_tests().count(), 0);
 }

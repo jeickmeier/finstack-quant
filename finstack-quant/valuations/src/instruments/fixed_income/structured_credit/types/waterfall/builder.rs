@@ -4,19 +4,19 @@
 use super::*;
 
 impl Waterfall {
-    /// Start building a waterfall in `base_currency`; tiers are added with
+    /// Start building a waterfall in `currency`; tiers are added with
     /// [`WaterfallBuilder::add_tier`] and [`WaterfallBuilder::build`]
     /// validates the result.
     ///
     /// # Arguments
     ///
-    /// * `base_currency` - Currency every tier allocates in.
+    /// * `currency` - Currency every tier allocates in.
     #[must_use]
-    pub fn builder(base_currency: Currency) -> WaterfallBuilder {
+    pub fn builder(currency: Currency) -> WaterfallBuilder {
         WaterfallBuilder {
             engine: Self {
                 tiers: Vec::new(),
-                base_currency,
+                currency,
                 coverage_rules: None,
             },
             next_priority: 1,
@@ -132,7 +132,7 @@ impl Waterfall {
     ///
     /// # Arguments
     ///
-    /// * `base_currency` - Deal currency of the waterfall; tranche balances and fees must
+    /// * `currency` - Deal currency of the waterfall; tranche balances and fees must
     ///   match this currency.
     /// * `tranches` - Capital structure whose notes become sequential interest and
     ///   principal recipients.
@@ -145,14 +145,14 @@ impl Waterfall {
     /// * `coverage_tests` - Deal-level coverage tests, each placed after the
     ///   interest tier of its [`CoverageTestSpec::placement_tranche`].
     pub fn standard_sequential(
-        base_currency: Currency,
+        currency: Currency,
         tranches: &super::super::TrancheStructure,
         fees: TemplateFees,
         coverage_tests: &[CoverageTestSpec],
     ) -> Self {
         let mut engine = Self {
             tiers: Vec::new(),
-            base_currency,
+            currency,
             coverage_rules: None,
         };
         let mut priority = 1;

@@ -123,7 +123,7 @@ impl MetricCalculator for ModifiedDurationCalculator {
             flows,
             &curve,
             quote.settlement,
-            Money::new(base, deal.pool.get_base_currency())?,
+            Money::new(base, deal.pool.get_currency())?,
             ytm_bump_bp,
         )
     }

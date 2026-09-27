@@ -315,7 +315,7 @@ impl AssetBackedFacility {
     /// frequency or term-out, or malformed rules.
     pub fn validate(&self) -> finstack_quant_core::Result<()> {
         let invalid = |msg: String| finstack_quant_core::Error::Validation(msg);
-        let currency = self.collateral.get_base_currency();
+        let currency = self.collateral.get_currency();
         if self.commitment.currency() != currency || self.drawn.currency() != currency {
             return Err(finstack_quant_core::Error::CurrencyMismatch {
                 expected: currency,

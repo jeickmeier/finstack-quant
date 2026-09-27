@@ -230,7 +230,7 @@ impl BorrowingBaseRules {
         balances: Option<&[f64]>,
         live: Option<LiveCollateral<'_>>,
     ) -> finstack_quant_core::Result<BorrowingBaseReport> {
-        let currency = pool.get_base_currency();
+        let currency = pool.get_currency();
         if let Some(balances) = balances {
             if balances.len() != pool.assets.len() {
                 return Err(finstack_quant_core::Error::Validation(format!(
@@ -255,7 +255,7 @@ impl BorrowingBaseRules {
                 .unwrap_or(asset.liquidation.is_some());
             let is_eligible = advance.is_some_and(|advance| {
                 let rule = &advance.eligibility;
-                !((rule.exclude_defaulted && asset.is_defaulted)
+                !((rule.exclude_defaulted && asset.defaulted)
                     || (rule.exclude_non_performing && unresolved_npl))
                     && rule
                         .max_maturity

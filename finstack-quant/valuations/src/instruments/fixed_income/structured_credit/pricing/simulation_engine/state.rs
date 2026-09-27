@@ -17,7 +17,7 @@ pub(super) struct SimulationState<'a> {
     pub(super) deferred_interest: HashMap<String, Money>,
     pub(super) results: HashMap<String, TrancheCashflows>,
     pub(super) prev_date: Option<Date>,
-    pub(super) base_currency: Currency,
+    pub(super) currency: Currency,
     pub(super) recovery_lag_months: u32,
     /// Asset pool; owned once a reinvestment purchase has added a synthetic row.
     pub(super) pool: std::borrow::Cow<'a, AssetPool>,
@@ -315,7 +315,7 @@ pub(crate) struct StateTemplate {
     pool_state: PoolState,
     loss_alloc_order: Vec<usize>,
     closing_seasoning_months: u32,
-    base_currency: Currency,
+    currency: Currency,
     total_pool_balance: Money,
     original_pool_balance: Money,
     performing_pool_balance: Money,
@@ -328,7 +328,7 @@ impl StateTemplate {
         tranches: &TrancheStructure,
         closing_date: Date,
     ) -> Result<Self> {
-        let base_currency = pool.get_base_currency();
+        let currency = pool.get_currency();
         let pool_balance_cleanup_threshold = embedded_registry()?.pool_balance_cleanup_threshold();
 
         let results: HashMap<String, TrancheCashflows> = tranches
@@ -348,11 +348,11 @@ impl StateTemplate {
                         deferred_flows: Vec::new(),
                         writedown_flows: Vec::new(),
                         final_balance: t.current_balance,
-                        total_interest: Money::from((0_i64, base_currency)),
-                        total_principal: Money::from((0_i64, base_currency)),
-                        total_pik: Money::from((0_i64, base_currency)),
-                        total_deferred: Money::from((0_i64, base_currency)),
-                        total_writedown: Money::from((0_i64, base_currency)),
+                        total_interest: Money::from((0_i64, currency)),
+                        total_principal: Money::from((0_i64, currency)),
+                        total_pik: Money::from((0_i64, currency)),
+                        total_deferred: Money::from((0_i64, currency)),
+                        total_writedown: Money::from((0_i64, currency)),
                     },
                 )
             })
@@ -389,7 +389,7 @@ impl StateTemplate {
 
         let total_pool_balance = pool
             .total_balance()
-            .unwrap_or(Money::from((0_i64, base_currency)));
+            .unwrap_or(Money::from((0_i64, currency)));
         // The original (cut-off) balance every "fraction of the original pool"
         // quantity is stated against; equals the current balance for a
         // new-issue pool, the tallies' reconstruction for a seasoned one.
@@ -419,7 +419,7 @@ impl StateTemplate {
             pool_state,
             loss_alloc_order,
             closing_seasoning_months,
-            base_currency,
+            currency,
             total_pool_balance,
             original_pool_balance,
             performing_pool_balance,
@@ -445,11 +445,9 @@ impl<'a> SimulationState<'a> {
     ) -> Self {
         let mut recovery_queue = RecoveryQueue::new();
         for asset in &pool.assets {
-            if let (true, Some(date), Some(amount)) = (
-                asset.is_defaulted,
-                asset.default_date,
-                asset.recovery_amount,
-            ) {
+            if let (true, Some(date), Some(amount)) =
+                (asset.defaulted, asset.default_date, asset.recovery_amount)
+            {
                 recovery_queue.add_recovery(date, amount, asset.balance);
             }
         }
@@ -460,7 +458,7 @@ impl<'a> SimulationState<'a> {
                 - pool
                     .assets
                     .iter()
-                    .filter(|asset| asset.is_defaulted)
+                    .filter(|asset| asset.defaulted)
                     .filter_map(|asset| asset.recovery_amount)
                     .map(|amount| amount.amount())
                     .sum::<f64>())
@@ -473,7 +471,7 @@ impl<'a> SimulationState<'a> {
             deferred_interest: template.deferred_interest.clone(),
             results: template.results.clone(),
             prev_date: Some(state_date),
-            base_currency: template.base_currency,
+            currency: template.currency,
             recovery_lag_months,
             pool: std::borrow::Cow::Borrowed(pool),
             tranches,
@@ -502,14 +500,14 @@ impl<'a> SimulationState<'a> {
             closing_seasoning_months: template.closing_seasoning_months,
             reserve_balance: pool.reserve_account,
             spread_account: pool.excess_spread_account,
-            principal_funding_account: Money::from((0_i64, template.base_currency)),
-            undistributed_interest: Money::from((0_i64, template.base_currency)),
+            principal_funding_account: Money::from((0_i64, template.currency)),
+            undistributed_interest: Money::from((0_i64, template.currency)),
             undistributed_principal: pool.collection_account,
             floating_rate_shift: 0.0,
-            draws_from_reserve: Money::from((0_i64, template.base_currency)),
-            draws_from_principal: Money::from((0_i64, template.base_currency)),
-            cumulative_unfunded_draws: Money::from((0_i64, template.base_currency)),
-            reserve_replenished: Money::from((0_i64, template.base_currency)),
+            draws_from_reserve: Money::from((0_i64, template.currency)),
+            draws_from_principal: Money::from((0_i64, template.currency)),
+            cumulative_unfunded_draws: Money::from((0_i64, template.currency)),
+            reserve_replenished: Money::from((0_i64, template.currency)),
             reserve_balance_path: Vec::new(),
             reserve_interest_paid: Vec::new(),
         }
@@ -563,10 +561,10 @@ impl<'a> SimulationState<'a> {
                 .tranche_balances
                 .get(tranche_id)
                 .copied()
-                .unwrap_or(Money::from((0_i64, self.base_currency)));
+                .unwrap_or(Money::from((0_i64, self.currency)));
             if final_balance.amount() < 0.0 && final_balance.amount().abs() <= WRITEDOWN_DE_MINIMIS
             {
-                final_balance = Money::from((0_i64, self.base_currency));
+                final_balance = Money::from((0_i64, self.currency));
             }
             res.final_balance = final_balance;
 
@@ -635,7 +633,7 @@ pub(super) fn pool_composition(state: &SimulationState) -> Result<(f64, f64, f64
     let mut rated_balance = 0.0_f64;
     let mut factor = 0.0_f64;
     for (i, balance) in state.pool_state.balances.iter().enumerate() {
-        if *balance <= 0.0 || state.pool_state.is_defaulted[i] {
+        if *balance <= 0.0 || state.pool_state.defaulted[i] {
             continue;
         }
         match (
@@ -652,7 +650,7 @@ pub(super) fn pool_composition(state: &SimulationState) -> Result<(f64, f64, f64
             }
         }
         if let Some(asset) = state.pool.assets.get(i) {
-            let rating = asset.credit_quality.unwrap_or(CreditRating::NR);
+            let rating = asset.rating.unwrap_or(CreditRating::NR);
             rated_balance += balance;
             factor += balance * finstack_quant_models::credit::moodys_warf_factor(rating)?;
         }
@@ -670,7 +668,7 @@ impl SimulationState<'_> {
     /// against every recorded equity distribution (waterfall payments, reserve
     /// interest routed straight to equity and terminal sweeps).
     pub(super) fn equity_history(&self) -> Result<EquityHistory> {
-        let mut invested = Money::from((0_i64, self.base_currency));
+        let mut invested = Money::from((0_i64, self.currency));
         let mut distributions: Vec<(Date, Money)> = Vec::new();
         for tranche in self
             .tranches

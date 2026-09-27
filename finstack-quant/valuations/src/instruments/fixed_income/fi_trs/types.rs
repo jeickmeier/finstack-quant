@@ -183,7 +183,7 @@ impl FIIndexTotalReturnSwap {
                 "{context} notional must be non-negative and finite"
             )));
         }
-        if self.notional.currency() != self.underlying.base_currency {
+        if self.notional.currency() != self.underlying.currency {
             return Err(finstack_quant_core::Error::Validation(format!(
                 "{context} notional currency must match the underlying base currency"
             )));

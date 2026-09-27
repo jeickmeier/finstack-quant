@@ -112,14 +112,14 @@ pub struct OasResult {
 ///   and its waterfall and credit assumptions.
 /// * `tranche_id` - Identifier of the tranche whose option-adjusted spread is
 ///   solved.
-/// * `market_price_pct` - Observed clean price as a percentage of the
-///   tranche's CURRENT balance (the factor-adjusted quote basis). Accrued
-///   interest is added exactly once at the deal's quote settlement date;
-///   payments on or before settlement are excluded.
 /// * `market` - Market context supplying the discount curve and stochastic
 ///   scenario dependencies.
 /// * `as_of` - Valuation date used for projected tranche cashflows and
 ///   discounting.
+/// * `market_price_pct` - Observed clean price as a percentage of the
+///   tranche's CURRENT balance (the factor-adjusted quote basis). Accrued
+///   interest is added exactly once at the deal's quote settlement date;
+///   payments on or before settlement are excluded.
 /// * `config` - stochastic-rate/credit coupling and Monte-Carlo settings.
 ///
 /// # Errors
@@ -130,9 +130,9 @@ pub struct OasResult {
 pub fn calculate_tranche_oas(
     deal: &StructuredCredit,
     tranche_id: &str,
-    market_price_pct: f64,
     market: &MarketContext,
     as_of: Date,
+    market_price_pct: f64,
     config: &OasConfig,
 ) -> Result<OasResult> {
     deal.validate_for_pricing()?;

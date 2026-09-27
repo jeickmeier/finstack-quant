@@ -69,7 +69,7 @@ pub(super) fn period_hedge_flows(
     period_start: Date,
     pay_date: Date,
 ) -> Result<PeriodHedgeFlows> {
-    let mut receipts = Money::from((0_i64, state.base_currency));
+    let mut receipts = Money::from((0_i64, state.currency));
     let mut payments = Vec::new();
     for schedule in &state.hedge_schedules {
         let tracked = match &schedule.notional {
@@ -93,11 +93,11 @@ pub(super) fn period_hedge_flows(
             .sum::<f64>()
             * scale;
         if net > 0.0 {
-            receipts = receipts.checked_add(Money::new(net, state.base_currency)?)?;
+            receipts = receipts.checked_add(Money::new(net, state.currency)?)?;
         } else if net < 0.0 {
             payments.push((
                 schedule.id.clone(),
-                Money::new(-net, state.base_currency)?,
+                Money::new(-net, state.currency)?,
                 schedule.priority,
             ));
         }

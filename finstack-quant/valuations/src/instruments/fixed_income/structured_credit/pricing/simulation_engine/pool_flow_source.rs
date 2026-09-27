@@ -736,7 +736,7 @@ impl PoolFlowSource for StochasticPathFlowSource {
                     let alive = request
                         .state
                         .pool_state
-                        .is_defaulted
+                        .defaulted
                         .iter()
                         .zip(request.state.pool_state.balances.iter())
                         .filter(|(defaulted, balance)| !**defaulted && **balance > 0.0)

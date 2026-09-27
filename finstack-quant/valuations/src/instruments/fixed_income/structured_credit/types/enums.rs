@@ -135,15 +135,15 @@ pub enum AssetType {
         /// Ltv.
         ltv: Option<f64>,
     },
-    /// Hotel property mortgage
-    HotelMortgage {
+    /// Hospitality (hotel) property mortgage
+    HospitalityMortgage {
         /// Ltv.
         ltv: Option<f64>,
     },
     /// Other property type mortgage
     OtherMortgage {
-        /// Property type.
-        property_type: String,
+        /// Free-text description of the property type.
+        description: String,
         /// Ltv.
         ltv: Option<f64>,
     },
@@ -248,7 +248,7 @@ impl AssetType {
             AssetType::IndustrialMortgage { .. } => "industrial_mortgage",
             AssetType::RetailMortgage { .. } => "retail_mortgage",
             AssetType::OfficeMortgage { .. } => "office_mortgage",
-            AssetType::HotelMortgage { .. } => "hotel_mortgage",
+            AssetType::HospitalityMortgage { .. } => "hospitality_mortgage",
             AssetType::OtherMortgage { .. } => "other_mortgage",
             AssetType::NewAutoLoan { .. } => "new_auto_loan",
             AssetType::UsedAutoLoan { .. } => "used_auto_loan",
@@ -280,7 +280,7 @@ impl AssetType {
                 | AssetType::IndustrialMortgage { .. }
                 | AssetType::RetailMortgage { .. }
                 | AssetType::OfficeMortgage { .. }
-                | AssetType::HotelMortgage { .. }
+                | AssetType::HospitalityMortgage { .. }
                 | AssetType::OtherMortgage { .. }
                 | AssetType::NewAutoLoan { .. }
                 | AssetType::UsedAutoLoan { .. }

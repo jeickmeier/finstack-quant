@@ -111,7 +111,7 @@ mod tests {
         for bad in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
             let metrics = TrancheMetrics {
                 tranche_id: "A".to_string(),
-                currency: "USD".to_string(),
+                currency: finstack_quant_core::currency::Currency::USD,
                 pv: 100.0,
                 price_pct: 100.0,
                 factor: 1.0,

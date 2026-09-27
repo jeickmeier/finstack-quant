@@ -118,7 +118,7 @@ fn borrowing_base_excludes_concentration_excess_and_ineligible_collateral() {
 
     // A defaulted loan drops out of the eligible balance.
     let mut defaulted = facility.clone();
-    defaulted.collateral.assets[4].is_defaulted = true;
+    defaulted.collateral.assets[4].defaulted = true;
     let report = defaulted.borrowing_base().expect("report");
     assert!((report.eligible_collateral.amount() - 85_000_000.0).abs() < 1e-6);
     // Cap is now 17M: OBL-0 (30M) and the two 20M obligors are trimmed to 17M

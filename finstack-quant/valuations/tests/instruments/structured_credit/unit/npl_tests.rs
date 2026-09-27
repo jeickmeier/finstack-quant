@@ -225,7 +225,7 @@ fn full_liquidation_retires_the_loan_and_full_reperformance_keeps_the_coupon() {
 #[test]
 fn liquidation_terms_are_validated() {
     let mut flagged = npl_deal(workout());
-    flagged.pool.assets[0].is_defaulted = true;
+    flagged.pool.assets[0].defaulted = true;
     assert!(flagged.validate_invariants().is_err());
 
     let mut late = npl_deal(LiquidationSpec {

@@ -15936,7 +15936,7 @@ class AssetPool:
         self,
         id: str,
         deal_type: Literal["clo", "cbo", "abs", "rmbs", "cmbs", "auto", "card"],
-        base_currency: Currency | str,
+        currency: Currency | str,
     ) -> None:
         """
         Structured-credit collateral pool.
@@ -15947,9 +15947,9 @@ class AssetPool:
             Pool identifier.
         deal_type : {"clo", "cbo", "abs", "rmbs", "cmbs", "auto", "card"}
             Deal classification for pool-level assumptions.
-        base_currency : Currency | str
-            Base currency (``Currency`` or ISO-4217 code) for every asset and
-            pool-level account.
+        currency : Currency | str
+            Currency (``Currency`` or ISO-4217 code) every asset and
+            pool-level account is denominated in.
 
         Returns
         -------
@@ -16386,9 +16386,9 @@ class AssetPool:
         ...
 
     @property
-    def base_currency(self) -> str:
+    def currency(self) -> str:
         """
-        Base ISO-4217 currency code.
+        ISO-4217 currency code every pool amount is denominated in.
 
         Returns
         -------
@@ -17876,10 +17876,10 @@ class PoolAsset:
     ...     Money(10_000_000.0, Currency("USD")),
     ...     0.08,
     ...     datetime.date(2031, 1, 15),
-    ...     credit_quality="B",
+    ...     rating="B",
     ...     balloon={"extension_prob": 0.3, "extension_months": 24},
     ... )
-    >>> loan.credit_quality, loan.balloon["extension_months"]
+    >>> loan.rating, loan.balloon["extension_months"]
     ('B', 24)
     """
 
@@ -17895,10 +17895,10 @@ class PoolAsset:
         spread_bp: float | None = None,
         forward_curve_id: str | None = None,
         index_floor_bp: float | None = None,
-        credit_quality: str | None = None,
+        rating: str | None = None,
         industry: str | None = None,
         obligor_id: str | None = None,
-        is_defaulted: bool = False,
+        defaulted: bool = False,
         recovery_amount: Money | None = None,
         default_date: datetime.date | None = None,
         purchase_price: Money | None = None,
@@ -17948,14 +17948,14 @@ class PoolAsset:
         index_floor_bp : float, optional
             Floor on the floating index in basis points (``100`` = 1%),
             applied before ``spread_bp`` is added; ignored on fixed-rate rows.
-        credit_quality : str, optional
+        rating : str, optional
             Credit rating (``"BB"``, ``"CCC"``, ``"NR"`` ...), used by the
             coverage-test haircuts and the CCC bucket.
         industry : str, optional
             Industry label for concentration reporting.
         obligor_id : str, optional
             Obligor identifier for exposure aggregation.
-        is_defaulted : bool, optional
+        defaulted : bool, optional
             ``True`` marks the row defaulted at closing; ``recovery_amount`` and
             ``default_date`` describe its state.
         recovery_amount : Money, optional
@@ -18019,13 +18019,13 @@ class PoolAsset:
             ``LiquidationSpec`` for a non-performing loan
             (``months_to_resolution``, ``proceeds_pct`` and ``carry_cost_pct``
             percents, ``reperformance_prob`` decimal, optional
-            ``modified_rate`` decimal); leave ``is_defaulted`` false.
+            ``modified_rate`` decimal); leave ``defaulted`` false.
 
         Raises
         ------
         ValueError
             If a sub-spec does not match its serde shape, a date is invalid or
-            ``credit_quality`` is not a known rating.
+            ``rating`` is not a known rating.
         """
         ...
 
@@ -18347,7 +18347,7 @@ class PoolAsset:
         ...
 
     @property
-    def credit_quality(self) -> str | None:
+    def rating(self) -> str | None:
         """
         Credit rating string.
 
@@ -18396,7 +18396,7 @@ class PoolAsset:
         ...
 
     @property
-    def is_defaulted(self) -> bool:
+    def defaulted(self) -> bool:
         """
         Whether the row is defaulted.
 
@@ -21098,7 +21098,7 @@ class Waterfall:
     ... )
     >>> market = MarketContext().insert(DiscountCurve.flat("USD-SOFR-DISC", as_of, 0.03))
     >>> waterfall = deal.create_waterfall()
-    >>> waterfall.base_currency, len(waterfall.tiers) > 0
+    >>> waterfall.currency, len(waterfall.tiers) > 0
     ('USD', True)
     """
 
@@ -21211,9 +21211,9 @@ class Waterfall:
         ...
 
     @property
-    def base_currency(self) -> str:
+    def currency(self) -> str:
         """
-        Base ISO-4217 currency code of the waterfall.
+        ISO-4217 currency code every waterfall amount is denominated in.
 
         Returns
         -------
@@ -22491,7 +22491,7 @@ class StructuredCredit:
         """
         ...
 
-    def enable_stochastic_defaults(self) -> StructuredCredit:
+    def enable_stochastic(self) -> StructuredCredit:
         """
         Return a copy with the deal-type stochastic prepayment, default and
         correlation specifications enabled for :meth:`price_stochastic`.
@@ -23839,7 +23839,7 @@ class StructuredCreditBuilder:
         ----------
         value : Waterfall | dict[str, Any] | str
             Typed :class:`Waterfall` or its serde form (``tiers``,
-            ``base_currency``, optional ``coverage_rules``).
+            ``currency``, optional ``coverage_rules``).
         Returns
         -------
         StructuredCreditBuilder
@@ -29776,14 +29776,14 @@ def structured_credit_tranche_discount_margin(
     tranche_id: str,
     market: MarketContext | str,
     as_of: datetime.date | str,
-    target_pv: float,
+    market_price_pct: float,
 ) -> float:
     """Solve a z-spread-equivalent discount margin for a floating-rate tranche.
 
     Contractual cashflows are projected without changing coupon projection,
     then a constant additive spread is applied to the discount curve. The
-    result is zero at model PV, negative for a richer (higher) target PV, and
-    positive for a cheaper (lower) target PV; it is not the contractual quoted
+    result is zero at the model price, negative for a richer (higher) price,
+    and positive for a cheaper (lower) price; it is not the contractual quoted
     margin.
 
     Parameters
@@ -29801,12 +29801,10 @@ def structured_credit_tranche_discount_margin(
     as_of : datetime.date | str
         Valuation date used for projection and discounting, either a date-like
         object or an ISO 8601 string.
-    target_pv : float
-        Positive dirty settlement value in the tranche's currency, including
-        accrued interest once. Settlement is the deal's ``quote_settlement_date``
-        or the valuation date when omitted. Values above model value
-        produce a negative result; values below model PV produce a positive
-        result.
+    market_price_pct : float
+        Clean settlement price as a percentage of the tranche's current
+        balance (100.0 = par). Accrued interest is added once at the deal's
+        ``quote_settlement_date`` (valuation date when omitted).
 
     Returns
     -------
@@ -29819,9 +29817,9 @@ def structured_credit_tranche_discount_margin(
         If ``tranche_id`` is not part of the deal.
     ValueError
         If the JSON or date is malformed, the deal fails validation, the
-        tranche is missing or fixed-rate, ``target_pv`` is not finite, required
-        market data is unavailable, or the spread solve fails or exceeds
-        ±5000 bp.
+        tranche is missing or fixed-rate, ``market_price_pct`` is not finite and
+        positive, required market data is unavailable, or the spread solve
+        fails or exceeds ±5000 bp.
 
     Examples
     --------
@@ -29884,9 +29882,9 @@ def structured_credit_tranche_breakeven_cdr(
 def structured_credit_tranche_oas(
     instrument: StructuredCredit | str,
     tranche_id: str,
-    market_price_pct: float,
     market: MarketContext | str,
     as_of: datetime.date | str,
+    market_price_pct: float,
     config: dict[str, Any] | str | None = None,
 ) -> OasResult:
     """Compute option-adjusted spread for a tranche. Returns an ``OasResult``.
@@ -29898,15 +29896,15 @@ def structured_credit_tranche_oas(
         ``StructuredCredit`` instance.
     tranche_id : str
         Identifier of the tranche within the deal.
-    market_price_pct : float
-        Clean settlement price as a percentage of current balance (100.0 = par).
-        Accrued interest is added once at the deal's ``quote_settlement_date``
-        (valuation date when omitted); earlier payments belong to the seller.
     market : MarketContext or str
         Typed ``MarketContext`` or serialized market-context JSON supplying
         curves and fixings.
     as_of : datetime.date | str
         Valuation date, either a date-like object or an ISO 8601 string.
+    market_price_pct : float
+        Clean settlement price as a percentage of current balance (100.0 = par).
+        Accrued interest is added once at the deal's ``quote_settlement_date``
+        (valuation date when omitted); earlier payments belong to the seller.
     config : dict or str or None, optional
         Serialized ``OasConfig``. All fields are required when supplied.
 
@@ -29928,7 +29926,7 @@ def structured_credit_tranche_oas(
     --------
     >>> from finstack_quant.valuations.instruments import structured_credit_tranche_oas
     >>> try:
-    ...     structured_credit_tranche_oas("{}", "A", 100.0, "{}", "2026-01-01")
+    ...     structured_credit_tranche_oas("{}", "A", "{}", "2026-01-01", 100.0)
     ... except ValueError as exc:
     ...     print("schema" in str(exc))
     True

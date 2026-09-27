@@ -106,7 +106,7 @@ pub enum ReserveInterestDestination {
     /// waterfall runs. Excluded from the interest-coverage numerator.
     Tranche {
         /// Identifier of the receiving tranche; must exist in the deal.
-        tranche_id: InstrumentId,
+        tranche_id: String,
     },
     /// Capitalized into the reserve account.
     Retain,
@@ -251,14 +251,14 @@ impl InstrumentCollateral {
     /// Validate the collateral against the pool base currency.
     ///
     /// Checks each instrument's own invariants, that every monetary field is
-    /// in `base_currency`, that identifiers are unique across the three lists,
+    /// in `currency`, that identifiers are unique across the three lists,
     /// that every override names a held instrument, and that a `Worst` call
     /// policy only applies to instruments carrying a quoted clean price.
     ///
     /// # Arguments
     ///
-    /// * `base_currency` - Pool base currency every instrument must use.
-    pub fn validate(&self, base_currency: Currency) -> Result<()> {
+    /// * `currency` - Pool base currency every instrument must use.
+    pub fn validate(&self, currency: Currency) -> Result<()> {
         let mut seen: HashSet<&str> = HashSet::default();
         for instrument in self.iter() {
             let id = instrument.id();
@@ -270,16 +270,16 @@ impl InstrumentCollateral {
             match instrument {
                 CollateralInstrument::Bond(bond) => {
                     bond.validate()?;
-                    require_currency(bond.notional.currency(), base_currency, id)?;
+                    require_currency(bond.notional.currency(), currency, id)?;
                 }
                 CollateralInstrument::TermLoan(loan) => {
                     loan.validate()?;
-                    require_currency(loan.currency, base_currency, id)?;
-                    require_currency(loan.notional_limit.currency(), base_currency, id)?;
+                    require_currency(loan.currency, currency, id)?;
+                    require_currency(loan.notional_limit.currency(), currency, id)?;
                 }
                 CollateralInstrument::Revolver(facility) => {
                     facility.validate()?;
-                    require_currency(facility.commitment.currency(), base_currency, id)?;
+                    require_currency(facility.commitment.currency(), currency, id)?;
                 }
             }
         }
@@ -310,10 +310,10 @@ impl InstrumentCollateral {
     ///
     /// # Arguments
     ///
-    /// * `base_currency` - Currency of the returned total.
-    pub fn total_balance(&self, base_currency: Currency) -> Result<Money> {
+    /// * `currency` - Currency of the returned total.
+    pub fn total_balance(&self, currency: Currency) -> Result<Money> {
         self.iter()
-            .try_fold(Money::from((0_i64, base_currency)), |acc, instrument| {
+            .try_fold(Money::from((0_i64, currency)), |acc, instrument| {
                 acc.checked_add(current_balance(instrument, None)?)
             })
     }
@@ -345,10 +345,10 @@ impl InstrumentCollateral {
                 forward_curve_id,
                 maturity: bond.maturity,
                 index_floor_bp: None,
-                credit_quality: None,
+                rating: None,
                 industry: None,
                 obligor_id: None,
-                is_defaulted: false,
+                defaulted: false,
                 recovery_amount: None,
                 default_date: None,
                 purchase_price: None,
@@ -385,10 +385,10 @@ impl InstrumentCollateral {
                 forward_curve_id,
                 maturity: loan.maturity,
                 index_floor_bp: None,
-                credit_quality: None,
+                rating: None,
                 industry: None,
                 obligor_id: None,
-                is_defaulted: false,
+                defaulted: false,
                 recovery_amount: None,
                 default_date: None,
                 purchase_price: None,
@@ -425,10 +425,10 @@ impl InstrumentCollateral {
                 forward_curve_id,
                 maturity: facility.maturity,
                 index_floor_bp: None,
-                credit_quality: None,
+                rating: None,
                 industry: None,
                 obligor_id: None,
-                is_defaulted: false,
+                defaulted: false,
                 recovery_amount: None,
                 default_date: None,
                 purchase_price: None,

@@ -572,7 +572,7 @@ fn structured_credit_tranche_analytics_declare_typed_results() {
     assert!(dts.contains("export interface TrancheScenarioCell {"));
     assert!(contains_ignoring_ws(
         &dts,
-        "structuredCreditTrancheOas(instrumentJson: string, trancheId: string, marketPricePct: number, marketJson: string, asOf: string, config?: string | null): OasResult;",
+        "structuredCreditTrancheOas(instrumentJson: string, trancheId: string, marketJson: string, asOf: string, marketPricePct: number, config?: string | null): OasResult;",
     ));
     assert!(contains_ignoring_ws(
         &dts,
@@ -584,7 +584,7 @@ fn structured_credit_tranche_analytics_declare_typed_results() {
     ));
     assert!(contains_ignoring_ws(
         &dts,
-        "structuredCreditTrancheDiscountMargin(instrumentJson: string, trancheId: string, marketJson: string, asOf: string, targetPv: number): number;",
+        "structuredCreditTrancheDiscountMargin(instrumentJson: string, trancheId: string, marketJson: string, asOf: string, marketPricePct: number): number;",
     ));
     assert!(contains_ignoring_ws(
         &dts,

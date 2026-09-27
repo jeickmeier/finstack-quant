@@ -89,7 +89,7 @@ pub(super) fn current_collateral_wac(
     let mut weighted = 0.0_f64;
     let mut balance = 0.0_f64;
     for i in 0..state.pool_state.len() {
-        if state.pool_state.is_defaulted[i] {
+        if state.pool_state.defaulted[i] {
             continue;
         }
         let b = state.pool_state.balances[i];

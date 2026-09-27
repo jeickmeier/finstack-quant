@@ -75,7 +75,7 @@ fn baseline() -> StructuredCredit {
             maturity(),
             DayCount::Act360,
         );
-        asset.credit_quality = Some(CreditRating::BB);
+        asset.rating = Some(CreditRating::BB);
         pool.assets.push(asset);
     }
     let tranches = TrancheStructure::new(vec![
@@ -288,7 +288,7 @@ fn floating_first_asset(deal: &mut StructuredCredit) {
         maturity(),
         DayCount::Act360,
     );
-    loating.credit_quality = Some(CreditRating::BB);
+    loating.rating = Some(CreditRating::BB);
     deal.pool.assets[0] = loating;
 }
 
@@ -987,10 +987,10 @@ fn knobs() -> Vec<Knob> {
             change: |d| d.pool.assets[0].rate = 0.12,
         },
         Knob {
-            name: "pool.assets[0].is_defaulted",
+            name: "pool.assets[0].defaulted",
             common: none,
             change: |d| {
-                d.pool.assets[0].is_defaulted = true;
+                d.pool.assets[0].defaulted = true;
                 d.pool.assets[0].default_date = Some(ymd(2023, 12, 1));
                 d.pool.assets[0].recovery_amount = Some(usd(4_000_000.0));
             },

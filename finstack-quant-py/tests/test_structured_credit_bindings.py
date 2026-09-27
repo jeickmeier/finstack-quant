@@ -154,9 +154,9 @@ def test_tranche_oas_returns_typed_wrapper() -> None:
     result = instruments.structured_credit_tranche_oas(
         deal_json,
         "CLONOTES-A",
-        model_price_pct,
         market,
         "2024-01-01",
+        model_price_pct,
         _DETERMINISTIC_OAS_CONFIG_JSON,
     )
 

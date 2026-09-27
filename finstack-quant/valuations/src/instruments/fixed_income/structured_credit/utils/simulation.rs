@@ -45,19 +45,19 @@ impl RecoveryQueue {
     }
 
     /// Total pending (unreleased) recovery amount.
-    pub(crate) fn pending_amount(&self, base_currency: Currency) -> Money {
+    pub(crate) fn pending_amount(&self, currency: Currency) -> Money {
         self.pending
             .iter()
-            .fold(Money::from((0_i64, base_currency)), |acc, (_, amt, _)| {
+            .fold(Money::from((0_i64, currency)), |acc, (_, amt, _)| {
                 acc.checked_add(*amt).unwrap_or(acc)
             })
     }
 
     /// Total defaulted par behind the pending (unreleased) claims.
-    pub(crate) fn pending_par(&self, base_currency: Currency) -> Money {
+    pub(crate) fn pending_par(&self, currency: Currency) -> Money {
         self.pending
             .iter()
-            .fold(Money::from((0_i64, base_currency)), |acc, (_, _, par)| {
+            .fold(Money::from((0_i64, currency)), |acc, (_, _, par)| {
                 acc.checked_add(*par).unwrap_or(acc)
             })
     }
@@ -79,10 +79,10 @@ impl RecoveryQueue {
         &mut self,
         current_date: Date,
         recovery_lag_months: u32,
-        base_currency: Currency,
+        currency: Currency,
     ) -> finstack_quant_core::Result<(Money, Money)> {
-        let mut released = Money::from((0_i64, base_currency));
-        let mut released_par = Money::from((0_i64, base_currency));
+        let mut released = Money::from((0_i64, currency));
+        let mut released_par = Money::from((0_i64, currency));
 
         while let Some((orig_date, _, _)) = self.pending.front() {
             let months = i32::try_from(recovery_lag_months).map_err(|_| {

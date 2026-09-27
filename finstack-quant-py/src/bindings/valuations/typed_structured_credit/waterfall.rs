@@ -40,7 +40,7 @@ use super::PyCoverageRules;
 /// ... )
 /// >>> market = MarketContext().insert(DiscountCurve.flat("USD-SOFR-DISC", as_of, 0.03))
 /// >>> waterfall = deal.create_waterfall()
-/// >>> waterfall.base_currency, len(waterfall.tiers) > 0
+/// >>> waterfall.currency, len(waterfall.tiers) > 0
 /// ('USD', True)
 #[pyclass(
     module = "finstack_quant.valuations.instruments",
@@ -58,10 +58,10 @@ sc_wire_methods!(PyWaterfall, Waterfall, "Waterfall");
 
 #[pymethods]
 impl PyWaterfall {
-    /// Base ISO-4217 currency code of the waterfall.
+    /// ISO-4217 currency code every waterfall amount is denominated in.
     #[getter]
-    fn base_currency(&self) -> String {
-        self.inner.base_currency.to_string()
+    fn currency(&self) -> String {
+        self.inner.currency.to_string()
     }
 
     /// Ordered tiers as ``WaterfallTier`` serde dicts (``id``, ``priority``,
@@ -103,8 +103,8 @@ impl PyWaterfall {
     /// Return ``repr(self)``.
     fn __repr__(&self) -> String {
         format!(
-            "Waterfall(base_currency={}, tiers={})",
-            self.inner.base_currency,
+            "Waterfall(currency={}, tiers={})",
+            self.inner.currency,
             self.inner.tiers.len()
         )
     }

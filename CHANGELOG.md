@@ -2,6 +2,75 @@
 
 ## [Unreleased]
 
+### Structured-credit deal terms (2026-09-24)
+
+A pool asset's agency rating is `rating` (as on `Tranche`) and its default
+flag is `defaulted` (optional on the wire, as on `CDSIndexConstituent`); every
+stochastic default/prepay variant names its systematic-factor beta
+`factor_loading`; the hotel collateral class is `hospitality_mortgage`,
+matching `RealEstatePropertyType`; the deal/pool/index denomination currency
+is `currency`; and the tranche spread solvers take the same clean price, in
+the same position. Retired keys are rejected by `deny_unknown_fields`
+(`tests/instruments/structured_credit/integration/serialization_tests.rs`).
+Numbers do not change.
+
+#### Changed (BREAKING)
+
+- `PoolAsset.credit_quality` (now `rating`). Rust / Python kwarg and getter /
+  JSON.
+- `PoolAsset.is_defaulted` (now `defaulted`, `#[serde(default)] = false`).
+  Rust / Python kwarg and getter / JSON.
+- `StochasticDefaultSpec::IntensityProcess.factor_sensitivity` (now
+  `factor_loading`; also on the in-memory `HazardCurveBased` variant and the
+  `intensity_process` / `from_hazard_curve` parameters). Rust / JSON.
+- Structured-credit assumptions registry `default_factor_sensitivity` (now
+  `default_factor_loading`). JSON.
+- Every systematic-factor loading is clamped to, and the registry validates,
+  one range, [-1, 1]. The intensity-process and hazard-curve default models
+  previously clamped to [-2, 2] and the registry accepted any non-negative
+  default loading; the four other stochastic variants already used [-1, 1],
+  and every shipped registry value (0.5, 0.8) lies inside it. Rust / JSON.
+- `AssetType::HotelMortgage` (now `HospitalityMortgage`, wire
+  `hospitality_mortgage`). Rust / JSON.
+- `AssetType::OtherMortgage.property_type` (now `description`, as on
+  `Generic` and `Hybrid`). Rust / JSON.
+- `AssetPool.base_currency` (now `currency`; `AssetPool::new` parameter too)
+  and `AssetPool::get_base_currency` (now `get_currency`). Rust / Python
+  constructor argument and getter / JSON.
+- `Waterfall.base_currency` (now `currency`; builder and template parameters
+  too). Rust / Python getter / JSON.
+- `IndexUnderlyingParams.base_currency` (now `currency`; `new` parameter too),
+  used by `FIIndexTotalReturnSwap.underlying`. Rust / JSON.
+- `TrancheMetrics.currency` and `EquityMetrics.currency` are now typed
+  `Currency` (unknown ISO codes fail to load). Rust; JSON and Python unchanged.
+- `calculate_tranche_discount_margin` takes `market_price_pct` (clean price, %
+  of CURRENT balance, accrued added at settlement) in place of the dirty
+  `target_pv: Money`, as the OAS and metrics solvers do. Python / WASM
+  `structured_credit_tranche_discount_margin` / `structuredCreditTrancheDiscountMargin`
+  take `market_price_pct` / `marketPricePct` in place of `target_pv` /
+  `targetPv`. Rust / Python / WASM.
+- `calculate_tranche_oas` (and Python `structured_credit_tranche_oas`, WASM
+  `structuredCreditTrancheOas`) takes `market_price_pct` after `as_of`:
+  `(deal, tranche_id, market, as_of, market_price_pct, config)`. Rust / Python
+  / WASM.
+- `calculate_tranche_breakeven_cdr` and `scenario_table` name their market
+  parameter `market`. Rust.
+- `StructuredCredit::enable_stochastic_defaults` (now `enable_stochastic`,
+  pairing with `disable_stochastic` and `is_stochastic`). Rust / Python.
+- `ReserveInterestDestination::Tranche.tranche_id` is now `String`, like every
+  other tranche reference. Rust (wire shape unchanged).
+- Coverage-test results name the computed ratio `ratio` and the flag
+  `passing` (was `current_ratio` / `is_passing` on `TestResult`). Rust.
+
+#### Fixed
+
+- The incentive fee's `share` is validated as a decimal in [0, 1] on the
+  user-supplied paths (`fees.incentive_fee.share` and a custom waterfall's
+  `IncentiveFee.share`), not only in the assumptions registry; a percent-style
+  `20` is now rejected instead of paying 20x the residual.
+- WASM docs described the OAS and metrics price as a percent of ORIGINAL
+  balance; it is a percent of CURRENT balance.
+
 ### FX and money market (2026-09-24)
 
 The FX family's quote-currency discount curve is `domestic_discount_curve_id`

@@ -125,7 +125,7 @@ pub(super) fn recycle_reinvestment_principal(
         ));
     }
     let Some(period) = state.pool.reinvestment_period.as_ref() else {
-        return Ok(Money::from((0_i64, state.base_currency)));
+        return Ok(Money::from((0_i64, state.currency)));
     };
     let criteria = &period.criteria;
     if !criteria.max_price_pct.is_finite()
@@ -137,7 +137,7 @@ pub(super) fn recycle_reinvestment_principal(
         ));
     }
     if price_fraction * 100.0 > criteria.max_price_pct || recyclable.amount() <= 0.0 {
-        return Ok(Money::from((0_i64, state.base_currency)));
+        return Ok(Money::from((0_i64, state.currency)));
     }
     if let Some(assumptions) = period.assumptions.clone() {
         let min_yield = criteria.min_yield;
@@ -159,7 +159,7 @@ pub(super) fn recycle_reinvestment_principal(
     let mut eligible = vec![false; state.pool_state.len()];
     #[allow(clippy::needless_range_loop)] // parallel per-asset vectors are indexed together
     for i in 0..state.pool_state.len() {
-        if state.pool_state.is_defaulted[i] || state.pool_state.balances[i] <= 0.0 {
+        if state.pool_state.defaulted[i] || state.pool_state.balances[i] <= 0.0 {
             continue;
         }
         let coupon = if let Some(curve_idx) = state.pool_state.curve_indices[i] {
@@ -190,7 +190,7 @@ pub(super) fn recycle_reinvestment_principal(
 
     if performing_total <= 0.0 {
         // No surviving collateral to reinvest into — recycle is a no-op.
-        return Ok(Money::from((0_i64, state.base_currency)));
+        return Ok(Money::from((0_i64, state.currency)));
     }
 
     // Par acquired by spending `recyclable` cash at the reinvestment price.
@@ -245,7 +245,7 @@ fn purchase_replacement_collateral(
     })?;
     let maturity = payment_date.add_months(months).min(legal_final);
     if maturity <= payment_date {
-        return Ok(Money::from((0_i64, state.base_currency)));
+        return Ok(Money::from((0_i64, state.currency)));
     }
     let spread = assumptions.spread_bp / 10_000.0;
     let coupon = match &assumptions.forward_curve_id {
@@ -263,11 +263,11 @@ fn purchase_replacement_collateral(
     let all_in_floor = assumptions.all_in_floor_bp.map(|bp| bp / 10_000.0);
     let coupon = all_in_floor.map_or(coupon, |floor| coupon.max(floor));
     if coupon / price_fraction < min_yield {
-        return Ok(Money::from((0_i64, state.base_currency)));
+        return Ok(Money::from((0_i64, state.currency)));
     }
     let par = Money::new(
         par_acquired_at_price(recyclable.amount(), price_fraction),
-        state.base_currency,
+        state.currency,
     )?;
     let purchases = state
         .pool_state

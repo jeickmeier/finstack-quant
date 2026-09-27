@@ -701,7 +701,7 @@ test('predefaulted collateral pays its outstanding recovery once', () => {
     )
   );
   Object.assign(fixture.instrument.instrument.spec.pool.assets[0], {
-    is_defaulted: true,
+    defaulted: true,
     default_date: fixture.as_of,
     recovery_amount: { amount: '70000000', currency: 'USD' },
   });

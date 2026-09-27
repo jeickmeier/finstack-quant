@@ -5942,22 +5942,23 @@ export interface ValuationInstrumentsNamespace {
    *
    * Contractual cashflows are projected without changing coupon projection,
    * then a constant additive spread is applied to the discount curve. The result
-   * is zero at model PV, negative for a richer (higher) `targetPv`, and positive
-   * for a cheaper (lower) `targetPv`; it is not the contractual quoted margin.
+   * is zero at the model price, negative for a richer (higher)
+   * `marketPricePct`, and positive for a cheaper (lower) `marketPricePct`; it is
+   * not the contractual quoted margin.
    * @param instrumentJson - Canonical instrument envelope JSON in the Finstack v1 schema.
    * @param trancheId - Identifier of the floating-rate tranche whose contractual cashflows are spread-discounted.
    * @param marketJson - Canonical market-context JSON supplying the discount curve and any forward curves or historical fixings required for cashflow projection.
    * @param asOf - ISO-8601 valuation date used for projection and discounting.
-   * @param targetPv - Positive dirty settlement amount in tranche currency, including accrued interest once; settlement uses the deal's quote_settlement_date or the valuation date.
+   * @param marketPricePct - Clean settlement price as a percentage of the tranche's CURRENT balance (100.0 = par); accrued interest is added once at the deal's quote_settlement_date or the valuation date.
    * @returns The z-spread-equivalent discount margin in decimal units.
-   * @throws Error - Thrown if JSON or the date is malformed, the deal is invalid, the tranche is missing or fixed-rate, target_pv is non-finite, required market data is unavailable, or the spread solve fails or exceeds ±5000 bp.
+   * @throws Error - Thrown if JSON or the date is malformed, the deal is invalid, the tranche is missing or fixed-rate, market_price_pct is not finite and positive, required market data is unavailable, or the spread solve fails or exceeds ±5000 bp.
    */
   structuredCreditTrancheDiscountMargin(
     instrumentJson: string,
     trancheId: string,
     marketJson: string,
     asOf: string,
-    targetPv: number
+    marketPricePct: number
   ): number;
   /**
    * Break-even constant default rate (CDR, decimal) for a tranche — the highest
@@ -5982,23 +5983,23 @@ export interface ValuationInstrumentsNamespace {
    * Python exposes through its typed `OasResult` wrapper. Pass it to
    * `JSON.stringify` if a wire string is needed.
    *
-   * `marketPricePct` is the quoted price as a percentage of original balance.
+   * `marketPricePct` is the clean settlement quote as a percentage of CURRENT balance.
    * `config`, when present, is a JSON `OasConfig`; the default is used otherwise.
    * @returns Typed `OasResult` object for the tranche.
    * @param instrumentJson - Canonical instrument envelope JSON in the Finstack v1 schema.
    * @param trancheId - Stable tranche identifier used to select the required domain object.
-   * @param marketPricePct - Clean settlement quote as a percentage of original balance; accrued interest is added once.
    * @param marketJson - Canonical market-context JSON supplying curves, quotes, and FX data.
    * @param asOf - ISO-8601 valuation date used to resolve date-dependent market data.
+   * @param marketPricePct - Clean settlement quote as a percentage of CURRENT balance; accrued interest is added once.
    * @throws Error - Throws a JavaScript exception if the instrument, market, or optional configuration JSON is malformed; the instrument fails pricing validation; `as_of` is invalid; the tranche or discount curve is missing; the OAS solve fails or produces a non-finite result; or the result cannot be converted to a JavaScript value.
    * @param config - Config used by this call.
    */
   structuredCreditTrancheOas(
     instrumentJson: string,
     trancheId: string,
-    marketPricePct: number,
     marketJson: string,
     asOf: string,
+    marketPricePct: number,
     config?: string | null
   ): OasResult;
   /**
@@ -6028,7 +6029,7 @@ export interface ValuationInstrumentsNamespace {
    * Per-tranche risk/spread metrics (PV, price, WAL, z-spread, CS01, spread/
    * modified duration, convexity) computed from one tranche's own cashflows.
    *
-   * `marketPricePct`, when provided, is the quoted price (% of original balance)
+   * `marketPricePct`, when provided, is the quoted clean price (% of CURRENT balance)
    * the z-spread and CS01 are solved against; otherwise the tranche's own model
    * price is used (zero z-spread). Returns a typed `TrancheMetrics` object —
    * a plain object with the same snake_case fields Python exposes through its
@@ -6039,7 +6040,7 @@ export interface ValuationInstrumentsNamespace {
    * @param trancheId - Stable tranche identifier used to select the required domain object.
    * @param marketJson - Canonical market-context JSON supplying curves, quotes, and FX data.
    * @param asOf - ISO-8601 valuation date used to resolve date-dependent market data.
-   * @param marketPricePct - Optional clean settlement quote as a percentage of original balance; omit to use the deal quote, or its model clean price when no quote is supplied.
+   * @param marketPricePct - Optional clean settlement quote as a percentage of CURRENT balance; omit to use the deal quote, or its model clean price when no quote is supplied.
    * @throws Error - Throws a JavaScript exception if the instrument or market JSON is malformed; the instrument fails pricing validation; `as_of` is invalid; the tranche or discount curve is missing; a metric fails or is non-finite; or the result cannot be converted to a JavaScript value.
    */
   structuredCreditTrancheMetrics(

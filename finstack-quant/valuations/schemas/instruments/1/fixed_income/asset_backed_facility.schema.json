@@ -585,10 +585,6 @@
           },
           "type": "array"
         },
-        "base_currency": {
-          "$ref": "https://finstack_quant.dev/schemas/common/1/currency.schema.json",
-          "description": "Base currency for every asset and pool-level account."
-        },
         "collection_account": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
           "description": "AssetPool-level accounts\nCollection account balance (collected but not yet distributed)"
@@ -608,6 +604,10 @@
         "cumulative_scheduled_amortization": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
           "description": "Cumulative scheduled amortization (level-pay principal for amortizing assets).\n\nPart of the original-balance denominator in\n[`current_loss_percentage`](super::StructuredCredit::current_loss_percentage),\nso it must be stated: omitting it understates the denominator and\noverstates the reported loss rate."
+        },
+        "currency": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/currency.schema.json",
+          "description": "Base currency for every asset and pool-level account."
         },
         "deal_type": {
           "$ref": "#/$defs/DealType",
@@ -692,7 +692,7 @@
       "required": [
         "id",
         "deal_type",
-        "base_currency",
+        "currency",
         "assets",
         "cumulative_defaults",
         "cumulative_recoveries",
@@ -967,7 +967,7 @@
         },
         {
           "additionalProperties": false,
-          "description": "Hotel property mortgage",
+          "description": "Hospitality (hotel) property mortgage",
           "properties": {
             "ltv": {
               "description": "Ltv.",
@@ -978,7 +978,7 @@
               ]
             },
             "type": {
-              "const": "hotel_mortgage",
+              "const": "hospitality_mortgage",
               "type": "string"
             }
           },
@@ -991,6 +991,10 @@
           "additionalProperties": false,
           "description": "Other property type mortgage",
           "properties": {
+            "description": {
+              "description": "Free-text description of the property type.",
+              "type": "string"
+            },
             "ltv": {
               "description": "Ltv.",
               "format": "double",
@@ -999,10 +1003,6 @@
                 "null"
               ]
             },
-            "property_type": {
-              "description": "Property type.",
-              "type": "string"
-            },
             "type": {
               "const": "other_mortgage",
               "type": "string"
@@ -1010,7 +1010,7 @@
           },
           "required": [
             "type",
-            "property_type"
+            "description"
           ],
           "type": "object"
         },
@@ -4174,17 +4174,6 @@
           "default": null,
           "description": "Contractual periodic payment for level-pay assets. Required for exact\nseasoned-loan amortization; when absent it is inferred once from the\ncurrent state and the amortization term (or the remaining contractual\nperiods to maturity)."
         },
-        "credit_quality": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/CreditRating"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "Optional credit-quality classification of the obligor or asset."
-        },
         "day_count": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/day_count.schema.json",
           "description": "Day-count convention used for coupon and accrual calculations."
@@ -4200,6 +4189,11 @@
           ],
           "default": null,
           "description": "Economic default date for the outstanding recovery claim; required for defaulted assets."
+        },
+        "defaulted": {
+          "default": false,
+          "description": "Whether the asset has defaulted (optional on the wire, default `false`).",
+          "type": "boolean"
         },
         "delinquency_buckets": {
           "description": "Delinquent balance per bucket (30, 60, 90 days past due, ...) at the\nvaluation date, in the pool's currency. Requires\n`credit_model.delinquency` with the same number of buckets; the sum\nmust not exceed `balance`. `None` for a fully current asset.",
@@ -4246,10 +4240,6 @@
             "null"
           ]
         },
-        "is_defaulted": {
-          "description": "Whether the asset is currently treated as defaulted by the pool model.",
-          "type": "boolean"
-        },
         "liquidation": {
           "anyOf": [
             {
@@ -4259,7 +4249,7 @@
               "type": "null"
             }
           ],
-          "description": "Non-performing loan resolution: the loan pays nothing until the\nresolution date, where a share liquidates (a default whose recovery\nis the net proceeds) and the rest re-performs. The timeline replaces\nthe default flag: `is_defaulted` stays `false` and\n`recovery_amount`/`default_date` stay unset."
+          "description": "Non-performing loan resolution: the loan pays nothing until the\nresolution date, where a share liquidates (a default whose recovery\nis the net proceeds) and the rest re-performs. The timeline replaces\nthe default flag: `defaulted` stays `false` and\n`recovery_amount`/`default_date` stay unset."
         },
         "market_price_pct": {
           "description": "Market price as percent of par (`60.0` = 60% of par). Read by the\nexcess-CCC coverage rule; an asset without a price is carried at par.",
@@ -4339,6 +4329,17 @@
           "format": "double",
           "type": "number"
         },
+        "rating": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/CreditRating"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Optional agency credit rating of the obligor or asset; drives WARF,\nthe CCC bucket and `CoverageRules.rating_haircuts`."
+        },
         "recovery_amount": {
           "anyOf": [
             {
@@ -4394,7 +4395,6 @@
         "balance",
         "rate",
         "maturity",
-        "is_defaulted",
         "day_count"
       ],
       "type": "object"
@@ -5121,8 +5121,8 @@
               "type": "string"
             },
             "tranche_id": {
-              "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
-              "description": "Identifier of the receiving tranche; must exist in the deal."
+              "description": "Identifier of the receiving tranche; must exist in the deal.",
+              "type": "string"
             }
           },
           "required": [
@@ -5658,7 +5658,7 @@
         },
         {
           "additionalProperties": false,
-          "description": "Intensity process (Cox model) for default.\n\nMean-reverting intensity with factor sensitivity.",
+          "description": "Intensity process (Cox model) for default.\n\nMean-reverting intensity with factor loading.",
           "properties": {
             "base_hazard": {
               "description": "Base annual hazard rate",
@@ -5671,8 +5671,8 @@
               "format": "double",
               "type": "number"
             },
-            "factor_sensitivity": {
-              "description": "Sensitivity to systematic factor",
+            "factor_loading": {
+              "description": "Loading (β) on the systematic factor, clamped to [-1, 1]",
               "format": "double",
               "type": "number"
             },
@@ -5694,7 +5694,7 @@
           "required": [
             "model",
             "base_hazard",
-            "factor_sensitivity",
+            "factor_loading",
             "mean_reversion",
             "volatility"
           ],
@@ -6327,26 +6327,25 @@
                   "currency": "USD"
                 },
                 "contractual_payment": null,
-                "credit_quality": null,
                 "day_count": "act_360",
                 "default_date": null,
+                "defaulted": false,
                 "forward_curve_id": null,
                 "id": "COLLATERAL-1",
                 "industry": null,
-                "is_defaulted": false,
                 "maturity": "2034-01-01",
                 "mdr_override": null,
                 "obligor_id": null,
                 "origination_date": null,
                 "purchase_price": null,
                 "rate": 0.07,
+                "rating": null,
                 "recovery_amount": null,
                 "recovery_rate": null,
                 "smm_override": null,
                 "spread_bp": null
               }
             ],
-            "base_currency": "USD",
             "collection_account": {
               "amount": "0",
               "currency": "USD"
@@ -6367,6 +6366,7 @@
               "amount": "0",
               "currency": "USD"
             },
+            "currency": "USD",
             "deal_type": "clo",
             "excess_spread_account": {
               "amount": "0",

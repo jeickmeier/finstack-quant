@@ -89,7 +89,7 @@
         "base_cpr": 0.06,
         "prepay_factor_loading": 0.4,
         "cpr_volatility": 0.2,
-        "default_factor_sensitivity": 0.5,
+        "default_factor_loading": 0.5,
         "default_mean_reversion": 0.5,
         "default_volatility": 0.3,
         "refi_sensitivity": 2.0,
@@ -107,7 +107,7 @@
         "base_cpr": 0.2,
         "prepay_factor_loading": 0.25,
         "cpr_volatility": 0.15,
-        "default_factor_sensitivity": 0.8,
+        "default_factor_loading": 0.8,
         "default_mean_reversion": 0.3,
         "default_volatility": 0.4
       }

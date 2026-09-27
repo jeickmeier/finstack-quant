@@ -39,10 +39,10 @@ use super::super::instruments::enum_from_str;
 /// ...     Money(10_000_000.0, Currency("USD")),
 /// ...     0.08,
 /// ...     datetime.date(2031, 1, 15),
-/// ...     credit_quality="B",
+/// ...     rating="B",
 /// ...     balloon={"extension_prob": 0.3, "extension_months": 24},
 /// ... )
-/// >>> loan.credit_quality, loan.balloon["extension_months"]
+/// >>> loan.rating, loan.balloon["extension_months"]
 /// ('B', 24)
 #[pyclass(
     module = "finstack_quant.valuations.instruments",
@@ -111,14 +111,14 @@ impl PyPoolAsset {
     /// index_floor_bp : float, optional
     ///     Floor on the floating index in basis points (``100`` = 1%),
     ///     applied before ``spread_bp`` is added; ignored on fixed-rate rows.
-    /// credit_quality : str, optional
+    /// rating : str, optional
     ///     Credit rating (``"BB"``, ``"CCC"``, ``"NR"`` ...), used by the
     ///     coverage-test haircuts and the CCC bucket.
     /// industry : str, optional
     ///     Industry label for concentration reporting.
     /// obligor_id : str, optional
     ///     Obligor identifier for exposure aggregation.
-    /// is_defaulted : bool, optional
+    /// defaulted : bool, optional
     ///     ``True`` marks the row defaulted at closing; ``recovery_amount``
     ///     and ``default_date`` describe its state.
     /// recovery_amount : Money, optional
@@ -183,17 +183,17 @@ impl PyPoolAsset {
     ///     ``LiquidationSpec`` for a non-performing loan
     ///     (``months_to_resolution``, ``proceeds_pct`` and ``carry_cost_pct``
     ///     percents, ``reperformance_prob`` decimal, optional
-    ///     ``modified_rate`` decimal); leave ``is_defaulted`` false.
+    ///     ``modified_rate`` decimal); leave ``defaulted`` false.
     ///
     /// Raises
     /// ------
     /// ValueError
     ///     If a sub-spec does not match its serde shape, a date is invalid
-    ///     or ``credit_quality`` is not a known rating.
+    ///     or ``rating`` is not a known rating.
     #[new]
     #[pyo3(signature = (
         id, asset_type, balance, rate, maturity, *, day_count=None, spread_bp=None, forward_curve_id=None,
-        index_floor_bp=None, credit_quality=None, industry=None, obligor_id=None, is_defaulted=false,
+        index_floor_bp=None, rating=None, industry=None, obligor_id=None, defaulted=false,
         recovery_amount=None, default_date=None, purchase_price=None, acquisition_date=None,
         origination_date=None, smm_override=None, mdr_override=None, recovery_rate=None, commitment=None,
         contractual_payment=None, amortization_term_months=None, io_months=None,
@@ -201,7 +201,7 @@ impl PyPoolAsset {
         prepayment_penalty=None, special_servicing=None, noi=None, liquidation=None
     ))]
     #[pyo3(
-        text_signature = "(id, asset_type, balance, rate, maturity, *, day_count=None, spread_bp=None, forward_curve_id=None, index_floor_bp=None, credit_quality=None, industry=None, obligor_id=None, is_defaulted=False, recovery_amount=None, default_date=None, purchase_price=None, acquisition_date=None, origination_date=None, smm_override=None, mdr_override=None, recovery_rate=None, commitment=None, contractual_payment=None, amortization_term_months=None, io_months=None, market_price_pct=None, delinquency_buckets=None, balloon=None, prepayment_penalty=None, special_servicing=None, noi=None, liquidation=None)"
+        text_signature = "(id, asset_type, balance, rate, maturity, *, day_count=None, spread_bp=None, forward_curve_id=None, index_floor_bp=None, rating=None, industry=None, obligor_id=None, defaulted=False, recovery_amount=None, default_date=None, purchase_price=None, acquisition_date=None, origination_date=None, smm_override=None, mdr_override=None, recovery_rate=None, commitment=None, contractual_payment=None, amortization_term_months=None, io_months=None, market_price_pct=None, delinquency_buckets=None, balloon=None, prepayment_penalty=None, special_servicing=None, noi=None, liquidation=None)"
     )]
     // PyO3 binding: one keyword per public Rust field.
     #[allow(clippy::too_many_arguments)]
@@ -216,10 +216,10 @@ impl PyPoolAsset {
         spread_bp: Option<f64>,
         forward_curve_id: Option<String>,
         index_floor_bp: Option<f64>,
-        credit_quality: Option<&str>,
+        rating: Option<&str>,
         industry: Option<String>,
         obligor_id: Option<String>,
-        is_defaulted: bool,
+        defaulted: bool,
         recovery_amount: Option<PyRef<'_, PyMoney>>,
         default_date: Option<&Bound<'_, PyAny>>,
         purchase_price: Option<PyRef<'_, PyMoney>>,
@@ -242,8 +242,8 @@ impl PyPoolAsset {
     ) -> PyResult<Self> {
         let asset_type: AssetType =
             crate::bindings::module_utils::py_to_serde(py, asset_type, "asset_type")?;
-        let credit_quality: Option<CreditRating> = credit_quality
-            .map(|value| enum_from_str(value, "credit_quality"))
+        let rating: Option<CreditRating> = rating
+            .map(|value| enum_from_str(value, "rating"))
             .transpose()?;
         let balloon: Option<BalloonSpec> = opt_spec(py, balloon, "balloon")?;
         let prepayment_penalty: Option<PrepaymentPenalty> =
@@ -260,10 +260,10 @@ impl PyPoolAsset {
             forward_curve_id,
             index_floor_bp,
             maturity: extract_date(maturity)?,
-            credit_quality,
+            rating,
             industry,
             obligor_id,
-            is_defaulted,
+            defaulted,
             recovery_amount: opt_money(recovery_amount),
             default_date: opt_date(default_date)?,
             purchase_price: opt_money(purchase_price),
@@ -456,9 +456,9 @@ impl PyPoolAsset {
 
     /// Credit rating string, or ``None`` when unrated.
     #[getter]
-    fn credit_quality(&self) -> PyResult<Option<String>> {
+    fn rating(&self) -> PyResult<Option<String>> {
         self.inner
-            .credit_quality
+            .rating
             .as_ref()
             .map(enum_to_py_string)
             .transpose()
@@ -478,8 +478,8 @@ impl PyPoolAsset {
 
     /// ``True`` when the row is defaulted.
     #[getter]
-    fn is_defaulted(&self) -> bool {
-        self.inner.is_defaulted
+    fn defaulted(&self) -> bool {
+        self.inner.defaulted
     }
 
     /// Expected recovery on a defaulted row, or ``None``.

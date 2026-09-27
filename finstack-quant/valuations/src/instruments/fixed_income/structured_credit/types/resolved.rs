@@ -59,7 +59,7 @@ impl StructuredCredit {
     fn validate_resolved_pool(&self, pool: &super::AssetPool) -> Result<()> {
         pool.validate_reserve_config(&self.tranches)?;
         for asset in &pool.assets {
-            if asset.is_defaulted {
+            if asset.defaulted {
                 if asset.default_date.is_none() || asset.recovery_amount.is_none() {
                     return Err(finstack_quant_core::Error::Validation(format!(
                         "defaulted asset {} requires default_date and outstanding recovery_amount",

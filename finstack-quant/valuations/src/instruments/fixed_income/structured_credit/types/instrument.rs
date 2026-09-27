@@ -92,9 +92,9 @@ impl Instrument for StructuredCredit {
         }
         self.validate_custom_waterfall()?;
         self.pool.validate_original_balance()?;
-        let base_currency = self.pool.get_base_currency();
+        let currency = self.pool.get_currency();
         for hedge in &self.hedge_swaps {
-            hedge.validate(base_currency, &self.tranches)?;
+            hedge.validate(currency, &self.tranches)?;
         }
         if let Some(rules) = &self.coverage_rules {
             rules.validate()?;
@@ -295,10 +295,9 @@ impl StructuredCredit {
                     asset.id
                 )));
             }
-            if asset.is_defaulted || asset.recovery_amount.is_some() || asset.default_date.is_some()
-            {
+            if asset.defaulted || asset.recovery_amount.is_some() || asset.default_date.is_some() {
                 return Err(invalid(format!(
-                    "asset {} carries liquidation terms: leave is_defaulted false and \
+                    "asset {} carries liquidation terms: leave defaulted false and \
                      recovery_amount/default_date unset (the resolution timeline books the default)",
                     asset.id
                 )));
@@ -328,7 +327,7 @@ impl StructuredCredit {
     /// by date.
     fn validate_tranche_draws(&self) -> finstack_quant_core::Result<()> {
         let invalid = |msg: String| finstack_quant_core::Error::Validation(msg);
-        let currency = self.pool.get_base_currency();
+        let currency = self.pool.get_currency();
         let debt_note = |id: &str| {
             self.tranches
                 .tranches

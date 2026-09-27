@@ -111,18 +111,18 @@ fn oas_differs_between_floored_and_unfloored_pools() {
     let unfloored = calculate_tranche_oas(
         &deal(None),
         "E",
-        90.0,
         &market,
         close(),
+        90.0,
         &OasConfig::default(),
     )
     .expect("oas");
     let floored = calculate_tranche_oas(
         &deal(Some(600.0)),
         "E",
-        90.0,
         &market,
         close(),
+        90.0,
         &OasConfig::default(),
     )
     .expect("oas");

@@ -37,7 +37,7 @@
 //!
 //! The systematic factor follows the canonical copula convention: a LOW
 //! latent factor realization (`Z < 0`) is the stress state. With a positive
-//! factor sensitivity `β`, intensity therefore *rises* as `Z` falls
+//! factor loading `β`, intensity therefore *rises* as `Z` falls
 //! (`exp(−β·σ·Z)`), matching the Gaussian-copula barrier `Φ⁻¹(PD) − √ρ·Z`
 //! used by the copula default models and ensuring defaults and
 //! market-correlated recoveries co-move negatively across every engine.
@@ -62,8 +62,8 @@ use super::traits::{MacroCreditFactors, StochasticDefault};
 pub(crate) struct IntensityProcessDefault {
     /// Base hazard rate (annual)
     base_hazard: f64,
-    /// Factor sensitivity (beta)
-    factor_sensitivity: f64,
+    /// Factor loading (beta)
+    factor_loading: f64,
     /// Volatility of intensity process
     volatility: f64,
     /// Asset correlation for distribution calculation
@@ -75,12 +75,12 @@ impl IntensityProcessDefault {
     ///
     /// # Arguments
     /// * `base_hazard` - Base annual hazard rate (λ₀)
-    /// * `factor_sensitivity` - Sensitivity to systematic factor (β)
+    /// * `factor_loading` - Loading (β) on the systematic factor, clamped to [-1, 1] (typical: 0.3-0.8)
     /// * `volatility` - Intensity volatility (σ)
-    pub(crate) fn new(base_hazard: f64, factor_sensitivity: f64, volatility: f64) -> Self {
+    pub(crate) fn new(base_hazard: f64, factor_loading: f64, volatility: f64) -> Self {
         Self {
             base_hazard: base_hazard.clamp(0.0, 1.0),
-            factor_sensitivity: factor_sensitivity.clamp(-2.0, 2.0),
+            factor_loading: factor_loading.clamp(-1.0, 1.0),
             volatility: volatility.clamp(0.0, 2.0),
             correlation: 0.20, // Default correlation
         }
@@ -105,7 +105,7 @@ impl IntensityProcessDefault {
 
     /// Compensated lognormal shock `exp(−βσZ − ½β²σ²)` with unit mean.
     fn shock_multiplier(&self, factor: f64) -> f64 {
-        let beta_sigma = self.factor_sensitivity * self.volatility;
+        let beta_sigma = self.factor_loading * self.volatility;
         (-beta_sigma * factor - 0.5 * beta_sigma * beta_sigma).exp()
     }
 }

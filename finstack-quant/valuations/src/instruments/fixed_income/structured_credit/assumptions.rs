@@ -131,7 +131,7 @@ impl StructuredCreditAssumptionRegistry {
             base_cpr: record.base_cpr,
             prepay_factor_loading: record.prepay_factor_loading,
             cpr_volatility: record.cpr_volatility,
-            default_factor_sensitivity: record.default_factor_sensitivity,
+            default_factor_loading: record.default_factor_loading,
             default_mean_reversion: record.default_mean_reversion,
             default_volatility: record.default_volatility,
             refi_sensitivity: record.refi_sensitivity,
@@ -152,7 +152,7 @@ impl StructuredCreditAssumptionRegistry {
             base_cpr: record.base_cpr,
             prepay_factor_loading: record.prepay_factor_loading,
             cpr_volatility: record.cpr_volatility,
-            default_factor_sensitivity: record.default_factor_sensitivity,
+            default_factor_loading: record.default_factor_loading,
             default_mean_reversion: record.default_mean_reversion,
             default_volatility: record.default_volatility,
         })
@@ -174,10 +174,10 @@ impl StructuredCreditAssumptionRegistry {
         })
     }
 
-    pub(crate) fn deal_fees(&self, id: &str, base_currency: Currency) -> Result<DealFees> {
+    pub(crate) fn deal_fees(&self, id: &str, currency: Currency) -> Result<DealFees> {
         let fees = &self.deal_profile(id)?.fees;
         Ok(DealFees {
-            trustee_fee: Money::new(fees.trustee_fee, base_currency)?,
+            trustee_fee: Money::new(fees.trustee_fee, currency)?,
             senior_mgmt_fee_bp: fees.senior_mgmt_fee_bp,
             subordinated_mgmt_fee_bp: fees.subordinated_mgmt_fee_bp,
             servicing_fee_bp: fees.servicing_fee_bp,
@@ -504,7 +504,7 @@ struct RmbsStochasticRecord {
     base_cpr: f64,
     prepay_factor_loading: f64,
     cpr_volatility: f64,
-    default_factor_sensitivity: f64,
+    default_factor_loading: f64,
     default_mean_reversion: f64,
     default_volatility: f64,
     refi_sensitivity: f64,
@@ -520,7 +520,7 @@ struct CloStochasticRecord {
     base_cpr: f64,
     prepay_factor_loading: f64,
     cpr_volatility: f64,
-    default_factor_sensitivity: f64,
+    default_factor_loading: f64,
     default_mean_reversion: f64,
     default_volatility: f64,
 }
@@ -659,9 +659,9 @@ fn validate_rmbs_stochastic_record(record: &RmbsStochasticRecord) -> Result<()> 
         record.cpr_volatility,
         "RMBS stochastic CPR volatility",
     )?;
-    validate_nonnegative_finite(
-        record.default_factor_sensitivity,
-        "RMBS stochastic default factor sensitivity",
+    validate_factor_loading(
+        record.default_factor_loading,
+        "RMBS stochastic default factor loading",
     )?;
     validate_nonnegative_finite(
         record.default_mean_reversion,
@@ -699,9 +699,9 @@ fn validate_clo_stochastic_record(record: &CloStochasticRecord) -> Result<()> {
         record.cpr_volatility,
         "CLO stochastic CPR volatility",
     )?;
-    validate_nonnegative_finite(
-        record.default_factor_sensitivity,
-        "CLO stochastic default factor sensitivity",
+    validate_factor_loading(
+        record.default_factor_loading,
+        "CLO stochastic default factor loading",
     )?;
     validate_nonnegative_finite(
         record.default_mean_reversion,
@@ -889,5 +889,30 @@ mod tests {
                 "month {month}: {annual} vs {expected}"
             );
         }
+    }
+
+    #[test]
+    // schema-rejection-test
+    fn clo_stochastic_record_rejects_retired_default_factor_sensitivity_key() {
+        let legacy = serde_json::json!({
+            "ids": ["clo_standard"],
+            "base_cdr": 0.02,
+            "default_correlation": 0.2,
+            "base_cpr": 0.2,
+            "prepay_factor_loading": 0.25,
+            "cpr_volatility": 0.15,
+            "default_factor_sensitivity": 0.8,
+            "default_mean_reversion": 0.3,
+            "default_volatility": 0.4,
+        });
+        assert!(serde_json::from_value::<super::CloStochasticRecord>(legacy).is_err());
+    }
+
+    /// The default-side loading uses the same [-1, 1] range as every other
+    /// systematic-factor loading.
+    #[test]
+    fn default_factor_loading_outside_unit_range_is_rejected() {
+        assert!(super::validate_factor_loading(0.8, "default factor loading").is_ok());
+        assert!(super::validate_factor_loading(1.5, "default factor loading").is_err());
     }
 }

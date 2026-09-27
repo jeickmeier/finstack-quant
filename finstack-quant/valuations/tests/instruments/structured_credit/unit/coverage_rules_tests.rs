@@ -42,7 +42,7 @@ fn maturity() -> Date {
 fn loan(id: &str, balance: f64, rating: CreditRating) -> PoolAsset {
     let mut asset =
         PoolAsset::fixed_rate_bond(id, usd(balance), 0.08, maturity(), DayCount::Act360);
-    asset.credit_quality = Some(rating);
+    asset.rating = Some(rating);
     asset
 }
 
@@ -101,7 +101,7 @@ fn oc_ratio(pool: &AssetPool, tranches: &TrancheStructure, rules: Option<&Covera
     CoverageTestSpec::oc("A", 1.0)
         .evaluate(&ctx)
         .expect("oc test")
-        .current_ratio
+        .ratio
 }
 
 fn ccc_rules(carry_at_market_value: bool) -> CoverageRules {
@@ -304,7 +304,7 @@ fn clo_with_closing_default(valuation: DefaultedValuation) -> (StructuredCredit,
             .push(loan(&format!("L{i}"), 10_000_000.0, CreditRating::BB));
     }
     let mut defaulted = loan("L9", 10_000_000.0, CreditRating::D);
-    defaulted.is_defaulted = true;
+    defaulted.defaulted = true;
     defaulted.default_date = Some(d(2023, 12, 1));
     defaulted.recovery_amount = Some(usd(4_000_000.0));
     pool.assets.push(defaulted);

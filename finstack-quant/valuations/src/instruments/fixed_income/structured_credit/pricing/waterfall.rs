@@ -141,7 +141,7 @@ pub(crate) fn special_serviced_balance(
             .filter(|(index, asset)| {
                 special_serviced.map_or(asset.special_servicing.is_some(), |flags| {
                     flags.get(*index).copied().unwrap_or(false)
-                }) && !asset.is_defaulted
+                }) && !asset.defaulted
             })
             .map(|(index, asset)| {
                 asset_balances
@@ -208,14 +208,14 @@ pub fn execute_waterfall_with_explanation(
         || principal_remaining.amount() < 0.0
         || (classified_cash.amount() - context.available_cash.amount()).abs()
             > (context.available_cash.amount().abs() * f64::EPSILON * 8.0).max(1e-8)
-        || classified_cash.currency() != waterfall.base_currency
+        || classified_cash.currency() != waterfall.currency
     {
         return Err(CoreError::Validation(format!(
             "waterfall available cash must equal nonnegative interest plus principal in its base currency: available={}, interest={}, principal={}",
             context.available_cash.amount(), interest_remaining.amount(), principal_remaining.amount()
         )));
     }
-    let mut total_diverted = Money::from((0_i64, waterfall.base_currency));
+    let mut total_diverted = Money::from((0_i64, waterfall.currency));
     let mut had_diversions = false;
     let mut diversion_reason = None;
 
@@ -229,11 +229,11 @@ pub fn execute_waterfall_with_explanation(
         pool,
         context.asset_balances,
         context.special_serviced,
-        waterfall.base_currency,
+        waterfall.currency,
     )?;
 
     let allocation_ctx = AllocationContext {
-        base_currency: waterfall.base_currency,
+        currency: waterfall.currency,
         tranches,
         tranche_index,
         pool_balance: context.pool_balance,
@@ -331,9 +331,9 @@ pub fn execute_waterfall_with_explanation(
     let mut principal_paid_in_period: HashMap<String, Money> = HashMap::default();
 
     // Interest a `Reinvest` test retained as principal proceeds this period.
-    let mut diverted_to_reinvestment = Money::from((0_i64, waterfall.base_currency));
+    let mut diverted_to_reinvestment = Money::from((0_i64, waterfall.currency));
     // Principal proceeds spent by `InterestThenPrincipal` tiers.
-    let mut principal_used_for_interest = Money::from((0_i64, waterfall.base_currency));
+    let mut principal_used_for_interest = Money::from((0_i64, waterfall.currency));
     let mut reinvestment_diversions: Vec<DiversionRecord> = Vec::new();
 
     for tier in tiers {
@@ -352,7 +352,7 @@ pub fn execute_waterfall_with_explanation(
                     .iter()
                     .find(|result| result.test_id == test.id)
                 {
-                    if !result.is_passing {
+                    if !result.passing {
                         failing.push(test.id.as_str());
                         if let Some(cure) = result.cure_amount {
                             binding_cure = binding_cure.max(cure.amount());
@@ -361,10 +361,7 @@ pub fn execute_waterfall_with_explanation(
                 }
             }
             if failing.is_empty() {
-                tier_allocations.push((
-                    tier.id.clone(),
-                    Money::from((0_i64, waterfall.base_currency)),
-                ));
+                tier_allocations.push((tier.id.clone(), Money::from((0_i64, waterfall.currency))));
                 continue;
             }
             had_diversions = true;
@@ -376,7 +373,7 @@ pub fn execute_waterfall_with_explanation(
                 Some(pct) => divertible.min(interest_remaining.amount().max(0.0) * pct / 100.0),
                 None => divertible,
             };
-            let divertible = Money::new(divertible, waterfall.base_currency)?;
+            let divertible = Money::new(divertible, waterfall.currency)?;
             let action = tier
                 .tests
                 .first()
@@ -400,7 +397,7 @@ pub fn execute_waterfall_with_explanation(
                             &explain,
                             &mut principal_paid_in_period,
                         )?,
-                        _ => Money::from((0_i64, waterfall.base_currency)),
+                        _ => Money::from((0_i64, waterfall.currency)),
                     }
                 }
                 CoverageTestAction::Reinvest => {
@@ -474,7 +471,7 @@ pub fn execute_waterfall_with_explanation(
                 // Interest proceeds first; only the shortfall touches principal.
                 let from_interest = Money::new(
                     tier_cash.amount().min(interest_remaining.amount()).max(0.0),
-                    waterfall.base_currency,
+                    waterfall.currency,
                 )?;
                 let from_principal = tier_cash.checked_sub(from_interest)?;
                 interest_remaining = interest_remaining.checked_sub(from_interest)?;
@@ -494,7 +491,7 @@ pub fn execute_waterfall_with_explanation(
 
     let coverage_tests_public: Vec<(String, f64, bool)> = coverage_test_results
         .iter()
-        .map(|r| (r.test_id.clone(), r.current_ratio, r.is_passing))
+        .map(|r| (r.test_id.clone(), r.ratio, r.passing))
         .collect();
     // DiversionRecords are built only from payments that actually moved cash.
     // A failing coverage test with no cash to divert (e.g. an empty waterfall
@@ -545,7 +542,7 @@ pub fn execute_waterfall_with_explanation(
 /// parameter count in allocation functions.
 pub(crate) struct AllocationContext<'a> {
     /// Base currency for allocations
-    pub(crate) base_currency: Currency,
+    pub(crate) currency: Currency,
     /// Tranche structure for looking up tranche data
     pub(crate) tranches: &'a TrancheStructure,
     /// O(1) lookup from tranche ID to index
@@ -620,8 +617,8 @@ fn allocate_sequential(
     explain: &ExplainOpts,
     principal_paid_in_period: &mut HashMap<String, Money>,
 ) -> Result<Money> {
-    let base_currency = ctx.base_currency;
-    let mut tier_total = Money::from((0_i64, base_currency));
+    let currency = ctx.currency;
+    let mut tier_total = Money::from((0_i64, currency));
 
     for recipient in recipients {
         if available.amount() <= 0.0 {
@@ -629,7 +626,7 @@ fn allocate_sequential(
         }
 
         let requested = calculate_payment_amount(
-            base_currency,
+            currency,
             &recipient.calculation,
             available,
             ctx.tranches,
@@ -651,7 +648,7 @@ fn allocate_sequential(
                 .distributions
                 .get(&RecipientType::Equity)
                 .copied()
-                .unwrap_or(Money::from((0_i64, base_currency))),
+                .unwrap_or(Money::from((0_i64, currency))),
         )?;
 
         let paid = if requested.amount() <= available.amount() {
@@ -664,12 +661,12 @@ fn allocate_sequential(
             principal_paid_in_period,
             &recipient.calculation,
             paid,
-            base_currency,
+            currency,
         )?;
 
         let shortfall = requested
             .checked_sub(paid)
-            .unwrap_or(Money::from((0_i64, base_currency)));
+            .unwrap_or(Money::from((0_i64, currency)));
 
         use std::collections::hash_map::Entry;
         match output.distributions.entry(recipient.recipient_type.clone()) {
@@ -757,17 +754,17 @@ fn allocate_pro_rata(
     explain: &ExplainOpts,
     principal_paid_in_period: &mut HashMap<String, Money>,
 ) -> Result<Money> {
-    let base_currency = ctx.base_currency;
+    let currency = ctx.currency;
     if recipients.is_empty() {
-        return Ok(Money::from((0_i64, base_currency)));
+        return Ok(Money::from((0_i64, currency)));
     }
 
-    let mut total_requested = Money::from((0_i64, base_currency));
+    let mut total_requested = Money::from((0_i64, currency));
     let mut recipient_requests = Vec::with_capacity(recipients.len());
 
     for recipient in recipients {
         let requested = calculate_payment_amount(
-            base_currency,
+            currency,
             &recipient.calculation,
             available,
             ctx.tranches,
@@ -789,7 +786,7 @@ fn allocate_pro_rata(
                 .distributions
                 .get(&RecipientType::Equity)
                 .copied()
-                .unwrap_or(Money::from((0_i64, base_currency))),
+                .unwrap_or(Money::from((0_i64, currency))),
         )?;
         total_requested = total_requested.checked_add(requested)?;
         recipient_requests.push((recipient, requested));
@@ -811,7 +808,7 @@ fn allocate_pro_rata(
     // this redistribution a small-balance senior carrying a large shifting-interest
     // weight would drop its excess past outstanding junior debt — a subordination
     // inversion.
-    let scale = currency_scale_factor(base_currency);
+    let scale = currency_scale_factor(currency);
     let tier_available_units = to_currency_units(tier_available.amount(), scale)?;
 
     let weights: Vec<f64> = recipient_requests
@@ -825,10 +822,10 @@ fn allocate_pro_rata(
 
     let final_units = water_fill_allocation(tier_available_units, &weights, &caps);
 
-    let mut tier_total = Money::from((0_i64, base_currency));
+    let mut tier_total = Money::from((0_i64, currency));
 
     for (idx, (recipient, requested)) in recipient_requests.iter().enumerate() {
-        let allocated = Money::new(final_units[idx] as f64 / scale, base_currency)?;
+        let allocated = Money::new(final_units[idx] as f64 / scale, currency)?;
 
         // `water_fill_allocation` never allocates above a recipient's cap
         // (`requested`); the `min` is retained as a defensive floor.
@@ -842,12 +839,12 @@ fn allocate_pro_rata(
             principal_paid_in_period,
             &recipient.calculation,
             paid,
-            base_currency,
+            currency,
         )?;
 
         let shortfall = requested
             .checked_sub(paid)
-            .unwrap_or(Money::from((0_i64, base_currency)));
+            .unwrap_or(Money::from((0_i64, currency)));
 
         use std::collections::hash_map::Entry;
         match output.distributions.entry(recipient.recipient_type.clone()) {
@@ -1184,7 +1181,7 @@ pub(crate) fn senior_fee_accrual(
     inputs: SeniorFeeInputs<'_>,
 ) -> Result<Money> {
     let empty_in_period: HashMap<String, Money> = HashMap::default();
-    let mut total = Money::from((0_i64, waterfall.base_currency));
+    let mut total = Money::from((0_i64, waterfall.currency));
     let first_note_priority = waterfall
         .tiers
         .iter()
@@ -1201,7 +1198,7 @@ pub(crate) fn senior_fee_accrual(
     for tier in fees {
         for recipient in &tier.recipients {
             let amount = calculate_payment_amount(
-                waterfall.base_currency,
+                waterfall.currency,
                 &recipient.calculation,
                 inputs.available,
                 tranches,
@@ -1219,7 +1216,7 @@ pub(crate) fn senior_fee_accrual(
                 false,
                 inputs.floating_rate_shift,
                 None,
-                Money::from((0_i64, waterfall.base_currency)),
+                Money::from((0_i64, waterfall.currency)),
             )?;
             total = total.checked_add(amount)?;
         }
@@ -1259,8 +1256,8 @@ pub(super) fn evaluate_coverage_tests(
             let result = spec.evaluate(context)?;
             Ok(CoverageTestResult {
                 test_id: spec.id.clone(),
-                current_ratio: result.current_ratio,
-                is_passing: result.is_passing,
+                ratio: result.ratio,
+                passing: result.passing,
                 cure_amount: result.cure_amount,
             })
         })
@@ -1271,8 +1268,8 @@ pub(super) fn evaluate_coverage_tests(
 #[derive(Debug, Clone)]
 pub(super) struct CoverageTestResult {
     pub(super) test_id: String,
-    pub(super) current_ratio: f64,
-    pub(super) is_passing: bool,
+    pub(super) ratio: f64,
+    pub(super) passing: bool,
     /// Amount needed to cure the breach (divert to senior principal).
     cure_amount: Option<Money>,
 }
@@ -1284,7 +1281,7 @@ fn record_in_period_principal(
     principal_paid_in_period: &mut HashMap<String, Money>,
     calculation: &PaymentCalculation,
     paid: Money,
-    base_currency: Currency,
+    currency: Currency,
 ) -> Result<()> {
     if paid.amount() <= 0.0 {
         return Ok(());
@@ -1292,7 +1289,7 @@ fn record_in_period_principal(
     if let PaymentCalculation::TranchePrincipal { tranche_id, .. } = calculation {
         let entry = principal_paid_in_period
             .entry(tranche_id.clone())
-            .or_insert(Money::from((0_i64, base_currency)));
+            .or_insert(Money::from((0_i64, currency)));
         *entry = entry.checked_add(paid)?;
     }
     Ok(())
@@ -1301,7 +1298,7 @@ fn record_in_period_principal(
 /// Calculate payment amount for a recipient.
 #[allow(clippy::too_many_arguments)]
 fn calculate_payment_amount(
-    base_currency: Currency,
+    currency: Currency,
     calculation: &PaymentCalculation,
     available: Money,
     tranches: &TrancheStructure,
@@ -1471,9 +1468,9 @@ fn calculate_payment_amount(
             // scheduled target (toward zero) to de-leverage the structure;
             // the scheduled target only applies to the tier's regular pass.
             let target = if diverted {
-                Money::from((0_i64, base_currency))
+                Money::from((0_i64, currency))
             } else {
-                target_balance.unwrap_or(Money::from((0_i64, base_currency)))
+                target_balance.unwrap_or(Money::from((0_i64, currency)))
             };
             let needed = (current.amount() - paid_this_period - target.amount()).max(0.0);
             (needed, *rounding)
@@ -1484,6 +1481,12 @@ fn calculate_payment_amount(
         PaymentCalculation::NetWacCarryover { amount, .. } => (amount.amount().max(0.0), None),
 
         PaymentCalculation::IncentiveFee { hurdle_irr, share } => {
+            if !share.is_finite() || !(0.0..=1.0).contains(share) {
+                return Err(CoreError::Validation(format!(
+                    "waterfall recipient calculation IncentiveFee.share must be a decimal \
+                     fraction in [0, 1] (0.2 = 20%), got {share}"
+                )));
+            }
             // The hurdle is tested on equity's cash to date plus what it has
             // already received earlier in this run plus this cash; the share
             // applies only to the part of this cash above the hurdle, so the
@@ -1508,14 +1511,14 @@ fn calculate_payment_amount(
             // dynamically from SimulationState, not stored in the waterfall definition.
             let shortfall = target_balance
                 .checked_sub(reserve_balance)
-                .unwrap_or(Money::from((0_i64, base_currency)));
+                .unwrap_or(Money::from((0_i64, currency)));
             (shortfall.amount().max(0.0).min(available.amount()), None)
         }
     };
 
     if let Some(convention) = rounding {
         // m1 fix: use currency-specific decimal places
-        let decimals = currency_decimal_places(base_currency) as i32;
+        let decimals = currency_decimal_places(currency) as i32;
         let scale = 10f64.powi(decimals);
         let val = raw_amount;
         let rounded_val = match convention {
@@ -1523,9 +1526,9 @@ fn calculate_payment_amount(
             RoundingConvention::Floor => (val * scale).floor() / scale,
             RoundingConvention::Ceiling => (val * scale).ceil() / scale,
         };
-        Ok(Money::new(rounded_val, base_currency)?)
+        Ok(Money::new(rounded_val, currency)?)
     } else {
-        Ok(Money::new(raw_amount, base_currency)?)
+        Ok(Money::new(raw_amount, currency)?)
     }
 }
 
@@ -1618,10 +1621,10 @@ mod coverage_position_tests {
             forward_curve_id: None,
             index_floor_bp: None,
             maturity: maturity(),
-            credit_quality: Some(CreditRating::BB),
+            rating: Some(CreditRating::BB),
             industry: Some("Technology".into()),
             obligor_id: Some("OBLIGOR_0".into()),
-            is_defaulted: false,
+            defaulted: false,
             recovery_amount: None,
             default_date: None,
             purchase_price: None,

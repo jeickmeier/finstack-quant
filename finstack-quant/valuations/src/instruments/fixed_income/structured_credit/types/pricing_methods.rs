@@ -398,7 +398,7 @@ impl StructuredCredit {
     ) -> finstack_quant_core::Result<Money> {
         let disc = context.get_discount(&self.discount_curve_id)?;
 
-        let mut pv = Money::from((0_i64, self.pool.get_base_currency()));
+        let mut pv = Money::from((0_i64, self.pool.get_currency()));
         for (date, amount) in &cashflows.cashflows {
             if *date > as_of {
                 let df = disc.df_between_dates(as_of, *date)?;

@@ -60,8 +60,8 @@ impl PyAssetPool {
     ///     Pool identifier.
     /// deal_type : {"clo", "cbo", "abs", "rmbs", "cmbs", "auto", "card"}
     ///     Deal classification for pool-level assumptions.
-    /// base_currency : Currency | str
-    ///     Base currency for every asset and pool-level account.
+    /// currency : Currency | str
+    ///     Currency every asset and pool-level account is denominated in.
     ///
     /// Returns
     /// -------
@@ -82,11 +82,11 @@ impl PyAssetPool {
     /// >>> "POOL-1" in repr(pool)
     /// True
     #[new]
-    #[pyo3(text_signature = "(id, deal_type, base_currency)")]
-    fn new(id: &str, deal_type: &str, base_currency: &Bound<'_, PyAny>) -> PyResult<Self> {
+    #[pyo3(text_signature = "(id, deal_type, currency)")]
+    fn new(id: &str, deal_type: &str, currency: &Bound<'_, PyAny>) -> PyResult<Self> {
         let deal_type: DealType = enum_from_str(deal_type, "deal_type")?;
-        let base_currency = currency_from_py(base_currency, "base_currency")?;
-        let inner = AssetPool::new(id, deal_type, base_currency);
+        let currency = currency_from_py(currency, "currency")?;
+        let inner = AssetPool::new(id, deal_type, currency);
         Ok(Self { inner })
     }
 
@@ -506,10 +506,10 @@ impl PyAssetPool {
         enum_to_py_string(&self.inner.deal_type)
     }
 
-    /// Base ISO-4217 currency code.
+    /// ISO-4217 currency code every pool amount is denominated in.
     #[getter]
-    fn base_currency(&self) -> String {
-        self.inner.base_currency.to_string()
+    fn currency(&self) -> String {
+        self.inner.currency.to_string()
     }
 
     /// Loan-level assets as a list of dicts (``PoolAsset`` serde shape).
@@ -640,10 +640,10 @@ impl PyAssetPool {
     /// Return ``repr(self)``.
     fn __repr__(&self) -> String {
         format!(
-            "AssetPool(id='{}', deal_type='{}', base_currency='{}', assets={}, rep_lines={}, instruments={})",
+            "AssetPool(id='{}', deal_type='{}', currency='{}', assets={}, rep_lines={}, instruments={})",
             self.inner.id.as_str(),
             enum_to_py_string(&self.inner.deal_type).unwrap_or_default(),
-            self.inner.base_currency,
+            self.inner.currency,
             self.inner.assets.len(),
             self.inner
                 .rep_lines

@@ -199,8 +199,7 @@ fn stochastic_helper_methods_toggle_flags() {
     let mut sc = build_sc("ABS-STOCHASTIC", 1_000_000.0);
     assert!(!sc.is_stochastic());
 
-    sc.enable_stochastic_defaults()
-        .expect("valid built-in defaults");
+    sc.enable_stochastic().expect("valid built-in defaults");
     assert!(sc.is_stochastic());
     assert!(sc.credit_model.stochastic_prepay_spec.is_some());
     assert!(sc.credit_model.stochastic_default_spec.is_some());
@@ -214,10 +213,9 @@ fn stochastic_helper_methods_toggle_flags() {
 }
 
 #[test]
-fn enable_stochastic_defaults_populates_specs_for_each_deal_family() {
+fn enable_stochastic_populates_specs_for_each_deal_family() {
     let mut abs = build_sc("ABS-DEFAULTS", 1_000_000.0);
-    abs.enable_stochastic_defaults()
-        .expect("valid built-in defaults");
+    abs.enable_stochastic().expect("valid built-in defaults");
     assert!(abs.is_stochastic());
 
     let make = |deal_type| {
@@ -240,8 +238,7 @@ fn enable_stochastic_defaults_populates_specs_for_each_deal_family() {
         make(DealType::Cmbs),
         make(DealType::Card),
     ] {
-        sc.enable_stochastic_defaults()
-            .expect("valid built-in defaults");
+        sc.enable_stochastic().expect("valid built-in defaults");
         assert!(sc.credit_model.stochastic_prepay_spec.is_some());
         assert!(sc.credit_model.stochastic_default_spec.is_some());
         assert!(sc.credit_model.correlation_structure.is_some());
@@ -379,21 +376,15 @@ fn structured_credit_pricing_conveniences_validate_before_market_access() {
         calculate_tranche_breakeven_cdr(&sc, "missing", &market, closing_date())
             .expect_err("invalid breakeven cdr")
             .to_string(),
-        calculate_tranche_discount_margin(
-            &sc,
-            "missing",
-            &market,
-            closing_date(),
-            Money::new(1.0, Currency::USD).expect("valid money fixture"),
-        )
-        .expect_err("invalid discount margin")
-        .to_string(),
+        calculate_tranche_discount_margin(&sc, "missing", &market, closing_date(), 99.0)
+            .expect_err("invalid discount margin")
+            .to_string(),
         calculate_tranche_oas(
             &sc,
             "missing",
-            99.0,
             &market,
             closing_date(),
+            99.0,
             &OasConfig::default(),
         )
         .expect_err("invalid oas")

@@ -405,7 +405,7 @@ mod tests {
                 .iter()
                 .find(|asset| asset.id.as_str() == "BOND1")
                 .unwrap();
-            assert!(asset.is_defaulted);
+            assert!(asset.defaulted);
             assert_eq!(asset.default_date, Some(date!(2026 - 04 - 01)));
             assert_eq!(asset.balance.amount(), 8_000_000.0);
             let claim = asset.recovery_amount.unwrap();
@@ -449,7 +449,7 @@ mod tests {
         let InstrumentJson::StructuredCredit(mut deal) = envelope.instrument else {
             panic!("expected structured credit");
         };
-        deal.pool.assets.retain(|asset| asset.is_defaulted);
+        deal.pool.assets.retain(|asset| asset.defaulted);
         // The empty market cannot project the fixture swap; this test is
         // about the default claim, not the hedge.
         deal.hedge_swaps.clear();

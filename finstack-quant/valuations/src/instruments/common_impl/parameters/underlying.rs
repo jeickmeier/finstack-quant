@@ -196,8 +196,8 @@ impl CommodityUnderlyingParams {
 pub struct IndexUnderlyingParams {
     /// Index identifier (e.g., "CDX.IG", "HY.BOND.INDEX")
     pub index_id: IndexId,
-    /// Base currency of the index
-    pub base_currency: Currency,
+    /// Currency the index (and so the swap notional) is denominated in.
+    pub currency: Currency,
     /// Optional yield curve/scalar identifier for carry calculation
     pub yield_id: Option<PriceId>,
     /// Market scalar identifier for signed index duration in years. Required when
@@ -206,11 +206,17 @@ pub struct IndexUnderlyingParams {
 }
 
 impl IndexUnderlyingParams {
-    /// Create index underlying parameters
-    pub fn new(index_id: impl Into<String>, base_currency: Currency) -> Self {
+    /// Create index underlying parameters with no yield or duration scalar.
+    ///
+    /// # Arguments
+    ///
+    /// * `index_id` - Identifier of the reference index (e.g. `"US-CORP-INDEX"`).
+    /// * `currency` - ISO-4217 currency the index is denominated in; the swap
+    ///   notional must use the same currency.
+    pub fn new(index_id: impl Into<String>, currency: Currency) -> Self {
         Self {
             index_id: IndexId::new(index_id),
-            base_currency,
+            currency,
             yield_id: None,
             duration_id: None,
         }
@@ -271,7 +277,7 @@ mod tests {
     fn index_underlying_rejects_removed_convexity_id() {
         let legacy = serde_json::json!({
             "index_id": "US-CORP-INDEX",
-            "base_currency": "USD",
+            "currency": "USD",
             "yield_id": "US-CORP-YIELD",
             "duration_id": "US-CORP-DURATION",
             "convexity_id": "US-CORP-CONVEXITY",
@@ -286,10 +292,20 @@ mod tests {
     fn index_underlying_rejects_removed_contract_size() {
         let legacy = serde_json::json!({
             "index_id": "US-CORP-INDEX",
-            "base_currency": "USD",
+            "currency": "USD",
             "yield_id": "US-CORP-YIELD",
             "duration_id": "US-CORP-DURATION",
             "contract_size": 1.0,
+        });
+        assert!(serde_json::from_value::<IndexUnderlyingParams>(legacy).is_err());
+    }
+
+    #[test]
+    // schema-rejection-test
+    fn index_underlying_rejects_retired_base_currency_key() {
+        let legacy = serde_json::json!({
+            "index_id": "US-CORP-INDEX",
+            "base_currency": "USD",
         });
         assert!(serde_json::from_value::<IndexUnderlyingParams>(legacy).is_err());
     }

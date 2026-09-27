@@ -75,7 +75,7 @@ pub struct ScenarioTable {
 ///
 /// * `deal` - The structured-credit deal owning the tranche.
 /// * `tranche_id` - Identifier of the tranche to evaluate.
-/// * `context` - Market context for cashflow projection and discounting.
+/// * `market` - Market context for cashflow projection and discounting.
 /// * `as_of` - Valuation date used for every projected/repriced CPR, CDR, and
 ///   severity scenario cell.
 /// * `grid` - The scenario grid to sweep.
@@ -87,7 +87,7 @@ pub struct ScenarioTable {
 pub fn scenario_table(
     deal: &StructuredCredit,
     tranche_id: &str,
-    context: &MarketContext,
+    market: &MarketContext,
     as_of: Date,
     grid: &ScenarioGrid,
 ) -> Result<ScenarioTable> {
@@ -138,7 +138,7 @@ pub fn scenario_table(
             finstack_quant_core::validation::validate_f64_unit_interval(value, name)?;
         }
     }
-    let disc = context.get_discount(deal.discount_curve_id.as_str())?;
+    let disc = market.get_discount(deal.discount_curve_id.as_str())?;
     let mut cells = Vec::with_capacity(cell_count);
     for &cpr in &grid.cprs {
         for &cdr in &grid.cdrs {
@@ -153,7 +153,7 @@ pub fn scenario_table(
                 scenario.credit_model.recovery_spec =
                     RecoveryModelSpec::with_lag(1.0 - severity, lag);
 
-                let cashflows = generate_tranche_cashflows(&scenario, tranche_id, context, as_of)?;
+                let cashflows = generate_tranche_cashflows(&scenario, tranche_id, market, as_of)?;
                 let price = if current_balance > 0.0 {
                     let quote = super::quote::SettlementQuote::for_tranche(
                         &scenario,

@@ -185,13 +185,13 @@ pub(super) fn advance(
         .enumerate()
         .map(|(i, tranche)| (tranche.id.as_str(), i))
         .collect();
-    let pool_balance = Money::new(state.pool_state.balances.iter().sum(), state.base_currency)?;
+    let pool_balance = Money::new(state.pool_state.balances.iter().sum(), state.currency)?;
     let unresolved_npl = state.unresolved_npl();
     let special_serviced_balance = special_serviced_balance(
         &state.pool,
         Some(&state.pool_state.balances),
         Some(&state.pool_state.special_serviced),
-        state.base_currency,
+        state.currency,
     )?;
     let fees = senior_fee_accrual(
         waterfall,
@@ -262,7 +262,7 @@ pub(super) fn advance(
                     spec.id
                 ))
             })?;
-        if saved.trigger.update(result.current_ratio, period.payment) {
+        if saved.trigger.update(result.ratio, period.payment) {
             match saved.trigger.consequence {
                 TriggerConsequence::DivertCashFlow => actions.diversions.push(spec.clone()),
                 TriggerConsequence::TrapExcessSpread => actions.trap = true,
@@ -279,7 +279,7 @@ pub(super) fn advance(
     // instead of buying collateral. A failing `Reinvest` test keeps the window
     // open: its cure is recycled to rebuild par.
     if results.iter().any(|result| {
-        !result.is_passing
+        !result.passing
             && all_specs
                 .iter()
                 .find(|spec| spec.id == result.test_id)

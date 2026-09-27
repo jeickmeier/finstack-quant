@@ -677,7 +677,7 @@ pub struct Waterfall {
     /// Ordered payment tiers, including [`PaymentType::CoverageTest`] positions
     pub tiers: Vec<WaterfallTier>,
     /// Base currency
-    pub base_currency: Currency,
+    pub currency: Currency,
     /// Collateral valuation rules for the OC tests; `None` values collateral
     /// at par with defaulted assets at recovery.
     pub coverage_rules: Option<CoverageRules>,

@@ -446,9 +446,7 @@ fn market_correlated_recovery_moves_equity_pv() {
     let mut constant = structured_credit(false);
     constant.credit_model.default_spec = DefaultModelSpec::constant_cdr(0.20);
     constant.credit_model.recovery_spec = RecoveryModelSpec::with_lag(0.40, 0);
-    constant
-        .enable_stochastic_defaults()
-        .expect("stochastic defaults");
+    constant.enable_stochastic().expect("stochastic defaults");
     let mut dispersed = constant.clone();
     dispersed.credit_model.stochastic_recovery_spec = Some(
         finstack_quant_models::correlation::RecoverySpec::market_correlated(0.40, 0.30, 0.80)

@@ -43,12 +43,12 @@
                 "currency": "USD"
               },
               "contractual_payment": null,
-              "credit_quality": null,
+              "rating": null,
               "day_count": "act_360",
               "id": "COLLATERAL-1",
               "forward_curve_id": null,
               "industry": null,
-              "is_defaulted": false,
+              "defaulted": false,
               "maturity": "2034-01-01",
               "mdr_override": null,
               "obligor_id": null,
@@ -59,7 +59,7 @@
               "spread_bp": null
             }
           ],
-          "base_currency": "USD",
+          "currency": "USD",
           "collection_account": {
             "amount": "0",
             "currency": "USD"

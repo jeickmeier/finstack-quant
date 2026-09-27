@@ -260,7 +260,7 @@ fn build_full_feature_structured_credit() -> StructuredCredit {
     .with_rating(CreditRating::A)
     .with_industry("Healthcare")
     .with_obligor("OBLIGOR-2");
-    bond.is_defaulted = true;
+    bond.defaulted = true;
     bond.recovery_amount =
         Some(Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"));
     bond.purchase_price =
@@ -784,4 +784,101 @@ fn canonical_fixture_still_parses_under_strict_nested_serde() {
         }
         other => panic!("Unexpected instrument variant: {other:?}"),
     }
+}
+
+// Structured-credit deal-term wire names (naming slice D7)
+
+fn pool_asset_json() -> serde_json::Value {
+    let asset = PoolAsset::fixed_rate_bond(
+        "B1",
+        Money::new(1_000_000.0, Currency::USD).unwrap(),
+        0.06,
+        maturity_date(),
+        finstack_quant_core::dates::DayCount::Thirty360,
+    );
+    serde_json::to_value(&asset).unwrap()
+}
+
+#[test]
+fn pool_asset_uses_rating_and_defaulted_keys() {
+    let json = pool_asset_json();
+    assert!(json.get("rating").is_some());
+    assert_eq!(json["defaulted"], serde_json::json!(false));
+
+    // `defaulted` is optional on the wire, like `CDSIndexConstituent.defaulted`.
+    let mut without_flag = json.clone();
+    without_flag.as_object_mut().unwrap().remove("defaulted");
+    let asset: PoolAsset = serde_json::from_value(without_flag).unwrap();
+    assert!(!asset.defaulted);
+}
+
+#[test]
+// schema-rejection-test
+fn pool_asset_rejects_retired_is_defaulted_key() {
+    let mut json = pool_asset_json();
+    let map = json.as_object_mut().unwrap();
+    map.remove("defaulted");
+    map.insert("is_defaulted".into(), serde_json::json!(false));
+    assert!(serde_json::from_value::<PoolAsset>(json).is_err());
+}
+
+#[test]
+// schema-rejection-test
+fn pool_asset_rejects_retired_credit_quality_key() {
+    let mut json = pool_asset_json();
+    let map = json.as_object_mut().unwrap();
+    map.remove("rating");
+    map.insert("credit_quality".into(), serde_json::json!("BB"));
+    assert!(serde_json::from_value::<PoolAsset>(json).is_err());
+}
+
+#[test]
+// schema-rejection-test
+fn asset_type_rejects_retired_hotel_mortgage_tag() {
+    let mut json = pool_asset_json();
+    json["asset_type"] = serde_json::json!({"type": "hospitality_mortgage", "ltv": 0.6});
+    serde_json::from_value::<PoolAsset>(json.clone()).expect("hospitality_mortgage loads");
+    json["asset_type"] = serde_json::json!({"type": "hotel_mortgage", "ltv": 0.6});
+    assert!(serde_json::from_value::<PoolAsset>(json).is_err());
+}
+
+#[test]
+// schema-rejection-test
+fn other_mortgage_rejects_retired_property_type_key() {
+    let mut json = pool_asset_json();
+    json["asset_type"] =
+        serde_json::json!({"type": "other_mortgage", "description": "self storage", "ltv": null});
+    serde_json::from_value::<PoolAsset>(json.clone()).expect("description loads");
+    json["asset_type"] =
+        serde_json::json!({"type": "other_mortgage", "property_type": "self storage", "ltv": null});
+    assert!(serde_json::from_value::<PoolAsset>(json).is_err());
+}
+
+#[test]
+// schema-rejection-test
+fn asset_pool_rejects_retired_base_currency_key() {
+    let pool = AssetPool::new("P", DealType::Abs, Currency::USD);
+    let mut json = serde_json::to_value(&pool).unwrap();
+    assert_eq!(json["currency"], serde_json::json!("USD"));
+    let map = json.as_object_mut().unwrap();
+    map.remove("currency");
+    map.insert("base_currency".into(), serde_json::json!("USD"));
+    assert!(serde_json::from_value::<AssetPool>(json).is_err());
+}
+
+#[test]
+// schema-rejection-test
+fn waterfall_rejects_retired_base_currency_key() {
+    let waterfall = build_full_feature_structured_credit()
+        .create_waterfall()
+        .unwrap();
+    let mut json = serde_json::to_value(&waterfall).unwrap();
+    assert_eq!(json["currency"], serde_json::json!("USD"));
+    let map = json.as_object_mut().unwrap();
+    map.remove("currency");
+    map.insert("base_currency".into(), serde_json::json!("USD"));
+    assert!(serde_json::from_value::<
+        finstack_quant_valuations::instruments::fixed_income::structured_credit::Waterfall,
+    >(json)
+    .is_err());
 }

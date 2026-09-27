@@ -432,7 +432,7 @@
         "pool": {
           "id": "POOL-FULL",
           "deal_type": "clo",
-          "base_currency": "USD",
+          "currency": "USD",
           "assets": [
             {
               "id": "LOAN1",
@@ -447,10 +447,10 @@
               "spread_bp": 350.0,
               "forward_curve_id": "SOFR-3M",
               "maturity": "2030-01-01",
-              "credit_quality": "BB",
+              "rating": "BB",
               "industry": "Technology",
               "obligor_id": "OBLIGOR-1",
-              "is_defaulted": false,
+              "defaulted": false,
               "recovery_amount": null,
               "purchase_price": null,
               "acquisition_date": null,
@@ -471,10 +471,10 @@
               "spread_bp": null,
               "forward_curve_id": null,
               "maturity": "2029-07-01",
-              "credit_quality": "A",
+              "rating": "A",
               "industry": "Healthcare",
               "obligor_id": "OBLIGOR-2",
-              "is_defaulted": true,
+              "defaulted": true,
               "default_date": "2026-04-01",
               "recovery_amount": {
                 "amount": "1000000",

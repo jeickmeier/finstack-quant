@@ -553,9 +553,9 @@ impl PyStructuredCredit {
     ///     If the deal-type defaults cannot be built (for example an empty
     ///     pool for the RMBS coupon-driven incentive).
     #[pyo3(text_signature = "($self)")]
-    fn enable_stochastic_defaults(&self) -> PyResult<Self> {
+    fn enable_stochastic(&self) -> PyResult<Self> {
         let mut deal = self.inner.clone();
-        deal.enable_stochastic_defaults().map_err(core_to_py)?;
+        deal.enable_stochastic().map_err(core_to_py)?;
         Ok(Self { inner: deal })
     }
 
@@ -1871,7 +1871,7 @@ impl PyStructuredCreditBuilder {
     /// ----------
     /// value : Waterfall | dict | str
     ///     Typed :class:`Waterfall` or its serde form (``tiers``,
-    ///     ``base_currency``, optional ``coverage_rules``).
+    ///     ``currency``, optional ``coverage_rules``).
     ///
     /// Returns
     /// -------

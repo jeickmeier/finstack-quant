@@ -312,11 +312,11 @@ breakeven = structured_credit_tranche_breakeven_cdr(long_wire, "BBB", lesson28_m
 grid = {"cprs": [0.0], "cdrs": [0.0, 0.01, 0.02, 0.05], "severities": [0.6], "recovery_lag": 6}
 scenario_table = structured_credit_tranche_scenario_table(long_wire, "BBB", lesson28_market, AS_OF, grid)
 scenario_rows = json.loads(scenario_table.to_json())["cells"]
-oas = structured_credit_tranche_oas(long_wire, "BBB", mezzanine.price_pct, lesson28_market, AS_OF)
+oas = structured_credit_tranche_oas(long_wire, "BBB", lesson28_market, AS_OF, mezzanine.price_pct)
 # This BBB contract pays a fixed coupon. A floating-tranche margin is inapplicable.
 discount_margin_error = None
 try:
-    structured_credit_tranche_discount_margin(long_wire, "BBB", lesson28_market, AS_OF, mezzanine.pv)
+    structured_credit_tranche_discount_margin(long_wire, "BBB", lesson28_market, AS_OF, mezzanine.price_pct)
 except ValueError as error:
     discount_margin_error = str(error)
 print("Fixed-coupon discount-margin rejection:", discount_margin_error)

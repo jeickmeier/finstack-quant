@@ -213,9 +213,9 @@ fn production_structured_metrics_settlement_crosses_coupon_once() {
     let oas = calculate_tranche_oas(
         &deal,
         tranche_id,
-        clean,
         &market,
         as_of,
+        clean,
         &OasConfig {
             stochastic_rates: false,
             stochastic_credit: false,
@@ -245,7 +245,7 @@ fn production_structured_metrics_opening_balance_and_unadjusted_boundary() {
     let (mut deal, market) = deal_and_market();
     deal.first_payment_date = date!(2024 - 06 - 30); // Sunday; payment adjusts to Friday June 28.
     deal.tranches.tranches[0].current_balance =
-        finstack_quant_core::money::Money::new(80_000_000.0, deal.pool.get_base_currency())
+        finstack_quant_core::money::Money::new(80_000_000.0, deal.pool.get_currency())
             .expect("balance");
     deal.credit_model.default_spec = DefaultModelSpec::constant_cdr(0.9);
     let as_of = date!(2024 - 05 - 15);
@@ -291,13 +291,11 @@ fn production_structured_metrics_credit_model_risks_move_pv() {
 }
 
 #[test]
-fn production_structured_metrics_discount_margin_uses_dirty_settlement_target() {
+fn production_structured_metrics_discount_margin_settles_clean_price_at_quote_date() {
     use finstack_quant_cashflows::builder::FloatingRateSpec;
     use finstack_quant_core::{
-        currency::Currency,
         dates::{DayCount, Tenor},
         market_data::{scalars::ScalarTimeSeries, term_structures::ForwardCurve},
-        money::Money,
         types::CurveId,
     };
     use finstack_quant_valuations::instruments::fixed_income::loan_terms::RateSpec;
@@ -349,30 +347,25 @@ fn production_structured_metrics_discount_margin_uses_dirty_settlement_target() 
             amount.amount() * curve.df_between_dates(settlement, *date).expect("df")
         })
         .sum();
-    let dm = calculate_tranche_discount_margin(
-        &deal,
-        id,
-        &market,
-        as_of,
-        Money::new(dirty, Currency::USD).expect("target"),
-    )
-    .expect("DM");
+    // The solver takes a clean price per CURRENT face; strip the accrued
+    // interest the buyer pays at settlement from the independent dirty value.
+    let accrued: f64 = flows
+        .accrual_periods
+        .iter()
+        .map(|period| period.accrued(settlement).expect("accrued"))
+        .sum();
+    let current = deal.tranches.tranches[0].current_balance.amount();
+    let clean_pct = (dirty - accrued) / current * 100.0;
+    let dm = calculate_tranche_discount_margin(&deal, id, &market, as_of, clean_pct).expect("DM");
     assert!(dm.abs() < 1e-10, "{dm}");
-    assert!(calculate_tranche_discount_margin(
-        &deal,
-        id,
-        &market,
-        as_of,
-        Money::new(dirty, Currency::EUR).expect("wrong currency")
-    )
-    .is_err());
+    assert!(calculate_tranche_discount_margin(&deal, id, &market, as_of, 0.0).is_err());
 }
 
 #[test]
 fn production_structured_metrics_deferred_coupon_is_not_current_accrual() {
     let (mut deal, market) = deal_and_market();
     deal.tranches.tranches[0].deferred_interest =
-        finstack_quant_core::money::Money::new(1_000_000.0, deal.pool.get_base_currency())
+        finstack_quant_core::money::Money::new(1_000_000.0, deal.pool.get_currency())
             .expect("deferred");
     let result = deal
         .value_tranche_with_metrics(

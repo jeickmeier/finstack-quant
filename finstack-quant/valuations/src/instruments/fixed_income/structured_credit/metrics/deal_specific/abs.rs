@@ -117,7 +117,7 @@ impl crate::metrics::MetricCalculator for AbsCreditEnhancementCalculator {
             .checked_add(pool.reserve_account)?
             .checked_add(pool.excess_spread_account)?;
         for asset in &pool.assets {
-            if asset.is_defaulted {
+            if asset.defaulted {
                 if let Some(recovery) = asset.recovery_amount {
                     collateral = collateral.checked_add(recovery)?;
                 }

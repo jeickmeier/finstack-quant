@@ -285,13 +285,32 @@ mod discount_margin_tests {
             .with_calendar("nyse")
     }
 
+    /// Clean price (% of current face) of a dirty amount on the closing date.
+    /// Nothing has accrued at closing, so clean = dirty / current balance.
+    fn clean_pct(sc: &StructuredCredit, dirty: f64) -> f64 {
+        let senior = sc
+            .tranches
+            .tranches
+            .iter()
+            .find(|t| t.id.as_str() == "SR")
+            .unwrap();
+        dirty / senior.current_balance.amount() * 100.0
+    }
+
     /// At the model PV (no extra spread), canonical discount margin is zero.
     #[test]
     fn discount_margin_is_zero_at_the_model_pv() {
         let sc = deal(true);
         let mkt = market();
         let pv = sc.value_tranche("SR", &mkt, closing()).unwrap();
-        let dm = calculate_tranche_discount_margin(&sc, "SR", &mkt, closing(), pv).unwrap();
+        let dm = calculate_tranche_discount_margin(
+            &sc,
+            "SR",
+            &mkt,
+            closing(),
+            clean_pct(&sc, pv.amount()),
+        )
+        .unwrap();
         assert!(
             dm.abs() < 1e-6,
             "at the model PV the discount margin must be zero (no spread over \
@@ -306,8 +325,8 @@ mod discount_margin_tests {
         let sc = deal(true);
         let mkt = market();
         let pv = sc.value_tranche("SR", &mkt, closing()).unwrap();
-        let richer = Money::new(pv.amount() * 1.002, pv.currency()).expect("valid money fixture");
-        let cheaper = Money::new(pv.amount() * 0.998, pv.currency()).expect("valid money fixture");
+        let richer = clean_pct(&sc, pv.amount() * 1.002);
+        let cheaper = clean_pct(&sc, pv.amount() * 0.998);
         let dm_rich =
             calculate_tranche_discount_margin(&sc, "SR", &mkt, closing(), richer).unwrap();
         let dm_cheap =
@@ -337,7 +356,14 @@ mod discount_margin_tests {
         let pv = sc.value_tranche("SR", &mkt, closing()).unwrap();
         let target = Money::new(pv.amount() * 0.99, pv.currency()).expect("valid money fixture");
 
-        let dm = calculate_tranche_discount_margin(&sc, "SR", &mkt, closing(), target).unwrap();
+        let dm = calculate_tranche_discount_margin(
+            &sc,
+            "SR",
+            &mkt,
+            closing(),
+            clean_pct(&sc, target.amount()),
+        )
+        .unwrap();
 
         let flows = generate_tranche_cashflows(&sc, "SR", &mkt, closing()).unwrap();
         let curve = mkt.get_discount("USD-OIS").unwrap();
@@ -357,7 +383,13 @@ mod discount_margin_tests {
         let sc = deal(false);
         let mkt = market();
         let pv = sc.value_tranche("SR", &mkt, closing()).unwrap();
-        let result = calculate_tranche_discount_margin(&sc, "SR", &mkt, closing(), pv);
+        let result = calculate_tranche_discount_margin(
+            &sc,
+            "SR",
+            &mkt,
+            closing(),
+            clean_pct(&sc, pv.amount()),
+        );
         assert!(result.is_err(), "DM on a fixed-rate tranche must error");
     }
 
@@ -771,7 +803,7 @@ mod oas_tests {
             stochastic_credit: false,
             ..Default::default()
         };
-        let oas = calculate_tranche_oas(&sc, "SR", market_price, &mkt, as_of, &config).unwrap();
+        let oas = calculate_tranche_oas(&sc, "SR", &mkt, as_of, market_price, &config).unwrap();
 
         assert!(
             (oas.oas - z_bp / 10_000.0).abs() < 1e-4,
@@ -810,7 +842,7 @@ mod oas_tests {
             prepay_beta: 0.0,
             ..Default::default()
         };
-        let oas = calculate_tranche_oas(&sc, "SR", market_price, &mkt, as_of, &config).unwrap();
+        let oas = calculate_tranche_oas(&sc, "SR", &mkt, as_of, market_price, &config).unwrap();
         assert!(
             (oas.oas - z_bp / 10_000.0).abs() < 1e-4,
             "zero-vol stochastic-rate OAS {} should equal the z-spread {} (decimal) \
@@ -868,7 +900,7 @@ mod oas_tests {
             tolerance: 1e-14,
             ..Default::default()
         };
-        let oas = calculate_tranche_oas(&sc, "SR", market_price, &mkt, as_of, &config).unwrap();
+        let oas = calculate_tranche_oas(&sc, "SR", &mkt, as_of, market_price, &config).unwrap();
         assert!(
             (oas.oas - z).abs() < 1e-8,
             "deterministic OAS {} must equal the z-spread {z} (diff {:e})",
@@ -889,7 +921,7 @@ mod oas_tests {
             stochastic_credit: true,
             ..Default::default()
         };
-        let oas = calculate_tranche_oas(&sc, "SR", 99.0, &mkt, closing(), &config).unwrap();
+        let oas = calculate_tranche_oas(&sc, "SR", &mkt, closing(), 99.0, &config).unwrap();
         assert!(oas.oas.is_finite(), "OAS must be finite, got {}", oas.oas);
         assert!(oas.price_std_error >= 0.0);
         assert!(

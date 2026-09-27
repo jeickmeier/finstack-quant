@@ -17,7 +17,7 @@
 //!
 //! where:
 //! - λ_base(t) is the hazard rate from the HazardCurve
-//! - β is the factor sensitivity parameter
+//! - β is the factor loading parameter
 //! - Z is the systematic factor realization
 //! - σ is the volatility of the intensity shock
 //!
@@ -63,7 +63,7 @@ use finstack_quant_core::market_data::term_structures::HazardCurve;
 ///     .knots([(1.0, 0.02), (3.0, 0.025), (5.0, 0.03)])
 ///     .build()?;
 ///
-/// // Wrap in stochastic adapter with factor sensitivity
+/// // Wrap in stochastic adapter with factor loading
 /// let stochastic_default = StochasticDefaultSpec::from_hazard_curve(hazard_curve, 0.5);
 /// # let _ = stochastic_default;
 /// # Ok(())
@@ -73,8 +73,8 @@ use finstack_quant_core::market_data::term_structures::HazardCurve;
 pub(crate) struct HazardCurveDefault {
     /// The underlying hazard curve
     hazard_curve: HazardCurve,
-    /// Factor sensitivity (β) for systematic risk
-    factor_sensitivity: f64,
+    /// Factor loading (β) for systematic risk
+    factor_loading: f64,
     /// Volatility of intensity shocks (σ)
     volatility: f64,
     /// Asset correlation for default distribution calculation
@@ -95,11 +95,11 @@ impl HazardCurveDefault {
     /// # Arguments
     ///
     /// * `hazard_curve` - The underlying calibrated hazard curve
-    /// * `factor_sensitivity` - Sensitivity to systematic factor shocks (typical: 0.3-0.8)
-    pub(crate) fn new(hazard_curve: HazardCurve, factor_sensitivity: f64) -> Self {
+    /// * `factor_loading` - Loading (β) on the systematic factor, clamped to [-1, 1] (typical: 0.3-0.8)
+    pub(crate) fn new(hazard_curve: HazardCurve, factor_loading: f64) -> Self {
         Self {
             hazard_curve,
-            factor_sensitivity: factor_sensitivity.clamp(-2.0, 2.0),
+            factor_loading: factor_loading.clamp(-1.0, 1.0),
             volatility: 0.30,  // Default volatility
             correlation: 0.20, // Default correlation
             seasoning_offset_months: 0,
@@ -133,7 +133,7 @@ impl HazardCurveDefault {
     /// the shock unit mean under `Z ~ N(0, 1)`, so the simulated mean hazard
     /// equals the base curve.
     fn shocked_hazard_multiplier(&self, factor: f64) -> f64 {
-        let beta_sigma = self.factor_sensitivity * self.volatility;
+        let beta_sigma = self.factor_loading * self.volatility;
         (-beta_sigma * factor - 0.5 * beta_sigma * beta_sigma).exp()
     }
 

@@ -53,14 +53,16 @@ pub struct PoolAsset {
         schemars(with = "finstack_quant_core::wire::DateWire")
     )]
     pub maturity: Date,
-    /// Optional credit-quality classification of the obligor or asset.
-    pub credit_quality: Option<CreditRating>,
+    /// Optional agency credit rating of the obligor or asset; drives WARF,
+    /// the CCC bucket and `CoverageRules.rating_haircuts`.
+    pub rating: Option<CreditRating>,
     /// Optional industry classification used by concentration checks.
     pub industry: Option<String>,
     /// Optional obligor identifier used for single-name concentration limits.
     pub obligor_id: Option<String>,
-    /// Whether the asset is currently treated as defaulted by the pool model.
-    pub is_defaulted: bool,
+    /// Whether the asset has defaulted (optional on the wire, default `false`).
+    #[serde(default)]
+    pub defaulted: bool,
     /// Realized or modeled recovery amount when the asset is defaulted.
     pub recovery_amount: Option<Money>,
     /// Economic default date for the outstanding recovery claim; required for defaulted assets.
@@ -153,7 +155,7 @@ pub struct PoolAsset {
     /// Non-performing loan resolution: the loan pays nothing until the
     /// resolution date, where a share liquidates (a default whose recovery
     /// is the net proceeds) and the rest re-performs. The timeline replaces
-    /// the default flag: `is_defaulted` stays `false` and
+    /// the default flag: `defaulted` stays `false` and
     /// `recovery_amount`/`default_date` stay unset.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub liquidation: Option<LiquidationSpec>,
@@ -211,10 +213,10 @@ impl PoolAsset {
             forward_curve_id,
             maturity: bond.maturity,
             index_floor_bp: None,
-            credit_quality: None,
+            rating: None,
             industry,
             obligor_id: None,
-            is_defaulted: false,
+            defaulted: false,
             recovery_amount: None,
             default_date: None,
             purchase_price: bond
@@ -294,10 +296,10 @@ impl PoolAsset {
             forward_curve_id: Some(forward_curve_id.into()),
             maturity,
             index_floor_bp: None,
-            credit_quality: None,
+            rating: None,
             industry: None,
             obligor_id: None,
-            is_defaulted: false,
+            defaulted: false,
             recovery_amount: None,
             default_date: None,
             purchase_price: None,
@@ -340,10 +342,10 @@ impl PoolAsset {
             forward_curve_id: None,
             maturity,
             index_floor_bp: None,
-            credit_quality: None,
+            rating: None,
             industry: None,
             obligor_id: None,
-            is_defaulted: false,
+            defaulted: false,
             recovery_amount: None,
             default_date: None,
             purchase_price: None,
@@ -369,7 +371,7 @@ impl PoolAsset {
 
     /// Set credit quality
     pub fn with_rating(mut self, rating: CreditRating) -> Self {
-        self.credit_quality = Some(rating);
+        self.rating = Some(rating);
         self
     }
 
@@ -416,7 +418,7 @@ impl PoolAsset {
     /// * `recovery_amount` - Unreceived recovery cash in the asset currency, from zero to defaulted par.
     /// * `default_date` - Economic default date used to schedule the recovery payment.
     pub fn default_with_recovery(&mut self, recovery_amount: Money, default_date: Date) {
-        self.is_defaulted = true;
+        self.defaulted = true;
         self.recovery_amount = Some(recovery_amount);
         self.default_date = Some(default_date);
     }
@@ -550,7 +552,7 @@ pub struct AssetPool {
     pub deal_type: DealType,
 
     /// Base currency for every asset and pool-level account.
-    pub base_currency: Currency,
+    pub currency: Currency,
 
     /// Underlying assets
     pub assets: Vec<PoolAsset>,
@@ -743,12 +745,12 @@ impl RepLine {
 
 impl AssetPool {
     /// Create new asset pool
-    pub fn new(id: impl Into<InstrumentId>, deal_type: DealType, base_currency: Currency) -> Self {
-        let zero_money = Money::from((0_i64, base_currency));
+    pub fn new(id: impl Into<InstrumentId>, deal_type: DealType, currency: Currency) -> Self {
+        let zero_money = Money::from((0_i64, currency));
         Self {
             id: id.into(),
             deal_type,
-            base_currency,
+            currency,
             assets: Vec::new(),
             cumulative_defaults: zero_money,
             cumulative_recoveries: zero_money,
@@ -831,10 +833,10 @@ impl AssetPool {
                     forward_curve_id: line.forward_curve_id,
                     index_floor_bp: line.index_floor_bp,
                     maturity: line.maturity,
-                    credit_quality: None,
+                    rating: None,
                     industry: None,
                     obligor_id: None,
-                    is_defaulted: false,
+                    defaulted: false,
                     recovery_amount: None,
                     default_date: None,
                     purchase_price: None,
@@ -865,7 +867,7 @@ impl AssetPool {
             }
         }
         if let Some(instruments) = pool.instruments.as_ref() {
-            instruments.validate(self.base_currency)?;
+            instruments.validate(self.currency)?;
             pool.assets = instruments.materialize(closing_date)?;
         }
         pool.validate_rows()?;
@@ -977,17 +979,21 @@ impl AssetPool {
             )));
         }
         if let Some(target) = self.reserve_target {
-            if target.currency() != self.base_currency || target.amount() < 0.0 {
+            if target.currency() != self.currency || target.amount() < 0.0 {
                 return Err(finstack_quant_core::Error::Validation(format!(
                     "reserve_target must be a non-negative {} amount, got {target}",
-                    self.base_currency
+                    self.currency
                 )));
             }
         }
         if let ReserveInterestDestination::Tranche { tranche_id } =
             &self.reserve_interest_destination
         {
-            if !tranches.tranches.iter().any(|t| &t.id == tranche_id) {
+            if !tranches
+                .tranches
+                .iter()
+                .any(|t| t.id.as_str() == tranche_id)
+            {
                 return Err(finstack_quant_core::Error::Validation(format!(
                     "reserve_interest_destination names unknown tranche '{tranche_id}'"
                 )));
@@ -1025,21 +1031,21 @@ impl AssetPool {
         self.validate_representation()?;
         if let Some(instruments) = &self.instruments {
             if self.assets.is_empty() && !instruments.is_empty() {
-                return instruments.total_balance(self.base_currency);
+                return instruments.total_balance(self.currency);
             }
         }
         if let Some(lines) = &self.rep_lines {
             if self.assets.is_empty() {
                 return lines
                     .iter()
-                    .try_fold(Money::from((0_i64, self.base_currency)), |sum, line| {
+                    .try_fold(Money::from((0_i64, self.currency)), |sum, line| {
                         sum.checked_add(line.balance)
                     });
             }
         }
         self.assets
             .iter()
-            .try_fold(Money::from((0_i64, self.base_currency)), |acc, asset| {
+            .try_fold(Money::from((0_i64, self.currency)), |acc, asset| {
                 self.validate_asset_currency(asset)?;
                 acc.checked_add(asset.balance)
             })
@@ -1078,9 +1084,9 @@ impl AssetPool {
         let Some(original) = self.original_balance else {
             return Ok(());
         };
-        if original.currency() != self.base_currency {
+        if original.currency() != self.currency {
             return Err(finstack_quant_core::Error::CurrencyMismatch {
-                expected: self.base_currency,
+                expected: self.currency,
                 actual: original.currency(),
             });
         }
@@ -1101,8 +1107,8 @@ impl AssetPool {
         if self.assets.is_empty() {
             return self.total_balance();
         }
-        self.assets.iter().filter(|a| !a.is_defaulted).try_fold(
-            Money::from((0_i64, self.base_currency)),
+        self.assets.iter().filter(|a| !a.defaulted).try_fold(
+            Money::from((0_i64, self.currency)),
             |acc, asset| {
                 self.validate_asset_currency(asset)?;
                 acc.checked_add(asset.balance)
@@ -1131,7 +1137,7 @@ impl AssetPool {
         let mut included = 0.0;
         for asset in &self.assets {
             let balance = asset.balance.amount();
-            if asset.is_defaulted
+            if asset.defaulted
                 || balance <= 0.0
                 || !is_fixed(&asset.forward_curve_id, asset.spread_bp)
             {
@@ -1265,22 +1271,22 @@ impl AssetPool {
     }
 
     /// Base currency of the pool.
-    pub fn get_base_currency(&self) -> Currency {
-        self.base_currency
+    pub fn get_currency(&self) -> Currency {
+        self.currency
     }
 
     fn validate_asset_currency(&self, asset: &PoolAsset) -> finstack_quant_core::Result<()> {
         let actual = asset.balance.currency();
-        if actual != self.base_currency {
+        if actual != self.currency {
             return Err(finstack_quant_core::Error::CurrencyMismatch {
-                expected: self.base_currency,
+                expected: self.currency,
                 actual,
             });
         }
         if let Some(payment) = asset.contractual_payment {
-            if payment.currency() != self.base_currency {
+            if payment.currency() != self.currency {
                 return Err(finstack_quant_core::Error::CurrencyMismatch {
-                    expected: self.base_currency,
+                    expected: self.currency,
                     actual: payment.currency(),
                 });
             }
@@ -1319,7 +1325,7 @@ impl AssetPool {
         let mut weighted_spread = 0.0;
         let mut included_balance = 0.0;
         for asset in &self.assets {
-            if asset.is_defaulted {
+            if asset.defaulted {
                 continue;
             }
             let Some(spread_bp) = asset.spread_bp else {
@@ -1380,7 +1386,7 @@ pub fn calculate_pool_stats(
     let defaulted_balance: f64 = pool
         .assets
         .iter()
-        .filter(|a| a.is_defaulted)
+        .filter(|a| a.defaulted)
         .map(|a| a.balance.amount())
         .sum();
 
@@ -1401,7 +1407,7 @@ pub fn calculate_pool_stats(
         undrawn_commitment: pool
             .assets
             .iter()
-            .filter(|a| !a.is_defaulted)
+            .filter(|a| !a.defaulted)
             .filter_map(|a| {
                 a.commitment
                     .map(|c| (c.amount() - a.balance.amount()).max(0.0))
@@ -1420,7 +1426,7 @@ mod tests {
         let pool = AssetPool::new("TEST_POOL", DealType::Clo, Currency::USD);
         assert_eq!(pool.id.as_str(), "TEST_POOL");
         assert_eq!(pool.deal_type, DealType::Clo);
-        assert_eq!(pool.get_base_currency(), Currency::USD);
+        assert_eq!(pool.get_currency(), Currency::USD);
     }
 }
 

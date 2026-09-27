@@ -38,12 +38,12 @@ pub enum StochasticDefaultSpec {
 
     /// Intensity process (Cox model) for default.
     ///
-    /// Mean-reverting intensity with factor sensitivity.
+    /// Mean-reverting intensity with factor loading.
     IntensityProcess {
         /// Base annual hazard rate
         base_hazard: f64,
-        /// Sensitivity to systematic factor
-        factor_sensitivity: f64,
+        /// Loading (β) on the systematic factor, clamped to [-1, 1]
+        factor_loading: f64,
         /// Mean reversion speed
         mean_reversion: f64,
         /// Intensity volatility
@@ -76,8 +76,8 @@ pub enum StochasticDefaultSpec {
     HazardCurveBased {
         /// The calibrated hazard curve
         hazard_curve: Box<HazardCurve>,
-        /// Factor sensitivity (β) for systematic risk shocks
-        factor_sensitivity: f64,
+        /// Factor loading (β) for systematic risk shocks
+        factor_loading: f64,
         /// Volatility of intensity shocks (σ)
         volatility: f64,
         /// Asset correlation for default distribution
@@ -101,7 +101,7 @@ impl serde::Serialize for StochasticDefaultSpec {
             },
             IntensityProcess {
                 base_hazard: f64,
-                factor_sensitivity: f64,
+                factor_loading: f64,
                 mean_reversion: f64,
                 volatility: f64,
                 correlation: f64,
@@ -126,13 +126,13 @@ impl serde::Serialize for StochasticDefaultSpec {
             },
             Self::IntensityProcess {
                 base_hazard,
-                factor_sensitivity,
+                factor_loading,
                 mean_reversion,
                 volatility,
                 correlation,
             } => PersistedStochasticDefaultSpec::IntensityProcess {
                 base_hazard: *base_hazard,
-                factor_sensitivity: *factor_sensitivity,
+                factor_loading: *factor_loading,
                 mean_reversion: *mean_reversion,
                 volatility: *volatility,
                 correlation: *correlation,
@@ -181,14 +181,14 @@ impl PartialEq for StochasticDefaultSpec {
             (
                 Self::IntensityProcess {
                     base_hazard: a1,
-                    factor_sensitivity: a2,
+                    factor_loading: a2,
                     mean_reversion: a3,
                     volatility: a4,
                     correlation: a5,
                 },
                 Self::IntensityProcess {
                     base_hazard: b1,
-                    factor_sensitivity: b2,
+                    factor_loading: b2,
                     mean_reversion: b3,
                     volatility: b4,
                     correlation: b5,
@@ -209,13 +209,13 @@ impl PartialEq for StochasticDefaultSpec {
             (
                 Self::HazardCurveBased {
                     hazard_curve: a1,
-                    factor_sensitivity: a2,
+                    factor_loading: a2,
                     volatility: a3,
                     correlation: a4,
                 },
                 Self::HazardCurveBased {
                     hazard_curve: b1,
-                    factor_sensitivity: b2,
+                    factor_loading: b2,
                     volatility: b3,
                     correlation: b4,
                 },
@@ -261,13 +261,13 @@ impl StochasticDefaultSpec {
     /// Create an intensity process default spec.
     pub fn intensity_process(
         base_hazard: f64,
-        factor_sensitivity: f64,
+        factor_loading: f64,
         mean_reversion: f64,
         volatility: f64,
     ) -> Self {
         StochasticDefaultSpec::IntensityProcess {
             base_hazard: base_hazard.clamp(0.0, 1.0),
-            factor_sensitivity: factor_sensitivity.clamp(-2.0, 2.0),
+            factor_loading: factor_loading.clamp(-1.0, 1.0),
             mean_reversion: mean_reversion.clamp(0.0, 10.0),
             volatility: volatility.clamp(0.0, 2.0),
             correlation: 0.20,
@@ -294,11 +294,11 @@ impl StochasticDefaultSpec {
     /// # Arguments
     ///
     /// * `hazard_curve` - Calibrated hazard curve (e.g., from CDS spreads)
-    /// * `factor_sensitivity` - Sensitivity to systematic factor (typical: 0.3-0.8)
-    pub fn from_hazard_curve(hazard_curve: HazardCurve, factor_sensitivity: f64) -> Self {
+    /// * `factor_loading` - Loading (β) on the systematic factor, clamped to [-1, 1] (typical: 0.3-0.8)
+    pub fn from_hazard_curve(hazard_curve: HazardCurve, factor_loading: f64) -> Self {
         StochasticDefaultSpec::HazardCurveBased {
             hazard_curve: Box::new(hazard_curve),
-            factor_sensitivity: factor_sensitivity.clamp(-2.0, 2.0),
+            factor_loading: factor_loading.clamp(-1.0, 1.0),
             volatility: 0.30,
             correlation: 0.20,
         }
@@ -351,12 +351,12 @@ impl StochasticDefaultSpec {
 
             StochasticDefaultSpec::IntensityProcess {
                 base_hazard,
-                factor_sensitivity,
+                factor_loading,
                 mean_reversion: _,
                 volatility,
                 correlation,
             } => Some(Box::new(
-                IntensityProcessDefault::new(*base_hazard, *factor_sensitivity, *volatility)
+                IntensityProcessDefault::new(*base_hazard, *factor_loading, *volatility)
                     .with_correlation(*correlation),
             )),
 
@@ -372,11 +372,11 @@ impl StochasticDefaultSpec {
 
             StochasticDefaultSpec::HazardCurveBased {
                 hazard_curve,
-                factor_sensitivity,
+                factor_loading,
                 volatility,
                 correlation,
             } => Some(Box::new(
-                HazardCurveDefault::new((**hazard_curve).clone(), *factor_sensitivity)
+                HazardCurveDefault::new((**hazard_curve).clone(), *factor_loading)
                     .with_volatility(*volatility)
                     .with_correlation(*correlation)
                     .with_seasoning_offset(seasoning_offset_months),
@@ -495,6 +495,39 @@ mod tests {
             .expect("valid spec")
             .expect("Should build intensity process model");
         assert_eq!(model.model_name(), "Intensity Process Default Model");
+    }
+
+    /// Every stochastic default/prepay variant clamps its systematic-factor
+    /// loading to the same documented range, [-1, 1].
+    #[test]
+    fn intensity_process_factor_loading_clamps_to_unit_range() {
+        let spec = StochasticDefaultSpec::intensity_process(0.02, 1.5, 0.5, 0.30);
+        let StochasticDefaultSpec::IntensityProcess { factor_loading, .. } = spec else {
+            panic!("expected an intensity-process spec");
+        };
+        assert_eq!(factor_loading, 1.0);
+    }
+
+    #[test]
+    fn intensity_process_factor_loading_round_trips() {
+        let spec = StochasticDefaultSpec::intensity_process(0.02, 0.5, 0.5, 0.30);
+        let json = serde_json::to_value(&spec).expect("serializes");
+        assert_eq!(json["factor_loading"], 0.5);
+        let back: StochasticDefaultSpec = serde_json::from_value(json).expect("round-trips");
+        assert_eq!(back, spec);
+    }
+
+    #[test]
+    // schema-rejection-test
+    fn intensity_process_rejects_retired_factor_sensitivity_key() {
+        let legacy = serde_json::json!({
+            "model": "intensity_process",
+            "base_hazard": 0.02,
+            "factor_sensitivity": 0.5,
+            "mean_reversion": 0.5,
+            "volatility": 0.3,
+        });
+        assert!(serde_json::from_value::<StochasticDefaultSpec>(legacy).is_err());
     }
 
     #[test]

@@ -46,7 +46,7 @@ fn test_pool_asset_floating_rate_loan_creation() {
     assert_eq!(asset.spread_bp(), 450.0);
     assert!(asset.forward_curve_id.is_some());
     assert_eq!(asset.forward_curve_id.as_ref().unwrap(), "SOFR-3M");
-    assert!(!asset.is_defaulted);
+    assert!(!asset.defaulted);
 }
 
 #[test]
@@ -84,7 +84,7 @@ fn test_pool_asset_builder_methods() {
     .with_obligor("OBLIGOR001");
 
     // Assert
-    assert_eq!(asset.credit_quality, Some(CreditRating::BB));
+    assert_eq!(asset.rating, Some(CreditRating::BB));
     assert_eq!(asset.industry.as_deref(), Some("Technology"));
     assert_eq!(asset.obligor_id.as_deref(), Some("OBLIGOR001"));
 }
@@ -125,7 +125,7 @@ fn test_pool_asset_default_with_recovery() {
     );
 
     // Assert
-    assert!(asset.is_defaulted);
+    assert!(asset.defaulted);
     assert_eq!(asset.recovery_amount.unwrap().amount(), 400_000.0);
 }
 
@@ -162,7 +162,7 @@ fn test_asset_pool_creation() {
     // Assert
     assert_eq!(pool.id.as_str(), "TEST_POOL");
     assert_eq!(pool.deal_type, DealType::Clo);
-    assert_eq!(pool.get_base_currency(), Currency::USD);
+    assert_eq!(pool.get_currency(), Currency::USD);
     assert_eq!(pool.assets.len(), 0);
     assert_eq!(pool.total_balance().unwrap().amount(), 0.0);
 }
@@ -206,7 +206,7 @@ fn test_asset_pool_empty_pool_balance() {
     // Assert
     assert_eq!(total.amount(), 0.0);
     assert_eq!(total.currency(), Currency::EUR);
-    assert_eq!(pool.get_base_currency(), Currency::EUR);
+    assert_eq!(pool.get_currency(), Currency::EUR);
 }
 
 #[test]
@@ -409,7 +409,7 @@ fn test_pool_weighted_avg_spread_excludes_defaulted() {
         maturity_date(),
         finstack_quant_core::dates::DayCount::Act360,
     );
-    defaulted.is_defaulted = true;
+    defaulted.defaulted = true;
     pool.assets.push(defaulted);
 
     // Defaulted assets are excluded from numerator AND denominator.
@@ -802,10 +802,10 @@ fn test_pool_asset_type_classification() {
         forward_curve_id: Some("SOFR-3M".to_string()),
         index_floor_bp: None,
         maturity: maturity_date(),
-        credit_quality: Some(CreditRating::BB),
+        rating: Some(CreditRating::BB),
         industry: Some("Technology".to_string()),
         obligor_id: Some("OB1".to_string()),
-        is_defaulted: false,
+        defaulted: false,
         recovery_amount: None,
         default_date: None,
         purchase_price: None,
@@ -864,7 +864,7 @@ fn test_pool_wac_excludes_floating_and_defaulted_collateral() {
         maturity_date(),
         finstack_quant_core::dates::DayCount::Thirty360,
     );
-    defaulted.is_defaulted = true;
+    defaulted.defaulted = true;
     pool.assets.push(defaulted);
 
     // Rounding only: two products, one sum and one division.

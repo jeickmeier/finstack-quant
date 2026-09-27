@@ -385,3 +385,22 @@ fn incentive_fee_shares_principal_proceeds_above_the_hurdle() {
         );
     }
 }
+
+/// `IncentiveFeeSpec.share` is a decimal fraction; a percent-style `20`
+/// must be rejected rather than paying 20x the residual.
+#[test]
+fn incentive_fee_share_outside_unit_interval_is_rejected() {
+    let deal = clo(|fees| {
+        fees.incentive_fee = Some(IncentiveFeeSpec {
+            hurdle_irr: 0.12,
+            share: 20.0,
+        });
+    });
+    let err = deal
+        .create_waterfall()
+        .expect_err("share = 20 is a percent, not a decimal");
+    assert!(
+        err.to_string().contains("fees.incentive_fee.share"),
+        "error must name the wire path: {err}"
+    );
+}

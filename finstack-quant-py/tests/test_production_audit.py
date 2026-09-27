@@ -119,7 +119,7 @@ def test_structured_credit_predefaulted_collateral_pays_recovery_once() -> None:
     )
     asset = fixture["instrument"]["instrument"]["spec"]["pool"]["assets"][0]
     asset.update(
-        is_defaulted=True, default_date=fixture["as_of"], recovery_amount={"amount": "70000000", "currency": "USD"}
+        defaulted=True, default_date=fixture["as_of"], recovery_amount={"amount": "70000000", "currency": "USD"}
     )
     fixture["market"]["curves"][0]["knot_points"] = [[0.0, 1.0], [20.0, 1.0]]
     result = price_instrument(
