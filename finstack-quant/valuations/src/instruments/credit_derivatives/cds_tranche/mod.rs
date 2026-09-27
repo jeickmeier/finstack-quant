@@ -77,7 +77,7 @@
 //!
 //! # See Also
 //!
-//! - [`CDSTranche`] for instrument struct
+//! - [`CdsTranche`] for instrument struct
 //! - [`crate::instruments::PayReceive`] for buyer (`Pay`) vs seller (`Receive`)
 //! - [`finstack_quant_models::correlation::copula`] for copula model implementations
 //! - [`finstack_quant_models::correlation::recovery`] for stochastic recovery models
@@ -91,7 +91,7 @@ mod types;
 
 pub use finstack_quant_models::correlation::copula::CopulaSpec;
 pub use finstack_quant_models::correlation::recovery::RecoverySpec;
-pub use parameters::CDSTrancheParams;
-pub use types::{CDSTranche, CDSTrancheBuilder};
+pub use parameters::CdsTrancheParams;
+pub use types::{CdsTranche, CdsTrancheBuilder};
 
-pub use pricing::{CDSTranchePricer, CDSTranchePricerConfig, HeteroMethod};
+pub use pricing::{CdsTranchePricer, CdsTranchePricerConfig, HeteroMethod};

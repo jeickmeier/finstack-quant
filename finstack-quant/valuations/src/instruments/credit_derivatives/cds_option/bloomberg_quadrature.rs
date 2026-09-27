@@ -54,9 +54,9 @@
 
 use crate::constants::{bloomberg_cdso, numerical, BASIS_POINTS_PER_UNIT};
 use crate::instruments::common_impl::parameters::OptionType;
-use crate::instruments::credit_derivatives::cds::pricing::CDSPricer;
+use crate::instruments::credit_derivatives::cds::pricing::CdsPricer;
 use crate::instruments::credit_derivatives::cds::CreditDefaultSwap;
-use crate::instruments::credit_derivatives::cds_option::CDSOption;
+use crate::instruments::credit_derivatives::cds_option::CdsOption;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::{DiscountCurve, HazardCurve};
@@ -75,7 +75,7 @@ const DISTRESSED_FORWARD_SPREAD_LIMIT: f64 = 0.10;
 
 /// Price a CDS option under the Bloomberg CDSO numerical-quadrature model.
 pub fn npv(
-    option: &CDSOption,
+    option: &CdsOption,
     cds: &CreditDefaultSwap,
     curves: &MarketContext,
     sigma: f64,
@@ -100,7 +100,7 @@ pub fn npv(
 /// Bloomberg CDSO theta: shorten the exercise time by 1/365.25 while
 /// retaining the same calibrated forward price and lognormal mean.
 pub fn theta(
-    option: &CDSOption,
+    option: &CdsOption,
     cds: &CreditDefaultSwap,
     curves: &MarketContext,
     sigma: f64,
@@ -122,7 +122,7 @@ pub fn theta(
 /// Bloomberg CDSO ATM Forward (in basis points) — the bootstrapped forward
 /// par spread of the no-knockout forward CDS at expiry.
 pub fn forward_par_at_expiry_bp(
-    option: &CDSOption,
+    option: &CdsOption,
     cds: &CreditDefaultSwap,
     curves: &MarketContext,
     as_of: Date,
@@ -143,13 +143,13 @@ pub fn forward_par_at_expiry_bp(
 ///   `H_spread = ξ (c − K) A(K)` (DOCS 2055833 Eq. 2.4).
 /// - `CleanPrice`: the strike clean-price **fraction** `K` (`107.0` wire
 ///   points become `1.07` exactly once, upstream in
-///   [`CDSOptionStrike::clean_price_fraction`]) and the original index
+///   [`CdsOptionStrike::clean_price_fraction`]) and the original index
 ///   factor `f0`, for the direct price term
 ///   `H_price = ξ (K − 1) · f0 / f` evaluated inside the outer
 ///   current-factor scale `f`.
 ///
-/// [`CDSOptionStrike::clean_price_fraction`]:
-///     super::strike::CDSOptionStrike::clean_price_fraction
+/// [`CdsOptionStrike::clean_price_fraction`]:
+///     super::strike::CdsOptionStrike::clean_price_fraction
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum QuadratureStrike {
     /// Forward-spread strike `K` (decimal rate).
@@ -231,14 +231,14 @@ pub struct ForwardCdsContext {
 
 impl ForwardCdsContext {
     pub fn build(
-        option: &CDSOption,
+        option: &CdsOption,
         disc: &DiscountCurve,
         surv: &HazardCurve,
         cds: &CreditDefaultSwap,
         as_of: Date,
         sigma: f64,
     ) -> Result<Self> {
-        let cds_pricer = CDSPricer::new();
+        let cds_pricer = CdsPricer::new();
         // LGD must be strictly positive and finite; recovery is already
         // validated to `(0, 1)` at construction time, but guard against NaN /
         // future construction-path regressions with an explicit error rather
@@ -382,10 +382,10 @@ impl ForwardCdsContext {
 
         let coupon = decimal_to_f64(option.effective_coupon_bp()? / Decimal::new(10_000, 0))?;
         let strike = match &option.strike {
-            super::strike::CDSOptionStrike::Spread(spread) => QuadratureStrike::Spread {
+            super::strike::CdsOptionStrike::Spread(spread) => QuadratureStrike::Spread {
                 strike: decimal_to_f64(*spread)?,
             },
-            price @ super::strike::CDSOptionStrike::CleanPricePct(_) => {
+            price @ super::strike::CdsOptionStrike::CleanPricePct(_) => {
                 let strike_index_factor = option.strike_index_factor.ok_or_else(|| {
                     finstack_quant_core::Error::Validation(format!(
                         "CDS option '{}' has a clean-price strike but no \
@@ -860,7 +860,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::instruments::credit_derivatives::cds_option::parameters::CDSOptionParams;
+    use crate::instruments::credit_derivatives::cds_option::parameters::CdsOptionParams;
     use crate::instruments::credit_derivatives::cds_option::pricer::synthetic_underlying_cds;
     use crate::instruments::CreditParams;
     use finstack_quant_core::currency::Currency;
@@ -904,7 +904,7 @@ mod tests {
             .insert(flat_hazard("HZ-SN", as_of, 0.4, 0.02))
     }
 
-    fn option(as_of: Date, option_type: OptionType, strike_bp: f64, vol: f64) -> CDSOption {
+    fn option(as_of: Date, option_type: OptionType, strike_bp: f64, vol: f64) -> CdsOption {
         option_with_coupon(as_of, option_type, strike_bp, strike_bp, vol)
     }
 
@@ -914,9 +914,9 @@ mod tests {
         strike_bp: f64,
         coupon_bp: f64,
         vol: f64,
-    ) -> CDSOption {
-        let params = CDSOptionParams::new(
-            super::super::strike::CDSOptionStrike::Spread(bp_to_decimal(strike_bp)),
+    ) -> CdsOption {
+        let params = CdsOptionParams::new(
+            super::super::strike::CdsOptionStrike::Spread(bp_to_decimal(strike_bp)),
             as_of.add_months(12),
             as_of.add_months(60),
             Money::from((10_000_000_i64, Currency::USD)),
@@ -925,7 +925,7 @@ mod tests {
         .expect("valid option params")
         .with_coupon_bp(Decimal::try_from(coupon_bp).expect("valid coupon bp"));
         let credit = CreditParams::corporate_standard("SN", "HZ-SN");
-        let mut option = CDSOption::new("CDSO-UNIT", &params, &credit, "USD-OIS", "CDSO-VOL")
+        let mut option = CdsOption::new("CDSO-UNIT", &params, &credit, "USD-OIS", "CDSO-VOL")
             .expect("valid cds option");
         option
             .instrument_pricing_overrides
@@ -935,7 +935,7 @@ mod tests {
     }
 
     fn context_for(
-        option: &CDSOption,
+        option: &CdsOption,
         market: &MarketContext,
         as_of: Date,
         sigma: f64,
@@ -1457,11 +1457,11 @@ mod tests {
         strike_factor: f64,
         current_factor: f64,
         realized_loss: Option<f64>,
-    ) -> CDSOption {
+    ) -> CdsOption {
         use crate::instruments::common_impl::traits::Instrument;
 
-        let params = CDSOptionParams::new(
-            super::super::strike::CDSOptionStrike::CleanPricePct(
+        let params = CdsOptionParams::new(
+            super::super::strike::CdsOptionStrike::CleanPricePct(
                 Decimal::try_from(strike_price_pct).expect("valid clean-price strike"),
             ),
             as_of.add_months(12),
@@ -1476,7 +1476,7 @@ mod tests {
         .expect("valid strike index factor")
         .with_coupon_bp(Decimal::try_from(coupon_bp).expect("valid coupon bp"));
         let credit = CreditParams::corporate_standard("HY", "HZ-SN");
-        let mut option = CDSOption::new("CDSO-HY-UNIT", &params, &credit, "USD-OIS", "CDSO-VOL")
+        let mut option = CdsOption::new("CDSO-HY-UNIT", &params, &credit, "USD-OIS", "CDSO-VOL")
             .expect("valid cds option");
         option.realized_loss = realized_loss.unwrap_or(0.0);
         option
@@ -1489,7 +1489,7 @@ mod tests {
         option
     }
 
-    fn npv_per_unit(option: &CDSOption, market: &MarketContext, as_of: Date, sigma: f64) -> f64 {
+    fn npv_per_unit(option: &CdsOption, market: &MarketContext, as_of: Date, sigma: f64) -> f64 {
         let cds = synthetic_underlying_cds(option, as_of).expect("synthetic cds");
         npv(option, &cds, market, sigma, as_of)
             .expect("npv")
@@ -1883,7 +1883,7 @@ mod tests {
             payer.underlying_is_index = true;
             payer.knockout = false;
             payer.strike =
-                super::super::super::strike::CDSOptionStrike::CleanPricePct(Decimal::from(100));
+                super::super::super::strike::CdsOptionStrike::CleanPricePct(Decimal::from(100));
             payer.strike_index_factor = Some(1.0);
             let mut receiver = payer.clone();
             receiver.option_type = OptionType::Put;

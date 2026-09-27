@@ -12,7 +12,7 @@ use finstack_quant_core::currency::Currency;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::Percentage;
 use finstack_quant_valuations::instruments::credit_derivatives::cds_tranche::{
-    CDSTrancheParams, CDSTranchePricer, CDSTranchePricerConfig, CopulaSpec, HeteroMethod,
+    CdsTrancheParams, CdsTranchePricer, CdsTranchePricerConfig, CopulaSpec, HeteroMethod,
 };
 use time::macros::date;
 
@@ -21,7 +21,7 @@ use time::macros::date;
 #[test]
 fn test_default_config_integration_tolerance() {
     // Arrange & Act
-    let config = CDSTranchePricerConfig::default();
+    let config = CdsTranchePricerConfig::default();
 
     // Assert
     assert_eq!(
@@ -33,7 +33,7 @@ fn test_default_config_integration_tolerance() {
 #[test]
 fn test_default_config_uses_issuer_curves() {
     // Arrange & Act
-    let config = CDSTranchePricerConfig::default();
+    let config = CdsTranchePricerConfig::default();
 
     // Assert
     assert!(
@@ -45,7 +45,7 @@ fn test_default_config_uses_issuer_curves() {
 #[test]
 fn test_default_config_correlation_bounds() {
     // Arrange & Act
-    let config = CDSTranchePricerConfig::default();
+    let config = CdsTranchePricerConfig::default();
 
     // Assert
     assert_eq!(
@@ -65,7 +65,7 @@ fn test_default_config_correlation_bounds() {
 #[test]
 fn test_default_config_accrual_on_default() {
     // Arrange & Act
-    let config = CDSTranchePricerConfig::default();
+    let config = CdsTranchePricerConfig::default();
 
     // Assert
     assert!(
@@ -77,7 +77,7 @@ fn test_default_config_accrual_on_default() {
 #[test]
 fn test_default_config_hetero_method() {
     // Arrange & Act
-    let config = CDSTranchePricerConfig::default();
+    let config = CdsTranchePricerConfig::default();
 
     // Assert
     assert!(
@@ -104,7 +104,7 @@ fn test_hetero_method_equality() {
 
 #[test]
 fn test_pricer_config_builder_methods_wire_copula_and_numerical_settings() {
-    let student_t = CDSTranchePricerConfig::default()
+    let student_t = CdsTranchePricerConfig::default()
         .with_student_t_copula(6.0)
         .expect("valid Student-t df");
     assert!(matches!(
@@ -114,7 +114,7 @@ fn test_pricer_config_builder_methods_wire_copula_and_numerical_settings() {
         } if (degrees_of_freedom - 6.0).abs() < 1e-12
     ));
 
-    let rfl = CDSTranchePricerConfig::default().with_rfl_copula(0.15);
+    let rfl = CdsTranchePricerConfig::default().with_rfl_copula(0.15);
     assert!(matches!(
         rfl.copula_spec,
         CopulaSpec::RandomFactorLoading {
@@ -122,7 +122,7 @@ fn test_pricer_config_builder_methods_wire_copula_and_numerical_settings() {
         } if (loading_volatility - 0.15).abs() < 1e-12
     ));
 
-    let rfl_pct = CDSTranchePricerConfig::default()
+    let rfl_pct = CdsTranchePricerConfig::default()
         .with_rfl_copula_pct(Percentage::new(12.5).expect("finite percentage"));
     assert!(matches!(
         rfl_pct.copula_spec,
@@ -131,24 +131,24 @@ fn test_pricer_config_builder_methods_wire_copula_and_numerical_settings() {
         } if (loading_volatility - 0.125).abs() < 1e-12
     ));
 
-    let multi_factor = CDSTranchePricerConfig::default().with_multi_factor_copula();
+    let multi_factor = CdsTranchePricerConfig::default().with_multi_factor_copula();
     assert!(matches!(multi_factor.copula_spec, CopulaSpec::MultiFactor));
 
-    let config = CDSTranchePricerConfig::default().with_integration_tolerance(1e-8);
+    let config = CdsTranchePricerConfig::default().with_integration_tolerance(1e-8);
     let pricer =
-        CDSTranchePricer::with_params(config.clone()).expect("valid tranche pricer config");
+        CdsTranchePricer::with_params(config.clone()).expect("valid tranche pricer config");
     assert_eq!(config.integration_tolerance, 1e-8);
     assert_eq!(pricer.get_config().integration_tolerance, 1e-8);
 
-    let adaptive = CDSTranchePricerConfig::default().with_adaptive_student_t_integration(true);
+    let adaptive = CdsTranchePricerConfig::default().with_adaptive_student_t_integration(true);
     assert!(adaptive.adaptive_student_t_integration);
-    assert!(!CDSTranchePricerConfig::default().adaptive_student_t_integration);
+    assert!(!CdsTranchePricerConfig::default().adaptive_student_t_integration);
 }
 
 #[test]
 fn pricer_rejects_unsupported_integration_tolerance() {
-    let config = CDSTranchePricerConfig::default().with_integration_tolerance(0.0);
-    let error = CDSTranchePricer::with_params(config)
+    let config = CdsTranchePricerConfig::default().with_integration_tolerance(0.0);
+    let error = CdsTranchePricer::with_params(config)
         .err()
         .expect("unsupported integration tolerance must fail");
     assert!(error.to_string().contains("integration_tolerance"));
@@ -156,13 +156,13 @@ fn pricer_rejects_unsupported_integration_tolerance() {
 
 #[test]
 fn pricer_rejects_invalid_direct_student_t_spec() {
-    let config = CDSTranchePricerConfig {
+    let config = CdsTranchePricerConfig {
         copula_spec: CopulaSpec::StudentT {
             degrees_of_freedom: 2.0,
         },
         ..Default::default()
     };
-    let error = CDSTranchePricer::with_params(config)
+    let error = CdsTranchePricer::with_params(config)
         .err()
         .expect("invalid Student-t df must fail");
     assert!(error.to_string().contains("degrees of freedom"));
@@ -170,18 +170,18 @@ fn pricer_rejects_invalid_direct_student_t_spec() {
 
 #[test]
 fn test_pricer_config_recovery_builders_populate_recovery_spec() {
-    let stochastic = CDSTranchePricerConfig::default().with_stochastic_recovery();
+    let stochastic = CdsTranchePricerConfig::default().with_stochastic_recovery();
     assert!(stochastic.stochastic_recovery_spec.is_some());
 
     let custom =
-        CDSTranchePricerConfig::default().with_custom_stochastic_recovery(0.35, 0.20, -0.4);
+        CdsTranchePricerConfig::default().with_custom_stochastic_recovery(0.35, 0.20, -0.4);
     let custom_debug = format!("{:?}", custom.stochastic_recovery_spec);
     assert!(custom.stochastic_recovery_spec.is_some());
     assert!(custom_debug.contains("0.35"));
     assert!(custom_debug.contains("0.2"));
     assert!(custom_debug.contains("-0.4"));
 
-    let custom_pct = CDSTranchePricerConfig::default().with_custom_stochastic_recovery_pct(
+    let custom_pct = CdsTranchePricerConfig::default().with_custom_stochastic_recovery_pct(
         Percentage::new(45.0).expect("finite percentage"),
         Percentage::new(25.0).expect("finite percentage"),
         -0.3,
@@ -191,12 +191,12 @@ fn test_pricer_config_recovery_builders_populate_recovery_spec() {
     assert!(custom_pct_debug.contains("0.45"));
     assert!(custom_pct_debug.contains("0.25"));
 
-    let constant = CDSTranchePricerConfig::default().with_constant_recovery(0.42);
+    let constant = CdsTranchePricerConfig::default().with_constant_recovery(0.42);
     let constant_debug = format!("{:?}", constant.stochastic_recovery_spec);
     assert!(constant.stochastic_recovery_spec.is_some());
     assert!(constant_debug.contains("0.42"));
 
-    let constant_pct = CDSTranchePricerConfig::default()
+    let constant_pct = CdsTranchePricerConfig::default()
         .with_constant_recovery_pct(Percentage::new(38.0).expect("finite percentage"));
     let constant_pct_debug = format!("{:?}", constant_pct.stochastic_recovery_spec);
     assert!(constant_pct.stochastic_recovery_spec.is_some());
@@ -208,7 +208,7 @@ fn test_pricer_config_recovery_builders_populate_recovery_spec() {
 #[test]
 fn test_config_cloneable() {
     // Arrange
-    let config1 = CDSTranchePricerConfig::default();
+    let config1 = CdsTranchePricerConfig::default();
 
     // Act
     let config2 = config1.clone();
@@ -221,7 +221,7 @@ fn test_config_cloneable() {
 #[test]
 fn test_config_independent_after_clone() {
     // Arrange
-    let mut config1 = CDSTranchePricerConfig::default();
+    let mut config1 = CdsTranchePricerConfig::default();
     let config2 = config1.clone();
 
     // Act
@@ -240,7 +240,7 @@ fn test_config_independent_after_clone() {
 #[test]
 fn test_accumulated_loss_valid_zero() {
     // Arrange
-    let params = CDSTrancheParams::equity_tranche(
+    let params = CdsTrancheParams::equity_tranche(
         "CDX.NA.IG",
         42,
         Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
@@ -259,7 +259,7 @@ fn test_accumulated_loss_valid_zero() {
 #[test]
 fn test_accumulated_loss_valid_mid_range() {
     // Arrange
-    let params = CDSTrancheParams::equity_tranche(
+    let params = CdsTrancheParams::equity_tranche(
         "CDX.NA.IG",
         42,
         Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
@@ -278,7 +278,7 @@ fn test_accumulated_loss_valid_mid_range() {
 #[test]
 fn test_accumulated_loss_valid_one() {
     // Arrange
-    let params = CDSTrancheParams::equity_tranche(
+    let params = CdsTrancheParams::equity_tranche(
         "CDX.NA.IG",
         42,
         Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
@@ -297,7 +297,7 @@ fn test_accumulated_loss_valid_one() {
 #[test]
 fn test_accumulated_loss_invalid_negative() {
     // Arrange
-    let params = CDSTrancheParams::equity_tranche(
+    let params = CdsTrancheParams::equity_tranche(
         "CDX.NA.IG",
         42,
         Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
@@ -321,7 +321,7 @@ fn test_accumulated_loss_invalid_negative() {
 #[test]
 fn test_accumulated_loss_invalid_greater_than_one() {
     // Arrange
-    let params = CDSTrancheParams::equity_tranche(
+    let params = CdsTrancheParams::equity_tranche(
         "CDX.NA.IG",
         42,
         Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
@@ -345,7 +345,7 @@ fn test_accumulated_loss_invalid_greater_than_one() {
 #[test]
 fn test_accumulated_loss_invalid_large_value() {
     // Arrange
-    let params = CDSTrancheParams::equity_tranche(
+    let params = CdsTrancheParams::equity_tranche(
         "CDX.NA.IG",
         42,
         Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),

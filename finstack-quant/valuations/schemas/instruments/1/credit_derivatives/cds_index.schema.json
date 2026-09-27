@@ -1,6 +1,31 @@
 {
   "$defs": {
-    "CDSIndex": {
+    "CdsConvention": {
+      "description": "Regional ISDA CDS schedule family.\n\nExact documentation clauses stay on the instrument or quote. This enum\nidentifies the regional schedule family used to resolve calendars,\nday-count, frequency, stub, and settlement from the convention registry.",
+      "oneOf": [
+        {
+          "const": "isda_na",
+          "description": "Standard North American convention (quarterly, Act/360).",
+          "type": "string"
+        },
+        {
+          "const": "isda_eu",
+          "description": "Standard European convention (quarterly, Act/360).",
+          "type": "string"
+        },
+        {
+          "const": "isda_as",
+          "description": "Standard Asian convention (quarterly, Act/360).",
+          "type": "string"
+        },
+        {
+          "const": "custom",
+          "description": "Custom convention.",
+          "type": "string"
+        }
+      ]
+    },
+    "CdsIndex": {
       "additionalProperties": false,
       "description": "CDS Index instrument definition",
       "properties": {
@@ -12,7 +37,7 @@
         "constituents": {
           "description": "Optional list of constituents when using `IndexPricing::Constituents`",
           "items": {
-            "$ref": "#/$defs/CDSIndexConstituent"
+            "$ref": "#/$defs/CdsIndexConstituent"
           },
           "type": "array"
         },
@@ -58,7 +83,7 @@
         },
         "num_constituents": {
           "default": null,
-          "description": "Number of reference entities in the index pool.\n\nRequired for portfolio-level analytics (e.g. jump-to-default) when\n`constituents` is empty (`SingleCurve` mode), since the per-name\nrisk number is `notional / N · LGD`. Index pool sizes drift with\nseries — iTraxx Crossover has been 75 names only since Series 9,\nand CDX.NA.HY membership varies — so this is supplied explicitly\nrather than inferred from `index_name`. Standard presets populate\nit via `CDSIndex::from_preset`; set it directly with\n`with_num_constituents` for custom indices.",
+          "description": "Number of reference entities in the index pool.\n\nRequired for portfolio-level analytics (e.g. jump-to-default) when\n`constituents` is empty (`SingleCurve` mode), since the per-name\nrisk number is `notional / N · LGD`. Index pool sizes drift with\nseries — iTraxx Crossover has been 75 names only since Series 9,\nand CDX.NA.HY membership varies — so this is supplied explicitly\nrather than inferred from `index_name`. Standard presets populate\nit via `CdsIndex::from_preset`; set it directly with\n`with_num_constituents` for custom indices.",
           "format": "uint32",
           "minimum": 0,
           "type": [
@@ -134,7 +159,7 @@
       ],
       "type": "object"
     },
-    "CDSIndexConstituent": {
+    "CdsIndexConstituent": {
       "additionalProperties": false,
       "description": "Constituent in a CDS index with weight and credit parameters.",
       "properties": {
@@ -158,31 +183,6 @@
         "weight"
       ],
       "type": "object"
-    },
-    "CdsConvention": {
-      "description": "Regional ISDA CDS schedule family.\n\nExact documentation clauses stay on the instrument or quote. This enum\nidentifies the regional schedule family used to resolve calendars,\nday-count, frequency, stub, and settlement from the convention registry.",
-      "oneOf": [
-        {
-          "const": "isda_na",
-          "description": "Standard North American convention (quarterly, Act/360).",
-          "type": "string"
-        },
-        {
-          "const": "isda_eu",
-          "description": "Standard European convention (quarterly, Act/360).",
-          "type": "string"
-        },
-        {
-          "const": "isda_as",
-          "description": "Standard Asian convention (quarterly, Act/360).",
-          "type": "string"
-        },
-        {
-          "const": "custom",
-          "description": "Custom convention.",
-          "type": "string"
-        }
-      ]
     },
     "ClearingStatus": {
       "description": "Clearing status for OTC derivatives.\n\nDetermines whether a trade is cleared through a CCP or remains bilateral\nunder a CSA agreement.",
@@ -968,7 +968,7 @@
       "additionalProperties": false,
       "properties": {
         "spec": {
-          "$ref": "#/$defs/CDSIndex"
+          "$ref": "#/$defs/CdsIndex"
         },
         "type": {
           "const": "cds_index",

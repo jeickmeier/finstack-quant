@@ -51,10 +51,10 @@ impl MetricCalculator for GammaCalculator {
 
         let (forward, strike) = ResolvedVolatility {
             sigma: inputs.sigma,
-            convention: inputs.volatility_convention,
+            convention: inputs.convention,
         }
         .model_rates(inputs.forward, strike)?;
-        let gamma = match inputs.volatility_convention {
+        let gamma = match inputs.convention {
             VolatilityConvention::Normal => {
                 bachelier_gamma(forward, strike, inputs.sigma, inputs.time_to_expiry)
             }

@@ -24,13 +24,13 @@ BarrierCrossing = _valuations.instruments.BarrierCrossing
 Bond = _valuations.instruments.Bond
 BondBuilder = _valuations.instruments.BondBuilder
 BorrowingBaseRules = _valuations.instruments.BorrowingBaseRules
-CDSIndex = _valuations.instruments.CDSIndex
-CDSIndexBuilder = _valuations.instruments.CDSIndexBuilder
-CDSIndexConstituent = _valuations.instruments.CDSIndexConstituent
-CDSIndexParams = _valuations.instruments.CDSIndexParams
-CDSTranche = _valuations.instruments.CDSTranche
-CDSTrancheBuilder = _valuations.instruments.CDSTrancheBuilder
-CDSTrancheParams = _valuations.instruments.CDSTrancheParams
+CdsIndex = _valuations.instruments.CdsIndex
+CdsIndexBuilder = _valuations.instruments.CdsIndexBuilder
+CdsIndexConstituent = _valuations.instruments.CdsIndexConstituent
+CdsIndexParams = _valuations.instruments.CdsIndexParams
+CdsTranche = _valuations.instruments.CdsTranche
+CdsTrancheBuilder = _valuations.instruments.CdsTrancheBuilder
+CdsTrancheParams = _valuations.instruments.CdsTrancheParams
 CallAssumption = _valuations.instruments.CallAssumption
 CallPutSchedule = _valuations.instruments.CallPutSchedule
 CapFloor = _valuations.instruments.CapFloor
@@ -118,17 +118,17 @@ __all__: list[str] = [
     "Bond",
     "BondBuilder",
     "BorrowingBaseRules",
-    "CDSIndex",
-    "CDSIndexBuilder",
-    "CDSIndexConstituent",
-    "CDSIndexParams",
-    "CDSTranche",
-    "CDSTrancheBuilder",
-    "CDSTrancheParams",
     "CallAssumption",
     "CallPutSchedule",
     "CapFloor",
     "CapFloorBuilder",
+    "CdsIndex",
+    "CdsIndexBuilder",
+    "CdsIndexConstituent",
+    "CdsIndexParams",
+    "CdsTranche",
+    "CdsTrancheBuilder",
+    "CdsTrancheParams",
     "ConcentrationLimit",
     "ConversionSpec",
     "ConvertibleBond",

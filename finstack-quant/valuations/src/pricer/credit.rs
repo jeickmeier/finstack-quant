@@ -1,11 +1,11 @@
 //! Pricer registrations for credit instruments.
 //!
-//! Covers: CDS, CDSIndex, CDSTranche, CDSOption, StructuredCredit.
+//! Covers: CDS, CdsIndex, CdsTranche, CdsOption, StructuredCredit.
 //!
 //! # Model keys
 //!
 //! Credit products register only their *real* model key (`HazardRate` for
-//! CDS / CDSIndex / CDSTranche, `BloombergCdso` for CDSOption).
+//! CDS / CdsIndex / CdsTranche, `BloombergCdso` for CdsOption).
 
 use super::{
     expect_inst, register_generic, InstrumentType, ModelKey, Pricer, PricerKey, PricerRegistry,
@@ -24,7 +24,7 @@ use indexmap::IndexMap;
 pub(crate) fn register_credit_pricers(
     registry: &mut PricerRegistry,
 ) -> std::result::Result<(), crate::pricer::PricingError> {
-    registry.register(CDSHazardPricer)?;
+    registry.register(CdsHazardPricer)?;
 
     // CDS Index
     registry.register(
@@ -33,7 +33,7 @@ pub(crate) fn register_credit_pricers(
 
     // CDS Tranche
     registry.register(
-        crate::instruments::credit_derivatives::cds_tranche::pricing::SimpleCDSTrancheHazardPricer::default(),
+        crate::instruments::credit_derivatives::cds_tranche::pricing::SimpleCdsTrancheHazardPricer::default(),
     )?;
 
     // CDS Option — Bloomberg CDSO numerical-quadrature model.
@@ -55,9 +55,9 @@ pub(crate) fn register_credit_pricers(
     Ok(())
 }
 
-struct CDSHazardPricer;
+struct CdsHazardPricer;
 
-impl Pricer for CDSHazardPricer {
+impl Pricer for CdsHazardPricer {
     fn key(&self) -> PricerKey {
         PricerKey::new(InstrumentType::Cds, ModelKey::HazardRate)
     }

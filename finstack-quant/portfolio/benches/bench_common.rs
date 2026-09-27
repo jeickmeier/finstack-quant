@@ -31,10 +31,10 @@ use finstack_quant_valuations::instruments::credit_derivatives::cds::{
     ProtectionLegSpec,
 };
 use finstack_quant_valuations::instruments::credit_derivatives::cds_option::{
-    CDSOption, CDSOptionParams,
+    CdsOption, CdsOptionParams,
 };
-use finstack_quant_valuations::instruments::credit_derivatives::cds_tranche::CDSTranche;
-use finstack_quant_valuations::instruments::credit_derivatives::cds_tranche::CDSTrancheParams;
+use finstack_quant_valuations::instruments::credit_derivatives::cds_tranche::CdsTranche;
+use finstack_quant_valuations::instruments::credit_derivatives::cds_tranche::CdsTrancheParams;
 use finstack_quant_valuations::instruments::equity::equity_option::{
     EquityOption, EquityOptionParams,
 };
@@ -228,7 +228,7 @@ fn build_market_context(base: Date, rate_shift: f64) -> MarketContext {
         (0.30, 0.40),
     ];
 
-    // Duplicate curves for CreditIndexData (CDSTranche pricing requires a credit index
+    // Duplicate curves for CreditIndexData (CdsTranche pricing requires a credit index
     // wrapping the same hazard and base-correlation data).
     let hazard_for_index = HazardCurve::builder("CORP-HAZARD")
         .base_date(base)
@@ -819,8 +819,8 @@ pub fn create_institutional_portfolio(num_positions: usize) -> Portfolio {
     // 11. CDS Options
     for i in 0..positions_per_derivative.min(2) {
         let cds_option_id = format!("CDSOPTION_{}", i);
-        let option_params = CDSOptionParams::call(
-            finstack_quant_valuations::instruments::credit_derivatives::CDSOptionStrike::Spread(
+        let option_params = CdsOptionParams::call(
+            finstack_quant_valuations::instruments::credit_derivatives::CdsOptionStrike::Spread(
                 rust_decimal::Decimal::new(1, 2),
             ),
             base + time::Duration::days(365),
@@ -829,7 +829,7 @@ pub fn create_institutional_portfolio(num_positions: usize) -> Portfolio {
         )
         .expect("valid CDS option params");
         let credit_params = CreditParams::new("CORP", 0.40, "CORP-HAZARD");
-        let cds_option = CDSOption::new(
+        let cds_option = CdsOption::new(
             cds_option_id.clone(),
             &option_params,
             &credit_params,
@@ -901,7 +901,7 @@ pub fn create_institutional_portfolio(num_positions: usize) -> Portfolio {
     // 13. CDS Tranches
     for i in 0..positions_per_exotic.min(2) {
         let tranche_id = format!("CDSTRANCHE_{}", i);
-        let tranche_params = CDSTrancheParams::equity_tranche(
+        let tranche_params = CdsTrancheParams::equity_tranche(
             "CDX.NA.IG",
             42,
             Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
@@ -919,7 +919,7 @@ pub fn create_institutional_portfolio(num_positions: usize) -> Portfolio {
             adjust_accrual_dates: false,
             roll_rule: finstack_quant_cashflows::builder::specs::RollRule::None,
         };
-        let mut tranche = CDSTranche::new(
+        let mut tranche = CdsTranche::new(
             tranche_id.clone(),
             &tranche_params,
             &schedule_params,

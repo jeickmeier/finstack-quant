@@ -1340,7 +1340,7 @@ def attribute_pnl(
 
     Parameters
     ----------
-    instrument : Bond | TermLoan | InterestRateSwap | Swaption | CapFloor | CreditDefaultSwap | CDSIndex | CDSTranche | FxForward | FxOption | ConvertibleBond | EquityOption | StructuredCredit | CompositeInstrument | str
+    instrument : Bond | TermLoan | InterestRateSwap | Swaption | CapFloor | CreditDefaultSwap | CdsIndex | CdsTranche | FxForward | FxOption | ConvertibleBond | EquityOption | StructuredCredit | CompositeInstrument | str
         Typed instrument wrapper from ``finstack_quant.valuations`` or a
         canonical v1 instrument envelope JSON string
         (``{"schema": "finstack_quant.instrument/1", "instrument": {...}}``).

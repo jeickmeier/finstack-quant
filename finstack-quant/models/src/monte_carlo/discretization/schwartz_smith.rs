@@ -23,7 +23,7 @@ use super::super::traits::Discretization;
 #[derive(Debug, Clone)]
 pub struct ExactSchwartzSmith {
     /// Instantaneous correlation of the driving Brownian motions.
-    rho: f64,
+    rho_xy: f64,
     /// Per-run cache of the `dt`-dependent X-leg constants, populated by
     /// [`Discretization::prepare`]. `None` until prepared (e.g. stepped
     /// directly without the engine), in which case constants are computed inline.
@@ -37,7 +37,7 @@ pub struct ExactSchwartzSmith {
 #[derive(Debug, Clone, Copy)]
 struct SsStepConstants {
     dt: f64,
-    kappa_x: f64,
+    kappa: f64,
     sigma_x: f64,
     exp_kappa_dt: f64,
     one_minus_exp_over_kappa: f64,
@@ -52,16 +52,16 @@ impl SsStepConstants {
     /// [`ExactSchwartzSmith::step`] exactly so cached and inline paths are
     /// bit-identical.
     #[inline]
-    fn compute(kappa_x: f64, sigma_x: f64, rho: f64, dt: f64) -> Self {
-        let exp_kappa_dt = (-kappa_x * dt).exp();
-        let one_minus_exp_over_kappa = -(-kappa_x * dt).exp_m1() / kappa_x;
-        let x_time_std = (-(-2.0 * kappa_x * dt).exp_m1() / (2.0 * kappa_x)).sqrt();
+    fn compute(kappa: f64, sigma_x: f64, rho_xy: f64, dt: f64) -> Self {
+        let exp_kappa_dt = (-kappa * dt).exp();
+        let one_minus_exp_over_kappa = -(-kappa * dt).exp_m1() / kappa;
+        let x_time_std = (-(-2.0 * kappa * dt).exp_m1() / (2.0 * kappa)).sqrt();
         let sqrt_dt = dt.sqrt();
         let transition_rho =
-            (rho * (one_minus_exp_over_kappa / x_time_std / sqrt_dt)).clamp(-1.0, 1.0);
+            (rho_xy * (one_minus_exp_over_kappa / x_time_std / sqrt_dt)).clamp(-1.0, 1.0);
         Self {
             dt,
-            kappa_x,
+            kappa,
             sigma_x,
             exp_kappa_dt,
             one_minus_exp_over_kappa,
@@ -78,7 +78,7 @@ impl ExactSchwartzSmith {
     ///
     /// # Arguments
     ///
-    /// * `rho` - Instantaneous correlation between X and Y Brownian motions;
+    /// * `rho_xy` - Instantaneous correlation between X and Y Brownian motions;
     ///   must be finite and in `[-1, 1]`.
     ///
     /// The discretization stores the instantaneous Brownian correlation and
@@ -89,22 +89,22 @@ impl ExactSchwartzSmith {
     /// # Errors
     ///
     /// Returns an input error for non-finite or out-of-range correlation.
-    pub fn new(rho: f64) -> finstack_quant_core::Result<Self> {
-        if !rho.is_finite() || !(-1.0..=1.0).contains(&rho) {
+    pub fn new(rho_xy: f64) -> finstack_quant_core::Result<Self> {
+        if !rho_xy.is_finite() || !(-1.0..=1.0).contains(&rho_xy) {
             return Err(finstack_quant_core::Error::Input(
                 finstack_quant_core::InputError::Invalid,
             ));
         }
 
         Ok(Self {
-            rho,
+            rho_xy,
             prepared: None,
         })
     }
 
     /// Create from Schwartz-Smith process (convenience method).
     ///
-    /// Uses the process's `rho` and retains no reference to the process, so the
+    /// Uses the process's `rho_xy` and retains no reference to the process, so the
     /// same discretization can be reused only with processes using compatible
     /// two-factor shock conventions.
     ///
@@ -116,7 +116,7 @@ impl ExactSchwartzSmith {
     ///
     /// Returns the same invalid-correlation error as [`Self::new`].
     pub fn from_process(process: &SchwartzSmithProcess) -> finstack_quant_core::Result<Self> {
-        Self::new(process.params().rho)
+        Self::new(process.params().rho_xy)
     }
 }
 
@@ -134,7 +134,7 @@ impl Discretization<SchwartzSmithProcess> for ExactSchwartzSmith {
             return;
         }
         let params = process.params();
-        let kappa_x = params.kappa_x;
+        let kappa = params.kappa;
         let sigma_x = params.sigma_x;
         let lambda_x = params.lambda_x;
         let mu_y = params.mu_y;
@@ -145,12 +145,12 @@ impl Discretization<SchwartzSmithProcess> for ExactSchwartzSmith {
         let consts = match self.prepared {
             Some(c)
                 if c.dt.to_bits() == dt.to_bits()
-                    && c.kappa_x.to_bits() == kappa_x.to_bits()
+                    && c.kappa.to_bits() == kappa.to_bits()
                     && c.sigma_x.to_bits() == sigma_x.to_bits() =>
             {
                 c
             }
-            _ => SsStepConstants::compute(kappa_x, sigma_x, self.rho, dt),
+            _ => SsStepConstants::compute(kappa, sigma_x, self.rho_xy, dt),
         };
         let x_mean = x[0] * consts.exp_kappa_dt - lambda_x * consts.one_minus_exp_over_kappa;
         x[0] = x_mean + consts.x_std * z[0];
@@ -169,9 +169,9 @@ impl Discretization<SchwartzSmithProcess> for ExactSchwartzSmith {
         }
         let params = process.params();
         self.prepared = Some(SsStepConstants::compute(
-            params.kappa_x,
+            params.kappa,
             params.sigma_x,
-            self.rho,
+            self.rho_xy,
             time_grid.dt(0),
         ));
     }
@@ -192,11 +192,11 @@ mod tests {
 
     #[test]
     fn test_exact_schwartz_smith_creation() {
-        for rho in [-1.0, -0.5, 0.0, 1.0] {
-            assert!(ExactSchwartzSmith::new(rho).is_ok());
+        for rho_xy in [-1.0, -0.5, 0.0, 1.0] {
+            assert!(ExactSchwartzSmith::new(rho_xy).is_ok());
         }
-        for rho in [f64::NAN, f64::INFINITY, -1.01, 1.01] {
-            assert!(ExactSchwartzSmith::new(rho).is_err());
+        for rho_xy in [f64::NAN, f64::INFINITY, -1.01, 1.01] {
+            assert!(ExactSchwartzSmith::new(rho_xy).is_err());
         }
     }
 

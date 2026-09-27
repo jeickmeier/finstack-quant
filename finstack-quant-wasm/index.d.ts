@@ -7076,7 +7076,7 @@ export interface ModelCreditNamespace {
    * @param debtBarrier - Positive debt face value defining the structural-model default barrier.
    * @param riskFreeRate - Annualized risk-free rate expressed as a decimal, such as 0.05 for 5%.
    * @param payoutRate - Continuous payout rate on assets, expressed as a decimal.
-   * @param barrierTypeJson - Serialized `BarrierType` JSON (terminal or first-passage).
+   * @param barrierTypeJson - Serialized `MertonBarrierType` JSON (terminal or first-passage).
    * @param dynamicsJson - Serialized `AssetDynamics` JSON (GBM, jump-diffusion, or CreditGrades).
    * @throws Error - Throws a JavaScript exception if model inputs are invalid, if `barrier_type_json` or `dynamics_json` does not deserialize, or if the model cannot be serialized to JSON.
    */
@@ -7263,20 +7263,20 @@ export interface CreditDerivativesNamespace {
    */
   creditDefaultSwapExampleJson(): string;
   /**
-   * Example tagged `CDSIndex` instrument JSON.
-   * @returns Example tagged `CDSIndex` instrument JSON.
+   * Example tagged `CdsIndex` instrument JSON.
+   * @returns Example tagged `CdsIndex` instrument JSON.
    * @throws Error - Throws a JavaScript exception if the example envelope cannot be serialized to JSON.
    */
   cdsIndexExampleJson(): string;
   /**
-   * Example tagged `CDSTranche` instrument JSON.
-   * @returns Example tagged `CDSTranche` instrument JSON.
+   * Example tagged `CdsTranche` instrument JSON.
+   * @returns Example tagged `CdsTranche` instrument JSON.
    * @throws Error - Throws a JavaScript exception if the example envelope cannot be serialized to JSON.
    */
   cdsTrancheExampleJson(): string;
   /**
-   * Example tagged `CDSOption` instrument JSON.
-   * @returns Example tagged `CDSOption` instrument JSON.
+   * Example tagged `CdsOption` instrument JSON.
+   * @returns Example tagged `CdsOption` instrument JSON.
    * @throws Error - Throws a JavaScript exception if the example option cannot be constructed or its envelope cannot be serialized to JSON.
    */
   cdsOptionExampleJson(): string;

@@ -15,14 +15,14 @@ use finstack_quant_core::money::Money;
 use finstack_quant_valuations::constants::isda::STANDARD_RECOVERY_SENIOR;
 use finstack_quant_valuations::instruments::credit_derivatives::cds::PayReceive;
 use finstack_quant_valuations::instruments::credit_derivatives::cds_index::{
-    CDSIndex, IndexPricing,
+    CdsIndex, IndexPricing,
 };
 use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::metrics::MetricId;
 use time::macros::date;
 
 fn metric_value(
-    index: &CDSIndex,
+    index: &CdsIndex,
     market: &finstack_quant_core::market_data::context::MarketContext,
     as_of: finstack_quant_core::dates::Date,
     metric: MetricId,
@@ -181,7 +181,7 @@ fn test_single_curve_buy_vs_sell_protection() {
     let idx_buy = standard_single_curve_index("CDX-BUY", start, end, 10_000_000.0);
 
     // Sell protection (receive fixed)
-    let idx_sell = CDSIndex::from_preset(
+    let idx_sell = CdsIndex::from_preset(
         &standard_cdx_params(),
         "CDX-SELL",
         Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),

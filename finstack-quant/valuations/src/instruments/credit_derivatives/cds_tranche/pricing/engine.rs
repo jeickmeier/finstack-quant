@@ -1,13 +1,13 @@
 //! Numerical pricing, expected-loss, and sensitivity helpers for CDS tranches.
 //!
 use super::config::{
-    CDSTranchePricer, CDSTranchePricerConfig, DiscountAt, EffectiveStructure,
+    CdsTranchePricer, CdsTranchePricerConfig, DiscountAt, EffectiveStructure,
     ProjectedDiscountedRow, ProjectionInputs, PROBABILITY_CLIP,
 };
 use crate::cashflow::builder::{CashFlowMeta, CashFlowSchedule};
 use crate::cashflow::primitives::{CFKind, CashFlow};
 use crate::constants::BASIS_POINTS_PER_UNIT;
-use crate::instruments::credit_derivatives::cds_tranche::CDSTranche;
+use crate::instruments::credit_derivatives::cds_tranche::CdsTranche;
 use crate::instruments::PayReceive;
 use finstack_quant_core::dates::{calendar_by_id, Date, DateExt, HolidayCalendar};
 use finstack_quant_core::market_data::context::MarketContext;
@@ -20,7 +20,7 @@ use finstack_quant_models::correlation::copula::{
     StudentTCopula,
 };
 
-impl CDSTranchePricer {
+impl CdsTranchePricer {
     /// Return the cached copula instance, building it on first call.
     ///
     /// The copula is determined entirely by `self.params.copula_spec` at
@@ -88,7 +88,7 @@ impl CDSTranchePricer {
     /// Create a new Gaussian Copula model with default parameters.
     pub fn new() -> Self {
         Self {
-            params: CDSTranchePricerConfig::default(),
+            params: CdsTranchePricerConfig::default(),
             copula_cache: std::sync::OnceLock::new(),
         }
     }
@@ -108,7 +108,7 @@ impl CDSTranchePricer {
     ///
     /// Returns an error when the copula, recovery, quadrature, bump, correlation,
     /// settlement, or convolution settings violate their documented ranges.
-    pub fn with_params(params: CDSTranchePricerConfig) -> Result<Self> {
+    pub fn with_params(params: CdsTranchePricerConfig) -> Result<Self> {
         params.validate()?;
         Ok(Self {
             params,
@@ -134,7 +134,7 @@ impl CDSTranchePricer {
     #[must_use = "pricing result should be used"]
     pub fn price_tranche(
         &self,
-        tranche: &CDSTranche,
+        tranche: &CdsTranche,
         market_ctx: &MarketContext,
         as_of: Date,
     ) -> Result<Money> {
@@ -164,7 +164,7 @@ impl CDSTranchePricer {
     /// Build the projected premium/default schedule for the tranche.
     pub fn build_projected_schedule(
         &self,
-        tranche: &CDSTranche,
+        tranche: &CdsTranche,
         market_ctx: &MarketContext,
         as_of: Date,
     ) -> Result<CashFlowSchedule> {
@@ -221,7 +221,7 @@ impl CDSTranchePricer {
 
     pub(super) fn project_discountable_rows(
         &self,
-        tranche: &CDSTranche,
+        tranche: &CdsTranche,
         market_ctx: &MarketContext,
         as_of: Date,
     ) -> Result<Vec<ProjectedDiscountedRow>> {
@@ -456,7 +456,7 @@ impl CDSTranchePricer {
 
     pub(super) fn prepare_projection_inputs(
         &self,
-        tranche: &CDSTranche,
+        tranche: &CdsTranche,
         market_ctx: &MarketContext,
         as_of: Date,
     ) -> Result<ProjectionInputs> {
@@ -499,7 +499,7 @@ impl CDSTranchePricer {
     /// Falls back to weekend-only logic when no calendar is specified.
     pub(super) fn calculate_settlement_date(
         &self,
-        tranche: &CDSTranche,
+        tranche: &CdsTranche,
         _market_ctx: &MarketContext,
         as_of: Date,
     ) -> Result<Date> {
@@ -625,7 +625,7 @@ impl CDSTranchePricer {
     /// - Results are always in [0, 1]
     pub(super) fn calculate_effective_structure(
         &self,
-        tranche: &CDSTranche,
+        tranche: &CdsTranche,
         recovery_rate: f64,
     ) -> EffectiveStructure {
         let l = tranche.realized_loss;

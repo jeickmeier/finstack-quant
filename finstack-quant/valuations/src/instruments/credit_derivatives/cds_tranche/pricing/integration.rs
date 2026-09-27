@@ -1,6 +1,6 @@
 //! Adaptive conditioning-factor integration for bounded pool expectations.
 
-use super::config::CDSTranchePricer;
+use super::config::CdsTranchePricer;
 use finstack_quant_core::math::integration::adaptive_simpson;
 use finstack_quant_core::math::{chi_squared_quantile, ln_gamma, norm_pdf};
 use finstack_quant_core::{Error, Result};
@@ -75,7 +75,7 @@ fn integrate_normal(
     )
 }
 
-impl CDSTranchePricer {
+impl CdsTranchePricer {
     /// Integrate a bounded expectation over every copula conditioning factor.
     /// Nested quadrature and omitted factor tails consume separate shares of
     /// `integration_tolerance`. Conditional-name approximation or convolution
@@ -146,17 +146,17 @@ impl CDSTranchePricer {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::instruments::credit_derivatives::cds_tranche::CDSTranchePricerConfig;
+    use crate::instruments::credit_derivatives::cds_tranche::CdsTranchePricerConfig;
 
     #[test]
     fn production_credit_audit_unconverged_integrals_fail() {
-        let pricer = CDSTranchePricer::with_params(CDSTranchePricerConfig {
+        let pricer = CdsTranchePricer::with_params(CdsTranchePricerConfig {
             integration_max_depth: 0,
             ..Default::default()
         })
         .expect("config");
         assert!(pricer.integrate_factors(&|_| Ok(1.0)).is_err());
-        assert!(CDSTranchePricer::new()
+        assert!(CdsTranchePricer::new()
             .integrate_factors(&|_| Ok(f64::NAN))
             .is_err());
     }
@@ -173,7 +173,7 @@ mod tests {
             },
             CopulaSpec::MultiFactor,
         ] {
-            let pricer = CDSTranchePricer::with_params(CDSTranchePricerConfig {
+            let pricer = CdsTranchePricer::with_params(CdsTranchePricerConfig {
                 copula_spec: spec.clone(),
                 integration_tolerance: 1e-8,
                 ..Default::default()
@@ -186,8 +186,8 @@ mod tests {
 
     #[test]
     fn student_t_default_uses_product_gauss_node_count() {
-        let pricer = CDSTranchePricer::with_params(
-            CDSTranchePricerConfig::default()
+        let pricer = CdsTranchePricer::with_params(
+            CdsTranchePricerConfig::default()
                 .with_student_t_copula(6.0)
                 .expect("valid df"),
         )
@@ -209,7 +209,7 @@ mod tests {
 
     #[test]
     fn student_t_product_gauss_ignores_adaptive_depth() {
-        let pricer = CDSTranchePricer::with_params(CDSTranchePricerConfig {
+        let pricer = CdsTranchePricer::with_params(CdsTranchePricerConfig {
             copula_spec: CopulaSpec::student_t(6.0).expect("valid df"),
             integration_max_depth: 0,
             ..Default::default()
@@ -221,8 +221,8 @@ mod tests {
 
     #[test]
     fn student_t_pair_matches_two_scalar_integrals() {
-        let pricer = CDSTranchePricer::with_params(
-            CDSTranchePricerConfig::default()
+        let pricer = CdsTranchePricer::with_params(
+            CdsTranchePricerConfig::default()
                 .with_student_t_copula(6.0)
                 .expect("valid df"),
         )

@@ -13,8 +13,8 @@ use finstack_quant_valuations::instruments::fixed_income::loan_terms::RateSpec;
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
     calculate_tranche_breakeven_cdr, calculate_tranche_discount_margin, calculate_tranche_metrics,
     calculate_tranche_oas, generate_cashflows, generate_tranche_cashflows, run_simulation,
-    scenario_table, AssetPool, DealType, HedgeSwap, OasConfig, PoolAsset, PricingMode,
-    ScenarioGrid, StructuredCredit, Tranche, TrancheSeniority, TrancheStructure,
+    scenario_table, AssetPool, DealType, HedgeSwap, OasConfig, PoolAsset, ScenarioGrid,
+    StructuredCredit, StructuredCreditPricingMode, Tranche, TrancheSeniority, TrancheStructure,
 };
 use finstack_quant_valuations::instruments::{
     Instrument, PricingOptions, ScenarioPricingOverrides,
@@ -86,7 +86,7 @@ fn stochastic_pricing_zero_notional_returns_validation_error() {
     market = market.insert(discount_curve(closing_date()));
 
     let err = sc
-        .price_stochastic_with_mode(&market, closing_date(), PricingMode::Tree)
+        .price_stochastic_with_mode(&market, closing_date(), StructuredCreditPricingMode::Tree)
         .expect_err("zero-notional stochastic pricing should be rejected");
 
     assert!(err.to_string().contains("positive pool notional"));
@@ -103,7 +103,7 @@ fn stochastic_pricing_is_deterministic_and_returns_tranche_results() {
         .price_stochastic_with_mode(
             &market,
             as_of,
-            PricingMode::MonteCarlo {
+            StructuredCreditPricingMode::MonteCarlo {
                 num_paths: 1,
                 antithetic: false,
             },
@@ -113,7 +113,7 @@ fn stochastic_pricing_is_deterministic_and_returns_tranche_results() {
         .price_stochastic_with_mode(
             &market,
             as_of,
-            PricingMode::MonteCarlo {
+            StructuredCreditPricingMode::MonteCarlo {
                 num_paths: 1,
                 antithetic: false,
             },
@@ -124,7 +124,7 @@ fn stochastic_pricing_is_deterministic_and_returns_tranche_results() {
     assert_eq!(first.tranche_results.len(), 1);
     assert_eq!(
         first.pricing_mode,
-        PricingMode::MonteCarlo {
+        StructuredCreditPricingMode::MonteCarlo {
             num_paths: 1,
             antithetic: false,
         }
@@ -148,7 +148,7 @@ fn monte_carlo_parallel_path_evaluation_is_reproducible() {
     let sc = build_sc("ABS-MC-REPRO", 1_000_000.0);
     let mut market = MarketContext::new();
     market = market.insert(discount_curve(closing_date()));
-    let mode = PricingMode::MonteCarlo {
+    let mode = StructuredCreditPricingMode::MonteCarlo {
         num_paths: 4,
         antithetic: true,
     };
@@ -300,7 +300,7 @@ fn tranche_and_stochastic_pricing_apply_scenario_price_shock_once() {
         .price_stochastic_with_mode(
             &market,
             closing_date(),
-            PricingMode::MonteCarlo {
+            StructuredCreditPricingMode::MonteCarlo {
                 num_paths: 4,
                 antithetic: true,
             },
@@ -318,7 +318,7 @@ fn tranche_and_stochastic_pricing_apply_scenario_price_shock_once() {
         .price_stochastic_with_mode(
             &market,
             closing_date(),
-            PricingMode::MonteCarlo {
+            StructuredCreditPricingMode::MonteCarlo {
                 num_paths: 4,
                 antithetic: true,
             },
@@ -401,7 +401,7 @@ fn structured_credit_pricing_conveniences_validate_before_market_access() {
         sc.price_stochastic_with_mode(
             &market,
             closing_date(),
-            PricingMode::MonteCarlo {
+            StructuredCreditPricingMode::MonteCarlo {
                 num_paths: 4,
                 antithetic: true,
             },
@@ -521,7 +521,7 @@ fn mc_variance_no_catastrophic_cancellation_on_large_pv_deal() {
         .price_stochastic_with_mode(
             &market,
             close,
-            PricingMode::MonteCarlo {
+            StructuredCreditPricingMode::MonteCarlo {
                 num_paths: 500,
                 antithetic: false,
             },
@@ -639,7 +639,7 @@ fn philox_rng_discipline_determinism_and_stream_identity() {
             .unwrap(),
     );
 
-    let mode_4 = PricingMode::MonteCarlo {
+    let mode_4 = StructuredCreditPricingMode::MonteCarlo {
         num_paths: 4,
         antithetic: false,
     };
@@ -677,7 +677,7 @@ fn philox_rng_discipline_determinism_and_stream_identity() {
     // `PhiloxRng::new(42).substream(0)` and draws `month_count` normals.
     // Two runs with 1 path must be bit-identical (determinism); and the NPV
     // must equal the value produced when we use a fresh substream(0) here.
-    let mode_1 = PricingMode::MonteCarlo {
+    let mode_1 = StructuredCreditPricingMode::MonteCarlo {
         num_paths: 1,
         antithetic: false,
     };
@@ -757,7 +757,7 @@ fn all_pricing_modes_succeed_on_canonical_deal() {
     let close = closing_date();
     let market = MarketContext::new().insert(discount_curve(close));
 
-    let tree = sc.price_stochastic_with_mode(&market, close, PricingMode::Tree);
+    let tree = sc.price_stochastic_with_mode(&market, close, StructuredCreditPricingMode::Tree);
     // Tree mode may legitimately reject this fixture if the deal's payment
     // schedule exceeds tree_steps capacity — that's the documented safety
     // guard. Skip the comparison in that case but still verify MC + Hybrid
@@ -779,7 +779,7 @@ fn all_pricing_modes_succeed_on_canonical_deal() {
         .price_stochastic_with_mode(
             &market,
             close,
-            PricingMode::MonteCarlo {
+            StructuredCreditPricingMode::MonteCarlo {
                 num_paths: 8,
                 antithetic: true,
             },
@@ -789,7 +789,7 @@ fn all_pricing_modes_succeed_on_canonical_deal() {
         .price_stochastic_with_mode(
             &market,
             close,
-            PricingMode::Hybrid {
+            StructuredCreditPricingMode::Hybrid {
                 tree_periods: 6,
                 num_paths: 16,
             },
@@ -801,19 +801,19 @@ fn all_pricing_modes_succeed_on_canonical_deal() {
         &finstack_quant_valuations::instruments::fixed_income::structured_credit::StochasticPricingResult,
     )> = Vec::new();
     if let Some(t) = tree_priced.as_ref() {
-        assert_eq!(t.pricing_mode, PricingMode::Tree);
+        assert_eq!(t.pricing_mode, StructuredCreditPricingMode::Tree);
         entries.push(("Tree", t));
     }
     assert_eq!(
         mc.pricing_mode,
-        PricingMode::MonteCarlo {
+        StructuredCreditPricingMode::MonteCarlo {
             num_paths: 8,
             antithetic: true,
         }
     );
     assert_eq!(
         hybrid.pricing_mode,
-        PricingMode::Hybrid {
+        StructuredCreditPricingMode::Hybrid {
             tree_periods: 6,
             num_paths: 16,
         }
@@ -904,14 +904,14 @@ fn stochastic_pricing_result_is_reproducible_across_configurations() {
     struct Case {
         label: &'static str,
         stochastic: bool,
-        mode: PricingMode,
+        mode: StructuredCreditPricingMode,
     }
 
     let cases = [
         Case {
             label: "abs_mc",
             stochastic: false,
-            mode: PricingMode::MonteCarlo {
+            mode: StructuredCreditPricingMode::MonteCarlo {
                 num_paths: 100,
                 antithetic: false,
             },
@@ -923,7 +923,7 @@ fn stochastic_pricing_result_is_reproducible_across_configurations() {
         Case {
             label: "clo_standard_mc_antithetic",
             stochastic: true,
-            mode: PricingMode::MonteCarlo {
+            mode: StructuredCreditPricingMode::MonteCarlo {
                 num_paths: 50,
                 antithetic: true,
             },
@@ -931,7 +931,7 @@ fn stochastic_pricing_result_is_reproducible_across_configurations() {
         Case {
             label: "clo_standard_mc",
             stochastic: true,
-            mode: PricingMode::MonteCarlo {
+            mode: StructuredCreditPricingMode::MonteCarlo {
                 num_paths: 100,
                 antithetic: false,
             },
@@ -942,7 +942,7 @@ fn stochastic_pricing_result_is_reproducible_across_configurations() {
         Case {
             label: "abs_hybrid",
             stochastic: false,
-            mode: PricingMode::Hybrid {
+            mode: StructuredCreditPricingMode::Hybrid {
                 tree_periods: 6,
                 num_paths: 100,
             },
@@ -950,7 +950,7 @@ fn stochastic_pricing_result_is_reproducible_across_configurations() {
         Case {
             label: "factor_correlated_mc",
             stochastic: false,
-            mode: PricingMode::MonteCarlo {
+            mode: StructuredCreditPricingMode::MonteCarlo {
                 num_paths: 50,
                 antithetic: true,
             },
@@ -1088,11 +1088,11 @@ fn stochastic_waterfall_matches_independent_cashflow_vectors() {
             let senior_value = 80_000_000.0 - senior_loss + interest;
             let equity_value = (20_000_000.0 - loss).max(0.0);
             let mut modes = vec![
-                PricingMode::MonteCarlo {
+                StructuredCreditPricingMode::MonteCarlo {
                     num_paths: 4,
                     antithetic: true,
                 },
-                PricingMode::Hybrid {
+                StructuredCreditPricingMode::Hybrid {
                     tree_periods: 2,
                     num_paths: 8,
                 },
@@ -1100,7 +1100,7 @@ fn stochastic_waterfall_matches_independent_cashflow_vectors() {
             // Exact trees branch monthly and intentionally cap terminal paths.
             // The one-quarter vector verifies that engine within its supported size.
             if periods == 1 {
-                modes.push(PricingMode::Tree);
+                modes.push(StructuredCreditPricingMode::Tree);
             }
             for mode in modes {
                 let result = sc
@@ -1153,7 +1153,7 @@ fn stochastic_pin_deal() -> StructuredCredit {
     sc
 }
 
-/// `PricingMode::MonteCarlo.num_paths` counts independent estimators: with
+/// `StructuredCreditPricingMode::MonteCarlo.num_paths` counts independent estimators: with
 /// antithetic pairing the engine simulates two paths per estimator. The
 /// default halved from 10,000 total paths to 5,000 estimators, so the default
 /// PV is unchanged. Reference: bit patterns captured before the change, when
@@ -1168,7 +1168,7 @@ fn default_monte_carlo_pv_is_bit_identical_under_estimator_semantics() {
         .expect("default stochastic price");
     assert_eq!(
         result.pricing_mode,
-        PricingMode::MonteCarlo {
+        StructuredCreditPricingMode::MonteCarlo {
             num_paths: 5_000,
             antithetic: true
         }
@@ -1179,7 +1179,11 @@ fn default_monte_carlo_pv_is_bit_identical_under_estimator_semantics() {
 
     // Formerly `monte_carlo(200)` (200 total antithetic paths).
     let explicit = sc
-        .price_stochastic_with_mode(&market, closing_date(), PricingMode::monte_carlo(100))
+        .price_stochastic_with_mode(
+            &market,
+            closing_date(),
+            StructuredCreditPricingMode::monte_carlo(100),
+        )
         .expect("explicit stochastic price");
     assert_eq!(explicit.num_paths, 200);
     assert_eq!(explicit.npv.amount().to_bits(), 0x4130_b915_f154_110f);

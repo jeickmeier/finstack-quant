@@ -8,7 +8,7 @@
 
 use finstack_quant_valuations::instruments::rates::cap_floor::OvernightCouponConvention;
 use finstack_quant_valuations::instruments::{
-    AgencyMbsPassthrough, CDSOption, CommodityForward, CommodityFuture, Deposit,
+    AgencyMbsPassthrough, CdsOption, CommodityForward, CommodityFuture, Deposit,
 };
 use serde::de::DeserializeOwned;
 use serde::Serialize;
@@ -35,9 +35,9 @@ fn assert_rejects<T: Serialize + DeserializeOwned>(
 }
 
 #[test]
-// schema-rejection-test: CDSOption `cash_settlement_date`
+// schema-rejection-test: CdsOption `cash_settlement_date`
 fn cds_option_retired_cash_settlement_date_is_rejected() {
-    let option = CDSOption::example().expect("example");
+    let option = CdsOption::example().expect("example");
     assert_rejects(
         &option,
         "premium_settlement_date",

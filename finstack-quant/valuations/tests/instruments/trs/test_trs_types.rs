@@ -12,10 +12,10 @@ use finstack_quant_valuations::instruments::{PayReceive, TrsScheduleSpec};
 #[test]
 fn test_trs_side_rejects_retired_total_return_spellings() {
     use finstack_quant_valuations::instruments::equity::equity_trs::EquityTotalReturnSwap;
-    use finstack_quant_valuations::instruments::fixed_income::fi_trs::FIIndexTotalReturnSwap;
+    use finstack_quant_valuations::instruments::fixed_income::fi_trs::FiIndexTotalReturnSwap;
 
     let equity = serde_json::to_value(EquityTotalReturnSwap::example().unwrap()).unwrap();
-    let fi = serde_json::to_value(FIIndexTotalReturnSwap::example().unwrap()).unwrap();
+    let fi = serde_json::to_value(FiIndexTotalReturnSwap::example().unwrap()).unwrap();
     for retired in [
         "receive_total_return", // schema-rejection-test: now `receive`
         "pay_total_return",     // schema-rejection-test: now `pay`
@@ -25,7 +25,7 @@ fn test_trs_side_rejects_retired_total_return_spellings() {
         assert!(serde_json::from_value::<EquityTotalReturnSwap>(value).is_err());
         let mut value = fi.clone();
         value["side"] = serde_json::json!(retired);
-        assert!(serde_json::from_value::<FIIndexTotalReturnSwap>(value).is_err());
+        assert!(serde_json::from_value::<FiIndexTotalReturnSwap>(value).is_err());
     }
 }
 

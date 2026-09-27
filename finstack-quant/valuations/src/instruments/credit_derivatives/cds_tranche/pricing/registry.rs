@@ -1,6 +1,6 @@
 //! Numerical pricing, expected-loss, and sensitivity helpers for CDS tranches.
 //!
-use super::config::CDSTranchePricer;
+use super::config::CdsTranchePricer;
 use crate::instruments::common_impl::traits::Instrument;
 use crate::pricer::expect_inst;
 use finstack_quant_core::market_data::context::MarketContext;
@@ -37,11 +37,11 @@ impl JumpToDefaultResult {
 }
 
 /// Registry pricer for CDS Tranche using Gaussian Copula model
-pub(crate) struct SimpleCDSTrancheHazardPricer {
+pub(crate) struct SimpleCdsTrancheHazardPricer {
     model_key: crate::pricer::ModelKey,
 }
 
-impl SimpleCDSTrancheHazardPricer {
+impl SimpleCdsTrancheHazardPricer {
     /// Create new CDS tranche pricer with default hazard rate model
     pub(crate) fn new() -> Self {
         Self {
@@ -50,13 +50,13 @@ impl SimpleCDSTrancheHazardPricer {
     }
 }
 
-impl Default for SimpleCDSTrancheHazardPricer {
+impl Default for SimpleCdsTrancheHazardPricer {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl crate::pricer::Pricer for SimpleCDSTrancheHazardPricer {
+impl crate::pricer::Pricer for SimpleCdsTrancheHazardPricer {
     fn key(&self) -> crate::pricer::PricerKey {
         crate::pricer::PricerKey::new(crate::pricer::InstrumentType::CdsTranche, self.model_key)
     }
@@ -71,12 +71,12 @@ impl crate::pricer::Pricer for SimpleCDSTrancheHazardPricer {
 
         // Type-safe downcasting
         let cds_tranche = expect_inst::<
-            crate::instruments::credit_derivatives::cds_tranche::CDSTranche,
+            crate::instruments::credit_derivatives::cds_tranche::CdsTranche,
         >(instrument, crate::pricer::InstrumentType::CdsTranche)?;
 
         // Use the provided as_of date for valuation
         // Compute present value using the engine
-        let pv = CDSTranchePricer::new()
+        let pv = CdsTranchePricer::new()
             .price_tranche(cds_tranche, market, as_of)
             .map_err(|e| {
                 crate::pricer::PricingError::model_failure_with_context(

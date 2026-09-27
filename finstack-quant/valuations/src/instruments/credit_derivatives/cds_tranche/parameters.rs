@@ -6,7 +6,7 @@ use finstack_quant_core::{dates::Date, money::Money, Error, Result};
 ///
 /// Groups parameters specific to CDS tranches.
 #[derive(Debug, Clone)]
-pub struct CDSTrancheParams {
+pub struct CdsTrancheParams {
     /// Index name (e.g., "CDX.NA.IG", "iTraxx Europe")
     pub index_name: String,
     /// Index series
@@ -25,7 +25,7 @@ pub struct CDSTrancheParams {
     pub realized_loss: f64,
 }
 
-impl CDSTrancheParams {
+impl CdsTrancheParams {
     /// Create new CDS tranche parameters
     #[allow(clippy::too_many_arguments)]
     pub fn new(
@@ -101,7 +101,7 @@ mod tests {
 
     #[test]
     fn test_tranche_helper_units_are_percent_points() {
-        let params = CDSTrancheParams::equity_tranche(
+        let params = CdsTrancheParams::equity_tranche(
             "CDX.NA.IG",
             42,
             Money::from((1_000_000_i64, Currency::USD)),
@@ -111,7 +111,7 @@ mod tests {
         assert!((params.attach_pct - 0.0).abs() < 1e-12);
         assert!((params.detach_pct - 3.0).abs() < 1e-12);
 
-        let mezz = CDSTrancheParams::mezzanine_tranche(
+        let mezz = CdsTrancheParams::mezzanine_tranche(
             "CDX.NA.IG",
             42,
             Money::from((1_000_000_i64, Currency::USD)),

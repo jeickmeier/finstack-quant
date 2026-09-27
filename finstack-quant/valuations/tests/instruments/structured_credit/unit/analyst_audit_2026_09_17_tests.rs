@@ -20,9 +20,9 @@ use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
     execute_waterfall, run_simulation, run_simulation_with_diagnostics, AllocationMode, AssetPool,
     AssetType, CallAssumption, CardPortfolioSpec, ControlledAccumulationSpec, CoverageRules,
     CoverageTestSpec, DealType, LiquidationSpec, PaymentCalculation, PaymentType, PoolAsset,
-    PricingMode, Recipient, RecipientType, ReinvestmentCriteria, ReinvestmentPeriod, StepDownSpec,
-    StepDownTrigger, StructuredCredit, Tranche, TrancheSeniority, TrancheStructure, Waterfall,
-    WaterfallContext, WaterfallRules, WaterfallTier,
+    Recipient, RecipientType, ReinvestmentCriteria, ReinvestmentPeriod, StepDownSpec,
+    StepDownTrigger, StructuredCredit, StructuredCreditPricingMode, Tranche, TrancheSeniority,
+    TrancheStructure, Waterfall, WaterfallContext, WaterfallRules, WaterfallTier,
 };
 use finstack_quant_valuations::instruments::{Instrument, PricingOptions};
 use finstack_quant_valuations::metrics::MetricId;
@@ -626,7 +626,7 @@ fn p8_stochastic_price_uses_the_same_face_as_deterministic() {
         .price_stochastic_with_mode(
             &mkt,
             close,
-            PricingMode::MonteCarlo {
+            StructuredCreditPricingMode::MonteCarlo {
                 num_paths: 1,
                 antithetic: false,
             },

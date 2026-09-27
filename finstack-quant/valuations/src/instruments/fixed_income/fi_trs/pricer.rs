@@ -24,7 +24,7 @@
 //! This is **not** a full production mark-to-market model for fixed income index TRS.
 //! It intentionally omits roll-down and mark-to-market from underlying rate/spread moves.
 
-use super::types::FIIndexTotalReturnSwap;
+use super::types::FiIndexTotalReturnSwap;
 use crate::instruments::common_impl::pricing::{
     PeriodReturnInputs, TotalReturnLegParams, TrsEngine, TrsReturnModel,
 };
@@ -54,7 +54,7 @@ use finstack_quant_core::Result;
 /// Returns an error if `yield_id` is configured but the corresponding market data
 /// is missing. This prevents silent zero-yield assumptions that would materially
 /// affect carry calculations.
-fn extract_index_yield(trs: &FIIndexTotalReturnSwap, context: &MarketContext) -> Result<f64> {
+fn extract_index_yield(trs: &FiIndexTotalReturnSwap, context: &MarketContext) -> Result<f64> {
     match &trs.underlying.yield_id {
         Some(id) => {
             let scalar = context.get_price(id.as_str()).map_err(|_| {
@@ -93,11 +93,11 @@ fn require_unitless_scalar(scalar: &MarketScalar, kind: &str, id: &str) -> Resul
 ///
 /// Returns an error if the level is missing, has the wrong currency, or is
 /// not positive and finite.
-fn extract_index_level(trs: &FIIndexTotalReturnSwap, context: &MarketContext) -> Result<f64> {
+fn extract_index_level(trs: &FiIndexTotalReturnSwap, context: &MarketContext) -> Result<f64> {
     let id = trs.underlying.index_id.as_str();
     let scalar = context.get_price(id).map_err(|_| {
         finstack_quant_core::Error::Validation(format!(
-            "FIIndexTotalReturnSwap '{}': index level '{}' is required to value the \
+            "FiIndexTotalReturnSwap '{}': index level '{}' is required to value the \
              period in progress but is not in the market context",
             trs.id.as_str(),
             id
@@ -109,7 +109,7 @@ fn extract_index_level(trs: &FIIndexTotalReturnSwap, context: &MarketContext) ->
     )?;
     if !level.is_finite() || level <= 0.0 {
         return Err(finstack_quant_core::Error::Validation(format!(
-            "FIIndexTotalReturnSwap '{}': index level '{}' must be positive and finite, got {}",
+            "FiIndexTotalReturnSwap '{}': index level '{}' must be positive and finite, got {}",
             trs.id.as_str(),
             id,
             level
@@ -143,7 +143,7 @@ fn extract_index_level(trs: &FIIndexTotalReturnSwap, context: &MarketContext) ->
 /// (handled by `TrsEngine`). Direct rate sensitivity of the underlying index is
 /// captured by the [`DurationDv01`](super::metrics::DurationDv01Calculator) metric.
 struct FiIndexReturnModel<'a> {
-    trs: &'a FIIndexTotalReturnSwap,
+    trs: &'a FiIndexTotalReturnSwap,
     index_yield: f64,
 }
 
@@ -163,7 +163,7 @@ impl TrsReturnModel for FiIndexReturnModel<'_> {
         if t_start < 0.0 && t_end >= 0.0 {
             let reset_level = self.trs.initial_level.ok_or_else(|| {
                 finstack_quant_core::Error::Validation(format!(
-                    "FIIndexTotalReturnSwap '{}': the return period starting {} is in \
+                    "FiIndexTotalReturnSwap '{}': the return period starting {} is in \
                      progress; set initial_level to the index level at that reset",
                     self.trs.id.as_str(),
                     period_start
@@ -214,7 +214,7 @@ impl TrsReturnModel for FiIndexReturnModel<'_> {
 /// - A period is in progress and `initial_level` or the index level is missing
 /// - The discount curve is not found
 pub(crate) fn pv_total_return_leg(
-    trs: &FIIndexTotalReturnSwap,
+    trs: &FiIndexTotalReturnSwap,
     context: &MarketContext,
     as_of: Date,
 ) -> Result<Money> {
@@ -223,7 +223,7 @@ pub(crate) fn pv_total_return_leg(
     static CARRY_MODEL_WARNING: std::sync::Once = std::sync::Once::new();
     CARRY_MODEL_WARNING.call_once(|| {
         tracing::warn!(
-            "FIIndexTotalReturnSwap total-return leg uses a carry-only analytic model; \
+            "FiIndexTotalReturnSwap total-return leg uses a carry-only analytic model; \
              it is not a full mark-to-market index return model"
         );
     });

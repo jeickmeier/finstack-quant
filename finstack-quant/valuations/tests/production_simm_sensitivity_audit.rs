@@ -3,7 +3,7 @@
 use finstack_quant_core::{currency::Currency, market_data::context::MarketContext, money::Money};
 use finstack_quant_margin::Marginable;
 use finstack_quant_valuations::instruments::{
-    EquityTotalReturnSwap, FIIndexTotalReturnSwap, InterestRateSwap, PayReceive,
+    EquityTotalReturnSwap, FiIndexTotalReturnSwap, InterestRateSwap, PayReceive,
 };
 
 #[test]
@@ -41,7 +41,7 @@ fn payer_fixed_rate_proxy_has_positive_rate_sensitivity() {
 
 #[test]
 fn fi_index_margin_requires_the_same_duration_as_its_risk_metric() {
-    let mut instrument = FIIndexTotalReturnSwap::example().expect("FI TRS");
+    let mut instrument = FiIndexTotalReturnSwap::example().expect("FI TRS");
     instrument.underlying.duration_id = None;
     assert!(instrument
         .simm_sensitivities(&MarketContext::new(), instrument.schedule.start)

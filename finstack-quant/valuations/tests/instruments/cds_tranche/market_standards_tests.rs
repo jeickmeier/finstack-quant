@@ -13,9 +13,9 @@ use super::helpers::*;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::math::{binomial_probability, log_factorial};
 use finstack_quant_core::money::Money;
-use finstack_quant_valuations::instruments::credit_derivatives::cds_tranche::CDSTranche;
-use finstack_quant_valuations::instruments::credit_derivatives::cds_tranche::CDSTrancheParams;
-use finstack_quant_valuations::instruments::credit_derivatives::cds_tranche::CDSTranchePricer;
+use finstack_quant_valuations::instruments::credit_derivatives::cds_tranche::CdsTranche;
+use finstack_quant_valuations::instruments::credit_derivatives::cds_tranche::CdsTrancheParams;
+use finstack_quant_valuations::instruments::credit_derivatives::cds_tranche::CdsTranchePricer;
 use finstack_quant_valuations::instruments::PayReceive;
 use time::macros::date;
 
@@ -121,11 +121,11 @@ fn test_standard_recovery_rate() {
 
 #[test]
 fn test_standard_tranche_derives_contractual_effective_date_for_seasoned_trade() {
-    let pricer = CDSTranchePricer::new();
+    let pricer = CdsTranchePricer::new();
     let market = standard_market_context();
     let as_of = base_date();
 
-    let params = CDSTrancheParams::mezzanine_tranche(
+    let params = CdsTrancheParams::mezzanine_tranche(
         "CDX.NA.IG.42",
         42,
         Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
@@ -133,7 +133,7 @@ fn test_standard_tranche_derives_contractual_effective_date_for_seasoned_trade()
         500.0,
     );
 
-    let mut explicit = CDSTranche::standard(
+    let mut explicit = CdsTranche::standard(
         "CDX-SEASONED-EXPLICIT",
         &params,
         "USD-OIS",
@@ -253,7 +253,7 @@ fn test_aod_enabled_by_default() {
     // Reference: Post-2009 ISDA CDS standard model (ISDA CDS Standard Model)
 
     let config =
-        finstack_quant_valuations::instruments::credit_derivatives::cds_tranche::CDSTranchePricerConfig::default();
+        finstack_quant_valuations::instruments::credit_derivatives::cds_tranche::CdsTranchePricerConfig::default();
     assert!(
         config.include_accrual_on_default,
         "Accrual-on-default should be enabled by default per ISDA standards"
@@ -296,7 +296,7 @@ fn test_standard_quarterly_frequency() {
 fn test_equity_tranche_parameters() {
     // Market Standard: Equity tranche is 0-3%
 
-    let params = CDSTrancheParams::equity_tranche(
+    let params = CdsTrancheParams::equity_tranche(
         "CDX.NA.IG.42",
         42,
         finstack_quant_core::money::Money::new(
@@ -316,7 +316,7 @@ fn test_equity_tranche_parameters() {
 fn test_mezzanine_tranche_parameters() {
     // Market Standard: Mezzanine tranche is 3-7%
 
-    let params = CDSTrancheParams::mezzanine_tranche(
+    let params = CdsTrancheParams::mezzanine_tranche(
         "CDX.NA.IG.42",
         42,
         finstack_quant_core::money::Money::new(
@@ -337,14 +337,14 @@ fn test_mezzanine_tranche_parameters() {
 #[test]
 fn test_adaptive_integration_config() {
     use finstack_quant_valuations::instruments::credit_derivatives::cds_tranche::{
-        CDSTranchePricer, CDSTranchePricerConfig,
+        CdsTranchePricer, CdsTranchePricerConfig,
     };
     for tolerance in [1e-6, 1e-8, 1e-10, 1e-12] {
-        let config = CDSTranchePricerConfig::default().with_integration_tolerance(tolerance);
-        CDSTranchePricer::with_params(config).expect("supported global integration budget");
+        let config = CdsTranchePricerConfig::default().with_integration_tolerance(tolerance);
+        CdsTranchePricer::with_params(config).expect("supported global integration budget");
     }
     assert_eq!(
-        CDSTranchePricerConfig::default().integration_tolerance,
+        CdsTranchePricerConfig::default().integration_tolerance,
         1e-10
     );
 }
@@ -404,7 +404,7 @@ fn test_spread_dv01_sign_convention() {
     // higher running coupon increases premium received → positive DV01
 
     let pricer =
-        finstack_quant_valuations::instruments::credit_derivatives::cds_tranche::CDSTranchePricer::new();
+        finstack_quant_valuations::instruments::credit_derivatives::cds_tranche::CdsTranchePricer::new();
     let mut tranche = mezzanine_tranche();
     tranche.side = finstack_quant_valuations::instruments::PayReceive::Receive;
     let market = standard_market_context();
@@ -431,11 +431,11 @@ fn test_homogeneous_pool_assumption() {
     // Reference: Li (2000)
 
     let mut config =
-        finstack_quant_valuations::instruments::credit_derivatives::cds_tranche::CDSTranchePricerConfig::default();
+        finstack_quant_valuations::instruments::credit_derivatives::cds_tranche::CdsTranchePricerConfig::default();
     config.use_issuer_curves = false;
 
     let pricer =
-        finstack_quant_valuations::instruments::credit_derivatives::cds_tranche::CDSTranchePricer::with_params(
+        finstack_quant_valuations::instruments::credit_derivatives::cds_tranche::CdsTranchePricer::with_params(
             config,
         )
         .expect("valid tranche pricer config");
@@ -452,11 +452,11 @@ fn test_heterogeneous_pool_extension() {
     // Reference: Hull & White (2004), "Valuation of a CDO and an n-th to Default CDS"
 
     let mut config =
-        finstack_quant_valuations::instruments::credit_derivatives::cds_tranche::CDSTranchePricerConfig::default();
+        finstack_quant_valuations::instruments::credit_derivatives::cds_tranche::CdsTranchePricerConfig::default();
     config.use_issuer_curves = true;
 
     let pricer =
-        finstack_quant_valuations::instruments::credit_derivatives::cds_tranche::CDSTranchePricer::with_params(
+        finstack_quant_valuations::instruments::credit_derivatives::cds_tranche::CdsTranchePricer::with_params(
             config,
         )
         .expect("valid tranche pricer config");

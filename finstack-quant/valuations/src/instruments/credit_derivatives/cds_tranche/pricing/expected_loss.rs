@@ -1,7 +1,7 @@
 //! Numerical pricing, expected-loss, and sensitivity helpers for CDS tranches.
 //!
-use super::config::{CDSTranchePricer, ElWdPoint, PoolExposure};
-use crate::instruments::credit_derivatives::cds_tranche::CDSTranche;
+use super::config::{CdsTranchePricer, ElWdPoint, PoolExposure};
+use crate::instruments::credit_derivatives::cds_tranche::CdsTranche;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::term_structures::CreditIndexData;
 use finstack_quant_core::{Error, Result};
@@ -26,7 +26,7 @@ struct ElInvariants {
     detach_pct: f64,
 }
 
-impl CDSTranchePricer {
+impl CdsTranchePricer {
     /// Calculate expected tranche loss using the base correlation approach.
     ///
     /// Decomposes the tranche [A, D] as the difference between two equity
@@ -34,7 +34,7 @@ impl CDSTranchePricer {
     /// the base correlation curve with enhanced numerical stability.
     pub(super) fn calculate_expected_tranche_loss(
         &self,
-        tranche: &CDSTranche,
+        tranche: &CdsTranche,
         index_data: &CreditIndexData,
         maturity: Date,
     ) -> Result<f64> {
@@ -110,7 +110,7 @@ impl CDSTranchePricer {
     /// Compute the date-independent invariants needed for EL fraction evaluation.
     fn el_invariants(
         &self,
-        tranche: &CDSTranche,
+        tranche: &CdsTranche,
         index_data: &CreditIndexData,
     ) -> Result<ElInvariants> {
         let eff = self.calculate_effective_structure(tranche, index_data.recovery_rate);
@@ -271,7 +271,7 @@ impl CDSTranchePricer {
     /// expected-loss-curve accessor and diagnostics.
     pub(super) fn build_el_curve(
         &self,
-        tranche: &CDSTranche,
+        tranche: &CdsTranche,
         index_data: &CreditIndexData,
         dates: &[Date],
     ) -> Result<Vec<(Date, f64)>> {
@@ -298,7 +298,7 @@ impl CDSTranchePricer {
     /// inconsistencies.
     pub(super) fn build_el_wd_curve(
         &self,
-        tranche: &CDSTranche,
+        tranche: &CdsTranche,
         index_data: &CreditIndexData,
         dates: &[Date],
     ) -> Result<Vec<ElWdPoint>> {
@@ -576,15 +576,15 @@ pub(super) fn stochastic_recovery_exposure_scale(
 
 #[cfg(test)]
 mod production_credit_audit {
-    use super::super::config::CDSTranchePricerConfig;
+    use super::super::config::CdsTranchePricerConfig;
     use super::*;
     use finstack_quant_core::dates::Month;
     #[test]
     fn base_correlation_clamps_only_configured_numerical_budget() {
         let date = Date::from_calendar_date(2030, Month::January, 1).expect("date");
         for tolerance in [1e-8, 1e-10, 1e-12] {
-            let pricer = CDSTranchePricer::with_params(
-                CDSTranchePricerConfig::default().with_integration_tolerance(tolerance),
+            let pricer = CdsTranchePricer::with_params(
+                CdsTranchePricerConfig::default().with_integration_tolerance(tolerance),
             )
             .expect("pricer");
             assert_eq!(

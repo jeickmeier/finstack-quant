@@ -1,4 +1,4 @@
-//! `CDSOption` test suite, organised around the Bloomberg CDSO numerical-
+//! `CdsOption` test suite, organised around the Bloomberg CDSO numerical-
 //! quadrature pricer.
 //!
 //! - [`common`]: shared fixtures and a builder for setup-heavy tests.

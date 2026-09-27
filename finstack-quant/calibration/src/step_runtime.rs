@@ -662,7 +662,7 @@ mod tests {
     };
     use finstack_quant_core::types::{CurveId, UnderlyingId};
     use finstack_quant_valuations::instruments::credit_derivatives::cds_tranche::{
-        CDSTranche, CDSTranchePricer, CDSTranchePricerConfig,
+        CdsTranche, CdsTranchePricer, CdsTranchePricerConfig,
     };
     use finstack_quant_valuations::instruments::OptionType;
     use finstack_quant_valuations::market::conventions::ids::{
@@ -814,15 +814,15 @@ mod tests {
         let instrument = crate::build::cds_tranche::build_cds_tranche_instrument(
             &quote,
             &build_context,
-            &crate::build::cds_tranche::CDSTrancheBuildOverrides::default(),
+            &crate::build::cds_tranche::CdsTrancheBuildOverrides::default(),
         )
         .expect("shared tranche builder");
         let tranche = instrument
             .as_any()
-            .downcast_ref::<CDSTranche>()
-            .expect("CDSTranche");
-        let pricer = CDSTranchePricer::with_params(
-            CDSTranchePricerConfig::default()
+            .downcast_ref::<CdsTranche>()
+            .expect("CdsTranche");
+        let pricer = CdsTranchePricer::with_params(
+            CdsTranchePricerConfig::default()
                 .with_student_t_copula(6.0)
                 .expect("valid fixture df"),
         )

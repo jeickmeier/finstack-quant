@@ -298,7 +298,7 @@ risk calculation with a standard reference.
 ### Bloomberg CDSO
 
 - Bloomberg L.P. Quantitative Analytics. *Pricing Credit Index Options.* DOCS
-  2055833 ⟨GO⟩. Numerical-quadrature CDS-option model used by `CDSOption`.
+  2055833 ⟨GO⟩. Numerical-quadrature CDS-option model used by `CdsOption`.
 
 <a id="hull-white-2000-cds"></a>
 

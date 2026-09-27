@@ -32,12 +32,12 @@ fn caplet_gamma(is_cap: bool, c: CapletInputs) -> f64 {
     use finstack_quant_models::volatility::VolatilityConvention;
     let (delta, gamma) = match c.convention {
         VolatilityConvention::Normal => (
-            normal::delta(is_cap, c.strike, c.forward, c.sigma, c.fixing_t),
-            normal::gamma(c.strike, c.forward, c.sigma, c.fixing_t),
+            normal::delta(is_cap, c.strike, c.forward, c.sigma, c.time_to_fixing),
+            normal::gamma(c.strike, c.forward, c.sigma, c.time_to_fixing),
         ),
         _ => (
-            black::delta(is_cap, c.strike, c.forward, c.sigma, c.fixing_t),
-            black::gamma(c.strike, c.forward, c.sigma, c.fixing_t),
+            black::delta(is_cap, c.strike, c.forward, c.sigma, c.time_to_fixing),
+            black::gamma(c.strike, c.forward, c.sigma, c.time_to_fixing),
         ),
     };
     gamma * c.forward_sensitivity * c.forward_sensitivity + delta * c.forward_second_sensitivity

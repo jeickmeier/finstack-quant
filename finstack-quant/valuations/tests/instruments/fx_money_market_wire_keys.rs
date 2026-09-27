@@ -51,7 +51,7 @@ fn retired_fx_keys_are_rejected() {
 
     let mut ndf = serde_json::to_value(Ndf::example()).expect("ser");
     ndf["settlement_calendar_id"] = json!("nyse");
-    ndf["fixing_source"] = json!("PBOC");
+    ndf["fixing_source"] = json!("pboc");
     // schema-rejection-test
     rejects::<Ndf>(ndf.clone(), "settlement_calendar_id", "quote_calendar_id");
     // schema-rejection-test

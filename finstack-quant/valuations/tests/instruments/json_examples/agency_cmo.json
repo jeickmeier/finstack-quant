@@ -1,7 +1,7 @@
 {
   "instrument": {
     "spec": {
-      "agency": "FNMA",
+      "agency": "fnma",
       "attributes": {
         "meta": {
           "deal": "fnr-2024-1"

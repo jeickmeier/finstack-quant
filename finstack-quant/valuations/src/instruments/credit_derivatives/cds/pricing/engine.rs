@@ -1,6 +1,6 @@
 //! Configuration, integration, and metric helpers for CDS pricing.
 //!
-use super::config::CDSPricerConfig;
+use super::config::CdsPricerConfig;
 use super::helpers::{
     date_from_hazard_time, haz_t, isda_standard_model_boundaries, settlement_date, sp_cond_to,
     validate_recovery_consistency,
@@ -16,8 +16,8 @@ use rust_decimal::prelude::ToPrimitive;
 
 /// CDS pricing engine. Stateless wrapper carrying configuration.
 #[derive(Debug)]
-pub(crate) struct CDSPricer {
-    pub(super) config: CDSPricerConfig,
+pub(crate) struct CdsPricer {
+    pub(super) config: CdsPricerConfig,
 }
 
 #[derive(Clone, Copy)]
@@ -49,24 +49,24 @@ pub(crate) struct CouponPeriod {
     pub(super) is_final: bool,
 }
 
-impl Default for CDSPricer {
+impl Default for CdsPricer {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl CDSPricer {
+impl CdsPricer {
     /// Create new pricer with default ISDA-compliant config.
     #[must_use]
     pub(crate) fn new() -> Self {
         Self {
-            config: CDSPricerConfig::default(),
+            config: CdsPricerConfig::default(),
         }
     }
 
     /// Create pricer with custom config.
     #[must_use]
-    pub(crate) fn with_config(config: CDSPricerConfig) -> Self {
+    pub(crate) fn with_config(config: CdsPricerConfig) -> Self {
         Self { config }
     }
 
@@ -444,7 +444,7 @@ impl CDSPricer {
 /// only the hazard curve is shocked. Protection and accrual-on-default still
 /// re-integrate against the bumped survival curve.
 pub(crate) struct CdsHazardRepriceCache {
-    pricer: CDSPricer,
+    pricer: CdsPricer,
     cds: CreditDefaultSwap,
     disc: std::sync::Arc<DiscountCurve>,
     as_of: Date,
@@ -469,7 +469,7 @@ impl CdsHazardRepriceCache {
     ) -> Result<Self> {
         use rust_decimal::prelude::ToPrimitive;
 
-        let pricer = CDSPricer::with_config(CDSPricerConfig::from_cds(cds));
+        let pricer = CdsPricer::with_config(CdsPricerConfig::from_cds(cds));
         let disc = market.get_discount(&cds.premium_leg.discount_curve_id)?;
         let periods_raw = pricer.coupon_periods(cds, as_of)?;
         let mut periods = Vec::with_capacity(periods_raw.len());
@@ -579,7 +579,7 @@ impl CdsHazardRepriceCache {
 
 #[cfg(test)]
 mod cds_hazard_reprice_cache_tests {
-    use super::{CDSPricer, CDSPricerConfig, CdsHazardRepriceCache};
+    use super::{CdsHazardRepriceCache, CdsPricer, CdsPricerConfig};
     use crate::instruments::common_impl::traits::Instrument;
     use crate::instruments::credit_derivatives::cds::{
         CdsConvention, CdsValuationConvention, CreditDefaultSwap, PayReceive,
@@ -677,13 +677,13 @@ mod cds_hazard_reprice_cache_tests {
         );
         assert!(
             cache.pricer.config.include_accrual_on_default,
-            "CDSPricerConfig::from_cds should enable accrual-on-default"
+            "CdsPricerConfig::from_cds should enable accrual-on-default"
         );
 
         let discount = market.get_discount(&cds.premium_leg.discount_curve_id)?;
-        let without_aod = CDSPricer::with_config(CDSPricerConfig {
+        let without_aod = CdsPricer::with_config(CdsPricerConfig {
             include_accrual_on_default: false,
-            ..CDSPricerConfig::from_cds(&cds)
+            ..CdsPricerConfig::from_cds(&cds)
         })
         .npv_full(&cds, discount.as_ref(), &hazard, as_of)?;
         let with_aod = cds.value(&market, as_of)?.amount();

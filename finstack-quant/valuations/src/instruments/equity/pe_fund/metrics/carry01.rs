@@ -20,7 +20,7 @@
 //! and measures the impact on LP valuation (lower carry = higher LP value).
 
 use crate::instruments::common_impl::traits::Instrument;
-use crate::instruments::equity::pe_fund::waterfall::{Tranche, WaterfallSpec};
+use crate::instruments::equity::pe_fund::waterfall::{PeFundWaterfallSpec, PeFundWaterfallTranche};
 use crate::instruments::equity::pe_fund::PrivateMarketsFund;
 use crate::metrics::{MetricCalculator, MetricContext};
 use finstack_quant_core::Result;
@@ -30,14 +30,14 @@ const CARRY_BUMP: f64 = 0.0001;
 
 /// Return a copy of the spec with GP shares in catch-up and promote tranches
 /// shifted by `delta` (promote LP shares renormalized to sum to 1.0).
-fn bumped_spec(spec: &WaterfallSpec, delta: f64) -> WaterfallSpec {
+fn bumped_spec(spec: &PeFundWaterfallSpec, delta: f64) -> PeFundWaterfallSpec {
     let mut bumped = spec.clone();
     for tranche in &mut bumped.tranches {
         match tranche {
-            Tranche::CatchUp { gp_share } => {
+            PeFundWaterfallTranche::CatchUp { gp_share } => {
                 *gp_share += delta;
             }
-            Tranche::PromoteTier {
+            PeFundWaterfallTranche::PromoteTier {
                 lp_share, gp_share, ..
             } => {
                 *gp_share += delta;
@@ -53,9 +53,10 @@ fn bumped_spec(spec: &WaterfallSpec, delta: f64) -> WaterfallSpec {
 
 /// Whether every carry-bearing GP share in the spec can absorb `delta`
 /// without leaving `[0, 1]`.
-fn can_bump(spec: &WaterfallSpec, delta: f64) -> bool {
+fn can_bump(spec: &PeFundWaterfallSpec, delta: f64) -> bool {
     spec.tranches.iter().all(|t| match t {
-        Tranche::CatchUp { gp_share } | Tranche::PromoteTier { gp_share, .. } => {
+        PeFundWaterfallTranche::CatchUp { gp_share }
+        | PeFundWaterfallTranche::PromoteTier { gp_share, .. } => {
             (0.0..=1.0).contains(&(gp_share + delta))
         }
         _ => true,
@@ -70,7 +71,7 @@ impl MetricCalculator for Carry01Calculator {
         let fund: &PrivateMarketsFund = context.instrument_as()?;
         let as_of = context.as_of;
 
-        let pv_for = |spec: WaterfallSpec| -> Result<f64> {
+        let pv_for = |spec: PeFundWaterfallSpec| -> Result<f64> {
             let mut bumped_fund = fund.clone();
             bumped_fund.waterfall_spec = spec;
             Ok(bumped_fund.value(context.curves.as_ref(), as_of)?.amount())

@@ -9,8 +9,8 @@ use crate::utils::{check_js_safe_count, parse_iso_date, to_js_err};
 use finstack_quant_core::dates::DayCount;
 use finstack_quant_core::math::random::Pcg64Rng;
 use finstack_quant_models::credit::{
-    AssetDynamics, BarrierType, CreditState, CreditStateVariable, DynamicRecoverySpec,
-    EndogenousHazardSpec, MertonModel, OptimalToggle, ThresholdDirection, ToggleExerciseModel,
+    AssetDynamics, CreditState, CreditStateVariable, DynamicRecoverySpec, EndogenousHazardSpec,
+    MertonBarrierType, MertonModel, OptimalToggle, ThresholdDirection, ToggleExerciseModel,
 };
 use js_sys::Float64Array;
 use wasm_bindgen::prelude::*;
@@ -355,7 +355,7 @@ pub fn merton_from_target_pd_json(
 /// @param debt_barrier - Positive debt face value defining the structural-model default barrier.
 /// @param risk_free_rate - Annualized risk-free rate expressed as a decimal, such as 0.05 for 5%.
 /// @param payout_rate - Continuous payout rate on assets, expressed as a decimal.
-/// @param barrier_type_json - Serialized `BarrierType` JSON (terminal or first-passage).
+/// @param barrier_type_json - Serialized `MertonBarrierType` JSON (terminal or first-passage).
 /// @param dynamics_json - Serialized `AssetDynamics` JSON (GBM, jump-diffusion, or CreditGrades).
 #[wasm_bindgen(js_name = mertonModelWithDynamicsJson)]
 pub fn merton_model_with_dynamics_json(
@@ -367,7 +367,8 @@ pub fn merton_model_with_dynamics_json(
     barrier_type_json: &str,
     dynamics_json: &str,
 ) -> Result<String, JsValue> {
-    let barrier_type: BarrierType = serde_json::from_str(barrier_type_json).map_err(to_js_err)?;
+    let barrier_type: MertonBarrierType =
+        serde_json::from_str(barrier_type_json).map_err(to_js_err)?;
     let dynamics: AssetDynamics = serde_json::from_str(dynamics_json).map_err(to_js_err)?;
     let model = MertonModel::new_with_dynamics(
         asset_value,

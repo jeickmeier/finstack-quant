@@ -1122,7 +1122,7 @@ impl Swaption {
             forward,
             annuity,
             sigma: quote.sigma,
-            volatility_convention: quote.convention,
+            convention: quote.convention,
             time_to_expiry: t,
         }))
     }
@@ -1180,7 +1180,7 @@ pub struct GreekInputs {
     /// Resolved volatility (from SABR, override, or surface)
     pub sigma: f64,
     /// Quote convention and displacement used by both pricing and Greek inputs.
-    pub volatility_convention: VolatilityConvention,
+    pub convention: VolatilityConvention,
     /// Time to option expiry in years
     pub time_to_expiry: f64,
 }

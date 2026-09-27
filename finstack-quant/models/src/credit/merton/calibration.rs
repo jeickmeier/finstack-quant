@@ -2,7 +2,7 @@ use finstack_quant_core::math::norm_cdf;
 use finstack_quant_core::math::solver::{BrentSolver, Solver};
 use finstack_quant_core::{Error, InputError, Result};
 
-use super::{AssetDynamics, BarrierType, MertonModel};
+use super::{AssetDynamics, MertonBarrierType, MertonModel};
 
 impl MertonModel {
     /// Minimum equity value **as a fraction of firm value** for which the
@@ -206,7 +206,7 @@ impl MertonModel {
                     b,
                     r,
                     q,
-                    BarrierType::Terminal,
+                    MertonBarrierType::Terminal,
                     AssetDynamics::GeometricBrownian,
                 );
             }
@@ -245,7 +245,7 @@ impl MertonModel {
     /// with a premium leg, accrual on default, and discounting — not the
     /// zero-coupon approximation of [`implied_spread`](Self::implied_spread),
     /// which understates a quoted spread by several percent at distressed
-    /// levels. The calibrated model has `BarrierType::Terminal` with
+    /// levels. The calibrated model has `MertonBarrierType::Terminal` with
     /// `AssetDynamics::GeometricBrownian` and the supplied `payout_rate`.
     ///
     /// # Multiple solutions
@@ -323,7 +323,7 @@ impl MertonModel {
                 total_debt,
                 risk_free_rate,
                 payout_rate,
-                BarrierType::Terminal,
+                MertonBarrierType::Terminal,
                 AssetDynamics::GeometricBrownian,
             )?;
             Ok(trial.cds_par_spread(maturity, recovery)? - target_spread)
@@ -337,7 +337,7 @@ impl MertonModel {
             total_debt,
             risk_free_rate,
             payout_rate,
-            BarrierType::Terminal,
+            MertonBarrierType::Terminal,
             AssetDynamics::GeometricBrownian,
         )
     }
@@ -504,7 +504,7 @@ impl MertonModel {
             barrier,
             risk_free_rate,
             payout_rate,
-            BarrierType::Terminal,
+            MertonBarrierType::Terminal,
             AssetDynamics::GeometricBrownian,
         )
     }
@@ -595,7 +595,7 @@ impl MertonModel {
             barrier,
             risk_free_rate,
             0.0,
-            BarrierType::FirstPassage {
+            MertonBarrierType::FirstPassage {
                 barrier_growth_rate: 0.0,
             },
             AssetDynamics::CreditGrades {
@@ -608,7 +608,7 @@ impl MertonModel {
 
 #[cfg(test)]
 mod tests {
-    use super::super::{AssetDynamics, BarrierType, MertonModel};
+    use super::super::{AssetDynamics, MertonBarrierType, MertonModel};
 
     #[test]
     fn from_cds_spread_rejects_out_of_range_recovery() {
@@ -677,7 +677,7 @@ mod tests {
             80.0,
             0.04,
             q,
-            BarrierType::Terminal,
+            MertonBarrierType::Terminal,
             AssetDynamics::GeometricBrownian,
         )
         .expect("valid");
@@ -755,7 +755,7 @@ mod tests {
             80.0,
             0.05,
             0.03,
-            BarrierType::Terminal,
+            MertonBarrierType::Terminal,
             AssetDynamics::GeometricBrownian,
         )
         .expect("valid");
@@ -777,7 +777,7 @@ mod tests {
             80.0,
             0.05,
             0.02,
-            BarrierType::Terminal,
+            MertonBarrierType::Terminal,
             AssetDynamics::GeometricBrownian,
         )
         .expect("valid");
@@ -1047,7 +1047,7 @@ mod tests {
             80.0,
             0.05,
             0.0,
-            BarrierType::Terminal,
+            MertonBarrierType::Terminal,
             AssetDynamics::JumpDiffusion {
                 jump_intensity: 0.5,
                 jump_mean: -0.30,

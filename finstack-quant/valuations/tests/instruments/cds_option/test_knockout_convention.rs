@@ -3,7 +3,7 @@
 use super::common::*;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::market_data::context::MarketContext;
-use finstack_quant_valuations::instruments::credit_derivatives::cds_option::CDSOption;
+use finstack_quant_valuations::instruments::credit_derivatives::cds_option::CdsOption;
 use finstack_quant_valuations::instruments::Instrument;
 use time::macros::date;
 
@@ -14,13 +14,13 @@ fn test_no_knockout_includes_pre_expiry_default_value() {
     let hazard = flat_hazard("HZ-SN", as_of, 0.4, 0.10);
     let market = MarketContext::new().insert(discount).insert(hazard);
 
-    let knockout = CDSOptionBuilder::new()
+    let knockout = CdsOptionBuilder::new()
         .call()
         .strike(100.0)
         .notional(10_000_000.0, Currency::USD)
         .knockout(true)
         .build(as_of);
-    let no_knockout = CDSOptionBuilder::new()
+    let no_knockout = CdsOptionBuilder::new()
         .call()
         .strike(100.0)
         .notional(10_000_000.0, Currency::USD)
@@ -38,12 +38,12 @@ fn test_no_knockout_includes_pre_expiry_default_value() {
 
 #[test]
 fn test_knockout_default_for_new_instruments_is_false() {
-    assert!(!CDSOption::example().unwrap().knockout);
+    assert!(!CdsOption::example().unwrap().knockout);
 }
 
 #[test]
 fn test_existing_single_name_fixture_builder_pins_knockout_true() {
     let as_of = date!(2025 - 01 - 01);
-    let option = CDSOptionBuilder::new().build(as_of);
+    let option = CdsOptionBuilder::new().build(as_of);
     assert!(option.knockout);
 }

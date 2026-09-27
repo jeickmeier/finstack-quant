@@ -8,7 +8,7 @@ use super::bloomberg_quadrature::{
     calibrate_lognormal_mean, normal_integral, z_limit, ForwardCdsContext,
 };
 use super::pricer::synthetic_underlying_cds;
-use super::CDSOption;
+use super::CdsOption;
 use crate::constants::bloomberg_cdso;
 use finstack_quant_calibration::api::engine;
 use finstack_quant_calibration::api::schema::CalibrationEnvelope;
@@ -38,13 +38,13 @@ fn bootstrap_market(fixture: &Value) -> MarketContext {
     MarketContext::try_from(result.result.final_market).expect("rehydrate market")
 }
 
-fn load_option(fixture: &Value) -> CDSOption {
+fn load_option(fixture: &Value) -> CdsOption {
     serde_json::from_value(fixture["instrument"]["instrument"]["spec"].clone())
         .expect("parse cds option spec")
 }
 
 fn context_for(
-    option: &CDSOption,
+    option: &CdsOption,
     market: &MarketContext,
     as_of: Date,
     sigma: f64,

@@ -11,7 +11,7 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::scalars::MarketScalar;
 use finstack_quant_core::money::Money;
 use finstack_quant_valuations::instruments::equity::equity_trs::EquityTotalReturnSwap;
-use finstack_quant_valuations::instruments::fixed_income::fi_trs::FIIndexTotalReturnSwap;
+use finstack_quant_valuations::instruments::fixed_income::fi_trs::FiIndexTotalReturnSwap;
 use finstack_quant_valuations::instruments::EquityUnderlyingParams;
 use finstack_quant_valuations::instruments::FinancingLegSpec;
 use finstack_quant_valuations::instruments::IndexUnderlyingParams;
@@ -27,7 +27,7 @@ fn test_fi_index_trs_currency_mismatch_validation() {
     let notional = Money::new(10_000_000.0, USD).expect("valid money fixture");
     let underlying = IndexUnderlyingParams::new("EUR-INDEX", EUR); // EUR index
 
-    let result = FIIndexTotalReturnSwap::builder()
+    let result = FiIndexTotalReturnSwap::builder()
         .id("TRS-MISMATCH".into())
         .notional(notional) // USD notional
         .underlying(underlying) // EUR index
@@ -130,7 +130,7 @@ fn test_fi_index_trs_builder_validation() {
     // Try to create TRS without optional yield/duration IDs
     let underlying = IndexUnderlyingParams::new("TEST-INDEX", USD);
 
-    let result = FIIndexTotalReturnSwap::builder()
+    let result = FiIndexTotalReturnSwap::builder()
         .id("TRS-NO-YIELD".into())
         .notional(Money::new(10_000_000.0, USD).expect("valid money fixture"))
         .underlying(underlying)
@@ -444,7 +444,7 @@ fn test_fi_index_trs_maturity_equals_valuation_date() {
         .with_yield("HY-INDEX-YIELD")
         .with_duration("HY-INDEX-DURATION");
 
-    let trs = FIIndexTotalReturnSwap::builder()
+    let trs = FiIndexTotalReturnSwap::builder()
         .id("TRS-MATURE".into())
         .notional(Money::new(10_000_000.0, USD).expect("valid money fixture"))
         .underlying(underlying)

@@ -22,7 +22,7 @@ use std::sync::Arc;
 /// remaining** — which is essentially every real deal, since
 /// `build_scenario_tree_config` sets `num_periods` to months-to-maturity.
 ///
-/// The default is [`PricingMode::MonteCarlo`] — the mode that can price the
+/// The default is [`StructuredCreditPricingMode::MonteCarlo`] — the mode that can price the
 /// deals this module is built for at realistic horizons (the public
 /// `price_stochastic` entry point also selects Monte Carlo). Tree remains
 /// available and correct for genuinely short horizons; select it explicitly.
@@ -35,13 +35,7 @@ use std::sync::Arc;
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(rename_all = "snake_case", deny_unknown_fields)]
 #[non_exhaustive]
-// Distinct from `finstack_quant_models::factor::config::PricingMode`
-// (`delta_based` / `full_repricing`).
-#[cfg_attr(
-    feature = "json-schema",
-    schemars(rename = "StructuredCreditPricingMode")
-)]
-pub enum PricingMode {
+pub enum StructuredCreditPricingMode {
     /// Tree-based pricing (exact, non-recombining).
     ///
     /// Bounded to roughly ten periods by the `3^n` node count — see the type
@@ -68,7 +62,7 @@ pub enum PricingMode {
     },
 }
 
-impl Default for PricingMode {
+impl Default for StructuredCreditPricingMode {
     /// Monte Carlo, not Tree.
     ///
     /// Tree is bounded to roughly ten periods by its `3^n` node count, so it
@@ -80,17 +74,17 @@ impl Default for PricingMode {
     /// `default_stochastic_pricing_mode` already selects, so the standalone
     /// default agrees with the public entry point.
     fn default() -> Self {
-        PricingMode::MonteCarlo {
+        StructuredCreditPricingMode::MonteCarlo {
             num_paths: 5_000,
             antithetic: true,
         }
     }
 }
 
-impl PricingMode {
+impl StructuredCreditPricingMode {
     /// Create tree pricing mode.
     pub fn tree() -> Self {
-        PricingMode::Tree
+        StructuredCreditPricingMode::Tree
     }
 
     /// Create an antithetic Monte Carlo pricing mode.
@@ -101,7 +95,7 @@ impl PricingMode {
     ///   at least 50 (100 simulated paths); the engine simulates
     ///   `2 × num_paths` scenario paths.
     pub fn monte_carlo(num_paths: usize) -> Self {
-        PricingMode::MonteCarlo {
+        StructuredCreditPricingMode::MonteCarlo {
             num_paths: num_paths.max(50),
             antithetic: true,
         }
@@ -109,7 +103,7 @@ impl PricingMode {
 
     /// Create hybrid pricing mode.
     pub fn hybrid(tree_periods: usize, num_paths: usize) -> Self {
-        PricingMode::Hybrid {
+        StructuredCreditPricingMode::Hybrid {
             tree_periods: tree_periods.max(6),
             num_paths: num_paths.max(100),
         }
@@ -125,7 +119,7 @@ pub(crate) struct StochasticPricerConfig {
     pub discount_curve: Arc<DiscountCurve>,
 
     /// Pricing mode (tree, MC, or hybrid)
-    pub pricing_mode: PricingMode,
+    pub pricing_mode: StructuredCreditPricingMode,
 
     /// Scenario tree configuration
     pub tree_config: ScenarioTreeConfig,
@@ -158,7 +152,7 @@ impl StochasticPricerConfig {
         Self {
             valuation_date,
             discount_curve,
-            pricing_mode: PricingMode::default(),
+            pricing_mode: StructuredCreditPricingMode::default(),
             tree_config,
             es_confidence: 0.95,
             max_tree_paths: 100_000,
@@ -177,7 +171,7 @@ impl StochasticPricerConfig {
     }
 
     /// Set pricing mode.
-    pub(crate) fn with_pricing_mode(mut self, mode: PricingMode) -> Self {
+    pub(crate) fn with_pricing_mode(mut self, mode: StructuredCreditPricingMode) -> Self {
         self.pricing_mode = mode;
         self
     }
@@ -230,9 +224,9 @@ mod tests {
     /// `price_stochastic` overrode the default before it was used.
     #[test]
     fn test_pricing_mode_default_is_monte_carlo() {
-        let mode = PricingMode::default();
+        let mode = StructuredCreditPricingMode::default();
         assert!(
-            matches!(mode, PricingMode::MonteCarlo { .. }),
+            matches!(mode, StructuredCreditPricingMode::MonteCarlo { .. }),
             "the default pricing mode must be Monte Carlo, not Tree — Tree \
              cannot price a deal at a realistic horizon"
         );
@@ -241,7 +235,7 @@ mod tests {
         assert!(
             matches!(
                 mode,
-                PricingMode::MonteCarlo {
+                StructuredCreditPricingMode::MonteCarlo {
                     num_paths: 5_000,
                     antithetic: true
                 }
@@ -253,7 +247,10 @@ mod tests {
     /// Tree remains selectable and correct within its node bound.
     #[test]
     fn tree_mode_is_still_available_explicitly() {
-        assert!(matches!(PricingMode::tree(), PricingMode::Tree));
+        assert!(matches!(
+            StructuredCreditPricingMode::tree(),
+            StructuredCreditPricingMode::Tree
+        ));
     }
 
     #[test]
@@ -267,7 +264,7 @@ mod tests {
         assert_eq!(config.valuation_date, today);
         assert!(matches!(
             config.pricing_mode,
-            PricingMode::MonteCarlo { .. }
+            StructuredCreditPricingMode::MonteCarlo { .. }
         ));
     }
 
@@ -278,28 +275,28 @@ mod tests {
         let tree_config = ScenarioTreeConfig::new(12, 3);
 
         let config = StochasticPricerConfig::new(today, curve, tree_config)
-            .with_pricing_mode(PricingMode::monte_carlo(5_000));
+            .with_pricing_mode(StructuredCreditPricingMode::monte_carlo(5_000));
 
         assert!(matches!(
             config.pricing_mode,
-            PricingMode::MonteCarlo { .. }
+            StructuredCreditPricingMode::MonteCarlo { .. }
         ));
     }
 
     #[test]
     fn hybrid_pricing_mode_uses_num_paths() {
         // schema-rejection-test: `hybrid.mc_paths`
-        let err = serde_json::from_str::<PricingMode>(
+        let err = serde_json::from_str::<StructuredCreditPricingMode>(
             r#"{"hybrid": {"tree_periods": 2, "mc_paths": 100}}"#,
         )
         .expect_err("retired hybrid.mc_paths must be rejected");
         assert!(err.to_string().contains("mc_paths"), "{err}");
-        let mode: PricingMode =
+        let mode: StructuredCreditPricingMode =
             serde_json::from_str(r#"{"hybrid": {"tree_periods": 2, "num_paths": 100}}"#)
                 .expect("canonical hybrid parses");
         assert_eq!(
             mode,
-            PricingMode::Hybrid {
+            StructuredCreditPricingMode::Hybrid {
                 tree_periods: 2,
                 num_paths: 100
             }

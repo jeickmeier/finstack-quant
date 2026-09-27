@@ -18,7 +18,7 @@ use finstack_quant_core::types::{CurveId, IndexId};
 pub use finstack_quant_test_utils::assert::relative_eq;
 use finstack_quant_valuations::constants::isda::STANDARD_RECOVERY_SENIOR;
 use finstack_quant_valuations::instruments::credit_derivatives::cds_option::{
-    CDSOption, CDSOptionParams, CDSOptionStrike, ProtectionStartConvention,
+    CdsOption, CdsOptionParams, CdsOptionStrike, ProtectionStartConvention,
 };
 use finstack_quant_valuations::instruments::CreditParams;
 use finstack_quant_valuations::instruments::OptionType;
@@ -133,9 +133,9 @@ fn bp_to_decimal(bp: f64) -> Decimal {
     Decimal::try_from(bp / 10000.0).expect("valid decimal from bp")
 }
 
-/// Test builder for `CDSOption`. Strikes are accepted in basis points for
+/// Test builder for `CdsOption`. Strikes are accepted in basis points for
 /// readability and converted to decimal internally.
-pub struct CDSOptionBuilder {
+pub struct CdsOptionBuilder {
     id: String,
     strike_bp: f64,
     clean_price_strike_pct: Option<f64>,
@@ -153,7 +153,7 @@ pub struct CDSOptionBuilder {
     knockout: Option<bool>,
 }
 
-impl CDSOptionBuilder {
+impl CdsOptionBuilder {
     pub fn new() -> Self {
         Self {
             id: "CDSOPT-TEST".to_string(),
@@ -271,17 +271,17 @@ impl CDSOptionBuilder {
         self
     }
 
-    pub fn build(self, as_of: Date) -> CDSOption {
+    pub fn build(self, as_of: Date) -> CdsOption {
         let expiry = as_of.add_months(self.expiry_months);
         let underlying_maturity = as_of.add_months(self.cds_maturity_months);
 
         let strike = match self.clean_price_strike_pct {
-            Some(pct) => CDSOptionStrike::CleanPricePct(
+            Some(pct) => CdsOptionStrike::CleanPricePct(
                 Decimal::try_from(pct).expect("valid clean-price strike"),
             ),
-            None => CDSOptionStrike::Spread(bp_to_decimal(self.strike_bp)),
+            None => CdsOptionStrike::Spread(bp_to_decimal(self.strike_bp)),
         };
-        let mut option_params = CDSOptionParams::new(
+        let mut option_params = CdsOptionParams::new(
             strike,
             expiry,
             underlying_maturity,
@@ -308,7 +308,7 @@ impl CDSOptionBuilder {
         }
 
         let credit_params = CreditParams::corporate_standard("SN", "HZ-SN");
-        let mut option = CDSOption::new(
+        let mut option = CdsOption::new(
             self.id,
             &option_params,
             &credit_params,
@@ -330,7 +330,7 @@ impl CDSOptionBuilder {
     }
 }
 
-impl Default for CDSOptionBuilder {
+impl Default for CdsOptionBuilder {
     fn default() -> Self {
         Self::new()
     }

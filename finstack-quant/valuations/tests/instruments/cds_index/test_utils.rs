@@ -11,7 +11,7 @@ pub use finstack_quant_test_utils::assert::{in_range, relative_eq};
 use finstack_quant_valuations::constants::isda::STANDARD_RECOVERY_SENIOR;
 use finstack_quant_valuations::instruments::credit_derivatives::cds::PayReceive;
 use finstack_quant_valuations::instruments::credit_derivatives::cds_index::{
-    CDSIndex, CDSIndexConstituent, CDSIndexParams,
+    CdsIndex, CdsIndexConstituent, CdsIndexParams,
 };
 use finstack_quant_valuations::instruments::CreditParams;
 
@@ -115,15 +115,15 @@ pub fn replayable_multi_constituent_market_context(
 }
 
 /// Create standard CDX IG preset.
-pub fn standard_cdx_params() -> CDSIndexParams {
-    CDSIndexParams::cdx_na_ig(42, 1, 100.0)
+pub fn standard_cdx_params() -> CdsIndexParams {
+    CdsIndexParams::cdx_na_ig(42, 1, 100.0)
 }
 
 /// Create equal-weight constituents (active, not defaulted).
-pub fn equal_weight_constituents(count: usize) -> Vec<CDSIndexConstituent> {
+pub fn equal_weight_constituents(count: usize) -> Vec<CdsIndexConstituent> {
     (0..count)
         .map(|i| {
-            CDSIndexConstituent::active(
+            CdsIndexConstituent::active(
                 CreditParams::corporate_standard(format!("NAME{}", i + 1), format!("HZ{}", i + 1)),
                 1.0 / count as f64,
             )
@@ -132,8 +132,8 @@ pub fn equal_weight_constituents(count: usize) -> Vec<CDSIndexConstituent> {
 }
 
 /// Create a standard single-curve index
-pub fn standard_single_curve_index(id: &str, start: Date, end: Date, notional: f64) -> CDSIndex {
-    CDSIndex::from_preset(
+pub fn standard_single_curve_index(id: &str, start: Date, end: Date, notional: f64) -> CdsIndex {
+    CdsIndex::from_preset(
         &standard_cdx_params(),
         id,
         Money::new(notional, Currency::USD).expect("valid money fixture"),
@@ -154,8 +154,8 @@ pub fn standard_constituents_index(
     end: Date,
     notional: f64,
     num_constituents: usize,
-) -> CDSIndex {
-    CDSIndex::from_preset(
+) -> CdsIndex {
+    CdsIndex::from_preset(
         &standard_cdx_params(),
         id,
         Money::new(notional, Currency::USD).expect("valid money fixture"),

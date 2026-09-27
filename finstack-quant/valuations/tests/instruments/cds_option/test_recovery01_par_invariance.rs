@@ -9,7 +9,7 @@ use time::macros::date;
 fn test_recovery01_ignores_unreplayable_par_spread_sidecar() {
     let as_of = date!(2025 - 01 - 01);
     let market = standard_market(as_of);
-    let option = CDSOptionBuilder::new().build(as_of);
+    let option = CdsOptionBuilder::new().build(as_of);
 
     let result = option
         .price_with_metrics(

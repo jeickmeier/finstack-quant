@@ -4,7 +4,7 @@
 use finstack_quant_valuations::instruments::json_loader::{
     instrument_registry, InstrumentEnvelope, InstrumentJson, InstrumentSchema,
 };
-use finstack_quant_valuations::instruments::{AgencyCmo, CDSOption};
+use finstack_quant_valuations::instruments::{AgencyCmo, CdsOption};
 
 mod schema_roundtrip {
     use super::*;
@@ -56,7 +56,7 @@ mod schema_roundtrip {
     fn cds_option_schema_example_matches_canonical_json() {
         let envelope = InstrumentEnvelope {
             schema: finstack_quant_valuations::instruments::json_loader::InstrumentSchema::CURRENT,
-            instrument: InstrumentJson::CDSOption(CDSOption::example().expect("cdso")),
+            instrument: InstrumentJson::CdsOption(CdsOption::example().expect("cdso")),
         };
         let canonical = serde_json::to_value(envelope).expect("serialize cds option example");
 

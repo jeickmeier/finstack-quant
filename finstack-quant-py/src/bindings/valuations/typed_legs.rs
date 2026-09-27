@@ -1,6 +1,6 @@
 //! Typed leg-spec wrappers (`FixedLegSpec`, `FloatLegSpec`, `PremiumLegSpec`,
 //! `ProtectionLegSpec`) shared by the typed `InterestRateSwap`, `Swaption`,
-//! `CreditDefaultSwap` and `CDSIndex` builders.
+//! `CreditDefaultSwap` and `CdsIndex` builders.
 //!
 //! Thin frozen wrappers: construction and validation stay in Rust, the
 //! bindings only coerce Python inputs (`float | Rate`, `float | Bps`,

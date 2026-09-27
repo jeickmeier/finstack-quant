@@ -9,7 +9,7 @@
 //!
 //! Public API mirrors the CDS pricer surface for parity: NPV, par spread,
 //! risky PV01, and leg PVs. Heavy numerical work is delegated to
-//! `crate::instruments::credit_derivatives::cds::pricing::CDSPricer`.
+//! `crate::instruments::credit_derivatives::cds::pricing::CdsPricer`.
 
 use crate::cashflow::builder::schedule::merge_cashflow_schedules;
 use crate::cashflow::builder::{CashFlowSchedule, Notional};
@@ -20,11 +20,11 @@ use crate::cashflow::traits::{
 use crate::constants::{credit, BASIS_POINTS_PER_UNIT};
 use crate::instruments::common_impl::traits::Instrument;
 use crate::instruments::credit_derivatives::cds::pricing::{
-    date_from_hazard_time, CDSPricer, CDSPricerConfig,
+    date_from_hazard_time, CdsPricer, CdsPricerConfig,
 };
 use crate::instruments::credit_derivatives::cds::{CreditDefaultSwap, PayReceive};
 use crate::instruments::credit_derivatives::cds_index::{
-    CDSIndex, ConstituentResult, IndexParSpreadResult, IndexPricing, IndexResult,
+    CdsIndex, ConstituentResult, IndexParSpreadResult, IndexPricing, IndexResult,
 };
 use crate::pricer::expect_inst;
 use crate::recalibration::{
@@ -51,7 +51,7 @@ const INDEX_FACTOR_CONSISTENCY_TOL: f64 = 1e-6;
 /// the index's configured pricing mode.
 ///
 /// All priced quantities (NPV, leg PVs, par spread, RPV01, CS01) are
-/// derived by delegating to the single-name `CDSPricer` per-name (Constituents
+/// derived by delegating to the single-name `CdsPricer` per-name (Constituents
 /// mode) or via a single synthetic CDS (SingleCurve mode), then aggregating.
 /// This guarantees that `npv ≈ par_spread × notional × risky_pv01 − pv_protection_leg`
 /// holds to numerical tolerance.
@@ -60,10 +60,10 @@ const INDEX_FACTOR_CONSISTENCY_TOL: f64 = 1e-6;
 /// by `build_projected_schedule` to expose expected cashflow timing to
 /// `CashflowProvider` consumers; it is intentionally a coarser approximation
 /// than the priced values and is not used to compute any reported PV.
-pub(crate) struct CDSIndexPricer {
-    /// Configuration carried so inner `CDSPricer` instances and the
+pub(crate) struct CdsIndexPricer {
+    /// Configuration carried so inner `CdsPricer` instances and the
     /// informational flow projection stay in sync.
-    cds_config: CDSPricerConfig,
+    cds_config: CdsPricerConfig,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -78,7 +78,7 @@ struct ResolvedConstituent<'a> {
 impl ResolvedConstituent<'_> {
     fn apply_to_cds(
         &self,
-        index: &CDSIndex,
+        index: &CdsIndex,
         cds: &mut CreditDefaultSwap,
     ) -> finstack_quant_core::Result<()> {
         cds.id = format!("{}-{:03}", index.id, self.ordinal).into();
@@ -105,24 +105,24 @@ struct ProjectedIndexFlows {
     constituents: Vec<ProjectedConstituentFlows>,
 }
 
-impl Default for CDSIndexPricer {
+impl Default for CdsIndexPricer {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl CDSIndexPricer {
+impl CdsIndexPricer {
     /// Create a new CDS Index pricer with default ISDA-compliant CDS config.
     pub(crate) fn new() -> Self {
         Self {
-            cds_config: CDSPricerConfig::default(),
+            cds_config: CdsPricerConfig::default(),
         }
     }
 
     /// Compute instrument NPV from the perspective of `PayReceive`.
     pub(crate) fn npv(
         &self,
-        index: &CDSIndex,
+        index: &CdsIndex,
         curves: &MarketContext,
         as_of: Date,
     ) -> Result<Money> {
@@ -131,16 +131,16 @@ impl CDSIndexPricer {
 
     /// Compute instrument NPV with optional per-constituent breakdown.
     ///
-    /// NPV is computed by delegating to `CDSPricer::npv_full` per resolved
+    /// NPV is computed by delegating to `CdsPricer::npv_full` per resolved
     /// position (one synthetic CDS in `SingleCurve` mode, N constituents
     /// otherwise) and then summing. The contractual index upfront
-    /// (`CDSIndex.upfront`) is discounted from its payment date on the
+    /// (`CdsIndex.upfront`) is discounted from its payment date on the
     /// premium discount curve and applied once at the aggregate, with the same
-    /// sign convention used by `CDSPricer::npv_full` for single-name CDS
+    /// sign convention used by `CdsPricer::npv_full` for single-name CDS
     /// upfronts. Upfronts paid before `as_of` are dropped.
     pub(crate) fn npv_detailed(
         &self,
-        index: &CDSIndex,
+        index: &CdsIndex,
         curves: &MarketContext,
         as_of: Date,
     ) -> Result<IndexResult<Money>> {
@@ -176,7 +176,7 @@ impl CDSIndexPricer {
     /// Returns the unsigned protection-leg PV (always non-negative).
     pub(crate) fn pv_protection_leg(
         &self,
-        index: &CDSIndex,
+        index: &CdsIndex,
         curves: &MarketContext,
         as_of: Date,
     ) -> Result<Money> {
@@ -185,11 +185,11 @@ impl CDSIndexPricer {
 
     /// Present value of the protection leg with optional per-constituent breakdown.
     ///
-    /// Delegates to `CDSPricer::pv_protection_leg` per resolved position and
+    /// Delegates to `CdsPricer::pv_protection_leg` per resolved position and
     /// sums. Result is the unsigned (non-negative) protection-leg PV.
     pub(crate) fn pv_protection_leg_detailed(
         &self,
-        index: &CDSIndex,
+        index: &CdsIndex,
         curves: &MarketContext,
         as_of: Date,
     ) -> Result<IndexResult<Money>> {
@@ -203,7 +203,7 @@ impl CDSIndexPricer {
     /// Returns the unsigned premium-leg PV (always non-negative).
     pub(crate) fn pv_premium_leg(
         &self,
-        index: &CDSIndex,
+        index: &CdsIndex,
         curves: &MarketContext,
         as_of: Date,
     ) -> Result<Money> {
@@ -212,11 +212,11 @@ impl CDSIndexPricer {
 
     /// Present value of the premium leg with optional per-constituent breakdown.
     ///
-    /// Delegates to `CDSPricer::pv_premium_leg` per resolved position and
+    /// Delegates to `CdsPricer::pv_premium_leg` per resolved position and
     /// sums. Result is the unsigned (non-negative) premium-leg PV.
     pub(crate) fn pv_premium_leg_detailed(
         &self,
-        index: &CDSIndex,
+        index: &CdsIndex,
         curves: &MarketContext,
         as_of: Date,
     ) -> Result<IndexResult<Money>> {
@@ -228,7 +228,7 @@ impl CDSIndexPricer {
     /// Par spread in basis points that sets NPV to zero.
     pub(crate) fn par_spread(
         &self,
-        index: &CDSIndex,
+        index: &CdsIndex,
         curves: &MarketContext,
         as_of: Date,
     ) -> Result<f64> {
@@ -244,7 +244,7 @@ impl CDSIndexPricer {
     /// [`IndexParSpreadResult::denominator`].
     pub(crate) fn par_spread_detailed(
         &self,
-        index: &CDSIndex,
+        index: &CdsIndex,
         curves: &MarketContext,
         as_of: Date,
     ) -> Result<IndexParSpreadResult> {
@@ -252,7 +252,7 @@ impl CDSIndexPricer {
         // aggregation paths; without this the SingleCurve branch builds the
         // synthetic CDS directly and silently prices e.g. index_factor > 1.
         index.validate()?;
-        let pricer = CDSPricer::with_config(self.cds_config.clone());
+        let pricer = CdsPricer::with_config(self.cds_config.clone());
         match index.pricing {
             IndexPricing::SingleCurve => {
                 let cds = self.synthetic_cds(index)?;
@@ -332,7 +332,7 @@ impl CDSIndexPricer {
     /// Risky PV01 (absolute currency units) aggregated by pricing mode.
     pub(crate) fn risky_pv01(
         &self,
-        index: &CDSIndex,
+        index: &CdsIndex,
         curves: &MarketContext,
         as_of: Date,
     ) -> Result<f64> {
@@ -344,11 +344,11 @@ impl CDSIndexPricer {
     /// The schedule exposes expected cashflow timing for `CashflowProvider`
     /// consumers (treasury reports, schedule listings). It is a coarser
     /// approximation than the priced PV (which uses ISDA Standard Model
-    /// integration via `CDSPricer`); discounting this schedule and summing
+    /// integration via `CdsPricer`); discounting this schedule and summing
     /// will agree with `npv()` only to within a few percent for benign curves.
     pub(crate) fn build_projected_schedule(
         &self,
-        index: &CDSIndex,
+        index: &CdsIndex,
         curves: &MarketContext,
         as_of: Date,
     ) -> Result<CashFlowSchedule> {
@@ -389,7 +389,7 @@ impl CDSIndexPricer {
     /// Risky PV01 with optional per-constituent breakdown.
     pub(crate) fn risky_pv01_detailed(
         &self,
-        index: &CDSIndex,
+        index: &CdsIndex,
         curves: &MarketContext,
         as_of: Date,
     ) -> Result<IndexResult<f64>> {
@@ -401,7 +401,7 @@ impl CDSIndexPricer {
     /// CS01 (approximate) aggregated by pricing mode.
     pub(crate) fn cs01(
         &self,
-        index: &CDSIndex,
+        index: &CdsIndex,
         curves: &MarketContext,
         as_of: Date,
         provider: &dyn RecalibrationProvider,
@@ -412,7 +412,7 @@ impl CDSIndexPricer {
     /// CS01 (approximate) with optional per-constituent breakdown.
     pub(crate) fn cs01_detailed(
         &self,
-        index: &CDSIndex,
+        index: &CdsIndex,
         curves: &MarketContext,
         as_of: Date,
         provider: &dyn RecalibrationProvider,
@@ -433,7 +433,7 @@ impl CDSIndexPricer {
         let discount_id = &cds.premium_leg.discount_curve_id;
         let bump_bp = 1.0_f64;
 
-        let pricer = CDSPricer::with_config(self.cds_config.clone());
+        let pricer = CdsPricer::with_config(self.cds_config.clone());
         let hazard = curves.get_hazard(credit_id)?;
         crate::metrics::sensitivities::cs01::require_hazard_replay(
             hazard.as_ref(),
@@ -486,13 +486,13 @@ impl CDSIndexPricer {
     /// `MarketContext::get_discount` call is performed exactly once.
     fn aggregate_f64_detailed<F>(
         &self,
-        index: &CDSIndex,
+        index: &CdsIndex,
         curves: &MarketContext,
         as_of: Date,
         f: F,
     ) -> Result<IndexResult<f64>>
     where
-        F: Fn(&CDSPricer, &CreditDefaultSwap, &DiscountCurve, &HazardCurve, Date) -> Result<f64>,
+        F: Fn(&CdsPricer, &CreditDefaultSwap, &DiscountCurve, &HazardCurve, Date) -> Result<f64>,
     {
         index.validate()?;
         if as_of >= index.premium_leg.end {
@@ -501,7 +501,7 @@ impl CDSIndexPricer {
                 constituents: Vec::new(),
             });
         }
-        let pricer = CDSPricer::with_config(self.cds_config.clone());
+        let pricer = CdsPricer::with_config(self.cds_config.clone());
         match index.pricing {
             IndexPricing::SingleCurve => {
                 let cds = self.synthetic_cds(index)?;
@@ -543,13 +543,13 @@ impl CDSIndexPricer {
     /// outputs. Returns the aggregate in the index notional currency.
     fn aggregate_money_detailed<F>(
         &self,
-        index: &CDSIndex,
+        index: &CdsIndex,
         curves: &MarketContext,
         as_of: Date,
         f: F,
     ) -> Result<IndexResult<Money>>
     where
-        F: Fn(&CDSPricer, &CreditDefaultSwap, &DiscountCurve, &HazardCurve, Date) -> Result<Money>,
+        F: Fn(&CdsPricer, &CreditDefaultSwap, &DiscountCurve, &HazardCurve, Date) -> Result<Money>,
     {
         index.validate()?;
         let currency = index.notional.currency();
@@ -559,7 +559,7 @@ impl CDSIndexPricer {
                 constituents: Vec::new(),
             });
         }
-        let pricer = CDSPricer::with_config(self.cds_config.clone());
+        let pricer = CdsPricer::with_config(self.cds_config.clone());
         match index.pricing {
             IndexPricing::SingleCurve => {
                 let cds = self.synthetic_cds(index)?;
@@ -597,7 +597,7 @@ impl CDSIndexPricer {
 
     fn for_each_constituent<'a>(
         &self,
-        index: &'a CDSIndex,
+        index: &'a CdsIndex,
         mut visit: impl FnMut(ResolvedConstituent<'a>) -> Result<()>,
     ) -> Result<usize> {
         if index.constituents.is_empty() {
@@ -715,7 +715,7 @@ impl CDSIndexPricer {
 
     fn project_resolved_flows(
         &self,
-        index: &CDSIndex,
+        index: &CdsIndex,
         curves: &MarketContext,
         as_of: Date,
     ) -> Result<ProjectedIndexFlows> {
@@ -747,7 +747,7 @@ impl CDSIndexPricer {
         }
     }
 
-    fn synthetic_cds(&self, index: &CDSIndex) -> Result<CreditDefaultSwap> {
+    fn synthetic_cds(&self, index: &CdsIndex) -> Result<CreditDefaultSwap> {
         // `to_synthetic_cds()` already applies `index_factor` to notional and
         // leaves the synthetic CDS without an upfront: the index applies its
         // own upfront once at the aggregate level in `npv_detailed`.
@@ -913,14 +913,14 @@ impl crate::pricer::Pricer for SimpleCdsIndexHazardPricer {
         use crate::instruments::common_impl::traits::Instrument;
 
         // Type-safe downcasting
-        let cds_index = expect_inst::<crate::instruments::credit_derivatives::cds_index::CDSIndex>(
+        let cds_index = expect_inst::<crate::instruments::credit_derivatives::cds_index::CdsIndex>(
             instrument,
             crate::pricer::InstrumentType::CdsIndex,
         )?;
 
         // Use the provided as_of date for valuation
         // Compute present value using the engine
-        let pv = CDSIndexPricer::new()
+        let pv = CdsIndexPricer::new()
             .npv(cds_index, market, as_of)
             .map_err(|e| {
                 crate::pricer::PricingError::model_failure_with_context(
@@ -962,7 +962,7 @@ mod tests {
     use super::*;
     use crate::cashflow::primitives::CFKind;
     use crate::instruments::common_impl::parameters::CreditParams;
-    use crate::instruments::credit_derivatives::cds_index::CDSIndexConstituent;
+    use crate::instruments::credit_derivatives::cds_index::CdsIndexConstituent;
     use date_support::date;
     use discount_forward_curve_support::flat_discount_with_tenor;
     use finstack_quant_core::currency::Currency;
@@ -984,16 +984,16 @@ mod tests {
 
     #[test]
     fn constituent_positions_skip_defaulted_names_and_renormalize_live_weights() {
-        let mut index = CDSIndex::example();
+        let mut index = CdsIndex::example();
         index.pricing = IndexPricing::Constituents;
         index.index_factor = 0.6;
         index.constituents = vec![
-            CDSIndexConstituent {
+            CdsIndexConstituent {
                 credit: CreditParams::corporate_standard("LIVE", "LIVE-HAZARD"),
                 weight: 0.6,
                 defaulted: false,
             },
-            CDSIndexConstituent {
+            CdsIndexConstituent {
                 credit: CreditParams::corporate_standard("DEFAULTED", "DEFAULTED-HAZARD"),
                 weight: 0.4,
                 defaulted: true,
@@ -1001,7 +1001,7 @@ mod tests {
         ];
 
         let mut resolved = Vec::new();
-        let count = CDSIndexPricer::new()
+        let count = CdsIndexPricer::new()
             .for_each_constituent(&index, |position| {
                 resolved.push((
                     position.credit_curve_id.clone(),
@@ -1022,20 +1022,20 @@ mod tests {
     fn upfront_respects_pay_receive_sign() {
         let as_of = date(2024, 1, 1);
         let market = sample_market(as_of);
-        let pricer = CDSIndexPricer::new();
+        let pricer = CdsIndexPricer::new();
         let upfront = Money::from((125_000_i64, Currency::USD));
 
         // Paid on the valuation date, so the discount factor is exactly 1.
-        let mut pay = CDSIndex::example();
+        let mut pay = CdsIndex::example();
         pay.upfront = Some((as_of, upfront));
         let pay_base = pricer
-            .npv(&CDSIndex::example(), &market, as_of)
+            .npv(&CdsIndex::example(), &market, as_of)
             .expect("base pay npv");
         let pay_with_upfront = pricer
             .npv(&pay, &market, as_of)
             .expect("pay npv with upfront");
 
-        let mut receive = CDSIndex::example();
+        let mut receive = CdsIndex::example();
         receive.side = crate::instruments::credit_derivatives::cds::PayReceive::Receive;
         let mut receive_with_upfront = receive.clone();
         receive_with_upfront.upfront = Some((as_of, upfront));
@@ -1054,8 +1054,8 @@ mod tests {
     fn projected_schedule_contains_premium_and_default_rows() {
         let as_of = date(2024, 1, 1);
         let market = sample_market(as_of);
-        let schedule = CDSIndexPricer::new()
-            .build_projected_schedule(&CDSIndex::example(), &market, as_of)
+        let schedule = CdsIndexPricer::new()
+            .build_projected_schedule(&CdsIndex::example(), &market, as_of)
             .expect("projected schedule should build");
 
         assert!(schedule
@@ -1072,12 +1072,12 @@ mod tests {
     fn npv_close_to_discounted_projected_schedule() {
         // The cashflow schedule is an informational mid-period Riemann
         // projection while the priced NPV uses the ISDA Standard Model
-        // integration via `CDSPricer`. They should agree to a few percent
+        // integration via `CdsPricer`. They should agree to a few percent
         // for benign curves but are not numerically identical.
         let as_of = date(2024, 1, 1);
         let market = sample_market(as_of);
-        let index = CDSIndex::example();
-        let pricer = CDSIndexPricer::new();
+        let index = CdsIndex::example();
+        let pricer = CdsIndexPricer::new();
         let schedule = pricer
             .build_projected_schedule(&index, &market, as_of)
             .expect("projected schedule should build");
@@ -1115,8 +1115,8 @@ mod tests {
         // that the dual-pathway design previously violated.
         let as_of = date(2024, 1, 1);
         let market = sample_market(as_of);
-        let pricer = CDSIndexPricer::new();
-        let index = CDSIndex::example(); // Pay by default
+        let pricer = CdsIndexPricer::new();
+        let index = CdsIndex::example(); // Pay by default
 
         let npv = pricer.npv(&index, &market, as_of).expect("npv");
         let pv_prot = pricer
@@ -1163,22 +1163,22 @@ mod tests {
                 .expect("hazard B"),
         );
 
-        let mut index = CDSIndex::example();
+        let mut index = CdsIndex::example();
         index.pricing = IndexPricing::Constituents;
         index.constituents = vec![
-            CDSIndexConstituent {
+            CdsIndexConstituent {
                 credit: CreditParams::corporate_standard("A", "HZ-A"),
                 weight: 0.5,
                 defaulted: false,
             },
-            CDSIndexConstituent {
+            CdsIndexConstituent {
                 credit: CreditParams::corporate_standard("B", "HZ-B"),
                 weight: 0.5,
                 defaulted: false,
             },
         ];
 
-        let pricer = CDSIndexPricer::new();
+        let pricer = CdsIndexPricer::new();
         let npv = pricer.npv(&index, &market, as_of).expect("npv");
         let pv_prot = pricer
             .pv_protection_leg(&index, &market, as_of)
@@ -1200,16 +1200,16 @@ mod tests {
 
     #[test]
     fn rejects_index_factor_inconsistent_with_defaulted_weights() {
-        let mut index = CDSIndex::example();
+        let mut index = CdsIndex::example();
         index.pricing = IndexPricing::Constituents;
         // No defaults but index_factor > 1 should be rejected.
         index.index_factor = 1.2;
-        index.constituents = vec![CDSIndexConstituent {
+        index.constituents = vec![CdsIndexConstituent {
             credit: CreditParams::corporate_standard("A", "HZ-A"),
             weight: 1.0,
             defaulted: false,
         }];
-        let err = CDSIndexPricer::new()
+        let err = CdsIndexPricer::new()
             .for_each_constituent(&index, |_| Ok(()))
             .expect_err("inconsistent index_factor should fail");
         let msg = format!("{err}");
@@ -1222,24 +1222,24 @@ mod tests {
         // consistency check is two-sided — an index_factor strictly below
         // `1 − sum_defaulted_weights` would silently shrink the surviving
         // notional further than the declared defaults justify.
-        let mut index = CDSIndex::example();
+        let mut index = CdsIndex::example();
         index.pricing = IndexPricing::Constituents;
         // 20% declared default → factor should be 0.8; we set 0.5 to
         // simulate the bug.
         index.index_factor = 0.5;
         index.constituents = vec![
-            CDSIndexConstituent {
+            CdsIndexConstituent {
                 credit: CreditParams::corporate_standard("A", "HZ-A"),
                 weight: 0.8,
                 defaulted: false,
             },
-            CDSIndexConstituent {
+            CdsIndexConstituent {
                 credit: CreditParams::corporate_standard("B", "HZ-B"),
                 weight: 0.2,
                 defaulted: true,
             },
         ];
-        let err = CDSIndexPricer::new()
+        let err = CdsIndexPricer::new()
             .for_each_constituent(&index, |_| Ok(()))
             .expect_err("understated index_factor should fail when defaults are declared");
         let msg = format!("{err}");
@@ -1252,15 +1252,15 @@ mod tests {
         // no constituents are flagged as defaulted (e.g. SingleCurve mode
         // or external default tracking). This must NOT be rejected by the
         // Q4 lower-bound check.
-        let mut index = CDSIndex::example();
+        let mut index = CdsIndex::example();
         index.pricing = IndexPricing::Constituents;
         index.index_factor = 0.8;
-        index.constituents = vec![CDSIndexConstituent {
+        index.constituents = vec![CdsIndexConstituent {
             credit: CreditParams::corporate_standard("A", "HZ-A"),
             weight: 1.0,
             defaulted: false,
         }];
-        CDSIndexPricer::new()
+        CdsIndexPricer::new()
             .for_each_constituent(&index, |_| Ok(()))
             .expect("factor < 1 with no declared defaults must be accepted");
     }
@@ -1272,10 +1272,10 @@ mod tests {
         // numerator / denominator must reproduce the reported total.
         let as_of = date(2024, 5, 15);
         let market = sample_market(as_of);
-        let index = CDSIndex::example();
+        let index = CdsIndex::example();
         assert_eq!(index.pricing, IndexPricing::SingleCurve);
 
-        let r = CDSIndexPricer::new()
+        let r = CdsIndexPricer::new()
             .par_spread_detailed(&index, &market, as_of)
             .expect("detailed par spread");
 
@@ -1294,21 +1294,21 @@ mod tests {
 
     #[test]
     fn rejects_negative_constituent_weight() {
-        let mut index = CDSIndex::example();
+        let mut index = CdsIndex::example();
         index.pricing = IndexPricing::Constituents;
         index.constituents = vec![
-            CDSIndexConstituent {
+            CdsIndexConstituent {
                 credit: CreditParams::corporate_standard("A", "HZ-A"),
                 weight: 1.5,
                 defaulted: false,
             },
-            CDSIndexConstituent {
+            CdsIndexConstituent {
                 credit: CreditParams::corporate_standard("B", "HZ-B"),
                 weight: -0.5,
                 defaulted: false,
             },
         ];
-        let err = CDSIndexPricer::new()
+        let err = CdsIndexPricer::new()
             .for_each_constituent(&index, |_| Ok(()))
             .expect_err("negative weight should fail");
         let msg = format!("{err}");
@@ -1331,7 +1331,7 @@ mod tests {
         for offset in 0..14 {
             let default_date = start + time::Duration::days(offset);
             for delay in [1_u16, 2, 3, 5] {
-                let settle = CDSIndexPricer::settlement_date_with_delay(default_date, delay);
+                let settle = CdsIndexPricer::settlement_date_with_delay(default_date, delay);
                 assert!(
                     !settle.is_weekend(),
                     "settlement (default {default_date:?}, T+{delay}) must be a \
@@ -1347,7 +1347,7 @@ mod tests {
         // T+0 is a pass-through (same date, no business-day roll).
         let d = date(2025, 1, 4); // Saturday
         assert_eq!(
-            CDSIndexPricer::settlement_date_with_delay(d, 0),
+            CdsIndexPricer::settlement_date_with_delay(d, 0),
             d,
             "T+0 settlement is a pass-through of the default date"
         );

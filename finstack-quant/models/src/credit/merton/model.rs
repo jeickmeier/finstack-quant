@@ -1,6 +1,6 @@
 use finstack_quant_core::{Error, InputError, Result};
 
-use super::{AssetDynamics, BarrierType};
+use super::{AssetDynamics, MertonBarrierType};
 
 /// Merton structural credit model.
 ///
@@ -42,7 +42,7 @@ pub struct MertonModel {
     pub(super) payout_rate: f64,
     /// Whether default is tested only at maturity or continuously over the
     /// life of the debt.
-    pub(super) barrier_type: BarrierType,
+    pub(super) barrier_type: MertonBarrierType,
     /// Stochastic process governing the asset value.
     pub(super) dynamics: AssetDynamics,
 }
@@ -72,7 +72,7 @@ pub struct RawMertonModel {
     pub payout_rate: f64,
     /// Whether default is tested only at maturity or continuously over the
     /// life of the debt.
-    pub barrier_type: BarrierType,
+    pub barrier_type: MertonBarrierType,
     /// Stochastic process governing the asset value.
     pub dynamics: AssetDynamics,
 }
@@ -119,7 +119,7 @@ impl MertonModel {
             debt_barrier,
             risk_free_rate,
             0.0,
-            BarrierType::Terminal,
+            MertonBarrierType::Terminal,
             AssetDynamics::GeometricBrownian,
         )
     }
@@ -152,9 +152,9 @@ impl MertonModel {
     /// unsupported combinations are rejected here rather than silently
     /// falling back to a different process:
     ///
-    /// - `JumpDiffusion` requires `BarrierType::Terminal`. First passage of a
+    /// - `JumpDiffusion` requires `MertonBarrierType::Terminal`. First passage of a
     ///   jump-diffusion to a barrier has no elementary closed form.
-    /// - `CreditGrades` requires `BarrierType::FirstPassage` with a zero
+    /// - `CreditGrades` requires `MertonBarrierType::FirstPassage` with a zero
     ///   growth rate. The CreditGrades survival function *is* a first-passage
     ///   law with a stochastic flat barrier, so any other pairing would
     ///   describe a process the model does not evaluate.
@@ -172,7 +172,7 @@ impl MertonModel {
         debt_barrier: f64,
         risk_free_rate: f64,
         payout_rate: f64,
-        barrier_type: BarrierType,
+        barrier_type: MertonBarrierType,
         dynamics: AssetDynamics,
     ) -> Result<Self> {
         if !(asset_value.is_finite() && asset_value > 0.0) {
@@ -194,7 +194,7 @@ impl MertonModel {
                 "MertonModel: payout_rate must be finite, got {payout_rate}"
             )));
         }
-        if let BarrierType::FirstPassage {
+        if let MertonBarrierType::FirstPassage {
             barrier_growth_rate,
         } = barrier_type
         {
@@ -206,18 +206,18 @@ impl MertonModel {
         }
         dynamics.validate()?;
         match (&dynamics, &barrier_type) {
-            (AssetDynamics::JumpDiffusion { .. }, BarrierType::FirstPassage { .. }) => {
+            (AssetDynamics::JumpDiffusion { .. }, MertonBarrierType::FirstPassage { .. }) => {
                 return Err(Error::Validation(
-                    "MertonModel: JumpDiffusion dynamics require BarrierType::Terminal; \
+                    "MertonModel: JumpDiffusion dynamics require MertonBarrierType::Terminal; \
                      first passage of a jump-diffusion has no closed-form default \
                      probability. Use Monte Carlo for pathwise first-passage default."
                         .to_string(),
                 ));
             }
-            (AssetDynamics::CreditGrades { .. }, BarrierType::Terminal) => {
+            (AssetDynamics::CreditGrades { .. }, MertonBarrierType::Terminal) => {
                 return Err(Error::Validation(
                     "MertonModel: CreditGrades dynamics require \
-                     BarrierType::FirstPassage { barrier_growth_rate: 0.0 }; the \
+                     MertonBarrierType::FirstPassage { barrier_growth_rate: 0.0 }; the \
                      CreditGrades survival function is a first-passage law with a \
                      stochastic flat barrier."
                         .to_string(),
@@ -225,7 +225,7 @@ impl MertonModel {
             }
             (
                 AssetDynamics::CreditGrades { .. },
-                BarrierType::FirstPassage {
+                MertonBarrierType::FirstPassage {
                     barrier_growth_rate,
                 },
             ) if *barrier_growth_rate != 0.0 => {
@@ -280,7 +280,7 @@ impl MertonModel {
 
     /// Barrier monitoring type.
     #[inline]
-    pub fn barrier_type(&self) -> &BarrierType {
+    pub fn barrier_type(&self) -> &MertonBarrierType {
         &self.barrier_type
     }
 
@@ -293,7 +293,7 @@ impl MertonModel {
 
 #[cfg(test)]
 mod tests {
-    use super::super::{AssetDynamics, BarrierType, MertonModel};
+    use super::super::{AssetDynamics, MertonBarrierType, MertonModel};
 
     #[test]
     fn credit_grades_produces_valid_model() {
@@ -301,7 +301,10 @@ mod tests {
         assert!(m.asset_value() > 0.0);
         assert!(m.asset_vol() > 0.0);
         assert!(matches!(m.dynamics(), AssetDynamics::CreditGrades { .. }));
-        assert!(matches!(m.barrier_type(), BarrierType::FirstPassage { .. }));
+        assert!(matches!(
+            m.barrier_type(),
+            MertonBarrierType::FirstPassage { .. }
+        ));
         let pd = m.default_probability(5.0);
         assert!(pd > 0.0 && pd < 1.0, "PD should be in (0,1), got {pd}");
     }

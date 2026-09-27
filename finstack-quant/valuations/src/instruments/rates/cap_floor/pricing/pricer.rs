@@ -67,7 +67,7 @@ pub(crate) fn price_caplet_quote(
     let inputs = CapletFloorletInputs {
         forward,
         strike,
-        volatility: quote.sigma,
+        sigma: quote.sigma,
         ..inputs
     };
     match quote.convention {
@@ -134,7 +134,7 @@ pub(crate) fn price_cap_floor(
             strike,
             forward,
             discount_factor: df,
-            volatility: quote.sigma,
+            sigma: quote.sigma,
             time_to_fixing: effective_t_fix,
             accrual_year_fraction: tau,
             currency: cap_floor.notional.currency(),

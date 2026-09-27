@@ -20,7 +20,7 @@
 
 use crate::instruments::common_impl::traits::Instrument;
 use crate::instruments::credit_derivatives::cds::metrics::market_doc_clause;
-use crate::instruments::credit_derivatives::cds_index::CDSIndex;
+use crate::instruments::credit_derivatives::cds_index::CdsIndex;
 use crate::metrics::{MetricCalculator, MetricContext};
 use crate::recalibration::{HazardRecalibrationAction, HazardRecalibrationRequest};
 use finstack_quant_core::market_data::context::MarketContext;
@@ -34,7 +34,7 @@ const RECOVERY_BUMP: f64 = 0.01;
 /// calibration quotes, a frozen-curve recovery realignment otherwise.
 fn market_with_recovery(
     context: &MetricContext,
-    index: &CDSIndex,
+    index: &CdsIndex,
     market: &MarketContext,
     curve_id: &str,
     new_recovery: f64,
@@ -83,10 +83,10 @@ pub(crate) struct Recovery01Calculator;
 
 impl MetricCalculator for Recovery01Calculator {
     fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
-        let index: &CDSIndex = context.instrument_as()?;
+        let index: &CdsIndex = context.instrument_as()?;
         let as_of = context.as_of;
 
-        let bump = |idx: &CDSIndex, delta: f64| -> CDSIndex {
+        let bump = |idx: &CdsIndex, delta: f64| -> CdsIndex {
             let mut bumped = idx.clone();
             if bumped.constituents.is_empty() {
                 let base = bumped.protection_leg.recovery_rate;
@@ -100,7 +100,7 @@ impl MetricCalculator for Recovery01Calculator {
             bumped
         };
 
-        let effective_delta = |idx: &CDSIndex, delta: f64| -> f64 {
+        let effective_delta = |idx: &CdsIndex, delta: f64| -> f64 {
             if idx.constituents.is_empty() {
                 let base = idx.protection_leg.recovery_rate;
                 (base + delta).clamp(0.0, 1.0) - base
@@ -119,7 +119,7 @@ impl MetricCalculator for Recovery01Calculator {
 
         // Re-express every hazard curve the bumped index will price against
         // at its bumped recovery (re-bootstrap when par quotes are stored).
-        let market_for = |bumped: &CDSIndex| -> Result<MarketContext> {
+        let market_for = |bumped: &CdsIndex| -> Result<MarketContext> {
             let mut market = context.curves.as_ref().clone();
             if bumped.constituents.is_empty() {
                 market = market_with_recovery(

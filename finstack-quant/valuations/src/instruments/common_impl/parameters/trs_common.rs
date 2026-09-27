@@ -1,7 +1,7 @@
 //! Common TRS types shared between equity and fixed income TRS.
 //!
 //! This module provides shared types used by both `EquityTotalReturnSwap`
-//! and `FIIndexTotalReturnSwap` instruments.
+//! and `FiIndexTotalReturnSwap` instruments.
 
 use crate::cashflow::builder::ScheduleParams;
 use finstack_quant_core::dates::{Date, DateExt, Schedule};

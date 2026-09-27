@@ -16,7 +16,7 @@ use finstack_quant_valuations::instruments::Instrument;
 
 /// A prepared CDS tranche quote ready for use in calibration.
 #[derive(Debug, Clone)]
-pub(crate) struct CDSTrancheCalibrationQuote {
+pub(crate) struct CdsTrancheCalibrationQuote {
     /// Prepared quote with constructed instrument and pillar timing.
     pub(crate) prepared: PreparedQuote<CdsTrancheQuote>,
     /// Optional upfront cashflow from the market quote.
@@ -36,7 +36,7 @@ pub(crate) enum CalibrationQuote {
     /// Credit quote (CDS Par Spread, Upfront).
     Cds(PreparedQuote<CdsQuote>),
     /// CDS Tranche quote.
-    CDSTranche(CDSTrancheCalibrationQuote),
+    CdsTranche(CdsTrancheCalibrationQuote),
     /// Inflation quote (ZCIS)
     Inflation(PreparedQuote<InflationQuote>),
     /// Cross-currency basis swap quote (par spread on a fixed-notional or MtM-resetting
@@ -50,7 +50,7 @@ impl CalibrationQuote {
         match self {
             CalibrationQuote::Rates(q) => q.quote.id().as_str(),
             CalibrationQuote::Cds(q) => q.quote.id().as_str(),
-            CalibrationQuote::CDSTranche(q) => q.prepared.quote.id.as_str(),
+            CalibrationQuote::CdsTranche(q) => q.prepared.quote.id.as_str(),
             CalibrationQuote::Inflation(q) => q.quote.id().as_str(),
             CalibrationQuote::XccyBasis(q) => q.quote.id().as_str(),
         }
@@ -61,7 +61,7 @@ impl CalibrationQuote {
         match self {
             CalibrationQuote::Rates(q) => q.instrument.as_ref(),
             CalibrationQuote::Cds(q) => q.instrument.as_ref(),
-            CalibrationQuote::CDSTranche(q) => q.prepared.instrument.as_ref(),
+            CalibrationQuote::CdsTranche(q) => q.prepared.instrument.as_ref(),
             CalibrationQuote::Inflation(q) => q.instrument.as_ref(),
             CalibrationQuote::XccyBasis(q) => q.instrument.as_ref(),
         }
@@ -72,7 +72,7 @@ impl CalibrationQuote {
         match self {
             CalibrationQuote::Rates(q) => q.pillar_time,
             CalibrationQuote::Cds(q) => q.pillar_time,
-            CalibrationQuote::CDSTranche(q) => q.prepared.pillar_time,
+            CalibrationQuote::CdsTranche(q) => q.prepared.pillar_time,
             CalibrationQuote::Inflation(q) => q.pillar_time,
             CalibrationQuote::XccyBasis(q) => q.pillar_time,
         }

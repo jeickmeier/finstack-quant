@@ -11,7 +11,7 @@ use finstack_quant_core::currency::Currency;
 use finstack_quant_core::money::Money;
 use finstack_quant_valuations::constants::isda::STANDARD_RECOVERY_SENIOR;
 use finstack_quant_valuations::instruments::credit_derivatives::cds::PayReceive;
-use finstack_quant_valuations::instruments::credit_derivatives::cds_index::CDSIndex;
+use finstack_quant_valuations::instruments::credit_derivatives::cds_index::CdsIndex;
 use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::metrics::MetricId;
 use time::macros::date;
@@ -46,7 +46,7 @@ fn test_jump_to_default_negative_for_protection_seller() {
     let end = date!(2030 - 01 - 01);
     let as_of = start;
 
-    let idx = CDSIndex::from_preset(
+    let idx = CdsIndex::from_preset(
         &standard_cdx_params(),
         "CDX-JTD-SELL",
         Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),

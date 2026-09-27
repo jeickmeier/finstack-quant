@@ -14,8 +14,8 @@ use finstack_quant_core::market_data::term_structures::{
 };
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::CurveId;
-use finstack_quant_valuations::instruments::credit_derivatives::cds_tranche::CDSTranche;
-use finstack_quant_valuations::instruments::credit_derivatives::cds_tranche::CDSTranchePricer;
+use finstack_quant_valuations::instruments::credit_derivatives::cds_tranche::CdsTranche;
+use finstack_quant_valuations::instruments::credit_derivatives::cds_tranche::CdsTranchePricer;
 use finstack_quant_valuations::instruments::Attributes;
 use finstack_quant_valuations::instruments::PayReceive;
 use finstack_quant_valuations::market::conventions::ids::{CdsConventionKey, CdsDocClause};
@@ -87,7 +87,7 @@ fn tranche_upfront_frac(
     notional: f64,
     market: &MarketContext,
 ) -> f64 {
-    let tranche = CDSTranche::builder()
+    let tranche = CdsTranche::builder()
         .id("QUOTE_TRANCHE".into())
         .index_name("CDX".to_string())
         .series(40)
@@ -110,7 +110,7 @@ fn tranche_upfront_frac(
         .build()
         .expect("tranche");
 
-    let pv = CDSTranchePricer::new()
+    let pv = CdsTranchePricer::new()
         .price_tranche(&tranche, market, base_date)
         .expect("price")
         .amount();

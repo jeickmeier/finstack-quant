@@ -213,11 +213,11 @@ fn test_schwartz_smith_params_serialization() {
     let restored = roundtrip_json(&params);
 
     // Compare fields
-    assert_eq!(params.kappa_x, restored.kappa_x);
+    assert_eq!(params.kappa, restored.kappa);
     assert_eq!(params.sigma_x, restored.sigma_x);
     assert_eq!(params.mu_y, restored.mu_y);
     assert_eq!(params.sigma_y, restored.sigma_y);
-    assert_eq!(params.rho, restored.rho);
+    assert_eq!(params.rho_xy, restored.rho_xy);
 }
 
 #[test]
@@ -234,12 +234,19 @@ fn test_edge_case_extreme_correlations() {
     // Test perfect positive correlation
     let params_pos = SchwartzSmithParams::new(2.0, 0.3, 0.02, 0.15, 1.0).expect("valid");
     let restored_pos = roundtrip_json(&params_pos);
-    assert_eq!(params_pos.rho, restored_pos.rho);
-    assert_eq!(restored_pos.rho, 1.0);
+    assert_eq!(params_pos.rho_xy, restored_pos.rho_xy);
+    assert_eq!(restored_pos.rho_xy, 1.0);
 
     // Test perfect negative correlation
     let params_neg = SchwartzSmithParams::new(2.0, 0.3, 0.02, 0.15, -1.0).expect("valid");
     let restored_neg = roundtrip_json(&params_neg);
-    assert_eq!(params_neg.rho, restored_neg.rho);
-    assert_eq!(restored_neg.rho, -1.0);
+    assert_eq!(params_neg.rho_xy, restored_neg.rho_xy);
+    assert_eq!(restored_neg.rho_xy, -1.0);
+}
+
+#[test]
+// schema-rejection-test: retired `kappa_x` / `rho` keys (now `kappa` / `rho_xy`).
+fn test_schwartz_smith_params_reject_retired_keys() {
+    let old = r#"{"kappa_x":2.0,"sigma_x":0.3,"mu_y":0.02,"sigma_y":0.15,"rho":-0.5}"#;
+    assert!(serde_json::from_str::<SchwartzSmithParams>(old).is_err());
 }

@@ -12,7 +12,7 @@ fn test_vol_monotonicity_and_high_vol_finiteness() {
     let mut values = Vec::new();
 
     for vol in [0.05, 0.30, 1.0, 2.0, 5.0] {
-        let option = CDSOptionBuilder::new().call().implied_vol(vol).build(as_of);
+        let option = CdsOptionBuilder::new().call().implied_vol(vol).build(as_of);
         let pv = option.value(&market, as_of).expect("option value").amount();
         assert_finite(pv, "high-vol CDS option PV");
         values.push((vol, pv));
@@ -34,7 +34,7 @@ fn test_put_delta_sign_negative() {
     let market = standard_market(as_of);
 
     for strike in [75.0, 100.0, 150.0, 250.0] {
-        let put = CDSOptionBuilder::new().put().strike(strike).build(as_of);
+        let put = CdsOptionBuilder::new().put().strike(strike).build(as_of);
         let delta = put.delta(&market, as_of).expect("put delta");
         assert!(
             delta < 0.0,

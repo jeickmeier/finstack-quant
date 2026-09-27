@@ -1,6 +1,6 @@
 //! CDS Index types and implementations.
 //!
-//! This module defines the `CDSIndex` instrument along with its pricing
+//! This module defines the `CdsIndex` instrument along with its pricing
 //! configuration and constituents. The index can be priced in two modes:
 //! - `SingleCurve`: delegate to a synthetic single-name CDS priced off a
 //!   single index hazard curve.
@@ -23,8 +23,8 @@ use crate::instruments::credit_derivatives::cds::{
     CdsConvention, CreditDefaultSwap, PayReceive, PremiumLegSpec, ProtectionLegSpec,
 };
 
-use super::parameters::CDSIndexParams;
-use super::pricer::CDSIndexPricer;
+use super::parameters::CdsIndexParams;
+use super::pricer::CdsIndexPricer;
 use crate::impl_instrument_base;
 
 /// Pricing mode for CDS indices.
@@ -42,7 +42,7 @@ pub enum IndexPricing {
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
-pub struct CDSIndexConstituent {
+pub struct CdsIndexConstituent {
     /// Credit configuration for the issuer (includes hazard curve id and recovery)
     pub credit: CreditParams,
     /// Weight of the issuer in the index notional (e.g., 1/125.0 for CDX IG)
@@ -55,7 +55,7 @@ pub struct CDSIndexConstituent {
     pub defaulted: bool,
 }
 
-impl CDSIndexConstituent {
+impl CdsIndexConstituent {
     /// Construct an active (non-defaulted) constituent.
     ///
     /// Common case for new trades: `defaulted` defaults to `false`. Mark
@@ -131,7 +131,7 @@ pub struct IndexParSpreadResult {
 )]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
-pub struct CDSIndex {
+pub struct CdsIndex {
     /// Unique instrument identifier
     pub id: InstrumentId,
     /// Index name, e.g., "CDX.NA.IG", "CDX.NA.HY", "iTraxx Europe"
@@ -155,7 +155,7 @@ pub struct CDSIndex {
     /// Pricing aggregation mode
     pub pricing: IndexPricing,
     /// Optional list of constituents when using `IndexPricing::Constituents`
-    pub constituents: Vec<CDSIndexConstituent>,
+    pub constituents: Vec<CdsIndexConstituent>,
     /// Number of reference entities in the index pool.
     ///
     /// Required for portfolio-level analytics (e.g. jump-to-default) when
@@ -164,7 +164,7 @@ pub struct CDSIndex {
     /// series — iTraxx Crossover has been 75 names only since Series 9,
     /// and CDX.NA.HY membership varies — so this is supplied explicitly
     /// rather than inferred from `index_name`. Standard presets populate
-    /// it via `CDSIndex::from_preset`; set it directly with
+    /// it via `CdsIndex::from_preset`; set it directly with
     /// `with_num_constituents` for custom indices.
     #[serde(default)]
     #[builder(default)]
@@ -218,7 +218,7 @@ pub struct CDSIndex {
     pub attributes: Attributes,
 }
 
-impl CDSIndex {
+impl CdsIndex {
     fn premium_with_standard_defaults(&self) -> PremiumLegSpec {
         let mut premium = self.premium_leg.clone();
         if premium.calendar_id.is_none() {
@@ -283,7 +283,7 @@ impl CDSIndex {
         }
     }
 
-    /// Construct a `CDSIndex` from a preset descriptor + trade-specific args.
+    /// Construct a `CdsIndex` from a preset descriptor + trade-specific args.
     ///
     /// Replaces the previous `new_standard` constructor. Trade state that is
     /// orthogonal to the preset (constituents, index factor) is attached
@@ -292,8 +292,8 @@ impl CDSIndex {
     /// # Example
     ///
     /// ```text
-    /// let idx = CDSIndex::from_preset(
-    ///     &CDSIndexParams::cdx_na_ig(42, 1, 100.0),
+    /// let idx = CdsIndex::from_preset(
+    ///     &CdsIndexParams::cdx_na_ig(42, 1, 100.0),
     ///     "CDX-IG-42",
     ///     Money::from((10_000_000_i64, Currency::USD)),
     ///     PayReceive::Pay,
@@ -312,7 +312,7 @@ impl CDSIndex {
     /// as `Decimal`.
     #[allow(clippy::too_many_arguments)]
     pub fn from_preset(
-        preset: &CDSIndexParams,
+        preset: &CdsIndexParams,
         id: impl Into<InstrumentId>,
         notional: Money,
         side: PayReceive,
@@ -387,7 +387,7 @@ impl CDSIndex {
     ///
     /// Defaults to 1.0. Set to less than 1.0 when modeling an index after
     /// one or more constituents have defaulted; pair with `defaulted=true`
-    /// on the corresponding `CDSIndexConstituent`s. Validation occurs at
+    /// on the corresponding `CdsIndexConstituent`s. Validation occurs at
     /// pricing time and rejects `index_factor` values that exceed
     /// `1 − Σ defaulted weights`.
     pub fn with_index_factor(mut self, factor: f64) -> Self {
@@ -471,7 +471,7 @@ impl CDSIndex {
         let w = 1.0 / (list.len() as f64);
         self.constituents = list
             .into_iter()
-            .map(|credit| CDSIndexConstituent {
+            .map(|credit| CdsIndexConstituent {
                 credit,
                 weight: w,
                 defaulted: false,
@@ -482,7 +482,7 @@ impl CDSIndex {
     }
 
     /// Configure explicit constituents with custom weights.
-    pub fn with_constituents(mut self, constituents: Vec<CDSIndexConstituent>) -> Self {
+    pub fn with_constituents(mut self, constituents: Vec<CdsIndexConstituent>) -> Self {
         if constituents.is_empty() {
             self.constituents.clear();
             self.pricing = IndexPricing::SingleCurve;
@@ -499,7 +499,7 @@ impl CDSIndex {
         curves: &finstack_quant_core::market_data::context::MarketContext,
         as_of: finstack_quant_core::dates::Date,
     ) -> finstack_quant_core::Result<finstack_quant_core::money::Money> {
-        let pricer = CDSIndexPricer::new();
+        let pricer = CdsIndexPricer::new();
         pricer.pv_protection_leg(self, curves, as_of)
     }
 
@@ -509,7 +509,7 @@ impl CDSIndex {
         curves: &finstack_quant_core::market_data::context::MarketContext,
         as_of: finstack_quant_core::dates::Date,
     ) -> finstack_quant_core::Result<finstack_quant_core::money::Money> {
-        let pricer = CDSIndexPricer::new();
+        let pricer = CdsIndexPricer::new();
         pricer.pv_premium_leg(self, curves, as_of)
     }
 
@@ -519,7 +519,7 @@ impl CDSIndex {
         curves: &finstack_quant_core::market_data::context::MarketContext,
         as_of: finstack_quant_core::dates::Date,
     ) -> finstack_quant_core::Result<f64> {
-        let pricer = CDSIndexPricer::new();
+        let pricer = CdsIndexPricer::new();
         pricer.par_spread(self, curves, as_of)
     }
 
@@ -529,7 +529,7 @@ impl CDSIndex {
         curves: &finstack_quant_core::market_data::context::MarketContext,
         as_of: finstack_quant_core::dates::Date,
     ) -> finstack_quant_core::Result<f64> {
-        let pricer = CDSIndexPricer::new();
+        let pricer = CdsIndexPricer::new();
         pricer.risky_pv01(self, curves, as_of)
     }
 
@@ -540,7 +540,7 @@ impl CDSIndex {
         as_of: finstack_quant_core::dates::Date,
         provider: &dyn crate::recalibration::RecalibrationProvider,
     ) -> finstack_quant_core::Result<f64> {
-        let pricer = CDSIndexPricer::new();
+        let pricer = CdsIndexPricer::new();
         pricer.cs01(self, curves, as_of, provider)
     }
 
@@ -550,7 +550,7 @@ impl CDSIndex {
         curves: &finstack_quant_core::market_data::context::MarketContext,
         as_of: finstack_quant_core::dates::Date,
     ) -> finstack_quant_core::Result<IndexResult<Money>> {
-        let pricer = CDSIndexPricer::new();
+        let pricer = CdsIndexPricer::new();
         pricer.npv_detailed(self, curves, as_of)
     }
 
@@ -560,7 +560,7 @@ impl CDSIndex {
         curves: &finstack_quant_core::market_data::context::MarketContext,
         as_of: finstack_quant_core::dates::Date,
     ) -> finstack_quant_core::Result<IndexResult<Money>> {
-        let pricer = CDSIndexPricer::new();
+        let pricer = CdsIndexPricer::new();
         pricer.pv_protection_leg_detailed(self, curves, as_of)
     }
 
@@ -570,7 +570,7 @@ impl CDSIndex {
         curves: &finstack_quant_core::market_data::context::MarketContext,
         as_of: finstack_quant_core::dates::Date,
     ) -> finstack_quant_core::Result<IndexResult<Money>> {
-        let pricer = CDSIndexPricer::new();
+        let pricer = CdsIndexPricer::new();
         pricer.pv_premium_leg_detailed(self, curves, as_of)
     }
 
@@ -580,7 +580,7 @@ impl CDSIndex {
         curves: &finstack_quant_core::market_data::context::MarketContext,
         as_of: finstack_quant_core::dates::Date,
     ) -> finstack_quant_core::Result<IndexParSpreadResult> {
-        let pricer = CDSIndexPricer::new();
+        let pricer = CdsIndexPricer::new();
         pricer.par_spread_detailed(self, curves, as_of)
     }
 
@@ -590,7 +590,7 @@ impl CDSIndex {
         curves: &finstack_quant_core::market_data::context::MarketContext,
         as_of: finstack_quant_core::dates::Date,
     ) -> finstack_quant_core::Result<IndexResult<f64>> {
-        let pricer = CDSIndexPricer::new();
+        let pricer = CdsIndexPricer::new();
         pricer.risky_pv01_detailed(self, curves, as_of)
     }
 
@@ -601,16 +601,16 @@ impl CDSIndex {
         as_of: finstack_quant_core::dates::Date,
         provider: &dyn crate::recalibration::RecalibrationProvider,
     ) -> finstack_quant_core::Result<IndexResult<f64>> {
-        let pricer = CDSIndexPricer::new();
+        let pricer = CdsIndexPricer::new();
         pricer.cs01_detailed(self, curves, as_of, provider)
     }
 }
 
-impl crate::instruments::common_impl::traits::Instrument for CDSIndex {
+impl crate::instruments::common_impl::traits::Instrument for CdsIndex {
     impl_instrument_base!(crate::pricer::InstrumentType::CdsIndex);
 
     fn validate_invariants(&self) -> finstack_quant_core::Result<()> {
-        CDSIndex::validate(self)
+        CdsIndex::validate(self)
     }
 
     fn default_model(&self) -> crate::pricer::ModelKey {
@@ -639,7 +639,7 @@ impl crate::instruments::common_impl::traits::Instrument for CDSIndex {
         curves: &finstack_quant_core::market_data::context::MarketContext,
         as_of: finstack_quant_core::dates::Date,
     ) -> finstack_quant_core::Result<finstack_quant_core::money::Money> {
-        let pricer = CDSIndexPricer::new();
+        let pricer = CdsIndexPricer::new();
         pricer.npv(self, curves, as_of)
     }
 
@@ -654,7 +654,7 @@ impl crate::instruments::common_impl::traits::Instrument for CDSIndex {
     crate::impl_focused_pricing_overrides!();
 }
 
-impl finstack_quant_cashflows::CashflowScheduleSource for CDSIndex {
+impl finstack_quant_cashflows::CashflowScheduleSource for CdsIndex {
     fn notional(&self) -> finstack_quant_core::Result<Option<Money>> {
         Ok(Some(self.notional))
     }
@@ -664,7 +664,7 @@ impl finstack_quant_cashflows::CashflowScheduleSource for CDSIndex {
         curves: &finstack_quant_core::market_data::context::MarketContext,
         as_of: finstack_quant_core::dates::Date,
     ) -> finstack_quant_core::Result<crate::cashflow::builder::CashFlowSchedule> {
-        let pricer = CDSIndexPricer::new();
+        let pricer = CdsIndexPricer::new();
         let schedule = pricer.build_projected_schedule(self, curves, as_of)?;
         Ok(schedule
             .with_representation(crate::cashflow::builder::CashflowRepresentation::Projected))
@@ -681,7 +681,7 @@ mod tests {
 
     #[test]
     fn simm_margin_spec_without_credit_classification_is_rejected() {
-        let mut index = CDSIndex::example();
+        let mut index = CdsIndex::example();
         index.margin_spec =
             Some(finstack_quant_margin::OtcMarginSpec::usd_bilateral().expect("margin spec"));
 
@@ -691,7 +691,7 @@ mod tests {
 
     #[test]
     fn classified_simm_margin_spec_is_valid() {
-        let mut index = CDSIndex::example();
+        let mut index = CdsIndex::example();
         index.margin_spec = Some(
             finstack_quant_margin::OtcMarginSpec::usd_bilateral()
                 .expect("margin spec")

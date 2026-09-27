@@ -1,11 +1,11 @@
-//! Construction parameters for [`CDSOption`](super::CDSOption).
+//! Construction parameters for [`CdsOption`](super::CdsOption).
 //!
-//! Validated at the point of construction so the resulting `CDSOption` is
+//! Validated at the point of construction so the resulting `CdsOption` is
 //! guaranteed to satisfy the Bloomberg CDSO model's preconditions.
 
 use crate::instruments::common_impl::numeric::decimal_to_f64;
 use crate::instruments::common_impl::parameters::OptionType;
-use crate::instruments::credit_derivatives::cds_option::strike::CDSOptionStrike;
+use crate::instruments::credit_derivatives::cds_option::strike::CdsOptionStrike;
 use crate::instruments::credit_derivatives::cds_option::ProtectionStartConvention;
 use crate::instruments::SettlementType;
 use finstack_quant_core::{dates::Date, money::Money};
@@ -13,18 +13,18 @@ use rust_decimal::Decimal;
 
 /// Spread-strike upper bound — `0.10` decimal = 1000 bp = 10% spread,
 /// matching the Bloomberg CDSO calibration guard for distressed credit.
-/// Applies only to [`CDSOptionStrike::Spread`]; clean-price strikes are
+/// Applies only to [`CdsOptionStrike::Spread`]; clean-price strikes are
 /// quoted in percentage-price points and routinely exceed `100`.
 pub(crate) const MAX_STRIKE: f64 = 0.10;
 
 pub(crate) fn validate_common_terms(
-    strike: &CDSOptionStrike,
+    strike: &CdsOptionStrike,
     expiry: Date,
     underlying_maturity: Date,
     index_factor: f64,
 ) -> finstack_quant_core::Result<()> {
     match strike {
-        CDSOptionStrike::Spread(spread) => {
+        CdsOptionStrike::Spread(spread) => {
             let strike_f64 = decimal_to_f64(*spread, "strike")?;
             if strike_f64 <= 0.0 {
                 return Err(finstack_quant_core::Error::Validation(format!(
@@ -39,7 +39,7 @@ pub(crate) fn validate_common_terms(
                 )));
             }
         }
-        CDSOptionStrike::CleanPricePct(price_pct) => {
+        CdsOptionStrike::CleanPricePct(price_pct) => {
             let price_f64 = decimal_to_f64(*price_pct, "strike clean price")?;
             if price_f64 <= 0.0 {
                 return Err(finstack_quant_core::Error::Validation(format!(
@@ -71,9 +71,9 @@ pub(crate) fn default_index_factor() -> f64 {
 /// Construction-time inputs for a CDS option.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-pub struct CDSOptionParams {
+pub struct CdsOptionParams {
     /// Typed option strike: forward spread or clean price.
-    pub strike: CDSOptionStrike,
+    pub strike: CdsOptionStrike,
     /// Option expiry date. Must precede `underlying_maturity`.
     #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
@@ -128,7 +128,7 @@ fn default_settlement() -> SettlementType {
     SettlementType::Cash
 }
 
-impl CDSOptionParams {
+impl CdsOptionParams {
     fn validate(&self) -> finstack_quant_core::Result<()> {
         validate_common_terms(
             &self.strike,
@@ -140,7 +140,7 @@ impl CDSOptionParams {
 
     /// Construct a validated set of parameters.
     pub fn new(
-        strike: CDSOptionStrike,
+        strike: CdsOptionStrike,
         expiry: Date,
         underlying_maturity: Date,
         notional: Money,
@@ -165,7 +165,7 @@ impl CDSOptionParams {
 
     /// Convenience constructor for a payer (call on spread) option.
     pub fn call(
-        strike: CDSOptionStrike,
+        strike: CdsOptionStrike,
         expiry: Date,
         underlying_maturity: Date,
         notional: Money,
@@ -181,7 +181,7 @@ impl CDSOptionParams {
 
     /// Convenience constructor for a receiver (put on spread) option.
     pub fn put(
-        strike: CDSOptionStrike,
+        strike: CdsOptionStrike,
         expiry: Date,
         underlying_maturity: Date,
         notional: Money,
@@ -253,8 +253,8 @@ mod tests {
 
     #[test]
     fn valid_params_construct() {
-        CDSOptionParams::call(
-            CDSOptionStrike::Spread(Decimal::new(1, 2)),
+        CdsOptionParams::call(
+            CdsOptionStrike::Spread(Decimal::new(1, 2)),
             date!(2025 - 06 - 20),
             date!(2030 - 06 - 20),
             Money::from((10_000_000_i64, Currency::USD)),
@@ -264,8 +264,8 @@ mod tests {
 
     #[test]
     fn zero_strike_rejected() {
-        let err = CDSOptionParams::call(
-            CDSOptionStrike::Spread(Decimal::ZERO),
+        let err = CdsOptionParams::call(
+            CdsOptionStrike::Spread(Decimal::ZERO),
             date!(2025 - 06 - 20),
             date!(2030 - 06 - 20),
             Money::from((10_000_000_i64, Currency::USD)),
@@ -276,8 +276,8 @@ mod tests {
 
     #[test]
     fn negative_strike_rejected() {
-        assert!(CDSOptionParams::call(
-            CDSOptionStrike::Spread(Decimal::new(-5, 3)),
+        assert!(CdsOptionParams::call(
+            CdsOptionStrike::Spread(Decimal::new(-5, 3)),
             date!(2025 - 06 - 20),
             date!(2030 - 06 - 20),
             Money::from((10_000_000_i64, Currency::USD)),
@@ -287,8 +287,8 @@ mod tests {
 
     #[test]
     fn expiry_after_maturity_rejected() {
-        let err = CDSOptionParams::call(
-            CDSOptionStrike::Spread(Decimal::new(1, 2)),
+        let err = CdsOptionParams::call(
+            CdsOptionStrike::Spread(Decimal::new(1, 2)),
             date!(2030 - 06 - 21),
             date!(2030 - 06 - 20),
             Money::from((10_000_000_i64, Currency::USD)),
@@ -299,8 +299,8 @@ mod tests {
 
     #[test]
     fn index_factor_bounds_enforced() {
-        let params = CDSOptionParams::call(
-            CDSOptionStrike::Spread(Decimal::new(1, 2)),
+        let params = CdsOptionParams::call(
+            CdsOptionStrike::Spread(Decimal::new(1, 2)),
             date!(2025 - 06 - 20),
             date!(2030 - 06 - 20),
             Money::from((10_000_000_i64, Currency::USD)),
@@ -314,8 +314,8 @@ mod tests {
 
     #[test]
     fn clean_price_strike_above_100_is_valid_at_common_terms() {
-        let params = CDSOptionParams::call(
-            CDSOptionStrike::CleanPricePct(Decimal::new(1070, 1)),
+        let params = CdsOptionParams::call(
+            CdsOptionStrike::CleanPricePct(Decimal::new(1070, 1)),
             date!(2025 - 06 - 20),
             date!(2030 - 06 - 20),
             Money::from((10_000_000_i64, Currency::USD)),
@@ -330,8 +330,8 @@ mod tests {
     #[test]
     fn spread_strike_rejects_price_points_magnitude() {
         // 107.0 quoted as a spread is 10700% — far beyond MAX_STRIKE.
-        let err = CDSOptionParams::call(
-            CDSOptionStrike::Spread(Decimal::new(1070, 1)),
+        let err = CdsOptionParams::call(
+            CdsOptionStrike::Spread(Decimal::new(1070, 1)),
             date!(2025 - 06 - 20),
             date!(2030 - 06 - 20),
             Money::from((10_000_000_i64, Currency::USD)),
@@ -342,8 +342,8 @@ mod tests {
 
     #[test]
     fn settlement_defaults_to_cash_and_is_overridable() {
-        let params = CDSOptionParams::call(
-            CDSOptionStrike::Spread(Decimal::new(1, 2)),
+        let params = CdsOptionParams::call(
+            CdsOptionStrike::Spread(Decimal::new(1, 2)),
             date!(2025 - 06 - 20),
             date!(2030 - 06 - 20),
             Money::from((10_000_000_i64, Currency::USD)),

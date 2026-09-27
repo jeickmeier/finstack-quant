@@ -1,6 +1,6 @@
 //! Configuration, integration, and metric helpers for CDS pricing.
 //!
-use super::engine::CDSPricer;
+use super::engine::CdsPricer;
 use super::helpers::{date_from_hazard_time, isda_standard_model_boundaries, settlement_date};
 use crate::constants::{credit, numerical};
 use finstack_quant_core::dates::{Date, HolidayCalendar};
@@ -33,7 +33,7 @@ pub(super) struct ProtectionLegInputs<'a> {
     pub surv: &'a HazardCurve,
 }
 
-impl CDSPricer {
+impl CdsPricer {
     /// ISDA Standard Model with conditional survival and relative discounting
     pub(super) fn protection_leg_isda_standard_model_cond(
         &self,

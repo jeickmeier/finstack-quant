@@ -1,4 +1,4 @@
-"""Typed CreditDefaultSwap / CDSIndex bindings + CDS typed-vs-JSON golden."""
+"""Typed CreditDefaultSwap / CdsIndex bindings + CDS typed-vs-JSON golden."""
 
 from __future__ import annotations
 
@@ -13,7 +13,7 @@ from finstack_quant.core.dates import DayCount, Tenor
 from finstack_quant.core.money import Money
 from finstack_quant.valuations import ValuationResult
 from finstack_quant.valuations.instruments import (
-    CDSIndex,
+    CdsIndex,
     CreditDefaultSwap,
     PremiumLegSpec,
     ProtectionLegSpec,
@@ -278,11 +278,11 @@ class TestPremiumLegSpecTyped:
         assert "coupon_bp=100" in repr(leg)
 
 
-class TestCDSIndexTyped:
+class TestCdsIndexTyped:
     def test_builder_round_trip(self) -> None:
         premium, protection = _legs()
         index = (
-            CDSIndex
+            CdsIndex
             .builder()
             .id("CDX-IG-42")
             .index_name("CDX.NA.IG")
@@ -300,13 +300,13 @@ class TestCDSIndexTyped:
         )
         payload = json.loads(index.to_json())
         assert payload["instrument"]["type"] == "cds_index"
-        assert CDSIndex.from_json(index.to_json()).id == "CDX-IG-42"
+        assert CdsIndex.from_json(index.to_json()).id == "CDX-IG-42"
 
     @pytest.mark.parametrize("value", ["isda_na", "isda_eu", "isda_as", "custom"])
     def test_every_convention_literal_value_accepted(self, value: str) -> None:
         premium, protection = _legs()
         index = (
-            CDSIndex
+            CdsIndex
             .builder()
             .id("CDX-CONV")
             .index_name("CDX.NA.IG")
@@ -328,7 +328,7 @@ class TestCDSIndexTyped:
     def test_every_pricing_literal_value_accepted(self, value: str) -> None:
         premium, protection = _legs()
         builder = (
-            CDSIndex
+            CdsIndex
             .builder()
             .id("CDX-PRICING")
             .index_name("CDX.NA.IG")
@@ -362,25 +362,25 @@ class TestCDSIndexTyped:
 
     def test_invalid_pricing_raises(self) -> None:
         with pytest.raises(ValueError, match="invalid pricing"):
-            CDSIndex.builder().pricing("SingleCurve")  # schema-rejection-test
+            CdsIndex.builder().pricing("SingleCurve")  # schema-rejection-test
 
     def test_invalid_convention_raises(self) -> None:
         with pytest.raises(ValueError, match="invalid convention"):
-            CDSIndex.builder().convention("bespoke")
+            CdsIndex.builder().convention("bespoke")
 
     def test_from_json_rejects_wrong_type(self) -> None:
         with pytest.raises(ValueError, match="cds_index"):
-            CDSIndex.from_json(TermLoan.example().to_json())
+            CdsIndex.from_json(TermLoan.example().to_json())
 
     def test_builder_missing_required_field_raises(self) -> None:
         with pytest.raises(ValueError, match="missing required field"):
-            CDSIndex.builder().id("CDX-BAD").build()
+            CdsIndex.builder().id("CDX-BAD").build()
 
     def test_builder_setters_accept_keyword_value(self) -> None:
         """Every builder setter's `value` parameter name must match its text_signature."""
         premium, protection = _legs()
         index = (
-            CDSIndex
+            CdsIndex
             .builder()
             .id(value="CDX-KW")
             .index_name(value="CDX.NA.IG")

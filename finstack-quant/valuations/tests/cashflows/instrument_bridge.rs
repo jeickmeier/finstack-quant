@@ -4,7 +4,7 @@ use finstack_quant_cashflows::CashflowProvider;
 use finstack_quant_valuations::instruments::commodity::commodity_forward::CommodityForward;
 use finstack_quant_valuations::instruments::commodity::commodity_swap::CommoditySwap;
 use finstack_quant_valuations::instruments::credit_derivatives::cds::CreditDefaultSwap;
-use finstack_quant_valuations::instruments::credit_derivatives::{CDSIndex, CDSTranche};
+use finstack_quant_valuations::instruments::credit_derivatives::{CdsIndex, CdsTranche};
 use finstack_quant_valuations::instruments::fixed_income::bond_future::BondFuture;
 use finstack_quant_valuations::instruments::fixed_income::convertible::ConvertibleBond;
 use finstack_quant_valuations::instruments::fixed_income::dollar_roll::DollarRoll;
@@ -300,12 +300,12 @@ fn agency_cmo_exposes_cashflow_provider_bridge() {
 
 #[test]
 fn cds_index_exposes_cashflow_provider_bridge() {
-    let index = CDSIndex::example();
+    let index = CdsIndex::example();
     assert_provider(&index);
 }
 
 #[test]
 fn cds_tranche_exposes_cashflow_provider_bridge() {
-    let tranche = CDSTranche::example();
+    let tranche = CdsTranche::example();
     assert_provider(&tranche);
 }

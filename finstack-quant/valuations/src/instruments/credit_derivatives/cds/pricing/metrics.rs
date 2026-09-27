@@ -1,6 +1,6 @@
 //! Configuration, integration, and metric helpers for CDS pricing.
 //!
-use super::engine::{AodInputs, CDSPricer, CouponPeriod};
+use super::engine::{AodInputs, CdsPricer, CouponPeriod};
 use super::helpers::sp_cond_to;
 use crate::cashflow::builder::specs::RollRule;
 use crate::constants::{credit, numerical, BASIS_POINTS_PER_UNIT, ONE_BASIS_POINT};
@@ -35,7 +35,7 @@ pub(crate) enum AccrualDayCountPolicy {
     IsdaStandard,
 }
 
-impl CDSPricer {
+impl CdsPricer {
     /// Generate contractual accrual and payment dates from the premium terms.
     fn premium_schedule(&self, cds: &CreditDefaultSwap) -> Result<Schedule> {
         let mut builder = ScheduleBuilder::new(cds.premium_leg.start, cds.premium_leg.end)?;

@@ -3,7 +3,9 @@
 use super::pricer;
 use crate::impl_instrument_base;
 use crate::instruments::common_impl::traits::{Attributes, Instrument};
-use crate::instruments::equity::pe_fund::waterfall::{AllocationLedger, FundEvent, WaterfallSpec};
+use crate::instruments::equity::pe_fund::waterfall::{
+    AllocationLedger, FundEvent, PeFundWaterfallSpec,
+};
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
@@ -33,7 +35,7 @@ pub struct PrivateMarketsFund {
     /// Functional currency of the fund.
     pub currency: Currency,
     /// Waterfall specification defining LP/GP allocation tiers.
-    pub waterfall_spec: WaterfallSpec,
+    pub waterfall_spec: PeFundWaterfallSpec,
     /// Time-ordered list of fund events (contributions, proceeds, distributions).
     pub events: Vec<FundEvent>,
     /// Optional discount curve for future LP cashflows.
@@ -92,7 +94,7 @@ impl PrivateMarketsFund {
     pub fn new(
         id: impl Into<InstrumentId>,
         currency: Currency,
-        waterfall_spec: WaterfallSpec,
+        waterfall_spec: PeFundWaterfallSpec,
         events: Vec<FundEvent>,
     ) -> Self {
         Self {
@@ -111,10 +113,10 @@ impl PrivateMarketsFund {
 
     /// Create a canonical example private markets fund with a simple waterfall and events.
     pub fn example() -> finstack_quant_core::Result<Self> {
-        use super::waterfall::{WaterfallSpec, WaterfallStyle};
+        use super::waterfall::{PeFundWaterfallSpec, WaterfallStyle};
         use finstack_quant_core::currency::Currency;
         // Build a simple European-style waterfall: Return of capital -> 8% pref -> 50% catch-up -> 80/20 promote
-        let spec = WaterfallSpec::builder()
+        let spec = PeFundWaterfallSpec::builder()
             .style(WaterfallStyle::European)
             .return_of_capital()
             .preferred_irr(0.08)

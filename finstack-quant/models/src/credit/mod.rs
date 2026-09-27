@@ -39,7 +39,7 @@ pub mod toggle_exercise;
 pub use dynamic_recovery::DynamicRecoverySpec;
 pub use endogenous_hazard::EndogenousHazardSpec;
 pub use market_anchored::CreditVolatilityConversion;
-pub use merton::{AssetDynamics, BarrierType, MertonModel, SimulatedPaths};
+pub use merton::{AssetDynamics, MertonBarrierType, MertonModel, SimulatedPaths};
 pub use rating_factors::{moodys_warf_factor, RatingFactorTable};
 pub use toggle_exercise::{
     CreditState, CreditStateVariable, OptimalToggle, ThresholdDirection, ToggleExerciseModel,

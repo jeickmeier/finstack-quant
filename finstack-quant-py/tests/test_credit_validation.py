@@ -89,9 +89,12 @@ def test_structural_spec_constructors_and_equality() -> None:
     with pytest.raises(ValueError, match="hazard_rate, distance_to_default, leverage"):
         credit.ToggleExerciseModel.threshold("ebitda", 1.0, "above")
 
-    assert credit.BarrierType.terminal() == credit.BarrierType.terminal()
-    assert repr(credit.BarrierType.terminal()) == "BarrierType.terminal()"
-    assert repr(credit.BarrierType.first_passage(0.02)) == "BarrierType.first_passage(barrier_growth_rate=0.02)"
+    assert credit.MertonBarrierType.terminal() == credit.MertonBarrierType.terminal()
+    assert repr(credit.MertonBarrierType.terminal()) == "MertonBarrierType.terminal()"
+    assert (
+        repr(credit.MertonBarrierType.first_passage(0.02))
+        == "MertonBarrierType.first_passage(barrier_growth_rate=0.02)"
+    )
     model = credit.MertonModel(100.0, 0.25, 80.0, 0.05)
     assert model == credit.MertonModel.from_json(model.to_json())
     series = model.default_probabilities([1.0, 2.0])

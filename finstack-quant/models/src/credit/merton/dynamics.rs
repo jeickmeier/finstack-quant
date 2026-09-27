@@ -102,9 +102,7 @@ impl AssetDynamics {
 #[derive(Debug, Clone, Copy, PartialEq, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(rename_all = "snake_case")]
-// Distinct from the barrier-option `finstack_quant_core::types::BarrierType`.
-#[cfg_attr(feature = "json-schema", schemars(rename = "MertonBarrierType"))]
-pub enum BarrierType {
+pub enum MertonBarrierType {
     /// Default only assessed at maturity (classic Merton).
     Terminal,
     /// Continuous barrier monitoring (Black-Cox extension).
@@ -116,7 +114,7 @@ pub enum BarrierType {
 
 #[cfg(test)]
 mod tests {
-    use super::super::{AssetDynamics, BarrierType, MertonModel};
+    use super::super::{AssetDynamics, MertonBarrierType, MertonModel};
 
     #[test]
     fn new_rejects_invalid_inputs() {
@@ -137,7 +135,7 @@ mod tests {
                 80.0,
                 0.05,
                 0.0,
-                BarrierType::Terminal,
+                MertonBarrierType::Terminal,
                 dynamics,
             )
         };
@@ -177,12 +175,12 @@ mod tests {
                 },
             )
         };
-        assert!(build(BarrierType::Terminal).is_err());
-        assert!(build(BarrierType::FirstPassage {
+        assert!(build(MertonBarrierType::Terminal).is_err());
+        assert!(build(MertonBarrierType::FirstPassage {
             barrier_growth_rate: 0.02
         })
         .is_err());
-        assert!(build(BarrierType::FirstPassage {
+        assert!(build(MertonBarrierType::FirstPassage {
             barrier_growth_rate: 0.0
         })
         .is_ok());
@@ -193,7 +191,7 @@ mod tests {
             80.0,
             0.05,
             0.0,
-            BarrierType::FirstPassage {
+            MertonBarrierType::FirstPassage {
                 barrier_growth_rate: 0.0
             },
             AssetDynamics::CreditGrades {
@@ -248,7 +246,7 @@ mod tests {
             80.0,
             0.05,
             0.0,
-            BarrierType::FirstPassage {
+            MertonBarrierType::FirstPassage {
                 barrier_growth_rate: 0.0,
             },
             AssetDynamics::JumpDiffusion {

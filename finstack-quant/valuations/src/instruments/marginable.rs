@@ -5,9 +5,9 @@
 
 use crate::instruments::common_impl::traits::Instrument;
 use crate::instruments::credit_derivatives::cds::CreditDefaultSwap;
-use crate::instruments::credit_derivatives::cds_index::CDSIndex;
+use crate::instruments::credit_derivatives::cds_index::CdsIndex;
 use crate::instruments::equity::equity_trs::EquityTotalReturnSwap;
-use crate::instruments::fixed_income::fi_trs::FIIndexTotalReturnSwap;
+use crate::instruments::fixed_income::fi_trs::FiIndexTotalReturnSwap;
 use crate::instruments::rates::irs::InterestRateSwap;
 use crate::instruments::rates::repo::Repo;
 use crate::instruments::PayReceive;
@@ -395,12 +395,12 @@ impl Marginable for CreditDefaultSwap {
     }
 
     fn mtm_for_vm(&self, market: &MarketContext, as_of: Date) -> Result<Money> {
-        use crate::instruments::credit_derivatives::cds::pricing::CDSPricer;
+        use crate::instruments::credit_derivatives::cds::pricing::CdsPricer;
 
         let disc = market.get_discount(self.premium_leg.discount_curve_id.as_str())?;
         let surv = market.get_hazard(self.protection_leg.credit_curve_id.as_str())?;
 
-        let pricer = CDSPricer::new();
+        let pricer = CdsPricer::new();
         let pv_prot = pricer.pv_protection_leg(self, disc.as_ref(), surv.as_ref(), as_of)?;
         let pv_prem = pricer.pv_premium_leg(self, disc.as_ref(), surv.as_ref(), as_of)?;
 
@@ -418,7 +418,7 @@ impl Marginable for CreditDefaultSwap {
     }
 }
 
-impl Marginable for CDSIndex {
+impl Marginable for CdsIndex {
     fn id(&self) -> &str {
         self.id.as_str()
     }
@@ -529,7 +529,7 @@ impl Marginable for EquityTotalReturnSwap {
     }
 }
 
-impl Marginable for FIIndexTotalReturnSwap {
+impl Marginable for FiIndexTotalReturnSwap {
     fn id(&self) -> &str {
         self.id.as_str()
     }

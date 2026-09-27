@@ -23,9 +23,7 @@ use std::sync::OnceLock;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(rename_all = "snake_case")]
-// Distinct from the structured-credit collateral `AssetType`.
-#[cfg_attr(feature = "json-schema", schemars(rename = "BasketAssetType"))]
-pub enum AssetType {
+pub enum BasketAssetType {
     /// Equity security
     Equity,
     /// Fixed income security
@@ -58,7 +56,7 @@ pub enum ConstituentReference {
         /// Price identifier in MarketContext
         price_id: PriceId,
         /// Type of asset for validation
-        asset_type: AssetType,
+        asset_type: BasketAssetType,
     },
 }
 
@@ -186,7 +184,7 @@ impl Basket {
                 id: "EQ-AAPL".to_string(),
                 reference: ConstituentReference::MarketData {
                     price_id: PriceId::new("AAPL-SPOT"),
-                    asset_type: AssetType::Equity,
+                    asset_type: BasketAssetType::Equity,
                 },
                 weight: 0.6,
                 units: None,
@@ -196,7 +194,7 @@ impl Basket {
                 id: "BOND-UST10".to_string(),
                 reference: ConstituentReference::MarketData {
                     price_id: PriceId::new("UST10Y-PRICE"),
-                    asset_type: AssetType::Bond,
+                    asset_type: BasketAssetType::Bond,
                 },
                 weight: 0.4,
                 units: None,
@@ -288,7 +286,7 @@ impl Basket {
                 id: "EQ-AAPL".to_string(),
                 reference: ConstituentReference::MarketData {
                     price_id: PriceId::new("AAPL-SPOT"),
-                    asset_type: AssetType::Equity,
+                    asset_type: BasketAssetType::Equity,
                 },
                 weight: 1.0,
                 units: None,
@@ -450,7 +448,7 @@ mod tests {
                     id: "CONST1".to_string(),
                     reference: ConstituentReference::MarketData {
                         price_id: "AAPL".to_string().into(),
-                        asset_type: AssetType::Equity,
+                        asset_type: BasketAssetType::Equity,
                     },
                     weight: 0.6,
                     units: None,
@@ -460,7 +458,7 @@ mod tests {
                     id: "CONST2".to_string(),
                     reference: ConstituentReference::MarketData {
                         price_id: "MSFT".to_string().into(),
-                        asset_type: AssetType::Equity,
+                        asset_type: BasketAssetType::Equity,
                     },
                     weight: 0.4,
                     units: None,

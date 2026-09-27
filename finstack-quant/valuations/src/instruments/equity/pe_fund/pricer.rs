@@ -93,13 +93,13 @@ pub(crate) fn compute_pv(
 mod tests {
     use super::*;
     use crate::instruments::common_impl::traits::Instrument;
-    use crate::instruments::equity::pe_fund::waterfall::{FundEvent, WaterfallSpec};
+    use crate::instruments::equity::pe_fund::waterfall::{FundEvent, PeFundWaterfallSpec};
     use finstack_quant_core::currency::Currency;
     use time::macros::date;
 
     fn fully_realized_fund() -> PrivateMarketsFund {
         // 100% LP promote tier: the LP receives the full 2M distribution.
-        let spec = WaterfallSpec::builder()
+        let spec = PeFundWaterfallSpec::builder()
             .return_of_capital()
             .promote_tier(0.0, 1.0, 0.0)
             .build()

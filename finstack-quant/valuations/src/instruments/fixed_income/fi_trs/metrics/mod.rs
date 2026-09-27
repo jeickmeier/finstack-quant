@@ -54,7 +54,7 @@ pub(crate) fn register_fi_trs_metrics(
     registry.register_metric(
         MetricId::Dv01,
         Arc::new(crate::metrics::UnifiedDv01Calculator::<
-            crate::instruments::fixed_income::fi_trs::FIIndexTotalReturnSwap,
+            crate::instruments::fixed_income::fi_trs::FiIndexTotalReturnSwap,
         >::new(
             crate::metrics::Dv01CalculatorConfig::parallel_combined()
         )),
@@ -63,7 +63,7 @@ pub(crate) fn register_fi_trs_metrics(
     registry.register_metric(
         MetricId::BucketedDv01,
         Arc::new(crate::metrics::UnifiedDv01Calculator::<
-            crate::instruments::fixed_income::fi_trs::FIIndexTotalReturnSwap,
+            crate::instruments::fixed_income::fi_trs::FiIndexTotalReturnSwap,
         >::new(
             crate::metrics::Dv01CalculatorConfig::triangular_key_rate(),
         )),

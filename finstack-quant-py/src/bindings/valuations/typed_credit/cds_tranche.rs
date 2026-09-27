@@ -1,5 +1,5 @@
-//! CDS tranche Python wrappers: `CDSTranche`, its fluent builder and the
-//! `CDSTrancheParams` descriptor used by `CDSTranche.standard`.
+//! CDS tranche Python wrappers: `CdsTranche`, its fluent builder and the
+//! `CdsTrancheParams` descriptor used by `CdsTranche.standard`.
 
 use pyo3::prelude::*;
 
@@ -11,7 +11,7 @@ use crate::bindings::date_utils::{date_to_py, extract_date};
 use crate::bindings::extract::extract_market;
 use crate::errors::core_to_py;
 use finstack_quant_core::types::{CurveId, InstrumentId};
-use finstack_quant_valuations::instruments::credit_derivatives::cds_tranche::CDSTrancheParams;
+use finstack_quant_valuations::instruments::credit_derivatives::cds_tranche::CdsTrancheParams;
 use finstack_quant_valuations::instruments::PayReceive;
 use finstack_quant_valuations::instruments::{Instrument, InstrumentJson};
 
@@ -28,12 +28,12 @@ use super::super::typed_fx::{
 };
 
 type CdsTrancheBuilderInner =
-    finstack_quant_valuations::instruments::credit_derivatives::cds_tranche::CDSTrancheBuilder;
+    finstack_quant_valuations::instruments::credit_derivatives::cds_tranche::CdsTrancheBuilder;
 
-/// Economic terms of an index tranche (typed wrapper for Rust ``CDSTrancheParams``).
+/// Economic terms of an index tranche (typed wrapper for Rust ``CdsTrancheParams``).
 ///
 /// Attachment and detachment are quoted in percent points (``3.0`` = 3%),
-/// the running coupon in basis points. Pass to ``CDSTranche.standard`` for a
+/// the running coupon in basis points. Pass to ``CdsTranche.standard`` for a
 /// tranche on the standard quarterly ACT/360 schedule.
 ///
 /// Examples
@@ -41,26 +41,26 @@ type CdsTrancheBuilderInner =
 /// >>> import datetime
 /// >>> from finstack_quant.core.currency import Currency
 /// >>> from finstack_quant.core.money import Money
-/// >>> from finstack_quant.valuations.instruments import CDSTrancheParams
-/// >>> params = CDSTrancheParams.mezzanine_tranche(
+/// >>> from finstack_quant.valuations.instruments import CdsTrancheParams
+/// >>> params = CdsTrancheParams.mezzanine_tranche(
 /// ...     "CDX.NA.IG", 42, Money(10_000_000.0, Currency("USD")), datetime.date(2029, 12, 20), 100.0
 /// ... )
 /// >>> (params.attach_pct, params.detach_pct)
 /// (3.0, 7.0)
 #[pyclass(
     module = "finstack_quant.valuations.instruments",
-    name = "CDSTrancheParams",
+    name = "CdsTrancheParams",
     frozen,
     skip_from_py_object
 )]
 #[derive(Clone)]
-pub struct PyCDSTrancheParams {
+pub struct PyCdsTrancheParams {
     /// Inner canonical Rust tranche parameters.
-    pub(crate) inner: CDSTrancheParams,
+    pub(crate) inner: CdsTrancheParams,
 }
 
 #[pymethods]
-impl PyCDSTrancheParams {
+impl PyCdsTrancheParams {
     /// Describe a tranche on a credit index.
     ///
     /// Parameters
@@ -85,7 +85,7 @@ impl PyCDSTrancheParams {
     ///
     /// Returns
     /// -------
-    /// CDSTrancheParams
+    /// CdsTrancheParams
     ///     The tranche terms.
     ///
     /// Raises
@@ -100,8 +100,8 @@ impl PyCDSTrancheParams {
     /// >>> import datetime
     /// >>> from finstack_quant.core.currency import Currency
     /// >>> from finstack_quant.core.money import Money
-    /// >>> from finstack_quant.valuations.instruments import CDSTrancheParams
-    /// >>> params = CDSTrancheParams(
+    /// >>> from finstack_quant.valuations.instruments import CdsTrancheParams
+    /// >>> params = CdsTrancheParams(
     /// ...     "CDX.NA.IG", 42, 7.0, 15.0, Money(5_000_000.0, Currency("USD")), "2029-12-20", 100.0
     /// ... )
     /// >>> params.coupon_bp
@@ -123,7 +123,7 @@ impl PyCDSTrancheParams {
         coupon_bp: &Bound<'_, PyAny>,
         realized_loss: f64,
     ) -> PyResult<Self> {
-        let inner = CDSTrancheParams::new(
+        let inner = CdsTrancheParams::new(
             index_name,
             series,
             attach_pct,
@@ -154,7 +154,7 @@ impl PyCDSTrancheParams {
     ///
     /// Returns
     /// -------
-    /// CDSTrancheParams
+    /// CdsTrancheParams
     ///     Tranche terms with ``attach_pct=0.0`` and ``detach_pct=3.0``.
     ///
     /// Raises
@@ -166,8 +166,8 @@ impl PyCDSTrancheParams {
     /// --------
     /// >>> from finstack_quant.core.currency import Currency
     /// >>> from finstack_quant.core.money import Money
-    /// >>> from finstack_quant.valuations.instruments import CDSTrancheParams
-    /// >>> CDSTrancheParams.equity_tranche(
+    /// >>> from finstack_quant.valuations.instruments import CdsTrancheParams
+    /// >>> CdsTrancheParams.equity_tranche(
     /// ...     "CDX.NA.IG", 42, Money(1e7, Currency("USD")), "2029-12-20", 500.0
     /// ... ).detach_pct
     /// 3.0
@@ -181,7 +181,7 @@ impl PyCDSTrancheParams {
         coupon_bp: &Bound<'_, PyAny>,
     ) -> PyResult<Self> {
         Ok(Self {
-            inner: CDSTrancheParams::equity_tranche(
+            inner: CdsTrancheParams::equity_tranche(
                 index_name,
                 series,
                 money_from_py(notional, None, "notional")?,
@@ -208,7 +208,7 @@ impl PyCDSTrancheParams {
     ///
     /// Returns
     /// -------
-    /// CDSTrancheParams
+    /// CdsTrancheParams
     ///     Tranche terms with ``attach_pct=3.0`` and ``detach_pct=7.0``.
     ///
     /// Raises
@@ -220,8 +220,8 @@ impl PyCDSTrancheParams {
     /// --------
     /// >>> from finstack_quant.core.currency import Currency
     /// >>> from finstack_quant.core.money import Money
-    /// >>> from finstack_quant.valuations.instruments import CDSTrancheParams
-    /// >>> CDSTrancheParams.mezzanine_tranche(
+    /// >>> from finstack_quant.valuations.instruments import CdsTrancheParams
+    /// >>> CdsTrancheParams.mezzanine_tranche(
     /// ...     "CDX.NA.IG", 42, Money(1e7, Currency("USD")), "2029-12-20", 100.0
     /// ... ).attach_pct
     /// 3.0
@@ -235,7 +235,7 @@ impl PyCDSTrancheParams {
         coupon_bp: &Bound<'_, PyAny>,
     ) -> PyResult<Self> {
         Ok(Self {
-            inner: CDSTrancheParams::mezzanine_tranche(
+            inner: CdsTrancheParams::mezzanine_tranche(
                 index_name,
                 series,
                 money_from_py(notional, None, "notional")?,
@@ -296,7 +296,7 @@ impl PyCDSTrancheParams {
     /// Return ``repr(self)``.
     fn __repr__(&self) -> String {
         format!(
-            "CDSTrancheParams(index_name={:?}, series={}, attach_pct={}, detach_pct={}, notional={}, maturity={}, coupon_bp={}, realized_loss={})",
+            "CdsTrancheParams(index_name={:?}, series={}, attach_pct={}, detach_pct={}, notional={}, maturity={}, coupon_bp={}, realized_loss={})",
             self.inner.index_name,
             self.inner.series,
             float_repr(self.inner.attach_pct),
@@ -309,84 +309,84 @@ impl PyCDSTrancheParams {
     }
 }
 
-/// Synthetic CDO / index tranche (typed wrapper for Rust ``CDSTranche``).
+/// Synthetic CDO / index tranche (typed wrapper for Rust ``CdsTranche``).
 ///
 /// Protection on portfolio losses between ``attach_pct`` and ``detach_pct``
 /// (percent points), paying ``coupon_bp`` on the surviving tranche
 /// notional. Priced with the one-factor Gaussian copula against the
 /// ``credit_index_id`` loss distribution.
 ///
-/// Build with ``CDSTranche.builder()`` or ``CDSTranche.standard(...)``; start
-/// from ``CDSTranche.example()``. Instances are accepted directly by
+/// Build with ``CdsTranche.builder()`` or ``CdsTranche.standard(...)``; start
+/// from ``CdsTranche.example()``. Instances are accepted directly by
 /// ``price_instrument`` and expose ``price`` / ``metric`` /
 /// ``expected_loss`` / ``jump_to_default`` themselves.
 ///
 /// Examples
 /// --------
-/// >>> from finstack_quant.valuations.instruments import CDSTranche
-/// >>> tranche = CDSTranche.example()
+/// >>> from finstack_quant.valuations.instruments import CdsTranche
+/// >>> tranche = CdsTranche.example()
 /// >>> (tranche.attach_pct, tranche.detach_pct, tranche.side)
 /// (0.0, 3.0, 'pay')
 #[pyclass(
     module = "finstack_quant.valuations.instruments",
-    name = "CDSTranche",
+    name = "CdsTranche",
     frozen,
     skip_from_py_object
 )]
 #[derive(Clone)]
-pub struct PyCDSTranche {
+pub struct PyCdsTranche {
     /// Inner canonical Rust CDS tranche.
-    pub(crate) inner: finstack_quant_valuations::instruments::CDSTranche,
+    pub(crate) inner: finstack_quant_valuations::instruments::CdsTranche,
 }
 
-impl PyCDSTranche {
+impl PyCdsTranche {
     /// Serialize as the canonical instrument envelope accepted by the JSON loader.
     pub(crate) fn envelope_json(&self) -> PyResult<String> {
         serialize_typed_instrument_json(
-            InstrumentJson::CDSTranche(self.inner.clone()),
-            "CDSTranche",
+            InstrumentJson::CdsTranche(self.inner.clone()),
+            "CdsTranche",
         )
     }
 }
 
 instrument_envelope_methods!(
-    PyCDSTranche,
-    CDSTranche,
+    PyCdsTranche,
+    CdsTranche,
     "cds_tranche",
-    PyCDSTrancheBuilder,
-    finstack_quant_valuations::instruments::CDSTranche::builder().realized_loss(0.0)
+    PyCdsTrancheBuilder,
+    finstack_quant_valuations::instruments::CdsTranche::builder().realized_loss(0.0)
 );
-instrument_pricing_methods!(PyCDSTranche);
+instrument_pricing_methods!(PyCdsTranche);
 
 #[pymethods]
-impl PyCDSTranche {
+impl PyCdsTranche {
     /// Canonical example: CDX.NA.IG 42 equity (0–3%) tranche, USD 10,000,000.
     ///
-    /// Mirrors Rust ``CDSTranche::example()``: buy protection, 100bp running,
+    /// Mirrors Rust ``CdsTranche::example()``: buy protection, 100bp running,
     /// maturity 2029-12-20, curves ``USD-OIS`` / ``CDX.NA.IG.HAZARD``.
     ///
     /// Returns
     /// -------
-    /// CDSTranche
+    /// CdsTranche
     ///     The example tranche.
     #[staticmethod]
     #[pyo3(text_signature = "()")]
     fn example() -> Self {
         Self {
-            inner: finstack_quant_valuations::instruments::CDSTranche::example(),
+            inner: finstack_quant_valuations::instruments::CdsTranche::example(),
         }
     }
 
     /// Build a tranche on the standard schedule.
     ///
-    /// Mirrors Rust ``CDSTranche::standard``: quarterly, ACT/360, Following,
+    /// Mirrors Rust ``CdsTranche::standard``: quarterly, ACT/360, Following,
     /// weekends-only calendar, short-front stub.
     ///
     /// Parameters
     /// ----------
     /// id : str
     ///     Unique instrument identifier.
-    /// params : CDSTrancheParams
+    /// params : CdsTrancheParams
     ///     Economic terms (attach/detach, notional, maturity, coupon).
     /// discount_curve_id : str
     ///     Discount curve identifier.
@@ -397,7 +397,7 @@ impl PyCDSTranche {
     ///
     /// Returns
     /// -------
-    /// CDSTranche
+    /// CdsTranche
     ///     The validated tranche.
     ///
     /// Raises
@@ -409,13 +409,13 @@ impl PyCDSTranche {
     #[pyo3(text_signature = "(id, params, discount_curve_id, credit_index_id, side)")]
     fn standard(
         id: &str,
-        params: PyRef<'_, PyCDSTrancheParams>,
+        params: PyRef<'_, PyCdsTrancheParams>,
         discount_curve_id: &str,
         credit_index_id: &str,
         side: &str,
     ) -> PyResult<Self> {
         let side: PayReceive = enum_from_str(side, "side")?;
-        let inner = finstack_quant_valuations::instruments::CDSTranche::standard(
+        let inner = finstack_quant_valuations::instruments::CdsTranche::standard(
             InstrumentId::new(id.to_string()),
             &params.inner,
             CurveId::new(discount_curve_id.to_string()),
@@ -428,7 +428,7 @@ impl PyCDSTranche {
 
     /// Expected tranche loss as a fraction of tranche notional.
     ///
-    /// Mirrors Rust ``CDSTranche::expected_loss``.
+    /// Mirrors Rust ``CdsTranche::expected_loss``.
     ///
     /// Parameters
     /// ----------
@@ -454,7 +454,7 @@ impl PyCDSTranche {
 
     /// Jump-to-default exposure of the tranche.
     ///
-    /// Mirrors Rust ``CDSTranche::jump_to_default``: PV impact of one
+    /// Mirrors Rust ``CdsTranche::jump_to_default``: PV impact of one
     /// constituent defaulting immediately.
     ///
     /// Parameters
@@ -620,7 +620,7 @@ impl PyCDSTranche {
     /// Return ``repr(self)``.
     fn __repr__(&self) -> String {
         format!(
-            "CDSTranche(id={:?}, index_name={:?}, series={}, attach_pct={}, detach_pct={}, side={:?}, notional={}, coupon_bp={}, maturity={})",
+            "CdsTranche(id={:?}, index_name={:?}, series={}, attach_pct={}, detach_pct={}, side={:?}, notional={}, coupon_bp={}, maturity={})",
             self.inner.id.as_str(),
             self.inner.index_name,
             self.inner.series,
@@ -634,7 +634,7 @@ impl PyCDSTranche {
     }
 }
 
-/// Fluent builder for ``CDSTranche``; wraps the Rust
+/// Fluent builder for ``CdsTranche``; wraps the Rust
 /// ``FinancialBuilder``-generated builder (consuming setters).
 ///
 /// The builder pre-seeds ``realized_loss(0.0)``; ``roll_rule`` defaults to
@@ -644,10 +644,10 @@ impl PyCDSTranche {
 /// new builder per instrument.
 #[pyclass(
     module = "finstack_quant.valuations.instruments",
-    name = "CDSTrancheBuilder",
+    name = "CdsTrancheBuilder",
     skip_from_py_object
 )]
-pub struct PyCDSTrancheBuilder {
+pub struct PyCdsTrancheBuilder {
     inner: Option<CdsTrancheBuilderInner>,
     fields: Vec<(&'static str, String)>,
 }
@@ -663,7 +663,7 @@ macro_rules! tranche_set {
 }
 
 #[pymethods]
-impl PyCDSTrancheBuilder {
+impl PyCdsTrancheBuilder {
     /// Set the instrument identifier.
     ///
     /// Parameters
@@ -673,7 +673,7 @@ impl PyCDSTrancheBuilder {
     ///
     /// Returns
     /// -------
-    /// CDSTrancheBuilder
+    /// CdsTrancheBuilder
     ///     ``self``, for chaining.
     #[pyo3(text_signature = "($self, value)")]
     fn id<'py>(mut slf: PyRefMut<'py, Self>, value: &str) -> PyResult<PyRefMut<'py, Self>> {
@@ -694,7 +694,7 @@ impl PyCDSTrancheBuilder {
     ///
     /// Returns
     /// -------
-    /// CDSTrancheBuilder
+    /// CdsTrancheBuilder
     ///     ``self``, for chaining.
     #[pyo3(text_signature = "($self, value)")]
     fn index_name<'py>(mut slf: PyRefMut<'py, Self>, value: &str) -> PyResult<PyRefMut<'py, Self>> {
@@ -715,7 +715,7 @@ impl PyCDSTrancheBuilder {
     ///
     /// Returns
     /// -------
-    /// CDSTrancheBuilder
+    /// CdsTrancheBuilder
     ///     ``self``, for chaining.
     #[pyo3(text_signature = "($self, value)")]
     fn series<'py>(mut slf: PyRefMut<'py, Self>, value: u16) -> PyResult<PyRefMut<'py, Self>> {
@@ -737,7 +737,7 @@ impl PyCDSTrancheBuilder {
     ///
     /// Returns
     /// -------
-    /// CDSTrancheBuilder
+    /// CdsTrancheBuilder
     ///     ``self``, for chaining.
     #[pyo3(text_signature = "($self, value)")]
     fn attach_pct<'py>(mut slf: PyRefMut<'py, Self>, value: f64) -> PyResult<PyRefMut<'py, Self>> {
@@ -759,7 +759,7 @@ impl PyCDSTrancheBuilder {
     ///
     /// Returns
     /// -------
-    /// CDSTrancheBuilder
+    /// CdsTrancheBuilder
     ///     ``self``, for chaining.
     #[pyo3(text_signature = "($self, value)")]
     fn detach_pct<'py>(mut slf: PyRefMut<'py, Self>, value: f64) -> PyResult<PyRefMut<'py, Self>> {
@@ -780,7 +780,7 @@ impl PyCDSTrancheBuilder {
     ///
     /// Returns
     /// -------
-    /// CDSTrancheBuilder
+    /// CdsTrancheBuilder
     ///     ``self``, for chaining.
     #[pyo3(text_signature = "($self, value)")]
     fn notional<'py>(
@@ -805,7 +805,7 @@ impl PyCDSTrancheBuilder {
     ///
     /// Returns
     /// -------
-    /// CDSTrancheBuilder
+    /// CdsTrancheBuilder
     ///     ``self``, for chaining.
     #[pyo3(text_signature = "($self, value)")]
     fn maturity<'py>(
@@ -830,7 +830,7 @@ impl PyCDSTrancheBuilder {
     ///
     /// Returns
     /// -------
-    /// CDSTrancheBuilder
+    /// CdsTrancheBuilder
     ///     ``self``, for chaining.
     ///
     /// Raises
@@ -860,7 +860,7 @@ impl PyCDSTrancheBuilder {
     ///
     /// Returns
     /// -------
-    /// CDSTrancheBuilder
+    /// CdsTrancheBuilder
     ///     ``self``, for chaining.
     ///
     /// Raises
@@ -890,7 +890,7 @@ impl PyCDSTrancheBuilder {
     ///
     /// Returns
     /// -------
-    /// CDSTrancheBuilder
+    /// CdsTrancheBuilder
     ///     ``self``, for chaining.
     ///
     /// Raises
@@ -920,7 +920,7 @@ impl PyCDSTrancheBuilder {
     ///
     /// Returns
     /// -------
-    /// CDSTrancheBuilder
+    /// CdsTrancheBuilder
     ///     ``self``, for chaining.
     ///
     /// Raises
@@ -951,7 +951,7 @@ impl PyCDSTrancheBuilder {
     ///
     /// Returns
     /// -------
-    /// CDSTrancheBuilder
+    /// CdsTrancheBuilder
     ///     ``self``, for chaining.
     #[pyo3(text_signature = "($self, value)")]
     fn calendar_id<'py>(
@@ -975,7 +975,7 @@ impl PyCDSTrancheBuilder {
     ///
     /// Returns
     /// -------
-    /// CDSTrancheBuilder
+    /// CdsTrancheBuilder
     ///     ``self``, for chaining.
     #[pyo3(text_signature = "($self, value)")]
     fn discount_curve_id<'py>(
@@ -999,7 +999,7 @@ impl PyCDSTrancheBuilder {
     ///
     /// Returns
     /// -------
-    /// CDSTrancheBuilder
+    /// CdsTrancheBuilder
     ///     ``self``, for chaining.
     #[pyo3(text_signature = "($self, value)")]
     fn credit_index_id<'py>(
@@ -1023,7 +1023,7 @@ impl PyCDSTrancheBuilder {
     ///
     /// Returns
     /// -------
-    /// CDSTrancheBuilder
+    /// CdsTrancheBuilder
     ///     ``self``, for chaining.
     ///
     /// Raises
@@ -1051,7 +1051,7 @@ impl PyCDSTrancheBuilder {
     ///
     /// Returns
     /// -------
-    /// CDSTrancheBuilder
+    /// CdsTrancheBuilder
     ///     ``self``, for chaining.
     #[pyo3(text_signature = "($self, value)")]
     fn start_date<'py>(
@@ -1077,7 +1077,7 @@ impl PyCDSTrancheBuilder {
     ///
     /// Returns
     /// -------
-    /// CDSTrancheBuilder
+    /// CdsTrancheBuilder
     ///     ``self``, for chaining.
     #[pyo3(text_signature = "($self, value)")]
     fn realized_loss<'py>(
@@ -1104,7 +1104,7 @@ impl PyCDSTrancheBuilder {
     ///
     /// Returns
     /// -------
-    /// CDSTrancheBuilder
+    /// CdsTrancheBuilder
     ///     ``self``, for chaining.
     #[pyo3(text_signature = "($self, value)")]
     fn roll_rule<'py>(
@@ -1130,7 +1130,7 @@ impl PyCDSTrancheBuilder {
     ///
     /// Returns
     /// -------
-    /// CDSTrancheBuilder
+    /// CdsTrancheBuilder
     ///     ``self``, for chaining.
     ///
     /// Raises
@@ -1161,7 +1161,7 @@ impl PyCDSTrancheBuilder {
     ///
     /// Returns
     /// -------
-    /// CDSTrancheBuilder
+    /// CdsTrancheBuilder
     ///     ``self``, for chaining.
     ///
     /// Raises
@@ -1189,7 +1189,7 @@ impl PyCDSTrancheBuilder {
     ///
     /// Returns
     /// -------
-    /// CDSTrancheBuilder
+    /// CdsTrancheBuilder
     ///     ``self``, for chaining.
     ///
     /// Raises
@@ -1209,12 +1209,12 @@ impl PyCDSTrancheBuilder {
 
     /// Build the validated CDS tranche.
     ///
-    /// Validation is the Rust ``CDSTranche::builder().build()`` invariants
+    /// Validation is the Rust ``CdsTranche::builder().build()`` invariants
     /// only; there is no additional binding-side check.
     ///
     /// Returns
     /// -------
-    /// CDSTranche
+    /// CdsTranche
     ///     The validated CDS tranche.
     ///
     /// Raises
@@ -1224,20 +1224,20 @@ impl PyCDSTrancheBuilder {
     ///     or the completed tranche fails validation (``attach_pct >=
     ///     detach_pct``, fractional attach/detach, loss outside ``[0, 1]``).
     #[pyo3(text_signature = "($self)")]
-    fn build(mut slf: PyRefMut<'_, Self>) -> PyResult<PyCDSTranche> {
+    fn build(mut slf: PyRefMut<'_, Self>) -> PyResult<PyCdsTranche> {
         let b = take_builder(&mut slf.inner)?;
         let inner = b.build().map_err(core_to_py)?;
-        Ok(PyCDSTranche { inner })
+        Ok(PyCdsTranche { inner })
     }
 
     /// Return ``repr(self)`` listing the fields set so far.
     fn __repr__(&self) -> String {
-        builder_repr("CDSTrancheBuilder", &self.fields)
+        builder_repr("CdsTrancheBuilder", &self.fields)
     }
 }
 
 /// Register the tranche helper classes on the instruments submodule.
 pub fn register(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
-    m.add_class::<PyCDSTrancheParams>()?;
+    m.add_class::<PyCdsTrancheParams>()?;
     Ok(())
 }

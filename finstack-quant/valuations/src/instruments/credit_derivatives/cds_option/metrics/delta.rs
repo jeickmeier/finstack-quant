@@ -1,4 +1,4 @@
-//! Delta for [`CDSOption`], branched by strike kind.
+//! Delta for [`CdsOption`], branched by strike kind.
 //!
 //! - **Spread strikes**: Bloomberg's CDSO terminal reports Δ as the
 //!   Black-76 N(d₁) sensitivity of the option premium to the displayed ATM
@@ -11,7 +11,7 @@
 //!   surface volatility.
 //!
 //! This module is the single source of truth for both values;
-//! [`CDSOption::delta`] is a thin pass-through to [`delta`].
+//! [`CdsOption::delta`] is a thin pass-through to [`delta`].
 
 use crate::instruments::common_impl::traits::Instrument;
 use crate::instruments::credit_derivatives::cds_option::bloomberg_quadrature::{
@@ -20,7 +20,7 @@ use crate::instruments::credit_derivatives::cds_option::bloomberg_quadrature::{
 use crate::instruments::credit_derivatives::cds_option::pricer::{
     resolve_sigma, synthetic_underlying_cds,
 };
-use crate::instruments::credit_derivatives::cds_option::{CDSOption, CDSOptionStrikeKind};
+use crate::instruments::credit_derivatives::cds_option::{CdsOption, CdsOptionStrikeKind};
 use crate::instruments::OptionType;
 use crate::metrics::{MetricCalculator, MetricContext};
 use crate::recalibration::{
@@ -38,8 +38,8 @@ pub(crate) struct DeltaCalculator;
 
 impl MetricCalculator for DeltaCalculator {
     fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
-        let option: &CDSOption = context.instrument_as()?;
-        let provider = if option.strike.kind() == CDSOptionStrikeKind::CleanPricePct {
+        let option: &CdsOption = context.instrument_as()?;
+        let provider = if option.strike.kind() == CdsOptionStrikeKind::CleanPricePct {
             Some(context.recalibration_provider("cds_option_delta")?)
         } else {
             None
@@ -53,7 +53,7 @@ impl MetricCalculator for DeltaCalculator {
 /// Returned as a unit-less ratio (multiply by 100 for the displayed
 /// percentage). Payers Δ ≥ 0, receivers Δ ≤ 0 under both conventions.
 pub(crate) fn delta(
-    option: &CDSOption,
+    option: &CdsOption,
     curves: &MarketContext,
     as_of: finstack_quant_core::dates::Date,
 ) -> Result<f64> {
@@ -61,7 +61,7 @@ pub(crate) fn delta(
 }
 
 fn delta_with_provider(
-    option: &CDSOption,
+    option: &CdsOption,
     curves: &MarketContext,
     as_of: finstack_quant_core::dates::Date,
     provider: Option<&dyn RecalibrationProvider>,
@@ -72,8 +72,8 @@ fn delta_with_provider(
         return Ok(0.0);
     }
     match option.strike.kind() {
-        CDSOptionStrikeKind::Spread => spread_black_delta(option, curves, as_of, t),
-        CDSOptionStrikeKind::CleanPricePct => {
+        CdsOptionStrikeKind::Spread => spread_black_delta(option, curves, as_of, t),
+        CdsOptionStrikeKind::CleanPricePct => {
             let provider = provider
                 .ok_or_else(|| crate::recalibration::provider_missing("cds_option_delta"))?;
             price_strike_delta(option, curves, as_of, provider)
@@ -84,7 +84,7 @@ fn delta_with_provider(
 /// Bloomberg CDSO Δ — closed-form Black-76 N(d₁) on the displayed ATM
 /// forward spread (spread strikes only).
 fn spread_black_delta(
-    option: &CDSOption,
+    option: &CdsOption,
     curves: &MarketContext,
     as_of: finstack_quant_core::dates::Date,
     t: f64,
@@ -114,7 +114,7 @@ fn spread_black_delta(
 /// curves). The denominator reprices the current-factor-scaled synthetic
 /// underlying CDS on the same bumped curves and conventions.
 pub(super) fn price_strike_delta(
-    option: &CDSOption,
+    option: &CdsOption,
     curves: &MarketContext,
     as_of: finstack_quant_core::dates::Date,
     provider: &dyn RecalibrationProvider,

@@ -60,10 +60,10 @@ impl MetricCalculator for VegaCalculator {
 
         let (forward, strike) = ResolvedVolatility {
             sigma: inputs.sigma,
-            convention: inputs.volatility_convention,
+            convention: inputs.convention,
         }
         .model_rates(inputs.forward, strike)?;
-        let vega_raw = match inputs.volatility_convention {
+        let vega_raw = match inputs.convention {
             VolatilityConvention::Normal => {
                 bachelier_vega(forward, strike, inputs.sigma, inputs.time_to_expiry)
             }

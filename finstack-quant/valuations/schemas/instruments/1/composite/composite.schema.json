@@ -340,25 +340,25 @@
       "type": "object"
     },
     "AgencyProgram": {
-      "description": "Agency program enumeration.\n\nIdentifies the government-sponsored enterprise (GSE) or government agency\nthat guarantees the mortgage-backed security.\n\n# GNMA Programs\n\nGinnie Mae has two distinct programs with different payment delay conventions:\n- **GNMA I**: Single-issuer pools with a 45-day stated delay. Payments on the 15th.\n- **GNMA II**: Multi-issuer pools with a 50-day stated delay. Payments on the 20th.\n\nUse `GnmaI` or `GnmaII` to select the appropriate convention. Their\npersisted values are exactly `GNMA_I` and `GNMA_II`, respectively.",
+      "description": "Agency program enumeration.\n\nIdentifies the government-sponsored enterprise (GSE) or government agency\nthat guarantees the mortgage-backed security.\n\n# GNMA Programs\n\nGinnie Mae has two distinct programs with different payment delay conventions:\n- **GNMA I**: Single-issuer pools with a 45-day stated delay. Payments on the 15th.\n- **GNMA II**: Multi-issuer pools with a 50-day stated delay. Payments on the 20th.\n\nUse `GnmaI` or `GnmaII` to select the appropriate convention. Their\npersisted values are exactly `gnma_i` and `gnma_ii`, respectively.",
       "oneOf": [
         {
-          "const": "FNMA",
+          "const": "fnma",
           "description": "Fannie Mae (Federal National Mortgage Association)",
           "type": "string"
         },
         {
-          "const": "FHLMC",
+          "const": "fhlmc",
           "description": "Freddie Mac (Federal Home Loan Mortgage Corporation)",
           "type": "string"
         },
         {
-          "const": "GNMA_I",
+          "const": "gnma_i",
           "description": "Ginnie Mae I - single-issuer pools with 45-day stated delay.\n\nGNMA I securities pay on the 15th of the month following the accrual\nperiod, resulting in a 45-day stated delay from accrual start.",
           "type": "string"
         },
         {
-          "const": "GNMA_II",
+          "const": "gnma_ii",
           "description": "Ginnie Mae II - multi-issuer pools with 50-day stated delay.\n\nGNMA II securities pay on the 20th of the month following the accrual\nperiod, resulting in a ~50-day stated delay from accrual start. This is\nthe larger and more actively traded GNMA program.",
           "type": "string"
         }
@@ -3006,527 +3006,6 @@
         }
       ]
     },
-    "CDSIndex": {
-      "additionalProperties": false,
-      "description": "CDS Index instrument definition",
-      "properties": {
-        "attributes": {
-          "$ref": "https://finstack_quant.dev/schemas/common/1/attributes.schema.json",
-          "default": {},
-          "description": "Attributes for tagging and selection"
-        },
-        "constituents": {
-          "description": "Optional list of constituents when using `IndexPricing::Constituents`",
-          "items": {
-            "$ref": "#/$defs/CDSIndexConstituent"
-          },
-          "type": "array"
-        },
-        "convention": {
-          "$ref": "#/$defs/CdsConvention",
-          "description": "Regional ISDA convention"
-        },
-        "id": {
-          "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
-          "description": "Unique instrument identifier"
-        },
-        "index_factor": {
-          "description": "Index factor (fraction of surviving notional since series inception)",
-          "format": "double",
-          "type": "number"
-        },
-        "index_name": {
-          "description": "Index name, e.g., \"CDX.NA.IG\", \"CDX.NA.HY\", \"iTraxx Europe\"",
-          "type": "string"
-        },
-        "instrument_pricing_overrides": {
-          "$ref": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json",
-          "description": "Instrument-owned pricing inputs."
-        },
-        "margin_spec": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/OtcMarginSpec"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "Optional OTC margin specification for VM/IM.\n\nCDS indices are typically cleared through ICE Clear Credit. Use\n`OtcMarginSpec::cleared(\"ICE\", Currency::USD)` for standard cleared\nindices. Bilateral SIMM indices must attach an explicit\n`SimmCreditClassification` rather than infer qualifying status from the\nindex name."
-        },
-        "metric_pricing_overrides": {
-          "$ref": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json",
-          "description": "Metric-time pricing configuration."
-        },
-        "notional": {
-          "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
-          "description": "Notional amount of the index"
-        },
-        "num_constituents": {
-          "default": null,
-          "description": "Number of reference entities in the index pool.\n\nRequired for portfolio-level analytics (e.g. jump-to-default) when\n`constituents` is empty (`SingleCurve` mode), since the per-name\nrisk number is `notional / N · LGD`. Index pool sizes drift with\nseries — iTraxx Crossover has been 75 names only since Series 9,\nand CDX.NA.HY membership varies — so this is supplied explicitly\nrather than inferred from `index_name`. Standard presets populate\nit via `CDSIndex::from_preset`; set it directly with\n`with_num_constituents` for custom indices.",
-          "format": "uint32",
-          "minimum": 0,
-          "type": [
-            "integer",
-            "null"
-          ]
-        },
-        "premium_leg": {
-          "$ref": "#/$defs/PremiumLegSpec",
-          "description": "Premium leg specification (coupon schedule and discounting)"
-        },
-        "pricing": {
-          "$ref": "#/$defs/IndexPricing",
-          "description": "Pricing aggregation mode"
-        },
-        "protection_leg": {
-          "$ref": "#/$defs/ProtectionLegSpec",
-          "description": "Protection leg specification (credit curve and settlement)"
-        },
-        "scenario_pricing_overrides": {
-          "$ref": "https://finstack_quant.dev/schemas/common/1/scenario_pricing_overrides.schema.json",
-          "description": "Scenario-only pricing adjustments."
-        },
-        "series": {
-          "description": "Series number (e.g., 42)",
-          "format": "uint16",
-          "maximum": 65535,
-          "minimum": 0,
-          "type": "integer"
-        },
-        "side": {
-          "$ref": "#/$defs/PayReceive",
-          "description": "Protection buyer/seller perspective"
-        },
-        "upfront": {
-          "description": "Contractual upfront payment `(payment date, amount)` on the index\nnotional. A positive amount is paid by the protection buyer to the\nseller; a negative amount by the seller to the buyer. It is\ndiscounted from its payment date and dropped once that date is before\nthe valuation date.",
-          "maxItems": 2,
-          "minItems": 2,
-          "prefixItems": [
-            {
-              "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json"
-            },
-            {
-              "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json"
-            }
-          ],
-          "type": [
-            "array",
-            "null"
-          ]
-        },
-        "version": {
-          "description": "Version number within series",
-          "format": "uint16",
-          "maximum": 65535,
-          "minimum": 0,
-          "type": "integer"
-        }
-      },
-      "required": [
-        "id",
-        "index_name",
-        "series",
-        "version",
-        "notional",
-        "index_factor",
-        "side",
-        "convention",
-        "premium_leg",
-        "protection_leg",
-        "pricing",
-        "constituents"
-      ],
-      "type": "object"
-    },
-    "CDSIndexConstituent": {
-      "additionalProperties": false,
-      "description": "Constituent in a CDS index with weight and credit parameters.",
-      "properties": {
-        "credit": {
-          "$ref": "#/$defs/CreditParams",
-          "description": "Credit configuration for the issuer (includes hazard curve id and recovery)"
-        },
-        "defaulted": {
-          "default": false,
-          "description": "Whether the constituent has defaulted. Defaulted names are excluded from the\npremium leg but their settled protection payment is already reflected in `index_factor`.\nPer O'Kane (2008) Ch. 7: \"On default, the protection payment is settled and the\nname is removed from the index. The index factor adjusts to reflect the reduced notional.\"",
-          "type": "boolean"
-        },
-        "weight": {
-          "description": "Weight of the issuer in the index notional (e.g., 1/125.0 for CDX IG)",
-          "format": "double",
-          "type": "number"
-        }
-      },
-      "required": [
-        "credit",
-        "weight"
-      ],
-      "type": "object"
-    },
-    "CDSOption": {
-      "additionalProperties": false,
-      "description": "Credit option instrument (option on CDS spread or clean index price)\n\nThe public pricing surface supports European options with cash or\nphysical settlement. Before expiry, cash- and physical-settled options\ncarry the same cash-equivalent model NPV and route through the same\nquadrature; the clean payoff excludes accrued because the same underlying\naccrued appears on both sides before exercise and cancels. A physical\nexercise cashflow at settlement is dirty (includes accrued at exercise\nsettlement), and this pricer does not create or deliver a live underlying\nCDS position — valuation at or after a physical exercise boundary fails\nexplicitly. Non-European exercise is rejected at pricing time so\ndeserialized instruments cannot silently fall through to an unsupported\nengine.",
-      "properties": {
-        "attributes": {
-          "$ref": "https://finstack_quant.dev/schemas/common/1/attributes.schema.json",
-          "default": {},
-          "description": "Additional attributes"
-        },
-        "coupon_bp": {
-          "anyOf": [
-            {
-              "$ref": "https://finstack_quant.dev/schemas/common/1/decimal.schema.json"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "description": "Contractual running coupon `c` of the underlying CDS, in basis points\n(e.g., `100` for the standard CDX.NA.IG coupon, `500` for the\nstandard CDX.NA.HY coupon). When `None`, the synthetic underlying\nCDS uses `strike` as its running coupon — the appropriate single-name\nSNAC default where the trade is struck at the par spread. For CDS\nindex options where the index has a fixed standard coupon different\nfrom the option strike, set this explicitly so the strike-adjustment\nterm `H(K) = ξN(c − K)A(K)` (DOCS 2055833 Eq. 2.4) is populated."
-        },
-        "credit_curve_id": {
-          "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
-          "description": "Credit curve identifier"
-        },
-        "discount_curve_id": {
-          "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
-          "description": "Discount curve identifier"
-        },
-        "exercise_settlement_date": {
-          "anyOf": [
-            {
-              "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "Payment date of the exercise proceeds, defaulting to legal expiry.\nMust be on or after expiry and before CDS maturity. Discounting uses\nthis date; spread variance ends at legal expiry."
-        },
-        "exercise_style": {
-          "$ref": "#/$defs/ExerciseStyle",
-          "description": "Exercise style"
-        },
-        "expiry": {
-          "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
-          "description": "Option expiry date"
-        },
-        "id": {
-          "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
-          "description": "Unique instrument identifier"
-        },
-        "index_factor": {
-          "default": 1.0,
-          "description": "Current index factor `f` at valuation: the surviving fraction of the\noriginal index notional, in `(0, 1]`. Defaults to `1.0` (no settled\ndefaults) and scales the notional only when `underlying_is_index`.\nSee [`Self::strike_index_factor`] for the original factor `f0`\nattached to a clean-price strike.",
-          "format": "double",
-          "type": "number"
-        },
-        "instrument_pricing_overrides": {
-          "$ref": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json",
-          "description": "Instrument-owned pricing inputs."
-        },
-        "knockout": {
-          "default": false,
-          "description": "Whether the option knocks out if the underlying defaults before\nexercise. This is contract-specific; new instruments default to\nno-knockout and legacy single-name books can opt in explicitly.",
-          "type": "boolean"
-        },
-        "metric_pricing_overrides": {
-          "$ref": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json",
-          "description": "Metric-time pricing configuration."
-        },
-        "notional": {
-          "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
-          "description": "Notional amount"
-        },
-        "option_type": {
-          "$ref": "#/$defs/OptionType",
-          "description": "Option type (Call = right to buy protection, Put = right to sell protection)"
-        },
-        "premium_settlement_date": {
-          "anyOf": [
-            {
-              "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "Payment date of the option premium, returned by the settlement-date\naccessor. This does not change variance time or front-end protection;\nthe option value excludes the separately agreed trade premium."
-        },
-        "protection_start_convention": {
-          "$ref": "#/$defs/ProtectionStartConvention",
-          "default": "spot",
-          "description": "Convention used to select the synthetic underlying CDS accrual start\nwhen `underlying_start_date` is not explicitly supplied."
-        },
-        "realized_loss": {
-          "default": 0.0,
-          "description": "Realized (settled) cumulative index loss from option inception to\nvaluation date, as a decimal fraction of the original index notional\nin `[0, 1]`. Defaults to `0.0`.\n\nBloomberg CDSO treats index options as no-knockout. Settled losses\nafter option inception are therefore deterministic payoff adjustments\nat exercise (DOCS 2055833 Eq. 2.5 and DOCS 2151513). Single-name\noptions knock out instead and must leave this at `0.0`.",
-          "format": "double",
-          "type": "number"
-        },
-        "recovery_rate": {
-          "description": "Recovery rate assumption",
-          "format": "double",
-          "type": "number"
-        },
-        "scenario_pricing_overrides": {
-          "$ref": "https://finstack_quant.dev/schemas/common/1/scenario_pricing_overrides.schema.json",
-          "description": "Scenario-only pricing adjustments."
-        },
-        "settlement": {
-          "$ref": "#/$defs/SettlementType",
-          "description": "Settlement type"
-        },
-        "strike": {
-          "$ref": "#/$defs/CDSOptionStrike",
-          "description": "Typed option strike: a decimal forward spread (`{\"spread\": \"0.0325\"}`)\nor a clean price in percentage points (`{\"clean_price_pct\": \"107.0\"}`)."
-        },
-        "strike_index_factor": {
-          "description": "Original index factor `f0` attached to the option strike.\n\nDistinct from [`Self::index_factor`], which is the current factor\n`f` at valuation: defaults settled between option strike and\nvaluation reduce `f` below `f0`. A clean-price strike quotes the\nprice on `f0` notional, so its deterministic payoff term scales by\n`f0 / f`; the strike factor is therefore required for clean-price\nstrikes (`CDSOptionStrike::CleanPricePct`) and must not be inferred\nfrom the current factor after a default. Rejected for spread\nstrikes, whose payoff does not reference it.",
-          "format": "double",
-          "type": [
-            "number",
-            "null"
-          ]
-        },
-        "underlying_convention": {
-          "$ref": "#/$defs/CdsConvention",
-          "default": "isda_na",
-          "description": "Convention used by the underlying CDS contract.\n\nThis controls the CDS schedule, settlement lag, business day convention,\nand other market-standard mechanics used when deriving forward spread and\nrisky annuity for the option's underlying."
-        },
-        "underlying_is_index": {
-          "default": false,
-          "description": "If true, the underlying is a CDS index; else single-name CDS.\n\nThe Bloomberg CDSO model treats the two cases differently in the\nno-knockout calibration `F_0 = E[V_te]` (DOCS 2055833 §1.2): index\noptions trade no-knockout and the calibration target includes the\n`(1−R)·(1−q_te)` FEP-equivalent contribution; single-name options\nknock out on default and skip it.",
-          "type": "boolean"
-        },
-        "underlying_maturity": {
-          "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
-          "description": "Underlying CDS maturity date"
-        },
-        "underlying_start_date": {
-          "anyOf": [
-            {
-              "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "Underlying CDS accrual-effective date used for forward spread and risky\nannuity. Bloomberg CDSO can quote a standard CDS effective date before\noption expiry; in that case premium accrues from this date while\nprotection starts at expiry."
-        },
-        "vol_surface_id": {
-          "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
-          "description": "Volatility surface identifier"
-        }
-      },
-      "required": [
-        "id",
-        "strike",
-        "option_type",
-        "exercise_style",
-        "expiry",
-        "underlying_maturity",
-        "notional",
-        "settlement",
-        "recovery_rate",
-        "discount_curve_id",
-        "credit_curve_id",
-        "vol_surface_id"
-      ],
-      "type": "object"
-    },
-    "CDSOptionStrike": {
-      "description": "Typed CDS-option strike: forward-spread or clean-price convention.\n\nWire format: externally tagged JSON — `{\"spread\": \"0.0325\"}` or\n`{\"clean_price_pct\": \"107.0\"}` — with no bare-decimal fallback.\n\n# Examples\n\n```rust\nuse finstack_quant_valuations::instruments::credit_derivatives::cds_option::CDSOptionStrike;\nuse rust_decimal::Decimal;\n\nlet spread = CDSOptionStrike::Spread(Decimal::new(325, 4)); // 0.0325 = 325 bp\nassert!(spread.spread_decimal().is_some());\nassert_eq!(spread.native_surface_coordinate().unwrap(), 0.0325);\n\nlet price = CDSOptionStrike::CleanPricePct(Decimal::new(1070, 1)); // 107.0\nassert_eq!(price.native_surface_coordinate().unwrap(), 107.0);\nassert!((price.clean_price_fraction().unwrap() - 1.07).abs() < 1e-15);\n```",
-      "oneOf": [
-        {
-          "additionalProperties": false,
-          "description": "Strike forward spread as a decimal annual rate (`0.0325` = 325 bp).",
-          "properties": {
-            "spread": {
-              "$ref": "https://finstack_quant.dev/schemas/common/1/decimal.schema.json"
-            }
-          },
-          "required": [
-            "spread"
-          ],
-          "type": "object"
-        },
-        {
-          "additionalProperties": false,
-          "description": "Strike clean price in percentage-price points (`107.0` = fraction\n`1.07`). CDX HY index options are quoted this way.",
-          "properties": {
-            "clean_price_pct": {
-              "$ref": "https://finstack_quant.dev/schemas/common/1/decimal.schema.json"
-            }
-          },
-          "required": [
-            "clean_price_pct"
-          ],
-          "type": "object"
-        }
-      ]
-    },
-    "CDSTranche": {
-      "additionalProperties": false,
-      "description": "CDS Tranche instrument definition (boilerplate)",
-      "properties": {
-        "attach_pct": {
-          "description": "Attachment point in percent (e.g., 0.0 for equity)",
-          "format": "double",
-          "type": "number"
-        },
-        "attributes": {
-          "$ref": "https://finstack_quant.dev/schemas/common/1/attributes.schema.json",
-          "description": "Attributes for scenario selection and tagging"
-        },
-        "business_day_convention": {
-          "$ref": "https://finstack_quant.dev/schemas/common/1/business_day_convention.schema.json",
-          "default": "modified_following",
-          "description": "Business day convention"
-        },
-        "calendar_id": {
-          "anyOf": [
-            {
-              "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "Optional holiday calendar id"
-        },
-        "coupon_bp": {
-          "description": "Running coupon in basis points (e.g., 100 = 1.00%)",
-          "format": "double",
-          "type": "number"
-        },
-        "credit_index_id": {
-          "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
-          "description": "Credit index identifier for survival/loss modeling (placeholder)"
-        },
-        "day_count": {
-          "$ref": "https://finstack_quant.dev/schemas/common/1/day_count.schema.json",
-          "description": "Day count (typically Act/360)"
-        },
-        "detach_pct": {
-          "description": "Detachment point in percent (e.g., 3.0 for 0-3% tranche)",
-          "format": "double",
-          "type": "number"
-        },
-        "discount_curve_id": {
-          "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
-          "description": "Discount curve identifier (by quote currency)"
-        },
-        "frequency": {
-          "$ref": "https://finstack_quant.dev/schemas/common/1/tenor.schema.json",
-          "description": "Payment frequency (typically quarterly)"
-        },
-        "id": {
-          "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
-          "description": "Unique instrument identifier"
-        },
-        "index_name": {
-          "description": "Index name (e.g., \"CDX.NA.IG\", \"CDX.NA.HY\", \"iTraxx EUR\")",
-          "type": "string"
-        },
-        "instrument_pricing_overrides": {
-          "$ref": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json",
-          "description": "Instrument-owned pricing inputs."
-        },
-        "maturity": {
-          "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
-          "description": "Maturity date of the tranche"
-        },
-        "metric_pricing_overrides": {
-          "$ref": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json",
-          "description": "Metric-time pricing configuration."
-        },
-        "notional": {
-          "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
-          "description": "Notional amount of the tranche"
-        },
-        "realized_loss": {
-          "description": "Realized (settled) loss on the reference pool as a decimal fraction of\nthe original portfolio notional, in `[0, 1]`.",
-          "format": "double",
-          "type": "number"
-        },
-        "roll_rule": {
-          "$ref": "#/$defs/RollRule",
-          "default": "none",
-          "description": "Coupon roll-date grid. `cds_imm` selects the standard CDS roll dates\n(20th of Mar, Jun, Sep, Dec); `none` (the default) generates a bespoke\nschedule from `frequency` and `stub`. The equity-futures `imm` grid is\nrejected. Use [`Self::standard`] for the IMM constructor."
-        },
-        "scenario_pricing_overrides": {
-          "$ref": "https://finstack_quant.dev/schemas/common/1/scenario_pricing_overrides.schema.json",
-          "description": "Scenario-only pricing adjustments."
-        },
-        "series": {
-          "description": "Series number (e.g., 37)",
-          "format": "uint16",
-          "maximum": 65535,
-          "minimum": 0,
-          "type": "integer"
-        },
-        "side": {
-          "$ref": "#/$defs/PayReceive",
-          "description": "Tranche side, as on CDS and CDSIndex: `pay` buys protection (pays the\nrunning premium), `receive` sells protection (receives the premium)."
-        },
-        "start_date": {
-          "anyOf": [
-            {
-              "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "description": "Optional effective date for schedule anchoring (if None, uses as_of date)"
-        },
-        "stub": {
-          "$ref": "#/$defs/StubKind",
-          "default": "short_front",
-          "description": "Stub convention for a bespoke (`roll_rule = none`) coupon schedule.\nDefaults to `short_front`."
-        },
-        "upfront": {
-          "default": null,
-          "description": "Optional upfront payment (date, amount). Positive means paid by protection buyer.",
-          "maxItems": 2,
-          "minItems": 2,
-          "prefixItems": [
-            {
-              "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json"
-            },
-            {
-              "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json"
-            }
-          ],
-          "type": [
-            "array",
-            "null"
-          ]
-        }
-      },
-      "required": [
-        "id",
-        "index_name",
-        "series",
-        "attach_pct",
-        "detach_pct",
-        "notional",
-        "maturity",
-        "coupon_bp",
-        "frequency",
-        "day_count",
-        "discount_curve_id",
-        "credit_index_id",
-        "side",
-        "realized_loss",
-        "attributes"
-      ],
-      "type": "object"
-    },
     "CFKind": {
       "description": "Enumeration of cash-flow kinds for classification and ordering.\n\nUsed to distinguish between different types of cashflows for\nproper sequencing, risk calculation, and accounting treatment.\n\n# Sign Convention\n\nThe enum itself is **view agnostic**: individual instruments are\nresponsible for mapping these kinds into a holder or issuer view.\nBy convention in this crate:\n\n| Kind | Holder View (Long) | Issuer View (Short) |\n|------|-------------------|---------------------|\n| Interest (Fixed/Float) | Positive (receive) | Negative (pay) |\n| Notional (initial) | Negative (pay) | Positive (receive) |\n| Notional (final) | Positive (receive) | Negative (pay) |\n| Amortization | Positive (receive) | Negative (pay) |\n| PIK | Increases notional | Increases liability |\n| Fee | Negative (pay) | Positive (receive) |\n\nWhen constructing cashflow schedules, instruments should apply the appropriate\nsign based on the economic perspective being represented.\n\n# Cashflow Categories\n\nVariants are grouped by category:\n- **Interest**: `Fixed`, `FloatReset`, `Stub`\n- **Inflation**: `InflationCoupon`\n- **Fees**: `Fee`, `CommitmentFee`, `UsageFee`, `FacilityFee`\n- **Principal**: `Notional`, `PIK`, `Amortization`, `PrePayment`\n- **Revolving**: `RevolvingDraw`, `RevolvingRepayment`\n- **Credit Events**: `DefaultedNotional`, `Recovery`\n- **Margin/Collateral**: `InitialMarginPost`, `VariationMarginPay`, etc.",
       "oneOf": [
@@ -4606,6 +4085,527 @@
           "type": "string"
         }
       ]
+    },
+    "CdsIndex": {
+      "additionalProperties": false,
+      "description": "CDS Index instrument definition",
+      "properties": {
+        "attributes": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/attributes.schema.json",
+          "default": {},
+          "description": "Attributes for tagging and selection"
+        },
+        "constituents": {
+          "description": "Optional list of constituents when using `IndexPricing::Constituents`",
+          "items": {
+            "$ref": "#/$defs/CdsIndexConstituent"
+          },
+          "type": "array"
+        },
+        "convention": {
+          "$ref": "#/$defs/CdsConvention",
+          "description": "Regional ISDA convention"
+        },
+        "id": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+          "description": "Unique instrument identifier"
+        },
+        "index_factor": {
+          "description": "Index factor (fraction of surviving notional since series inception)",
+          "format": "double",
+          "type": "number"
+        },
+        "index_name": {
+          "description": "Index name, e.g., \"CDX.NA.IG\", \"CDX.NA.HY\", \"iTraxx Europe\"",
+          "type": "string"
+        },
+        "instrument_pricing_overrides": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json",
+          "description": "Instrument-owned pricing inputs."
+        },
+        "margin_spec": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/OtcMarginSpec"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Optional OTC margin specification for VM/IM.\n\nCDS indices are typically cleared through ICE Clear Credit. Use\n`OtcMarginSpec::cleared(\"ICE\", Currency::USD)` for standard cleared\nindices. Bilateral SIMM indices must attach an explicit\n`SimmCreditClassification` rather than infer qualifying status from the\nindex name."
+        },
+        "metric_pricing_overrides": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json",
+          "description": "Metric-time pricing configuration."
+        },
+        "notional": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
+          "description": "Notional amount of the index"
+        },
+        "num_constituents": {
+          "default": null,
+          "description": "Number of reference entities in the index pool.\n\nRequired for portfolio-level analytics (e.g. jump-to-default) when\n`constituents` is empty (`SingleCurve` mode), since the per-name\nrisk number is `notional / N · LGD`. Index pool sizes drift with\nseries — iTraxx Crossover has been 75 names only since Series 9,\nand CDX.NA.HY membership varies — so this is supplied explicitly\nrather than inferred from `index_name`. Standard presets populate\nit via `CdsIndex::from_preset`; set it directly with\n`with_num_constituents` for custom indices.",
+          "format": "uint32",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "premium_leg": {
+          "$ref": "#/$defs/PremiumLegSpec",
+          "description": "Premium leg specification (coupon schedule and discounting)"
+        },
+        "pricing": {
+          "$ref": "#/$defs/IndexPricing",
+          "description": "Pricing aggregation mode"
+        },
+        "protection_leg": {
+          "$ref": "#/$defs/ProtectionLegSpec",
+          "description": "Protection leg specification (credit curve and settlement)"
+        },
+        "scenario_pricing_overrides": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/scenario_pricing_overrides.schema.json",
+          "description": "Scenario-only pricing adjustments."
+        },
+        "series": {
+          "description": "Series number (e.g., 42)",
+          "format": "uint16",
+          "maximum": 65535,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "side": {
+          "$ref": "#/$defs/PayReceive",
+          "description": "Protection buyer/seller perspective"
+        },
+        "upfront": {
+          "description": "Contractual upfront payment `(payment date, amount)` on the index\nnotional. A positive amount is paid by the protection buyer to the\nseller; a negative amount by the seller to the buyer. It is\ndiscounted from its payment date and dropped once that date is before\nthe valuation date.",
+          "maxItems": 2,
+          "minItems": 2,
+          "prefixItems": [
+            {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json"
+            },
+            {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json"
+            }
+          ],
+          "type": [
+            "array",
+            "null"
+          ]
+        },
+        "version": {
+          "description": "Version number within series",
+          "format": "uint16",
+          "maximum": 65535,
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "id",
+        "index_name",
+        "series",
+        "version",
+        "notional",
+        "index_factor",
+        "side",
+        "convention",
+        "premium_leg",
+        "protection_leg",
+        "pricing",
+        "constituents"
+      ],
+      "type": "object"
+    },
+    "CdsIndexConstituent": {
+      "additionalProperties": false,
+      "description": "Constituent in a CDS index with weight and credit parameters.",
+      "properties": {
+        "credit": {
+          "$ref": "#/$defs/CreditParams",
+          "description": "Credit configuration for the issuer (includes hazard curve id and recovery)"
+        },
+        "defaulted": {
+          "default": false,
+          "description": "Whether the constituent has defaulted. Defaulted names are excluded from the\npremium leg but their settled protection payment is already reflected in `index_factor`.\nPer O'Kane (2008) Ch. 7: \"On default, the protection payment is settled and the\nname is removed from the index. The index factor adjusts to reflect the reduced notional.\"",
+          "type": "boolean"
+        },
+        "weight": {
+          "description": "Weight of the issuer in the index notional (e.g., 1/125.0 for CDX IG)",
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "required": [
+        "credit",
+        "weight"
+      ],
+      "type": "object"
+    },
+    "CdsOption": {
+      "additionalProperties": false,
+      "description": "Credit option instrument (option on CDS spread or clean index price)\n\nThe public pricing surface supports European options with cash or\nphysical settlement. Before expiry, cash- and physical-settled options\ncarry the same cash-equivalent model NPV and route through the same\nquadrature; the clean payoff excludes accrued because the same underlying\naccrued appears on both sides before exercise and cancels. A physical\nexercise cashflow at settlement is dirty (includes accrued at exercise\nsettlement), and this pricer does not create or deliver a live underlying\nCDS position — valuation at or after a physical exercise boundary fails\nexplicitly. Non-European exercise is rejected at pricing time so\ndeserialized instruments cannot silently fall through to an unsupported\nengine.",
+      "properties": {
+        "attributes": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/attributes.schema.json",
+          "default": {},
+          "description": "Additional attributes"
+        },
+        "coupon_bp": {
+          "anyOf": [
+            {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/decimal.schema.json"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Contractual running coupon `c` of the underlying CDS, in basis points\n(e.g., `100` for the standard CDX.NA.IG coupon, `500` for the\nstandard CDX.NA.HY coupon). When `None`, the synthetic underlying\nCDS uses `strike` as its running coupon — the appropriate single-name\nSNAC default where the trade is struck at the par spread. For CDS\nindex options where the index has a fixed standard coupon different\nfrom the option strike, set this explicitly so the strike-adjustment\nterm `H(K) = ξN(c − K)A(K)` (DOCS 2055833 Eq. 2.4) is populated."
+        },
+        "credit_curve_id": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+          "description": "Credit curve identifier"
+        },
+        "discount_curve_id": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+          "description": "Discount curve identifier"
+        },
+        "exercise_settlement_date": {
+          "anyOf": [
+            {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Payment date of the exercise proceeds, defaulting to legal expiry.\nMust be on or after expiry and before CDS maturity. Discounting uses\nthis date; spread variance ends at legal expiry."
+        },
+        "exercise_style": {
+          "$ref": "#/$defs/ExerciseStyle",
+          "description": "Exercise style"
+        },
+        "expiry": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
+          "description": "Option expiry date"
+        },
+        "id": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+          "description": "Unique instrument identifier"
+        },
+        "index_factor": {
+          "default": 1.0,
+          "description": "Current index factor `f` at valuation: the surviving fraction of the\noriginal index notional, in `(0, 1]`. Defaults to `1.0` (no settled\ndefaults) and scales the notional only when `underlying_is_index`.\nSee [`Self::strike_index_factor`] for the original factor `f0`\nattached to a clean-price strike.",
+          "format": "double",
+          "type": "number"
+        },
+        "instrument_pricing_overrides": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json",
+          "description": "Instrument-owned pricing inputs."
+        },
+        "knockout": {
+          "default": false,
+          "description": "Whether the option knocks out if the underlying defaults before\nexercise. This is contract-specific; new instruments default to\nno-knockout and legacy single-name books can opt in explicitly.",
+          "type": "boolean"
+        },
+        "metric_pricing_overrides": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json",
+          "description": "Metric-time pricing configuration."
+        },
+        "notional": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
+          "description": "Notional amount"
+        },
+        "option_type": {
+          "$ref": "#/$defs/OptionType",
+          "description": "Option type (Call = right to buy protection, Put = right to sell protection)"
+        },
+        "premium_settlement_date": {
+          "anyOf": [
+            {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Payment date of the option premium, returned by the settlement-date\naccessor. This does not change variance time or front-end protection;\nthe option value excludes the separately agreed trade premium."
+        },
+        "protection_start_convention": {
+          "$ref": "#/$defs/ProtectionStartConvention",
+          "default": "spot",
+          "description": "Convention used to select the synthetic underlying CDS accrual start\nwhen `underlying_start_date` is not explicitly supplied."
+        },
+        "realized_loss": {
+          "default": 0.0,
+          "description": "Realized (settled) cumulative index loss from option inception to\nvaluation date, as a decimal fraction of the original index notional\nin `[0, 1]`. Defaults to `0.0`.\n\nBloomberg CDSO treats index options as no-knockout. Settled losses\nafter option inception are therefore deterministic payoff adjustments\nat exercise (DOCS 2055833 Eq. 2.5 and DOCS 2151513). Single-name\noptions knock out instead and must leave this at `0.0`.",
+          "format": "double",
+          "type": "number"
+        },
+        "recovery_rate": {
+          "description": "Recovery rate assumption",
+          "format": "double",
+          "type": "number"
+        },
+        "scenario_pricing_overrides": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/scenario_pricing_overrides.schema.json",
+          "description": "Scenario-only pricing adjustments."
+        },
+        "settlement": {
+          "$ref": "#/$defs/SettlementType",
+          "description": "Settlement type"
+        },
+        "strike": {
+          "$ref": "#/$defs/CdsOptionStrike",
+          "description": "Typed option strike: a decimal forward spread (`{\"spread\": \"0.0325\"}`)\nor a clean price in percentage points (`{\"clean_price_pct\": \"107.0\"}`)."
+        },
+        "strike_index_factor": {
+          "description": "Original index factor `f0` attached to the option strike.\n\nDistinct from [`Self::index_factor`], which is the current factor\n`f` at valuation: defaults settled between option strike and\nvaluation reduce `f` below `f0`. A clean-price strike quotes the\nprice on `f0` notional, so its deterministic payoff term scales by\n`f0 / f`; the strike factor is therefore required for clean-price\nstrikes (`CdsOptionStrike::CleanPricePct`) and must not be inferred\nfrom the current factor after a default. Rejected for spread\nstrikes, whose payoff does not reference it.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "underlying_convention": {
+          "$ref": "#/$defs/CdsConvention",
+          "default": "isda_na",
+          "description": "Convention used by the underlying CDS contract.\n\nThis controls the CDS schedule, settlement lag, business day convention,\nand other market-standard mechanics used when deriving forward spread and\nrisky annuity for the option's underlying."
+        },
+        "underlying_is_index": {
+          "default": false,
+          "description": "If true, the underlying is a CDS index; else single-name CDS.\n\nThe Bloomberg CDSO model treats the two cases differently in the\nno-knockout calibration `F_0 = E[V_te]` (DOCS 2055833 §1.2): index\noptions trade no-knockout and the calibration target includes the\n`(1−R)·(1−q_te)` FEP-equivalent contribution; single-name options\nknock out on default and skip it.",
+          "type": "boolean"
+        },
+        "underlying_maturity": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
+          "description": "Underlying CDS maturity date"
+        },
+        "underlying_start_date": {
+          "anyOf": [
+            {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Underlying CDS accrual-effective date used for forward spread and risky\nannuity. Bloomberg CDSO can quote a standard CDS effective date before\noption expiry; in that case premium accrues from this date while\nprotection starts at expiry."
+        },
+        "vol_surface_id": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+          "description": "Volatility surface identifier"
+        }
+      },
+      "required": [
+        "id",
+        "strike",
+        "option_type",
+        "exercise_style",
+        "expiry",
+        "underlying_maturity",
+        "notional",
+        "settlement",
+        "recovery_rate",
+        "discount_curve_id",
+        "credit_curve_id",
+        "vol_surface_id"
+      ],
+      "type": "object"
+    },
+    "CdsOptionStrike": {
+      "description": "Typed CDS-option strike: forward-spread or clean-price convention.\n\nWire format: externally tagged JSON — `{\"spread\": \"0.0325\"}` or\n`{\"clean_price_pct\": \"107.0\"}` — with no bare-decimal fallback.\n\n# Examples\n\n```rust\nuse finstack_quant_valuations::instruments::credit_derivatives::cds_option::CdsOptionStrike;\nuse rust_decimal::Decimal;\n\nlet spread = CdsOptionStrike::Spread(Decimal::new(325, 4)); // 0.0325 = 325 bp\nassert!(spread.spread_decimal().is_some());\nassert_eq!(spread.native_surface_coordinate().unwrap(), 0.0325);\n\nlet price = CdsOptionStrike::CleanPricePct(Decimal::new(1070, 1)); // 107.0\nassert_eq!(price.native_surface_coordinate().unwrap(), 107.0);\nassert!((price.clean_price_fraction().unwrap() - 1.07).abs() < 1e-15);\n```",
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "description": "Strike forward spread as a decimal annual rate (`0.0325` = 325 bp).",
+          "properties": {
+            "spread": {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/decimal.schema.json"
+            }
+          },
+          "required": [
+            "spread"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Strike clean price in percentage-price points (`107.0` = fraction\n`1.07`). CDX HY index options are quoted this way.",
+          "properties": {
+            "clean_price_pct": {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/decimal.schema.json"
+            }
+          },
+          "required": [
+            "clean_price_pct"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "CdsTranche": {
+      "additionalProperties": false,
+      "description": "CDS Tranche instrument definition (boilerplate)",
+      "properties": {
+        "attach_pct": {
+          "description": "Attachment point in percent (e.g., 0.0 for equity)",
+          "format": "double",
+          "type": "number"
+        },
+        "attributes": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/attributes.schema.json",
+          "description": "Attributes for scenario selection and tagging"
+        },
+        "business_day_convention": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/business_day_convention.schema.json",
+          "default": "modified_following",
+          "description": "Business day convention"
+        },
+        "calendar_id": {
+          "anyOf": [
+            {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Optional holiday calendar id"
+        },
+        "coupon_bp": {
+          "description": "Running coupon in basis points (e.g., 100 = 1.00%)",
+          "format": "double",
+          "type": "number"
+        },
+        "credit_index_id": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+          "description": "Credit index identifier for survival/loss modeling (placeholder)"
+        },
+        "day_count": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/day_count.schema.json",
+          "description": "Day count (typically Act/360)"
+        },
+        "detach_pct": {
+          "description": "Detachment point in percent (e.g., 3.0 for 0-3% tranche)",
+          "format": "double",
+          "type": "number"
+        },
+        "discount_curve_id": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+          "description": "Discount curve identifier (by quote currency)"
+        },
+        "frequency": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/tenor.schema.json",
+          "description": "Payment frequency (typically quarterly)"
+        },
+        "id": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+          "description": "Unique instrument identifier"
+        },
+        "index_name": {
+          "description": "Index name (e.g., \"CDX.NA.IG\", \"CDX.NA.HY\", \"iTraxx EUR\")",
+          "type": "string"
+        },
+        "instrument_pricing_overrides": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json",
+          "description": "Instrument-owned pricing inputs."
+        },
+        "maturity": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
+          "description": "Maturity date of the tranche"
+        },
+        "metric_pricing_overrides": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json",
+          "description": "Metric-time pricing configuration."
+        },
+        "notional": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
+          "description": "Notional amount of the tranche"
+        },
+        "realized_loss": {
+          "description": "Realized (settled) loss on the reference pool as a decimal fraction of\nthe original portfolio notional, in `[0, 1]`.",
+          "format": "double",
+          "type": "number"
+        },
+        "roll_rule": {
+          "$ref": "#/$defs/RollRule",
+          "default": "none",
+          "description": "Coupon roll-date grid. `cds_imm` selects the standard CDS roll dates\n(20th of Mar, Jun, Sep, Dec); `none` (the default) generates a bespoke\nschedule from `frequency` and `stub`. The equity-futures `imm` grid is\nrejected. Use [`Self::standard`] for the IMM constructor."
+        },
+        "scenario_pricing_overrides": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/scenario_pricing_overrides.schema.json",
+          "description": "Scenario-only pricing adjustments."
+        },
+        "series": {
+          "description": "Series number (e.g., 37)",
+          "format": "uint16",
+          "maximum": 65535,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "side": {
+          "$ref": "#/$defs/PayReceive",
+          "description": "Tranche side, as on CDS and CdsIndex: `pay` buys protection (pays the\nrunning premium), `receive` sells protection (receives the premium)."
+        },
+        "start_date": {
+          "anyOf": [
+            {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Optional effective date for schedule anchoring (if None, uses as_of date)"
+        },
+        "stub": {
+          "$ref": "#/$defs/StubKind",
+          "default": "short_front",
+          "description": "Stub convention for a bespoke (`roll_rule = none`) coupon schedule.\nDefaults to `short_front`."
+        },
+        "upfront": {
+          "default": null,
+          "description": "Optional upfront payment (date, amount). Positive means paid by protection buyer.",
+          "maxItems": 2,
+          "minItems": 2,
+          "prefixItems": [
+            {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json"
+            },
+            {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json"
+            }
+          ],
+          "type": [
+            "array",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "id",
+        "index_name",
+        "series",
+        "attach_pct",
+        "detach_pct",
+        "notional",
+        "maturity",
+        "coupon_bp",
+        "frequency",
+        "day_count",
+        "discount_curve_id",
+        "credit_index_id",
+        "side",
+        "realized_loss",
+        "attributes"
+      ],
+      "type": "object"
     },
     "CdsValuationConvention": {
       "description": "Valuation presentation and pricing policy for CDS marks.\n\nEach variant bundles a coherent set of choices (premium-leg accrual schedule,\nAct/360 accrual day counting, accrual-on-default bias, clean/dirty NPV,\npar-spread denominator). Mixing those choices via separate boolean\noverrides is intentionally not supported — the variants here are the only\nconventions traded in practice.",
@@ -10102,9 +10102,60 @@
         }
       ]
     },
-    "FIIndexTotalReturnSwap": {
+    "FeeStep": {
       "additionalProperties": false,
-      "description": "Fixed-income index total-return swap priced with a carry analytic.\n\nFor each scheduled period, the total-return leg uses\n`exp(y × accrual_fraction) - 1`, where `y` is an annual continuously\ncompounded decimal yield and the accrual fraction uses the schedule day\ncount. Both legs are discounted with `financing.discount_curve_id`; the\nfinancing leg projects `financing.forward_curve_id` plus `spread_bp`.\nReceive-total-return value is `PV(total return) - PV(financing)`;\npay-total-return value reverses that sign.\n\n# Model limitations\n\nThis deterministic carry analytic omits roll-down, underlying rate/spread\nmark-to-market, stochastic credit, constituent decomposition, early\ntermination, and bespoke fees. The period in progress on the valuation\ndate is valued from the live index level (`underlying.index_id`) against\n`initial_level`, then carried at the index yield to period end; a period\nthat has ended but is not yet paid stays in the PV at its projected carry.\nCashflow-schedule APIs\nreturn payment dates with zero amounts; use\n[`Self::pv_total_return_leg`] and [`Self::pv_financing_leg`] for projected\nleg values.\n\n# Construction\n\n```\nuse finstack_quant_core::{\n    currency::Currency, dates::DayCount, money::Money, types::InstrumentId,\n};\nuse finstack_quant_cashflows::builder::ScheduleParams;\nuse finstack_quant_valuations::instruments::{\n    Attributes, FinancingLegSpec, IndexUnderlyingParams, PayReceive,\n};\nuse finstack_quant_valuations::instruments::fixed_income::fi_trs::FIIndexTotalReturnSwap;\nuse finstack_quant_valuations::instruments::fixed_income::fi_trs::{\n    TrsScheduleSpec,\n};\nuse rust_decimal::Decimal;\nuse time::macros::date;\n\n# fn main() -> finstack_quant_core::Result<()> {\nlet trs = FIIndexTotalReturnSwap::builder()\n    .id(InstrumentId::new(\"CORP-TRS\"))\n    .notional(Money::from((10_000_000_i64, Currency::USD)))\n    .underlying(\n        IndexUnderlyingParams::new(\"US-CORP\", Currency::USD)\n            .with_yield(\"US-CORP-YIELD\")\n            .with_duration(\"US-CORP-DURATION\"),\n    )\n    .financing_leg(FinancingLegSpec::new(\n        \"USD-OIS\", \"USD-SOFR-3M\", Decimal::from(35), DayCount::Act360,\n    ))\n    .schedule(TrsScheduleSpec::from_params(\n        date!(2026 - 01 - 02),\n        date!(2027 - 01 - 02),\n        ScheduleParams::quarterly_act360(),\n    ))\n    .side(PayReceive::Receive)\n    .initial_level_opt(None)\n    .attributes(Attributes::new())\n    .build()?;\nassert_eq!(trs.notional.currency(), Currency::USD);\n# Ok(())\n# }\n```",
+      "description": "A dated change of a revolving facility's running fees.\n\nEach delta shifts every tier of the corresponding fee, in basis points per\nannum, from `date` forward. A leverage or ratings grid the analyst has\nforecast is entered as one step per grid change.",
+      "properties": {
+        "commitment_delta_bp": {
+          "default": 0.0,
+          "description": "Change to the commitment fee on the undrawn commitment, in basis\npoints per annum. Defaults to `0.0`.",
+          "format": "double",
+          "type": "number"
+        },
+        "date": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
+          "description": "Date the deltas take effect (strictly inside the facility life)."
+        },
+        "facility_delta_bp": {
+          "default": 0.0,
+          "description": "Change to the facility fee on the total commitment, in basis points\nper annum. Defaults to `0.0`.",
+          "format": "double",
+          "type": "number"
+        },
+        "usage_delta_bp": {
+          "default": 0.0,
+          "description": "Change to the usage fee on the drawn balance, in basis points per\nannum. Defaults to `0.0`.",
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "required": [
+        "date"
+      ],
+      "type": "object"
+    },
+    "FeeTier": {
+      "additionalProperties": false,
+      "description": "Fee tier for utilization-based fee structures.\n\nTiers are evaluated in order: the first tier where utilization >= threshold applies.\nTiers must be sorted by threshold (ascending); [`evaluate_fee_tiers`]\nrejects unordered tiers.",
+      "properties": {
+        "bp": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/decimal.schema.json",
+          "description": "Fee rate in basis points for this tier."
+        },
+        "threshold": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/decimal.schema.json",
+          "description": "Utilization threshold (0.0 to 1.0). Fee applies when utilization >= this threshold."
+        }
+      },
+      "required": [
+        "threshold",
+        "bp"
+      ],
+      "type": "object"
+    },
+    "FiIndexTotalReturnSwap": {
+      "additionalProperties": false,
+      "description": "Fixed-income index total-return swap priced with a carry analytic.\n\nFor each scheduled period, the total-return leg uses\n`exp(y × accrual_fraction) - 1`, where `y` is an annual continuously\ncompounded decimal yield and the accrual fraction uses the schedule day\ncount. Both legs are discounted with `financing.discount_curve_id`; the\nfinancing leg projects `financing.forward_curve_id` plus `spread_bp`.\nReceive-total-return value is `PV(total return) - PV(financing)`;\npay-total-return value reverses that sign.\n\n# Model limitations\n\nThis deterministic carry analytic omits roll-down, underlying rate/spread\nmark-to-market, stochastic credit, constituent decomposition, early\ntermination, and bespoke fees. The period in progress on the valuation\ndate is valued from the live index level (`underlying.index_id`) against\n`initial_level`, then carried at the index yield to period end; a period\nthat has ended but is not yet paid stays in the PV at its projected carry.\nCashflow-schedule APIs\nreturn payment dates with zero amounts; use\n[`Self::pv_total_return_leg`] and [`Self::pv_financing_leg`] for projected\nleg values.\n\n# Construction\n\n```\nuse finstack_quant_core::{\n    currency::Currency, dates::DayCount, money::Money, types::InstrumentId,\n};\nuse finstack_quant_cashflows::builder::ScheduleParams;\nuse finstack_quant_valuations::instruments::{\n    Attributes, FinancingLegSpec, IndexUnderlyingParams, PayReceive,\n};\nuse finstack_quant_valuations::instruments::fixed_income::fi_trs::FiIndexTotalReturnSwap;\nuse finstack_quant_valuations::instruments::fixed_income::fi_trs::{\n    TrsScheduleSpec,\n};\nuse rust_decimal::Decimal;\nuse time::macros::date;\n\n# fn main() -> finstack_quant_core::Result<()> {\nlet trs = FiIndexTotalReturnSwap::builder()\n    .id(InstrumentId::new(\"CORP-TRS\"))\n    .notional(Money::from((10_000_000_i64, Currency::USD)))\n    .underlying(\n        IndexUnderlyingParams::new(\"US-CORP\", Currency::USD)\n            .with_yield(\"US-CORP-YIELD\")\n            .with_duration(\"US-CORP-DURATION\"),\n    )\n    .financing_leg(FinancingLegSpec::new(\n        \"USD-OIS\", \"USD-SOFR-3M\", Decimal::from(35), DayCount::Act360,\n    ))\n    .schedule(TrsScheduleSpec::from_params(\n        date!(2026 - 01 - 02),\n        date!(2027 - 01 - 02),\n        ScheduleParams::quarterly_act360(),\n    ))\n    .side(PayReceive::Receive)\n    .initial_level_opt(None)\n    .attributes(Attributes::new())\n    .build()?;\nassert_eq!(trs.notional.currency(), Currency::USD);\n# Ok(())\n# }\n```",
       "properties": {
         "attributes": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/attributes.schema.json",
@@ -10174,57 +10225,6 @@
         "schedule",
         "side",
         "attributes"
-      ],
-      "type": "object"
-    },
-    "FeeStep": {
-      "additionalProperties": false,
-      "description": "A dated change of a revolving facility's running fees.\n\nEach delta shifts every tier of the corresponding fee, in basis points per\nannum, from `date` forward. A leverage or ratings grid the analyst has\nforecast is entered as one step per grid change.",
-      "properties": {
-        "commitment_delta_bp": {
-          "default": 0.0,
-          "description": "Change to the commitment fee on the undrawn commitment, in basis\npoints per annum. Defaults to `0.0`.",
-          "format": "double",
-          "type": "number"
-        },
-        "date": {
-          "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
-          "description": "Date the deltas take effect (strictly inside the facility life)."
-        },
-        "facility_delta_bp": {
-          "default": 0.0,
-          "description": "Change to the facility fee on the total commitment, in basis points\nper annum. Defaults to `0.0`.",
-          "format": "double",
-          "type": "number"
-        },
-        "usage_delta_bp": {
-          "default": 0.0,
-          "description": "Change to the usage fee on the drawn balance, in basis points per\nannum. Defaults to `0.0`.",
-          "format": "double",
-          "type": "number"
-        }
-      },
-      "required": [
-        "date"
-      ],
-      "type": "object"
-    },
-    "FeeTier": {
-      "additionalProperties": false,
-      "description": "Fee tier for utilization-based fee structures.\n\nTiers are evaluated in order: the first tier where utilization >= threshold applies.\nTiers must be sorted by threshold (ascending); [`evaluate_fee_tiers`]\nrejects unordered tiers.",
-      "properties": {
-        "bp": {
-          "$ref": "https://finstack_quant.dev/schemas/common/1/decimal.schema.json",
-          "description": "Fee rate in basis points for this tier."
-        },
-        "threshold": {
-          "$ref": "https://finstack_quant.dev/schemas/common/1/decimal.schema.json",
-          "description": "Utilization threshold (0.0 to 1.0). Fee applies when utilization >= this threshold."
-        }
-      },
-      "required": [
-        "threshold",
-        "bp"
       ],
       "type": "object"
     },
@@ -13928,7 +13928,7 @@
           "description": "Canonical `cds_index` instrument payload.",
           "properties": {
             "spec": {
-              "$ref": "#/$defs/CDSIndex"
+              "$ref": "#/$defs/CdsIndex"
             },
             "type": {
               "const": "cds_index",
@@ -13946,7 +13946,7 @@
           "description": "Canonical `cds_tranche` instrument payload.",
           "properties": {
             "spec": {
-              "$ref": "#/$defs/CDSTranche"
+              "$ref": "#/$defs/CdsTranche"
             },
             "type": {
               "const": "cds_tranche",
@@ -13964,7 +13964,7 @@
           "description": "Canonical `cds_option` instrument payload.",
           "properties": {
             "spec": {
-              "$ref": "#/$defs/CDSOption"
+              "$ref": "#/$defs/CdsOption"
             },
             "type": {
               "const": "cds_option",
@@ -14666,7 +14666,7 @@
           "description": "Canonical `trs_fixed_income_index` instrument payload.",
           "properties": {
             "spec": {
-              "$ref": "#/$defs/FIIndexTotalReturnSwap"
+              "$ref": "#/$defs/FiIndexTotalReturnSwap"
             },
             "type": {
               "const": "trs_fixed_income_index",
@@ -16177,52 +16177,52 @@
       "description": "Official NDF fixing source/benchmark.\n\nNDF settlements reference official fixing rates published by central banks\nor designated fixing bodies. Using the correct fixing source is critical\nfor proper settlement calculations.\n\n# Market Standards\n\n| Currency | Fixing Source | Publisher | Settlement |\n|----------|---------------|-----------|------------|\n| CNY | PBOC | People's Bank of China | USD T+2 |\n| CNH | CNHFIX | Treasury Markets Association (HK) | USD T+2 |\n| INR | RBI | Reserve Bank of India | USD T+2 |\n| KRW | KFTC | Korea Financial Telecommunications | USD T+1 |\n| BRL | PTAX | Banco Central do Brasil | USD T+2 |\n| TWD | TAIFX | Taipei Forex Inc. | USD T+2 |\n| PHP | PHP BVAL | Bankers Association of the Philippines | USD T+1 |\n| IDR | JISDOR | Bank Indonesia | USD T+2 |\n| MYR | BNM | Bank Negara Malaysia | USD T+2 |\n\n# Example\n\n```rust\nuse finstack_quant_valuations::instruments::fx::ndf::{Ndf, NdfFixingSource, NdfQuoteConvention};\nuse finstack_quant_core::currency::Currency;\nuse finstack_quant_core::dates::Date;\nuse finstack_quant_core::money::Money;\nuse finstack_quant_core::types::{CurveId, InstrumentId};\nuse time::Month;\n\nlet ndf = Ndf::builder()\n    .id(InstrumentId::new(\"USDCNY-NDF\"))\n    .base_currency(Currency::CNY)\n    .settlement_currency(Currency::USD)\n    .fixing_date(Date::from_calendar_date(2025, Month::March, 13).unwrap())\n    .maturity(Date::from_calendar_date(2025, Month::March, 15).unwrap())\n    .notional(Money::from((10_000_000_i64, Currency::CNY)))\n    .contract_rate(7.25)\n    .domestic_discount_curve_id(CurveId::new(\"USD-OIS\"))\n    .quote_convention(NdfQuoteConvention::BasePerSettlement)\n    .fixing_source_opt(Some(NdfFixingSource::Pboc))\n    .build()\n    .expect(\"Valid NDF\");\n```",
       "oneOf": [
         {
-          "const": "PBOC",
+          "const": "pboc",
           "description": "PBOC - People's Bank of China CNY/USD fixing.\nPublished daily at 9:15 AM Beijing time.",
           "type": "string"
         },
         {
-          "const": "CNHFIX",
+          "const": "cnhfix",
           "description": "CNHFIX - Treasury Markets Association CNH/USD fixing (offshore CNY).\nPublished daily at 11:15 AM Hong Kong time.",
           "type": "string"
         },
         {
-          "const": "RBI",
+          "const": "rbi",
           "description": "RBI - Reserve Bank of India INR/USD reference rate.\nPublished daily around 1:30 PM Mumbai time.",
           "type": "string"
         },
         {
-          "const": "KFTC",
+          "const": "kftc",
           "description": "KFTC - Korea Financial Telecommunications and Clearings Institute.\nKRW/USD fixing published at 3:30 PM Seoul time.",
           "type": "string"
         },
         {
-          "const": "PTAX",
+          "const": "ptax",
           "description": "PTAX - Banco Central do Brasil BRL/USD reference rate.\nPublished daily, settlement uses PTAX 800 (closing rate).",
           "type": "string"
         },
         {
-          "const": "TAIFX",
+          "const": "taifx",
           "description": "TAIFX - Taipei Forex Inc. TWD/USD fixing.\nPublished daily at 11:00 AM Taipei time.",
           "type": "string"
         },
         {
-          "const": "PHP_BVAL",
+          "const": "php_bval",
           "description": "BVAL - Bankers Association of the Philippines PHP/USD reference rate.\nAlso known as PHP BVAL or PDEx.",
           "type": "string"
         },
         {
-          "const": "JISDOR",
+          "const": "jisdor",
           "description": "JISDOR - Jakarta Interbank Spot Dollar Rate (Bank Indonesia).\nIDR/USD fixing published daily at 10:00 AM Jakarta time.",
           "type": "string"
         },
         {
-          "const": "BNM",
+          "const": "bnm",
           "description": "BNM - Bank Negara Malaysia MYR/USD fixing.\nPublished daily at 3:30 PM Kuala Lumpur time.",
           "type": "string"
         },
         {
-          "const": "OTHER",
+          "const": "other",
           "description": "Custom or other fixing source not covered by the enum.",
           "type": "string"
         }
@@ -17064,7 +17064,7 @@
         },
         {
           "additionalProperties": false,
-          "description": "Promote tier with hurdle and LP/GP split.\n\n**Hard-hurdle gating semantics**: before the split activates, the LP\nis paid at 100% until the LP-net IRR reaches this tier's `hurdle_irr`;\nonly cash above the hurdle is split `lp_share`/`gp_share` (cascading\nto the next tier once the next tier's hurdle is reached). If a\n[`Tranche::CatchUp`] precedes a promote tier whose `hurdle_irr` sits above\nthe preferred return, the LP-100% infill between the catch-up and the\nhurdle dilutes the GP's realized share back below the catch-up\ntarget. LPAs where all post-catch-up dollars split continuously at\n`lp_share`/`gp_share` should set this tier's hurdle equal to the\npreceding preferred return (or `0.0` when there is no gap to fill),\nso the LP-100% infill is empty.",
+          "description": "Promote tier with hurdle and LP/GP split.\n\n**Hard-hurdle gating semantics**: before the split activates, the LP\nis paid at 100% until the LP-net IRR reaches this tier's `hurdle_irr`;\nonly cash above the hurdle is split `lp_share`/`gp_share` (cascading\nto the next tier once the next tier's hurdle is reached). If a\n[`PeFundWaterfallTranche::CatchUp`] precedes a promote tier whose `hurdle_irr` sits above\nthe preferred return, the LP-100% infill between the catch-up and the\nhurdle dilutes the GP's realized share back below the catch-up\ntarget. LPAs where all post-catch-up dollars split continuously at\n`lp_share`/`gp_share` should set this tier's hurdle equal to the\npreceding preferred return (or `0.0` when there is no gap to fill),\nso the LP-100% infill is empty.",
           "properties": {
             "promote_tier": {
               "additionalProperties": false,

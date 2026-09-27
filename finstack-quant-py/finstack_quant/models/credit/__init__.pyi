@@ -29,10 +29,10 @@ import pandas
 from finstack_quant.core.types import CreditRating
 from finstack_quant.models.credit._structural import (
     AssetDynamics as AssetDynamics,
-    BarrierType as BarrierType,
     CreditState as CreditState,
     DynamicRecoverySpec as DynamicRecoverySpec,
     EndogenousHazardSpec as EndogenousHazardSpec,
+    MertonBarrierType as MertonBarrierType,
     MertonModel as MertonModel,
     RatingFactorTable as RatingFactorTable,
     SimulatedPaths as SimulatedPaths,
@@ -41,10 +41,10 @@ from finstack_quant.models.credit._structural import (
 
 __all__ = [
     "AssetDynamics",
-    "BarrierType",
     "CreditState",
     "DynamicRecoverySpec",
     "EndogenousHazardSpec",
+    "MertonBarrierType",
     "MertonModel",
     "RatingFactorTable",
     "SimulatedPaths",

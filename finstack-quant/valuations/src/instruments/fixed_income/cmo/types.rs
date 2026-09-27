@@ -33,15 +33,16 @@ pub enum CmoTrancheType {
     Accrual,
 }
 
+/// Displays the serde wire value (`sequential`, `pac`, ...).
 impl std::fmt::Display for CmoTrancheType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            CmoTrancheType::Sequential => write!(f, "SEQ"),
-            CmoTrancheType::Pac => write!(f, "PAC"),
-            CmoTrancheType::Support => write!(f, "SUP"),
-            CmoTrancheType::InterestOnly => write!(f, "IO"),
-            CmoTrancheType::PrincipalOnly => write!(f, "PO"),
-            CmoTrancheType::Accrual => write!(f, "Z"),
+            CmoTrancheType::Sequential => write!(f, "sequential"),
+            CmoTrancheType::Pac => write!(f, "pac"),
+            CmoTrancheType::Support => write!(f, "support"),
+            CmoTrancheType::InterestOnly => write!(f, "interest_only"),
+            CmoTrancheType::PrincipalOnly => write!(f, "principal_only"),
+            CmoTrancheType::Accrual => write!(f, "accrual"),
         }
     }
 }
@@ -741,6 +742,32 @@ impl crate::instruments::common_impl::traits::Instrument for AgencyCmo {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn display_matches_serde_wire_value() {
+        use crate::instruments::fixed_income::structured_credit::DealType;
+        for t in [
+            CmoTrancheType::Sequential,
+            CmoTrancheType::Pac,
+            CmoTrancheType::Support,
+            CmoTrancheType::InterestOnly,
+            CmoTrancheType::PrincipalOnly,
+            CmoTrancheType::Accrual,
+        ] {
+            assert_eq!(serde_json::to_value(t).expect("ser"), t.to_string());
+        }
+        for d in [
+            DealType::Clo,
+            DealType::Cbo,
+            DealType::Abs,
+            DealType::Rmbs,
+            DealType::Cmbs,
+            DealType::Auto,
+            DealType::Card,
+        ] {
+            assert_eq!(serde_json::to_value(d).expect("ser"), d.to_string());
+        }
+    }
 
     #[test]
     fn test_cmo_example() {

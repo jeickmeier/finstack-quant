@@ -19,7 +19,7 @@ use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
     ControlledAccumulationSpec, ReinvestmentPeriod,
 };
 use finstack_quant_valuations::instruments::{
-    AssetBackedFacility, BermudanSwaption, CDSOption, CDSTranche, CallableRangeAccrual,
+    AssetBackedFacility, BermudanSwaption, CallableRangeAccrual, CdsOption, CdsTranche,
     CmsSpreadOption, CommodityOption, CommoditySwaption, EquityOption, RevolvingCredit,
     StructuredCredit,
 };
@@ -56,7 +56,7 @@ fn assert_rejects<T: DeserializeOwned>(json: Value, retired: &str) {
 }
 
 #[test]
-// schema-rejection-test: RangeAccrual `accrual_start_date`, CDSTranche `effective_date`
+// schema-rejection-test: RangeAccrual `accrual_start_date`, CdsTranche `effective_date`
 fn retired_contract_start_keys_are_rejected() {
     assert_rejects_at(
         &CallableRangeAccrual::example(),
@@ -65,7 +65,7 @@ fn retired_contract_start_keys_are_rejected() {
         json!("2025-12-31"),
     );
     assert_rejects_at(
-        &CDSTranche::example(),
+        &CdsTranche::example(),
         "",
         "effective_date",
         json!("2025-03-20"),
@@ -73,12 +73,12 @@ fn retired_contract_start_keys_are_rejected() {
 }
 
 #[test]
-// schema-rejection-test: CommoditySwaption `swap_start`, `swap_end`; CDSOption `underlying_effective_date`, `cds_maturity`
+// schema-rejection-test: CommoditySwaption `swap_start`, `swap_end`; CdsOption `underlying_effective_date`, `cds_maturity`
 fn retired_underlying_date_keys_are_rejected() {
     let swaption = CommoditySwaption::example();
     assert_rejects_at(&swaption, "", "swap_start", json!("2025-07-01"));
     assert_rejects_at(&swaption, "", "swap_end", json!("2026-06-30"));
-    let option = CDSOption::example().expect("cds option");
+    let option = CdsOption::example().expect("cds option");
     assert_rejects_at(
         &option,
         "",

@@ -210,7 +210,7 @@
         },
         {
           "additionalProperties": false,
-          "description": "Promote tier with hurdle and LP/GP split.\n\n**Hard-hurdle gating semantics**: before the split activates, the LP\nis paid at 100% until the LP-net IRR reaches this tier's `hurdle_irr`;\nonly cash above the hurdle is split `lp_share`/`gp_share` (cascading\nto the next tier once the next tier's hurdle is reached). If a\n[`Tranche::CatchUp`] precedes a promote tier whose `hurdle_irr` sits above\nthe preferred return, the LP-100% infill between the catch-up and the\nhurdle dilutes the GP's realized share back below the catch-up\ntarget. LPAs where all post-catch-up dollars split continuously at\n`lp_share`/`gp_share` should set this tier's hurdle equal to the\npreceding preferred return (or `0.0` when there is no gap to fill),\nso the LP-100% infill is empty.",
+          "description": "Promote tier with hurdle and LP/GP split.\n\n**Hard-hurdle gating semantics**: before the split activates, the LP\nis paid at 100% until the LP-net IRR reaches this tier's `hurdle_irr`;\nonly cash above the hurdle is split `lp_share`/`gp_share` (cascading\nto the next tier once the next tier's hurdle is reached). If a\n[`PeFundWaterfallTranche::CatchUp`] precedes a promote tier whose `hurdle_irr` sits above\nthe preferred return, the LP-100% infill between the catch-up and the\nhurdle dilutes the GP's realized share back below the catch-up\ntarget. LPAs where all post-catch-up dollars split continuously at\n`lp_share`/`gp_share` should set this tier's hurdle equal to the\npreceding preferred return (or `0.0` when there is no gap to fill),\nso the LP-100% infill is empty.",
           "properties": {
             "promote_tier": {
               "additionalProperties": false,

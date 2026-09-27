@@ -43,12 +43,13 @@ impl TbaTerm {
     }
 }
 
+/// Displays the serde wire value (`fifteen_year`, `twenty_year`, `thirty_year`).
 impl std::fmt::Display for TbaTerm {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            TbaTerm::FifteenYear => write!(f, "15Y"),
-            TbaTerm::TwentyYear => write!(f, "20Y"),
-            TbaTerm::ThirtyYear => write!(f, "30Y"),
+            TbaTerm::FifteenYear => write!(f, "fifteen_year"),
+            TbaTerm::TwentyYear => write!(f, "twenty_year"),
+            TbaTerm::ThirtyYear => write!(f, "thirty_year"),
         }
     }
 }
@@ -453,6 +454,17 @@ impl crate::instruments::common_impl::traits::Instrument for AgencyTba {
 mod tests {
     use super::*;
     use time::Month;
+
+    #[test]
+    fn term_display_matches_serde_wire_value() {
+        for t in [
+            TbaTerm::FifteenYear,
+            TbaTerm::TwentyYear,
+            TbaTerm::ThirtyYear,
+        ] {
+            assert_eq!(serde_json::to_value(t).expect("ser"), t.to_string());
+        }
+    }
 
     #[test]
     // schema-rejection-test: prepayment_model (now prepayment_spec)

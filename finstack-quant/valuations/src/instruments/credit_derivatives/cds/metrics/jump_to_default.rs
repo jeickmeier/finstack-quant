@@ -30,7 +30,7 @@
 //! accrued premium in the JTD to give a more accurate P&L impact.
 
 use crate::constants::BASIS_POINTS_PER_UNIT;
-use crate::instruments::credit_derivatives::cds::pricing::{AccrualDayCountPolicy, CDSPricer};
+use crate::instruments::credit_derivatives::cds::pricing::{AccrualDayCountPolicy, CdsPricer};
 use crate::instruments::credit_derivatives::cds::{CreditDefaultSwap, PayReceive};
 use crate::metrics::{MetricCalculator, MetricContext};
 use finstack_quant_core::Result;
@@ -110,7 +110,7 @@ fn calculate_accrued_premium(
     cds: &CreditDefaultSwap,
     as_of: finstack_quant_core::dates::Date,
 ) -> Result<f64> {
-    let accrual_fraction = CDSPricer::new().coupon_accrued_fraction(
+    let accrual_fraction = CdsPricer::new().coupon_accrued_fraction(
         cds,
         as_of,
         AccrualDayCountPolicy::IsdaStandard,

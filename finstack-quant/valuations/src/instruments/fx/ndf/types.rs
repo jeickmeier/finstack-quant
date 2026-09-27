@@ -125,46 +125,37 @@ impl std::str::FromStr for NdfQuoteConvention {
 /// ```
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(rename_all = "snake_case")]
 #[non_exhaustive]
 pub enum NdfFixingSource {
     /// PBOC - People's Bank of China CNY/USD fixing.
     /// Published daily at 9:15 AM Beijing time.
-    #[serde(rename = "PBOC")]
     Pboc,
     /// CNHFIX - Treasury Markets Association CNH/USD fixing (offshore CNY).
     /// Published daily at 11:15 AM Hong Kong time.
-    #[serde(rename = "CNHFIX")]
     Cnhfix,
     /// RBI - Reserve Bank of India INR/USD reference rate.
     /// Published daily around 1:30 PM Mumbai time.
-    #[serde(rename = "RBI")]
     Rbi,
     /// KFTC - Korea Financial Telecommunications and Clearings Institute.
     /// KRW/USD fixing published at 3:30 PM Seoul time.
-    #[serde(rename = "KFTC")]
     Kftc,
     /// PTAX - Banco Central do Brasil BRL/USD reference rate.
     /// Published daily, settlement uses PTAX 800 (closing rate).
-    #[serde(rename = "PTAX")]
     Ptax,
     /// TAIFX - Taipei Forex Inc. TWD/USD fixing.
     /// Published daily at 11:00 AM Taipei time.
-    #[serde(rename = "TAIFX")]
     Taifx,
     /// BVAL - Bankers Association of the Philippines PHP/USD reference rate.
     /// Also known as PHP BVAL or PDEx.
-    #[serde(rename = "PHP_BVAL")]
     PhpBval,
     /// JISDOR - Jakarta Interbank Spot Dollar Rate (Bank Indonesia).
     /// IDR/USD fixing published daily at 10:00 AM Jakarta time.
-    #[serde(rename = "JISDOR")]
     Jisdor,
     /// BNM - Bank Negara Malaysia MYR/USD fixing.
     /// Published daily at 3:30 PM Kuala Lumpur time.
-    #[serde(rename = "BNM")]
     Bnm,
     /// Custom or other fixing source not covered by the enum.
-    #[serde(rename = "OTHER")]
     Other,
 }
 
@@ -201,16 +192,16 @@ impl NdfFixingSource {
 impl std::fmt::Display for NdfFixingSource {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            NdfFixingSource::Pboc => write!(f, "PBOC"),
-            NdfFixingSource::Cnhfix => write!(f, "CNHFIX"),
-            NdfFixingSource::Rbi => write!(f, "RBI"),
-            NdfFixingSource::Kftc => write!(f, "KFTC"),
-            NdfFixingSource::Ptax => write!(f, "PTAX"),
-            NdfFixingSource::Taifx => write!(f, "TAIFX"),
-            NdfFixingSource::PhpBval => write!(f, "PHP_BVAL"),
-            NdfFixingSource::Jisdor => write!(f, "JISDOR"),
-            NdfFixingSource::Bnm => write!(f, "BNM"),
-            NdfFixingSource::Other => write!(f, "OTHER"),
+            NdfFixingSource::Pboc => write!(f, "pboc"),
+            NdfFixingSource::Cnhfix => write!(f, "cnhfix"),
+            NdfFixingSource::Rbi => write!(f, "rbi"),
+            NdfFixingSource::Kftc => write!(f, "kftc"),
+            NdfFixingSource::Ptax => write!(f, "ptax"),
+            NdfFixingSource::Taifx => write!(f, "taifx"),
+            NdfFixingSource::PhpBval => write!(f, "php_bval"),
+            NdfFixingSource::Jisdor => write!(f, "jisdor"),
+            NdfFixingSource::Bnm => write!(f, "bnm"),
+            NdfFixingSource::Other => write!(f, "other"),
         }
     }
 }
@@ -220,16 +211,16 @@ impl std::str::FromStr for NdfFixingSource {
 
     fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
         match s {
-            "PBOC" => Ok(NdfFixingSource::Pboc),
-            "CNHFIX" => Ok(NdfFixingSource::Cnhfix),
-            "RBI" => Ok(NdfFixingSource::Rbi),
-            "KFTC" => Ok(NdfFixingSource::Kftc),
-            "PTAX" => Ok(NdfFixingSource::Ptax),
-            "TAIFX" => Ok(NdfFixingSource::Taifx),
-            "PHP_BVAL" => Ok(NdfFixingSource::PhpBval),
-            "JISDOR" => Ok(NdfFixingSource::Jisdor),
-            "BNM" => Ok(NdfFixingSource::Bnm),
-            "OTHER" => Ok(NdfFixingSource::Other),
+            "pboc" => Ok(NdfFixingSource::Pboc),
+            "cnhfix" => Ok(NdfFixingSource::Cnhfix),
+            "rbi" => Ok(NdfFixingSource::Rbi),
+            "kftc" => Ok(NdfFixingSource::Kftc),
+            "ptax" => Ok(NdfFixingSource::Ptax),
+            "taifx" => Ok(NdfFixingSource::Taifx),
+            "php_bval" => Ok(NdfFixingSource::PhpBval),
+            "jisdor" => Ok(NdfFixingSource::Jisdor),
+            "bnm" => Ok(NdfFixingSource::Bnm),
+            "other" => Ok(NdfFixingSource::Other),
             _ => Err(format!("Unknown NDF fixing source: {s}")),
         }
     }
@@ -1180,26 +1171,30 @@ mod tests {
     #[test]
     fn test_ndf_fixing_source_enum_display_and_parse() {
         // Test display
-        assert_eq!(NdfFixingSource::Pboc.to_string(), "PBOC");
-        assert_eq!(NdfFixingSource::Cnhfix.to_string(), "CNHFIX");
-        assert_eq!(NdfFixingSource::Rbi.to_string(), "RBI");
-        assert_eq!(NdfFixingSource::Kftc.to_string(), "KFTC");
-        assert_eq!(NdfFixingSource::Ptax.to_string(), "PTAX");
+        assert_eq!(NdfFixingSource::Pboc.to_string(), "pboc");
+        assert_eq!(NdfFixingSource::Cnhfix.to_string(), "cnhfix");
+        assert_eq!(NdfFixingSource::Rbi.to_string(), "rbi");
+        assert_eq!(NdfFixingSource::Kftc.to_string(), "kftc");
+        assert_eq!(NdfFixingSource::Ptax.to_string(), "ptax");
 
         // Test parse
         assert_eq!(
-            "PBOC".parse::<NdfFixingSource>().expect("valid source"),
+            "pboc".parse::<NdfFixingSource>().expect("valid source"),
             NdfFixingSource::Pboc
         );
         assert_eq!(
-            "CNHFIX".parse::<NdfFixingSource>().expect("valid source"),
+            "cnhfix".parse::<NdfFixingSource>().expect("valid source"),
             NdfFixingSource::Cnhfix
         );
-        for retired in ["cnh_fix", "CNH_FIX", "PHPBVAL", "BVAL", "PDEX", "pboc"] {
+        // schema-rejection-test: retired upper-case values "PBOC", "CNHFIX", "PHP_BVAL", "OTHER".
+        for retired in [
+            "cnh_fix", "CNH_FIX", "PHPBVAL", "BVAL", "PDEX", "PBOC", "CNHFIX", "PHP_BVAL", "OTHER",
+        ] {
             assert!(retired.parse::<NdfFixingSource>().is_err());
+            assert!(serde_json::from_str::<NdfFixingSource>(&format!("\"{retired}\"")).is_err());
         }
         assert_eq!(
-            "RBI".parse::<NdfFixingSource>().expect("valid source"),
+            "rbi".parse::<NdfFixingSource>().expect("valid source"),
             NdfFixingSource::Rbi
         );
     }
@@ -1303,7 +1298,7 @@ mod tests {
             .build()
             .expect("should build");
 
-        assert_eq!(ndf_enum.effective_fixing_source(), Some("PBOC".to_string()));
+        assert_eq!(ndf_enum.effective_fixing_source(), Some("pboc".to_string()));
     }
 
     #[test]

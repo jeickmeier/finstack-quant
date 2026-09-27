@@ -18,7 +18,7 @@ use finstack_quant_core::{
 };
 pub use finstack_quant_test_utils::assert::approx_eq;
 use finstack_quant_valuations::instruments::equity::equity_trs::EquityTotalReturnSwap;
-use finstack_quant_valuations::instruments::fixed_income::fi_trs::FIIndexTotalReturnSwap;
+use finstack_quant_valuations::instruments::fixed_income::fi_trs::FiIndexTotalReturnSwap;
 use finstack_quant_valuations::instruments::EquityUnderlyingParams;
 use finstack_quant_valuations::instruments::FinancingLegSpec;
 use finstack_quant_valuations::instruments::IndexUnderlyingParams;
@@ -321,7 +321,7 @@ impl TestFIIndexTrsBuilder {
         self
     }
 
-    pub fn build(self) -> FIIndexTotalReturnSwap {
+    pub fn build(self) -> FiIndexTotalReturnSwap {
         let mut underlying =
             IndexUnderlyingParams::new(self.index_id.clone(), self.notional.currency());
 
@@ -342,7 +342,7 @@ impl TestFIIndexTrsBuilder {
         let schedule =
             TrsScheduleSpec::from_params(self.start, self.end, ScheduleParams::quarterly_act360());
 
-        let mut builder = FIIndexTotalReturnSwap::builder()
+        let mut builder = FiIndexTotalReturnSwap::builder()
             .id(self.id.into())
             .notional(self.notional)
             .underlying(underlying)

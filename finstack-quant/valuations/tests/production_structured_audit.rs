@@ -140,7 +140,7 @@ fn production_structured_line_preserves_rates_recovery_and_seasoning() {
 
 #[test]
 fn production_structured_zero_vol_stochastic_matches_deterministic_with_constant_rates() {
-    use finstack_quant_valuations::instruments::fixed_income::structured_credit::PricingMode;
+    use finstack_quant_valuations::instruments::fixed_income::structured_credit::StructuredCreditPricingMode;
     let mut deal = StructuredCredit::example();
     deal.credit_model.prepayment_spec = PrepaymentModelSpec::constant_cpr(0.1);
     deal.credit_model.default_spec = DefaultModelSpec::constant_cdr(0.05);
@@ -152,7 +152,7 @@ fn production_structured_zero_vol_stochastic_matches_deterministic_with_constant
         .price_stochastic_with_mode(
             &market,
             as_of,
-            PricingMode::MonteCarlo {
+            StructuredCreditPricingMode::MonteCarlo {
                 num_paths: 1,
                 antithetic: false,
             },

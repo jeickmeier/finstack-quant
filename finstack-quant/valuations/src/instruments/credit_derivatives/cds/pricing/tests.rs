@@ -68,7 +68,7 @@ fn test_enhanced_protection_leg() {
     let (disc, credit) = create_test_curves();
     let as_of = Date::from_calendar_date(2025, time::Month::January, 1).expect("valid date");
     let cds = create_test_cds("TEST-CDS", as_of, as_of.add_months(60), 100.0, 0.40);
-    let pricer = CDSPricer::new();
+    let pricer = CdsPricer::new();
     let protection_pv = pricer
         .pv_protection_leg(&cds, &disc, &credit, as_of)
         .expect("should succeed");
@@ -80,8 +80,8 @@ fn test_accrual_on_default() {
     let (disc, credit) = create_test_curves();
     let as_of = Date::from_calendar_date(2025, time::Month::January, 1).expect("valid date");
     let cds = create_test_cds("TEST-CDS", as_of, as_of.add_months(60), 100.0, 0.40);
-    let pricer_with = CDSPricer::new();
-    let pricer_without = CDSPricer::with_config(CDSPricerConfig {
+    let pricer_with = CdsPricer::new();
+    let pricer_without = CdsPricer::with_config(CdsPricerConfig {
         include_accrual_on_default: false,
         ..Default::default()
     });
@@ -98,7 +98,7 @@ fn test_accrual_on_default() {
 fn premium_leg_scales_linearly_with_notional_when_accrual_on_default_enabled() {
     let (disc, credit) = create_test_curves();
     let as_of = Date::from_calendar_date(2025, time::Month::February, 15).expect("valid date");
-    let pricer = CDSPricer::new();
+    let pricer = CdsPricer::new();
 
     let mut cds_unit = create_test_cds(
         "TEST-CDS-UNIT",
@@ -132,7 +132,7 @@ fn test_par_spread_calculation() {
     let (disc, credit) = create_test_curves();
     let as_of = Date::from_calendar_date(2025, time::Month::January, 1).expect("valid date");
     let cds = create_test_cds("TEST-CDS", as_of, as_of.add_months(60), 0.0, 0.40);
-    let pricer = CDSPricer::new();
+    let pricer = CdsPricer::new();
     let par_spread = pricer
         .par_spread(&cds, &disc, &credit, as_of)
         .expect("should succeed");
@@ -159,7 +159,7 @@ fn test_settlement_delay_reduces_protection_pv() {
     let mut cds20 = cds0.clone();
     cds0.protection_leg.settlement_delay = 0;
     cds20.protection_leg.settlement_delay = 20;
-    let pricer = CDSPricer::new();
+    let pricer = CdsPricer::new();
     let pv0 = pricer
         .pv_protection_leg(&cds0, &disc, &credit, as_of)
         .expect("should succeed")
@@ -176,8 +176,8 @@ fn test_par_spread_full_premium_option_runs() {
     let (disc, credit) = create_test_curves();
     let as_of = Date::from_calendar_date(2025, time::Month::January, 1).expect("valid date");
     let cds = create_test_cds("CDS-PAR", as_of, as_of.add_months(60), 0.0, 0.40);
-    let pricer_ra = CDSPricer::new();
-    let pricer_full = CDSPricer::with_config(CDSPricerConfig {
+    let pricer_ra = CdsPricer::new();
+    let pricer_full = CdsPricer::with_config(CdsPricerConfig {
         par_spread_uses_full_premium: true,
         ..Default::default()
     });
@@ -204,7 +204,7 @@ fn test_xr14_regression_matches_baseline() {
     let mut cds_xr14 = create_test_cds("CDS-XR14", as_of, as_of.add_months(60), 100.0, 0.40);
     cds_xr14.doc_clause = Some(CdsDocClause::Xr14);
 
-    let pricer = CDSPricer::new();
+    let pricer = CdsPricer::new();
 
     let pv_baseline = pricer
         .pv_protection_leg_raw(&cds_baseline, &disc, &credit, as_of)
@@ -238,7 +238,7 @@ fn test_doc_clause_does_not_affect_protection_pv() {
         CdsDocClause::Cr14,
     ];
 
-    let pricer = CDSPricer::new();
+    let pricer = CdsPricer::new();
     let mut pvs = Vec::new();
     for clause in &clauses {
         let mut cds = create_test_cds("CDS-TEST", as_of, as_of.add_months(60), 100.0, 0.40);
@@ -369,7 +369,7 @@ fn test_schedule_generation_respects_isda_flag_and_calendar_availability() {
     let end = Date::from_calendar_date(2026, time::Month::July, 1).expect("valid date");
     let cds = create_test_cds("CDS-SCHED", start, end, 100.0, 0.40);
 
-    let isda = CDSPricer::new();
+    let isda = CdsPricer::new();
     let adjusted_schedule = isda
         .generate_isda_schedule(&cds)
         .expect("adjusted ISDA schedule");
@@ -402,7 +402,7 @@ fn test_premium_leg_per_bp_matches_risky_annuity_without_accrual_on_default() {
     let as_of = Date::from_calendar_date(2025, time::Month::January, 1).expect("valid date");
     let cds = create_test_cds("CDS-PER-BP", as_of, as_of.add_months(60), 100.0, 0.40);
 
-    let without_aod = CDSPricer::with_config(CDSPricerConfig {
+    let without_aod = CdsPricer::with_config(CdsPricerConfig {
         include_accrual_on_default: false,
         ..Default::default()
     });
@@ -417,7 +417,7 @@ fn test_premium_leg_per_bp_matches_risky_annuity_without_accrual_on_default() {
         "premium leg per bp without AoD should equal risky annuity × 1bp"
     );
 
-    let with_aod = CDSPricer::new();
+    let with_aod = CdsPricer::new();
     let per_bp_with_aod = with_aod
         .premium_leg_pv_per_bp(&cds, &disc, &credit, as_of)
         .expect("premium leg per bp with AoD");
@@ -444,8 +444,8 @@ fn test_full_premium_par_spread_is_below_risky_annuity_par_spread() {
     let mut cds = create_test_cds("CDS-PAR-FULL", as_of, as_of.add_months(60), 100.0, 0.40);
     cds.valuation_convention = CdsValuationConvention::IsdaDirty;
 
-    let isda = CDSPricer::new();
-    let full_premium = CDSPricer::with_config(CDSPricerConfig {
+    let isda = CdsPricer::new();
+    let full_premium = CdsPricer::with_config(CdsPricerConfig {
         par_spread_uses_full_premium: true,
         ..Default::default()
     });
@@ -472,7 +472,7 @@ fn test_npv_full_discounts_dated_upfront() {
     let as_of = Date::from_calendar_date(2025, time::Month::January, 1).expect("valid date");
     let mut cds = create_test_cds("CDS-UPFRONT", as_of, as_of.add_months(60), 100.0, 0.40);
     cds.valuation_convention = CdsValuationConvention::IsdaDirty;
-    let pricer = CDSPricer::new();
+    let pricer = CdsPricer::new();
 
     let base_npv = pricer
         .npv_full(&cds, &disc, &credit, as_of)
@@ -634,7 +634,7 @@ fn test_forward_start_none_matches_spot_cds() {
     let spot_cds = create_test_cds("CDS-SPOT", as_of, end, 100.0, 0.40);
     let fwd_none = create_forward_start_cds("CDS-FWD-NONE", as_of, end, 100.0, 0.40, None);
 
-    let pricer = CDSPricer::new();
+    let pricer = CdsPricer::new();
 
     let spot_prot = pricer
         .pv_protection_leg_raw(&spot_cds, &disc, &credit, as_of)
@@ -670,7 +670,7 @@ fn test_forward_start_lower_protection_pv_same_premium_pv() {
     let spot_cds = create_test_cds("CDS-SPOT", as_of, end, 100.0, 0.40);
     let fwd_cds = create_forward_start_cds("CDS-FWD", as_of, end, 100.0, 0.40, Some(fwd_date));
 
-    let pricer = CDSPricer::new();
+    let pricer = CdsPricer::new();
 
     let spot_prot = pricer
         .pv_protection_leg_raw(&spot_cds, &disc, &credit, as_of)
@@ -709,7 +709,7 @@ fn test_forward_start_protection_at_end_near_zero() {
 
     let fwd_cds = create_forward_start_cds("CDS-FWD-END", as_of, end, 100.0, 0.40, Some(end));
 
-    let pricer = CDSPricer::new();
+    let pricer = CdsPricer::new();
     let prot_pv = pricer
         .pv_protection_leg_raw(&fwd_cds, &disc, &credit, as_of)
         .expect("should succeed");
@@ -774,7 +774,7 @@ fn production_cds_option_audit_premium_frequency_and_stub_are_effective() {
     cds.premium_leg.calendar_id = None;
     cds.premium_leg.frequency = Tenor::semi_annual();
     cds.premium_leg.stub = StubKind::ShortFront;
-    let pricer = CDSPricer::new();
+    let pricer = CdsPricer::new();
     let front = pricer.coupon_periods(&cds, start).expect("front schedule");
     let front_ends: Vec<_> = front.iter().map(|p| p.accrual_end).collect();
     assert_eq!(

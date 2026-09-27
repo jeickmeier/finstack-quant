@@ -1,6 +1,6 @@
 //! Heterogeneous capped loss with common recovery and integration contracts.
 use super::config::{
-    CDSTranchePricer, HeteroMethod, PoolExposure, CDF_CLIP, GRID_STEP_MIN, HOMOGENEITY_TOLERANCE,
+    CdsTranchePricer, HeteroMethod, PoolExposure, CDF_CLIP, GRID_STEP_MIN, HOMOGENEITY_TOLERANCE,
     MAX_GRID_POINTS, NUMERICAL_TOLERANCE,
 };
 use super::expected_loss::stochastic_recovery_exposure_scale;
@@ -13,7 +13,7 @@ use finstack_quant_core::{Error, Result};
 use finstack_quant_models::correlation::recovery::RecoveryModel;
 use std::cell::RefCell;
 
-impl CDSTranchePricer {
+impl CdsTranchePricer {
     /// Integrate a complete constituent pool, applying the configured recovery
     /// model at every factor node in both convolution and normal-approximation paths.
     pub(super) fn calculate_equity_tranche_capped_hetero(

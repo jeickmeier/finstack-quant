@@ -1,11 +1,11 @@
-//! Unit tests for CDSOptionParams builder and validation.
+//! Unit tests for CdsOptionParams builder and validation.
 
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::money::Money;
 use finstack_quant_valuations::instruments::credit_derivatives::cds_option::{
-    CDSOptionParams, CDSOptionStrike,
+    CdsOptionParams, CdsOptionStrike,
 };
 use finstack_quant_valuations::instruments::OptionType;
 use rust_decimal::Decimal;
@@ -17,8 +17,8 @@ fn test_call_constructor() {
     let maturity = date!(2030 - 12 - 31);
     let notional = Money::new(10_000_000.0, Currency::USD).expect("valid money fixture");
 
-    let params = CDSOptionParams::call(
-        CDSOptionStrike::Spread(Decimal::new(1, 2)),
+    let params = CdsOptionParams::call(
+        CdsOptionStrike::Spread(Decimal::new(1, 2)),
         expiry,
         maturity,
         notional,
@@ -42,8 +42,8 @@ fn test_put_constructor() {
     let maturity = date!(2030 - 12 - 31);
     let notional = Money::new(5_000_000.0, Currency::EUR).expect("valid money fixture");
 
-    let params = CDSOptionParams::put(
-        CDSOptionStrike::Spread(Decimal::new(15, 3)),
+    let params = CdsOptionParams::put(
+        CdsOptionStrike::Spread(Decimal::new(15, 3)),
         expiry,
         maturity,
         notional,
@@ -61,8 +61,8 @@ fn test_index_option_builder() {
     let maturity = date!(2030 - 12 - 31);
     let notional = Money::new(10_000_000.0, Currency::USD).expect("valid money fixture");
 
-    let params = CDSOptionParams::call(
-        CDSOptionStrike::Spread(Decimal::new(1, 2)),
+    let params = CdsOptionParams::call(
+        CdsOptionStrike::Spread(Decimal::new(1, 2)),
         expiry,
         maturity,
         notional,
@@ -85,8 +85,8 @@ fn test_coupon_bp_for_index() {
     let maturity = date!(2030 - 12 - 31);
     let notional = Money::new(10_000_000.0, Currency::USD).expect("valid money fixture");
 
-    let params = CDSOptionParams::call(
-        CDSOptionStrike::Spread(Decimal::new(55, 4)),
+    let params = CdsOptionParams::call(
+        CdsOptionStrike::Spread(Decimal::new(55, 4)),
         expiry,
         maturity,
         notional,
@@ -106,8 +106,8 @@ fn test_chained_builders() {
     let maturity = date!(2028 - 06 - 30);
     let notional = Money::new(20_000_000.0, Currency::GBP).expect("valid money fixture");
 
-    let params = CDSOptionParams::put(
-        CDSOptionStrike::Spread(Decimal::new(2, 2)),
+    let params = CdsOptionParams::put(
+        CdsOptionStrike::Spread(Decimal::new(2, 2)),
         expiry,
         maturity,
         notional,
@@ -142,7 +142,7 @@ fn test_various_strikes() {
 
     for strike in strikes_decimal {
         let params =
-            CDSOptionParams::call(CDSOptionStrike::Spread(strike), expiry, maturity, notional)
+            CdsOptionParams::call(CdsOptionStrike::Spread(strike), expiry, maturity, notional)
                 .expect("valid call params");
         assert_eq!(params.strike.spread_decimal(), Some(strike));
     }
@@ -155,8 +155,8 @@ fn test_various_currencies() {
 
     for currency in [Currency::USD, Currency::EUR, Currency::GBP, Currency::JPY] {
         let notional = Money::new(10_000_000.0, currency).expect("valid money fixture");
-        let params = CDSOptionParams::call(
-            CDSOptionStrike::Spread(Decimal::new(1, 2)),
+        let params = CdsOptionParams::call(
+            CdsOptionStrike::Spread(Decimal::new(1, 2)),
             expiry,
             maturity,
             notional,

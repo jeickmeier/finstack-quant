@@ -11,7 +11,7 @@
 #![allow(clippy::field_reassign_with_default)]
 
 use super::helpers::*;
-use finstack_quant_valuations::instruments::credit_derivatives::cds_tranche::CDSTranchePricer;
+use finstack_quant_valuations::instruments::credit_derivatives::cds_tranche::CdsTranchePricer;
 use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::instruments::PayReceive;
 use finstack_quant_valuations::metrics::MetricId;
@@ -22,7 +22,7 @@ use std::sync::Arc;
 #[test]
 fn test_standard_cs01_requires_replay_recipe() {
     // Arrange
-    let pricer = CDSTranchePricer::new();
+    let pricer = CdsTranchePricer::new();
     let tranche = mezzanine_tranche();
     let market = standard_market_context();
     let as_of = base_date();
@@ -113,7 +113,7 @@ fn test_standard_cs01_is_normalized_across_bump_sizes() {
     let as_of = base_date();
     let tranche = mezzanine_tranche();
 
-    let pricer = CDSTranchePricer::new();
+    let pricer = CdsTranchePricer::new();
     let provider = finstack_quant_calibration::recalibration::CachedRecalibrationProvider::new();
 
     let cs01_1bp = pricer
@@ -153,7 +153,7 @@ fn test_direct_and_registered_cs01_share_quote_replay_convention() {
     market = market.insert_credit_index(&tranche.credit_index_id, index);
 
     let bump_bp = 2.0;
-    let pricer = CDSTranchePricer::new();
+    let pricer = CdsTranchePricer::new();
     let provider =
         Arc::new(finstack_quant_calibration::recalibration::CachedRecalibrationProvider::new());
     let direct = pricer
@@ -192,7 +192,7 @@ fn test_direct_and_registered_cs01_share_quote_replay_convention() {
 #[test]
 fn test_correlation_delta_is_finite() {
     // Arrange
-    let pricer = CDSTranchePricer::new();
+    let pricer = CdsTranchePricer::new();
     let tranche = mezzanine_tranche();
     let market = standard_market_context();
     let as_of = base_date();
@@ -209,7 +209,7 @@ fn test_correlation_delta_is_finite() {
 #[test]
 fn test_correlation_delta_equity_vs_senior() {
     // Arrange
-    let pricer = CDSTranchePricer::new();
+    let pricer = CdsTranchePricer::new();
     let market = standard_market_context();
     let as_of = base_date();
 
@@ -235,7 +235,7 @@ fn test_correlation_delta_equity_vs_senior() {
 #[test]
 fn test_jump_to_default_is_non_negative() {
     // Arrange
-    let pricer = CDSTranchePricer::new();
+    let pricer = CdsTranchePricer::new();
     let tranche = mezzanine_tranche();
     let market = standard_market_context();
     let as_of = base_date();
@@ -252,7 +252,7 @@ fn test_jump_to_default_is_non_negative() {
 #[test]
 fn test_jump_to_default_equity_greater_than_senior() {
     // Arrange
-    let pricer = CDSTranchePricer::new();
+    let pricer = CdsTranchePricer::new();
     let market = standard_market_context();
     let as_of = base_date();
 
@@ -278,7 +278,7 @@ fn test_jump_to_default_equity_greater_than_senior() {
 #[test]
 fn test_jump_to_default_senior_can_be_zero() {
     // Arrange
-    let pricer = CDSTranchePricer::new();
+    let pricer = CdsTranchePricer::new();
     let market = standard_market_context();
     let as_of = base_date();
 
@@ -301,7 +301,7 @@ fn test_jump_to_default_senior_can_be_zero() {
 #[test]
 fn test_jump_to_default_scales_with_notional() {
     // Arrange
-    let pricer = CDSTranchePricer::new();
+    let pricer = CdsTranchePricer::new();
     let market = standard_market_context();
     let as_of = base_date();
 
@@ -344,7 +344,7 @@ fn test_jump_to_default_scales_with_notional() {
 #[test]
 fn test_spread_dv01_is_finite() {
     // Arrange
-    let pricer = CDSTranchePricer::new();
+    let pricer = CdsTranchePricer::new();
     let tranche = mezzanine_tranche();
     let market = standard_market_context();
     let as_of = base_date();
@@ -361,7 +361,7 @@ fn test_spread_dv01_is_finite() {
 #[test]
 fn test_spread_dv01_positive_for_sell_protection() {
     // Arrange
-    let pricer = CDSTranchePricer::new();
+    let pricer = CdsTranchePricer::new();
     let mut tranche = mezzanine_tranche();
     tranche.side = PayReceive::Receive;
     let market = standard_market_context();
@@ -383,7 +383,7 @@ fn test_spread_dv01_positive_for_sell_protection() {
 #[test]
 fn test_spread_dv01_scales_with_notional() {
     // Arrange
-    let pricer = CDSTranchePricer::new();
+    let pricer = CdsTranchePricer::new();
     let market = standard_market_context();
     let as_of = base_date();
 
@@ -423,7 +423,7 @@ fn test_spread_dv01_scales_with_notional() {
 #[test]
 fn test_par_spread_is_positive() {
     // Arrange
-    let pricer = CDSTranchePricer::new();
+    let pricer = CdsTranchePricer::new();
     let tranche = mezzanine_tranche();
     let market = standard_market_context();
     let as_of = base_date();
@@ -440,7 +440,7 @@ fn test_par_spread_is_positive() {
 #[test]
 fn test_par_spread_equity_greater_than_senior() {
     // Arrange
-    let pricer = CDSTranchePricer::new();
+    let pricer = CdsTranchePricer::new();
     let market = standard_market_context();
     let as_of = base_date();
 
@@ -466,7 +466,7 @@ fn test_par_spread_equity_greater_than_senior() {
 #[test]
 fn test_par_spread_gives_zero_npv() {
     // Arrange
-    let pricer = CDSTranchePricer::new();
+    let pricer = CdsTranchePricer::new();
     let market = standard_market_context();
     let as_of = base_date();
 
@@ -520,7 +520,7 @@ fn test_par_spread_gives_zero_npv() {
 /// sign intent explicit, and eliminates an unnecessary iteration for all non-degenerate inputs.
 #[test]
 fn test_par_spread_positive_and_side_invariant() {
-    let pricer = CDSTranchePricer::new();
+    let pricer = CdsTranchePricer::new();
     let market = standard_market_context();
     let as_of = base_date();
 
@@ -592,7 +592,7 @@ fn test_par_spread_positive_and_side_invariant() {
 #[test]
 fn test_upfront_equals_pv() {
     // Arrange
-    let pricer = CDSTranchePricer::new();
+    let pricer = CdsTranchePricer::new();
     let tranche = mezzanine_tranche();
     let market = standard_market_context();
     let as_of = base_date();

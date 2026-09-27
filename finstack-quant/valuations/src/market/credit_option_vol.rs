@@ -37,7 +37,7 @@ use finstack_quant_core::{Error, Result};
 use rust_decimal::Decimal;
 
 use crate::instruments::credit_derivatives::cds_option::{
-    CDSOption, CDSOptionStrike, CDSOptionStrikeKind,
+    CdsOption, CdsOptionStrike, CdsOptionStrikeKind,
 };
 use crate::instruments::OptionType;
 use finstack_quant_models::credit::market_anchored::CreditVolatilityConversion;
@@ -46,7 +46,7 @@ use finstack_quant_models::credit::market_anchored::CreditVolatilityConversion;
 #[derive(Debug, Clone, Copy)]
 pub enum CreditVolSelector {
     /// Use the option's own typed strike, queried at its native coordinate.
-    Strike(CDSOptionStrike),
+    Strike(CdsOptionStrike),
     /// Native strike divided by the canonical native ATM-forward coordinate.
     ///
     /// `1.0` is at-the-money. The ratio is taken in the strike's own native
@@ -69,7 +69,7 @@ pub enum CreditVolSelector {
 pub struct CreditVolRequest<'a> {
     /// The index option supplying the expiry, underlying convention, index
     /// state, strike kind, and `vol_surface_id`.
-    pub option: &'a CDSOption,
+    pub option: &'a CdsOption,
     /// How to pick the surface point.
     pub selector: CreditVolSelector,
     /// Hazard curve the resulting volatility will be applied to. This is the
@@ -85,7 +85,7 @@ pub struct CreditVolRequest<'a> {
 #[derive(Debug, Clone, PartialEq)]
 pub struct HazardVolatilityQuote {
     /// Strike the selector resolved to.
-    pub resolved_strike: CDSOptionStrike,
+    pub resolved_strike: CdsOptionStrike,
     /// Native coordinate the surface was queried at — a decimal spread or a
     /// percentage clean price, matching the strike kind.
     pub surface_coordinate: f64,
@@ -204,7 +204,7 @@ fn resolve_strike(
     market: &MarketContext,
     as_of: Date,
     expiry_time: f64,
-) -> Result<CDSOptionStrike> {
+) -> Result<CdsOptionStrike> {
     match &request.selector {
         CreditVolSelector::Strike(strike) => Ok(*strike),
         CreditVolSelector::Moneyness(moneyness) => {
@@ -236,7 +236,7 @@ fn resolve_strike(
 /// decimal; clean-price strikes use the payer/receiver parity strike in
 /// percentage price points, which comes from the same payoff the quadrature
 /// integrates rather than a separate price approximation.
-fn native_atm_coordinate(option: &CDSOption, market: &MarketContext, as_of: Date) -> Result<f64> {
+fn native_atm_coordinate(option: &CdsOption, market: &MarketContext, as_of: Date) -> Result<f64> {
     use crate::instruments::credit_derivatives::cds_option::bloomberg_quadrature::ForwardCdsContext;
     use crate::instruments::credit_derivatives::cds_option::pricer::synthetic_underlying_cds;
 
@@ -245,21 +245,21 @@ fn native_atm_coordinate(option: &CDSOption, market: &MarketContext, as_of: Date
     let surv = market.get_hazard(&option.credit_curve_id)?;
     let ctx = ForwardCdsContext::build(option, disc.as_ref(), surv.as_ref(), &cds, as_of, 0.0)?;
     match option.strike.kind() {
-        CDSOptionStrikeKind::Spread => Ok(ctx.forward_par_spread),
-        CDSOptionStrikeKind::CleanPricePct => ctx.native_atm_forward_clean_price_pct(),
+        CdsOptionStrikeKind::Spread => Ok(ctx.forward_par_spread),
+        CdsOptionStrikeKind::CleanPricePct => ctx.native_atm_forward_clean_price_pct(),
     }
 }
 
 /// Wrap a native coordinate back into a typed strike of the given kind.
-fn native_to_strike(kind: CDSOptionStrikeKind, native: f64) -> Result<CDSOptionStrike> {
+fn native_to_strike(kind: CdsOptionStrikeKind, native: f64) -> Result<CdsOptionStrike> {
     let decimal = Decimal::try_from(native).map_err(|e| {
         Error::Validation(format!(
             "cannot represent resolved strike coordinate {native} as a decimal: {e}"
         ))
     })?;
     Ok(match kind {
-        CDSOptionStrikeKind::Spread => CDSOptionStrike::Spread(decimal),
-        CDSOptionStrikeKind::CleanPricePct => CDSOptionStrike::CleanPricePct(decimal),
+        CdsOptionStrikeKind::Spread => CdsOptionStrike::Spread(decimal),
+        CdsOptionStrikeKind::CleanPricePct => CdsOptionStrike::CleanPricePct(decimal),
     })
 }
 
@@ -271,13 +271,13 @@ fn native_to_strike(kind: CDSOptionStrikeKind, native: f64) -> Result<CDSOptionS
 /// delta; clean-price strikes use the curve-reprice price-strike delta, since
 /// a clean price is not a valid argument to the Black `d₁`.
 fn solve_delta_strike(
-    option: &CDSOption,
+    option: &CdsOption,
     market: &MarketContext,
     as_of: Date,
     expiry_time: f64,
     absolute_delta: f64,
     option_type: OptionType,
-) -> Result<CDSOptionStrike> {
+) -> Result<CdsOptionStrike> {
     if !absolute_delta.is_finite() || !(0.0..1.0).contains(&absolute_delta) || absolute_delta == 0.0
     {
         return Err(Error::Validation(format!(
@@ -343,7 +343,7 @@ fn solve_delta_strike(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::instruments::credit_derivatives::cds_option::CDSOptionParams;
+    use crate::instruments::credit_derivatives::cds_option::CdsOptionParams;
     use crate::instruments::CreditParams;
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::DateExt;
@@ -400,9 +400,9 @@ mod tests {
             .insert_surface(spread_surface())
     }
 
-    fn index_option(strike_spread: f64) -> CDSOption {
-        let params = CDSOptionParams::call(
-            CDSOptionStrike::Spread(Decimal::try_from(strike_spread).expect("valid strike")),
+    fn index_option(strike_spread: f64) -> CdsOption {
+        let params = CdsOptionParams::call(
+            CdsOptionStrike::Spread(Decimal::try_from(strike_spread).expect("valid strike")),
             as_of().add_months(6),
             as_of().add_months(66),
             Money::from((10_000_000_i64, Currency::USD)),
@@ -412,7 +412,7 @@ mod tests {
         .expect("index factor")
         .with_coupon_bp(Decimal::new(100, 0));
         let credit = CreditParams::corporate_standard("CDX", "CDX-IG");
-        CDSOption::new(
+        CdsOption::new(
             "CDX-IG-CDSO",
             &params,
             &credit,
@@ -423,7 +423,7 @@ mod tests {
     }
 
     fn request<'a>(
-        option: &'a CDSOption,
+        option: &'a CdsOption,
         selector: CreditVolSelector,
         target: &'a CurveId,
     ) -> CreditVolRequest<'a> {
@@ -723,8 +723,8 @@ mod tests {
             .insert(hazard("TARGET-HAZ", 0.03))
             .insert_surface(hy_surface);
 
-        let params = CDSOptionParams::call(
-            CDSOptionStrike::CleanPricePct(Decimal::new(1070, 1)),
+        let params = CdsOptionParams::call(
+            CdsOptionStrike::CleanPricePct(Decimal::new(1070, 1)),
             as_of().add_months(6),
             as_of().add_months(66),
             Money::from((10_000_000_i64, Currency::USD)),
@@ -736,7 +736,7 @@ mod tests {
         .expect("strike factor")
         .with_coupon_bp(Decimal::new(500, 0));
         let credit = CreditParams::corporate_standard("CDXHY", "CDX-HY");
-        let option = CDSOption::new(
+        let option = CdsOption::new(
             "CDX-HY-CDSO",
             &params,
             &credit,

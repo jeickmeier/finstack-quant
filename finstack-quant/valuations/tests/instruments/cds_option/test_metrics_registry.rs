@@ -67,7 +67,7 @@ fn bump_quote_calibrated_discount(
 fn test_metrics_registry_delta() {
     let as_of = date!(2025 - 01 - 01);
     let market = standard_market(as_of);
-    let option = CDSOptionBuilder::new().build(as_of);
+    let option = CdsOptionBuilder::new().build(as_of);
 
     let pv = option.value(&market, as_of).unwrap();
     let mut ctx = MetricContext::new(
@@ -91,7 +91,7 @@ fn test_metrics_registry_delta() {
 fn test_metrics_registry_all_greeks() {
     let as_of = date!(2025 - 01 - 01);
     let market = replayable_standard_market(as_of);
-    let option = CDSOptionBuilder::new().build(as_of);
+    let option = CdsOptionBuilder::new().build(as_of);
 
     let metrics = vec![
         MetricId::Delta,
@@ -126,7 +126,7 @@ fn test_cds_option_dv01_bumps_swap_curve_quotes_and_matches_cds_convention() {
     // central-difference sign and scale as CDS IR DV01 so portfolio aggregation
     // across CDS and CDS options is meaningful.
     let as_of = date!(2025 - 01 - 01);
-    let option = CDSOptionBuilder::new().build(as_of);
+    let option = CdsOptionBuilder::new().build(as_of);
     let discount = quote_calibrated_discount(0.03, as_of);
     let hazard = HazardCurve::builder("HZ-SN")
         .base_date(as_of)
@@ -182,7 +182,7 @@ fn test_cds_option_dv01_falls_back_to_direct_bump_without_calibration() {
         .unwrap();
     let hazard = flat_hazard("HZ-SN", as_of, 0.4, 0.02);
     let market = MarketContext::new().insert(discount).insert(hazard);
-    let option = CDSOptionBuilder::new().build(as_of);
+    let option = CdsOptionBuilder::new().build(as_of);
 
     let result = option
         .price_with_metrics(
@@ -219,7 +219,7 @@ fn test_metrics_registry_implied_vol() {
     let as_of = date!(2025 - 01 - 01);
     let market = standard_market(as_of);
     let target_vol = 0.30;
-    let mut option = CDSOptionBuilder::new().implied_vol(target_vol).build(as_of);
+    let mut option = CdsOptionBuilder::new().implied_vol(target_vol).build(as_of);
 
     let pv = option.value(&market, as_of).unwrap();
     option
@@ -245,7 +245,7 @@ fn test_metrics_registry_implied_vol() {
 fn test_cs01_dependency_propagates_replay_error() {
     let as_of = date!(2025 - 01 - 01);
     let market = standard_market(as_of);
-    let option = CDSOptionBuilder::new().build(as_of);
+    let option = CdsOptionBuilder::new().build(as_of);
 
     let pv = option.value(&market, as_of).unwrap();
     let mut ctx = MetricContext::new(
@@ -275,7 +275,7 @@ fn test_cds_option_cs01_requires_replay_recipe() {
         .build()
         .unwrap();
     let market = MarketContext::new().insert(discount).insert(hazard);
-    let option = CDSOptionBuilder::new().build(as_of);
+    let option = CdsOptionBuilder::new().build(as_of);
 
     let pv = option.value(&market, as_of).unwrap();
     let mut ctx = MetricContext::new(
@@ -298,7 +298,7 @@ fn test_bucketed_cs01_requires_replay_recipe() {
     // The standard fixture has no replay recipe.
     let as_of = date!(2025 - 01 - 01);
     let market = standard_market(as_of);
-    let option = CDSOptionBuilder::new().build(as_of);
+    let option = CdsOptionBuilder::new().build(as_of);
 
     let error = option
         .price_with_metrics(
@@ -316,7 +316,7 @@ fn test_metrics_near_expiry() {
     // Test metrics for near-expiry option
     let as_of = date!(2025 - 01 - 01);
     let market = standard_market(as_of);
-    let option = CDSOptionBuilder::new()
+    let option = CdsOptionBuilder::new()
         .expiry_months(1) // Very short time to expiry
         .cds_maturity_months(13)
         .build(as_of);
@@ -348,7 +348,7 @@ fn test_metrics_near_expiry() {
 fn test_spread_dv01_requires_replay_recipe() {
     let as_of = date!(2025 - 01 - 01);
     let market = standard_market(as_of);
-    let option = CDSOptionBuilder::new().call().build(as_of);
+    let option = CdsOptionBuilder::new().call().build(as_of);
 
     let error = option
         .price_with_metrics(

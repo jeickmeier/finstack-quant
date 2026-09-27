@@ -19,8 +19,8 @@ use crate::bindings::pandas_utils::{
 use crate::errors::{core_to_py, serde_json_to_py, value_error};
 use finstack_quant_core::math::random::Pcg64Rng;
 use finstack_quant_models::credit::{
-    moodys_warf_factor as rust_moodys_warf_factor, AssetDynamics, BarrierType, CreditState,
-    CreditStateVariable, DynamicRecoverySpec, EndogenousHazardSpec, MertonModel, OptimalToggle,
+    moodys_warf_factor as rust_moodys_warf_factor, AssetDynamics, CreditState, CreditStateVariable,
+    DynamicRecoverySpec, EndogenousHazardSpec, MertonBarrierType, MertonModel, OptimalToggle,
     RatingFactorTable, SimulatedPaths, ThresholdDirection, ToggleExerciseModel,
 };
 use pyo3::prelude::*;
@@ -163,11 +163,11 @@ impl PyRatingFactorTable {
 
 /// Default-barrier monitoring convention for structural credit models.
 ///
-/// ``BarrierType.terminal()`` tests default only at maturity (Merton 1974);
-/// ``BarrierType.first_passage(growth)`` tests continuously against a barrier
+/// ``MertonBarrierType.terminal()`` tests default only at maturity (Merton 1974);
+/// ``MertonBarrierType.first_passage(growth)`` tests continuously against a barrier
 /// growing at ``growth`` per year (Black-Cox 1976).
 #[pyclass(
-    name = "BarrierType",
+    name = "MertonBarrierType",
     module = "finstack_quant.models.credit",
     frozen,
     eq,
@@ -175,11 +175,11 @@ impl PyRatingFactorTable {
 )]
 #[derive(Clone, Copy, PartialEq)]
 pub(crate) struct PyBarrierType {
-    pub(crate) inner: BarrierType,
+    pub(crate) inner: MertonBarrierType,
 }
 
 impl PyBarrierType {
-    pub(crate) fn from_inner(inner: BarrierType) -> Self {
+    pub(crate) fn from_inner(inner: MertonBarrierType) -> Self {
         Self { inner }
     }
 }
@@ -190,7 +190,7 @@ impl PyBarrierType {
     #[staticmethod]
     fn terminal() -> Self {
         Self {
-            inner: BarrierType::Terminal,
+            inner: MertonBarrierType::Terminal,
         }
     }
 
@@ -203,7 +203,7 @@ impl PyBarrierType {
     #[staticmethod]
     fn first_passage(barrier_growth_rate: f64) -> Self {
         Self {
-            inner: BarrierType::FirstPassage {
+            inner: MertonBarrierType::FirstPassage {
                 barrier_growth_rate,
             },
         }
@@ -214,7 +214,7 @@ impl PyBarrierType {
     fn from_json(json: &str) -> PyResult<Self> {
         Ok(Self {
             inner: serde_json::from_str(json)
-                .map_err(|err| serde_json_to_py(err, "invalid BarrierType JSON"))?,
+                .map_err(|err| serde_json_to_py(err, "invalid MertonBarrierType JSON"))?,
         })
     }
 
@@ -222,7 +222,7 @@ impl PyBarrierType {
     #[allow(clippy::wrong_self_convention)]
     fn to_json(&self) -> PyResult<String> {
         serde_json::to_string(&self.inner)
-            .map_err(|err| serde_json_to_py(err, "BarrierType serialization failed"))
+            .map_err(|err| serde_json_to_py(err, "MertonBarrierType serialization failed"))
     }
 
     /// Support `pickle` (and therefore `multiprocessing`, `joblib`, `dask`).
@@ -231,10 +231,10 @@ impl PyBarrierType {
         crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
     }
 
-    /// Identify this value in notebooks and logs (``BarrierType.terminal()``,
-    /// ``BarrierType.first_passage(barrier_growth_rate=0.02)``).
+    /// Identify this value in notebooks and logs (``MertonBarrierType.terminal()``,
+    /// ``MertonBarrierType.first_passage(barrier_growth_rate=0.02)``).
     fn __repr__(&self) -> String {
-        variant_repr("BarrierType", &self.inner)
+        variant_repr("MertonBarrierType", &self.inner)
     }
 }
 
@@ -1773,10 +1773,10 @@ pub(crate) fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult
         py,
         [
             "AssetDynamics",
-            "BarrierType",
             "CreditState",
             "DynamicRecoverySpec",
             "EndogenousHazardSpec",
+            "MertonBarrierType",
             "MertonModel",
             "RatingFactorTable",
             "SimulatedPaths",

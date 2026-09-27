@@ -3,7 +3,7 @@
 //! Computes present value of the protection leg using the configured curves
 //! and the engine's implementation. The measure is returned in currency units.
 
-use crate::instruments::credit_derivatives::cds::pricing::CDSPricer;
+use crate::instruments::credit_derivatives::cds::pricing::CdsPricer;
 use crate::instruments::credit_derivatives::cds::CreditDefaultSwap;
 use crate::metrics::{MetricCalculator, MetricContext};
 use finstack_quant_core::Result;
@@ -20,7 +20,7 @@ impl MetricCalculator for ProtectionLegPvCalculator {
         let surv = context
             .curves
             .get_hazard(&cds.protection_leg.credit_curve_id)?;
-        let pricer = CDSPricer::new();
+        let pricer = CdsPricer::new();
         let pv = pricer.pv_protection_leg(cds, disc.as_ref(), surv.as_ref(), context.as_of)?;
         Ok(pv.amount())
     }

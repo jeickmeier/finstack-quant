@@ -11,7 +11,7 @@
 
 use super::helpers::*;
 use finstack_quant_valuations::instruments::credit_derivatives::cds_tranche::{
-    CDSTranchePricer, CDSTranchePricerConfig, HeteroMethod,
+    CdsTranchePricer, CdsTranchePricerConfig, HeteroMethod,
 };
 
 // ==================== Basic Expected Loss Tests ====================
@@ -19,7 +19,7 @@ use finstack_quant_valuations::instruments::credit_derivatives::cds_tranche::{
 #[test]
 fn test_expected_loss_is_non_negative() {
     // Arrange
-    let pricer = CDSTranchePricer::new();
+    let pricer = CdsTranchePricer::new();
     let tranche = mezzanine_tranche();
     let market = standard_market_context();
 
@@ -33,7 +33,7 @@ fn test_expected_loss_is_non_negative() {
 #[test]
 fn test_expected_loss_bounded_by_notional() {
     // Arrange
-    let pricer = CDSTranchePricer::new();
+    let pricer = CdsTranchePricer::new();
     let tranche = mezzanine_tranche();
     let market = standard_market_context();
 
@@ -50,7 +50,7 @@ fn test_expected_loss_bounded_by_notional() {
 #[test]
 fn test_expected_loss_equity_vs_senior() {
     // Arrange
-    let pricer = CDSTranchePricer::new();
+    let pricer = CdsTranchePricer::new();
     let market = standard_market_context();
 
     let equity = equity_tranche();
@@ -71,7 +71,7 @@ fn test_expected_loss_equity_vs_senior() {
 #[test]
 fn test_expected_loss_scales_with_notional() {
     // Arrange
-    let pricer = CDSTranchePricer::new();
+    let pricer = CdsTranchePricer::new();
     let market = standard_market_context();
 
     let mut tranche_10mm = mezzanine_tranche();
@@ -113,9 +113,9 @@ fn test_expected_loss_scales_with_notional() {
 #[test]
 fn test_homogeneous_expected_loss() {
     // Arrange
-    let mut config = CDSTranchePricerConfig::default();
+    let mut config = CdsTranchePricerConfig::default();
     config.use_issuer_curves = false; // Force homogeneous
-    let pricer = CDSTranchePricer::with_params(config).expect("valid tranche pricer config");
+    let pricer = CdsTranchePricer::with_params(config).expect("valid tranche pricer config");
 
     let tranche = mezzanine_tranche();
     let market = standard_market_context(); // No issuer curves
@@ -131,10 +131,10 @@ fn test_homogeneous_expected_loss() {
 #[test]
 fn test_heterogeneous_spa_expected_loss() {
     // Arrange
-    let mut config = CDSTranchePricerConfig::default();
+    let mut config = CdsTranchePricerConfig::default();
     config.use_issuer_curves = true;
     config.hetero_method = HeteroMethod::NormalApprox;
-    let pricer = CDSTranchePricer::with_params(config).expect("valid tranche pricer config");
+    let pricer = CdsTranchePricer::with_params(config).expect("valid tranche pricer config");
 
     let tranche = mezzanine_tranche();
     let market = market_context_with_issuers(50);
@@ -150,11 +150,11 @@ fn test_heterogeneous_spa_expected_loss() {
 #[test]
 fn test_heterogeneous_exact_convolution_expected_loss() {
     // Arrange
-    let mut config = CDSTranchePricerConfig::default();
+    let mut config = CdsTranchePricerConfig::default();
     config.use_issuer_curves = true;
     config.hetero_method = HeteroMethod::ExactConvolution;
     config.grid_step = 0.002;
-    let pricer = CDSTranchePricer::with_params(config).expect("valid tranche pricer config");
+    let pricer = CdsTranchePricer::with_params(config).expect("valid tranche pricer config");
 
     let tranche = mezzanine_tranche();
     let market = market_context_with_issuers(10); // Small pool for exact method
@@ -192,16 +192,16 @@ fn test_hetero_spa_matches_homogeneous_when_issuers_identical() {
 
     let hetero_market = base_market.insert_credit_index("CDX.NA.IG.42", hetero_index);
 
-    let mut homo_config = CDSTranchePricerConfig::default();
+    let mut homo_config = CdsTranchePricerConfig::default();
     homo_config.use_issuer_curves = false;
     let homo_pricer =
-        CDSTranchePricer::with_params(homo_config).expect("valid tranche pricer config");
+        CdsTranchePricer::with_params(homo_config).expect("valid tranche pricer config");
 
-    let mut hetero_config = CDSTranchePricerConfig::default();
+    let mut hetero_config = CdsTranchePricerConfig::default();
     hetero_config.use_issuer_curves = true;
     hetero_config.hetero_method = HeteroMethod::NormalApprox;
     let hetero_pricer =
-        CDSTranchePricer::with_params(hetero_config).expect("valid tranche pricer config");
+        CdsTranchePricer::with_params(hetero_config).expect("valid tranche pricer config");
 
     let tranche = custom_tranche(
         3.0,
@@ -232,18 +232,18 @@ fn test_hetero_spa_vs_exact_convolution_small_pool() {
     // Arrange
     let market = market_context_with_issuers(8);
 
-    let mut spa_config = CDSTranchePricerConfig::default();
+    let mut spa_config = CdsTranchePricerConfig::default();
     spa_config.use_issuer_curves = true;
     spa_config.hetero_method = HeteroMethod::NormalApprox;
     let spa_pricer =
-        CDSTranchePricer::with_params(spa_config).expect("valid tranche pricer config");
+        CdsTranchePricer::with_params(spa_config).expect("valid tranche pricer config");
 
-    let mut exact_config = CDSTranchePricerConfig::default();
+    let mut exact_config = CdsTranchePricerConfig::default();
     exact_config.use_issuer_curves = true;
     exact_config.hetero_method = HeteroMethod::ExactConvolution;
     exact_config.grid_step = 0.002;
     let exact_pricer =
-        CDSTranchePricer::with_params(exact_config).expect("valid tranche pricer config");
+        CdsTranchePricer::with_params(exact_config).expect("valid tranche pricer config");
 
     let tranche = mezzanine_tranche();
 
@@ -269,19 +269,19 @@ fn test_exact_convolution_grid_refinement() {
     // Arrange
     let market = market_context_with_issuers(10);
 
-    let mut coarse_config = CDSTranchePricerConfig::default();
+    let mut coarse_config = CdsTranchePricerConfig::default();
     coarse_config.use_issuer_curves = true;
     coarse_config.hetero_method = HeteroMethod::ExactConvolution;
     coarse_config.grid_step = 0.005;
     let coarse_pricer =
-        CDSTranchePricer::with_params(coarse_config).expect("valid tranche pricer config");
+        CdsTranchePricer::with_params(coarse_config).expect("valid tranche pricer config");
 
-    let mut fine_config = CDSTranchePricerConfig::default();
+    let mut fine_config = CdsTranchePricerConfig::default();
     fine_config.use_issuer_curves = true;
     fine_config.hetero_method = HeteroMethod::ExactConvolution;
     fine_config.grid_step = 0.001;
     let fine_pricer =
-        CDSTranchePricer::with_params(fine_config).expect("valid tranche pricer config");
+        CdsTranchePricer::with_params(fine_config).expect("valid tranche pricer config");
 
     let tranche = equity_tranche();
 
@@ -307,7 +307,7 @@ fn test_exact_convolution_grid_refinement() {
 #[test]
 fn test_el_ordering_by_subordination() {
     // Arrange
-    let pricer = CDSTranchePricer::new();
+    let pricer = CdsTranchePricer::new();
     let market = standard_market_context();
 
     let equity = equity_tranche();
@@ -348,7 +348,7 @@ fn test_el_ordering_by_subordination() {
 #[test]
 fn test_super_senior_low_expected_loss() {
     // Arrange
-    let pricer = CDSTranchePricer::new();
+    let pricer = CdsTranchePricer::new();
     let market = standard_market_context();
 
     let super_senior = custom_tranche(
@@ -390,7 +390,7 @@ fn test_zero_width_tranche_expected_loss() {
 #[test]
 fn test_full_portfolio_tranche_expected_loss() {
     // Arrange
-    let pricer = CDSTranchePricer::new();
+    let pricer = CdsTranchePricer::new();
     let market = standard_market_context();
 
     // Full portfolio: 0-100%

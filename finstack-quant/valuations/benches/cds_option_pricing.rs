@@ -16,7 +16,7 @@ use finstack_quant_core::market_data::term_structures::{DiscountCurve, HazardCur
 use finstack_quant_core::math::interp::InterpStyle;
 use finstack_quant_core::money::Money;
 use finstack_quant_valuations::instruments::credit_derivatives::cds_option::{
-    CDSOption, CDSOptionParams, CDSOptionStrike, ProtectionStartConvention,
+    CdsOption, CdsOptionParams, CdsOptionStrike, ProtectionStartConvention,
 };
 use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::instruments::{CreditParams, OptionType};
@@ -28,13 +28,13 @@ fn create_cds_option(
     option_type: OptionType,
     expiry_months: i32,
     cds_tenor_years: i32,
-) -> CDSOption {
+) -> CdsOption {
     let base = Date::from_calendar_date(2025, Month::January, 1).unwrap();
     let expiry = base + time::Duration::days((expiry_months * 30) as i64);
     let underlying_maturity = base + time::Duration::days((cds_tenor_years * 365) as i64);
 
-    let option_params = CDSOptionParams {
-        strike: CDSOptionStrike::Spread(Decimal::new(1, 2)), // 0.01 = 100bp
+    let option_params = CdsOptionParams {
+        strike: CdsOptionStrike::Spread(Decimal::new(1, 2)), // 0.01 = 100bp
         option_type,
         expiry,
         underlying_maturity,
@@ -53,7 +53,7 @@ fn create_cds_option(
         credit_curve_id: "ACME-HAZARD".into(),
     };
 
-    CDSOption::new(
+    CdsOption::new(
         format!("CDS_OPT_{}M_{}Y", expiry_months, cds_tenor_years),
         &option_params,
         &credit_params,
@@ -63,7 +63,7 @@ fn create_cds_option(
     .expect("valid CDS option setup")
 }
 
-fn create_index_cds_option() -> CDSOption {
+fn create_index_cds_option() -> CdsOption {
     let mut option = create_cds_option(OptionType::Call, 1, 5);
     option.underlying_is_index = true;
     option.index_factor = 1.0;

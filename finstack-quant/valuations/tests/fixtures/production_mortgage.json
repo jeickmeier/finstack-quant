@@ -44,7 +44,7 @@
   "tba": {
     "instrument": {
       "spec": {
-        "agency": "FNMA",
+        "agency": "fnma",
         "attributes": {
           "meta": {
             "program": "fnma"
@@ -67,7 +67,7 @@
         "trade_price": 100.0,
         "settlement_date": "2026-03-11",
         "assumed_pool": {
-          "agency": "FNMA",
+          "agency": "fnma",
           "attributes": {
             "meta": {
               "program": "fnma"
@@ -109,7 +109,7 @@
   "cmo": {
     "instrument": {
       "spec": {
-        "agency": "FNMA",
+        "agency": "fnma",
         "attributes": {
           "meta": {
             "deal": "fnr-2024-1"
@@ -160,7 +160,7 @@
           ]
         },
         "collateral": {
-          "agency": "FNMA",
+          "agency": "fnma",
           "attributes": {
             "meta": {
               "program": "fnma"
@@ -202,7 +202,7 @@
   "mbs": {
     "instrument": {
       "spec": {
-        "agency": "FNMA",
+        "agency": "fnma",
         "attributes": {
           "meta": {
             "program": "fnma"
@@ -243,7 +243,7 @@
   "roll": {
     "instrument": {
       "spec": {
-        "agency": "FNMA",
+        "agency": "fnma",
         "attributes": {
           "meta": {
             "program": "fnma"

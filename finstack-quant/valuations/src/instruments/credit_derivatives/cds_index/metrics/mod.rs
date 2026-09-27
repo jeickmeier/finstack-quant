@@ -1,6 +1,6 @@
 //! CDS Index metrics module.
 //!
-//! Provides metric calculators specific to `CDSIndex`, split into focused
+//! Provides metric calculators specific to `CdsIndex`, split into focused
 //! files. The calculators compose with the shared metrics framework and are
 //! registered via `register_cds_index_metrics`.
 //!
@@ -56,11 +56,11 @@ pub(crate) fn register_cds_index_metrics(
             (ExpectedLoss, expected_loss::ExpectedLossCalculator),
             (JumpToDefault, jump_to_default::JumpToDefaultCalculator),
             (Dv01, crate::metrics::UnifiedDv01Calculator::<
-                crate::instruments::CDSIndex,
+                crate::instruments::CdsIndex,
             >::new(crate::metrics::Dv01CalculatorConfig::parallel_combined())),
             // Theta is now registered universally in metrics::standard_registry()
             (BucketedDv01, crate::metrics::UnifiedDv01Calculator::<
-                crate::instruments::CDSIndex,
+                crate::instruments::CdsIndex,
             >::new(crate::metrics::Dv01CalculatorConfig::triangular_key_rate())),
         ]
     }

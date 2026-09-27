@@ -4,7 +4,7 @@
 //! - [`TermLoan`]: fixed/floating coupon schedule with amortization.
 //! - [`RevolvingCredit`]: deterministic draw/repay schedule, floating coupon.
 //! - [`AgencyMbsPassthrough`] / [`AgencyTba`]: prepayment-adjusted cashflows.
-//! - [`FIIndexTotalReturnSwap`]: carry-based TRS with yield/duration market data.
+//! - [`FiIndexTotalReturnSwap`]: carry-based TRS with yield/duration market data.
 //! - [`AgencyCmo`]: sequential and PAC waterfall allocation across collateral pools.
 //! - [`DollarRoll`]: front/back month settlement NPV and implied financing rate.
 
@@ -20,7 +20,7 @@ use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, InstrumentId};
 use finstack_quant_valuations::instruments::fixed_income::cmo::AgencyCmo;
 use finstack_quant_valuations::instruments::fixed_income::dollar_roll::DollarRoll;
-use finstack_quant_valuations::instruments::fixed_income::fi_trs::FIIndexTotalReturnSwap;
+use finstack_quant_valuations::instruments::fixed_income::fi_trs::FiIndexTotalReturnSwap;
 use finstack_quant_valuations::instruments::fixed_income::fi_trs::TrsScheduleSpec;
 use finstack_quant_valuations::instruments::fixed_income::mbs_passthrough::AgencyMbsPassthrough;
 use finstack_quant_valuations::instruments::fixed_income::revolving_credit::{
@@ -381,7 +381,7 @@ fn bench_fi_trs_pv(c: &mut Criterion) {
 
     for (label, years) in [("1Y", 1), ("3Y", 3), ("5Y", 5)] {
         let maturity = Date::from_calendar_date(as_of.year() + years, as_of.month(), 1).unwrap();
-        let mut trs = FIIndexTotalReturnSwap::example().unwrap();
+        let mut trs = FiIndexTotalReturnSwap::example().unwrap();
         trs.schedule = TrsScheduleSpec::from_params(
             as_of,
             maturity,

@@ -19,9 +19,9 @@ use finstack_quant_core::market_data::term_structures::{
 };
 use finstack_quant_core::math::interp::InterpStyle;
 use finstack_quant_core::money::Money;
-use finstack_quant_valuations::instruments::credit_derivatives::cds_tranche::CDSTrancheParams;
+use finstack_quant_valuations::instruments::credit_derivatives::cds_tranche::CdsTrancheParams;
 use finstack_quant_valuations::instruments::credit_derivatives::cds_tranche::{
-    CDSTranche, CDSTranchePricer, CDSTranchePricerConfig,
+    CdsTranche, CdsTranchePricer, CdsTranchePricerConfig,
 };
 use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::instruments::PayReceive;
@@ -33,11 +33,11 @@ use std::hint::black_box;
 use std::sync::Arc;
 use time::Month;
 
-fn create_tranche(attach_pct: f64, detach_pct: f64, tenor_years: i32) -> CDSTranche {
+fn create_tranche(attach_pct: f64, detach_pct: f64, tenor_years: i32) -> CdsTranche {
     let base = Date::from_calendar_date(2025, Month::January, 1).unwrap();
     let maturity = base + time::Duration::days((tenor_years * 365) as i64);
 
-    let tranche_params = CDSTrancheParams::new(
+    let tranche_params = CdsTrancheParams::new(
         "CDX.NA.IG.42",
         42,
         attach_pct,
@@ -49,7 +49,7 @@ fn create_tranche(attach_pct: f64, detach_pct: f64, tenor_years: i32) -> CDSTran
 
     let schedule_params = ScheduleParams::quarterly_act360();
 
-    let mut tranche = CDSTranche::new(
+    let mut tranche = CdsTranche::new(
         format!("CDX_IG42_{}_{}_{}", attach_pct, detach_pct, tenor_years),
         &tranche_params,
         &schedule_params,
@@ -321,8 +321,8 @@ fn bench_cds_tranche_student_t_npv(c: &mut Criterion) {
     let market = create_market();
     let as_of = Date::from_calendar_date(2025, Month::January, 1).unwrap();
     let tranche = create_tranche(3.0, 7.0, 5);
-    let pricer = CDSTranchePricer::with_params(
-        CDSTranchePricerConfig::default()
+    let pricer = CdsTranchePricer::with_params(
+        CdsTranchePricerConfig::default()
             .with_student_t_copula(6.0)
             .unwrap(),
     )

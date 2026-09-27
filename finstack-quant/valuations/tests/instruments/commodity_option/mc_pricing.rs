@@ -11,6 +11,7 @@ use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::DayCount;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::types::{CurveId, InstrumentId};
+use finstack_quant_models::monte_carlo::process::schwartz_smith::SchwartzSmithParams;
 use finstack_quant_valuations::instruments::commodity::commodity_option::{
     CommodityMcParams, CommodityOption, CommodityPricingModel,
 };
@@ -88,14 +89,14 @@ fn test_schwartz_smith_gbm_limit_converges_to_black76() {
     // This ensures E[exp(Y_T)] = exp(Y_0) = S_0 = F_0.
     let sigma_y = 0.20;
     let mc_params = CommodityMcParams {
-        model: CommodityPricingModel::SchwartzSmith {
+        model: CommodityPricingModel::SchwartzSmith(SchwartzSmithParams {
             kappa: 0.01,                    // Very small mean reversion
             sigma_x: 0.001,                 // Negligible short-term vol
             sigma_y,                        // Dominant long-term vol (matching Black-76 vol)
             rho_xy: 0.0,                    // No correlation
             mu_y: -0.5 * sigma_y * sigma_y, // Ito correction for martingale
             lambda_x: 0.0,                  // No risk premium
-        },
+        }),
         num_paths: 100_000,
         num_steps: 100,
         seed: Some(42),
@@ -124,14 +125,14 @@ fn test_mc_estimates_consistent_across_path_counts() {
     let market = build_market(as_of);
     let call = build_commodity_option(100.0, OptionType::Call);
 
-    let ss_model = CommodityPricingModel::SchwartzSmith {
+    let ss_model = CommodityPricingModel::SchwartzSmith(SchwartzSmithParams {
         kappa: 2.0,
         sigma_x: 0.30,
         sigma_y: 0.15,
         rho_xy: -0.5,
         mu_y: 0.0,
         lambda_x: 0.0,
-    };
+    });
 
     // Price with 10k paths
     let mc_10k = CommodityMcParams {
@@ -190,14 +191,14 @@ fn test_put_call_parity_mc() {
 
     // Near-GBM limit with Ito correction for martingale property
     let sigma_y = 0.20;
-    let ss_model = CommodityPricingModel::SchwartzSmith {
+    let ss_model = CommodityPricingModel::SchwartzSmith(SchwartzSmithParams {
         kappa: 0.01,
         sigma_x: 0.001,
         sigma_y,
         rho_xy: 0.0,
         mu_y: -0.5 * sigma_y * sigma_y,
         lambda_x: 0.0,
-    };
+    });
 
     let mc_params = CommodityMcParams {
         model: ss_model,
@@ -244,14 +245,14 @@ fn test_schwartz_smith_positive_option_values() {
     let market = build_market(as_of);
 
     let mc_params = CommodityMcParams {
-        model: CommodityPricingModel::SchwartzSmith {
+        model: CommodityPricingModel::SchwartzSmith(SchwartzSmithParams {
             kappa: 2.0,
             sigma_x: 0.30,
             sigma_y: 0.15,
             rho_xy: -0.5,
             mu_y: 0.0,
             lambda_x: 0.0,
-        },
+        }),
         num_paths: 50_000,
         num_steps: 50,
         seed: Some(42),
@@ -329,14 +330,14 @@ fn mc_result_reports_scaled_uncertainty_and_replay_metadata() {
     let market = build_market(as_of);
     let mut call = build_commodity_option(100.0, OptionType::Call);
     let params = CommodityMcParams {
-        model: CommodityPricingModel::SchwartzSmith {
+        model: CommodityPricingModel::SchwartzSmith(SchwartzSmithParams {
             kappa: 2.0,
             sigma_x: 0.3,
             sigma_y: 0.15,
             rho_xy: -0.5,
             mu_y: 0.0,
             lambda_x: 0.0,
-        },
+        }),
         num_paths: 2000,
         num_steps: 12,
         seed: Some(123),

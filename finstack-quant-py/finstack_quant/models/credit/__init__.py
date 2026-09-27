@@ -16,7 +16,7 @@ from finstack_quant.finstack_quant import models as _models
 
 MertonModel = _models.credit.MertonModel
 AssetDynamics = _models.credit.AssetDynamics
-BarrierType = _models.credit.BarrierType
+MertonBarrierType = _models.credit.MertonBarrierType
 SimulatedPaths = _models.credit.SimulatedPaths
 DynamicRecoverySpec = _models.credit.DynamicRecoverySpec
 EndogenousHazardSpec = _models.credit.EndogenousHazardSpec
@@ -43,10 +43,10 @@ for _name, _module in {
 
 __all__ = [
     "AssetDynamics",
-    "BarrierType",
     "CreditState",
     "DynamicRecoverySpec",
     "EndogenousHazardSpec",
+    "MertonBarrierType",
     "MertonModel",
     "RatingFactorTable",
     "SimulatedPaths",

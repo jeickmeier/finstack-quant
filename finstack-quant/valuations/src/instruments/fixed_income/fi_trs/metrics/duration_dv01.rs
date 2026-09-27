@@ -1,6 +1,6 @@
 //! Duration-based DV01 calculator for fixed income index TRS.
 
-use crate::instruments::fixed_income::fi_trs::FIIndexTotalReturnSwap;
+use crate::instruments::fixed_income::fi_trs::FiIndexTotalReturnSwap;
 use crate::instruments::PayReceive;
 use crate::metrics::{MetricCalculator, MetricContext};
 use finstack_quant_core::Result;
@@ -38,7 +38,7 @@ pub(crate) struct DurationDv01Calculator;
 
 impl MetricCalculator for DurationDv01Calculator {
     fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
-        let trs: &FIIndexTotalReturnSwap = context.instrument_as()?;
+        let trs: &FiIndexTotalReturnSwap = context.instrument_as()?;
 
         let duration = trs.index_duration(context.curves.as_ref())?;
 
@@ -64,7 +64,7 @@ mod production_mortgage_audit {
 
     #[test]
     fn duration_risk_requires_a_duration_input() {
-        let mut trs = FIIndexTotalReturnSwap::example().expect("trs");
+        let mut trs = FiIndexTotalReturnSwap::example().expect("trs");
         trs.underlying.duration_id = None;
         let mut context = MetricContext::new(
             Arc::new(trs),

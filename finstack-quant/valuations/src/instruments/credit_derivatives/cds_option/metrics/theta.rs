@@ -1,6 +1,6 @@
-//! Theta metric for `CDSOption`.
+//! Theta metric for `CdsOption`.
 
-use crate::instruments::credit_derivatives::cds_option::CDSOption;
+use crate::instruments::credit_derivatives::cds_option::CdsOption;
 use crate::metrics::{MetricCalculator, MetricContext};
 use finstack_quant_core::Result;
 
@@ -9,7 +9,7 @@ pub(crate) struct ThetaCalculator;
 
 impl MetricCalculator for ThetaCalculator {
     fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
-        let option: &CDSOption = context.instrument_as()?;
+        let option: &CdsOption = context.instrument_as()?;
         option.theta(&context.curves, context.as_of)
     }
 }

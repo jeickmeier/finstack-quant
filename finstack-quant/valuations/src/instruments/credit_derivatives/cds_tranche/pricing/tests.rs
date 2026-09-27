@@ -3,8 +3,8 @@
 use super::config::{DiscountAt, DEFAULT_INTEGRATION_TOLERANCE};
 use super::*;
 use crate::cashflow::primitives::CFKind;
-use crate::instruments::credit_derivatives::cds_tranche::parameters::CDSTrancheParams;
-use crate::instruments::credit_derivatives::cds_tranche::CDSTranche;
+use crate::instruments::credit_derivatives::cds_tranche::parameters::CdsTrancheParams;
+use crate::instruments::credit_derivatives::cds_tranche::CdsTranche;
 use crate::instruments::PayReceive;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DateExt};
@@ -139,12 +139,12 @@ fn sample_market_context_with_issuers(n: usize) -> MarketContext {
         .insert_credit_index("CDX.NA.IG.42", index)
 }
 
-fn sample_tranche() -> CDSTranche {
+fn sample_tranche() -> CdsTranche {
     let _issue_date = Date::from_calendar_date(2025, Month::January, 1).expect("Valid test date");
     let maturity = Date::from_calendar_date(2030, Month::January, 1).expect("Valid test date");
 
     {
-        let tranche_params = CDSTrancheParams::new(
+        let tranche_params = CdsTrancheParams::new(
             "CDX.NA.IG.42",                               // index_name
             42,                                           // series
             3.0,                                          // attach_pct (3%)
@@ -154,7 +154,7 @@ fn sample_tranche() -> CDSTranche {
             500.0,                                        // coupon_bp (5%)
         );
         let schedule_params = crate::cashflow::builder::ScheduleParams::quarterly_act360();
-        let mut tranche = CDSTranche::new(
+        let mut tranche = CdsTranche::new(
             "CDX_IG42_3_7_5Y",
             &tranche_params,
             &schedule_params,
@@ -170,7 +170,7 @@ fn sample_tranche() -> CDSTranche {
 
 #[test]
 fn test_model_creation() {
-    let model = CDSTranchePricer::new();
+    let model = CdsTranchePricer::new();
     assert_eq!(
         model.params.integration_tolerance,
         DEFAULT_INTEGRATION_TOLERANCE
@@ -183,7 +183,7 @@ fn upfront_uses_protection_side_and_survives_wipeout() {
     let market = sample_market_context();
     let as_of = Date::from_calendar_date(2025, Month::January, 1).expect("date");
     let upfront = Money::from((125000_i64, Currency::USD));
-    let pricer = CDSTranchePricer::new();
+    let pricer = CdsTranchePricer::new();
 
     let mut seller = sample_tranche();
     let seller_base = pricer
@@ -222,7 +222,7 @@ fn projected_schedule_contains_premium_and_default_rows() {
     let tranche = sample_tranche();
     let market = sample_market_context();
     let as_of = Date::from_calendar_date(2025, Month::January, 1).expect("Valid test date");
-    let schedule = CDSTranchePricer::new()
+    let schedule = CdsTranchePricer::new()
         .build_projected_schedule(&tranche, &market, as_of)
         .expect("projected tranche schedule");
 
@@ -241,7 +241,7 @@ fn price_matches_discounted_projected_rows() {
     let tranche = sample_tranche();
     let market = sample_market_context();
     let as_of = Date::from_calendar_date(2025, Month::January, 1).expect("Valid test date");
-    let pricer = CDSTranchePricer::new();
+    let pricer = CdsTranchePricer::new();
     let discount = market
         .get_discount(tranche.discount_curve_id.as_ref())
         .expect("discount curve");
@@ -260,7 +260,7 @@ fn price_matches_discounted_projected_rows() {
 
 #[test]
 fn test_conditional_default_probability() {
-    let model = CDSTranchePricer::new();
+    let model = CdsTranchePricer::new();
     let correlation = 0.30;
     let default_threshold = standard_normal_inv_cdf(0.05); // 5% default probability
 
@@ -309,7 +309,7 @@ fn test_log_factorial() {
 
 #[test]
 fn test_tranche_pricing_integration() {
-    let model = CDSTranchePricer::new();
+    let model = CdsTranchePricer::new();
     let tranche = sample_tranche();
     let market_ctx = sample_market_context();
     let as_of = Date::from_calendar_date(2025, Month::January, 1).expect("Valid test date");
@@ -326,20 +326,20 @@ fn test_tranche_pricing_integration() {
 
 #[test]
 fn test_equity_helper_matches_explicit_params_pv() {
-    let model = CDSTranchePricer::new();
+    let model = CdsTranchePricer::new();
     let market_ctx = sample_market_context();
     let as_of = Date::from_calendar_date(2025, Month::January, 1).expect("Valid test date");
     let maturity = Date::from_calendar_date(2030, Month::January, 1).expect("Valid test date");
     let schedule_params = crate::cashflow::builder::ScheduleParams::quarterly_act360();
 
-    let helper_params = CDSTrancheParams::equity_tranche(
+    let helper_params = CdsTrancheParams::equity_tranche(
         "CDX.NA.IG.42",
         42,
         Money::from((10_000_000_i64, Currency::USD)),
         maturity,
         500.0,
     );
-    let helper_tranche = CDSTranche::new(
+    let helper_tranche = CdsTranche::new(
         "CDX_IG42_0_3_HELPER",
         &helper_params,
         &schedule_params,
@@ -349,7 +349,7 @@ fn test_equity_helper_matches_explicit_params_pv() {
     )
     .expect("Valid tranche parameters");
 
-    let explicit_params = CDSTrancheParams::new(
+    let explicit_params = CdsTrancheParams::new(
         "CDX.NA.IG.42",
         42,
         0.0,
@@ -358,7 +358,7 @@ fn test_equity_helper_matches_explicit_params_pv() {
         maturity,
         500.0,
     );
-    let explicit_tranche = CDSTranche::new(
+    let explicit_tranche = CdsTranche::new(
         "CDX_IG42_0_3_EXPLICIT",
         &explicit_params,
         &schedule_params,
@@ -408,9 +408,9 @@ fn test_hetero_spa_matches_homogeneous_when_issuers_equal() {
         .expect("Curve builder should succeed with valid test data");
     let ctx = ctx_base.insert_credit_index("CDX.NA.IG.42", hetero_index);
 
-    let mut homo = CDSTranchePricer::new();
+    let mut homo = CdsTranchePricer::new();
     homo.params.use_issuer_curves = false;
-    let mut hetero = CDSTranchePricer::new();
+    let mut hetero = CdsTranchePricer::new();
     hetero.params.use_issuer_curves = true;
     hetero.params.hetero_method = HeteroMethod::NormalApprox;
 
@@ -429,7 +429,7 @@ fn test_hetero_spa_matches_homogeneous_when_issuers_equal() {
 fn test_hetero_spa_vs_exact_convolution_small_pool() {
     let ctx = sample_market_context_with_issuers(8);
     let as_of = Date::from_calendar_date(2025, Month::January, 1).expect("Valid test date");
-    let tranche_params = CDSTrancheParams::new(
+    let tranche_params = CdsTrancheParams::new(
         "CDX.NA.IG.42",
         42,
         3.0,
@@ -439,7 +439,7 @@ fn test_hetero_spa_vs_exact_convolution_small_pool() {
         0.0,
     );
     let schedule_params = crate::cashflow::builder::ScheduleParams::quarterly_act360();
-    let tranche = CDSTranche::new(
+    let tranche = CdsTranche::new(
         "CDX_IG42_3_7_5Y",
         &tranche_params,
         &schedule_params,
@@ -449,10 +449,10 @@ fn test_hetero_spa_vs_exact_convolution_small_pool() {
     )
     .expect("Valid tranche parameters");
 
-    let mut spa = CDSTranchePricer::new();
+    let mut spa = CdsTranchePricer::new();
     spa.params.use_issuer_curves = true;
     spa.params.hetero_method = HeteroMethod::NormalApprox;
-    let mut exact = CDSTranchePricer::new();
+    let mut exact = CdsTranchePricer::new();
     exact.params.use_issuer_curves = true;
     exact.params.hetero_method = HeteroMethod::ExactConvolution;
     exact.params.grid_step = 0.002;
@@ -475,9 +475,9 @@ fn price_hetero_tranche(
     as_of: Date,
     attach: f64,
     detach: f64,
-    configure: impl FnOnce(&mut CDSTranchePricer),
+    configure: impl FnOnce(&mut CdsTranchePricer),
 ) -> f64 {
-    let tranche_params = CDSTrancheParams::new(
+    let tranche_params = CdsTrancheParams::new(
         "CDX.NA.IG.42",
         42,
         attach,
@@ -487,7 +487,7 @@ fn price_hetero_tranche(
         0.0,
     );
     let schedule_params = crate::cashflow::builder::ScheduleParams::quarterly_act360();
-    let tranche = CDSTranche::new(
+    let tranche = CdsTranche::new(
         "AUDIT_M2_TRANCHE",
         &tranche_params,
         &schedule_params,
@@ -496,7 +496,7 @@ fn price_hetero_tranche(
         PayReceive::Receive,
     )
     .expect("Valid tranche parameters");
-    let mut pricer = CDSTranchePricer::new();
+    let mut pricer = CdsTranchePricer::new();
     pricer.params.use_issuer_curves = true;
     configure(&mut pricer);
     pricer
@@ -636,7 +636,7 @@ fn homogeneity_detection_uses_consistent_tolerance() {
             .insert_credit_index("CDX.NA.IG.42", index)
     };
 
-    let params = CDSTrancheParams::new(
+    let params = CdsTrancheParams::new(
         "CDX.NA.IG.42",
         42,
         0.0,
@@ -646,7 +646,7 @@ fn homogeneity_detection_uses_consistent_tolerance() {
         0.0,
     );
     let schedule_params = crate::cashflow::builder::ScheduleParams::quarterly_act360();
-    let tranche = CDSTranche::new(
+    let tranche = CdsTranche::new(
         "CDX_IG42_0_3_5Y",
         &params,
         &schedule_params,
@@ -656,7 +656,7 @@ fn homogeneity_detection_uses_consistent_tolerance() {
     )
     .expect("Valid tranche parameters");
 
-    let mut pricer = CDSTranchePricer::new();
+    let mut pricer = CdsTranchePricer::new();
     pricer.params.use_issuer_curves = true;
     pricer.params.hetero_method = HeteroMethod::NormalApprox;
 
@@ -686,7 +686,7 @@ fn homogeneity_detection_uses_consistent_tolerance() {
 fn test_grid_step_refines_exact_convolution() {
     let ctx = sample_market_context_with_issuers(10);
     let as_of = Date::from_calendar_date(2025, Month::January, 1).expect("Valid test date");
-    let tranche_params = CDSTrancheParams::new(
+    let tranche_params = CdsTrancheParams::new(
         "CDX.NA.IG.42",
         42,
         0.0,
@@ -696,7 +696,7 @@ fn test_grid_step_refines_exact_convolution() {
         0.0,
     );
     let schedule_params = crate::cashflow::builder::ScheduleParams::quarterly_act360();
-    let tranche = CDSTranche::new(
+    let tranche = CdsTranche::new(
         "CDX_IG42_0_3_5Y",
         &tranche_params,
         &schedule_params,
@@ -706,12 +706,12 @@ fn test_grid_step_refines_exact_convolution() {
     )
     .expect("Valid tranche parameters");
 
-    let mut exact_coarse = CDSTranchePricer::new();
+    let mut exact_coarse = CdsTranchePricer::new();
     exact_coarse.params.use_issuer_curves = true;
     exact_coarse.params.hetero_method = HeteroMethod::ExactConvolution;
     exact_coarse.params.grid_step = 0.005;
 
-    let mut exact_fine = CDSTranchePricer::new();
+    let mut exact_fine = CdsTranchePricer::new();
     exact_fine.params = exact_coarse.params.clone();
     exact_fine.params.grid_step = 0.001;
 
@@ -728,7 +728,7 @@ fn test_grid_step_refines_exact_convolution() {
 
 #[test]
 fn test_expected_loss_calculation() {
-    let model = CDSTranchePricer::new();
+    let model = CdsTranchePricer::new();
     let tranche = sample_tranche();
     let market_ctx = sample_market_context();
 
@@ -742,7 +742,7 @@ fn test_expected_loss_calculation() {
 
 #[test]
 fn test_payment_schedule_generation() {
-    let model = CDSTranchePricer::new();
+    let model = CdsTranchePricer::new();
     let tranche = sample_tranche();
     let as_of = Date::from_calendar_date(2025, Month::January, 1).expect("Valid test date");
 
@@ -762,7 +762,7 @@ fn test_payment_schedule_generation() {
 
 #[test]
 fn test_payment_schedule_imm_vs_non_imm() {
-    let model = CDSTranchePricer::new();
+    let model = CdsTranchePricer::new();
     let as_of = Date::from_calendar_date(2025, Month::January, 1).expect("Valid test date");
 
     let mut imm_tranche = sample_tranche();
@@ -817,10 +817,10 @@ fn test_payment_schedule_imm_vs_non_imm() {
 
 #[test]
 fn new_honors_monthly_schedule_params() {
-    let model = CDSTranchePricer::new();
+    let model = CdsTranchePricer::new();
     let as_of = Date::from_calendar_date(2025, Month::January, 15).expect("Valid test date");
     let maturity = Date::from_calendar_date(2026, Month::January, 15).expect("Valid test date");
-    let tranche_params = CDSTrancheParams::new(
+    let tranche_params = CdsTrancheParams::new(
         "CDX.NA.IG.42",
         42,
         3.0,
@@ -831,7 +831,7 @@ fn new_honors_monthly_schedule_params() {
     );
     let mut schedule_params = crate::cashflow::builder::ScheduleParams::quarterly_act360();
     schedule_params.frequency = finstack_quant_core::dates::Tenor::monthly();
-    let tranche = CDSTranche::new(
+    let tranche = CdsTranche::new(
         "CDX_MONTHLY",
         &tranche_params,
         &schedule_params,
@@ -843,7 +843,7 @@ fn new_honors_monthly_schedule_params() {
 
     assert!(
         tranche.roll_rule != crate::cashflow::builder::specs::RollRule::CdsImm,
-        "CDSTranche::new must honor ScheduleParams rather than implicit IMM"
+        "CdsTranche::new must honor ScheduleParams rather than implicit IMM"
     );
     assert_eq!(
         tranche.frequency,
@@ -870,10 +870,10 @@ fn new_honors_monthly_schedule_params() {
 
 #[test]
 fn standard_constructor_uses_imm_cds_dates() {
-    let model = CDSTranchePricer::new();
+    let model = CdsTranchePricer::new();
     let as_of = Date::from_calendar_date(2025, Month::January, 15).expect("Valid test date");
     let maturity = Date::from_calendar_date(2030, Month::March, 20).expect("cds date");
-    let tranche_params = CDSTrancheParams::new(
+    let tranche_params = CdsTrancheParams::new(
         "CDX.NA.IG.42",
         42,
         3.0,
@@ -882,7 +882,7 @@ fn standard_constructor_uses_imm_cds_dates() {
         maturity,
         500.0,
     );
-    let tranche = CDSTranche::standard(
+    let tranche = CdsTranche::standard(
         "CDX_STANDARD",
         &tranche_params,
         finstack_quant_core::types::CurveId::from("USD-OIS"),
@@ -911,7 +911,7 @@ fn standard_constructor_uses_imm_cds_dates() {
 
 #[test]
 fn test_el_curve_monotonicity() {
-    let model = CDSTranchePricer::new();
+    let model = CdsTranchePricer::new();
     let tranche = sample_tranche();
     let market_ctx = sample_market_context();
     let as_of = Date::from_calendar_date(2025, Month::January, 1).expect("Valid test date");
@@ -955,7 +955,7 @@ fn test_el_curve_monotonicity() {
 
 #[test]
 fn test_correlation_delta_calculation() {
-    let model = CDSTranchePricer::new();
+    let model = CdsTranchePricer::new();
     let tranche = sample_tranche();
     let market_ctx = sample_market_context();
     let as_of = Date::from_calendar_date(2025, Month::January, 1).expect("Valid test date");
@@ -970,7 +970,7 @@ fn test_correlation_delta_calculation() {
 
 #[test]
 fn test_jump_to_default_calculation() {
-    let model = CDSTranchePricer::new();
+    let model = CdsTranchePricer::new();
     let tranche = sample_tranche();
     let market_ctx = sample_market_context();
     let as_of = Date::from_calendar_date(2025, Month::January, 1).expect("Valid test date");
@@ -985,7 +985,7 @@ fn test_jump_to_default_calculation() {
 
 #[test]
 fn test_pv_decomposition_consistency() {
-    let model = CDSTranchePricer::new();
+    let model = CdsTranchePricer::new();
     let tranche = sample_tranche();
     let market_ctx = sample_market_context();
     let as_of = Date::from_calendar_date(2025, Month::January, 1).expect("Valid test date");
@@ -1034,7 +1034,7 @@ fn test_pv_decomposition_consistency() {
 
 #[test]
 fn test_extreme_correlation_numerical_stability() {
-    let model = CDSTranchePricer::new();
+    let model = CdsTranchePricer::new();
     let market_ctx = sample_market_context();
     let _as_of = Date::from_calendar_date(2025, Month::January, 1).expect("Valid test date");
     let index_data_arc = market_ctx
@@ -1102,7 +1102,7 @@ fn test_extreme_correlation_numerical_stability() {
 
 #[test]
 fn test_smooth_correlation_boundary_transitions() {
-    let model = CDSTranchePricer::new();
+    let model = CdsTranchePricer::new();
 
     // Test that smooth boundary transitions work correctly
     let test_values = [
@@ -1148,7 +1148,7 @@ fn test_smooth_correlation_boundary_transitions() {
 /// spurious sensitivity.
 #[test]
 fn test_smooth_correlation_boundary_c1_at_seams() {
-    let model = CDSTranchePricer::new();
+    let model = CdsTranchePricer::new();
     let cfg = model.get_config();
     let (min_c, max_c, w) = (
         cfg.min_correlation,
@@ -1190,7 +1190,7 @@ fn test_smooth_correlation_boundary_c1_at_seams() {
 
 #[test]
 fn test_conditional_default_probability_enhanced() {
-    let model = CDSTranchePricer::new();
+    let model = CdsTranchePricer::new();
     let default_threshold = standard_normal_inv_cdf(0.05); // 5% unconditional default prob
 
     // Test enhanced function across various correlation and market factor combinations
@@ -1238,7 +1238,7 @@ fn test_conditional_default_probability_enhanced() {
 
 #[test]
 fn test_realized_loss_impact() {
-    let model = CDSTranchePricer::new();
+    let model = CdsTranchePricer::new();
     let mut tranche = sample_tranche();
     // 0-3% tranche
     tranche.attach_pct = 0.0;
@@ -1283,13 +1283,13 @@ fn test_realized_loss_impact() {
 #[test]
 fn test_thin_tranche_stability() {
     // Test very thin tranches (width < 1%) for numerical stability
-    let model = CDSTranchePricer::new();
+    let model = CdsTranchePricer::new();
     let market_ctx = sample_market_context();
     let as_of = Date::from_calendar_date(2025, Month::January, 1).expect("Valid test date");
     let maturity = Date::from_calendar_date(2030, Month::January, 1).expect("Valid test date");
 
     // Create a very thin tranche (0.5% width)
-    let tranche_params = CDSTrancheParams::new(
+    let tranche_params = CdsTrancheParams::new(
         "CDX.NA.IG.42",
         42,
         3.0, // attach at 3%
@@ -1299,7 +1299,7 @@ fn test_thin_tranche_stability() {
         500.0,
     );
     let schedule_params = crate::cashflow::builder::ScheduleParams::quarterly_act360();
-    let tranche = CDSTranche::new(
+    let tranche = CdsTranche::new(
         "THIN_TRANCHE",
         &tranche_params,
         &schedule_params,
@@ -1321,12 +1321,12 @@ fn test_thin_tranche_stability() {
 #[test]
 fn test_super_senior_tranche() {
     // Test super senior tranche (30-100%)
-    let model = CDSTranchePricer::new();
+    let model = CdsTranchePricer::new();
     let market_ctx = sample_market_context();
     let as_of = Date::from_calendar_date(2025, Month::January, 1).expect("Valid test date");
     let maturity = Date::from_calendar_date(2030, Month::January, 1).expect("Valid test date");
 
-    let tranche_params = CDSTrancheParams::new(
+    let tranche_params = CdsTrancheParams::new(
         "CDX.NA.IG.42",
         42,
         30.0,  // super senior attachment
@@ -1336,7 +1336,7 @@ fn test_super_senior_tranche() {
         25.0, // Very low spread for super senior
     );
     let schedule_params = crate::cashflow::builder::ScheduleParams::quarterly_act360();
-    let tranche = CDSTranche::new(
+    let tranche = CdsTranche::new(
         "SUPER_SENIOR",
         &tranche_params,
         &schedule_params,
@@ -1360,7 +1360,7 @@ fn test_super_senior_tranche() {
 #[test]
 fn test_nearly_wiped_tranche() {
     // Test tranche that is nearly (but not fully) wiped out
-    let model = CDSTranchePricer::new();
+    let model = CdsTranchePricer::new();
     let mut tranche = sample_tranche();
     tranche.attach_pct = 0.0;
     tranche.detach_pct = 3.0;
@@ -1380,7 +1380,7 @@ fn test_nearly_wiped_tranche() {
 #[test]
 fn test_jtd_detail_consistency() {
     // Test that JTD detail is consistent with simple JTD
-    let model = CDSTranchePricer::new();
+    let model = CdsTranchePricer::new();
     let tranche = sample_tranche();
     let market_ctx = sample_market_context();
     let as_of = Date::from_calendar_date(2025, Month::January, 1).expect("Valid test date");
@@ -1411,7 +1411,7 @@ fn test_jtd_detail_consistency() {
 fn test_correlation_bump_is_a_pure_parallel_shift() {
     // A parallel shift of a monotone base-correlation curve is itself
     // monotone — the bump preserves the ordering without any repair loop.
-    let model = CDSTranchePricer::new();
+    let model = CdsTranchePricer::new();
     let market_ctx = sample_market_context();
     let index_data = market_ctx
         .get_credit_index("CDX.NA.IG.42")
@@ -1454,7 +1454,7 @@ fn test_correlation_bump_is_a_pure_parallel_shift() {
 /// sides differently near curve kinks, biasing the derivative.
 #[test]
 fn correlation_bump_up_and_down_are_symmetric() {
-    let model = CDSTranchePricer::new();
+    let model = CdsTranchePricer::new();
     let market_ctx = sample_market_context();
     let index_data = market_ctx
         .get_credit_index("CDX.NA.IG.42")
@@ -1502,7 +1502,7 @@ fn correlation_bump_up_and_down_are_symmetric() {
 #[test]
 fn test_par_spread_solver_convergence() {
     // Test that par spread solver converges correctly
-    let model = CDSTranchePricer::new();
+    let model = CdsTranchePricer::new();
     let tranche = sample_tranche();
     let market_ctx = sample_market_context();
     let as_of = Date::from_calendar_date(2025, Month::January, 1).expect("Valid test date");
@@ -1534,7 +1534,7 @@ fn test_par_spread_solver_convergence() {
 /// This pins that a successful result is always a true par spread.
 #[test]
 fn par_spread_ok_result_is_always_a_true_par() {
-    let model = CDSTranchePricer::new();
+    let model = CdsTranchePricer::new();
     let market_ctx = sample_market_context();
     let as_of = Date::from_calendar_date(2025, Month::January, 1).expect("date");
 
@@ -1542,7 +1542,7 @@ fn par_spread_ok_result_is_always_a_true_par() {
     let maturity = Date::from_calendar_date(2030, Month::January, 1).expect("date");
     for side in [PayReceive::Pay, PayReceive::Receive] {
         for &(attach, detach) in &[(0.0_f64, 3.0_f64), (3.0, 7.0), (10.0, 15.0)] {
-            let params = CDSTrancheParams::new(
+            let params = CdsTrancheParams::new(
                 "CDX.NA.IG.42",
                 42,
                 attach,
@@ -1552,7 +1552,7 @@ fn par_spread_ok_result_is_always_a_true_par() {
                 500.0,
             );
             let schedule_params = crate::cashflow::builder::ScheduleParams::quarterly_act360();
-            let tranche = CDSTranche::new(
+            let tranche = CdsTranche::new(
                 "PAR_SPREAD_TEST",
                 &params,
                 &schedule_params,
@@ -1597,7 +1597,7 @@ fn par_spread_ok_result_is_always_a_true_par() {
 fn test_settlement_date_calculation() {
     // Test settlement date logic for different index types
     // Using Wednesday Jan 1, 2025 so T+1 is Thursday (no weekend crossing)
-    let model = CDSTranchePricer::new();
+    let model = CdsTranchePricer::new();
     let market_ctx = sample_market_context();
     let as_of = Date::from_calendar_date(2025, Month::January, 1).expect("Valid test date");
 
@@ -1634,7 +1634,7 @@ fn test_settlement_date_calculation() {
 
 #[test]
 fn test_settlement_date_skips_weekends() {
-    let model = CDSTranchePricer::new();
+    let model = CdsTranchePricer::new();
     let market_ctx = sample_market_context();
     // Friday Jan 3, 2025
     let friday = Date::from_calendar_date(2025, Month::January, 3).expect("Valid test date");
@@ -1658,7 +1658,7 @@ fn test_settlement_date_skips_weekends() {
 
 #[test]
 fn test_settlement_date_weekday() {
-    let model = CDSTranchePricer::new();
+    let model = CdsTranchePricer::new();
     let market_ctx = sample_market_context();
     // Wednesday Jan 1, 2025
     let wednesday = Date::from_calendar_date(2025, Month::January, 1).expect("Valid test date");
@@ -1683,7 +1683,7 @@ fn test_settlement_date_weekday() {
 #[test]
 fn test_accrued_premium_calculation() {
     // Test accrued premium calculation
-    let model = CDSTranchePricer::new();
+    let model = CdsTranchePricer::new();
     let mut tranche = sample_tranche();
     let market_ctx = sample_market_context();
 
@@ -1706,7 +1706,7 @@ fn test_accrued_premium_calculation() {
 
 #[test]
 fn test_par_spread_missing_credit_index_errors() {
-    let model = CDSTranchePricer::new();
+    let model = CdsTranchePricer::new();
     let tranche = sample_tranche();
     let as_of = Date::from_calendar_date(2025, Month::January, 1).expect("Valid test date");
     let market_ctx = MarketContext::new().insert(
@@ -1733,7 +1733,7 @@ fn test_stochastic_recovery_impacts_equity_tranche() {
     let maturity = Date::from_calendar_date(2030, Month::January, 1).expect("Valid test date");
 
     // Create equity tranche (0-3%) which is most sensitive to stochastic recovery
-    let tranche_params = CDSTrancheParams::new(
+    let tranche_params = CdsTrancheParams::new(
         "CDX.NA.IG.42",
         42,
         0.0, // attach at 0%
@@ -1743,7 +1743,7 @@ fn test_stochastic_recovery_impacts_equity_tranche() {
         500.0, // 5% running coupon
     );
     let schedule_params = crate::cashflow::builder::ScheduleParams::quarterly_act360();
-    let tranche = CDSTranche::new(
+    let tranche = CdsTranche::new(
         "CDX_IG42_0_3_5Y",
         &tranche_params,
         &schedule_params,
@@ -1754,7 +1754,7 @@ fn test_stochastic_recovery_impacts_equity_tranche() {
     .expect("Valid tranche parameters");
 
     // Constant recovery (default)
-    let pricer_const = CDSTranchePricer::new();
+    let pricer_const = CdsTranchePricer::new();
     let pv_const = pricer_const
         .price_tranche(&tranche, &market_ctx, as_of)
         .expect("Constant recovery pricing should succeed")
@@ -1762,7 +1762,7 @@ fn test_stochastic_recovery_impacts_equity_tranche() {
 
     // Stochastic recovery (market-correlated)
     let pricer_stoch =
-        CDSTranchePricer::with_params(CDSTranchePricerConfig::default().with_stochastic_recovery())
+        CdsTranchePricer::with_params(CdsTranchePricerConfig::default().with_stochastic_recovery())
             .expect("valid tranche pricer config");
     let pv_stoch = pricer_stoch
         .price_tranche(&tranche, &market_ctx, as_of)
@@ -1794,7 +1794,7 @@ fn test_stochastic_recovery_impacts_equity_tranche() {
 #[test]
 fn test_stochastic_recovery_default_is_deterministic() {
     // Verify that default configuration uses deterministic (constant) recovery
-    let pricer = CDSTranchePricer::new();
+    let pricer = CdsTranchePricer::new();
     assert!(
         pricer.get_config().stochastic_recovery_spec.is_none(),
         "Default stochastic_recovery_spec should be None (deterministic)"
@@ -1866,7 +1866,7 @@ fn base_correlation_arbitrage_surfaces_as_error() {
     let as_of = Date::from_calendar_date(2025, Month::January, 1).expect("Valid test date");
     let tranche = sample_tranche(); // [3%, 7%] equity-ish tranche
 
-    let pricer = CDSTranchePricer::new();
+    let pricer = CdsTranchePricer::new();
 
     let result = pricer.price_tranche(&tranche, &market_ctx, as_of);
     assert!(
@@ -1891,7 +1891,7 @@ fn well_formed_base_correlation_prices_without_arbitrage_error() {
     let market_ctx = sample_market_context();
     let as_of = Date::from_calendar_date(2025, Month::January, 1).expect("Valid test date");
     let maturity = Date::from_calendar_date(2030, Month::January, 1).expect("Valid test date");
-    let pricer = CDSTranchePricer::new();
+    let pricer = CdsTranchePricer::new();
 
     for &(attach, detach, coupon) in &[
         (0.0_f64, 3.0_f64, 1000.0_f64), // equity
@@ -1900,7 +1900,7 @@ fn well_formed_base_correlation_prices_without_arbitrage_error() {
         (10.0, 15.0, 100.0),            // senior
         (15.0, 30.0, 50.0),             // super senior
     ] {
-        let params = CDSTrancheParams::new(
+        let params = CdsTrancheParams::new(
             "CDX.NA.IG.42",
             42,
             attach,
@@ -1910,7 +1910,7 @@ fn well_formed_base_correlation_prices_without_arbitrage_error() {
             coupon,
         );
         let schedule_params = crate::cashflow::builder::ScheduleParams::quarterly_act360();
-        let tranche = CDSTranche::new(
+        let tranche = CdsTranche::new(
             "ARB_FREE_TEST",
             &params,
             &schedule_params,
@@ -2030,7 +2030,7 @@ fn homogeneous_path_boundary_default_prob_does_not_panic() {
 
     // Drive the homogeneous Gaussian branch directly (disable issuer-curve path).
     let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-        let mut p = CDSTranchePricer::new();
+        let mut p = CdsTranchePricer::new();
         p.params.use_issuer_curves = false;
         p.calculate_equity_tranche_loss(7.0, 0.30, &index_data, maturity)
     }));
@@ -2066,7 +2066,7 @@ fn homogeneous_path_boundary_default_prob_does_not_panic() {
 #[test]
 fn within_period_default_fraction_is_survival_weighted() {
     let base_date = Date::from_calendar_date(2025, Month::January, 1).expect("date");
-    let pricer = CDSTranchePricer::new();
+    let pricer = CdsTranchePricer::new();
 
     // High-hazard index: positive λ ⇒ fraction must be < 0.5.
     let high_hazard =
@@ -2184,7 +2184,7 @@ fn discounting_is_invariant_under_curve_rebasing() {
             .insert_credit_index("CDX.NA.IG.42", index_data.clone())
     };
 
-    let pricer = CDSTranchePricer::new();
+    let pricer = CdsTranchePricer::new();
     let tranche = sample_tranche();
 
     let pv_asof_based = pricer
@@ -2205,7 +2205,7 @@ fn discounting_is_invariant_under_curve_rebasing() {
 }
 
 /// Premium leg PV (sell-protection sign: positive) for a given pricer config.
-fn premium_leg_pv(pricer: &CDSTranchePricer, tranche: &CDSTranche, ctx: &MarketContext) -> f64 {
+fn premium_leg_pv(pricer: &CdsTranchePricer, tranche: &CdsTranche, ctx: &MarketContext) -> f64 {
     let as_of = Date::from_calendar_date(2025, Month::January, 1).expect("date");
     let discount = ctx
         .get_discount(tranche.discount_curve_id.as_ref())
@@ -2239,9 +2239,9 @@ fn aod_enabled_premium_exceeds_disabled_premium() {
     let market_ctx = sample_market_context();
     let tranche = sample_tranche(); // sell protection, 500bp coupon
 
-    let mut enabled = CDSTranchePricer::new();
+    let mut enabled = CdsTranchePricer::new();
     enabled.params.include_accrual_on_default = true;
-    let mut disabled = CDSTranchePricer::new();
+    let mut disabled = CdsTranchePricer::new();
     disabled.params.include_accrual_on_default = false;
 
     let pv_enabled = premium_leg_pv(&enabled, &tranche, &market_ctx);
@@ -2310,7 +2310,7 @@ fn rising_hazard_lowers_premium_leg_pv() {
     };
 
     for aod_enabled in [true, false] {
-        let mut pricer = CDSTranchePricer::new();
+        let mut pricer = CdsTranchePricer::new();
         pricer.params.include_accrual_on_default = aod_enabled;
 
         let pv_low = premium_leg_pv(&pricer, &tranche, &build_ctx(1.0));
@@ -2367,9 +2367,9 @@ fn recovery_market_context(recovery: f64, hazard_scale: f64) -> MarketContext {
         .insert_credit_index("CDX.NA.IG.42", index_data)
 }
 
-fn super_senior_tranche(attach: f64, detach: f64) -> CDSTranche {
+fn super_senior_tranche(attach: f64, detach: f64) -> CdsTranche {
     let maturity = Date::from_calendar_date(2030, Month::January, 1).expect("date");
-    let params = CDSTrancheParams::new(
+    let params = CdsTrancheParams::new(
         "CDX.NA.IG.42",
         42,
         attach,
@@ -2379,7 +2379,7 @@ fn super_senior_tranche(attach: f64, detach: f64) -> CDSTranche {
         25.0,
     );
     let schedule_params = crate::cashflow::builder::ScheduleParams::quarterly_act360();
-    CDSTranche::new(
+    CdsTranche::new(
         "SS_TEST",
         &params,
         &schedule_params,
@@ -2396,7 +2396,7 @@ fn super_senior_tranche(attach: f64, detach: f64) -> CDSTranche {
 fn zero_recovery_has_no_senior_writedown() {
     let ctx = recovery_market_context(0.0, 1.0);
     let as_of = Date::from_calendar_date(2025, Month::January, 1).expect("date");
-    let pricer = CDSTranchePricer::new();
+    let pricer = CdsTranchePricer::new();
     let tranche = super_senior_tranche(60.0, 100.0);
 
     let index_data = ctx.get_credit_index("CDX.NA.IG.42").expect("credit index");
@@ -2431,7 +2431,7 @@ fn zero_recovery_has_no_senior_writedown() {
 #[test]
 fn super_senior_premium_falls_as_hazard_rises() {
     let tranche = super_senior_tranche(60.0, 100.0);
-    let pricer = CDSTranchePricer::new();
+    let pricer = CdsTranchePricer::new();
 
     let pv_low = premium_leg_pv(&pricer, &tranche, &recovery_market_context(0.40, 1.0));
     let pv_high = premium_leg_pv(&pricer, &tranche, &recovery_market_context(0.40, 5.0));
@@ -2481,7 +2481,7 @@ fn super_senior_premium_falls_as_hazard_rises() {
 /// effective detach erodes to `1 − G`.
 #[test]
 fn seasoned_recovery_writedown_matches_hand_computation() {
-    let pricer = CDSTranchePricer::new();
+    let pricer = CdsTranchePricer::new();
     let mut tranche = super_senior_tranche(95.0, 100.0);
     tranche.realized_loss = 0.06;
     let recovery = 0.40;
@@ -2523,9 +2523,9 @@ fn mid_period_protection_uses_survival_weighted_timing() {
     let mut tranche = sample_tranche();
     tranche.coupon_bp = 0.0;
 
-    let mut with_mid = CDSTranchePricer::new();
+    let mut with_mid = CdsTranchePricer::new();
     with_mid.params.mid_period_protection = true;
-    let mut without_mid = CDSTranchePricer::new();
+    let mut without_mid = CdsTranchePricer::new();
     without_mid.params.mid_period_protection = false;
 
     let pv_mid = with_mid
@@ -2564,7 +2564,7 @@ fn seasoned_first_period_default_timing_starts_at_valuation_date() {
     tranche.roll_rule = crate::cashflow::builder::specs::RollRule::None;
     tranche.coupon_bp = 0.0;
 
-    let pricer = CDSTranchePricer::new();
+    let pricer = CdsTranchePricer::new();
     let rows = pricer
         .project_discountable_rows(&tranche, &market_ctx, as_of)
         .expect("projected rows");
@@ -2594,13 +2594,13 @@ fn seasoned_first_period_default_timing_starts_at_valuation_date() {
 
 #[test]
 fn student_t_recovery_driver_uses_scaled_market_factor() {
-    let student_t = CDSTranchePricer::with_params(
-        CDSTranchePricerConfig::default()
+    let student_t = CdsTranchePricer::with_params(
+        CdsTranchePricerConfig::default()
             .with_student_t_copula(5.0)
             .expect("valid Student-t copula"),
     )
     .expect("valid tranche pricer config");
-    let gaussian = CDSTranchePricer::new();
+    let gaussian = CdsTranchePricer::new();
 
     assert_eq!(
         student_t.params.copula_spec,
@@ -2631,7 +2631,7 @@ fn test_stochastic_recovery_full_pool_el_matches_index() {
     let maturity = Date::from_calendar_date(2030, Month::January, 1).expect("date");
 
     let pricer_stoch =
-        CDSTranchePricer::with_params(CDSTranchePricerConfig::default().with_stochastic_recovery())
+        CdsTranchePricer::with_params(CdsTranchePricerConfig::default().with_stochastic_recovery())
             .expect("valid tranche pricer config");
 
     // Index-implied expected loss with the flat bootstrapped recovery.
@@ -2658,7 +2658,7 @@ fn test_stochastic_recovery_full_pool_el_matches_index() {
     // The renormalization must not flatten the override into constant
     // recovery: a strict sub-pool tranche (where the cap binds and the
     // z-shape matters) must still differ from the constant-recovery pricer.
-    let pricer_const = CDSTranchePricer::new();
+    let pricer_const = CdsTranchePricer::new();
     let equity_stoch = pricer_stoch
         .calculate_equity_tranche_loss(3.0, 0.25, &index_data, maturity)
         .expect("stochastic equity EL");
@@ -2686,7 +2686,7 @@ mod production_credit_audit {
         .expect("reference");
         let base = Date::from_calendar_date(2025, Month::January, 1).expect("date");
         let maturity = Date::from_calendar_date(2026, Month::January, 1).expect("date");
-        let pricer = CDSTranchePricer::with_params(CDSTranchePricerConfig {
+        let pricer = CdsTranchePricer::with_params(CdsTranchePricerConfig {
             min_correlation: 0.0001,
             max_correlation: 0.9999,
             corr_boundary_width: 0.00001,
@@ -2739,8 +2739,8 @@ mod production_credit_audit {
         let market = sample_market_context_with_issuers(3);
         let index = market.get_credit_index("CDX.NA.IG.42").expect("index");
         let maturity = Date::from_calendar_date(2030, Month::January, 1).expect("date");
-        let pricer = CDSTranchePricer::with_params(
-            CDSTranchePricerConfig::default().with_constant_recovery(1.0),
+        let pricer = CdsTranchePricer::with_params(
+            CdsTranchePricerConfig::default().with_constant_recovery(1.0),
         )
         .expect("pricer");
         let loss = pricer
@@ -2777,8 +2777,8 @@ mod production_credit_audit {
             })
             .sum();
         for tolerance in [1e-8, 1e-10] {
-            let pricer = CDSTranchePricer::with_params(
-                CDSTranchePricerConfig::default()
+            let pricer = CdsTranchePricer::with_params(
+                CdsTranchePricerConfig::default()
                     .with_custom_stochastic_recovery(0.4, 0.1, 0.3)
                     .with_integration_tolerance(tolerance),
             )

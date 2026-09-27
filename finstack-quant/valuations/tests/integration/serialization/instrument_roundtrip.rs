@@ -89,15 +89,15 @@ fn all_examples_roundtrip() {
     let ex = CreditDefaultSwap::example();
     let id = ex.id.as_str().to_string();
     assert_roundtrip(&id, json_loader::InstrumentJson::CreditDefaultSwap(ex));
-    let ex = CDSIndex::example();
+    let ex = CdsIndex::example();
     let id = ex.id.as_str().to_string();
-    assert_roundtrip(&id, json_loader::InstrumentJson::CDSIndex(ex));
-    let ex = CDSTranche::example();
+    assert_roundtrip(&id, json_loader::InstrumentJson::CdsIndex(ex));
+    let ex = CdsTranche::example();
     let id = ex.id.as_str().to_string();
-    assert_roundtrip(&id, json_loader::InstrumentJson::CDSTranche(ex));
-    let ex = CDSOption::example().unwrap();
+    assert_roundtrip(&id, json_loader::InstrumentJson::CdsTranche(ex));
+    let ex = CdsOption::example().unwrap();
     let id = ex.id.as_str().to_string();
-    assert_roundtrip(&id, json_loader::InstrumentJson::CDSOption(ex));
+    assert_roundtrip(&id, json_loader::InstrumentJson::CdsOption(ex));
     //
     // Equity
     let ex = Equity::example();
@@ -213,7 +213,7 @@ fn all_examples_roundtrip() {
     let ex = EquityTotalReturnSwap::example().unwrap();
     let id = ex.id.as_str().to_string();
     assert_roundtrip(&id, json_loader::InstrumentJson::TrsEquity(ex));
-    let ex = FIIndexTotalReturnSwap::example().unwrap();
+    let ex = FiIndexTotalReturnSwap::example().unwrap();
     let id = ex.id.as_str().to_string();
     assert_roundtrip(&id, json_loader::InstrumentJson::TrsFixedIncomeIndex(ex));
     //

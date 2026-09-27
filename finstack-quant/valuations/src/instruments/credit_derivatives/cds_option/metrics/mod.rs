@@ -1,6 +1,6 @@
 //! CDS Option metrics module.
 //!
-//! Provides metric calculators specific to `CDSOption`, split into focused
+//! Provides metric calculators specific to `CdsOption`, split into focused
 //! files. The calculators compose with the shared metrics framework and are
 //! registered via `register_cds_option_metrics`.
 //!
@@ -23,7 +23,7 @@ pub(crate) mod vega;
 
 use crate::metrics::MetricRegistry;
 
-/// Per-deal CS01 conventions for `CDSOption`.
+/// Per-deal CS01 conventions for `CdsOption`.
 ///
 /// Drives the generic credit CS01 calculator
 /// ([`crate::metrics::sensitivities::cs01::CreditParallelCs01`]). The CDS
@@ -38,7 +38,7 @@ use crate::metrics::MetricRegistry;
 /// silently interpreted as quote-spread risk.
 ///
 impl crate::metrics::sensitivities::cs01::CdsCs01Conventions
-    for crate::instruments::credit_derivatives::cds_option::CDSOption
+    for crate::instruments::credit_derivatives::cds_option::CdsOption
 {
     fn cs01_bootstrap_convention(
         &self,
@@ -105,10 +105,10 @@ pub(crate) fn register_cds_option_metrics(
             (Gamma, gamma::GammaCalculator),
             (Vega, vega::VegaCalculator),
             (Cs01, crate::metrics::sensitivities::cs01::CreditParallelCs01::<
-                crate::instruments::credit_derivatives::cds_option::CDSOption,
+                crate::instruments::credit_derivatives::cds_option::CdsOption,
             >::default()),
             (BucketedCs01, crate::metrics::sensitivities::cs01::CreditBucketedCs01::<
-                crate::instruments::credit_derivatives::cds_option::CDSOption,
+                crate::instruments::credit_derivatives::cds_option::CdsOption,
             >::default()),
             (SpreadDv01, spread_dv01::UnderlyingSpreadDv01Calculator),
             (Dv01, dv01::CdsOptionDv01Calculator),
@@ -116,7 +116,7 @@ pub(crate) fn register_cds_option_metrics(
             (ParSpread, par_spread::ParSpreadCalculator),
             (ImpliedVol, implied_vol::ImpliedVolCalculator),
             (BucketedDv01, crate::metrics::UnifiedDv01Calculator::<
-                crate::instruments::CDSOption,
+                crate::instruments::CdsOption,
             >::new(crate::metrics::Dv01CalculatorConfig::triangular_key_rate())),
         ]
     }

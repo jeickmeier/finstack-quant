@@ -1,5 +1,5 @@
-//! CDS index Python wrappers: `CDSIndex`, its fluent builder, the
-//! `CDSIndexParams` preset descriptor and the `CDSIndexConstituent` row.
+//! CDS index Python wrappers: `CdsIndex`, its fluent builder, the
+//! `CdsIndexParams` preset descriptor and the `CdsIndexConstituent` row.
 
 use pyo3::prelude::*;
 use pyo3::types::PyList;
@@ -10,7 +10,7 @@ use crate::bindings::extract::extract_market;
 use crate::errors::{core_to_py, serde_json_to_py};
 use finstack_quant_core::types::{CurveId, InstrumentId};
 use finstack_quant_valuations::instruments::credit_derivatives::cds_index::{
-    CDSIndexConstituent, CDSIndexParams, IndexPricing,
+    CdsIndexConstituent, CdsIndexParams, IndexPricing,
 };
 use finstack_quant_valuations::instruments::{CreditParams, Instrument, InstrumentJson};
 use rust_decimal::prelude::ToPrimitive;
@@ -27,35 +27,35 @@ use super::super::typed_legs::{PyPremiumLegSpec, PyProtectionLegSpec};
 use super::cds::cds_convention_from_str;
 
 type CdsIndexBuilderInner =
-    finstack_quant_valuations::instruments::credit_derivatives::cds_index::CDSIndexBuilder;
+    finstack_quant_valuations::instruments::credit_derivatives::cds_index::CdsIndexBuilder;
 
-/// Preset descriptor for a standardized CDS index (typed wrapper for Rust ``CDSIndexParams``).
+/// Preset descriptor for a standardized CDS index (typed wrapper for Rust ``CdsIndexParams``).
 ///
 /// Captures only the index identity (name, series, version), the running
 /// coupon and the regional convention. Trade state — notional, side, dates,
-/// curves — lives on the ``CDSIndex`` built with ``CDSIndex.from_preset``.
+/// curves — lives on the ``CdsIndex`` built with ``CdsIndex.from_preset``.
 ///
 /// Examples
 /// --------
-/// >>> from finstack_quant.valuations.instruments import CDSIndexParams
-/// >>> preset = CDSIndexParams.cdx_na_ig(42, 1, 100.0)
+/// >>> from finstack_quant.valuations.instruments import CdsIndexParams
+/// >>> preset = CdsIndexParams.cdx_na_ig(42, 1, 100.0)
 /// >>> (preset.index_name, preset.convention, preset.num_constituents)
 /// ('CDX.NA.IG', 'isda_na', 125)
 #[pyclass(
     module = "finstack_quant.valuations.instruments",
-    name = "CDSIndexParams",
+    name = "CdsIndexParams",
     frozen,
     eq,
     skip_from_py_object
 )]
 #[derive(Clone, PartialEq)]
-pub struct PyCDSIndexParams {
+pub struct PyCdsIndexParams {
     /// Inner canonical Rust preset.
-    pub(crate) inner: CDSIndexParams,
+    pub(crate) inner: CdsIndexParams,
 }
 
 #[pymethods]
-impl PyCDSIndexParams {
+impl PyCdsIndexParams {
     /// Describe a standardized CDS index.
     ///
     /// Parameters
@@ -76,7 +76,7 @@ impl PyCDSIndexParams {
     ///
     /// Returns
     /// -------
-    /// CDSIndexParams
+    /// CdsIndexParams
     ///     The preset.
     ///
     /// Raises
@@ -88,8 +88,8 @@ impl PyCDSIndexParams {
     ///
     /// Examples
     /// --------
-    /// >>> from finstack_quant.valuations.instruments import CDSIndexParams
-    /// >>> CDSIndexParams("CDX.NA.HY", 42, 1, 500.0).coupon_bp
+    /// >>> from finstack_quant.valuations.instruments import CdsIndexParams
+    /// >>> CdsIndexParams("CDX.NA.HY", 42, 1, 500.0).coupon_bp
     /// 500.0
     #[new]
     #[pyo3(signature = (index_name, series, version, coupon_bp, convention="isda_na", num_constituents=None))]
@@ -104,7 +104,7 @@ impl PyCDSIndexParams {
         convention: &str,
         num_constituents: Option<u32>,
     ) -> PyResult<Self> {
-        let mut inner = CDSIndexParams::new(
+        let mut inner = CdsIndexParams::new(
             index_name,
             series,
             version,
@@ -130,7 +130,7 @@ impl PyCDSIndexParams {
     ///
     /// Returns
     /// -------
-    /// CDSIndexParams
+    /// CdsIndexParams
     ///     The preset.
     ///
     /// Raises
@@ -140,14 +140,14 @@ impl PyCDSIndexParams {
     ///
     /// Examples
     /// --------
-    /// >>> from finstack_quant.valuations.instruments import CDSIndexParams
-    /// >>> CDSIndexParams.cdx_na_ig(42, 1, 100.0).num_constituents
+    /// >>> from finstack_quant.valuations.instruments import CdsIndexParams
+    /// >>> CdsIndexParams.cdx_na_ig(42, 1, 100.0).num_constituents
     /// 125
     #[staticmethod]
     #[pyo3(text_signature = "(series, version, coupon_bp)")]
     fn cdx_na_ig(series: u16, version: u16, coupon_bp: &Bound<'_, PyAny>) -> PyResult<Self> {
         Ok(Self {
-            inner: CDSIndexParams::cdx_na_ig(series, version, bps_from_py(coupon_bp, "coupon_bp")?),
+            inner: CdsIndexParams::cdx_na_ig(series, version, bps_from_py(coupon_bp, "coupon_bp")?),
         })
     }
 
@@ -164,7 +164,7 @@ impl PyCDSIndexParams {
     ///
     /// Returns
     /// -------
-    /// CDSIndexParams
+    /// CdsIndexParams
     ///     The preset.
     ///
     /// Raises
@@ -174,14 +174,14 @@ impl PyCDSIndexParams {
     ///
     /// Examples
     /// --------
-    /// >>> from finstack_quant.valuations.instruments import CDSIndexParams
-    /// >>> CDSIndexParams.cdx_na_hy(42, 1, 500.0).num_constituents
+    /// >>> from finstack_quant.valuations.instruments import CdsIndexParams
+    /// >>> CdsIndexParams.cdx_na_hy(42, 1, 500.0).num_constituents
     /// 100
     #[staticmethod]
     #[pyo3(text_signature = "(series, version, coupon_bp)")]
     fn cdx_na_hy(series: u16, version: u16, coupon_bp: &Bound<'_, PyAny>) -> PyResult<Self> {
         Ok(Self {
-            inner: CDSIndexParams::cdx_na_hy(series, version, bps_from_py(coupon_bp, "coupon_bp")?),
+            inner: CdsIndexParams::cdx_na_hy(series, version, bps_from_py(coupon_bp, "coupon_bp")?),
         })
     }
 
@@ -198,7 +198,7 @@ impl PyCDSIndexParams {
     ///
     /// Returns
     /// -------
-    /// CDSIndexParams
+    /// CdsIndexParams
     ///     The preset.
     ///
     /// Raises
@@ -208,14 +208,14 @@ impl PyCDSIndexParams {
     ///
     /// Examples
     /// --------
-    /// >>> from finstack_quant.valuations.instruments import CDSIndexParams
-    /// >>> CDSIndexParams.itraxx_europe(41, 1, 100.0).convention
+    /// >>> from finstack_quant.valuations.instruments import CdsIndexParams
+    /// >>> CdsIndexParams.itraxx_europe(41, 1, 100.0).convention
     /// 'isda_eu'
     #[staticmethod]
     #[pyo3(text_signature = "(series, version, coupon_bp)")]
     fn itraxx_europe(series: u16, version: u16, coupon_bp: &Bound<'_, PyAny>) -> PyResult<Self> {
         Ok(Self {
-            inner: CDSIndexParams::itraxx_europe(
+            inner: CdsIndexParams::itraxx_europe(
                 series,
                 version,
                 bps_from_py(coupon_bp, "coupon_bp")?,
@@ -262,7 +262,7 @@ impl PyCDSIndexParams {
     /// Return ``repr(self)``.
     fn __repr__(&self) -> String {
         format!(
-            "CDSIndexParams(index_name={:?}, series={}, version={}, coupon_bp={}, convention={:?}, num_constituents={})",
+            "CdsIndexParams(index_name={:?}, series={}, version={}, coupon_bp={}, convention={:?}, num_constituents={})",
             self.inner.index_name,
             self.inner.series,
             self.inner.version,
@@ -273,28 +273,28 @@ impl PyCDSIndexParams {
     }
 }
 
-/// One reference entity in a CDS index (typed wrapper for Rust ``CDSIndexConstituent``).
+/// One reference entity in a CDS index (typed wrapper for Rust ``CdsIndexConstituent``).
 ///
 /// Examples
 /// --------
-/// >>> from finstack_quant.valuations.instruments import CDSIndexConstituent
-/// >>> row = CDSIndexConstituent("ACME-CORP", 0.4, "ACME-HZD", 1 / 125)
+/// >>> from finstack_quant.valuations.instruments import CdsIndexConstituent
+/// >>> row = CdsIndexConstituent("ACME-CORP", 0.4, "ACME-HZD", 1 / 125)
 /// >>> (row.reference_entity, row.defaulted)
 /// ('ACME-CORP', False)
 #[pyclass(
     module = "finstack_quant.valuations.instruments",
-    name = "CDSIndexConstituent",
+    name = "CdsIndexConstituent",
     frozen,
     skip_from_py_object
 )]
 #[derive(Clone)]
-pub struct PyCDSIndexConstituent {
+pub struct PyCdsIndexConstituent {
     /// Inner canonical Rust constituent.
-    pub(crate) inner: CDSIndexConstituent,
+    pub(crate) inner: CdsIndexConstituent,
 }
 
 #[pymethods]
-impl PyCDSIndexConstituent {
+impl PyCdsIndexConstituent {
     /// Describe one index constituent.
     ///
     /// Parameters
@@ -313,13 +313,13 @@ impl PyCDSIndexConstituent {
     ///
     /// Returns
     /// -------
-    /// CDSIndexConstituent
+    /// CdsIndexConstituent
     ///     The constituent row.
     ///
     /// Examples
     /// --------
-    /// >>> from finstack_quant.valuations.instruments import CDSIndexConstituent
-    /// >>> CDSIndexConstituent("ACME-CORP", 0.4, "ACME-HZD", 0.008).weight
+    /// >>> from finstack_quant.valuations.instruments import CdsIndexConstituent
+    /// >>> CdsIndexConstituent("ACME-CORP", 0.4, "ACME-HZD", 0.008).weight
     /// 0.008
     #[new]
     #[pyo3(signature = (reference_entity, recovery_rate, credit_curve_id, weight, defaulted=false))]
@@ -334,7 +334,7 @@ impl PyCDSIndexConstituent {
         defaulted: bool,
     ) -> Self {
         Self {
-            inner: CDSIndexConstituent {
+            inner: CdsIndexConstituent {
                 credit: CreditParams::new(
                     reference_entity,
                     recovery_rate,
@@ -356,7 +356,7 @@ impl PyCDSIndexConstituent {
     ///
     /// Returns
     /// -------
-    /// CDSIndexConstituent
+    /// CdsIndexConstituent
     ///     The parsed constituent.
     ///
     /// Raises
@@ -366,16 +366,16 @@ impl PyCDSIndexConstituent {
     ///
     /// Examples
     /// --------
-    /// >>> from finstack_quant.valuations.instruments import CDSIndexConstituent
-    /// >>> row = CDSIndexConstituent("ACME-CORP", 0.4, "ACME-HZD", 0.008)
-    /// >>> CDSIndexConstituent.from_json(row.to_json()).credit_curve_id
+    /// >>> from finstack_quant.valuations.instruments import CdsIndexConstituent
+    /// >>> row = CdsIndexConstituent("ACME-CORP", 0.4, "ACME-HZD", 0.008)
+    /// >>> CdsIndexConstituent.from_json(row.to_json()).credit_curve_id
     /// 'ACME-HZD'
     #[staticmethod]
     #[pyo3(text_signature = "(json)")]
     fn from_json(json: &str) -> PyResult<Self> {
         serde_json::from_str(json)
             .map(|inner| Self { inner })
-            .map_err(|e| serde_json_to_py(e, "invalid CDSIndexConstituent JSON"))
+            .map_err(|e| serde_json_to_py(e, "invalid CdsIndexConstituent JSON"))
     }
 
     /// Serialize to the canonical JSON shape.
@@ -383,7 +383,7 @@ impl PyCDSIndexConstituent {
     /// Returns
     /// -------
     /// str
-    ///     JSON accepted by ``from_json`` and by ``CDSIndexBuilder.constituents``.
+    ///     JSON accepted by ``from_json`` and by ``CdsIndexBuilder.constituents``.
     ///
     /// Raises
     /// ------
@@ -392,7 +392,7 @@ impl PyCDSIndexConstituent {
     #[pyo3(text_signature = "($self)")]
     fn to_json(&self) -> PyResult<String> {
         serde_json::to_string(&self.inner)
-            .map_err(|e| serde_json_to_py(e, "failed to serialize CDSIndexConstituent"))
+            .map_err(|e| serde_json_to_py(e, "failed to serialize CdsIndexConstituent"))
     }
 
     /// Support `pickle` via the JSON round-trip.
@@ -434,7 +434,7 @@ impl PyCDSIndexConstituent {
     /// Return ``repr(self)``.
     fn __repr__(&self) -> String {
         format!(
-            "CDSIndexConstituent(reference_entity={:?}, recovery_rate={}, credit_curve_id={:?}, weight={}, defaulted={})",
+            "CdsIndexConstituent(reference_entity={:?}, recovery_rate={}, credit_curve_id={:?}, weight={}, defaulted={})",
             self.inner.credit.reference_entity,
             float_repr(self.inner.credit.recovery_rate),
             self.inner.credit.credit_curve_id.as_str(),
@@ -444,25 +444,25 @@ impl PyCDSIndexConstituent {
     }
 }
 
-/// Coerce `list[CDSIndexConstituent | dict] | str` to Rust constituents.
+/// Coerce `list[CdsIndexConstituent | dict] | str` to Rust constituents.
 fn constituents_from_py(
     py: Python<'_>,
     value: &Bound<'_, PyAny>,
-) -> PyResult<Vec<CDSIndexConstituent>> {
+) -> PyResult<Vec<CdsIndexConstituent>> {
     if let Ok(json) = value.extract::<std::borrow::Cow<'_, str>>() {
         return serde_json::from_str(&json)
             .map_err(|e| serde_json_to_py(e, "invalid constituents JSON"));
     }
     let Ok(items) = value.cast::<PyList>() else {
         return Err(pyo3::exceptions::PyTypeError::new_err(format!(
-            "constituents: expected a list of CDSIndexConstituent / dict or a JSON string, got {}",
+            "constituents: expected a list of CdsIndexConstituent / dict or a JSON string, got {}",
             value.get_type().name()?
         )));
     };
     items
         .iter()
         .map(|item| {
-            if let Ok(row) = item.cast::<PyCDSIndexConstituent>() {
+            if let Ok(row) = item.cast::<PyCdsIndexConstituent>() {
                 Ok(row.borrow().inner.clone())
             } else {
                 crate::bindings::module_utils::py_to_serde(py, &item, "constituents entry")
@@ -471,83 +471,83 @@ fn constituents_from_py(
         .collect()
 }
 
-/// Credit index (CDX / iTraxx) trade (typed wrapper for Rust ``CDSIndex``).
+/// Credit index (CDX / iTraxx) trade (typed wrapper for Rust ``CdsIndex``).
 ///
 /// Priced either against a single index hazard curve (``pricing="single_curve"``,
 /// a synthetic CDS) or by expanding into weighted constituents
 /// (``pricing="constituents"``). ``index_factor`` scales the surviving
 /// notional after defaults.
 ///
-/// Build with ``CDSIndex.builder()`` or ``CDSIndex.from_preset(...)``; start
-/// from ``CDSIndex.example()``. Instances are accepted directly by
+/// Build with ``CdsIndex.builder()`` or ``CdsIndex.from_preset(...)``; start
+/// from ``CdsIndex.example()``. Instances are accepted directly by
 /// ``price_instrument`` and expose ``price`` / ``metric`` / ``par_spread`` /
 /// ``risky_pv01`` / ``cs01`` themselves.
 ///
 /// Examples
 /// --------
-/// >>> from finstack_quant.valuations.instruments import CDSIndex
-/// >>> idx = CDSIndex.example()
+/// >>> from finstack_quant.valuations.instruments import CdsIndex
+/// >>> idx = CdsIndex.example()
 /// >>> (idx.index_name, idx.series, idx.pricing, idx.num_constituents)
 /// ('CDX.NA.IG', 42, 'single_curve', 125)
 #[pyclass(
     module = "finstack_quant.valuations.instruments",
-    name = "CDSIndex",
+    name = "CdsIndex",
     frozen,
     skip_from_py_object
 )]
 #[derive(Clone)]
-pub struct PyCDSIndex {
+pub struct PyCdsIndex {
     /// Inner canonical Rust CDS index.
-    pub(crate) inner: finstack_quant_valuations::instruments::CDSIndex,
+    pub(crate) inner: finstack_quant_valuations::instruments::CdsIndex,
 }
 
-impl PyCDSIndex {
+impl PyCdsIndex {
     /// Serialize as the canonical instrument envelope accepted by the JSON loader.
     pub(crate) fn envelope_json(&self) -> PyResult<String> {
-        serialize_typed_instrument_json(InstrumentJson::CDSIndex(self.inner.clone()), "CDSIndex")
+        serialize_typed_instrument_json(InstrumentJson::CdsIndex(self.inner.clone()), "CdsIndex")
     }
 }
 
 instrument_envelope_methods!(
-    PyCDSIndex,
-    CDSIndex,
+    PyCdsIndex,
+    CdsIndex,
     "cds_index",
-    PyCDSIndexBuilder,
-    finstack_quant_valuations::instruments::CDSIndex::builder().constituents(Vec::new())
+    PyCdsIndexBuilder,
+    finstack_quant_valuations::instruments::CdsIndex::builder().constituents(Vec::new())
 );
-instrument_pricing_methods!(PyCDSIndex);
+instrument_pricing_methods!(PyCdsIndex);
 
 #[pymethods]
-impl PyCDSIndex {
+impl PyCdsIndex {
     /// Canonical example: CDX.NA.IG series 42, USD 10,000,000 payer.
     ///
-    /// Mirrors Rust ``CDSIndex::example()``: 60bp running coupon,
+    /// Mirrors Rust ``CdsIndex::example()``: 60bp running coupon,
     /// ``single_curve`` pricing off ``CDX.NA.IG.HAZARD`` discounted on
     /// ``USD-OIS``, premium 2024-03-20 to 2029-12-20, 125 names.
     ///
     /// Returns
     /// -------
-    /// CDSIndex
+    /// CdsIndex
     ///     The example index trade.
     #[staticmethod]
     #[pyo3(text_signature = "()")]
     fn example() -> Self {
         Self {
-            inner: finstack_quant_valuations::instruments::CDSIndex::example(),
+            inner: finstack_quant_valuations::instruments::CdsIndex::example(),
         }
     }
 
     /// Build an index trade from a standardized preset.
     ///
-    /// Mirrors Rust ``CDSIndex::from_preset``: the premium leg takes the
+    /// Mirrors Rust ``CdsIndex::from_preset``: the premium leg takes the
     /// preset's fixed coupon and regional convention (day count, frequency,
     /// business-day rule, calendar, stub), pricing is ``"single_curve"``,
     /// ``index_factor`` is ``1.0`` and the constituent list is empty.
     ///
     /// Parameters
     /// ----------
-    /// preset : CDSIndexParams
-    ///     Index identity, coupon and convention (e.g. ``CDSIndexParams.cdx_na_ig``).
+    /// preset : CdsIndexParams
+    ///     Index identity, coupon and convention (e.g. ``CdsIndexParams.cdx_na_ig``).
     /// id : str
     ///     Unique instrument identifier for the trade.
     /// notional : Money
@@ -567,7 +567,7 @@ impl PyCDSIndex {
     ///
     /// Returns
     /// -------
-    /// CDSIndex
+    /// CdsIndex
     ///     The index trade.
     ///
     /// Raises
@@ -581,7 +581,7 @@ impl PyCDSIndex {
     // PyO3 binding: the argument list mirrors the Rust constructor one-for-one.
     #[allow(clippy::too_many_arguments)]
     fn from_preset(
-        preset: PyRef<'_, PyCDSIndexParams>,
+        preset: PyRef<'_, PyCdsIndexParams>,
         id: &str,
         notional: &Bound<'_, PyAny>,
         side: &str,
@@ -591,7 +591,7 @@ impl PyCDSIndex {
         discount_curve_id: &str,
         credit_curve_id: &str,
     ) -> PyResult<Self> {
-        let inner = finstack_quant_valuations::instruments::CDSIndex::from_preset(
+        let inner = finstack_quant_valuations::instruments::CdsIndex::from_preset(
             &preset.inner,
             InstrumentId::new(id.to_string()),
             money_from_py(notional, None, "notional")?,
@@ -608,7 +608,7 @@ impl PyCDSIndex {
 
     /// Par spread of the index in basis points.
     ///
-    /// Mirrors Rust ``CDSIndex::par_spread`` (risky-annuity denominator in
+    /// Mirrors Rust ``CdsIndex::par_spread`` (risky-annuity denominator in
     /// ``single_curve`` mode; weighted constituents otherwise).
     ///
     /// Parameters
@@ -643,7 +643,7 @@ impl PyCDSIndex {
 
     /// Risky PV01 (risky annuity) of the index premium leg.
     ///
-    /// Mirrors Rust ``CDSIndex::risky_pv01``: PV of 1bp running on the
+    /// Mirrors Rust ``CdsIndex::risky_pv01``: PV of 1bp running on the
     /// surviving notional.
     ///
     /// Parameters
@@ -678,7 +678,7 @@ impl PyCDSIndex {
 
     /// Credit spread sensitivity (CS01) of the index.
     ///
-    /// Mirrors Rust ``CDSIndex::cs01`` using the cached recalibration
+    /// Mirrors Rust ``CdsIndex::cs01`` using the cached recalibration
     /// provider: the hazard curve(s) are rebootstrapped after a 1bp parallel
     /// spread bump. Hazard curves built by hand without a lossless calibration
     /// recipe raise.
@@ -785,11 +785,11 @@ impl PyCDSIndex {
 
     /// Constituent rows (empty in ``single_curve`` mode).
     #[getter]
-    fn constituents(&self) -> Vec<PyCDSIndexConstituent> {
+    fn constituents(&self) -> Vec<PyCdsIndexConstituent> {
         self.inner
             .constituents
             .iter()
-            .map(|row| PyCDSIndexConstituent { inner: row.clone() })
+            .map(|row| PyCdsIndexConstituent { inner: row.clone() })
             .collect()
     }
 
@@ -831,7 +831,7 @@ impl PyCDSIndex {
     /// Return ``repr(self)``.
     fn __repr__(&self) -> String {
         format!(
-            "CDSIndex(id={:?}, index_name={:?}, series={}, side={:?}, notional={}, coupon_bp={}, end={}, pricing={:?})",
+            "CdsIndex(id={:?}, index_name={:?}, series={}, side={:?}, notional={}, coupon_bp={}, end={}, pricing={:?})",
             self.inner.id.as_str(),
             self.inner.index_name,
             self.inner.series,
@@ -844,7 +844,7 @@ impl PyCDSIndex {
     }
 }
 
-/// Fluent builder for ``CDSIndex``; wraps the Rust
+/// Fluent builder for ``CdsIndex``; wraps the Rust
 /// ``FinancialBuilder``-generated builder (consuming setters).
 ///
 /// The builder pre-seeds an empty ``constituents`` list so ``build()``
@@ -852,10 +852,10 @@ impl PyCDSIndex {
 /// Builders are consumed by ``build()``; create a new builder per instrument.
 #[pyclass(
     module = "finstack_quant.valuations.instruments",
-    name = "CDSIndexBuilder",
+    name = "CdsIndexBuilder",
     skip_from_py_object
 )]
-pub struct PyCDSIndexBuilder {
+pub struct PyCdsIndexBuilder {
     inner: Option<CdsIndexBuilderInner>,
     fields: Vec<(&'static str, String)>,
 }
@@ -871,7 +871,7 @@ macro_rules! cds_index_set {
 }
 
 #[pymethods]
-impl PyCDSIndexBuilder {
+impl PyCdsIndexBuilder {
     /// Set the instrument identifier.
     ///
     /// Parameters
@@ -881,7 +881,7 @@ impl PyCDSIndexBuilder {
     ///
     /// Returns
     /// -------
-    /// CDSIndexBuilder
+    /// CdsIndexBuilder
     ///     ``self``, for chaining.
     #[pyo3(text_signature = "($self, value)")]
     fn id<'py>(mut slf: PyRefMut<'py, Self>, value: &str) -> PyResult<PyRefMut<'py, Self>> {
@@ -898,7 +898,7 @@ impl PyCDSIndexBuilder {
     ///
     /// Returns
     /// -------
-    /// CDSIndexBuilder
+    /// CdsIndexBuilder
     ///     ``self``, for chaining.
     #[pyo3(text_signature = "($self, value)")]
     fn index_name<'py>(mut slf: PyRefMut<'py, Self>, value: &str) -> PyResult<PyRefMut<'py, Self>> {
@@ -919,7 +919,7 @@ impl PyCDSIndexBuilder {
     ///
     /// Returns
     /// -------
-    /// CDSIndexBuilder
+    /// CdsIndexBuilder
     ///     ``self``, for chaining.
     #[pyo3(text_signature = "($self, value)")]
     fn series<'py>(mut slf: PyRefMut<'py, Self>, value: u16) -> PyResult<PyRefMut<'py, Self>> {
@@ -936,7 +936,7 @@ impl PyCDSIndexBuilder {
     ///
     /// Returns
     /// -------
-    /// CDSIndexBuilder
+    /// CdsIndexBuilder
     ///     ``self``, for chaining.
     #[pyo3(text_signature = "($self, value)")]
     fn version<'py>(mut slf: PyRefMut<'py, Self>, value: u16) -> PyResult<PyRefMut<'py, Self>> {
@@ -957,7 +957,7 @@ impl PyCDSIndexBuilder {
     ///
     /// Returns
     /// -------
-    /// CDSIndexBuilder
+    /// CdsIndexBuilder
     ///     ``self``, for chaining.
     #[pyo3(text_signature = "($self, value)")]
     fn notional<'py>(
@@ -983,7 +983,7 @@ impl PyCDSIndexBuilder {
     ///
     /// Returns
     /// -------
-    /// CDSIndexBuilder
+    /// CdsIndexBuilder
     ///     ``self``, for chaining.
     #[pyo3(text_signature = "($self, value)")]
     fn index_factor<'py>(
@@ -1008,7 +1008,7 @@ impl PyCDSIndexBuilder {
     ///
     /// Returns
     /// -------
-    /// CDSIndexBuilder
+    /// CdsIndexBuilder
     ///     ``self``, for chaining.
     ///
     /// Raises
@@ -1037,7 +1037,7 @@ impl PyCDSIndexBuilder {
     ///
     /// Returns
     /// -------
-    /// CDSIndexBuilder
+    /// CdsIndexBuilder
     ///     ``self``, for chaining.
     ///
     /// Raises
@@ -1064,7 +1064,7 @@ impl PyCDSIndexBuilder {
     ///
     /// Returns
     /// -------
-    /// CDSIndexBuilder
+    /// CdsIndexBuilder
     ///     ``self``, for chaining.
     #[pyo3(text_signature = "($self, value)")]
     fn premium_leg<'py>(
@@ -1091,7 +1091,7 @@ impl PyCDSIndexBuilder {
     ///
     /// Returns
     /// -------
-    /// CDSIndexBuilder
+    /// CdsIndexBuilder
     ///     ``self``, for chaining.
     #[pyo3(text_signature = "($self, value)")]
     fn protection_leg<'py>(
@@ -1120,7 +1120,7 @@ impl PyCDSIndexBuilder {
     ///
     /// Returns
     /// -------
-    /// CDSIndexBuilder
+    /// CdsIndexBuilder
     ///     ``self``, for chaining.
     ///
     /// Raises
@@ -1142,15 +1142,15 @@ impl PyCDSIndexBuilder {
     ///
     /// Parameters
     /// ----------
-    /// value : list[CDSIndexConstituent | dict] | str
-    ///     Constituent rows as typed ``CDSIndexConstituent`` objects, dicts
+    /// value : list[CdsIndexConstituent | dict] | str
+    ///     Constituent rows as typed ``CdsIndexConstituent`` objects, dicts
     ///     with ``credit`` (``reference_entity``, ``recovery_rate``,
     ///     ``credit_curve_id``), ``weight`` and optional ``defaulted``, or a
     ///     JSON array of the same shape.
     ///
     /// Returns
     /// -------
-    /// CDSIndexBuilder
+    /// CdsIndexBuilder
     ///     ``self``, for chaining.
     ///
     /// Raises
@@ -1182,7 +1182,7 @@ impl PyCDSIndexBuilder {
     ///
     /// Returns
     /// -------
-    /// CDSIndexBuilder
+    /// CdsIndexBuilder
     ///     ``self``, for chaining.
     #[pyo3(text_signature = "($self, value)")]
     fn num_constituents<'py>(
@@ -1209,7 +1209,7 @@ impl PyCDSIndexBuilder {
     ///
     /// Returns
     /// -------
-    /// CDSIndexBuilder
+    /// CdsIndexBuilder
     ///     ``self``, for chaining.
     ///
     /// Raises
@@ -1237,7 +1237,7 @@ impl PyCDSIndexBuilder {
     ///
     /// Returns
     /// -------
-    /// CDSIndexBuilder
+    /// CdsIndexBuilder
     ///     ``self``, for chaining.
     ///
     /// Raises
@@ -1266,7 +1266,7 @@ impl PyCDSIndexBuilder {
     ///
     /// Returns
     /// -------
-    /// CDSIndexBuilder
+    /// CdsIndexBuilder
     ///     ``self``, for chaining.
     ///
     /// Raises
@@ -1286,12 +1286,12 @@ impl PyCDSIndexBuilder {
 
     /// Build the validated CDS index.
     ///
-    /// Validation is the Rust ``CDSIndex::builder().build()`` invariants
+    /// Validation is the Rust ``CdsIndex::builder().build()`` invariants
     /// only; there is no additional binding-side check.
     ///
     /// Returns
     /// -------
-    /// CDSIndex
+    /// CdsIndex
     ///     The validated CDS index.
     ///
     /// Raises
@@ -1300,21 +1300,21 @@ impl PyCDSIndexBuilder {
     ///     If the builder was already consumed, a required field is missing,
     ///     or the completed CDS index fails validation.
     #[pyo3(text_signature = "($self)")]
-    fn build(mut slf: PyRefMut<'_, Self>) -> PyResult<PyCDSIndex> {
+    fn build(mut slf: PyRefMut<'_, Self>) -> PyResult<PyCdsIndex> {
         let b = take_builder(&mut slf.inner)?;
         let inner = b.build().map_err(core_to_py)?;
-        Ok(PyCDSIndex { inner })
+        Ok(PyCdsIndex { inner })
     }
 
     /// Return ``repr(self)`` listing the fields set so far.
     fn __repr__(&self) -> String {
-        builder_repr("CDSIndexBuilder", &self.fields)
+        builder_repr("CdsIndexBuilder", &self.fields)
     }
 }
 
 /// Register the CDS-index helper classes on the instruments submodule.
 pub fn register(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
-    m.add_class::<PyCDSIndexParams>()?;
-    m.add_class::<PyCDSIndexConstituent>()?;
+    m.add_class::<PyCdsIndexParams>()?;
+    m.add_class::<PyCdsIndexConstituent>()?;
     Ok(())
 }

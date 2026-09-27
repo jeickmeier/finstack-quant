@@ -9,7 +9,7 @@ use crate::instruments::fixed_income::structured_credit::pricing::stochastic::ca
     rmbs_correlation_structure,
 };
 use crate::instruments::fixed_income::structured_credit::pricing::stochastic::pricer::{
-    PricingMode, StochasticPricer, StochasticPricerConfig, StochasticPricingResult,
+    StochasticPricer, StochasticPricerConfig, StochasticPricingResult, StructuredCreditPricingMode,
 };
 use crate::instruments::fixed_income::structured_credit::pricing::stochastic::tree::ScenarioTreeConfig;
 use crate::metrics::{MetricContext, MetricId};
@@ -70,9 +70,9 @@ impl StructuredCredit {
 
     /// Monte Carlo with `model_config.mc_paths` independent estimators
     /// (default 5,000) and `model_config.mc_antithetic` pairing (default on).
-    fn default_stochastic_pricing_mode(&self) -> PricingMode {
+    fn default_stochastic_pricing_mode(&self) -> StructuredCreditPricingMode {
         let model_config = &self.instrument_pricing_overrides.model_config;
-        PricingMode::MonteCarlo {
+        StructuredCreditPricingMode::MonteCarlo {
             num_paths: model_config.mc_paths.unwrap_or(5_000),
             antithetic: model_config.mc_antithetic.unwrap_or(true),
         }
@@ -94,12 +94,12 @@ impl StructuredCredit {
     ///
     /// Prefer the registry `StructuredCreditStochastic` model key for host
     /// pricing. Use this method only when a caller needs to force a
-    /// [`PricingMode`] without going through `price_with_metrics`.
+    /// [`StructuredCreditPricingMode`] without going through `price_with_metrics`.
     pub fn price_stochastic_with_mode(
         &self,
         context: &MarketContext,
         as_of: Date,
-        pricing_mode: PricingMode,
+        pricing_mode: StructuredCreditPricingMode,
     ) -> finstack_quant_core::Result<StochasticPricingResult> {
         let lifecycle =
             crate::instruments::common_impl::helpers::ValidatedPricingLifecycle::new(self)?;
@@ -113,7 +113,7 @@ impl StructuredCredit {
         &self,
         context: &MarketContext,
         effective_as_of: Date,
-        pricing_mode: PricingMode,
+        pricing_mode: StructuredCreditPricingMode,
     ) -> finstack_quant_core::Result<StochasticPricingResult> {
         let resolved = self.resolved_for_pricing()?;
         let mut tree_config = resolved.build_scenario_tree_config(effective_as_of)?;

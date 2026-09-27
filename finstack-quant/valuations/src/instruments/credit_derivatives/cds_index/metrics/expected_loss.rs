@@ -7,7 +7,7 @@
 //! which represents the expected loss across all constituents assuming equal weighting.
 
 use crate::constants::credit;
-use crate::instruments::credit_derivatives::cds_index::CDSIndex;
+use crate::instruments::credit_derivatives::cds_index::CdsIndex;
 use crate::metrics::{MetricCalculator, MetricContext};
 use finstack_quant_core::dates::DayCountContext;
 use finstack_quant_core::Result;
@@ -17,7 +17,7 @@ pub(crate) struct ExpectedLossCalculator;
 
 impl MetricCalculator for ExpectedLossCalculator {
     fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
-        let index: &CDSIndex = context.instrument_as()?;
+        let index: &CdsIndex = context.instrument_as()?;
 
         let as_of = context.as_of;
 

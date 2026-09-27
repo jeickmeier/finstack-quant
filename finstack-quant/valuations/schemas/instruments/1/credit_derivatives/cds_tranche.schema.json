@@ -1,6 +1,6 @@
 {
   "$defs": {
-    "CDSTranche": {
+    "CdsTranche": {
       "additionalProperties": false,
       "description": "CDS Tranche instrument definition (boilerplate)",
       "properties": {
@@ -102,7 +102,7 @@
         },
         "side": {
           "$ref": "#/$defs/PayReceive",
-          "description": "Tranche side, as on CDS and CDSIndex: `pay` buys protection (pays the\nrunning premium), `receive` sells protection (receives the premium)."
+          "description": "Tranche side, as on CDS and CdsIndex: `pay` buys protection (pays the\nrunning premium), `receive` sells protection (receives the premium)."
         },
         "start_date": {
           "anyOf": [
@@ -233,7 +233,7 @@
       "additionalProperties": false,
       "properties": {
         "spec": {
-          "$ref": "#/$defs/CDSTranche"
+          "$ref": "#/$defs/CdsTranche"
         },
         "type": {
           "const": "cds_tranche",

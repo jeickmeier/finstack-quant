@@ -395,7 +395,7 @@ impl CapFloorHullWhitePricer {
                         strike,
                         forward,
                         discount_factor: df,
-                        volatility: moment_match.normal_vol,
+                        sigma: moment_match.normal_vol,
                         time_to_fixing: t_fix,
                         accrual_year_fraction: tau,
                         currency: cap_floor.notional.currency(),

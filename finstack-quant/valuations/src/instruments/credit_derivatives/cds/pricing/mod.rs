@@ -84,7 +84,7 @@ mod metrics;
 #[cfg(test)]
 mod tests;
 
-pub(crate) use config::CDSPricerConfig;
-pub(crate) use engine::{CDSPricer, CdsHazardRepriceCache};
+pub(crate) use config::CdsPricerConfig;
+pub(crate) use engine::{CdsHazardRepriceCache, CdsPricer};
 pub(crate) use helpers::date_from_hazard_time;
 pub(crate) use metrics::AccrualDayCountPolicy;

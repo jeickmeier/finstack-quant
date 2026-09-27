@@ -3,7 +3,7 @@ use finstack_quant_core::market_data::term_structures::HazardCurve;
 use finstack_quant_core::math::norm_cdf;
 use finstack_quant_core::{Error, Result};
 
-use super::{BarrierType, MertonModel};
+use super::{MertonBarrierType, MertonModel};
 
 /// Premium payments per year on a standard CDS contract (quarterly, ISDA).
 const CDS_PREMIUM_PERIODS_PER_YEAR: f64 = 4.0;
@@ -184,10 +184,10 @@ impl MertonModel {
                 "debt_spread: horizon must be > 0, got {horizon}"
             )));
         }
-        if !matches!(self.barrier_type, BarrierType::Terminal) {
+        if !matches!(self.barrier_type, MertonBarrierType::Terminal) {
             return Err(Error::Validation(
                 "debt_spread: the endogenous Merton (1974) debt spread is defined for \
-                 BarrierType::Terminal only; a first-passage claim pays recovery at the \
+                 MertonBarrierType::Terminal only; a first-passage claim pays recovery at the \
                  hitting time. Use cds_par_spread or implied_spread instead."
                     .to_string(),
             ));
@@ -290,7 +290,7 @@ impl MertonModel {
 mod tests {
     use finstack_quant_core::math::norm_cdf;
 
-    use super::super::{AssetDynamics, BarrierType, MertonModel};
+    use super::super::{AssetDynamics, MertonBarrierType, MertonModel};
 
     #[test]
     fn implied_spread_positive_for_risky_firm() {
@@ -403,7 +403,7 @@ mod tests {
             80.0,
             0.04,
             0.0,
-            BarrierType::FirstPassage {
+            MertonBarrierType::FirstPassage {
                 barrier_growth_rate: 0.0,
             },
             AssetDynamics::GeometricBrownian,

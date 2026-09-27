@@ -232,7 +232,7 @@ pub struct MarketQuoteOverrides {
     ///
     /// Used only by CreditDefaultSwap risk replay, where it replaces the
     /// matching contractual hazard-curve pillar. It does not drive PV, and no
-    /// other instrument (CDSIndex included) reads it.
+    /// other instrument (CdsIndex included) reads it.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub cds_quote_bp: Option<f64>,
 }

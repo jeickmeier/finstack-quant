@@ -1,6 +1,6 @@
 //! CDS Tranche metrics module.
 //!
-//! Provides metric calculators specific to `CDSTranche`, split into focused
+//! Provides metric calculators specific to `CdsTranche`, split into focused
 //! files. The calculators compose with the shared metrics framework and are
 //! registered via `register_cds_tranche_metrics`.
 //!
@@ -71,11 +71,11 @@ pub(crate) fn register_cds_tranche_metrics(
             (ExpectedLoss, expected_loss::ExpectedLossCalculator),
             (JumpToDefault, jump_to_default::JumpToDefaultCalculator),
             (Dv01, crate::metrics::UnifiedDv01Calculator::<
-                crate::instruments::CDSTranche,
+                crate::instruments::CdsTranche,
             >::new(crate::metrics::Dv01CalculatorConfig::parallel_combined())),
             // Theta is now registered universally in metrics::standard_registry()
             (BucketedDv01, crate::metrics::UnifiedDv01Calculator::<
-                crate::instruments::CDSTranche,
+                crate::instruments::CdsTranche,
             >::new(crate::metrics::Dv01CalculatorConfig::triangular_key_rate())),
         ]
     }

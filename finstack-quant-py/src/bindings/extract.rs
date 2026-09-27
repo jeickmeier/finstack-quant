@@ -19,7 +19,7 @@ use crate::bindings::statements::types::PyFinancialModelSpec;
 use crate::bindings::valuations::composite::PyCompositeInstrument;
 use crate::bindings::valuations::instruments::{PyBond, PyTermLoan};
 use crate::bindings::valuations::typed_credit::{
-    PyCDSIndex, PyCDSTranche, PyConvertibleBond, PyCreditDefaultSwap,
+    PyCdsIndex, PyCdsTranche, PyConvertibleBond, PyCreditDefaultSwap,
 };
 use crate::bindings::valuations::typed_equity::PyEquityOption;
 use crate::bindings::valuations::typed_fx::{PyFxForward, PyFxOption};
@@ -49,8 +49,8 @@ use crate::errors::{display_to_py as to_py, portfolio_to_py};
 /// below to name each newly landed class so the message stays accurate.
 ///
 /// Currently wired: `Bond`, `TermLoan`, `InterestRateSwap`, `Swaption`,
-/// `CapFloor`, `CreditDefaultSwap`, `CDSIndex`, `FxForward`, `FxOption`,
-/// `CDSTranche`, `ConvertibleBond`, `EquityOption`, `StructuredCredit`,
+/// `CapFloor`, `CreditDefaultSwap`, `CdsIndex`, `FxForward`, `FxOption`,
+/// `CdsTranche`, `ConvertibleBond`, `EquityOption`, `StructuredCredit`,
 /// `RevolvingCredit`, `CompositeInstrument`.
 pub fn extract_instrument_json(obj: &Bound<'_, PyAny>) -> PyResult<String> {
     if let Ok(composite) = obj.cast::<PyCompositeInstrument>() {
@@ -77,7 +77,7 @@ pub fn extract_instrument_json(obj: &Bound<'_, PyAny>) -> PyResult<String> {
     if let Ok(cds) = obj.cast::<PyCreditDefaultSwap>() {
         return cds.borrow().envelope_json();
     }
-    if let Ok(cds_index) = obj.cast::<PyCDSIndex>() {
+    if let Ok(cds_index) = obj.cast::<PyCdsIndex>() {
         return cds_index.borrow().envelope_json();
     }
     if let Ok(fx_forward) = obj.cast::<PyFxForward>() {
@@ -86,7 +86,7 @@ pub fn extract_instrument_json(obj: &Bound<'_, PyAny>) -> PyResult<String> {
     if let Ok(fx_option) = obj.cast::<PyFxOption>() {
         return fx_option.borrow().envelope_json();
     }
-    if let Ok(cds_tranche) = obj.cast::<PyCDSTranche>() {
+    if let Ok(cds_tranche) = obj.cast::<PyCdsTranche>() {
         return cds_tranche.borrow().envelope_json();
     }
     if let Ok(convertible) = obj.cast::<PyConvertibleBond>() {

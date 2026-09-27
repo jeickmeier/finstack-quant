@@ -87,7 +87,7 @@ pub use bond_future::{BondFuture, BondFutureBuilder, BondFutureSpecs, Deliverabl
 pub use cmo::{AgencyCmo, CmoTranche, CmoTrancheType, CmoWaterfall};
 pub use convertible::ConvertibleBond;
 pub use dollar_roll::DollarRoll;
-pub use fi_trs::FIIndexTotalReturnSwap;
+pub use fi_trs::FiIndexTotalReturnSwap;
 pub use inflation_linked_bond::InflationLinkedBond;
 pub use mbs_passthrough::{AgencyMbsPassthrough, AgencyProgram, PoolType};
 pub use revolving_credit::RevolvingCredit;

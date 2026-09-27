@@ -17,7 +17,7 @@ use finstack_quant_core::types::{CurveId, InstrumentId};
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
     calculate_equity_metrics, run_simulation, run_simulation_with_diagnostics, CreditModelConfig,
     DealFees, DealType, LossAllocationPolicy, LossRecognition, MarketConditions, Metadata,
-    PricingMode, StructuredCredit, TrancheDraw, TrancheReadvance, WaterfallRules,
+    StructuredCredit, StructuredCreditPricingMode, TrancheDraw, TrancheReadvance, WaterfallRules,
 };
 use finstack_quant_valuations::instruments::{Instrument, InstrumentJson};
 
@@ -398,7 +398,7 @@ impl PyStructuredCredit {
                 .mc_paths
                 .unwrap_or(5_000)
         });
-        let mode = PricingMode::MonteCarlo {
+        let mode = StructuredCreditPricingMode::MonteCarlo {
             num_paths,
             antithetic,
         };

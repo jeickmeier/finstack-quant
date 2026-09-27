@@ -10,7 +10,7 @@
 use crate::instruments::common_impl::traits::Instrument;
 use crate::instruments::credit_derivatives::cds::metrics::market_doc_clause;
 use crate::instruments::credit_derivatives::cds_option::pricer::synthetic_underlying_cds;
-use crate::instruments::credit_derivatives::cds_option::CDSOption;
+use crate::instruments::credit_derivatives::cds_option::CdsOption;
 use crate::metrics::{MetricCalculator, MetricContext};
 use crate::recalibration::{HazardRecalibrationAction, HazardRecalibrationRequest};
 use finstack_quant_core::Result;
@@ -24,7 +24,7 @@ const MIN_EFFECTIVE_BUMP: f64 = 1e-6;
 pub(crate) struct Recovery01Calculator;
 
 fn price_at_bumped_recovery(
-    option: &CDSOption,
+    option: &CdsOption,
     context: &MetricContext,
     new_recovery: f64,
     as_of: finstack_quant_core::dates::Date,
@@ -68,7 +68,7 @@ fn price_at_bumped_recovery(
 
 impl MetricCalculator for Recovery01Calculator {
     fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
-        let option: &CDSOption = context.instrument_as()?;
+        let option: &CdsOption = context.instrument_as()?;
         let as_of = context.as_of;
         let base_recovery = option.recovery_rate;
 

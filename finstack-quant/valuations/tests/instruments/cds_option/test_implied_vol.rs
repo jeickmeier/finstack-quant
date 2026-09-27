@@ -1,7 +1,7 @@
 //! Integration tests for implied volatility solver.
 
 use super::common::*;
-use finstack_quant_valuations::instruments::credit_derivatives::cds_option::CDSOption;
+use finstack_quant_valuations::instruments::credit_derivatives::cds_option::CdsOption;
 use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::metrics::MetricId;
 use time::macros::date;
@@ -12,7 +12,7 @@ fn test_implied_vol_round_trip() {
     let market = standard_market(as_of);
 
     for vol in [0.15, 0.25, 0.35, 0.45] {
-        let option = CDSOptionBuilder::new().implied_vol(vol).build(as_of);
+        let option = CdsOptionBuilder::new().implied_vol(vol).build(as_of);
 
         // Price with known vol
         let pv = option.value(&market, as_of).unwrap().amount();
@@ -43,7 +43,7 @@ fn test_implied_vol_metric() {
     let market = standard_market(as_of);
     let target_vol = 0.28;
 
-    let mut option = CDSOptionBuilder::new().implied_vol(target_vol).build(as_of);
+    let mut option = CdsOptionBuilder::new().implied_vol(target_vol).build(as_of);
     let premium = option.value(&market, as_of).unwrap().amount();
     option
         .instrument_pricing_overrides
@@ -70,8 +70,8 @@ fn test_implied_vol_call_vs_put() {
     let market = standard_market(as_of);
     let vol = 0.30;
 
-    let call = CDSOptionBuilder::new().call().implied_vol(vol).build(as_of);
-    let put = CDSOptionBuilder::new().put().implied_vol(vol).build(as_of);
+    let call = CdsOptionBuilder::new().call().implied_vol(vol).build(as_of);
+    let put = CdsOptionBuilder::new().put().implied_vol(vol).build(as_of);
 
     let call_pv = call.value(&market, as_of).unwrap().amount();
     let put_pv = put.value(&market, as_of).unwrap().amount();
@@ -104,7 +104,7 @@ fn test_implied_vol_moneyness_independence() {
     let vol = 0.25;
 
     for strike in [100.0, 150.0, 200.0, 220.0, 250.0] {
-        let option = CDSOptionBuilder::new()
+        let option = CdsOptionBuilder::new()
             .strike(strike)
             .implied_vol(vol)
             .build(as_of);
@@ -142,7 +142,7 @@ fn test_implied_vol_with_initial_guess() {
     let market = standard_market(as_of);
     let true_vol = 0.40;
 
-    let option = CDSOptionBuilder::new().implied_vol(true_vol).build(as_of);
+    let option = CdsOptionBuilder::new().implied_vol(true_vol).build(as_of);
     let pv = option.value(&market, as_of).unwrap().amount();
 
     let mut option_solve = option;
@@ -166,7 +166,7 @@ fn test_implied_vol_distressed_credit() {
     let as_of = date!(2025 - 01 - 01);
     let market = standard_market(as_of);
     let true_vol = 1.50;
-    let option = CDSOptionBuilder::new().implied_vol(true_vol).build(as_of);
+    let option = CdsOptionBuilder::new().implied_vol(true_vol).build(as_of);
     let pv = option.value(&market, as_of).unwrap().amount();
     let mut option_solve = option;
     option_solve
@@ -186,7 +186,7 @@ fn test_max_implied_vol_hard_error() {
     let as_of = date!(2025 - 01 - 01);
     let market = standard_market(as_of);
 
-    let mut over_max = CDSOption::example().unwrap();
+    let mut over_max = CdsOption::example().unwrap();
     over_max
         .instrument_pricing_overrides
         .market_quotes
@@ -194,7 +194,7 @@ fn test_max_implied_vol_hard_error() {
     let err = over_max.validate_invariants().unwrap_err();
     assert!(err.to_string().contains("exceeds maximum"));
 
-    let invalid_option = CDSOptionBuilder::new().implied_vol(5.5).build(as_of);
+    let invalid_option = CdsOptionBuilder::new().implied_vol(5.5).build(as_of);
     let pricing_err = invalid_option.value(&market, as_of).unwrap_err();
     assert!(pricing_err.to_string().contains("exceeds maximum"));
 }
@@ -206,7 +206,7 @@ fn test_implied_vol_convergence_atm() {
     let vol = 0.30;
 
     // ATM option (strike near forward ~200bp)
-    let option = CDSOptionBuilder::new()
+    let option = CdsOptionBuilder::new()
         .strike(200.0)
         .implied_vol(vol)
         .build(as_of);
@@ -230,7 +230,7 @@ fn test_implied_vol_convergence_itm() {
     let vol = 0.30;
 
     // ITM call (low strike)
-    let option = CDSOptionBuilder::new()
+    let option = CdsOptionBuilder::new()
         .call()
         .strike(100.0)
         .implied_vol(vol)
@@ -255,7 +255,7 @@ fn test_implied_vol_convergence_otm() {
     let vol = 0.30;
 
     // OTM call (high strike)
-    let option = CDSOptionBuilder::new()
+    let option = CdsOptionBuilder::new()
         .call()
         .strike(400.0)
         .implied_vol(vol)

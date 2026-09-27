@@ -1,19 +1,19 @@
 //! Numerical pricing, expected-loss, and sensitivity helpers for CDS tranches.
 //!
 use super::config::{
-    CDSTranchePricer, NUMERICAL_TOLERANCE, PAR_SPREAD_MAX_ITER, PAR_SPREAD_TOLERANCE,
+    CdsTranchePricer, NUMERICAL_TOLERANCE, PAR_SPREAD_MAX_ITER, PAR_SPREAD_TOLERANCE,
 };
 use super::registry::JumpToDefaultResult;
 use crate::cashflow::builder::specs::RollRule;
 use crate::cashflow::primitives::CFKind;
 use crate::constants::BASIS_POINTS_PER_UNIT;
-use crate::instruments::credit_derivatives::cds_tranche::CDSTranche;
+use crate::instruments::credit_derivatives::cds_tranche::CdsTranche;
 use finstack_quant_core::dates::{next_cds_date, Date};
 use finstack_quant_core::market_data::{context::MarketContext, term_structures::CreditIndexData};
 use finstack_quant_core::math::binomial_pmf_all_into;
 use finstack_quant_core::{Error, Result};
 
-impl CDSTranchePricer {
+impl CdsTranchePricer {
     /// Apply smooth correlation boundary handling to avoid numerical discontinuities.
     ///
     /// A C¹ soft clamp into `(min_corr, max_corr)`:
@@ -265,7 +265,7 @@ impl CDSTranchePricer {
     }
 
     /// Calculate prior realized loss on the tranche as a fraction of original tranche notional.
-    pub(super) fn calculate_prior_tranche_loss(&self, tranche: &CDSTranche) -> f64 {
+    pub(super) fn calculate_prior_tranche_loss(&self, tranche: &CdsTranche) -> f64 {
         let l = tranche.realized_loss;
         let attach = tranche.attach_pct / 100.0;
         let detach = tranche.detach_pct / 100.0;
@@ -290,7 +290,7 @@ impl CDSTranchePricer {
     /// clamped so `X ≤ 1`.
     pub(super) fn realized_default_state(
         &self,
-        tranche: &CDSTranche,
+        tranche: &CdsTranche,
         recovery_rate: f64,
     ) -> (f64, f64) {
         let l = tranche.realized_loss.clamp(0.0, 1.0);
@@ -309,7 +309,7 @@ impl CDSTranchePricer {
     /// with `calculate_prior_tranche_loss` never exceeds `1`.
     pub(super) fn calculate_prior_tranche_writedown(
         &self,
-        tranche: &CDSTranche,
+        tranche: &CdsTranche,
         recovery_rate: f64,
     ) -> f64 {
         let attach = tranche.attach_pct / 100.0;
@@ -336,7 +336,7 @@ impl CDSTranchePricer {
     /// conventions and calendar support.
     pub(super) fn generate_payment_schedule(
         &self,
-        tranche: &CDSTranche,
+        tranche: &CdsTranche,
         as_of: Date,
     ) -> Result<Vec<Date>> {
         let dates = self.generate_full_payment_schedule(tranche, as_of)?;
@@ -346,7 +346,7 @@ impl CDSTranchePricer {
     /// Generate the complete contractual schedule before valuation-date filtering.
     pub(super) fn generate_full_payment_schedule(
         &self,
-        tranche: &CDSTranche,
+        tranche: &CdsTranche,
         as_of: Date,
     ) -> Result<Vec<Date>> {
         let start_date = tranche.contractual_start_date(as_of).unwrap_or(as_of);
@@ -415,7 +415,7 @@ impl CDSTranchePricer {
     /// coupon.
     pub fn calculate_model_upfront(
         &self,
-        tranche: &CDSTranche,
+        tranche: &CdsTranche,
         market_ctx: &MarketContext,
         as_of: Date,
     ) -> Result<f64> {
@@ -428,7 +428,7 @@ impl CDSTranchePricer {
     /// Uses central difference for O(h²) accuracy, consistent with CS01 and Correlation01.
     pub fn calculate_spread_dv01(
         &self,
-        tranche: &CDSTranche,
+        tranche: &CdsTranche,
         market_ctx: &MarketContext,
         as_of: Date,
     ) -> Result<f64> {
@@ -466,7 +466,7 @@ impl CDSTranchePricer {
     #[must_use = "par spread result should be used"]
     pub fn calculate_par_spread(
         &self,
-        tranche: &CDSTranche,
+        tranche: &CdsTranche,
         market_ctx: &MarketContext,
         as_of: Date,
     ) -> Result<f64> {
@@ -575,7 +575,7 @@ impl CDSTranchePricer {
     /// Calculate expected loss metric (the total expected loss at maturity).
     pub fn calculate_expected_loss(
         &self,
-        tranche: &CDSTranche,
+        tranche: &CdsTranche,
         market_ctx: &MarketContext,
     ) -> Result<f64> {
         tranche.validate()?;
@@ -615,7 +615,7 @@ impl CDSTranchePricer {
     #[must_use = "CS01 result should be used for hedging"]
     pub fn calculate_cs01(
         &self,
-        tranche: &CDSTranche,
+        tranche: &CdsTranche,
         market_ctx: &MarketContext,
         as_of: Date,
         provider: &dyn crate::recalibration::RecalibrationProvider,
@@ -657,7 +657,7 @@ impl CDSTranchePricer {
     #[must_use = "Correlation01 result should be used for hedging"]
     pub fn calculate_correlation_delta(
         &self,
-        tranche: &CDSTranche,
+        tranche: &CdsTranche,
         market_ctx: &MarketContext,
         as_of: Date,
     ) -> Result<f64> {
@@ -710,7 +710,7 @@ impl CDSTranchePricer {
     #[must_use = "JTD result should be used for risk management"]
     pub fn calculate_jump_to_default(
         &self,
-        tranche: &CDSTranche,
+        tranche: &CdsTranche,
         market_ctx: &MarketContext,
         _as_of: Date,
     ) -> Result<f64> {
@@ -732,7 +732,7 @@ impl CDSTranchePricer {
     /// - `count`: Number of names that would impact this tranche
     pub fn calculate_jump_to_default_detail(
         &self,
-        tranche: &CDSTranche,
+        tranche: &CdsTranche,
         market_ctx: &MarketContext,
     ) -> Result<JumpToDefaultResult> {
         tranche.validate()?;
@@ -850,7 +850,7 @@ impl CDSTranchePricer {
     #[must_use = "accrued premium result should be used"]
     pub fn calculate_accrued_premium(
         &self,
-        tranche: &CDSTranche,
+        tranche: &CdsTranche,
         market_ctx: &MarketContext,
         as_of: Date,
     ) -> Result<f64> {
@@ -930,7 +930,7 @@ impl CDSTranchePricer {
     /// - Validating model behavior
     pub fn get_expected_loss_curve(
         &self,
-        tranche: &CDSTranche,
+        tranche: &CdsTranche,
         market_ctx: &MarketContext,
         as_of: Date,
     ) -> Result<Vec<(Date, f64)>> {
@@ -972,7 +972,7 @@ mod tests {
     /// would propagate `inf`/`NaN` into the expected loss.
     #[test]
     fn conditional_equity_tranche_loss_finite_for_full_index() {
-        let pricer = CDSTranchePricer::new();
+        let pricer = CdsTranchePricer::new();
         let el = pricer
             .conditional_equity_tranche_capped(
                 125,        // num_constituents
@@ -1011,7 +1011,7 @@ mod tests {
     /// binomial must stay in force at index pool sizes.
     #[test]
     fn index_sized_homogeneous_pool_uses_finite_binomial() {
-        let binomial = CDSTranchePricer::new()
+        let binomial = CdsTranchePricer::new()
             .conditional_equity_tranche_capped(125, 0.08, 0.20, 0.60)
             .expect("binomial");
         let lhp = (0.20_f64 * 0.60).min(0.08);
@@ -1024,7 +1024,7 @@ mod tests {
 
     #[test]
     fn conditional_equity_tranche_rejects_nan_probability() {
-        let error = CDSTranchePricer::new()
+        let error = CdsTranchePricer::new()
             .conditional_equity_tranche_capped(125, 0.03, f64::NAN, 0.60)
             .expect_err("NaN conditional probability must fail before integration");
         assert!(matches!(error, finstack_quant_core::Error::Validation(_)));

@@ -188,10 +188,10 @@ fn typed_semantic_equality(
         ("repo", InstrumentJson::Repo(first), InstrumentJson::Repo(second)) => {
             Some(first == second)
         }
-        ("cds_tranche", InstrumentJson::CDSTranche(first), InstrumentJson::CDSTranche(second)) => {
+        ("cds_tranche", InstrumentJson::CdsTranche(first), InstrumentJson::CdsTranche(second)) => {
             Some(first == second)
         }
-        ("cds_option", InstrumentJson::CDSOption(first), InstrumentJson::CDSOption(second)) => {
+        ("cds_option", InstrumentJson::CdsOption(first), InstrumentJson::CdsOption(second)) => {
             Some(first == second)
         }
         ("equity", InstrumentJson::Equity(first), InstrumentJson::Equity(second)) => {

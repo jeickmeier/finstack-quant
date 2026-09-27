@@ -154,7 +154,7 @@ pub(super) fn settlement_date(
 /// are effectively constant under any reasonable interpolation. Curve
 /// knots remain as boundaries so piecewise-constant hazard is honoured.
 ///
-/// Configurable via `CDSPricerConfig::protection_leg_substeps_per_year`
+/// Configurable via `CdsPricerConfig::protection_leg_substeps_per_year`
 /// — see that field's docs for performance/precision tradeoffs.
 pub(crate) const PROTECTION_LEG_SUB_STEPS_PER_YEAR_DEFAULT: f64 = 25.0;
 

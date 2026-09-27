@@ -19,7 +19,7 @@
 //! price shock without requiring instrument-specific overrides.
 
 use crate::instruments::common_impl::traits::Instrument;
-use crate::instruments::exotics::basket::types::{AssetType, ConstituentReference};
+use crate::instruments::exotics::basket::types::{BasketAssetType, ConstituentReference};
 use crate::instruments::exotics::basket::{Basket, BasketConstituent};
 use crate::metrics::{MetricCalculator, MetricContext};
 use finstack_quant_core::money::Money;
@@ -165,7 +165,7 @@ fn instrument_price_and_type(
     constituent: &BasketConstituent,
     context: &MetricContext,
     as_of: finstack_quant_core::dates::Date,
-) -> Result<(Money, AssetType)> {
+) -> Result<(Money, BasketAssetType)> {
     let boxed = basket.boxed_constituent_at(constituent_index)?.ok_or(
         finstack_quant_core::Error::Input(finstack_quant_core::InputError::NotFound {
             id: constituent.id.clone(),
@@ -176,14 +176,14 @@ fn instrument_price_and_type(
     Ok((price, asset_type))
 }
 
-fn asset_type_for_instrument_key(key: crate::pricer::InstrumentType) -> AssetType {
+fn asset_type_for_instrument_key(key: crate::pricer::InstrumentType) -> BasketAssetType {
     use crate::pricer::InstrumentType;
 
     match key {
         InstrumentType::Equity
         | InstrumentType::EquityOption
         | InstrumentType::EquityFuture
-        | InstrumentType::EquityTotalReturnSwap => AssetType::Equity,
+        | InstrumentType::EquityTotalReturnSwap => BasketAssetType::Equity,
         InstrumentType::Bond
         | InstrumentType::BondFuture
         | InstrumentType::InflationLinkedBond
@@ -193,9 +193,11 @@ fn asset_type_for_instrument_key(key: crate::pricer::InstrumentType) -> AssetTyp
         | InstrumentType::TermLoan
         | InstrumentType::RevolvingCredit
         | InstrumentType::Deposit
-        | InstrumentType::Repo => AssetType::Bond,
-        InstrumentType::CommodityForward | InstrumentType::CommoditySwap => AssetType::Commodity,
-        _ => AssetType::Derivative,
+        | InstrumentType::Repo => BasketAssetType::Bond,
+        InstrumentType::CommodityForward | InstrumentType::CommoditySwap => {
+            BasketAssetType::Commodity
+        }
+        _ => BasketAssetType::Derivative,
     }
 }
 
@@ -211,7 +213,7 @@ fn basket_with_price_reference(
     basket: &Basket,
     constituent_index: usize,
     price_id: PriceId,
-    asset_type: AssetType,
+    asset_type: BasketAssetType,
 ) -> Basket {
     let mut bumped_basket = basket.clone();
     let constituent = &mut bumped_basket.constituents[constituent_index];

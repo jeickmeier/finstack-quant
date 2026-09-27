@@ -10,8 +10,8 @@ use finstack_quant_valuations::instruments::fixed_income::revolving_credit::{
     CreditSpreadProcessSpec, RevolvingCreditPricer,
 };
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
-    run_simulation_with_diagnostics, CoverageTestSpec, InstrumentCollateral, PricingMode,
-    StochasticPricingResult, StructuredCredit,
+    run_simulation_with_diagnostics, CoverageTestSpec, InstrumentCollateral,
+    StochasticPricingResult, StructuredCredit, StructuredCreditPricingMode,
 };
 use time::macros::date;
 
@@ -46,8 +46,8 @@ fn pool_of(
     deal
 }
 
-fn monte_carlo(num_paths: usize) -> PricingMode {
-    PricingMode::MonteCarlo {
+fn monte_carlo(num_paths: usize) -> StructuredCreditPricingMode {
+    StructuredCreditPricingMode::MonteCarlo {
         num_paths,
         antithetic: true,
     }

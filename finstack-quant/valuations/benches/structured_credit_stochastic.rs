@@ -13,8 +13,8 @@ use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::money::Money;
 use finstack_quant_valuations::instruments::fixed_income::loan_terms::RateSpec;
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
-    AssetPool, DealType, PoolAsset, PricingMode, StructuredCredit, Tranche, TrancheSeniority,
-    TrancheStructure,
+    AssetPool, DealType, PoolAsset, StructuredCredit, StructuredCreditPricingMode, Tranche,
+    TrancheSeniority, TrancheStructure,
 };
 use finstack_quant_valuations::instruments::Instrument;
 use std::hint::black_box;
@@ -92,7 +92,7 @@ fn bench_stochastic_mc(c: &mut Criterion) {
 
     for num_paths in [100usize, 1000] {
         for antithetic in [false, true] {
-            let mode = PricingMode::MonteCarlo {
+            let mode = StructuredCreditPricingMode::MonteCarlo {
                 num_paths,
                 antithetic,
             };

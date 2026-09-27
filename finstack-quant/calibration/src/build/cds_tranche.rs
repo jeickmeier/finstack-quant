@@ -12,7 +12,7 @@ use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, InstrumentId};
 use finstack_quant_core::{Error, Result};
 use finstack_quant_valuations::instruments::credit_derivatives::cds_tranche::{
-    CDSTranche, CDSTrancheParams,
+    CdsTranche, CdsTrancheParams,
 };
 use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::instruments::PayReceive;
@@ -26,14 +26,14 @@ use finstack_quant_valuations::market::conventions::ConventionRegistry;
 /// # Examples
 ///
 /// ```text
-/// use finstack_quant_calibration::build::cds_tranche::CDSTrancheBuildOverrides;
+/// use finstack_quant_calibration::build::cds_tranche::CdsTrancheBuildOverrides;
 ///
-/// let mut overrides = CDSTrancheBuildOverrides::default();
+/// let mut overrides = CdsTrancheBuildOverrides::default();
 /// overrides.frequency = Some("3M".parse().unwrap());
 /// overrides.day_count = Some(finstack_quant_core::dates::DayCount::Act360);
 /// ```
 #[derive(Debug, Clone)]
-pub struct CDSTrancheBuildOverrides {
+pub struct CdsTrancheBuildOverrides {
     /// Optional payment frequency override.
     ///
     /// If `None`, uses the payment frequency from the CDS convention.
@@ -58,7 +58,7 @@ pub struct CDSTrancheBuildOverrides {
     pub roll_rule: RollRule,
 }
 
-impl Default for CDSTrancheBuildOverrides {
+impl Default for CdsTrancheBuildOverrides {
     fn default() -> Self {
         Self {
             frequency: None,
@@ -108,7 +108,7 @@ impl Default for CDSTrancheBuildOverrides {
 ///
 /// ```text
 /// use finstack_quant_calibration::build::BuildCtx;
-/// use finstack_quant_calibration::build::cds_tranche::{build_cds_tranche_instrument, CDSTrancheBuildOverrides};
+/// use finstack_quant_calibration::build::cds_tranche::{build_cds_tranche_instrument, CdsTrancheBuildOverrides};
 /// use finstack_quant_calibration::quotes::cds_tranche::CdsTrancheQuote;
 /// use finstack_quant_calibration::quotes::ids::QuoteId;
 /// use finstack_quant_valuations::market::conventions::ids::{CdsConventionKey, CdsDocClause};
@@ -138,7 +138,7 @@ impl Default for CDSTrancheBuildOverrides {
 ///     },
 /// };
 ///
-/// let overrides = CDSTrancheBuildOverrides::default();
+/// let overrides = CdsTrancheBuildOverrides::default();
 /// let instrument = build_cds_tranche_instrument(&quote, &ctx, &overrides)?;
 /// # Ok(())
 /// # }
@@ -148,11 +148,11 @@ impl Default for CDSTrancheBuildOverrides {
 ///
 /// - [`CdsTrancheQuote`] for quote structure
 /// - [`BuildCtx`] for build context configuration
-/// - [`CDSTrancheBuildOverrides`] for override options
+/// - [`CdsTrancheBuildOverrides`] for override options
 pub fn build_cds_tranche_instrument(
     quote: &CdsTrancheQuote,
     ctx: &BuildCtx,
-    overrides: &CDSTrancheBuildOverrides,
+    overrides: &CdsTrancheBuildOverrides,
 ) -> Result<Box<dyn Instrument>> {
     tracing::debug!(quote_id = %quote.id(), "building CDS tranche instrument");
     quote.validate()?;
@@ -233,7 +233,7 @@ pub fn build_cds_tranche_instrument(
         }
     };
 
-    let tranche_params = CDSTrancheParams {
+    let tranche_params = CdsTrancheParams {
         index_name: index.clone(),
         series,
         attach_pct: attachment * 100.0, // Params expect percent
@@ -266,7 +266,7 @@ pub fn build_cds_tranche_instrument(
     // the standard orientation for calibration instruments.
     let side = PayReceive::Pay;
 
-    let mut instrument = CDSTranche::new(
+    let mut instrument = CdsTranche::new(
         InstrumentId::new(id.as_str()),
         &tranche_params,
         &schedule_params,
@@ -317,17 +317,17 @@ mod tests {
             convention: convention_key.clone(),
         };
 
-        let overrides = CDSTrancheBuildOverrides {
+        let overrides = CdsTrancheBuildOverrides {
             roll_rule: RollRule::None,
-            ..CDSTrancheBuildOverrides::default()
+            ..CdsTrancheBuildOverrides::default()
         };
 
         let instrument = build_cds_tranche_instrument(&quote, &ctx, &overrides)
             .expect("non-IMM tranche build should succeed");
         let tranche = instrument
             .as_any()
-            .downcast_ref::<CDSTranche>()
-            .expect("should be CDSTranche");
+            .downcast_ref::<CdsTranche>()
+            .expect("should be CdsTranche");
 
         assert_eq!(tranche.roll_rule, RollRule::None);
 
@@ -379,13 +379,13 @@ mod tests {
             convention: convention_key,
         };
 
-        let overrides = CDSTrancheBuildOverrides::default();
+        let overrides = CdsTrancheBuildOverrides::default();
         let instrument = build_cds_tranche_instrument(&quote, &ctx, &overrides)
             .expect("tranche build should succeed");
         let tranche = instrument
             .as_any()
-            .downcast_ref::<CDSTranche>()
-            .expect("should be CDSTranche");
+            .downcast_ref::<CdsTranche>()
+            .expect("should be CdsTranche");
 
         // Tranche notional = 100M * 0.04 = 4M
         // Upfront = 4M * (-0.025) = -100,000 USD
@@ -434,7 +434,7 @@ mod tests {
             convention: convention_key,
         };
 
-        let overrides = CDSTrancheBuildOverrides::default();
+        let overrides = CdsTrancheBuildOverrides::default();
         let result = build_cds_tranche_instrument(&quote, &ctx, &overrides);
 
         assert!(result.is_err(), "Should reject upfront_pct with abs > 1.0");
@@ -474,13 +474,13 @@ mod tests {
             convention: convention_key,
         };
 
-        let overrides = CDSTrancheBuildOverrides::default();
+        let overrides = CdsTrancheBuildOverrides::default();
         let instrument = build_cds_tranche_instrument(&quote, &ctx, &overrides)
             .expect("tranche build should succeed");
         let tranche = instrument
             .as_any()
-            .downcast_ref::<CDSTranche>()
-            .expect("should be CDSTranche");
+            .downcast_ref::<CdsTranche>()
+            .expect("should be CdsTranche");
 
         assert!(
             tranche.upfront.is_none(),

@@ -2,8 +2,8 @@ use super::*;
 use crate::instruments::fixed_income::bond::pricing::engine::merton_mc::MertonMcCalibrationSpec;
 use finstack_quant_models::credit::toggle_exercise::ThresholdDirection;
 use finstack_quant_models::credit::{
-    AssetDynamics, BarrierType, CreditStateVariable, DynamicRecoverySpec, EndogenousHazardSpec,
-    MertonModel, ToggleExerciseModel,
+    AssetDynamics, CreditStateVariable, DynamicRecoverySpec, EndogenousHazardSpec,
+    MertonBarrierType, MertonModel, ToggleExerciseModel,
 };
 
 fn test_merton() -> MertonModel {
@@ -13,7 +13,7 @@ fn test_merton() -> MertonModel {
         100.0,
         0.04,
         0.0,
-        BarrierType::FirstPassage {
+        MertonBarrierType::FirstPassage {
             barrier_growth_rate: 0.0,
         },
         AssetDynamics::GeometricBrownian,
@@ -254,7 +254,7 @@ fn stub_maturity_mc_matches_risk_free_pv_without_default_risk() {
         100.0,
         0.04,
         0.0,
-        BarrierType::FirstPassage {
+        MertonBarrierType::FirstPassage {
             barrier_growth_rate: 0.0,
         },
         AssetDynamics::GeometricBrownian,
@@ -645,7 +645,7 @@ fn non_gbm_dynamics_rejected() {
         100.0,
         0.04,
         0.0,
-        BarrierType::Terminal,
+        MertonBarrierType::Terminal,
         AssetDynamics::JumpDiffusion {
             jump_intensity: 0.5,
             jump_mean: -0.05,
@@ -784,7 +784,7 @@ fn effective_spread_zero_for_default_free_bond_on_term_structure_basis() {
         100.0,
         0.04,
         0.0,
-        BarrierType::FirstPassage {
+        MertonBarrierType::FirstPassage {
             barrier_growth_rate: 0.0,
         },
         AssetDynamics::GeometricBrownian,

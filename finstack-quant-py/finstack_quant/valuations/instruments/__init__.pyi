@@ -48,17 +48,17 @@ __all__ = [
     "BarrierCrossing",
     "Bond",
     "BondBuilder",
-    "CDSIndex",
-    "CDSIndexBuilder",
-    "CDSIndexConstituent",
-    "CDSIndexParams",
-    "CDSTranche",
-    "CDSTrancheBuilder",
-    "CDSTrancheParams",
     "CallAssumption",
     "CallPutSchedule",
     "CapFloor",
     "CapFloorBuilder",
+    "CdsIndex",
+    "CdsIndexBuilder",
+    "CdsIndexConstituent",
+    "CdsIndexParams",
+    "CdsTranche",
+    "CdsTrancheBuilder",
+    "CdsTrancheParams",
     "ConversionSpec",
     "ConvertibleBond",
     "ConvertibleBondBuilder",
@@ -4554,7 +4554,7 @@ class PremiumLegSpec:
     Premium (fixed coupon) leg of a CDS or CDS index.
 
     Thin typed wrapper for the canonical Rust ``PremiumLegSpec``. Used by
-    :class:`CreditDefaultSwap` and :class:`CDSIndex` builders. Immutable;
+    :class:`CreditDefaultSwap` and :class:`CdsIndex` builders. Immutable;
     fields are readable through properties and ``to_json`` / ``from_json``
     (and therefore ``pickle``) round-trip the wire form.
 
@@ -4887,7 +4887,7 @@ class ProtectionLegSpec:
     Protection (default-contingent) leg of a CDS or CDS index.
 
     Thin typed wrapper for the canonical Rust ``ProtectionLegSpec``. Used by
-    :class:`CreditDefaultSwap` and :class:`CDSIndex` builders. Immutable;
+    :class:`CreditDefaultSwap` and :class:`CdsIndex` builders. Immutable;
     fields are readable through properties and ``to_json`` / ``from_json``
     (and therefore ``pickle``) round-trip the wire form.
 
@@ -8614,37 +8614,37 @@ class CreditDefaultSwapBuilder:
         """
         ...
 
-class CDSIndex:
+class CdsIndex:
     """
     Credit index (CDX / iTraxx) trade (typed wrapper for the canonical Rust
-    ``CDSIndex``).
+    ``CdsIndex``).
 
     Priced against a single index hazard curve (``pricing="single_curve"``, a
     synthetic CDS) or by expanding into weighted constituents
     (``pricing="constituents"``); ``index_factor`` scales the surviving
-    notional after defaults. Construct via :meth:`CDSIndex.from_preset` (the
-    preferred way for standardized indices), :meth:`CDSIndex.builder`,
-    :meth:`CDSIndex.example` or :meth:`CDSIndex.from_json`. Every public Rust
+    notional after defaults. Construct via :meth:`CdsIndex.from_preset` (the
+    preferred way for standardized indices), :meth:`CdsIndex.builder`,
+    :meth:`CdsIndex.example` or :meth:`CdsIndex.from_json`. Every public Rust
     field is readable as a property; ``par_spread`` / ``risky_pv01`` / ``cs01``
-    mirror the Rust accessors and :meth:`CDSIndex.price` /
-    :meth:`CDSIndex.metric` run the same pricer as :func:`price_instrument`.
+    mirror the Rust accessors and :meth:`CdsIndex.price` /
+    :meth:`CdsIndex.metric` run the same pricer as :func:`price_instrument`.
 
     Examples
     --------
-    >>> from finstack_quant.valuations.instruments import CDSIndex
-    >>> idx = CDSIndex.example()
+    >>> from finstack_quant.valuations.instruments import CdsIndex
+    >>> idx = CdsIndex.example()
     >>> (idx.index_name, idx.series, idx.pricing, idx.num_constituents)
     ('CDX.NA.IG', 42, 'single_curve', 125)
     """
 
     @staticmethod
-    def builder() -> CDSIndexBuilder:
+    def builder() -> CdsIndexBuilder:
         """
-        Create a fluent builder (mirrors Rust ``CDSIndex::builder()``).
+        Create a fluent builder (mirrors Rust ``CdsIndex::builder()``).
 
         Returns
         -------
-        CDSIndexBuilder
+        CdsIndexBuilder
             A builder with fluent, consuming setter methods.
 
         Notes
@@ -8653,16 +8653,16 @@ class CDSIndex:
 
         Examples
         --------
-        >>> from finstack_quant.valuations.instruments import CDSIndex
-        >>> builder = CDSIndex.builder()
+        >>> from finstack_quant.valuations.instruments import CdsIndex
+        >>> builder = CdsIndex.builder()
         >>> builder.id("EXAMPLE") is builder
         True
         """
         ...
     @classmethod
-    def from_json(cls, json: str) -> CDSIndex:
+    def from_json(cls, json: str) -> CdsIndex:
         """
-        Deserialize a validated CDSIndex from its canonical v1 envelope.
+        Deserialize a validated CdsIndex from its canonical v1 envelope.
 
         Parameters
         ----------
@@ -8673,7 +8673,7 @@ class CDSIndex:
 
         Returns
         -------
-        CDSIndex
+        CdsIndex
             The validated instrument.
 
         Raises
@@ -8684,8 +8684,8 @@ class CDSIndex:
 
         Examples
         --------
-        >>> from finstack_quant.valuations.instruments import CDSIndex
-        >>> CDSIndex.from_json(CDSIndex.example().to_json()).id
+        >>> from finstack_quant.valuations.instruments import CdsIndex
+        >>> CdsIndex.from_json(CdsIndex.example().to_json()).id
         'CDX-IG-42'
         """
         ...
@@ -8697,7 +8697,7 @@ class CDSIndex:
         -------
         str
             Canonical instrument envelope accepted by :func:`price_instrument`
-            and :meth:`CDSIndex.from_json`.
+            and :meth:`CdsIndex.from_json`.
 
         Raises
         ------
@@ -8869,16 +8869,16 @@ class CDSIndex:
         """
         ...
     @staticmethod
-    def example() -> CDSIndex:
+    def example() -> CdsIndex:
         """
         Canonical CDX.NA.IG series 42 USD 10,000,000 payer (mirrors Rust
-        ``CDSIndex::example``): 60bp running coupon, ``single_curve`` pricing off
+        ``CdsIndex::example``): 60bp running coupon, ``single_curve`` pricing off
         ``CDX.NA.IG.HAZARD`` discounted on ``USD-OIS``, premium 2024-03-20 to
         2029-12-20, 125 names.
 
         Returns
         -------
-        CDSIndex
+        CdsIndex
             The example index trade.
 
         Notes
@@ -8887,14 +8887,14 @@ class CDSIndex:
 
         Examples
         --------
-        >>> from finstack_quant.valuations.instruments import CDSIndex
-        >>> CDSIndex.example().protection_leg.credit_curve_id
+        >>> from finstack_quant.valuations.instruments import CdsIndex
+        >>> CdsIndex.example().protection_leg.credit_curve_id
         'CDX.NA.IG.HAZARD'
         """
         ...
     @staticmethod
     def from_preset(
-        preset: CDSIndexParams,
+        preset: CdsIndexParams,
         id: str,
         notional: Money,
         side: Literal["pay", "receive"],
@@ -8903,18 +8903,18 @@ class CDSIndex:
         recovery_rate: float,
         discount_curve_id: str,
         credit_curve_id: str,
-    ) -> CDSIndex:
+    ) -> CdsIndex:
         """
         Build an index trade from a standardized preset (mirrors Rust
-        ``CDSIndex::from_preset``): the premium leg takes the preset's fixed
+        ``CdsIndex::from_preset``): the premium leg takes the preset's fixed
         coupon and regional convention (day count, frequency, business-day rule,
         calendar, stub), pricing is ``"single_curve"``, ``index_factor`` is
         ``1.0`` and the constituent list is empty.
 
         Parameters
         ----------
-        preset : CDSIndexParams
-            Index identity, coupon and convention (e.g. :meth:`CDSIndexParams.cdx_na_ig`).
+        preset : CdsIndexParams
+            Index identity, coupon and convention (e.g. :meth:`CdsIndexParams.cdx_na_ig`).
         id : str
             Unique instrument identifier for the trade.
         notional : Money
@@ -8934,7 +8934,7 @@ class CDSIndex:
 
         Returns
         -------
-        CDSIndex
+        CdsIndex
             The index trade.
 
         Raises
@@ -8947,9 +8947,9 @@ class CDSIndex:
         --------
         >>> from finstack_quant.core.currency import Currency
         >>> from finstack_quant.core.money import Money
-        >>> from finstack_quant.valuations.instruments import CDSIndex, CDSIndexParams
-        >>> idx = CDSIndex.from_preset(
-        ...     CDSIndexParams.cdx_na_ig(42, 1, 100.0),
+        >>> from finstack_quant.valuations.instruments import CdsIndex, CdsIndexParams
+        >>> idx = CdsIndex.from_preset(
+        ...     CdsIndexParams.cdx_na_ig(42, 1, 100.0),
         ...     "CDX-42-5Y",
         ...     Money(10_000_000.0, Currency("USD")),
         ...     "pay",
@@ -8968,7 +8968,7 @@ class CDSIndex:
     ) -> float:
         """
         Par spread of the index in basis points (mirrors Rust
-        ``CDSIndex::par_spread``; risky-annuity denominator in ``single_curve``
+        ``CdsIndex::par_spread``; risky-annuity denominator in ``single_curve``
         mode, weighted constituents otherwise).
 
         Parameters
@@ -8996,7 +8996,7 @@ class CDSIndex:
     ) -> float:
         """
         Risky PV01 (risky annuity) of the premium leg (mirrors Rust
-        ``CDSIndex::risky_pv01``): PV of 1bp running on the surviving notional.
+        ``CdsIndex::risky_pv01``): PV of 1bp running on the surviving notional.
 
         Parameters
         ----------
@@ -9020,7 +9020,7 @@ class CDSIndex:
         ...
     def cs01(self, market: MarketContext | str, as_of: datetime.date | datetime.datetime | pd.Timestamp | str) -> float:
         """
-        Credit spread sensitivity (mirrors Rust ``CDSIndex::cs01`` with the cached
+        Credit spread sensitivity (mirrors Rust ``CdsIndex::cs01`` with the cached
         recalibration provider): the hazard curve(s) are rebootstrapped after a
         1bp parallel spread bump. Hazard curves built by hand without a lossless
         calibration recipe raise.
@@ -9205,13 +9205,13 @@ class CDSIndex:
         """
         ...
     @property
-    def constituents(self) -> list[CDSIndexConstituent]:
+    def constituents(self) -> list[CdsIndexConstituent]:
         """
         Constituent rows.
 
         Returns
         -------
-        list[CDSIndexConstituent]
+        list[CdsIndexConstituent]
             Typed rows; empty in ``single_curve`` mode.
 
         Notes
@@ -9281,12 +9281,12 @@ class CDSIndex:
         ...
     def __repr__(self) -> str:
         """
-        Python-style rendering of the key economics, e.g. ``CDSIndex(id='CDX-IG-42', index_name='CDX.NA.IG', series=42, side='pay', notional=Money(10000000.0, 'USD'), coupon_bp=60, ...)``.
+        Python-style rendering of the key economics, e.g. ``CdsIndex(id='CDX-IG-42', index_name='CDX.NA.IG', series=42, side='pay', notional=Money(10000000.0, 'USD'), coupon_bp=60, ...)``.
 
         Returns
         -------
         str
-            ``CDSIndex(<field>=<value>, ...)``.
+            ``CdsIndex(<field>=<value>, ...)``.
 
         Notes
         -----
@@ -9294,9 +9294,9 @@ class CDSIndex:
         """
         ...
 
-class CDSIndexBuilder:
+class CdsIndexBuilder:
     """
-    Fluent builder for :class:`CDSIndex`; wraps the Rust ``FinancialBuilder``
+    Fluent builder for :class:`CdsIndex`; wraps the Rust ``FinancialBuilder``
     output one setter for one setter.
 
     The builder pre-seeds an empty ``constituents`` list so ``build()``
@@ -9313,7 +9313,7 @@ class CDSIndexBuilder:
     >>> from finstack_quant.core.dates import DayCount, Tenor
     >>> from finstack_quant.core.money import Money
     >>> from finstack_quant.valuations.instruments import (
-    ...     CDSIndex,
+    ...     CdsIndex,
     ...     PremiumLegSpec,
     ...     ProtectionLegSpec,
     ... )
@@ -9328,7 +9328,7 @@ class CDSIndexBuilder:
     ...     roll_rule=RollRule.CDS_IMM,
     ... )
     >>> index = (
-    ...     CDSIndex
+    ...     CdsIndex
     ...     .builder()
     ...     .id("CDX-IG-42")
     ...     .index_name("CDX.NA.IG")
@@ -9348,7 +9348,7 @@ class CDSIndexBuilder:
     'single_curve'
     """
 
-    def id(self, value: str) -> CDSIndexBuilder:
+    def id(self, value: str) -> CdsIndexBuilder:
         """
         Set the instrument identifier.
 
@@ -9359,7 +9359,7 @@ class CDSIndexBuilder:
 
         Returns
         -------
-        CDSIndexBuilder
+        CdsIndexBuilder
             ``self``, for chaining.
 
         Raises
@@ -9368,7 +9368,7 @@ class CDSIndexBuilder:
             If the builder was already consumed by ``build()``.
         """
         ...
-    def index_name(self, value: str) -> CDSIndexBuilder:
+    def index_name(self, value: str) -> CdsIndexBuilder:
         """
         Set the index name.
 
@@ -9379,7 +9379,7 @@ class CDSIndexBuilder:
 
         Returns
         -------
-        CDSIndexBuilder
+        CdsIndexBuilder
             ``self``, for chaining.
 
         Raises
@@ -9388,7 +9388,7 @@ class CDSIndexBuilder:
             If the builder was already consumed by ``build()``.
         """
         ...
-    def series(self, value: int) -> CDSIndexBuilder:
+    def series(self, value: int) -> CdsIndexBuilder:
         """
         Set the series number.
 
@@ -9399,7 +9399,7 @@ class CDSIndexBuilder:
 
         Returns
         -------
-        CDSIndexBuilder
+        CdsIndexBuilder
             ``self``, for chaining.
 
         Raises
@@ -9408,7 +9408,7 @@ class CDSIndexBuilder:
             If the builder was already consumed by ``build()``.
         """
         ...
-    def version(self, value: int) -> CDSIndexBuilder:
+    def version(self, value: int) -> CdsIndexBuilder:
         """
         Set the version number within the series.
 
@@ -9419,7 +9419,7 @@ class CDSIndexBuilder:
 
         Returns
         -------
-        CDSIndexBuilder
+        CdsIndexBuilder
             ``self``, for chaining.
 
         Raises
@@ -9428,7 +9428,7 @@ class CDSIndexBuilder:
             If the builder was already consumed by ``build()``.
         """
         ...
-    def notional(self, value: Money) -> CDSIndexBuilder:
+    def notional(self, value: Money) -> CdsIndexBuilder:
         """
         Set the notional amount of the index.
 
@@ -9439,7 +9439,7 @@ class CDSIndexBuilder:
 
         Returns
         -------
-        CDSIndexBuilder
+        CdsIndexBuilder
             ``self``, for chaining.
 
         Raises
@@ -9448,7 +9448,7 @@ class CDSIndexBuilder:
             If the builder was already consumed by ``build()``.
         """
         ...
-    def index_factor(self, value: float) -> CDSIndexBuilder:
+    def index_factor(self, value: float) -> CdsIndexBuilder:
         """
         Set the index factor (fraction of surviving notional).
 
@@ -9459,7 +9459,7 @@ class CDSIndexBuilder:
 
         Returns
         -------
-        CDSIndexBuilder
+        CdsIndexBuilder
             ``self``, for chaining.
 
         Raises
@@ -9468,7 +9468,7 @@ class CDSIndexBuilder:
             If the builder was already consumed by ``build()``.
         """
         ...
-    def side(self, value: Literal["pay", "receive"]) -> CDSIndexBuilder:
+    def side(self, value: Literal["pay", "receive"]) -> CdsIndexBuilder:
         """
         Set the protection buyer/seller perspective.
 
@@ -9479,7 +9479,7 @@ class CDSIndexBuilder:
 
         Returns
         -------
-        CDSIndexBuilder
+        CdsIndexBuilder
             ``self``, for chaining.
 
         Raises
@@ -9488,7 +9488,7 @@ class CDSIndexBuilder:
             If the builder was already consumed by ``build()`` or ``value`` is not a recognized side.
         """
         ...
-    def convention(self, value: Literal["isda_na", "isda_eu", "isda_as", "custom"]) -> CDSIndexBuilder:
+    def convention(self, value: Literal["isda_na", "isda_eu", "isda_as", "custom"]) -> CdsIndexBuilder:
         """
         Set the ISDA regional convention.
 
@@ -9499,7 +9499,7 @@ class CDSIndexBuilder:
 
         Returns
         -------
-        CDSIndexBuilder
+        CdsIndexBuilder
             ``self``, for chaining.
 
         Raises
@@ -9508,7 +9508,7 @@ class CDSIndexBuilder:
             If the builder was already consumed by ``build()`` or ``value`` is not one of the accepted strings (the message lists them).
         """
         ...
-    def premium_leg(self, value: PremiumLegSpec) -> CDSIndexBuilder:
+    def premium_leg(self, value: PremiumLegSpec) -> CdsIndexBuilder:
         """
         Set the premium leg specification.
 
@@ -9519,7 +9519,7 @@ class CDSIndexBuilder:
 
         Returns
         -------
-        CDSIndexBuilder
+        CdsIndexBuilder
             ``self``, for chaining.
 
         Raises
@@ -9528,7 +9528,7 @@ class CDSIndexBuilder:
             If the builder was already consumed by ``build()``.
         """
         ...
-    def protection_leg(self, value: ProtectionLegSpec) -> CDSIndexBuilder:
+    def protection_leg(self, value: ProtectionLegSpec) -> CdsIndexBuilder:
         """
         Set the protection leg specification.
 
@@ -9539,7 +9539,7 @@ class CDSIndexBuilder:
 
         Returns
         -------
-        CDSIndexBuilder
+        CdsIndexBuilder
             ``self``, for chaining.
 
         Raises
@@ -9548,18 +9548,18 @@ class CDSIndexBuilder:
             If the builder was already consumed by ``build()``.
         """
         ...
-    def pricing(self, value: Literal["single_curve", "constituents"]) -> CDSIndexBuilder:
+    def pricing(self, value: Literal["single_curve", "constituents"]) -> CdsIndexBuilder:
         """
         Set the pricing aggregation mode.
 
         Parameters
         ----------
         value : Literal["single_curve", "constituents"]
-            ``"single_curve"`` prices the index against a single index hazard curve (synthetic CDS). ``"constituents"`` prices each issuer separately and aggregates by weight; requires :meth:`CDSIndexBuilder.constituents` to be set.
+            ``"single_curve"`` prices the index against a single index hazard curve (synthetic CDS). ``"constituents"`` prices each issuer separately and aggregates by weight; requires :meth:`CdsIndexBuilder.constituents` to be set.
 
         Returns
         -------
-        CDSIndexBuilder
+        CdsIndexBuilder
             ``self``, for chaining.
 
         Raises
@@ -9568,18 +9568,18 @@ class CDSIndexBuilder:
             If the builder was already consumed by ``build()`` or ``value`` is not a recognized pricing mode.
         """
         ...
-    def constituents(self, value: list[CDSIndexConstituent | dict[str, object]] | str) -> CDSIndexBuilder:
+    def constituents(self, value: list[CdsIndexConstituent | dict[str, object]] | str) -> CdsIndexBuilder:
         """
         Set the index constituents.
 
         Parameters
         ----------
-        value : list[CDSIndexConstituent | dict[str, object]] | str
-            Constituent rows as typed :class:`CDSIndexConstituent` objects, dicts with ``credit`` (``reference_entity``, ``recovery_rate``, ``credit_curve_id``), ``weight`` and optional ``defaulted``, or a JSON array of the same shape.
+        value : list[CdsIndexConstituent | dict[str, object]] | str
+            Constituent rows as typed :class:`CdsIndexConstituent` objects, dicts with ``credit`` (``reference_entity``, ``recovery_rate``, ``credit_curve_id``), ``weight`` and optional ``defaulted``, or a JSON array of the same shape.
 
         Returns
         -------
-        CDSIndexBuilder
+        CdsIndexBuilder
             ``self``, for chaining.
 
         Raises
@@ -9590,7 +9590,7 @@ class CDSIndexBuilder:
             If ``value`` is neither a list nor a string.
         """
         ...
-    def num_constituents(self, value: int) -> CDSIndexBuilder:
+    def num_constituents(self, value: int) -> CdsIndexBuilder:
         """
         Set the number of reference entities in the index pool.
 
@@ -9601,7 +9601,7 @@ class CDSIndexBuilder:
 
         Returns
         -------
-        CDSIndexBuilder
+        CdsIndexBuilder
             ``self``, for chaining.
 
         Raises
@@ -9610,7 +9610,7 @@ class CDSIndexBuilder:
             If the builder was already consumed by ``build()``.
         """
         ...
-    def upfront(self, value: tuple[datetime.date | datetime.datetime | pd.Timestamp | str, Money]) -> CDSIndexBuilder:
+    def upfront(self, value: tuple[datetime.date | datetime.datetime | pd.Timestamp | str, Money]) -> CdsIndexBuilder:
         """
         Set the contractual upfront payment.
 
@@ -9622,7 +9622,7 @@ class CDSIndexBuilder:
 
         Returns
         -------
-        CDSIndexBuilder
+        CdsIndexBuilder
             ``self``, for chaining.
 
         Raises
@@ -9631,7 +9631,7 @@ class CDSIndexBuilder:
             If ``value`` is not a ``(date, Money)`` pair.
         """
         ...
-    def margin_spec(self, value: dict[str, object] | str) -> CDSIndexBuilder:
+    def margin_spec(self, value: dict[str, object] | str) -> CdsIndexBuilder:
         """
         Set the OTC margin (CSA / initial-margin) specification.
 
@@ -9642,7 +9642,7 @@ class CDSIndexBuilder:
 
         Returns
         -------
-        CDSIndexBuilder
+        CdsIndexBuilder
             ``self``, for chaining.
 
         Raises
@@ -9651,7 +9651,7 @@ class CDSIndexBuilder:
             If the builder was already consumed by ``build()`` or ``value`` does not deserialize as an ``OtcMarginSpec``.
         """
         ...
-    def attributes(self, value: Attributes | dict[str, str] | None) -> CDSIndexBuilder:
+    def attributes(self, value: Attributes | dict[str, str] | None) -> CdsIndexBuilder:
         """
         Set instrument attributes (tags and metadata).
 
@@ -9662,7 +9662,7 @@ class CDSIndexBuilder:
 
         Returns
         -------
-        CDSIndexBuilder
+        CdsIndexBuilder
             ``self``, for chaining.
 
         Raises
@@ -9676,28 +9676,28 @@ class CDSIndexBuilder:
     def __repr__(self) -> str:
         """
         Python-style rendering of the fields set so far, e.g.
-        ``CDSIndexBuilder(id='X', notional=Money(1000000.0, 'USD'))``.
+        ``CdsIndexBuilder(id='X', notional=Money(1000000.0, 'USD'))``.
 
         Returns
         -------
         str
-            ``CDSIndexBuilder(<field>=<value>, ...)``.
+            ``CdsIndexBuilder(<field>=<value>, ...)``.
 
         Notes
         -----
         This method does not raise; it renders the recorded setter calls.
         """
         ...
-    def build(self) -> CDSIndex:
+    def build(self) -> CdsIndex:
         """
         Build the validated CDS index.
 
-        Runs only the Rust ``CDSIndexBuilder::build`` validation (structural
-        invariants); pricing-time checks run in :meth:`CDSIndex.price`.
+        Runs only the Rust ``CdsIndexBuilder::build`` validation (structural
+        invariants); pricing-time checks run in :meth:`CdsIndex.price`.
 
         Returns
         -------
-        CDSIndex
+        CdsIndex
             The validated instrument.
 
         Raises
@@ -9705,42 +9705,42 @@ class CDSIndexBuilder:
         ValueError
             If the builder was already consumed, a required field is missing
             (the message names the builder and the field, e.g.
-            ``CDSIndexBuilder: missing required field 'id'``), or the instrument
+            ``CdsIndexBuilder: missing required field 'id'``), or the instrument
             fails validation (index factor outside ``[0, 1]``, empty constituents in ``constituents`` mode).
         """
         ...
 
-class CDSTranche:
+class CdsTranche:
     """
     Synthetic CDO / index tranche (typed wrapper for the canonical Rust
-    ``CDSTranche``): protection on portfolio losses between ``attach_pct``
+    ``CdsTranche``): protection on portfolio losses between ``attach_pct``
     and ``detach_pct`` (percent points), paying ``coupon_bp`` on the
     surviving tranche notional, priced with the one-factor Gaussian copula
     against the ``credit_index_id`` loss distribution.
 
-    Construct via :meth:`CDSTranche.standard` (standard quarterly ACT/360
-    schedule), :meth:`CDSTranche.builder`, :meth:`CDSTranche.example` or
-    :meth:`CDSTranche.from_json`. Every public Rust field is readable as a
+    Construct via :meth:`CdsTranche.standard` (standard quarterly ACT/360
+    schedule), :meth:`CdsTranche.builder`, :meth:`CdsTranche.example` or
+    :meth:`CdsTranche.from_json`. Every public Rust field is readable as a
     property; ``expected_loss`` / ``jump_to_default`` mirror the Rust
-    accessors and :meth:`CDSTranche.price` / :meth:`CDSTranche.metric` run
+    accessors and :meth:`CdsTranche.price` / :meth:`CdsTranche.metric` run
     the same pricer as :func:`price_instrument`.
 
     Examples
     --------
-    >>> from finstack_quant.valuations.instruments import CDSTranche
-    >>> tranche = CDSTranche.example()
+    >>> from finstack_quant.valuations.instruments import CdsTranche
+    >>> tranche = CdsTranche.example()
     >>> (tranche.attach_pct, tranche.detach_pct, tranche.side)
     (0.0, 3.0, 'pay')
     """
 
     @staticmethod
-    def builder() -> CDSTrancheBuilder:
+    def builder() -> CdsTrancheBuilder:
         """
-        Create a fluent builder (mirrors Rust ``CDSTranche::builder()``).
+        Create a fluent builder (mirrors Rust ``CdsTranche::builder()``).
 
         Returns
         -------
-        CDSTrancheBuilder
+        CdsTrancheBuilder
             A builder with fluent, consuming setter methods.
 
         Notes
@@ -9749,16 +9749,16 @@ class CDSTranche:
 
         Examples
         --------
-        >>> from finstack_quant.valuations.instruments import CDSTranche
-        >>> builder = CDSTranche.builder()
+        >>> from finstack_quant.valuations.instruments import CdsTranche
+        >>> builder = CdsTranche.builder()
         >>> builder.id("EXAMPLE") is builder
         True
         """
         ...
     @classmethod
-    def from_json(cls, json: str) -> CDSTranche:
+    def from_json(cls, json: str) -> CdsTranche:
         """
-        Deserialize a validated CDSTranche from its canonical v1 envelope.
+        Deserialize a validated CdsTranche from its canonical v1 envelope.
 
         Parameters
         ----------
@@ -9769,7 +9769,7 @@ class CDSTranche:
 
         Returns
         -------
-        CDSTranche
+        CdsTranche
             The validated instrument.
 
         Raises
@@ -9780,8 +9780,8 @@ class CDSTranche:
 
         Examples
         --------
-        >>> from finstack_quant.valuations.instruments import CDSTranche
-        >>> CDSTranche.from_json(CDSTranche.example().to_json()).id
+        >>> from finstack_quant.valuations.instruments import CdsTranche
+        >>> CdsTranche.from_json(CdsTranche.example().to_json()).id
         'CDXIG-42-0X3'
         """
         ...
@@ -9793,7 +9793,7 @@ class CDSTranche:
         -------
         str
             Canonical instrument envelope accepted by :func:`price_instrument`
-            and :meth:`CDSTranche.from_json`.
+            and :meth:`CdsTranche.from_json`.
 
         Raises
         ------
@@ -9965,15 +9965,15 @@ class CDSTranche:
         """
         ...
     @staticmethod
-    def example() -> CDSTranche:
+    def example() -> CdsTranche:
         """
         Canonical CDX.NA.IG 42 equity (0–3%) tranche, USD 10,000,000 (mirrors
-        Rust ``CDSTranche::example``): buy protection, 100bp running, maturity
+        Rust ``CdsTranche::example``): buy protection, 100bp running, maturity
         2029-12-20, curves ``USD-OIS`` / ``CDX.NA.IG.HAZARD``.
 
         Returns
         -------
-        CDSTranche
+        CdsTranche
             The example tranche.
 
         Notes
@@ -9982,29 +9982,29 @@ class CDSTranche:
 
         Examples
         --------
-        >>> from finstack_quant.valuations.instruments import CDSTranche
-        >>> CDSTranche.example().credit_index_id
+        >>> from finstack_quant.valuations.instruments import CdsTranche
+        >>> CdsTranche.example().credit_index_id
         'CDX.NA.IG.HAZARD'
         """
         ...
     @staticmethod
     def standard(
         id: str,
-        params: CDSTrancheParams,
+        params: CdsTrancheParams,
         discount_curve_id: str,
         credit_index_id: str,
         side: Literal["pay", "receive"],
-    ) -> CDSTranche:
+    ) -> CdsTranche:
         """
         Build a tranche on the standard schedule (mirrors Rust
-        ``CDSTranche::standard``): quarterly, ACT/360, Following, weekends-only
+        ``CdsTranche::standard``): quarterly, ACT/360, Following, weekends-only
         calendar, short-front stub.
 
         Parameters
         ----------
         id : str
             Unique instrument identifier.
-        params : CDSTrancheParams
+        params : CdsTrancheParams
             Economic terms (attach/detach, notional, maturity, coupon).
         discount_curve_id : str
             Discount curve identifier.
@@ -10015,7 +10015,7 @@ class CDSTranche:
 
         Returns
         -------
-        CDSTranche
+        CdsTranche
             The validated tranche.
 
         Raises
@@ -10028,11 +10028,11 @@ class CDSTranche:
         --------
         >>> from finstack_quant.core.currency import Currency
         >>> from finstack_quant.core.money import Money
-        >>> from finstack_quant.valuations.instruments import CDSTranche, CDSTrancheParams
-        >>> params = CDSTrancheParams.mezzanine_tranche(
+        >>> from finstack_quant.valuations.instruments import CdsTranche, CdsTrancheParams
+        >>> params = CdsTrancheParams.mezzanine_tranche(
         ...     "CDX.NA.IG", 42, Money(1e7, Currency("USD")), "2029-12-20", 100.0
         ... )
-        >>> tranche = CDSTranche.standard("CDX-42-3X7", params, "USD-OIS", "CDX.NA.IG.HAZARD", "pay")
+        >>> tranche = CdsTranche.standard("CDX-42-3X7", params, "USD-OIS", "CDX.NA.IG.HAZARD", "pay")
         >>> (tranche.day_count, tranche.business_day_convention)
         ('act_360', 'following')
         """
@@ -10040,7 +10040,7 @@ class CDSTranche:
     def expected_loss(self, market: MarketContext | str) -> float:
         """
         Expected tranche loss as a fraction of tranche notional (mirrors Rust
-        ``CDSTranche::expected_loss``).
+        ``CdsTranche::expected_loss``).
 
         Parameters
         ----------
@@ -10064,7 +10064,7 @@ class CDSTranche:
         self, market: MarketContext | str, as_of: datetime.date | datetime.datetime | pd.Timestamp | str
     ) -> float:
         """
-        Jump-to-default exposure (mirrors Rust ``CDSTranche::jump_to_default``):
+        Jump-to-default exposure (mirrors Rust ``CdsTranche::jump_to_default``):
         PV impact of one constituent defaulting immediately.
 
         Parameters
@@ -10395,12 +10395,12 @@ class CDSTranche:
         ...
     def __repr__(self) -> str:
         """
-        Python-style rendering of the key economics, e.g. ``CDSTranche(id='CDXIG-42-0X3', index_name='CDX.NA.IG', series=42, attach_pct=0.0, detach_pct=3.0, side='pay', ...)``.
+        Python-style rendering of the key economics, e.g. ``CdsTranche(id='CDXIG-42-0X3', index_name='CDX.NA.IG', series=42, attach_pct=0.0, detach_pct=3.0, side='pay', ...)``.
 
         Returns
         -------
         str
-            ``CDSTranche(<field>=<value>, ...)``.
+            ``CdsTranche(<field>=<value>, ...)``.
 
         Notes
         -----
@@ -10408,9 +10408,9 @@ class CDSTranche:
         """
         ...
 
-class CDSTrancheBuilder:
+class CdsTrancheBuilder:
     """
-    Fluent builder for :class:`CDSTranche`; wraps the Rust
+    Fluent builder for :class:`CdsTranche`; wraps the Rust
     ``FinancialBuilder`` output one setter for one setter.
 
     The builder pre-seeds ``realized_loss(0.0)``; ``roll_rule`` defaults to
@@ -10427,9 +10427,9 @@ class CDSTrancheBuilder:
     >>> from finstack_quant.core.currency import Currency
     >>> from finstack_quant.core.dates import DayCount, Tenor
     >>> from finstack_quant.core.money import Money
-    >>> from finstack_quant.valuations.instruments import CDSTranche
+    >>> from finstack_quant.valuations.instruments import CdsTranche
     >>> tranche = (
-    ...     CDSTranche
+    ...     CdsTranche
     ...     .builder()
     ...     .id("CDX-IG-42-3-7")
     ...     .index_name("CDX.NA.IG")
@@ -10450,7 +10450,7 @@ class CDSTrancheBuilder:
     100.0
     """
 
-    def id(self, value: str) -> CDSTrancheBuilder:
+    def id(self, value: str) -> CdsTrancheBuilder:
         """
         Set the instrument identifier.
 
@@ -10461,7 +10461,7 @@ class CDSTrancheBuilder:
 
         Returns
         -------
-        CDSTrancheBuilder
+        CdsTrancheBuilder
             ``self``, for chaining.
 
         Raises
@@ -10470,7 +10470,7 @@ class CDSTrancheBuilder:
             If the builder was already consumed by ``build()``.
         """
         ...
-    def index_name(self, value: str) -> CDSTrancheBuilder:
+    def index_name(self, value: str) -> CdsTrancheBuilder:
         """
         Set the underlying index name.
 
@@ -10481,7 +10481,7 @@ class CDSTrancheBuilder:
 
         Returns
         -------
-        CDSTrancheBuilder
+        CdsTrancheBuilder
             ``self``, for chaining.
 
         Raises
@@ -10490,7 +10490,7 @@ class CDSTrancheBuilder:
             If the builder was already consumed by ``build()``.
         """
         ...
-    def series(self, value: int) -> CDSTrancheBuilder:
+    def series(self, value: int) -> CdsTrancheBuilder:
         """
         Set the series number.
 
@@ -10501,7 +10501,7 @@ class CDSTrancheBuilder:
 
         Returns
         -------
-        CDSTrancheBuilder
+        CdsTrancheBuilder
             ``self``, for chaining.
 
         Raises
@@ -10510,7 +10510,7 @@ class CDSTrancheBuilder:
             If the builder was already consumed by ``build()``.
         """
         ...
-    def attach_pct(self, value: float) -> CDSTrancheBuilder:
+    def attach_pct(self, value: float) -> CdsTrancheBuilder:
         """
         Set the attachment point.
 
@@ -10521,7 +10521,7 @@ class CDSTrancheBuilder:
 
         Returns
         -------
-        CDSTrancheBuilder
+        CdsTrancheBuilder
             ``self``, for chaining.
 
         Raises
@@ -10530,7 +10530,7 @@ class CDSTrancheBuilder:
             If the builder was already consumed by ``build()``.
         """
         ...
-    def detach_pct(self, value: float) -> CDSTrancheBuilder:
+    def detach_pct(self, value: float) -> CdsTrancheBuilder:
         """
         Set the detachment point.
 
@@ -10541,7 +10541,7 @@ class CDSTrancheBuilder:
 
         Returns
         -------
-        CDSTrancheBuilder
+        CdsTrancheBuilder
             ``self``, for chaining.
 
         Raises
@@ -10550,7 +10550,7 @@ class CDSTrancheBuilder:
             If the builder was already consumed by ``build()``.
         """
         ...
-    def notional(self, value: Money) -> CDSTrancheBuilder:
+    def notional(self, value: Money) -> CdsTrancheBuilder:
         """
         Set the notional amount of the tranche.
 
@@ -10561,7 +10561,7 @@ class CDSTrancheBuilder:
 
         Returns
         -------
-        CDSTrancheBuilder
+        CdsTrancheBuilder
             ``self``, for chaining.
 
         Raises
@@ -10570,7 +10570,7 @@ class CDSTrancheBuilder:
             If the builder was already consumed by ``build()``.
         """
         ...
-    def maturity(self, value: datetime.date | datetime.datetime | pd.Timestamp | str) -> CDSTrancheBuilder:
+    def maturity(self, value: datetime.date | datetime.datetime | pd.Timestamp | str) -> CdsTrancheBuilder:
         """
         Set the maturity date of the tranche.
 
@@ -10581,7 +10581,7 @@ class CDSTrancheBuilder:
 
         Returns
         -------
-        CDSTrancheBuilder
+        CdsTrancheBuilder
             ``self``, for chaining.
 
         Raises
@@ -10590,7 +10590,7 @@ class CDSTrancheBuilder:
             If the builder was already consumed by ``build()`` or the date cannot be interpreted.
         """
         ...
-    def coupon_bp(self, value: float | Bps) -> CDSTrancheBuilder:
+    def coupon_bp(self, value: float | Bps) -> CdsTrancheBuilder:
         """
         Set the running coupon.
 
@@ -10601,7 +10601,7 @@ class CDSTrancheBuilder:
 
         Returns
         -------
-        CDSTrancheBuilder
+        CdsTrancheBuilder
             ``self``, for chaining.
 
         Raises
@@ -10612,7 +10612,7 @@ class CDSTrancheBuilder:
             If ``value`` is neither a number nor ``Bps``.
         """
         ...
-    def frequency(self, value: Tenor | str) -> CDSTrancheBuilder:
+    def frequency(self, value: Tenor | str) -> CdsTrancheBuilder:
         """
         Set the payment frequency.
 
@@ -10623,7 +10623,7 @@ class CDSTrancheBuilder:
 
         Returns
         -------
-        CDSTrancheBuilder
+        CdsTrancheBuilder
             ``self``, for chaining.
 
         Raises
@@ -10632,7 +10632,7 @@ class CDSTrancheBuilder:
             If the builder was already consumed by ``build()`` or a tenor string cannot be parsed.
         """
         ...
-    def day_count(self, value: DayCount | str) -> CDSTrancheBuilder:
+    def day_count(self, value: DayCount | str) -> CdsTrancheBuilder:
         """
         Set the day count convention.
 
@@ -10643,7 +10643,7 @@ class CDSTrancheBuilder:
 
         Returns
         -------
-        CDSTrancheBuilder
+        CdsTrancheBuilder
             ``self``, for chaining.
 
         Raises
@@ -10652,7 +10652,7 @@ class CDSTrancheBuilder:
             If the builder was already consumed by ``build()`` or a string name is not a recognized day count.
         """
         ...
-    def business_day_convention(self, value: BusinessDayConvention | str) -> CDSTrancheBuilder:
+    def business_day_convention(self, value: BusinessDayConvention | str) -> CdsTrancheBuilder:
         """
         Set the business day convention for coupon dates.
 
@@ -10663,7 +10663,7 @@ class CDSTrancheBuilder:
 
         Returns
         -------
-        CDSTrancheBuilder
+        CdsTrancheBuilder
             ``self``, for chaining.
 
         Raises
@@ -10672,7 +10672,7 @@ class CDSTrancheBuilder:
             If the builder was already consumed by ``build()`` or a string name is not a recognized convention.
         """
         ...
-    def calendar_id(self, value: str) -> CDSTrancheBuilder:
+    def calendar_id(self, value: str) -> CdsTrancheBuilder:
         """
         Set the holiday calendar identifier.
 
@@ -10683,7 +10683,7 @@ class CDSTrancheBuilder:
 
         Returns
         -------
-        CDSTrancheBuilder
+        CdsTrancheBuilder
             ``self``, for chaining.
 
         Raises
@@ -10692,7 +10692,7 @@ class CDSTrancheBuilder:
             If the builder was already consumed by ``build()``.
         """
         ...
-    def discount_curve_id(self, value: str) -> CDSTrancheBuilder:
+    def discount_curve_id(self, value: str) -> CdsTrancheBuilder:
         """
         Set the discount curve identifier (by quote currency).
 
@@ -10703,7 +10703,7 @@ class CDSTrancheBuilder:
 
         Returns
         -------
-        CDSTrancheBuilder
+        CdsTrancheBuilder
             ``self``, for chaining.
 
         Raises
@@ -10712,7 +10712,7 @@ class CDSTrancheBuilder:
             If the builder was already consumed by ``build()``.
         """
         ...
-    def credit_index_id(self, value: str) -> CDSTrancheBuilder:
+    def credit_index_id(self, value: str) -> CdsTrancheBuilder:
         """
         Set the credit index identifier for survival/loss modeling.
 
@@ -10723,7 +10723,7 @@ class CDSTrancheBuilder:
 
         Returns
         -------
-        CDSTrancheBuilder
+        CdsTrancheBuilder
             ``self``, for chaining.
 
         Raises
@@ -10732,7 +10732,7 @@ class CDSTrancheBuilder:
             If the builder was already consumed by ``build()``.
         """
         ...
-    def side(self, value: Literal["pay", "receive"]) -> CDSTrancheBuilder:
+    def side(self, value: Literal["pay", "receive"]) -> CdsTrancheBuilder:
         """
         Set the tranche side (``"pay"`` buys protection, ``"receive"`` sells it).
 
@@ -10743,7 +10743,7 @@ class CDSTrancheBuilder:
 
         Returns
         -------
-        CDSTrancheBuilder
+        CdsTrancheBuilder
             ``self``, for chaining.
 
         Raises
@@ -10752,7 +10752,7 @@ class CDSTrancheBuilder:
             If the builder was already consumed by ``build()`` or ``value`` is not a recognized side.
         """
         ...
-    def start_date(self, value: datetime.date | datetime.datetime | pd.Timestamp | str) -> CDSTrancheBuilder:
+    def start_date(self, value: datetime.date | datetime.datetime | pd.Timestamp | str) -> CdsTrancheBuilder:
         """
         Set the contract start (effective) date for schedule anchoring.
 
@@ -10763,7 +10763,7 @@ class CDSTrancheBuilder:
 
         Returns
         -------
-        CDSTrancheBuilder
+        CdsTrancheBuilder
             ``self``, for chaining.
 
         Raises
@@ -10772,7 +10772,7 @@ class CDSTrancheBuilder:
             If the builder was already consumed by ``build()`` or the date cannot be interpreted.
         """
         ...
-    def realized_loss(self, value: float) -> CDSTrancheBuilder:
+    def realized_loss(self, value: float) -> CdsTrancheBuilder:
         """
         Set the realized (settled) loss.
 
@@ -10783,7 +10783,7 @@ class CDSTrancheBuilder:
 
         Returns
         -------
-        CDSTrancheBuilder
+        CdsTrancheBuilder
             ``self``, for chaining.
 
         Raises
@@ -10792,7 +10792,7 @@ class CDSTrancheBuilder:
             If the builder was already consumed by ``build()``.
         """
         ...
-    def roll_rule(self, value: RollRule) -> CDSTrancheBuilder:
+    def roll_rule(self, value: RollRule) -> CdsTrancheBuilder:
         """
         Set the coupon roll-date grid.
 
@@ -10805,7 +10805,7 @@ class CDSTrancheBuilder:
 
         Returns
         -------
-        CDSTrancheBuilder
+        CdsTrancheBuilder
             ``self``, for chaining.
 
         Raises
@@ -10816,7 +10816,7 @@ class CDSTrancheBuilder:
         ...
     def stub(
         self, value: StubKind | Literal["none", "short_front", "long_front", "short_back", "long_back"]
-    ) -> CDSTrancheBuilder:
+    ) -> CdsTrancheBuilder:
         """
         Set the stub convention for a bespoke coupon schedule.
 
@@ -10827,7 +10827,7 @@ class CDSTrancheBuilder:
 
         Returns
         -------
-        CDSTrancheBuilder
+        CdsTrancheBuilder
             ``self``, for chaining.
 
         Raises
@@ -10836,7 +10836,7 @@ class CDSTrancheBuilder:
             If the builder was already consumed by ``build()`` or the stub is unknown.
         """
         ...
-    def upfront(self, value: tuple[datetime.date | datetime.datetime | pd.Timestamp | str, Money]) -> CDSTrancheBuilder:
+    def upfront(self, value: tuple[datetime.date | datetime.datetime | pd.Timestamp | str, Money]) -> CdsTrancheBuilder:
         """
         Set the upfront payment.
 
@@ -10847,7 +10847,7 @@ class CDSTrancheBuilder:
 
         Returns
         -------
-        CDSTrancheBuilder
+        CdsTrancheBuilder
             ``self``, for chaining.
 
         Raises
@@ -10858,7 +10858,7 @@ class CDSTrancheBuilder:
             If ``value`` is not a ``(date, Money)`` pair.
         """
         ...
-    def attributes(self, value: Attributes | dict[str, str] | None) -> CDSTrancheBuilder:
+    def attributes(self, value: Attributes | dict[str, str] | None) -> CdsTrancheBuilder:
         """
         Set instrument attributes (tags and metadata).
 
@@ -10869,7 +10869,7 @@ class CDSTrancheBuilder:
 
         Returns
         -------
-        CDSTrancheBuilder
+        CdsTrancheBuilder
             ``self``, for chaining.
 
         Raises
@@ -10883,28 +10883,28 @@ class CDSTrancheBuilder:
     def __repr__(self) -> str:
         """
         Python-style rendering of the fields set so far, e.g.
-        ``CDSTrancheBuilder(id='X', notional=Money(1000000.0, 'USD'))``.
+        ``CdsTrancheBuilder(id='X', notional=Money(1000000.0, 'USD'))``.
 
         Returns
         -------
         str
-            ``CDSTrancheBuilder(<field>=<value>, ...)``.
+            ``CdsTrancheBuilder(<field>=<value>, ...)``.
 
         Notes
         -----
         This method does not raise; it renders the recorded setter calls.
         """
         ...
-    def build(self) -> CDSTranche:
+    def build(self) -> CdsTranche:
         """
         Build the validated CDS tranche.
 
-        Runs only the Rust ``CDSTrancheBuilder::build`` validation (structural
-        invariants); pricing-time checks run in :meth:`CDSTranche.price`.
+        Runs only the Rust ``CdsTrancheBuilder::build`` validation (structural
+        invariants); pricing-time checks run in :meth:`CdsTranche.price`.
 
         Returns
         -------
-        CDSTranche
+        CdsTranche
             The validated instrument.
 
         Raises
@@ -10912,7 +10912,7 @@ class CDSTrancheBuilder:
         ValueError
             If the builder was already consumed, a required field is missing
             (the message names the builder and the field, e.g.
-            ``CDSTrancheBuilder: missing required field 'id'``), or the instrument
+            ``CdsTrancheBuilder: missing required field 'id'``), or the instrument
             fails validation (``attach_pct >= detach_pct``, fractional attach/detach, loss outside ``[0, 1]``).
         """
         ...
@@ -24244,10 +24244,10 @@ def price_instrument(
     | Swaption
     | CapFloor
     | CreditDefaultSwap
-    | CDSIndex
+    | CdsIndex
     | FxForward
     | FxOption
-    | CDSTranche
+    | CdsTranche
     | ConvertibleBond
     | EquityOption
     | StructuredCredit
@@ -24265,11 +24265,11 @@ def price_instrument(
 
     Parameters
     ----------
-    instrument : str or Bond or TermLoan or InterestRateSwap or Swaption or CapFloor or CreditDefaultSwap or CDSIndex or FxForward or FxOption or CDSTranche or ConvertibleBond or EquityOption or StructuredCredit or CompositeInstrument
+    instrument : str or Bond or TermLoan or InterestRateSwap or Swaption or CapFloor or CreditDefaultSwap or CdsIndex or FxForward or FxOption or CdsTranche or ConvertibleBond or EquityOption or StructuredCredit or CompositeInstrument
         Typed instrument instance (:class:`Bond`, :class:`TermLoan`,
         :class:`InterestRateSwap`, :class:`Swaption`, :class:`CapFloor`,
-        :class:`CreditDefaultSwap`, :class:`CDSIndex`, :class:`FxForward`,
-        :class:`FxOption`, :class:`CDSTranche`, :class:`ConvertibleBond`,
+        :class:`CreditDefaultSwap`, :class:`CdsIndex`, :class:`FxForward`,
+        :class:`FxOption`, :class:`CdsTranche`, :class:`ConvertibleBond`,
         :class:`EquityOption`, :class:`StructuredCredit`,
         :class:`~finstack_quant.valuations.composite.CompositeInstrument`) or a
         canonical ``finstack_quant.instrument/1`` JSON envelope.
@@ -24378,10 +24378,10 @@ def instrument_cashflows_json(
     | Swaption
     | CapFloor
     | CreditDefaultSwap
-    | CDSIndex
+    | CdsIndex
     | FxForward
     | FxOption
-    | CDSTranche
+    | CdsTranche
     | ConvertibleBond
     | EquityOption
     | StructuredCredit
@@ -24399,7 +24399,7 @@ def instrument_cashflows_json(
 
     Parameters
     ----------
-    instrument : str or Bond or TermLoan or InterestRateSwap or Swaption or CapFloor or CreditDefaultSwap or CDSIndex or FxForward or FxOption or CDSTranche or ConvertibleBond or EquityOption or StructuredCredit or CompositeInstrument
+    instrument : str or Bond or TermLoan or InterestRateSwap or Swaption or CapFloor or CreditDefaultSwap or CdsIndex or FxForward or FxOption or CdsTranche or ConvertibleBond or EquityOption or StructuredCredit or CompositeInstrument
         Typed instrument instance or a canonical
         ``finstack_quant.instrument/1`` JSON envelope.
     market : MarketContext or str
@@ -28633,7 +28633,7 @@ class StochasticPricingResult:
         Returns
         -------
         dict[str, Any]
-            The ``PricingMode`` serde shape.
+            The ``StructuredCreditPricingMode`` serde shape.
 
         Raises
         ------
@@ -30013,17 +30013,17 @@ def structured_credit_tranche_scenario_table(
     """
     ...
 
-class CDSIndexParams:
+class CdsIndexParams:
     """
     Preset descriptor for a standardized CDS index (typed wrapper for the Rust
-    ``CDSIndexParams``): index identity (name, series, version), fixed running
-    coupon and regional convention. Trade state lives on the :class:`CDSIndex`
-    built with :meth:`CDSIndex.from_preset`. Instances compare by value.
+    ``CdsIndexParams``): index identity (name, series, version), fixed running
+    coupon and regional convention. Trade state lives on the :class:`CdsIndex`
+    built with :meth:`CdsIndex.from_preset`. Instances compare by value.
 
     Examples
     --------
-    >>> from finstack_quant.valuations.instruments import CDSIndexParams
-    >>> preset = CDSIndexParams.cdx_na_ig(42, 1, 100.0)
+    >>> from finstack_quant.valuations.instruments import CdsIndexParams
+    >>> preset = CdsIndexParams.cdx_na_ig(42, 1, 100.0)
     >>> (preset.index_name, preset.convention, preset.num_constituents)
     ('CDX.NA.IG', 'isda_na', 125)
     """
@@ -30065,13 +30065,13 @@ class CDSIndexParams:
 
         Examples
         --------
-        >>> from finstack_quant.valuations.instruments import CDSIndexParams
-        >>> CDSIndexParams("CDX.NA.HY", 42, 1, 500.0).coupon_bp
+        >>> from finstack_quant.valuations.instruments import CdsIndexParams
+        >>> CdsIndexParams("CDX.NA.HY", 42, 1, 500.0).coupon_bp
         500.0
         """
         ...
     @staticmethod
-    def cdx_na_ig(series: int, version: int, coupon_bp: float | Bps) -> CDSIndexParams:
+    def cdx_na_ig(series: int, version: int, coupon_bp: float | Bps) -> CdsIndexParams:
         """
         CDX North American Investment Grade preset (125 names, ``isda_na``).
 
@@ -30086,7 +30086,7 @@ class CDSIndexParams:
 
         Returns
         -------
-        CDSIndexParams
+        CdsIndexParams
             The preset.
 
         Raises
@@ -30096,13 +30096,13 @@ class CDSIndexParams:
 
         Examples
         --------
-        >>> from finstack_quant.valuations.instruments import CDSIndexParams
-        >>> CDSIndexParams.cdx_na_ig(42, 1, 100.0).num_constituents
+        >>> from finstack_quant.valuations.instruments import CdsIndexParams
+        >>> CdsIndexParams.cdx_na_ig(42, 1, 100.0).num_constituents
         125
         """
         ...
     @staticmethod
-    def cdx_na_hy(series: int, version: int, coupon_bp: float | Bps) -> CDSIndexParams:
+    def cdx_na_hy(series: int, version: int, coupon_bp: float | Bps) -> CdsIndexParams:
         """
         CDX North American High Yield preset (100 names, ``isda_na``).
 
@@ -30117,7 +30117,7 @@ class CDSIndexParams:
 
         Returns
         -------
-        CDSIndexParams
+        CdsIndexParams
             The preset.
 
         Raises
@@ -30127,13 +30127,13 @@ class CDSIndexParams:
 
         Examples
         --------
-        >>> from finstack_quant.valuations.instruments import CDSIndexParams
-        >>> CDSIndexParams.cdx_na_hy(42, 1, 500.0).num_constituents
+        >>> from finstack_quant.valuations.instruments import CdsIndexParams
+        >>> CdsIndexParams.cdx_na_hy(42, 1, 500.0).num_constituents
         100
         """
         ...
     @staticmethod
-    def itraxx_europe(series: int, version: int, coupon_bp: float | Bps) -> CDSIndexParams:
+    def itraxx_europe(series: int, version: int, coupon_bp: float | Bps) -> CdsIndexParams:
         """
         iTraxx Europe Main preset (125 names, ``isda_eu``).
 
@@ -30148,7 +30148,7 @@ class CDSIndexParams:
 
         Returns
         -------
-        CDSIndexParams
+        CdsIndexParams
             The preset.
 
         Raises
@@ -30158,8 +30158,8 @@ class CDSIndexParams:
 
         Examples
         --------
-        >>> from finstack_quant.valuations.instruments import CDSIndexParams
-        >>> CDSIndexParams.itraxx_europe(41, 1, 100.0).convention
+        >>> from finstack_quant.valuations.instruments import CdsIndexParams
+        >>> CdsIndexParams.itraxx_europe(41, 1, 100.0).convention
         'isda_eu'
         """
         ...
@@ -30278,12 +30278,12 @@ class CDSIndexParams:
         ...
     def __repr__(self) -> str:
         """
-        Python-style rendering of the key economics, e.g. ``CDSIndexParams(index_name='CDX.NA.IG', series=42, version=1, coupon_bp=100.0, convention='isda_na', num_constituents=125)``.
+        Python-style rendering of the key economics, e.g. ``CdsIndexParams(index_name='CDX.NA.IG', series=42, version=1, coupon_bp=100.0, convention='isda_na', num_constituents=125)``.
 
         Returns
         -------
         str
-            ``CDSIndexParams(<field>=<value>, ...)``.
+            ``CdsIndexParams(<field>=<value>, ...)``.
 
         Notes
         -----
@@ -30291,17 +30291,17 @@ class CDSIndexParams:
         """
         ...
 
-class CDSIndexConstituent:
+class CdsIndexConstituent:
     """
     One reference entity in a CDS index (typed wrapper for the Rust
-    ``CDSIndexConstituent``): issuer credit parameters, index weight and
-    default flag. Accepted by :meth:`CDSIndexBuilder.constituents` alongside
+    ``CdsIndexConstituent``): issuer credit parameters, index weight and
+    default flag. Accepted by :meth:`CdsIndexBuilder.constituents` alongside
     dicts / JSON of the same shape; picklable.
 
     Examples
     --------
-    >>> from finstack_quant.valuations.instruments import CDSIndexConstituent
-    >>> row = CDSIndexConstituent("ACME-CORP", 0.4, "ACME-HZD", 1 / 125)
+    >>> from finstack_quant.valuations.instruments import CdsIndexConstituent
+    >>> row = CdsIndexConstituent("ACME-CORP", 0.4, "ACME-HZD", 1 / 125)
     >>> (row.reference_entity, row.defaulted)
     ('ACME-CORP', False)
     """
@@ -30337,13 +30337,13 @@ class CDSIndexConstituent:
 
         Examples
         --------
-        >>> from finstack_quant.valuations.instruments import CDSIndexConstituent
-        >>> CDSIndexConstituent("ACME-CORP", 0.4, "ACME-HZD", 0.008).weight
+        >>> from finstack_quant.valuations.instruments import CdsIndexConstituent
+        >>> CdsIndexConstituent("ACME-CORP", 0.4, "ACME-HZD", 0.008).weight
         0.008
         """
         ...
     @classmethod
-    def from_json(cls, json: str) -> CDSIndexConstituent:
+    def from_json(cls, json: str) -> CdsIndexConstituent:
         """
         Deserialize from the canonical JSON shape.
 
@@ -30355,7 +30355,7 @@ class CDSIndexConstituent:
 
         Returns
         -------
-        CDSIndexConstituent
+        CdsIndexConstituent
             The parsed constituent.
 
         Raises
@@ -30365,9 +30365,9 @@ class CDSIndexConstituent:
 
         Examples
         --------
-        >>> from finstack_quant.valuations.instruments import CDSIndexConstituent
-        >>> row = CDSIndexConstituent("ACME-CORP", 0.4, "ACME-HZD", 0.008)
-        >>> CDSIndexConstituent.from_json(row.to_json()).credit_curve_id
+        >>> from finstack_quant.valuations.instruments import CdsIndexConstituent
+        >>> row = CdsIndexConstituent("ACME-CORP", 0.4, "ACME-HZD", 0.008)
+        >>> CdsIndexConstituent.from_json(row.to_json()).credit_curve_id
         'ACME-HZD'
         """
         ...
@@ -30378,7 +30378,7 @@ class CDSIndexConstituent:
         Returns
         -------
         str
-            JSON accepted by :meth:`from_json` and :meth:`CDSIndexBuilder.constituents`.
+            JSON accepted by :meth:`from_json` and :meth:`CdsIndexBuilder.constituents`.
 
         Raises
         ------
@@ -30463,12 +30463,12 @@ class CDSIndexConstituent:
         ...
     def __repr__(self) -> str:
         """
-        Python-style rendering of the key economics, e.g. ``CDSIndexConstituent(reference_entity='ACME-CORP', recovery_rate=0.4, credit_curve_id='ACME-HZD', weight=0.008, defaulted=False)``.
+        Python-style rendering of the key economics, e.g. ``CdsIndexConstituent(reference_entity='ACME-CORP', recovery_rate=0.4, credit_curve_id='ACME-HZD', weight=0.008, defaulted=False)``.
 
         Returns
         -------
         str
-            ``CDSIndexConstituent(<field>=<value>, ...)``.
+            ``CdsIndexConstituent(<field>=<value>, ...)``.
 
         Notes
         -----
@@ -30476,12 +30476,12 @@ class CDSIndexConstituent:
         """
         ...
 
-class CDSTrancheParams:
+class CdsTrancheParams:
     """
     Economic terms of an index tranche (typed wrapper for the Rust
-    ``CDSTrancheParams``). Attachment and detachment are quoted in percent
+    ``CdsTrancheParams``). Attachment and detachment are quoted in percent
     points (``3.0`` = 3%), the running coupon in basis points. Pass to
-    :meth:`CDSTranche.standard` for a tranche on the standard quarterly
+    :meth:`CdsTranche.standard` for a tranche on the standard quarterly
     ACT/360 schedule.
 
     Examples
@@ -30489,8 +30489,8 @@ class CDSTrancheParams:
     >>> import datetime
     >>> from finstack_quant.core.currency import Currency
     >>> from finstack_quant.core.money import Money
-    >>> from finstack_quant.valuations.instruments import CDSTrancheParams
-    >>> params = CDSTrancheParams.mezzanine_tranche(
+    >>> from finstack_quant.valuations.instruments import CdsTrancheParams
+    >>> params = CdsTrancheParams.mezzanine_tranche(
     ...     "CDX.NA.IG", 42, Money(10_000_000.0, Currency("USD")), datetime.date(2029, 12, 20), 100.0
     ... )
     >>> (params.attach_pct, params.detach_pct)
@@ -30542,8 +30542,8 @@ class CDSTrancheParams:
         --------
         >>> from finstack_quant.core.currency import Currency
         >>> from finstack_quant.core.money import Money
-        >>> from finstack_quant.valuations.instruments import CDSTrancheParams
-        >>> CDSTrancheParams(
+        >>> from finstack_quant.valuations.instruments import CdsTrancheParams
+        >>> CdsTrancheParams(
         ...     "CDX.NA.IG", 42, 7.0, 15.0, Money(5_000_000.0, Currency("USD")), "2029-12-20", 100.0
         ... ).coupon_bp
         100.0
@@ -30556,7 +30556,7 @@ class CDSTrancheParams:
         notional: Money,
         maturity: datetime.date | datetime.datetime | pd.Timestamp | str,
         coupon_bp: float | Bps,
-    ) -> CDSTrancheParams:
+    ) -> CdsTrancheParams:
         """
         Standard equity tranche (0%–3%).
 
@@ -30575,7 +30575,7 @@ class CDSTrancheParams:
 
         Returns
         -------
-        CDSTrancheParams
+        CdsTrancheParams
             Tranche terms with ``attach_pct=0.0`` and ``detach_pct=3.0``.
 
         Raises
@@ -30589,8 +30589,8 @@ class CDSTrancheParams:
         --------
         >>> from finstack_quant.core.currency import Currency
         >>> from finstack_quant.core.money import Money
-        >>> from finstack_quant.valuations.instruments import CDSTrancheParams
-        >>> CDSTrancheParams.equity_tranche(
+        >>> from finstack_quant.valuations.instruments import CdsTrancheParams
+        >>> CdsTrancheParams.equity_tranche(
         ...     "CDX.NA.IG", 42, Money(1e7, Currency("USD")), "2029-12-20", 500.0
         ... ).detach_pct
         3.0
@@ -30603,7 +30603,7 @@ class CDSTrancheParams:
         notional: Money,
         maturity: datetime.date | datetime.datetime | pd.Timestamp | str,
         coupon_bp: float | Bps,
-    ) -> CDSTrancheParams:
+    ) -> CdsTrancheParams:
         """
         Standard mezzanine tranche (3%–7%).
 
@@ -30622,7 +30622,7 @@ class CDSTrancheParams:
 
         Returns
         -------
-        CDSTrancheParams
+        CdsTrancheParams
             Tranche terms with ``attach_pct=3.0`` and ``detach_pct=7.0``.
 
         Raises
@@ -30636,8 +30636,8 @@ class CDSTrancheParams:
         --------
         >>> from finstack_quant.core.currency import Currency
         >>> from finstack_quant.core.money import Money
-        >>> from finstack_quant.valuations.instruments import CDSTrancheParams
-        >>> CDSTrancheParams.mezzanine_tranche(
+        >>> from finstack_quant.valuations.instruments import CdsTrancheParams
+        >>> CdsTrancheParams.mezzanine_tranche(
         ...     "CDX.NA.IG", 42, Money(1e7, Currency("USD")), "2029-12-20", 100.0
         ... ).attach_pct
         3.0
@@ -30767,12 +30767,12 @@ class CDSTrancheParams:
         ...
     def __repr__(self) -> str:
         """
-        Python-style rendering of the key economics, e.g. ``CDSTrancheParams(index_name='CDX.NA.IG', series=42, attach_pct=3.0, detach_pct=7.0, ...)``.
+        Python-style rendering of the key economics, e.g. ``CdsTrancheParams(index_name='CDX.NA.IG', series=42, attach_pct=3.0, detach_pct=7.0, ...)``.
 
         Returns
         -------
         str
-            ``CDSTrancheParams(<field>=<value>, ...)``.
+            ``CdsTrancheParams(<field>=<value>, ...)``.
 
         Notes
         -----

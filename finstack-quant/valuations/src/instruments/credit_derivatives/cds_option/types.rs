@@ -1,4 +1,4 @@
-//! `CDSOption` instrument: European option to enter a forward CDS at a
+//! `CdsOption` instrument: European option to enter a forward CDS at a
 //! typed strike — a forward spread, or a clean index price (CDX HY
 //! convention).
 //!
@@ -11,7 +11,7 @@
 //!
 //! # Validation
 //!
-//! `CDSOption::new` validates all inputs at construction time:
+//! `CdsOption::new` validates all inputs at construction time:
 //! - Spread strikes must be positive and within the distressed-credit bound;
 //!   clean-price strikes must be positive percentage points (values above
 //!   100 are valid)
@@ -41,7 +41,7 @@ use finstack_quant_core::types::{CurveId, InstrumentId};
 use rust_decimal::Decimal;
 use time::Month;
 
-use super::parameters::CDSOptionParams;
+use super::parameters::CdsOptionParams;
 use crate::impl_instrument_base;
 
 /// Maximum valid implied volatility (inclusive upper bound).
@@ -88,12 +88,12 @@ pub enum ProtectionStartConvention {
 )]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
-pub struct CDSOption {
+pub struct CdsOption {
     /// Unique instrument identifier
     pub id: InstrumentId,
     /// Typed option strike: a decimal forward spread (`{"spread": "0.0325"}`)
     /// or a clean price in percentage points (`{"clean_price_pct": "107.0"}`).
-    pub strike: super::strike::CDSOptionStrike,
+    pub strike: super::strike::CdsOptionStrike,
     /// Option type (Call = right to buy protection, Put = right to sell protection)
     pub option_type: OptionType,
     /// Exercise style
@@ -226,7 +226,7 @@ pub struct CDSOption {
     /// valuation reduce `f` below `f0`. A clean-price strike quotes the
     /// price on `f0` notional, so its deterministic payoff term scales by
     /// `f0 / f`; the strike factor is therefore required for clean-price
-    /// strikes (`CDSOptionStrike::CleanPricePct`) and must not be inferred
+    /// strikes (`CdsOptionStrike::CleanPricePct`) and must not be inferred
     /// from the current factor after a default. Rejected for spread
     /// strikes, whose payoff does not reference it.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -260,7 +260,7 @@ pub struct CDSOption {
     pub coupon_bp: Option<Decimal>,
 }
 
-impl CDSOption {
+impl CdsOption {
     pub(crate) fn validate_supported_configuration(&self) -> finstack_quant_core::Result<()> {
         if self.exercise_style != ExerciseStyle::European {
             return Err(finstack_quant_core::Error::Validation(format!(
@@ -276,7 +276,7 @@ impl CDSOption {
         Ok(())
     }
 
-    /// Validate the CDSOption parameters.
+    /// Validate the CdsOption parameters.
     fn validate(&self) -> finstack_quant_core::Result<()> {
         use crate::instruments::common_impl::validation;
 
@@ -382,10 +382,10 @@ impl CDSOption {
     /// directly. Spread strikes reject `strike_index_factor` as an inert
     /// input.
     fn validate_strike_state(&self) -> finstack_quant_core::Result<()> {
-        use super::strike::CDSOptionStrike;
+        use super::strike::CdsOptionStrike;
 
         match &self.strike {
-            CDSOptionStrike::Spread(_) => {
+            CdsOptionStrike::Spread(_) => {
                 if self.strike_index_factor.is_some() {
                     return Err(finstack_quant_core::Error::Validation(
                         "strike_index_factor is only meaningful for clean-price strikes; \
@@ -395,7 +395,7 @@ impl CDSOption {
                 }
                 Ok(())
             }
-            CDSOptionStrike::CleanPricePct(_) => {
+            CdsOptionStrike::CleanPricePct(_) => {
                 if !self.underlying_is_index {
                     return Err(finstack_quant_core::Error::Validation(
                         "clean-price strikes are an index-option convention; \
@@ -446,8 +446,8 @@ impl CDSOption {
     pub fn example() -> finstack_quant_core::Result<Self> {
         use finstack_quant_core::currency::Currency;
         use time::macros::date;
-        let option_params = CDSOptionParams::call(
-            super::strike::CDSOptionStrike::Spread(Decimal::new(1, 2)), // 0.01 = 100bp
+        let option_params = CdsOptionParams::call(
+            super::strike::CdsOptionStrike::Spread(Decimal::new(1, 2)), // 0.01 = 100bp
             date!(2025 - 06 - 20),
             date!(2030 - 06 - 20),
             Money::from((10_000_000_i64, Currency::USD)),
@@ -457,7 +457,7 @@ impl CDSOption {
                 "CORP",
                 "CORP-HAZARD",
             );
-        CDSOption::new(
+        CdsOption::new(
             InstrumentId::new("CDSOPT-CALL-CORP-5Y"),
             &option_params,
             &credit_params,
@@ -478,10 +478,10 @@ impl CDSOption {
     ///
     /// # Errors
     ///
-    /// Returns an error if any validation fails. See [`CDSOptionParams`] for parameter constraints.
+    /// Returns an error if any validation fails. See [`CdsOptionParams`] for parameter constraints.
     pub fn new(
         id: impl Into<InstrumentId>,
-        option_params: &CDSOptionParams,
+        option_params: &CdsOptionParams,
         credit_params: &CreditParams,
         discount_curve_id: impl Into<CurveId>,
         vol_surface_id: impl Into<CurveId>,
@@ -564,8 +564,8 @@ impl CDSOption {
             return Ok(coupon_bp);
         }
         match &self.strike {
-            super::strike::CDSOptionStrike::Spread(s) => Ok(*s * Decimal::new(10_000, 0)),
-            super::strike::CDSOptionStrike::CleanPricePct(p) => {
+            super::strike::CdsOptionStrike::Spread(s) => Ok(*s * Decimal::new(10_000, 0)),
+            super::strike::CdsOptionStrike::CleanPricePct(p) => {
                 Err(finstack_quant_core::Error::Validation(format!(
                     "CDS option '{}' has clean-price strike {p} and no explicit \
                      coupon_bp; a price strike cannot serve as the running coupon",
@@ -689,7 +689,7 @@ pub(crate) fn prior_cds_roll_on_or_before(date: Date) -> Date {
     Date::from_calendar_date(date.year().saturating_sub(1), Month::December, 20).unwrap_or(date)
 }
 
-impl crate::instruments::common_impl::traits::Instrument for CDSOption {
+impl crate::instruments::common_impl::traits::Instrument for CdsOption {
     impl_instrument_base!(crate::pricer::InstrumentType::CdsOption);
 
     fn validate_invariants(&self) -> finstack_quant_core::Result<()> {
@@ -740,7 +740,7 @@ impl crate::instruments::common_impl::traits::Instrument for CDSOption {
 
 // Declare canonical market dependencies for the DV01 calculator.
 crate::impl_empty_cashflow_provider!(
-    CDSOption,
+    CdsOption,
     crate::cashflow::builder::CashflowRepresentation::Placeholder
 );
 
@@ -748,21 +748,21 @@ crate::impl_empty_cashflow_provider!(
 mod tests {
     use super::*;
     use crate::instruments::common_impl::traits::Instrument;
-    use crate::instruments::credit_derivatives::cds_option::CDSOptionStrike;
+    use crate::instruments::credit_derivatives::cds_option::CdsOptionStrike;
     use finstack_quant_core::currency::Currency;
     use time::macros::date;
 
     #[test]
     fn cash_settlement_date_defaults_to_t_plus_settle_lag() {
-        let option_params = CDSOptionParams::call(
-            CDSOptionStrike::Spread(Decimal::from_str_exact("0.0058395400").expect("valid strike")),
+        let option_params = CdsOptionParams::call(
+            CdsOptionStrike::Spread(Decimal::from_str_exact("0.0058395400").expect("valid strike")),
             date!(2026 - 06 - 26),
             date!(2031 - 06 - 20),
             Money::from((10_000_000_i64, Currency::USD)),
         )
         .expect("valid option params");
         let credit_params = CreditParams::corporate_standard("IBM", "IBM-USD-SENIOR");
-        let option = CDSOption::new(
+        let option = CdsOption::new(
             "IBM-USD-CDSO-PAYER-ATM-3M-20260502",
             &option_params,
             &credit_params,
@@ -791,8 +791,8 @@ mod tests {
 
     #[test]
     fn index_option_requires_coupon_bp() {
-        let option_params = CDSOptionParams::call(
-            CDSOptionStrike::Spread(Decimal::from_str_exact("0.005").expect("valid strike")),
+        let option_params = CdsOptionParams::call(
+            CdsOptionStrike::Spread(Decimal::from_str_exact("0.005").expect("valid strike")),
             date!(2026 - 06 - 26),
             date!(2031 - 06 - 20),
             Money::from((10_000_000_i64, Currency::USD)),
@@ -802,7 +802,7 @@ mod tests {
         .expect("valid index factor");
         let credit_params = CreditParams::corporate_standard("CDX", "CDX-IG");
 
-        let err = CDSOption::new(
+        let err = CdsOption::new(
             "CDX-CDSO-MISSING-COUPON",
             &option_params,
             &credit_params,
@@ -819,7 +819,7 @@ mod tests {
 
     #[test]
     fn pricing_boundary_rejects_non_finite_and_unsupported_terms() {
-        let mut option = CDSOption::example().expect("example");
+        let mut option = CdsOption::example().expect("example");
         option.recovery_rate = f64::NAN;
         assert!(option
             .validate_for_pricing()
@@ -838,7 +838,7 @@ mod tests {
 
     #[test]
     fn production_cds_option_audit_exercise_payment_not_before_expiry() {
-        let mut option = CDSOption::example().expect("example");
+        let mut option = CdsOption::example().expect("example");
         option.exercise_settlement_date = Some(option.expiry - time::Duration::days(1));
         let error = option.validate().expect_err("cannot pay before exercise");
         assert!(error.to_string().contains("on or after legal expiry"));

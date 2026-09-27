@@ -8,7 +8,7 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
 use finstack_quant_valuations::instruments::credit_derivatives::cds::PayReceive;
 use finstack_quant_valuations::instruments::credit_derivatives::cds_index::{
-    CDSIndex, CDSIndexConstituent, CDSIndexParams,
+    CdsIndex, CdsIndexConstituent, CdsIndexParams,
 };
 use finstack_quant_valuations::instruments::CreditParams;
 use finstack_quant_valuations::instruments::Instrument;
@@ -46,8 +46,8 @@ fn imm_20th_schedule_for_index_synthetic() {
     let start = as_of;
     let end = Date::from_calendar_date(2028, Month::January, 1).unwrap();
 
-    let idx = CDSIndex::from_preset(
-        &CDSIndexParams::cdx_na_ig(42, 1, 100.0),
+    let idx = CdsIndex::from_preset(
+        &CdsIndexParams::cdx_na_ig(42, 1, 100.0),
         "CDX-IMM",
         Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         PayReceive::Pay,
@@ -97,16 +97,16 @@ fn index_factor_scales_pv() {
         ctx = ctx.insert(flat_hazard(hid, as_of, rec, hz));
     }
 
-    let cons: Vec<CDSIndexConstituent> = names
+    let cons: Vec<CdsIndexConstituent> = names
         .iter()
         .map(|(n, hid)| {
-            CDSIndexConstituent::active(CreditParams::corporate_standard(*n, *hid), 1.0 / 5.0)
+            CdsIndexConstituent::active(CreditParams::corporate_standard(*n, *hid), 1.0 / 5.0)
         })
         .collect();
 
-    let preset = CDSIndexParams::cdx_na_ig(42, 1, 100.0);
+    let preset = CdsIndexParams::cdx_na_ig(42, 1, 100.0);
 
-    let idx_base = CDSIndex::from_preset(
+    let idx_base = CdsIndex::from_preset(
         &preset,
         "CDX-BASE",
         Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
@@ -120,7 +120,7 @@ fn index_factor_scales_pv() {
     .expect("valid test parameters")
     .with_constituents(cons.clone());
 
-    let idx_scaled = CDSIndex::from_preset(
+    let idx_scaled = CdsIndex::from_preset(
         &preset,
         "CDX-SCALED",
         Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),

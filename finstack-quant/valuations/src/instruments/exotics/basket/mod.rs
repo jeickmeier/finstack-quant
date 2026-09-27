@@ -123,7 +123,7 @@
 //! - [`Basket`] for main instrument struct
 //! - `BasketConstituent` for constituent specification
 //! - `ConstituentReference` for market data vs instrument references
-//! - `AssetType` for constituent asset classification
+//! - `BasketAssetType` for constituent asset classification
 
 pub(crate) mod metrics;
 pub(crate) mod pricer;
@@ -131,6 +131,8 @@ pub(crate) mod types;
 
 // Builder is generated via derive on `Basket`.
 pub use pricer::BasketCalculator;
-pub use types::{AssetType, Basket, BasketConstituent, BasketPricingConfig, ConstituentReference};
+pub use types::{
+    Basket, BasketAssetType, BasketConstituent, BasketPricingConfig, ConstituentReference,
+};
 
 // Generic pricer implementation is used directly via common_impl::GenericInstrumentPricer

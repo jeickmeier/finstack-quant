@@ -12,12 +12,12 @@ use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::StubKind;
 use finstack_quant_core::money::Money;
 use finstack_quant_valuations::instruments::credit_derivatives::cds_option::{
-    CDSOptionParams, CDSOptionStrike,
+    CdsOptionParams, CdsOptionStrike,
 };
-use finstack_quant_valuations::instruments::credit_derivatives::cds_tranche::CDSTrancheParams;
+use finstack_quant_valuations::instruments::credit_derivatives::cds_tranche::CdsTrancheParams;
 use finstack_quant_valuations::instruments::PayReceive;
 use finstack_quant_valuations::instruments::{
-    CDSOption, CDSTranche, CreditDefaultSwap, CreditParams, StructuredCredit,
+    CdsOption, CdsTranche, CreditDefaultSwap, CreditParams, StructuredCredit,
 };
 use serde::de::DeserializeOwned;
 use serde::Serialize;
@@ -79,18 +79,18 @@ fn market_quote_upfront_payment_is_rejected() {
 }
 
 #[test]
-// schema-rejection-test: CDSTranche root `running_coupon_bp`, `accumulated_loss`, `standard_imm_dates`
+// schema-rejection-test: CdsTranche root `running_coupon_bp`, `accumulated_loss`, `standard_imm_dates`
 fn cds_tranche_retired_keys_are_rejected() {
-    let tranche = CDSTranche::example();
+    let tranche = CdsTranche::example();
     assert_rejects_at(&tranche, "", "running_coupon_bp", serde_json::json!(100.0));
     assert_rejects_at(&tranche, "", "accumulated_loss", serde_json::json!(0.0));
     assert_rejects_at(&tranche, "", "standard_imm_dates", serde_json::json!(true));
 }
 
 #[test]
-// schema-rejection-test: CDSOption root `underlying_cds_coupon`, `realized_index_loss`
+// schema-rejection-test: CdsOption root `underlying_cds_coupon`, `realized_index_loss`
 fn cds_option_retired_keys_are_rejected() {
-    let option = CDSOption::example().expect("example");
+    let option = CdsOption::example().expect("example");
     assert_rejects_at(
         &option,
         "",
@@ -130,7 +130,7 @@ fn cds_premium_rejects_futures_imm_roll_rule() {
 
 #[test]
 fn cds_tranche_new_carries_schedule_stub_and_roll_rule() {
-    let params = CDSTrancheParams::equity_tranche(
+    let params = CdsTrancheParams::equity_tranche(
         "CDX.NA.IG",
         42,
         Money::new(10_000_000.0, Currency::USD).expect("money"),
@@ -139,7 +139,7 @@ fn cds_tranche_new_carries_schedule_stub_and_roll_rule() {
     );
     let mut schedule = ScheduleParams::quarterly_act360();
     schedule.stub = StubKind::LongFront;
-    let tranche = CDSTranche::new(
+    let tranche = CdsTranche::new(
         "TR-STUB",
         &params,
         &schedule,
@@ -151,7 +151,7 @@ fn cds_tranche_new_carries_schedule_stub_and_roll_rule() {
     assert_eq!(tranche.stub, StubKind::LongFront);
     assert_eq!(tranche.roll_rule, RollRule::None);
 
-    let standard = CDSTranche::example();
+    let standard = CdsTranche::example();
     assert_eq!(standard.roll_rule, RollRule::CdsImm);
 
     let mut imm = standard;
@@ -162,15 +162,15 @@ fn cds_tranche_new_carries_schedule_stub_and_roll_rule() {
 
 #[test]
 fn cds_option_accepts_zero_recovery_like_every_credit_instrument() {
-    let option_params = CDSOptionParams::call(
-        CDSOptionStrike::Spread(rust_decimal::Decimal::new(1, 2)),
+    let option_params = CdsOptionParams::call(
+        CdsOptionStrike::Spread(rust_decimal::Decimal::new(1, 2)),
         date!(2025 - 06 - 20),
         date!(2030 - 06 - 20),
         Money::new(10_000_000.0, Currency::USD).expect("money"),
     )
     .expect("option params");
     let credit_params = CreditParams::new("ACME", 0.0, "ACME-HAZARD");
-    let option = CDSOption::new(
+    let option = CdsOption::new(
         "CDSO-ZERO-R",
         &option_params,
         &credit_params,
@@ -184,7 +184,7 @@ fn cds_option_accepts_zero_recovery_like_every_credit_instrument() {
 
     let one = CreditParams::new("ACME", 1.0, "ACME-HAZARD");
     assert!(
-        CDSOption::new("CDSO-FULL-R", &option_params, &one, "USD-OIS", "CDSO-VOL").is_err(),
+        CdsOption::new("CDSO-FULL-R", &option_params, &one, "USD-OIS", "CDSO-VOL").is_err(),
         "full recovery leaves no protection and is rejected"
     );
 }
@@ -193,7 +193,7 @@ fn cds_option_accepts_zero_recovery_like_every_credit_instrument() {
 fn cds_tranche_side_uses_pay_receive_like_cds() {
     // A tranche buyer pays the running premium, exactly like a CDS/CDS-index
     // `pay` side: `pay` buys protection, `receive` sells it.
-    let tranche = CDSTranche::example();
+    let tranche = CdsTranche::example();
     assert_eq!(tranche.side, PayReceive::Pay);
     let json = serde_json::to_value(&tranche).expect("serialize");
     assert_eq!(json["side"], "pay");
@@ -205,7 +205,7 @@ fn cds_tranche_side_uses_pay_receive_like_cds() {
         let mut value = json.clone();
         value["side"] = serde_json::json!(retired);
         assert!(
-            serde_json::from_value::<CDSTranche>(value).is_err(),
+            serde_json::from_value::<CdsTranche>(value).is_err(),
             "retired tranche side {retired} must be rejected"
         );
     }

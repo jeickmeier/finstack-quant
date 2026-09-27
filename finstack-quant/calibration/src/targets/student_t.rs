@@ -29,7 +29,7 @@
 //!   dependent credit derivatives using a structural model."
 
 use crate::api::schema::StudentTParams;
-use crate::build::cds_tranche::{build_cds_tranche_instrument, CDSTrancheBuildOverrides};
+use crate::build::cds_tranche::{build_cds_tranche_instrument, CdsTrancheBuildOverrides};
 use crate::build::BuildCtx;
 use crate::config::CalibrationConfig;
 use crate::quotes::market_quote::MarketQuote;
@@ -42,7 +42,7 @@ use finstack_quant_core::market_data::term_structures::CreditIndexData;
 use finstack_quant_core::types::CurveId;
 use finstack_quant_core::Result;
 use finstack_quant_valuations::instruments::credit_derivatives::cds_tranche::{
-    CDSTranche, CDSTranchePricer, CDSTranchePricerConfig,
+    CdsTranche, CdsTranchePricer, CdsTranchePricerConfig,
 };
 use std::collections::BTreeMap;
 
@@ -190,14 +190,14 @@ impl StudentTTarget {
         let instrument = build_cds_tranche_instrument(
             &pricing_quote,
             &build_context,
-            &CDSTrancheBuildOverrides::default(),
+            &CdsTrancheBuildOverrides::default(),
         )?;
         let tranche = instrument
             .as_any()
-            .downcast_ref::<CDSTranche>()
+            .downcast_ref::<CdsTranche>()
             .ok_or_else(|| {
                 finstack_quant_core::Error::Validation(
-                    "shared tranche quote builder did not return CDSTranche".to_string(),
+                    "shared tranche quote builder did not return CdsTranche".to_string(),
                 )
             })?
             .clone();
@@ -209,7 +209,7 @@ impl StudentTTarget {
     /// Run the Brent root-finding calibration over the df domain.
     fn calibrate_df(
         &self,
-        tranche: &CDSTranche,
+        tranche: &CdsTranche,
         market_upfront: f64,
         as_of: Date,
     ) -> Result<(MarketContext, f64, CalibrationReport)> {
@@ -225,7 +225,7 @@ impl StudentTTarget {
             .tolerance()
             .max(STUDENT_T_UPFRONT_TOLERANCE);
 
-        let template = CDSTranchePricerConfig::default();
+        let template = CdsTranchePricerConfig::default();
         let price_residual = |df: f64| -> f64 {
             if df <= 2.0 || !df.is_finite() {
                 return f64::INFINITY;
@@ -233,7 +233,7 @@ impl StudentTTarget {
             let Ok(config) = template.clone().with_student_t_copula(df) else {
                 return f64::INFINITY;
             };
-            let Ok(pricer) = CDSTranchePricer::with_params(config) else {
+            let Ok(pricer) = CdsTranchePricer::with_params(config) else {
                 return f64::INFINITY;
             };
             match pricer.calculate_model_upfront(tranche, &self.base_context, as_of) {

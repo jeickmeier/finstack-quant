@@ -15,7 +15,7 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
 use finstack_quant_valuations::instruments::credit_derivatives::cds::PayReceive;
 use finstack_quant_valuations::instruments::credit_derivatives::cds_index::{
-    CDSIndex, CDSIndexConstituent, CDSIndexParams,
+    CdsIndex, CdsIndexConstituent, CdsIndexParams,
 };
 use finstack_quant_valuations::instruments::CreditParams;
 use finstack_quant_valuations::instruments::Instrument;
@@ -145,14 +145,14 @@ fn test_constituents_weights_dont_sum_to_one() {
     let as_of = start;
 
     let constituents = vec![
-        CDSIndexConstituent::active(CreditParams::corporate_standard("N1", "HZ1"), 0.3),
-        CDSIndexConstituent::active(CreditParams::corporate_standard("N2", "HZ2"), 0.3),
-        CDSIndexConstituent::active(CreditParams::corporate_standard("N3", "HZ3"), 0.3),
+        CdsIndexConstituent::active(CreditParams::corporate_standard("N1", "HZ1"), 0.3),
+        CdsIndexConstituent::active(CreditParams::corporate_standard("N2", "HZ2"), 0.3),
+        CdsIndexConstituent::active(CreditParams::corporate_standard("N3", "HZ3"), 0.3),
         // Sum = 0.9, not 1.0
     ];
 
-    let idx = CDSIndex::from_preset(
-        &CDSIndexParams::cdx_na_ig(42, 1, 100.0),
+    let idx = CdsIndex::from_preset(
+        &CdsIndexParams::cdx_na_ig(42, 1, 100.0),
         "CDX-BAD-WEIGHTS",
         Money::new(TEST_NOTIONAL, Currency::USD).expect("valid money fixture"),
         PayReceive::Pay,
@@ -180,12 +180,12 @@ fn test_negative_weights() {
     let as_of = start;
 
     let constituents = vec![
-        CDSIndexConstituent::active(CreditParams::corporate_standard("N1", "HZ1"), -0.5),
-        CDSIndexConstituent::active(CreditParams::corporate_standard("N2", "HZ2"), 1.5),
+        CdsIndexConstituent::active(CreditParams::corporate_standard("N1", "HZ1"), -0.5),
+        CdsIndexConstituent::active(CreditParams::corporate_standard("N2", "HZ2"), 1.5),
     ];
 
-    let idx = CDSIndex::from_preset(
-        &CDSIndexParams::cdx_na_ig(42, 1, 100.0),
+    let idx = CdsIndex::from_preset(
+        &CdsIndexParams::cdx_na_ig(42, 1, 100.0),
         "CDX-NEG-WEIGHTS",
         Money::new(TEST_NOTIONAL, Currency::USD).expect("valid money fixture"),
         PayReceive::Pay,
@@ -211,7 +211,7 @@ fn test_recovery_rate_zero() {
     let end = date!(2030 - 01 - 01);
     let as_of = start;
 
-    let idx = CDSIndex::from_preset(
+    let idx = CdsIndex::from_preset(
         &standard_cdx_params(),
         "CDX-ZERO-REC",
         Money::new(TEST_NOTIONAL, Currency::USD).expect("valid money fixture"),
@@ -246,7 +246,7 @@ fn test_recovery_rate_one() {
     let end = date!(2030 - 01 - 01);
     let as_of = start;
 
-    let idx = CDSIndex::from_preset(
+    let idx = CdsIndex::from_preset(
         &standard_cdx_params(),
         "CDX-FULL-REC",
         Money::new(TEST_NOTIONAL, Currency::USD).expect("valid money fixture"),
@@ -281,8 +281,8 @@ fn test_index_factor_zero() {
     let end = date!(2030 - 01 - 01);
     let as_of = start;
 
-    let idx = CDSIndex::from_preset(
-        &CDSIndexParams::cdx_na_ig(42, 1, 100.0),
+    let idx = CdsIndex::from_preset(
+        &CdsIndexParams::cdx_na_ig(42, 1, 100.0),
         "CDX-ZERO-FACTOR",
         Money::new(TEST_NOTIONAL, Currency::USD).expect("valid money fixture"),
         PayReceive::Pay,
@@ -314,8 +314,8 @@ fn test_index_factor_greater_than_one() {
     let end = date!(2030 - 01 - 01);
     let as_of = start;
 
-    let idx = CDSIndex::from_preset(
-        &CDSIndexParams::cdx_na_ig(42, 1, 100.0),
+    let idx = CdsIndex::from_preset(
+        &CdsIndexParams::cdx_na_ig(42, 1, 100.0),
         "CDX-BIG-FACTOR",
         Money::new(TEST_NOTIONAL, Currency::USD).expect("valid money fixture"),
         PayReceive::Pay,
@@ -345,8 +345,8 @@ fn test_par_spread_rejects_invalid_index_factor() {
     let end = date!(2030 - 01 - 01);
     let as_of = start;
 
-    let idx = CDSIndex::from_preset(
-        &CDSIndexParams::cdx_na_ig(42, 1, 100.0),
+    let idx = CdsIndex::from_preset(
+        &CdsIndexParams::cdx_na_ig(42, 1, 100.0),
         "CDX-PAR-BAD-FACTOR",
         Money::new(TEST_NOTIONAL, Currency::USD).expect("valid money fixture"),
         PayReceive::Pay,
@@ -375,8 +375,8 @@ fn test_empty_constituents_list() {
     let start = date!(2025 - 01 - 01);
     let end = date!(2030 - 01 - 01);
 
-    let idx = CDSIndex::from_preset(
-        &CDSIndexParams::cdx_na_ig(42, 1, 100.0),
+    let idx = CdsIndex::from_preset(
+        &CdsIndexParams::cdx_na_ig(42, 1, 100.0),
         "CDX-EMPTY",
         Money::new(TEST_NOTIONAL, Currency::USD).expect("valid money fixture"),
         PayReceive::Pay,
@@ -400,13 +400,13 @@ fn test_missing_constituent_hazard_curve() {
     let end = date!(2030 - 01 - 01);
     let as_of = start;
 
-    let constituents = vec![CDSIndexConstituent::active(
+    let constituents = vec![CdsIndexConstituent::active(
         CreditParams::corporate_standard("N1", "MISSING-CURVE"),
         1.0,
     )];
 
-    let idx = CDSIndex::from_preset(
-        &CDSIndexParams::cdx_na_ig(42, 1, 100.0),
+    let idx = CdsIndex::from_preset(
+        &CdsIndexParams::cdx_na_ig(42, 1, 100.0),
         "CDX-MISSING-CONST",
         Money::new(TEST_NOTIONAL, Currency::USD).expect("valid money fixture"),
         PayReceive::Pay,

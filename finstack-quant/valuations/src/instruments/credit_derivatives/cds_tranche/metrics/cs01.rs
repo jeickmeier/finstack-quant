@@ -1,7 +1,7 @@
 //! Quote-space CS01 to the index or complete issuer pool actually consumed by pricing.
 
 use super::super::credit_risk::{active_hazards, parallel_cs01, replace_hazard};
-use super::super::CDSTranche;
+use super::super::CdsTranche;
 use crate::metrics::sensitivities::config as sens_config;
 use crate::metrics::sensitivities::cs01::{compute_key_rate_cs01_series_for_hazard, Cs01Request};
 use crate::metrics::{MetricCalculator, MetricContext, MetricId};
@@ -11,7 +11,7 @@ pub(crate) struct CdsTrancheCs01Calculator;
 
 impl MetricCalculator for CdsTrancheCs01Calculator {
     fn calculate(&self, context: &mut MetricContext) -> finstack_quant_core::Result<f64> {
-        let tranche = context.instrument_as::<CDSTranche>()?.clone();
+        let tranche = context.instrument_as::<CdsTranche>()?.clone();
         let index = context.curves.get_credit_index(&tranche.credit_index_id)?;
         let hazards = active_hazards(&index, true);
         let bump = sens_config::from_context_or_default(
@@ -64,7 +64,7 @@ pub(crate) struct CdsTrancheBucketedCs01Calculator;
 
 impl MetricCalculator for CdsTrancheBucketedCs01Calculator {
     fn calculate(&self, context: &mut MetricContext) -> finstack_quant_core::Result<f64> {
-        let tranche = context.instrument_as::<CDSTranche>()?.clone();
+        let tranche = context.instrument_as::<CdsTranche>()?.clone();
         let index = context.curves.get_credit_index(&tranche.credit_index_id)?;
         let hazards = active_hazards(&index, true);
         let bump = sens_config::from_context_or_default(

@@ -13,8 +13,8 @@ use finstack_quant_valuations::instruments::fixed_income::revolving_credit::{
     StochasticUtilizationSpec, UtilizationProcess,
 };
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
-    calculate_tranche_oas, CallExercisePolicy, InstrumentCollateral, OasConfig, PricingMode,
-    StochasticPricingResult, StructuredCredit,
+    calculate_tranche_oas, CallExercisePolicy, InstrumentCollateral, OasConfig,
+    StochasticPricingResult, StructuredCredit, StructuredCreditPricingMode,
 };
 use finstack_quant_valuations::instruments::Instrument;
 use time::macros::date;
@@ -97,8 +97,8 @@ fn parity_deal(reserve: f64) -> StructuredCredit {
     })
 }
 
-fn monte_carlo(num_paths: usize) -> PricingMode {
-    PricingMode::MonteCarlo {
+fn monte_carlo(num_paths: usize) -> StructuredCreditPricingMode {
+    StructuredCreditPricingMode::MonteCarlo {
         num_paths,
         antithetic: true,
     }
@@ -128,7 +128,7 @@ fn zero_volatility_paths_reproduce_the_deterministic_pool() {
         .price_stochastic_with_mode(
             &market,
             CLOSING,
-            PricingMode::MonteCarlo {
+            StructuredCreditPricingMode::MonteCarlo {
                 num_paths: 4,
                 antithetic: false,
             },

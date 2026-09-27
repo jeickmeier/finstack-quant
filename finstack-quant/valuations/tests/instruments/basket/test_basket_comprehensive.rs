@@ -16,7 +16,7 @@ use finstack_quant_core::money::fx::{FxConversionPolicy, FxMatrix, FxProvider};
 use finstack_quant_core::money::Money;
 use finstack_quant_valuations::instruments::exotics::basket::BasketCalculator;
 use finstack_quant_valuations::instruments::exotics::basket::{
-    AssetType, Basket, BasketConstituent, BasketPricingConfig, ConstituentReference,
+    Basket, BasketAssetType, BasketConstituent, BasketPricingConfig, ConstituentReference,
 };
 use finstack_quant_valuations::instruments::fixed_income::bond::Bond;
 use finstack_quant_valuations::instruments::{Attributes, Instrument};
@@ -105,7 +105,7 @@ fn simple_equity_basket() -> Basket {
                 id: "AAPL".to_string(),
                 reference: ConstituentReference::MarketData {
                     price_id: "AAPL".into(),
-                    asset_type: AssetType::Equity,
+                    asset_type: BasketAssetType::Equity,
                 },
                 weight: 0.6,
                 units: None,
@@ -115,7 +115,7 @@ fn simple_equity_basket() -> Basket {
                 id: "MSFT".to_string(),
                 reference: ConstituentReference::MarketData {
                     price_id: "MSFT".into(),
-                    asset_type: AssetType::Equity,
+                    asset_type: BasketAssetType::Equity,
                 },
                 weight: 0.4,
                 units: None,
@@ -146,7 +146,7 @@ fn test_basket_creation_with_minimal_fields() {
             id: "CASH".to_string(),
             reference: ConstituentReference::MarketData {
                 price_id: "CASH".into(),
-                asset_type: AssetType::Cash,
+                asset_type: BasketAssetType::Cash,
             },
             weight: 1.0,
             units: None,
@@ -185,7 +185,7 @@ fn test_basket_builder_pattern() {
             id: "TEST".to_string(),
             reference: ConstituentReference::MarketData {
                 price_id: "TEST".into(),
-                asset_type: AssetType::Equity,
+                asset_type: BasketAssetType::Equity,
             },
             weight: 1.0,
             units: None,
@@ -324,7 +324,7 @@ fn test_custom_pricing_config() {
             id: "TEST".to_string(),
             reference: ConstituentReference::MarketData {
                 price_id: "TEST".into(),
-                asset_type: AssetType::Equity,
+                asset_type: BasketAssetType::Equity,
             },
             weight: 1.0,
             units: None,
@@ -350,7 +350,7 @@ fn test_pricing_with_explicit_units() {
                 id: "AAPL".to_string(),
                 reference: ConstituentReference::MarketData {
                     price_id: "AAPL".into(),
-                    asset_type: AssetType::Equity,
+                    asset_type: BasketAssetType::Equity,
                 },
                 weight: 0.0,
                 units: Some(10.0),
@@ -360,7 +360,7 @@ fn test_pricing_with_explicit_units() {
                 id: "MSFT".to_string(),
                 reference: ConstituentReference::MarketData {
                     price_id: "MSFT".into(),
-                    asset_type: AssetType::Equity,
+                    asset_type: BasketAssetType::Equity,
                 },
                 weight: 0.0,
                 units: Some(5.0),
@@ -404,7 +404,7 @@ fn test_nav_calculation_with_units() {
             id: "AAPL".to_string(),
             reference: ConstituentReference::MarketData {
                 price_id: "AAPL".into(),
-                asset_type: AssetType::Equity,
+                asset_type: BasketAssetType::Equity,
             },
             weight: 0.0,
             units: Some(100.0),
@@ -562,7 +562,7 @@ fn test_fx_conversion_eur_to_usd() {
             id: "EUR_EQUITY".to_string(),
             reference: ConstituentReference::MarketData {
                 price_id: "EUR_EQUITY".into(),
-                asset_type: AssetType::Equity,
+                asset_type: BasketAssetType::Equity,
             },
             weight: 0.0,
             units: Some(10.0),
@@ -606,7 +606,7 @@ fn test_fx_conversion_multiple_currencies() {
                 id: "EUR_EQUITY".to_string(),
                 reference: ConstituentReference::MarketData {
                     price_id: "EUR_EQUITY".into(),
-                    asset_type: AssetType::Equity,
+                    asset_type: BasketAssetType::Equity,
                 },
                 weight: 0.0,
                 units: Some(5.0),
@@ -616,7 +616,7 @@ fn test_fx_conversion_multiple_currencies() {
                 id: "GBP_EQUITY".to_string(),
                 reference: ConstituentReference::MarketData {
                     price_id: "GBP_EQUITY".into(),
-                    asset_type: AssetType::Equity,
+                    asset_type: BasketAssetType::Equity,
                 },
                 weight: 0.0,
                 units: Some(10.0),
@@ -626,7 +626,7 @@ fn test_fx_conversion_multiple_currencies() {
                 id: "USD_EQUITY".to_string(),
                 reference: ConstituentReference::MarketData {
                     price_id: "USD_EQUITY".into(),
-                    asset_type: AssetType::Equity,
+                    asset_type: BasketAssetType::Equity,
                 },
                 weight: 0.0,
                 units: Some(2.0),
@@ -670,7 +670,7 @@ fn test_fx_conversion_error_without_fx_provider() {
             id: "EUR_EQUITY".to_string(),
             reference: ConstituentReference::MarketData {
                 price_id: "EUR_EQUITY".into(),
-                asset_type: AssetType::Equity,
+                asset_type: BasketAssetType::Equity,
             },
             weight: 0.0,
             units: Some(10.0),
@@ -715,7 +715,7 @@ fn test_mixed_units_and_weights_with_aum() {
                 id: "AAPL".to_string(),
                 reference: ConstituentReference::MarketData {
                     price_id: "AAPL".into(),
-                    asset_type: AssetType::Equity,
+                    asset_type: BasketAssetType::Equity,
                 },
                 weight: 0.0,
                 units: Some(10.0), // Explicit units
@@ -725,7 +725,7 @@ fn test_mixed_units_and_weights_with_aum() {
                 id: "MSFT".to_string(),
                 reference: ConstituentReference::MarketData {
                     price_id: "MSFT".into(),
-                    asset_type: AssetType::Equity,
+                    asset_type: BasketAssetType::Equity,
                 },
                 weight: 0.5, // Weight-based
                 units: None,
@@ -827,7 +827,7 @@ fn test_basket_with_multiple_asset_types() {
                 id: "EQUITY".to_string(),
                 reference: ConstituentReference::MarketData {
                     price_id: "AAPL".into(),
-                    asset_type: AssetType::Equity,
+                    asset_type: BasketAssetType::Equity,
                 },
                 weight: 0.4,
                 units: None,
@@ -837,7 +837,7 @@ fn test_basket_with_multiple_asset_types() {
                 id: "BOND".to_string(),
                 reference: ConstituentReference::MarketData {
                     price_id: "BOND_AAA".into(),
-                    asset_type: AssetType::Bond,
+                    asset_type: BasketAssetType::Bond,
                 },
                 weight: 0.3,
                 units: None,
@@ -847,7 +847,7 @@ fn test_basket_with_multiple_asset_types() {
                 id: "CASH".to_string(),
                 reference: ConstituentReference::MarketData {
                     price_id: "CASH".into(),
-                    asset_type: AssetType::Cash,
+                    asset_type: BasketAssetType::Cash,
                 },
                 weight: 0.3,
                 units: None,
@@ -949,7 +949,7 @@ fn test_basket_value_with_zero_shares() {
             id: "AAPL".to_string(),
             reference: ConstituentReference::MarketData {
                 price_id: "AAPL".into(),
-                asset_type: AssetType::Equity,
+                asset_type: BasketAssetType::Equity,
             },
             weight: 0.0,
             units: Some(10.0),
@@ -989,7 +989,7 @@ fn test_basket_value_with_negative_shares() {
             id: "AAPL".to_string(),
             reference: ConstituentReference::MarketData {
                 price_id: "AAPL".into(),
-                asset_type: AssetType::Equity,
+                asset_type: BasketAssetType::Equity,
             },
             weight: 0.0,
             units: Some(10.0),
@@ -1105,7 +1105,7 @@ fn test_single_constituent_basket() {
             id: "AAPL".to_string(),
             reference: ConstituentReference::MarketData {
                 price_id: "AAPL".into(),
-                asset_type: AssetType::Equity,
+                asset_type: BasketAssetType::Equity,
             },
             weight: 1.0,
             units: None,
@@ -1137,7 +1137,7 @@ fn test_unitless_scalar_defaults_to_basket_currency() {
             id: "ASSET".to_string(),
             reference: ConstituentReference::MarketData {
                 price_id: "UNITLESS_PRICE".into(),
-                asset_type: AssetType::Equity,
+                asset_type: BasketAssetType::Equity,
             },
             weight: 0.0,
             units: Some(10.0),
@@ -1192,18 +1192,18 @@ fn test_basket_serialization_roundtrip() {
 fn test_asset_type_serialization() {
     // Arrange
     let types = vec![
-        AssetType::Equity,
-        AssetType::Bond,
-        AssetType::ETF,
-        AssetType::Cash,
-        AssetType::Commodity,
-        AssetType::Derivative,
+        BasketAssetType::Equity,
+        BasketAssetType::Bond,
+        BasketAssetType::ETF,
+        BasketAssetType::Cash,
+        BasketAssetType::Commodity,
+        BasketAssetType::Derivative,
     ];
 
     // Act & Assert
     for asset_type in types {
         let json = serde_json::to_string(&asset_type).unwrap();
-        let deserialized: AssetType = serde_json::from_str(&json).unwrap();
+        let deserialized: BasketAssetType = serde_json::from_str(&json).unwrap();
         // Can't directly compare due to no PartialEq, but serialization should succeed
         let _ = deserialized;
     }
@@ -1232,7 +1232,7 @@ fn test_basket_with_mixed_constituents_serialization() {
                 id: "MARKET_DATA_EQUITY".to_string(),
                 reference: ConstituentReference::MarketData {
                     price_id: "AAPL".into(),
-                    asset_type: AssetType::Equity,
+                    asset_type: BasketAssetType::Equity,
                 },
                 weight: 0.5,
                 units: None,
@@ -1294,7 +1294,7 @@ fn test_constituent_reference_market_data_roundtrip() {
     // Arrange
     let reference = ConstituentReference::MarketData {
         price_id: "AAPL-SPOT".into(),
-        asset_type: AssetType::Equity,
+        asset_type: BasketAssetType::Equity,
     };
 
     // Act
@@ -1436,7 +1436,7 @@ fn test_full_pricing_workflow_units_based() {
                 id: "AAPL".to_string(),
                 reference: ConstituentReference::MarketData {
                     price_id: "AAPL".into(),
-                    asset_type: AssetType::Equity,
+                    asset_type: BasketAssetType::Equity,
                 },
                 weight: 0.0,
                 units: Some(50.0),
@@ -1446,7 +1446,7 @@ fn test_full_pricing_workflow_units_based() {
                 id: "MSFT".to_string(),
                 reference: ConstituentReference::MarketData {
                     price_id: "MSFT".into(),
-                    asset_type: AssetType::Equity,
+                    asset_type: BasketAssetType::Equity,
                 },
                 weight: 0.0,
                 units: Some(30.0),
@@ -1516,7 +1516,7 @@ fn test_real_world_etf_scenario() {
                 id: "AAPL".to_string(),
                 reference: ConstituentReference::MarketData {
                     price_id: "AAPL".into(),
-                    asset_type: AssetType::Equity,
+                    asset_type: BasketAssetType::Equity,
                 },
                 weight: 0.25,
                 units: None,
@@ -1526,7 +1526,7 @@ fn test_real_world_etf_scenario() {
                 id: "MSFT".to_string(),
                 reference: ConstituentReference::MarketData {
                     price_id: "MSFT".into(),
-                    asset_type: AssetType::Equity,
+                    asset_type: BasketAssetType::Equity,
                 },
                 weight: 0.25,
                 units: None,
@@ -1536,7 +1536,7 @@ fn test_real_world_etf_scenario() {
                 id: "GOOGL".to_string(),
                 reference: ConstituentReference::MarketData {
                     price_id: "GOOGL".into(),
-                    asset_type: AssetType::Equity,
+                    asset_type: BasketAssetType::Equity,
                 },
                 weight: 0.25,
                 units: None,
@@ -1546,7 +1546,7 @@ fn test_real_world_etf_scenario() {
                 id: "AMZN".to_string(),
                 reference: ConstituentReference::MarketData {
                     price_id: "AMZN".into(),
-                    asset_type: AssetType::Equity,
+                    asset_type: BasketAssetType::Equity,
                 },
                 weight: 0.20,
                 units: None,
@@ -1556,7 +1556,7 @@ fn test_real_world_etf_scenario() {
                 id: "CASH".to_string(),
                 reference: ConstituentReference::MarketData {
                     price_id: "CASH".into(),
-                    asset_type: AssetType::Cash,
+                    asset_type: BasketAssetType::Cash,
                 },
                 weight: 0.05,
                 units: None,
@@ -1646,7 +1646,7 @@ fn constituent_delta_is_pv_change_per_one_percent_move() {
                 id: "AAPL".to_string(),
                 reference: ConstituentReference::MarketData {
                     price_id: "AAPL".into(),
-                    asset_type: AssetType::Equity,
+                    asset_type: BasketAssetType::Equity,
                 },
                 weight: 0.0,
                 units: Some(10.0),
@@ -1656,7 +1656,7 @@ fn constituent_delta_is_pv_change_per_one_percent_move() {
                 id: "MSFT".to_string(),
                 reference: ConstituentReference::MarketData {
                     price_id: "MSFT".into(),
-                    asset_type: AssetType::Equity,
+                    asset_type: BasketAssetType::Equity,
                 },
                 weight: 0.0,
                 units: Some(5.0),

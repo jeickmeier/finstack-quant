@@ -1,4 +1,4 @@
-//! Bloomberg-screen vega for [`CDSOption`].
+//! Bloomberg-screen vega for [`CdsOption`].
 //!
 //! Vega(1%) is the change in option premium for a `+0.01` (one absolute
 //! percentage point) shift in the lognormal spread volatility, computed
@@ -8,7 +8,7 @@
 use crate::instruments::credit_derivatives::cds_option::pricer::{
     resolve_sigma, synthetic_underlying_cds,
 };
-use crate::instruments::credit_derivatives::cds_option::{bloomberg_quadrature, CDSOption};
+use crate::instruments::credit_derivatives::cds_option::{bloomberg_quadrature, CdsOption};
 use crate::metrics::{MetricCalculator, MetricContext};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::Result;
@@ -20,7 +20,7 @@ pub(crate) struct VegaCalculator;
 
 impl MetricCalculator for VegaCalculator {
     fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
-        let option: &CDSOption = context.instrument_as()?;
+        let option: &CdsOption = context.instrument_as()?;
         vega(option, &context.curves, context.as_of)
     }
 }
@@ -28,7 +28,7 @@ impl MetricCalculator for VegaCalculator {
 /// Bloomberg CDSO Vega(1%) — one-sided forward difference of the
 /// canonical Bloomberg quadrature NPV on a `+0.01` lognormal-vol bump.
 pub(crate) fn vega(
-    option: &CDSOption,
+    option: &CdsOption,
     curves: &MarketContext,
     as_of: finstack_quant_core::dates::Date,
 ) -> Result<f64> {

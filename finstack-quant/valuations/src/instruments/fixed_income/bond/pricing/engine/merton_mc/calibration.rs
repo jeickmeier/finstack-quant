@@ -15,7 +15,7 @@ use crate::instruments::fixed_income::bond::CashflowSpec;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::{InputError, Result};
-use finstack_quant_models::credit::{AssetDynamics, BarrierType, MertonModel};
+use finstack_quant_models::credit::{AssetDynamics, MertonBarrierType, MertonModel};
 
 /// Output from MC calibration.
 #[derive(Debug, Clone)]
@@ -72,7 +72,7 @@ fn with_parameter(
     parameter: CalibrationParameter,
     x: f64,
 ) -> Result<MertonModel> {
-    let barrier_type: BarrierType = *base.barrier_type();
+    let barrier_type: MertonBarrierType = *base.barrier_type();
     let dynamics: AssetDynamics = *base.dynamics();
     let (asset_value, mut asset_vol, mut debt_barrier) =
         (base.asset_value(), base.asset_vol(), base.debt_barrier());

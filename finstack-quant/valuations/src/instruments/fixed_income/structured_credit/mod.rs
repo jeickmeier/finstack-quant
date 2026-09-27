@@ -66,7 +66,7 @@ pub use pricing::{
 };
 
 pub use pricing::coverage_tests::{TestContext, TestResult};
-pub use pricing::stochastic::PricingMode;
+pub use pricing::stochastic::StructuredCreditPricingMode;
 pub use pricing::stochastic::{StochasticPricingResult, TranchePricingResult};
 pub use pricing::waterfall::execute_waterfall_with_explanation;
 pub use pricing::waterfall::WaterfallContext;

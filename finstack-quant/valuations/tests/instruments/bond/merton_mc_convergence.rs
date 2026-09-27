@@ -10,7 +10,7 @@
 //! - PIK accrual increases terminal notional
 
 use finstack_quant_models::credit::{
-    AssetDynamics, BarrierType, DynamicRecoverySpec, EndogenousHazardSpec, MertonModel,
+    AssetDynamics, DynamicRecoverySpec, EndogenousHazardSpec, MertonBarrierType, MertonModel,
 };
 use finstack_quant_valuations::instruments::fixed_income::bond::pricing::engine::merton_mc::{
     MertonMcConfig, MertonMcEngine, MertonMcRun, PikMode, PikSchedule,
@@ -24,7 +24,7 @@ fn base_merton() -> MertonModel {
         100.0,
         0.04,
         0.0,
-        BarrierType::FirstPassage {
+        MertonBarrierType::FirstPassage {
             barrier_growth_rate: 0.0,
         },
         AssetDynamics::GeometricBrownian,
@@ -40,7 +40,7 @@ fn merton_with_vol(vol: f64) -> MertonModel {
         100.0,
         0.04,
         0.0,
-        BarrierType::FirstPassage {
+        MertonBarrierType::FirstPassage {
             barrier_growth_rate: 0.0,
         },
         AssetDynamics::GeometricBrownian,
@@ -56,7 +56,7 @@ fn merton_with_asset_value(asset_value: f64) -> MertonModel {
         100.0,
         0.04,
         0.0,
-        BarrierType::FirstPassage {
+        MertonBarrierType::FirstPassage {
             barrier_growth_rate: 0.0,
         },
         AssetDynamics::GeometricBrownian,

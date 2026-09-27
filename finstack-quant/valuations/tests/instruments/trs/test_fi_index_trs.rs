@@ -855,20 +855,20 @@ fn test_fi_index_trs_errors_on_price_scalar_for_duration() {
 fn seasoned_fi_trs(
     initial_level: Option<f64>,
 ) -> (
-    finstack_quant_valuations::instruments::fixed_income::fi_trs::FIIndexTotalReturnSwap,
+    finstack_quant_valuations::instruments::fixed_income::fi_trs::FiIndexTotalReturnSwap,
     MarketContext,
 ) {
     use finstack_quant_cashflows::builder::ScheduleParams;
     use finstack_quant_core::dates::DayCount;
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
     use finstack_quant_valuations::instruments::fixed_income::fi_trs::{
-        FIIndexTotalReturnSwap, TrsScheduleSpec,
+        FiIndexTotalReturnSwap, TrsScheduleSpec,
     };
     use finstack_quant_valuations::instruments::{
         Attributes, FinancingLegSpec, IndexUnderlyingParams,
     };
 
-    let trs = FIIndexTotalReturnSwap::builder()
+    let trs = FiIndexTotalReturnSwap::builder()
         .id("SEASONED-FI-TRS".into())
         .notional(Money::new(10_000_000.0, USD).expect("money"))
         .underlying(IndexUnderlyingParams::new("HY-INDEX", USD).with_yield("HY-INDEX-YIELD"))

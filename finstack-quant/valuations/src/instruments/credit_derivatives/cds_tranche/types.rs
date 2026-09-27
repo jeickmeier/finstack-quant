@@ -11,7 +11,7 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, InstrumentId};
 
-use super::parameters::CDSTrancheParams;
+use super::parameters::CdsTrancheParams;
 use super::pricing;
 use crate::impl_instrument_base;
 
@@ -26,7 +26,7 @@ use crate::impl_instrument_base;
 )]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
-pub struct CDSTranche {
+pub struct CdsTranche {
     /// Unique instrument identifier
     pub id: InstrumentId,
     /// Index name (e.g., "CDX.NA.IG", "CDX.NA.HY", "iTraxx EUR")
@@ -62,7 +62,7 @@ pub struct CDSTranche {
     pub discount_curve_id: CurveId,
     /// Credit index identifier for survival/loss modeling (placeholder)
     pub credit_index_id: CurveId,
-    /// Tranche side, as on CDS and CDSIndex: `pay` buys protection (pays the
+    /// Tranche side, as on CDS and CdsIndex: `pay` buys protection (pays the
     /// running premium), `receive` sells protection (receives the premium).
     pub side: PayReceive,
     /// Optional effective date for schedule anchoring (if None, uses as_of date)
@@ -120,7 +120,7 @@ pub struct CDSTranche {
     pub attributes: Attributes,
 }
 
-impl CDSTranche {
+impl CdsTranche {
     pub(crate) fn contractual_start_date(&self, as_of: Date) -> Option<Date> {
         if let Some(start_date) = self.start_date {
             return Some(start_date);
@@ -214,14 +214,14 @@ impl CDSTranche {
     pub fn example() -> Self {
         use finstack_quant_core::currency::Currency;
         use time::macros::date;
-        let params = super::parameters::CDSTrancheParams::equity_tranche(
+        let params = super::parameters::CdsTrancheParams::equity_tranche(
             "CDX.NA.IG",
             42,
             Money::from((10_000_000_i64, Currency::USD)),
             date!(2029 - 12 - 20),
             100.0,
         );
-        CDSTranche::standard(
+        CdsTranche::standard(
             InstrumentId::new("CDXIG-42-0X3"),
             &params,
             CurveId::new("USD-OIS"),
@@ -258,7 +258,7 @@ impl CDSTranche {
     /// - Notional must be positive
     pub fn new(
         id: impl Into<InstrumentId>,
-        tranche_params: &CDSTrancheParams,
+        tranche_params: &CdsTrancheParams,
         schedule_params: &ScheduleParams,
         discount_curve_id: impl Into<CurveId>,
         credit_index_id: impl Into<CurveId>,
@@ -345,7 +345,7 @@ impl CDSTranche {
     #[allow(clippy::too_many_arguments)]
     pub fn standard(
         id: impl Into<InstrumentId>,
-        tranche_params: &CDSTrancheParams,
+        tranche_params: &CdsTrancheParams,
         discount_curve_id: impl Into<CurveId>,
         credit_index_id: impl Into<CurveId>,
         side: PayReceive,
@@ -400,7 +400,7 @@ impl CDSTranche {
         curves: &MarketContext,
         as_of: Date,
     ) -> finstack_quant_core::Result<f64> {
-        let pricer = pricing::CDSTranchePricer::new();
+        let pricer = pricing::CdsTranchePricer::new();
         pricer.calculate_model_upfront(self, curves, as_of)
     }
 
@@ -410,7 +410,7 @@ impl CDSTranche {
         curves: &MarketContext,
         as_of: Date,
     ) -> finstack_quant_core::Result<f64> {
-        let pricer = pricing::CDSTranchePricer::new();
+        let pricer = pricing::CdsTranchePricer::new();
         pricer.calculate_spread_dv01(self, curves, as_of)
     }
 
@@ -420,13 +420,13 @@ impl CDSTranche {
         curves: &MarketContext,
         as_of: Date,
     ) -> finstack_quant_core::Result<f64> {
-        let pricer = pricing::CDSTranchePricer::new();
+        let pricer = pricing::CdsTranchePricer::new();
         pricer.calculate_par_spread(self, curves, as_of)
     }
 
     /// Calculate expected loss metric
     pub fn expected_loss(&self, curves: &MarketContext) -> finstack_quant_core::Result<f64> {
-        let pricer = pricing::CDSTranchePricer::new();
+        let pricer = pricing::CdsTranchePricer::new();
         pricer.calculate_expected_loss(self, curves)
     }
 
@@ -436,7 +436,7 @@ impl CDSTranche {
         curves: &MarketContext,
         as_of: Date,
     ) -> finstack_quant_core::Result<f64> {
-        let pricer = pricing::CDSTranchePricer::new();
+        let pricer = pricing::CdsTranchePricer::new();
         pricer.calculate_jump_to_default(self, curves, as_of)
     }
 
@@ -447,7 +447,7 @@ impl CDSTranche {
         curves: &MarketContext,
         as_of: Date,
     ) -> finstack_quant_core::Result<f64> {
-        let pricer = pricing::CDSTranchePricer::new();
+        let pricer = pricing::CdsTranchePricer::new();
         pricer.calculate_correlation_delta(self, curves, as_of)
     }
 
@@ -472,7 +472,7 @@ impl CDSTranche {
         curves: &MarketContext,
         as_of: Date,
     ) -> finstack_quant_core::Result<f64> {
-        let pricer = pricing::CDSTranchePricer::new();
+        let pricer = pricing::CdsTranchePricer::new();
         pricer.calculate_accrued_premium(self, curves, as_of)
     }
 
@@ -483,7 +483,7 @@ impl CDSTranche {
         &self,
         curves: &MarketContext,
     ) -> finstack_quant_core::Result<pricing::JumpToDefaultResult> {
-        let pricer = pricing::CDSTranchePricer::new();
+        let pricer = pricing::CdsTranchePricer::new();
         pricer.calculate_jump_to_default_detail(self, curves)
     }
 
@@ -495,7 +495,7 @@ impl CDSTranche {
         curves: &MarketContext,
         as_of: Date,
     ) -> finstack_quant_core::Result<Vec<(Date, f64)>> {
-        let pricer = pricing::CDSTranchePricer::new();
+        let pricer = pricing::CdsTranchePricer::new();
         pricer.get_expected_loss_curve(self, curves, as_of)
     }
 
@@ -504,7 +504,7 @@ impl CDSTranche {
 
 // Attributable is provided via blanket impl for all Instrument types
 
-impl Instrument for CDSTranche {
+impl Instrument for CdsTranche {
     impl_instrument_base!(crate::pricer::InstrumentType::CdsTranche);
 
     fn market_dependencies(
@@ -519,7 +519,7 @@ impl Instrument for CDSTranche {
     }
 
     fn validate_invariants(&self) -> finstack_quant_core::Result<()> {
-        CDSTranche::validate(self)
+        CdsTranche::validate(self)
     }
 
     fn default_model(&self) -> crate::pricer::ModelKey {
@@ -531,7 +531,7 @@ impl Instrument for CDSTranche {
         curves: &MarketContext,
         as_of: Date,
     ) -> finstack_quant_core::Result<Money> {
-        let pricer = pricing::CDSTranchePricer::new();
+        let pricer = pricing::CdsTranchePricer::new();
         pricer.price_tranche(self, curves, as_of)
     }
 
@@ -546,7 +546,7 @@ impl Instrument for CDSTranche {
     crate::impl_focused_pricing_overrides!();
 }
 
-impl finstack_quant_cashflows::CashflowScheduleSource for CDSTranche {
+impl finstack_quant_cashflows::CashflowScheduleSource for CdsTranche {
     fn notional(&self) -> finstack_quant_core::Result<Option<Money>> {
         Ok(Some(self.notional))
     }
@@ -556,7 +556,7 @@ impl finstack_quant_cashflows::CashflowScheduleSource for CDSTranche {
         curves: &MarketContext,
         as_of: Date,
     ) -> finstack_quant_core::Result<crate::cashflow::builder::CashFlowSchedule> {
-        let pricer = pricing::CDSTranchePricer::new();
+        let pricer = pricing::CdsTranchePricer::new();
         let schedule = pricer.build_projected_schedule(self, curves, as_of)?;
         Ok(schedule
             .with_representation(crate::cashflow::builder::CashflowRepresentation::Projected))
@@ -569,7 +569,7 @@ mod tests {
 
     #[test]
     fn market_dependencies_preserve_credit_index_identity() {
-        let tranche = CDSTranche::example();
+        let tranche = CdsTranche::example();
         let dependencies = tranche.market_dependencies().expect("tranche dependencies");
 
         assert_eq!(dependencies.credit_index_ids, vec![tranche.credit_index_id]);

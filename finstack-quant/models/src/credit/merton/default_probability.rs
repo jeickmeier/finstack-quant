@@ -1,7 +1,7 @@
 use finstack_quant_core::math::norm_cdf;
 use finstack_quant_core::{Error, Result};
 
-use super::{AssetDynamics, BarrierType, MertonModel};
+use super::{AssetDynamics, MertonBarrierType, MertonModel};
 
 /// Approximate CreditGrades survival probability (Finger et al. 2002).
 ///
@@ -177,8 +177,8 @@ impl MertonModel {
             return 0.0;
         }
         match self.barrier_type {
-            BarrierType::Terminal => self.terminal_pd(log_drift, horizon),
-            BarrierType::FirstPassage {
+            MertonBarrierType::Terminal => self.terminal_pd(log_drift, horizon),
+            MertonBarrierType::FirstPassage {
                 barrier_growth_rate,
             } => self.first_passage_pd(log_drift, barrier_growth_rate, horizon),
         }
@@ -426,7 +426,7 @@ impl MertonModel {
 mod tests {
     use finstack_quant_core::math::norm_cdf;
 
-    use super::super::{AssetDynamics, BarrierType, MertonModel};
+    use super::super::{AssetDynamics, MertonBarrierType, MertonModel};
 
     #[test]
     fn dd_textbook_values() {
@@ -474,7 +474,7 @@ mod tests {
             80.0,
             0.05,
             0.0,
-            BarrierType::FirstPassage {
+            MertonBarrierType::FirstPassage {
                 barrier_growth_rate: 0.05,
             },
             AssetDynamics::GeometricBrownian,
@@ -515,7 +515,7 @@ mod tests {
             80.0,
             0.05,
             0.0,
-            BarrierType::FirstPassage {
+            MertonBarrierType::FirstPassage {
                 barrier_growth_rate: 0.02,
             },
             AssetDynamics::GeometricBrownian,
@@ -542,7 +542,7 @@ mod tests {
             100.0,
             3.0,
             0.0,
-            BarrierType::FirstPassage {
+            MertonBarrierType::FirstPassage {
                 barrier_growth_rate: 0.0,
             },
             AssetDynamics::GeometricBrownian,
@@ -570,7 +570,7 @@ mod tests {
             1.0,
             0.0,
             5.0,
-            BarrierType::FirstPassage {
+            MertonBarrierType::FirstPassage {
                 barrier_growth_rate: 0.0,
             },
             AssetDynamics::GeometricBrownian,
@@ -595,7 +595,7 @@ mod tests {
             80.0,
             0.05,
             0.0,
-            BarrierType::FirstPassage {
+            MertonBarrierType::FirstPassage {
                 barrier_growth_rate: 0.0,
             },
             AssetDynamics::GeometricBrownian,
@@ -607,7 +607,7 @@ mod tests {
             80.0,
             0.05,
             0.0,
-            BarrierType::FirstPassage {
+            MertonBarrierType::FirstPassage {
                 barrier_growth_rate: 0.05,
             },
             AssetDynamics::GeometricBrownian,
@@ -649,7 +649,7 @@ mod tests {
             b,
             r,
             0.0, // payout_rate = 0
-            BarrierType::FirstPassage {
+            MertonBarrierType::FirstPassage {
                 barrier_growth_rate: 0.0,
             },
             AssetDynamics::GeometricBrownian,
@@ -689,7 +689,7 @@ mod tests {
             b,
             r,
             q,
-            BarrierType::FirstPassage {
+            MertonBarrierType::FirstPassage {
                 barrier_growth_rate: 0.0,
             },
             AssetDynamics::GeometricBrownian,
@@ -727,7 +727,7 @@ mod tests {
             80.0,
             0.05,
             0.0,
-            BarrierType::Terminal,
+            MertonBarrierType::Terminal,
             AssetDynamics::JumpDiffusion {
                 jump_intensity: 0.5,
                 jump_mean,
@@ -781,7 +781,7 @@ mod tests {
             80.0,
             0.05,
             0.0,
-            BarrierType::Terminal,
+            MertonBarrierType::Terminal,
             AssetDynamics::JumpDiffusion {
                 jump_intensity: 0.0,
                 jump_mean: -0.30,
@@ -874,7 +874,7 @@ mod tests {
             80.0,
             0.06,
             0.01,
-            BarrierType::FirstPassage {
+            MertonBarrierType::FirstPassage {
                 barrier_growth_rate: 0.03,
             },
             AssetDynamics::GeometricBrownian,
@@ -901,7 +901,7 @@ mod tests {
             b,
             r,
             q,
-            BarrierType::FirstPassage {
+            MertonBarrierType::FirstPassage {
                 barrier_growth_rate: g,
             },
             AssetDynamics::GeometricBrownian,
@@ -913,7 +913,7 @@ mod tests {
             b,
             r - g,
             q,
-            BarrierType::FirstPassage {
+            MertonBarrierType::FirstPassage {
                 barrier_growth_rate: 0.0,
             },
             AssetDynamics::GeometricBrownian,

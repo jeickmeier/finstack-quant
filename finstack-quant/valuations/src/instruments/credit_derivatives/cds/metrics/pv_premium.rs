@@ -3,7 +3,7 @@
 //! Computes present value of the premium leg using discount and hazard curves
 //! via the engine. The value is returned in currency units.
 
-use crate::instruments::credit_derivatives::cds::pricing::CDSPricer;
+use crate::instruments::credit_derivatives::cds::pricing::CdsPricer;
 use crate::instruments::credit_derivatives::cds::CreditDefaultSwap;
 use crate::metrics::{MetricCalculator, MetricContext};
 use finstack_quant_core::Result;
@@ -20,7 +20,7 @@ impl MetricCalculator for PremiumLegPvCalculator {
         let surv = context
             .curves
             .get_hazard(&cds.protection_leg.credit_curve_id)?;
-        let pricer = CDSPricer::new();
+        let pricer = CdsPricer::new();
         let pv = pricer.pv_premium_leg(cds, disc.as_ref(), surv.as_ref(), context.as_of)?;
         Ok(pv.amount())
     }

@@ -38,7 +38,7 @@
 //! Simpson. Normal tails outside [-10,10] have probability below 1.524e-23.
 //! Student-t uses the copula's product Gauss–Laguerre × Gauss–Hermite rule
 //! by default; nested adaptive Simpson over the mixing variable is opt-in
-//! via `CDSTranchePricerConfig::with_adaptive_student_t_integration`.
+//! via `CdsTranchePricerConfig::with_adaptive_student_t_integration`.
 //! When adaptive Student-t is enabled, mixing tails use explicit quantile
 //! bounds and the configured absolute integration tolerance is allocated
 //! across intervals, factors and tails; exhausted refinement produces an
@@ -72,6 +72,6 @@ mod sensitivities;
 #[cfg(test)]
 mod tests;
 
-pub use config::{CDSTranchePricer, CDSTranchePricerConfig, HeteroMethod};
+pub use config::{CdsTranchePricer, CdsTranchePricerConfig, HeteroMethod};
 pub use registry::JumpToDefaultResult;
-pub(crate) use registry::SimpleCDSTrancheHazardPricer;
+pub(crate) use registry::SimpleCdsTrancheHazardPricer;

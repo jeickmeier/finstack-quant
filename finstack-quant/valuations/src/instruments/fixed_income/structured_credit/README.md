@@ -26,7 +26,7 @@ There is **no `prelude` module** — import the names you need directly.
 | `DealFees`, `IncentiveFeeSpec` | Fee schedule the template turns into senior, junior and incentive fee tiers. |
 | `CoverageRules`, `DefaultedValuation`, `CccBucketRule`, `DiscountObligationRule` | Collateral valuation rules for the OC tests (rating haircuts, defaulted-asset value, excess-CCC bucket, discount obligations); `CoverageRules::clo_standard()` from the registry. |
 | `PrepaymentModelSpec`, `DefaultModelSpec`, `RecoveryModelSpec`, `PrepaymentCurve`, `DefaultCurve` | Deterministic behavioral models. |
-| `PricingMode` | Valuation-owned stochastic pricing mode — see [`pricing/stochastic/README.md`](pricing/stochastic/README.md). |
+| `StructuredCreditPricingMode` | Valuation-owned stochastic pricing mode — see [`pricing/stochastic/README.md`](pricing/stochastic/README.md). |
 | `StochasticPrepaySpec`, `StochasticDefaultSpec`, `CorrelationStructure`, `PoolGranularity` | Models-owned stochastic inputs; import from `finstack_quant_models::credit::pool`. |
 | `StochasticPricingResult`, `TranchePricingResult` | Stochastic output. |
 | `ReinvestmentPeriod`, `ReinvestmentCriteria`, `ReinvestmentAssumptions` | Deal-level reinvestment contract: window, eligibility, notes that amortize inside the window, and the replacement-collateral terms — see [Collection accounts and current-state inputs](#collection-accounts-and-current-state-inputs). |

@@ -27,10 +27,10 @@ use time::Month;
 /// - **GNMA II**: Multi-issuer pools with a 50-day stated delay. Payments on the 20th.
 ///
 /// Use `GnmaI` or `GnmaII` to select the appropriate convention. Their
-/// persisted values are exactly `GNMA_I` and `GNMA_II`, respectively.
+/// persisted values are exactly `gnma_i` and `gnma_ii`, respectively.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+#[serde(rename_all = "snake_case")]
 pub enum AgencyProgram {
     /// Fannie Mae (Federal National Mortgage Association)
     Fnma,
@@ -46,7 +46,7 @@ pub enum AgencyProgram {
     /// GNMA II securities pay on the 20th of the month following the accrual
     /// period, resulting in a ~50-day stated delay from accrual start. This is
     /// the larger and more actively traded GNMA program.
-    #[serde(rename = "GNMA_II")]
+    #[serde(rename = "gnma_ii")]
     GnmaII,
 }
 
@@ -125,10 +125,10 @@ impl AgencyProgram {
     /// Returns the canonical string representation.
     pub fn as_str(&self) -> &'static str {
         match self {
-            AgencyProgram::Fnma => "FNMA",
-            AgencyProgram::Fhlmc => "FHLMC",
-            AgencyProgram::GnmaII => "GNMA_II",
-            AgencyProgram::GnmaI => "GNMA_I",
+            AgencyProgram::Fnma => "fnma",
+            AgencyProgram::Fhlmc => "fhlmc",
+            AgencyProgram::GnmaII => "gnma_ii",
+            AgencyProgram::GnmaI => "gnma_i",
         }
     }
 
@@ -608,28 +608,28 @@ mod tests {
         let cases = [
             (
                 AgencyProgram::Fnma,
-                "FNMA",
+                "fnma",
                 55,
                 false,
                 Date::from_calendar_date(2024, Month::February, 26).expect("valid date"),
             ),
             (
                 AgencyProgram::Fhlmc,
-                "FHLMC",
+                "fhlmc",
                 55,
                 false,
                 Date::from_calendar_date(2024, Month::February, 26).expect("valid date"),
             ),
             (
                 AgencyProgram::GnmaI,
-                "GNMA_I",
+                "gnma_i",
                 45,
                 true,
                 Date::from_calendar_date(2024, Month::February, 15).expect("valid date"),
             ),
             (
                 AgencyProgram::GnmaII,
-                "GNMA_II",
+                "gnma_ii",
                 50,
                 true,
                 Date::from_calendar_date(2024, Month::February, 20).expect("valid date"),
@@ -734,11 +734,20 @@ mod tests {
     #[test]
     fn agency_program_accepts_only_canonical_gnma_ii() {
         let agency =
-            serde_json::from_str::<AgencyProgram>("\"GNMA_II\"").expect("canonical GNMA spelling");
+            serde_json::from_str::<AgencyProgram>("\"gnma_ii\"").expect("canonical GNMA spelling");
         assert_eq!(agency, AgencyProgram::GnmaII);
-        for legacy in ["GNMA", "GNMA_I_I"] {
+        for legacy in ["gnma", "gnma_i_i"] {
             serde_json::from_str::<AgencyProgram>(&format!("\"{legacy}\""))
                 .expect_err("legacy GNMA spelling must be rejected");
+        }
+    }
+
+    #[test]
+    // schema-rejection-test: retired upper-case wire values "FNMA", "FHLMC", "GNMA_I", "GNMA_II".
+    fn agency_program_rejects_retired_upper_case_values() {
+        for retired in ["FNMA", "FHLMC", "GNMA_I", "GNMA_II"] {
+            serde_json::from_str::<AgencyProgram>(&format!("\"{retired}\""))
+                .expect_err("upper-case agency program must be rejected");
         }
     }
 

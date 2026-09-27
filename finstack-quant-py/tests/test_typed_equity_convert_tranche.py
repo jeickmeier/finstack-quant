@@ -1,4 +1,4 @@
-"""Typed EquityOption / CDSTranche / ConvertibleBond bindings."""
+"""Typed EquityOption / CdsTranche / ConvertibleBond bindings."""
 
 from __future__ import annotations
 
@@ -12,7 +12,7 @@ from finstack_quant.core.currency import Currency
 from finstack_quant.core.dates import DayCount, Tenor
 from finstack_quant.core.money import Money
 from finstack_quant.valuations.instruments import (
-    CDSTranche,
+    CdsTranche,
     ConvertibleBond,
     EquityOption,
 )
@@ -117,16 +117,16 @@ class TestEquityOptionTyped:
         assert EquityOption.from_json(option.to_json()).id == "AAPL-C-200-EXERCISED"
 
 
-class TestCDSTrancheTyped:
+class TestCdsTrancheTyped:
     def test_builder_round_trip(self) -> None:
         tranche = _cds_tranche()
         payload = json.loads(tranche.to_json())
         assert payload["instrument"]["type"] == "cds_tranche"
-        assert CDSTranche.from_json(tranche.to_json()).id == "CDX-IG-42-3-7"
+        assert CdsTranche.from_json(tranche.to_json()).id == "CDX-IG-42-3-7"
 
     def test_sell_protection_side_and_overrides(self) -> None:
         tranche = (
-            CDSTranche
+            CdsTranche
             .builder()
             .id("CDX-IG-42-0-3")
             .index_name("CDX.NA.IG")
@@ -152,7 +152,7 @@ class TestCDSTrancheTyped:
 
     def test_invalid_side_case_raises(self) -> None:
         with pytest.raises(ValueError, match="invalid side"):
-            CDSTranche.builder().side("buy_protection")  # schema-rejection-test: now "pay"
+            CdsTranche.builder().side("buy_protection")  # schema-rejection-test: now "pay"
 
 
 class TestConvertibleBondTyped:

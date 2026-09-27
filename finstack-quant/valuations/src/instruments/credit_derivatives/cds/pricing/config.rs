@@ -8,7 +8,7 @@ use crate::constants::time as time_constants;
 /// Use factory methods like [`isda_standard()`](Self::isda_standard) for
 /// pre-configured setups.
 #[derive(Debug, Clone)]
-pub(crate) struct CDSPricerConfig {
+pub(crate) struct CdsPricerConfig {
     /// Include accrual on default in premium leg calculation
     pub(crate) include_accrual_on_default: bool,
     /// Par spread denominator methodology:
@@ -41,13 +41,13 @@ pub(crate) struct CDSPricerConfig {
     pub(crate) protection_leg_substeps_per_year: f64,
 }
 
-impl Default for CDSPricerConfig {
+impl Default for CdsPricerConfig {
     fn default() -> Self {
         Self::isda_standard()
     }
 }
 
-impl CDSPricerConfig {
+impl CdsPricerConfig {
     /// Create an ISDA 2014 standard compliant configuration (North America/US market).
     ///
     /// Features:

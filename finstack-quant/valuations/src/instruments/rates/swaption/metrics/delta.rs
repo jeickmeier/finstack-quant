@@ -74,10 +74,10 @@ impl MetricCalculator for DeltaCalculator {
 
         let (forward, strike) = ResolvedVolatility {
             sigma: inputs.sigma,
-            convention: inputs.volatility_convention,
+            convention: inputs.convention,
         }
         .model_rates(inputs.forward, strike)?;
-        let delta = match (inputs.volatility_convention, option.option_type) {
+        let delta = match (inputs.convention, option.option_type) {
             (VolatilityConvention::Normal, OptionType::Call) => {
                 bachelier_delta_call(forward, strike, inputs.sigma, inputs.time_to_expiry)
             }

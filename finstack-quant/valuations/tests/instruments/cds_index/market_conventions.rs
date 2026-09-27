@@ -15,7 +15,7 @@ use finstack_quant_core::dates::{DayCount, Tenor};
 use finstack_quant_core::money::Money;
 use finstack_quant_valuations::instruments::credit_derivatives::cds::{CdsConvention, PayReceive};
 use finstack_quant_valuations::instruments::credit_derivatives::cds_index::{
-    CDSIndex, CDSIndexParams,
+    CdsIndex, CdsIndexParams,
 };
 use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::metrics::MetricId;
@@ -30,8 +30,8 @@ fn test_cdx_na_ig_standard_conventions() {
     let start = date!(2025 - 01 - 01);
     let end = date!(2030 - 01 - 01);
 
-    let idx = CDSIndex::from_preset(
-        &CDSIndexParams::cdx_na_ig(42, 1, 100.0),
+    let idx = CdsIndex::from_preset(
+        &CdsIndexParams::cdx_na_ig(42, 1, 100.0),
         "CDX.NA.IG.42",
         Money::new(TEST_NOTIONAL, Currency::USD).expect("valid money fixture"),
         PayReceive::Pay,
@@ -55,8 +55,8 @@ fn test_cdx_na_hy_standard_conventions() {
     let start = date!(2025 - 01 - 01);
     let end = date!(2030 - 01 - 01);
 
-    let idx = CDSIndex::from_preset(
-        &CDSIndexParams::cdx_na_hy(39, 1, 500.0),
+    let idx = CdsIndex::from_preset(
+        &CdsIndexParams::cdx_na_hy(39, 1, 500.0),
         "CDX.NA.HY.39",
         Money::new(TEST_NOTIONAL, Currency::USD).expect("valid money fixture"),
         PayReceive::Pay,
@@ -78,8 +78,8 @@ fn test_itraxx_europe_standard_conventions() {
     let start = date!(2025 - 01 - 01);
     let end = date!(2030 - 01 - 01);
 
-    let idx = CDSIndex::from_preset(
-        &CDSIndexParams::itraxx_europe(41, 1, 25.0),
+    let idx = CdsIndex::from_preset(
+        &CdsIndexParams::itraxx_europe(41, 1, 25.0),
         "iTraxx.Europe.41",
         Money::new(TEST_NOTIONAL, Currency::USD).expect("valid money fixture"),
         PayReceive::Pay,
@@ -98,7 +98,7 @@ fn test_itraxx_europe_standard_conventions() {
 #[test]
 fn test_cdx_ig_standard_coupon() {
     // Market Standard: CDX IG standard coupon is 100 bp
-    let params = CDSIndexParams::cdx_na_ig(42, 1, 100.0);
+    let params = CdsIndexParams::cdx_na_ig(42, 1, 100.0);
 
     assert_eq!(params.coupon_bp, 100.0);
 }
@@ -106,7 +106,7 @@ fn test_cdx_ig_standard_coupon() {
 #[test]
 fn test_cdx_hy_standard_coupon() {
     // Market Standard: CDX HY standard coupon is 500 bp
-    let params = CDSIndexParams::cdx_na_hy(39, 1, 500.0);
+    let params = CdsIndexParams::cdx_na_hy(39, 1, 500.0);
 
     assert_eq!(params.coupon_bp, 500.0);
 }
@@ -114,7 +114,7 @@ fn test_cdx_hy_standard_coupon() {
 #[test]
 fn test_itraxx_standard_coupon() {
     // Market Standard: iTraxx standard coupon is typically 25 bp
-    let params = CDSIndexParams::itraxx_europe(41, 1, 25.0);
+    let params = CdsIndexParams::itraxx_europe(41, 1, 25.0);
 
     assert_eq!(params.coupon_bp, 25.0);
 }
@@ -166,7 +166,7 @@ fn test_standard_maturity_dates() {
 #[test]
 fn test_cdx_series_numbering() {
     // Test: Series and version numbering
-    let params = CDSIndexParams::cdx_na_ig(42, 1, 100.0);
+    let params = CdsIndexParams::cdx_na_ig(42, 1, 100.0);
 
     assert_eq!(params.series, 42);
     assert_eq!(params.version, 1);
@@ -191,8 +191,8 @@ fn test_index_factor_application() {
 
     let factor = 0.96; // 4% defaults
 
-    let idx = CDSIndex::from_preset(
-        &CDSIndexParams::cdx_na_ig(42, 1, 100.0),
+    let idx = CdsIndex::from_preset(
+        &CdsIndexParams::cdx_na_ig(42, 1, 100.0),
         "CDX-SEASONED",
         Money::new(TEST_NOTIONAL, Currency::USD).expect("valid money fixture"),
         PayReceive::Pay,
@@ -223,9 +223,9 @@ fn test_recovery_rate_standard() {
 #[test]
 fn test_cdx_vs_itraxx_naming() {
     // Test: CDX and iTraxx naming conventions
-    let cdx_ig = CDSIndexParams::cdx_na_ig(42, 1, 100.0);
-    let cdx_hy = CDSIndexParams::cdx_na_hy(39, 1, 500.0);
-    let itraxx = CDSIndexParams::itraxx_europe(41, 1, 25.0);
+    let cdx_ig = CdsIndexParams::cdx_na_ig(42, 1, 100.0);
+    let cdx_hy = CdsIndexParams::cdx_na_hy(39, 1, 500.0);
+    let itraxx = CdsIndexParams::itraxx_europe(41, 1, 25.0);
 
     assert_eq!(cdx_ig.index_name, "CDX.NA.IG");
     assert_eq!(cdx_hy.index_name, "CDX.NA.HY");
@@ -280,8 +280,8 @@ fn test_pricing_with_standard_conventions() {
     let end = date!(2030 - 03 - 20); // 5Y IMM
     let as_of = start;
 
-    let idx = CDSIndex::from_preset(
-        &CDSIndexParams::cdx_na_ig(42, 1, 100.0),
+    let idx = CdsIndex::from_preset(
+        &CdsIndexParams::cdx_na_ig(42, 1, 100.0),
         "CDX.NA.IG.42",
         Money::new(TEST_NOTIONAL, Currency::USD).expect("valid money fixture"),
         PayReceive::Pay,
@@ -373,8 +373,8 @@ fn test_fixed_coupon_in_premium_leg() {
 
     let fixed_coupon = 100.0; // 100 bp
 
-    let idx = CDSIndex::from_preset(
-        &CDSIndexParams::cdx_na_ig(42, 1, fixed_coupon),
+    let idx = CdsIndex::from_preset(
+        &CdsIndexParams::cdx_na_ig(42, 1, fixed_coupon),
         "CDX-COUPON",
         Money::new(TEST_NOTIONAL, Currency::USD).expect("valid money fixture"),
         PayReceive::Pay,

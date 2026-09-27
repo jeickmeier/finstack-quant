@@ -16,7 +16,7 @@ use finstack_quant_valuations::constants::isda::STANDARD_RECOVERY_SENIOR;
 use finstack_quant_valuations::constants::BASIS_POINTS_PER_UNIT;
 use finstack_quant_valuations::instruments::credit_derivatives::cds::PayReceive;
 use finstack_quant_valuations::instruments::credit_derivatives::cds_index::{
-    CDSIndex, CDSIndexConstituent, IndexPricing,
+    CdsIndex, CdsIndexConstituent, IndexPricing,
 };
 use finstack_quant_valuations::instruments::CreditParams;
 use finstack_quant_valuations::instruments::Instrument;
@@ -26,7 +26,7 @@ use time::macros::date;
 const TEST_NOTIONAL: f64 = 10_000_000.0;
 
 fn metric_value(
-    index: &CDSIndex,
+    index: &CdsIndex,
     market: &finstack_quant_core::market_data::context::MarketContext,
     as_of: finstack_quant_core::dates::Date,
     metric: MetricId,
@@ -181,12 +181,12 @@ fn test_constituents_unequal_weights() {
     let as_of = start;
 
     let constituents = vec![
-        CDSIndexConstituent::active(CreditParams::corporate_standard("N1", "HZ1"), 0.50), // Large
-        CDSIndexConstituent::active(CreditParams::corporate_standard("N2", "HZ2"), 0.30),
-        CDSIndexConstituent::active(CreditParams::corporate_standard("N3", "HZ3"), 0.20), // Small
+        CdsIndexConstituent::active(CreditParams::corporate_standard("N1", "HZ1"), 0.50), // Large
+        CdsIndexConstituent::active(CreditParams::corporate_standard("N2", "HZ2"), 0.30),
+        CdsIndexConstituent::active(CreditParams::corporate_standard("N3", "HZ3"), 0.20), // Small
     ];
 
-    let idx = CDSIndex::from_preset(
+    let idx = CdsIndex::from_preset(
         &standard_cdx_params(),
         "CDX-UNEQUAL",
         Money::new(TEST_NOTIONAL, Currency::USD).expect("valid money fixture"),
@@ -216,7 +216,7 @@ fn test_constituents_index_factor_application() {
     let factor = 0.95; // 95% surviving
     let constituents = equal_weight_constituents(5);
 
-    let idx = CDSIndex::from_preset(
+    let idx = CdsIndex::from_preset(
         &standard_cdx_params(),
         "CDX-FACTOR",
         Money::new(TEST_NOTIONAL, Currency::USD).expect("valid money fixture"),

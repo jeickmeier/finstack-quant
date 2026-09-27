@@ -116,9 +116,9 @@
 //! | Type | Description |
 //! |------|-------------|
 //! | `CreditDefaultSwap` | Single-name CDS |
-//! | `CDSIndex` | Credit indices (CDX, iTraxx) |
-//! | `CDSTranche` | Synthetic CDO tranches |
-//! | `CDSOption` | Options on CDS spreads |
+//! | `CdsIndex` | Credit indices (CDX, iTraxx) |
+//! | `CdsTranche` | Synthetic CDO tranches |
+//! | `CdsOption` | Options on CDS spreads |
 //!
 //! ## Equity & FX
 //! | Type | Description |
@@ -202,7 +202,7 @@ pub use fixed_income::{
     AgencyCmo, AgencyMbsPassthrough, AgencyProgram, AgencyTba, AssetBackedFacility, Bond,
     BondFuture, BondFutureBuilder, BondFutureSpecs, BondSettlementConvention, CmoTranche,
     CmoTrancheType, CmoWaterfall, ConvertibleBond, DeliverableBond, DollarRoll,
-    FIIndexTotalReturnSwap, InflationLinkedBond, PoolType, RevolvingCredit, StructuredCredit,
+    FiIndexTotalReturnSwap, InflationLinkedBond, PoolType, RevolvingCredit, StructuredCredit,
     TbaTerm, TermLoan,
 };
 
@@ -213,7 +213,7 @@ pub use rates::{
     YoYInflationSwap,
 };
 
-pub use credit_derivatives::{CDSIndex, CDSOption, CDSTranche, CreditDefaultSwap};
+pub use credit_derivatives::{CdsIndex, CdsOption, CdsTranche, CreditDefaultSwap};
 
 pub use equity::{
     Autocallable, CliquetOption, DiscountedCashFlow, Equity, EquityFuture, EquityFutureOption,
@@ -272,8 +272,7 @@ pub use common_impl::parameters::{
     BondConvention, CommodityUnderlyingParams, CreditParams, EquityUnderlyingParams, ExerciseStyle,
     FinancingLegSpec, FixedLegSpec, FloatLegSpec, FxUnderlyingParams, IndexUnderlyingParams,
     Monitoring, OptionMarketParams, OptionType, ParRateMethod, PayReceive, PremiumLegSpec,
-    ProtectionLegSpec, QuantoSpec, ScheduleSpec, SettlementType, TotalReturnLegSpec,
-    VolatilityModel,
+    ProtectionLegSpec, QuantoSpec, SettlementType, TotalReturnLegSpec, VolatilityModel,
 };
 
 pub use common_impl::parameters::trs_common::TrsScheduleSpec;

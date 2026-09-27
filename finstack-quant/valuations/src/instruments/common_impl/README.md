@@ -44,7 +44,6 @@ numeric-serde helpers that keep instrument invariants uniform.
 | `underlying.rs` | `FxUnderlyingParams`, `EquityUnderlyingParams`, `CommodityUnderlyingParams`, `IndexUnderlyingParams` |
 | `market.rs` | `OptionType`, `ExerciseStyle`, `SettlementType`, `CreditParams` |
 | `conventions.rs` | `BondConvention`, `CommodityConvention` |
-| `contract.rs` | `ScheduleSpec` |
 | `quanto.rs` | `QuantoSpec` (validated correlation in `[-1, 1]`) |
 | `trs_common.rs` | `TrsScheduleSpec` — shared by equity and fixed-income TRS |
 | `volatility.rs` | `VolatilityModel` plus a re-export of `crate::models::volatility::SABRParameters` |
@@ -81,7 +80,7 @@ Everything below is re-exported by `instruments/mod.rs`; the module paths under
   `PremiumLegSpec`, `ProtectionLegSpec`, `FinancingLegSpec`,
   `TotalReturnLegSpec`, `PayReceive`,
   `ParRateMethod`, `OptionType`, `ExerciseStyle`, `SettlementType`,
-  `CreditParams`, `OptionMarketParams`, `ScheduleSpec`,
+  `CreditParams`, `OptionMarketParams`,
   `BondConvention` and the four `*UnderlyingParams`).
 - `instruments::pricing` — glob of `common_impl::pricing`'s public items.
 - `instruments::cashflow_export` — `instrument_cashflows_json`,

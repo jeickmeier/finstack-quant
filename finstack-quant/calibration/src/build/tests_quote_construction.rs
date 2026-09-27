@@ -2,7 +2,7 @@
 #![allow(clippy::unwrap_used, clippy::panic)]
 
 use crate::build::cds::build_cds_instrument;
-use crate::build::cds_tranche::{build_cds_tranche_instrument, CDSTrancheBuildOverrides};
+use crate::build::cds_tranche::{build_cds_tranche_instrument, CdsTrancheBuildOverrides};
 use crate::build::rates::build_rate_instrument;
 use crate::build::BuildCtx;
 use crate::quotes::cds::CdsQuote;
@@ -212,7 +212,7 @@ fn test_all_quote_types_instrument_construction() {
             assert!(*detachment <= 1.0, "detachment should be capped at 100%");
         }
         if let MarketQuote::CdsTranche(tranche) = q {
-            let overrides = CDSTrancheBuildOverrides::default();
+            let overrides = CdsTrancheBuildOverrides::default();
             build_cds_tranche_instrument(tranche, &build_ctx, &overrides)
                 .expect("cds tranche instrument build");
         }

@@ -9,7 +9,7 @@
 //! so CDS and CDS-option IR DV01 share a single unit and sign convention and
 //! can be aggregated across a portfolio regardless of how the curve was built.
 
-use crate::instruments::credit_derivatives::cds_option::CDSOption;
+use crate::instruments::credit_derivatives::cds_option::CdsOption;
 use crate::metrics::sensitivities::config as sens_config;
 use crate::metrics::sensitivities::cs01::sensitivity_central_diff;
 use crate::metrics::{MetricCalculator, MetricContext};
@@ -27,7 +27,7 @@ pub(crate) struct CdsOptionDv01Calculator;
 
 impl CdsOptionDv01Calculator {
     fn price_at_rate_bump(
-        option: &CDSOption,
+        option: &CdsOption,
         context: &MetricContext,
         bump_bp: f64,
     ) -> Result<f64> {
@@ -63,7 +63,7 @@ impl CdsOptionDv01Calculator {
 
 impl MetricCalculator for CdsOptionDv01Calculator {
     fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
-        let option: &CDSOption = context.instrument_as()?;
+        let option: &CdsOption = context.instrument_as()?;
         let defaults = sens_config::from_context_or_default(
             context.get_config(),
             context.get_metric_overrides(),

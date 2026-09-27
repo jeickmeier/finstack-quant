@@ -548,7 +548,7 @@ mod tests {
     use finstack_quant_core::money::fx::{FxMatrix, SimpleFxProvider};
     use finstack_quant_core::types::{Attributes, CurveId};
     use finstack_quant_valuations::instruments::commodity::commodity_swap::CommoditySwap;
-    use finstack_quant_valuations::instruments::credit_derivatives::CDSIndex;
+    use finstack_quant_valuations::instruments::credit_derivatives::CdsIndex;
     use finstack_quant_valuations::instruments::fixed_income::bond;
     use finstack_quant_valuations::instruments::fixed_income::AgencyMbsPassthrough;
     use finstack_quant_valuations::instruments::rates::Swaption;
@@ -877,7 +877,7 @@ mod tests {
             "POS_CDX",
             "ENTITY_A",
             "CDX-IG-42",
-            Arc::new(CDSIndex::example()),
+            Arc::new(CdsIndex::example()),
             1.0,
             PositionUnit::Units,
         )

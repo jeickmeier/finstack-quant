@@ -16,7 +16,7 @@ pub(crate) struct CapletFloorletInputs {
     /// Discount factor to payment date.
     pub(crate) discount_factor: f64,
     /// Annualized volatility in the model convention.
-    pub(crate) volatility: f64,
+    pub(crate) sigma: f64,
     /// Time to fixing date in years.
     pub(crate) time_to_fixing: f64,
     /// Accrual year fraction for the period.

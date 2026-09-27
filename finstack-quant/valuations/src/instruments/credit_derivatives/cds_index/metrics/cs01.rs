@@ -7,7 +7,7 @@
 //!
 //! - [`Cs01Calculator`]: parallel CS01 derived from per-name finite differences
 //!   summed over surviving constituents (or computed on the synthetic CDS in
-//!   `SingleCurve` mode). Routed through [`CDSIndex::cs01`]; treats each
+//!   `SingleCurve` mode). Routed through [`CdsIndex::cs01`]; treats each
 //!   constituent's bump as a parallel par-spread shock.
 //! - [`CdsIndexBucketedCs01Calculator`]: quote-bucketed par-spread CS01 — the
 //!   bucketed counterpart of [`Cs01Calculator`]. Applies one exact atomic
@@ -20,9 +20,9 @@
 //! - Short index protection (buy protection) → CS01 positive.
 //!
 //! [canonical]: crate::metrics::sensitivities::cs01
-//! [`CDSIndex::cs01`]: crate::instruments::credit_derivatives::cds_index::CDSIndex::cs01
+//! [`CdsIndex::cs01`]: crate::instruments::credit_derivatives::cds_index::CdsIndex::cs01
 
-use crate::instruments::credit_derivatives::cds_index::{CDSIndex, IndexPricing};
+use crate::instruments::credit_derivatives::cds_index::{CdsIndex, IndexPricing};
 use crate::metrics::sensitivities::config as sens_config;
 use crate::metrics::sensitivities::cs01::{
     compute_key_rate_cs01_series_with_context_raw, cs01_reval, Cs01Request,
@@ -38,12 +38,12 @@ pub(crate) struct Cs01Calculator;
 impl MetricCalculator for Cs01Calculator {
     fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
         let provider = context.recalibration_provider("cs01")?;
-        let idx: &CDSIndex = context.instrument_as()?;
+        let idx: &CdsIndex = context.instrument_as()?;
         idx.cs01(&context.curves, context.as_of, provider.as_ref())
     }
 }
 
-fn index_credit_curve_ids(index: &CDSIndex) -> Result<Vec<CurveId>> {
+fn index_credit_curve_ids(index: &CdsIndex) -> Result<Vec<CurveId>> {
     match index.pricing {
         IndexPricing::SingleCurve => Ok(vec![index.protection_leg.credit_curve_id.clone()]),
         IndexPricing::Constituents => {
@@ -73,7 +73,7 @@ pub(crate) struct CdsIndexBucketedCs01Calculator;
 
 impl MetricCalculator for CdsIndexBucketedCs01Calculator {
     fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
-        let index: CDSIndex = context.instrument_as::<CDSIndex>()?.clone();
+        let index: CdsIndex = context.instrument_as::<CdsIndex>()?.clone();
 
         // Expired → zero, no series (mirrors the parallel aggregation path).
         if context.as_of >= index.premium_leg.end {

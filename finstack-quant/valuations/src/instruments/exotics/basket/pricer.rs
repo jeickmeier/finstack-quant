@@ -390,7 +390,7 @@ mod tests {
     use super::*;
     use crate::instruments::common_impl::traits::Attributes;
     use crate::instruments::exotics::basket::types::{
-        AssetType, BasketConstituent, ConstituentReference,
+        BasketAssetType, BasketConstituent, ConstituentReference,
     };
     use finstack_quant_core::types::{InstrumentId, PriceId};
 
@@ -402,7 +402,7 @@ mod tests {
                 id: format!("CONST-{i}"),
                 reference: ConstituentReference::MarketData {
                     price_id: PriceId::new(format!("PX-{i}")),
-                    asset_type: AssetType::Equity,
+                    asset_type: BasketAssetType::Equity,
                 },
                 weight: w,
                 units: None,

@@ -193,7 +193,7 @@ impl MetricCalculator for CarryAccruedCalculator {
 /// (deterministic selection of the root closest to `r = 0`) come from the core
 /// solver, so PE-fund metrics inherit its compensated summation, scale
 /// invariance, and unbounded high-rate handling. The waterfall IRR routine
-/// (`WaterfallSpec::calculate_irr`) delegates here so both stay consistent.
+/// (`PeFundWaterfallSpec::calculate_irr`) delegates here so both stay consistent.
 ///
 /// # Arguments
 ///
@@ -264,7 +264,7 @@ pub(crate) fn register_private_markets_fund_metrics(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::instruments::equity::pe_fund::{FundEvent, WaterfallSpec};
+    use crate::instruments::equity::pe_fund::{FundEvent, PeFundWaterfallSpec};
     use time::Month;
 
     fn test_currency() -> finstack_quant_core::currency::Currency {
@@ -303,7 +303,7 @@ mod tests {
     /// `calculate_irr` must discount cashflows with the exact closed form
     /// `(1 + r)^{-t}` — no linearized `1 − r·t` near zero. This reconciles the
     /// standalone routine with the waterfall's IRR routine
-    /// (`WaterfallSpec::calculate_irr`), which also uses `(1 + r)^{-t}`.
+    /// (`PeFundWaterfallSpec::calculate_irr`), which also uses `(1 + r)^{-t}`.
     ///
     /// With a near-zero IRR (a marginal gain over a multi-year horizon) the old
     /// `1 − r·t` linearization is a different discount function from
@@ -363,7 +363,7 @@ mod tests {
     fn test_moic_calculation() {
         // 100% LP promote tier so the full distribution reaches the LP and
         // the ledger-basis MOIC  equals the naive 2x.
-        let spec = WaterfallSpec::builder()
+        let spec = PeFundWaterfallSpec::builder()
             .return_of_capital()
             .promote_tier(0.0, 1.0, 0.0)
             .build()
@@ -417,7 +417,7 @@ mod tests {
     /// realized IRR.
     #[test]
     fn fully_realized_fund_tvpi_equals_dpi_and_lp_irr_is_realized() {
-        let spec = WaterfallSpec::builder()
+        let spec = PeFundWaterfallSpec::builder()
             .return_of_capital()
             .promote_tier(0.0, 1.0, 0.0)
             .build()

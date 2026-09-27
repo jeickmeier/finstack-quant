@@ -254,7 +254,7 @@ impl MertonModel {
 
 #[cfg(test)]
 mod tests {
-    use super::super::{AssetDynamics, BarrierType, MertonModel};
+    use super::super::{AssetDynamics, MertonBarrierType, MertonModel};
 
     #[test]
     fn simulate_paths_rejects_degenerate_grid() {
@@ -343,7 +343,7 @@ mod tests {
             80.0,
             0.05,
             0.0,
-            BarrierType::Terminal,
+            MertonBarrierType::Terminal,
             AssetDynamics::JumpDiffusion {
                 jump_intensity: 0.5,
                 jump_mean: -0.05,
@@ -388,7 +388,7 @@ mod tests {
             80.0,
             0.05,
             0.0,
-            BarrierType::Terminal,
+            MertonBarrierType::Terminal,
             AssetDynamics::JumpDiffusion {
                 jump_intensity: 0.5,
                 jump_mean: -0.05,

@@ -2,7 +2,7 @@
 //!
 //! Returns the canonical Risky PV01 = `Risky Annuity × Notional / 10000`.
 
-use crate::instruments::credit_derivatives::cds::pricing::CDSPricer;
+use crate::instruments::credit_derivatives::cds::pricing::CdsPricer;
 use crate::instruments::credit_derivatives::cds::CreditDefaultSwap;
 use crate::metrics::{MetricCalculator, MetricContext};
 use finstack_quant_core::Result;
@@ -19,6 +19,6 @@ impl MetricCalculator for RiskyPv01Calculator {
         let surv = context
             .curves
             .get_hazard(&cds.protection_leg.credit_curve_id)?;
-        CDSPricer::new().risky_pv01(cds, disc.as_ref(), surv.as_ref(), context.as_of)
+        CdsPricer::new().risky_pv01(cds, disc.as_ref(), surv.as_ref(), context.as_of)
     }
 }

@@ -2,6 +2,47 @@
 
 ## [Unreleased]
 
+### Type-name hygiene (2026-09-24)
+
+#### Changed (BREAKING)
+
+- Acronyms in type names are CamelCase: `CDSIndex` (now `CdsIndex`),
+  `CDSTranche` (now `CdsTranche`), `CDSOption` (now `CdsOption`) and every
+  `CDSIndex*`/`CDSTranche*`/`CDSOption*`/`CDSPricer*` companion
+  (`CdsIndexParams`, `CdsIndexConstituent`, `CdsTrancheParams`,
+  `CdsTranchePricer`, `CdsTranchePricerConfig`, `CdsOptionStrike`, ...), and
+  `FIIndexTotalReturnSwap` (now `FiIndexTotalReturnSwap`). Rust, Python
+  (`valuations.instruments.CdsIndex`, `CdsTranche`, their builders and params)
+  and schema `$defs` names; instrument JSON `type` tags are unchanged.
+- Types that shared a name with a different concept take their schema names:
+  basket `AssetType` (now `BasketAssetType`), private-markets `Tranche` (now
+  `PeFundWaterfallTranche`) and `WaterfallSpec` (now `PeFundWaterfallSpec`),
+  structured-credit stochastic `PricingMode` (now
+  `StructuredCreditPricingMode`) and Merton `BarrierType` (now
+  `MertonBarrierType`, also Python `models.credit.MertonBarrierType`). Rust
+  only for the first four; schemas are unchanged.
+- `AgencyProgram` wire values are snake_case: `"FNMA"` (now `"fnma"`),
+  `"FHLMC"` (now `"fhlmc"`), `"GNMA_I"` (now `"gnma_i"`), `"GNMA_II"` (now
+  `"gnma_ii"`); `as_str` and `Display` match. JSON for AgencyMbsPassthrough,
+  AgencyTba, DollarRoll and AgencyCmo.
+- `NdfFixingSource` wire values are snake_case: `"PBOC"` (now `"pboc"`),
+  `"CNHFIX"` (now `"cnhfix"`), `"PHP_BVAL"` (now `"php_bval"`), `"OTHER"` (now
+  `"other"`) and likewise for `rbi`, `kftc`, `ptax`, `taifx`, `jisdor`, `bnm`;
+  `Display`, `FromStr` and `Ndf::effective_fixing_source` match. Ndf JSON.
+- `DealType`, `CmoTrancheType` and `TbaTerm` `Display` prints the serde wire
+  value (`clo`, `pac`, `thirty_year`) instead of a label (`CLO`, `PAC`, `30Y`).
+  Rust only.
+- `SchwartzSmithParams.kappa_x` (now `kappa`) and `SchwartzSmithParams.rho`
+  (now `rho_xy`), Schwartz & Smith (2000) notation; `CommodityPricingModel::SchwartzSmith`
+  now carries a `SchwartzSmithParams` instead of re-declaring its fields.
+  Rust only.
+- `swaption::GreekInputs.volatility_convention` (now `convention`). Rust only.
+
+#### Removed
+
+- The unused valuations `instruments::ScheduleSpec`; use core
+  `dates::ScheduleSpec`. Rust only.
+
 ### Compounding and leg specs (2026-09-24)
 
 #### Changed (BREAKING)

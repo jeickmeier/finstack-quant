@@ -226,7 +226,7 @@ results and want typed returns on both sides.
 - `pricing/` subdirectory vs `pricer.rs`: Use a directory when an instrument has 3+ distinct pricing engines; use a single `pricer.rs` file otherwise.
 
 ### Binding Names
-- `CDSTranche`/`CDSOption` Rust struct names use all-caps `CDS` prefix (matching `CDSIndex` and `InstrumentType` enum variants). Python/JS binding names are preserved as `CdsTranche`/`CdsOption` for backward compatibility.
+- Acronyms in type names use CamelCase (`CdsIndex`, `CdsTranche`, `CdsOption`, `FiIndexTotalReturnSwap`), matching `InstrumentType` variants and C-CASE; Rust, Python and JS names are identical.
 
 ### Documentation
 - Module READMEs: valuations has more READMEs than core; core uses inline doc comments instead. Both approaches are acceptable.

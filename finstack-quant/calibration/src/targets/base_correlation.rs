@@ -1,11 +1,11 @@
 //! Bootstrapper for base correlation curves built from tranche quotes.
 
 use crate::api::schema::BaseCorrelationParams;
-use crate::build::cds_tranche::{build_cds_tranche_instrument, CDSTrancheBuildOverrides};
+use crate::build::cds_tranche::{build_cds_tranche_instrument, CdsTrancheBuildOverrides};
 use crate::build::context::BuildCtx;
 use crate::build::prepared::PreparedQuote;
 use crate::config::CalibrationConfig;
-use crate::prepared::{CDSTrancheCalibrationQuote, CalibrationQuote};
+use crate::prepared::{CalibrationQuote, CdsTrancheCalibrationQuote};
 use crate::quotes::cds_tranche::CdsTrancheQuote;
 use crate::quotes::market_quote::{ExtractQuotes, MarketQuote};
 use crate::solver::bootstrap::SequentialBootstrapper;
@@ -19,7 +19,7 @@ use finstack_quant_core::market_data::term_structures::BaseCorrelationCurve;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::HashMap;
 use finstack_quant_core::Result;
-use finstack_quant_valuations::instruments::credit_derivatives::cds_tranche::CDSTranchePricer;
+use finstack_quant_valuations::instruments::credit_derivatives::cds_tranche::CdsTranchePricer;
 use finstack_quant_valuations::market::conventions::ConventionRegistry;
 use std::sync::Arc;
 
@@ -136,7 +136,7 @@ pub(crate) struct BaseCorrelationTarget {
     /// Reusable sequential bootstrap scratch context.
     scratch: ContextScratch,
     /// Reusable tranche pricer retaining lazy copula and quadrature caches.
-    pricer: CDSTranchePricer,
+    pricer: CdsTranchePricer,
 }
 
 impl BaseCorrelationTarget {
@@ -145,7 +145,7 @@ impl BaseCorrelationTarget {
         Self {
             params,
             scratch: ContextScratch::new(base_context),
-            pricer: CDSTranchePricer::new(),
+            pricer: CdsTranchePricer::new(),
         }
     }
 
@@ -181,8 +181,8 @@ impl BaseCorrelationTarget {
         BuildCtx::new(self.params.base_date, self.params.notional, curve_ids)
     }
 
-    fn build_overrides(&self) -> CDSTrancheBuildOverrides {
-        CDSTrancheBuildOverrides {
+    fn build_overrides(&self) -> CdsTrancheBuildOverrides {
+        CdsTrancheBuildOverrides {
             frequency: self.params.frequency,
             day_count: self.params.day_count,
             business_day_convention: self.params.business_day_convention,
@@ -204,7 +204,7 @@ impl BaseCorrelationTarget {
         &self,
         quote: &CdsTrancheQuote,
         build_ctx: &BuildCtx,
-        overrides: &CDSTrancheBuildOverrides,
+        overrides: &CdsTrancheBuildOverrides,
         time_day_count: DayCount,
     ) -> Result<CalibrationQuote> {
         // Build pricing instrument without embedded upfront
@@ -238,7 +238,7 @@ impl BaseCorrelationTarget {
             self.params.currency,
         )?;
 
-        Ok(CalibrationQuote::CDSTranche(CDSTrancheCalibrationQuote {
+        Ok(CalibrationQuote::CdsTranche(CdsTrancheCalibrationQuote {
             prepared: prepared_quote,
             upfront: Some(upfront_money),
             detachment_pct,
@@ -364,7 +364,7 @@ impl BootstrapTarget for BaseCorrelationTarget {
 
     fn quote_time(&self, quote: &Self::Quote) -> Result<f64> {
         match quote {
-            CalibrationQuote::CDSTranche(pq) => Ok(pq.detachment_pct),
+            CalibrationQuote::CdsTranche(pq) => Ok(pq.detachment_pct),
             _ => Err(finstack_quant_core::Error::Input(
                 finstack_quant_core::InputError::Invalid,
             )),
@@ -424,7 +424,7 @@ impl BootstrapTarget for BaseCorrelationTarget {
 
     fn calculate_residual(&self, curve: &Self::Curve, quote: &Self::Quote) -> Result<f64> {
         let (pq, upfront) = match quote {
-            CalibrationQuote::CDSTranche(pq) => (&pq.prepared, &pq.upfront),
+            CalibrationQuote::CdsTranche(pq) => (&pq.prepared, &pq.upfront),
             _ => {
                 return Err(finstack_quant_core::Error::Input(
                     finstack_quant_core::InputError::Invalid,
@@ -435,10 +435,10 @@ impl BootstrapTarget for BaseCorrelationTarget {
         let tranche = pq
             .instrument
             .as_any()
-            .downcast_ref::<finstack_quant_valuations::instruments::credit_derivatives::cds_tranche::CDSTranche>()
+            .downcast_ref::<finstack_quant_valuations::instruments::credit_derivatives::cds_tranche::CdsTranche>()
             .ok_or_else(|| {
                 finstack_quant_core::Error::Validation(
-                    "Base correlation calibration requires a CDSTranche instrument".to_string(),
+                    "Base correlation calibration requires a CdsTranche instrument".to_string(),
                 )
             })?;
         let index_id = self.params.index_id.as_str();

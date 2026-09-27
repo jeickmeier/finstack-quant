@@ -44,7 +44,7 @@ re-exported flat at `finstack_quant_valuations::instruments`:
 `Bond`, `BondSettlementConvention`, `BondFuture`, `BondFutureBuilder`,
 `BondFutureSpecs`, `DeliverableBond`, `AgencyCmo`, `CmoTranche`,
 `CmoTrancheType`, `CmoWaterfall`, `ConvertibleBond`, `DollarRoll`,
-`FIIndexTotalReturnSwap`, `InflationLinkedBond`, `AgencyMbsPassthrough`,
+`FiIndexTotalReturnSwap`, `InflationLinkedBond`, `AgencyMbsPassthrough`,
 `AgencyProgram`, `PoolType`, `RevolvingCredit`, `StructuredCredit`,
 `AgencyTba`, `TbaTerm`, `TermLoan`.
 

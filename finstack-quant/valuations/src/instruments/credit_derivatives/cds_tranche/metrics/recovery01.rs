@@ -30,7 +30,7 @@
 //! pricing convention, not the per-issuer recovery agreements.
 
 use crate::instruments::common_impl::traits::Instrument;
-use crate::instruments::credit_derivatives::cds_tranche::CDSTranche;
+use crate::instruments::credit_derivatives::cds_tranche::CdsTranche;
 use crate::metrics::{MetricCalculator, MetricContext};
 use crate::recalibration::{HazardRecalibrationAction, HazardRecalibrationRequest};
 use finstack_quant_core::market_data::context::MarketContext;
@@ -72,7 +72,7 @@ fn rebuild_with_recovery(original: &CreditIndexData, new_recovery: f64) -> Resul
 /// **frozen** (reused unchanged).
 fn frozen_market_at_bumped_recovery(
     base_market: &MarketContext,
-    tranche: &CDSTranche,
+    tranche: &CdsTranche,
     original_index: &CreditIndexData,
     new_recovery: f64,
 ) -> Result<MarketContext> {
@@ -87,7 +87,7 @@ fn frozen_market_at_bumped_recovery(
 fn recalibrated_market_at_bumped_recovery(
     context: &MetricContext,
     base_market: &MarketContext,
-    tranche: &CDSTranche,
+    tranche: &CdsTranche,
     original_index: &CreditIndexData,
     new_recovery: f64,
 ) -> Result<MarketContext> {
@@ -125,7 +125,7 @@ fn recalibrated_market_at_bumped_recovery(
 
 impl MetricCalculator for Recovery01Calculator {
     fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
-        let tranche: &CDSTranche = context.instrument_as()?;
+        let tranche: &CdsTranche = context.instrument_as()?;
         let as_of = context.as_of;
         let market = context.curves.as_ref();
 

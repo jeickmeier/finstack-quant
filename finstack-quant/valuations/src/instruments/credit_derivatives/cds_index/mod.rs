@@ -80,12 +80,12 @@
 //!
 //! # Examples
 //!
-//! See [`CDSIndex`] for construction and usage examples.
+//! See [`CdsIndex`] for construction and usage examples.
 //!
 //! # See Also
 //!
-//! - `CDSIndex` for index CDS struct
-//! - `CDSIndexConstituent` for constituent entity information
+//! - `CdsIndex` for index CDS struct
+//! - `CdsIndexConstituent` for constituent entity information
 //! - `IndexPricing` for intrinsic vs index-level pricing mode
 //! - index metrics module for index risk metrics
 
@@ -94,8 +94,8 @@ pub(crate) mod parameters;
 pub(crate) mod pricer;
 mod types;
 
-pub use parameters::CDSIndexParams;
+pub use parameters::CdsIndexParams;
 pub use types::{
-    CDSIndex, CDSIndexBuilder, CDSIndexConstituent, ConstituentResult, IndexParSpreadResult,
+    CdsIndex, CdsIndexBuilder, CdsIndexConstituent, ConstituentResult, IndexParSpreadResult,
     IndexPricing, IndexResult,
 };

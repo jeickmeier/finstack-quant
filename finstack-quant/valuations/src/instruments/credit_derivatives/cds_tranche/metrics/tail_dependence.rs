@@ -29,12 +29,12 @@
 //! # Implementation
 //!
 //! Delegates to the copula built from the same pricer configuration used by
-//! the tranche pricing path (`CDSTranchePricer::config().copula_spec`), so the
+//! the tranche pricing path (`CdsTranchePricer::config().copula_spec`), so the
 //! reported λ_L is always computed by the exact model implementation rather
 //! than a re-derived local formula that could drift from it.
 
-use crate::instruments::credit_derivatives::cds_tranche::pricing::CDSTranchePricer;
-use crate::instruments::credit_derivatives::cds_tranche::CDSTranche;
+use crate::instruments::credit_derivatives::cds_tranche::pricing::CdsTranchePricer;
+use crate::instruments::credit_derivatives::cds_tranche::CdsTranche;
 use crate::metrics::{MetricCalculator, MetricContext};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::CreditIndexData;
@@ -49,7 +49,7 @@ use std::sync::Arc;
 pub(crate) struct TailDependenceCalculator;
 
 fn credit_index_for_tail_dependence(
-    tranche: &CDSTranche,
+    tranche: &CdsTranche,
     market: &MarketContext,
 ) -> Result<Arc<CreditIndexData>> {
     market
@@ -66,7 +66,7 @@ fn credit_index_for_tail_dependence(
 
 impl MetricCalculator for TailDependenceCalculator {
     fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
-        let tranche = context.instrument_as::<CDSTranche>()?;
+        let tranche = context.instrument_as::<CdsTranche>()?;
 
         let index_data = credit_index_for_tail_dependence(tranche, &context.curves)?;
         let correlation = index_data
@@ -77,7 +77,7 @@ impl MetricCalculator for TailDependenceCalculator {
         // and delegate to its canonical tail-dependence implementation.
         // Models without a closed-form λ_L (e.g. Random Factor Loading)
         // return NaN per the trait contract.
-        let pricer = CDSTranchePricer::new();
+        let pricer = CdsTranchePricer::new();
         let copula = pricer
             .get_config()
             .copula_spec
@@ -94,7 +94,7 @@ mod tests {
 
     #[test]
     fn missing_credit_index_is_an_error_not_nan() {
-        let tranche = CDSTranche::example();
+        let tranche = CdsTranche::example();
         let error = credit_index_for_tail_dependence(&tranche, &MarketContext::new())
             .expect_err("missing credit index must fail");
         assert!(error.to_string().contains(tranche.credit_index_id.as_str()));

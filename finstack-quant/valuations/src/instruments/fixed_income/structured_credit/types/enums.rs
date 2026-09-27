@@ -31,16 +31,17 @@ pub enum DealType {
     Card,
 }
 
+/// Displays the serde wire value (`clo`, `rmbs`, ...).
 impl core::fmt::Display for DealType {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {
-            DealType::Clo => write!(f, "CLO"),
-            DealType::Cbo => write!(f, "CBO"),
-            DealType::Abs => write!(f, "ABS"),
-            DealType::Rmbs => write!(f, "RMBS"),
-            DealType::Cmbs => write!(f, "CMBS"),
-            DealType::Auto => write!(f, "Auto ABS"),
-            DealType::Card => write!(f, "Credit Card ABS"),
+            DealType::Clo => write!(f, "clo"),
+            DealType::Cbo => write!(f, "cbo"),
+            DealType::Abs => write!(f, "abs"),
+            DealType::Rmbs => write!(f, "rmbs"),
+            DealType::Cmbs => write!(f, "cmbs"),
+            DealType::Auto => write!(f, "auto"),
+            DealType::Card => write!(f, "card"),
         }
     }
 }

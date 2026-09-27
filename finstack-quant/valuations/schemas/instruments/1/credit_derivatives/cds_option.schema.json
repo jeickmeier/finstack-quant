@@ -1,6 +1,31 @@
 {
   "$defs": {
-    "CDSOption": {
+    "CdsConvention": {
+      "description": "Regional ISDA CDS schedule family.\n\nExact documentation clauses stay on the instrument or quote. This enum\nidentifies the regional schedule family used to resolve calendars,\nday-count, frequency, stub, and settlement from the convention registry.",
+      "oneOf": [
+        {
+          "const": "isda_na",
+          "description": "Standard North American convention (quarterly, Act/360).",
+          "type": "string"
+        },
+        {
+          "const": "isda_eu",
+          "description": "Standard European convention (quarterly, Act/360).",
+          "type": "string"
+        },
+        {
+          "const": "isda_as",
+          "description": "Standard Asian convention (quarterly, Act/360).",
+          "type": "string"
+        },
+        {
+          "const": "custom",
+          "description": "Custom convention.",
+          "type": "string"
+        }
+      ]
+    },
+    "CdsOption": {
       "additionalProperties": false,
       "description": "Credit option instrument (option on CDS spread or clean index price)\n\nThe public pricing surface supports European options with cash or\nphysical settlement. Before expiry, cash- and physical-settled options\ncarry the same cash-equivalent model NPV and route through the same\nquadrature; the clean payoff excludes accrued because the same underlying\naccrued appears on both sides before exercise and cancels. A physical\nexercise cashflow at settlement is dirty (includes accrued at exercise\nsettlement), and this pricer does not create or deliver a live underlying\nCDS position — valuation at or after a physical exercise boundary fails\nexplicitly. Non-European exercise is rejected at pricing time so\ndeserialized instruments cannot silently fall through to an unsupported\nengine.",
       "properties": {
@@ -115,11 +140,11 @@
           "description": "Settlement type"
         },
         "strike": {
-          "$ref": "#/$defs/CDSOptionStrike",
+          "$ref": "#/$defs/CdsOptionStrike",
           "description": "Typed option strike: a decimal forward spread (`{\"spread\": \"0.0325\"}`)\nor a clean price in percentage points (`{\"clean_price_pct\": \"107.0\"}`)."
         },
         "strike_index_factor": {
-          "description": "Original index factor `f0` attached to the option strike.\n\nDistinct from [`Self::index_factor`], which is the current factor\n`f` at valuation: defaults settled between option strike and\nvaluation reduce `f` below `f0`. A clean-price strike quotes the\nprice on `f0` notional, so its deterministic payoff term scales by\n`f0 / f`; the strike factor is therefore required for clean-price\nstrikes (`CDSOptionStrike::CleanPricePct`) and must not be inferred\nfrom the current factor after a default. Rejected for spread\nstrikes, whose payoff does not reference it.",
+          "description": "Original index factor `f0` attached to the option strike.\n\nDistinct from [`Self::index_factor`], which is the current factor\n`f` at valuation: defaults settled between option strike and\nvaluation reduce `f` below `f0`. A clean-price strike quotes the\nprice on `f0` notional, so its deterministic payoff term scales by\n`f0 / f`; the strike factor is therefore required for clean-price\nstrikes (`CdsOptionStrike::CleanPricePct`) and must not be inferred\nfrom the current factor after a default. Rejected for spread\nstrikes, whose payoff does not reference it.",
           "format": "double",
           "type": [
             "number",
@@ -172,8 +197,8 @@
       ],
       "type": "object"
     },
-    "CDSOptionStrike": {
-      "description": "Typed CDS-option strike: forward-spread or clean-price convention.\n\nWire format: externally tagged JSON — `{\"spread\": \"0.0325\"}` or\n`{\"clean_price_pct\": \"107.0\"}` — with no bare-decimal fallback.\n\n# Examples\n\n```rust\nuse finstack_quant_valuations::instruments::credit_derivatives::cds_option::CDSOptionStrike;\nuse rust_decimal::Decimal;\n\nlet spread = CDSOptionStrike::Spread(Decimal::new(325, 4)); // 0.0325 = 325 bp\nassert!(spread.spread_decimal().is_some());\nassert_eq!(spread.native_surface_coordinate().unwrap(), 0.0325);\n\nlet price = CDSOptionStrike::CleanPricePct(Decimal::new(1070, 1)); // 107.0\nassert_eq!(price.native_surface_coordinate().unwrap(), 107.0);\nassert!((price.clean_price_fraction().unwrap() - 1.07).abs() < 1e-15);\n```",
+    "CdsOptionStrike": {
+      "description": "Typed CDS-option strike: forward-spread or clean-price convention.\n\nWire format: externally tagged JSON — `{\"spread\": \"0.0325\"}` or\n`{\"clean_price_pct\": \"107.0\"}` — with no bare-decimal fallback.\n\n# Examples\n\n```rust\nuse finstack_quant_valuations::instruments::credit_derivatives::cds_option::CdsOptionStrike;\nuse rust_decimal::Decimal;\n\nlet spread = CdsOptionStrike::Spread(Decimal::new(325, 4)); // 0.0325 = 325 bp\nassert!(spread.spread_decimal().is_some());\nassert_eq!(spread.native_surface_coordinate().unwrap(), 0.0325);\n\nlet price = CdsOptionStrike::CleanPricePct(Decimal::new(1070, 1)); // 107.0\nassert_eq!(price.native_surface_coordinate().unwrap(), 107.0);\nassert!((price.clean_price_fraction().unwrap() - 1.07).abs() < 1e-15);\n```",
       "oneOf": [
         {
           "additionalProperties": false,
@@ -200,31 +225,6 @@
             "clean_price_pct"
           ],
           "type": "object"
-        }
-      ]
-    },
-    "CdsConvention": {
-      "description": "Regional ISDA CDS schedule family.\n\nExact documentation clauses stay on the instrument or quote. This enum\nidentifies the regional schedule family used to resolve calendars,\nday-count, frequency, stub, and settlement from the convention registry.",
-      "oneOf": [
-        {
-          "const": "isda_na",
-          "description": "Standard North American convention (quarterly, Act/360).",
-          "type": "string"
-        },
-        {
-          "const": "isda_eu",
-          "description": "Standard European convention (quarterly, Act/360).",
-          "type": "string"
-        },
-        {
-          "const": "isda_as",
-          "description": "Standard Asian convention (quarterly, Act/360).",
-          "type": "string"
-        },
-        {
-          "const": "custom",
-          "description": "Custom convention.",
-          "type": "string"
         }
       ]
     },
@@ -302,7 +302,7 @@
       "additionalProperties": false,
       "properties": {
         "spec": {
-          "$ref": "#/$defs/CDSOption"
+          "$ref": "#/$defs/CdsOption"
         },
         "type": {
           "const": "cds_option",

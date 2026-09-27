@@ -24,7 +24,8 @@ use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::math::interp::InterpStyle;
 use finstack_quant_core::money::Money;
 use finstack_quant_valuations::instruments::equity::pe_fund::{
-    ClawbackSettle, ClawbackSpec, FundEvent, PrivateMarketsFund, WaterfallSpec, WaterfallStyle,
+    ClawbackSettle, ClawbackSpec, FundEvent, PeFundWaterfallSpec, PrivateMarketsFund,
+    WaterfallStyle,
 };
 use finstack_quant_valuations::instruments::Instrument;
 use std::hint::black_box;
@@ -46,8 +47,8 @@ fn create_market() -> MarketContext {
 
 // Waterfall specs
 
-fn simple_waterfall() -> WaterfallSpec {
-    WaterfallSpec::builder()
+fn simple_waterfall() -> PeFundWaterfallSpec {
+    PeFundWaterfallSpec::builder()
         .style(WaterfallStyle::European)
         .return_of_capital()
         .promote_tier(0.0, 1.0, 0.0)
@@ -55,8 +56,8 @@ fn simple_waterfall() -> WaterfallSpec {
         .unwrap()
 }
 
-fn standard_waterfall() -> WaterfallSpec {
-    WaterfallSpec::builder()
+fn standard_waterfall() -> PeFundWaterfallSpec {
+    PeFundWaterfallSpec::builder()
         .style(WaterfallStyle::European)
         .return_of_capital()
         .preferred_irr(0.08)
@@ -66,8 +67,8 @@ fn standard_waterfall() -> WaterfallSpec {
         .unwrap()
 }
 
-fn full_waterfall_with_clawback() -> WaterfallSpec {
-    WaterfallSpec::builder()
+fn full_waterfall_with_clawback() -> PeFundWaterfallSpec {
+    PeFundWaterfallSpec::builder()
         .style(WaterfallStyle::European)
         .return_of_capital()
         .promote_tier(0.0, 0.80, 0.20)
@@ -79,8 +80,8 @@ fn full_waterfall_with_clawback() -> WaterfallSpec {
         .unwrap()
 }
 
-fn american_waterfall() -> WaterfallSpec {
-    WaterfallSpec::builder()
+fn american_waterfall() -> PeFundWaterfallSpec {
+    PeFundWaterfallSpec::builder()
         .style(WaterfallStyle::American)
         .return_of_capital()
         .preferred_irr(0.08)
@@ -145,7 +146,7 @@ fn make_clawback_events(n: usize) -> Vec<FundEvent> {
 
 fn make_fund(
     events: Vec<FundEvent>,
-    spec: WaterfallSpec,
+    spec: PeFundWaterfallSpec,
     with_discount: bool,
 ) -> PrivateMarketsFund {
     let fund = PrivateMarketsFund::new("PMF-BENCH", Currency::USD, spec, events);

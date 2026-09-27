@@ -35,11 +35,11 @@ ALL_TYPED = [
     ("Swaption", build_swaption),
     ("CapFloor", build_capfloor),
     ("CreditDefaultSwap", build_cds),
-    ("CDSIndex", build_cds_index),
+    ("CdsIndex", build_cds_index),
     ("FxForward", build_fx_forward),
     ("FxOption", build_fx_option),
     ("EquityOption", build_equity_option),
-    ("CDSTranche", build_cds_tranche),
+    ("CdsTranche", build_cds_tranche),
     ("ConvertibleBond", build_convertible),
     ("StructuredCredit", build_structured_credit),
 ]

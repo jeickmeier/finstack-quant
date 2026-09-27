@@ -29,7 +29,7 @@ const NORMAL_VOL_BUMP: f64 = 1e-4;
 /// # Timing convention
 ///
 /// The vega formula's `T` argument is the year fraction to the option fixing
-/// date (`c.fixing_t`) — the same time the pricer uses for both the vol-surface
+/// date (`c.time_to_fixing`) — the same time the pricer uses for both the vol-surface
 /// lookup and the model `T`. Using a single time keeps vega consistent with the
 /// reported price and with delta/gamma (a finite-difference vega reconciles with
 /// the analytic one).
@@ -75,9 +75,9 @@ fn caplet_vega(c: CapletInputs) -> f64 {
     use finstack_quant_models::volatility::VolatilityConvention;
     match c.convention {
         VolatilityConvention::Normal => {
-            normal::vega_per_pct(c.strike, c.forward, c.sigma, c.fixing_t)
+            normal::vega_per_pct(c.strike, c.forward, c.sigma, c.time_to_fixing)
         }
-        _ => black::vega_per_pct(c.strike, c.forward, c.sigma, c.fixing_t),
+        _ => black::vega_per_pct(c.strike, c.forward, c.sigma, c.time_to_fixing),
     }
 }
 

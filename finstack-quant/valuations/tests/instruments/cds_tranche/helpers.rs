@@ -10,8 +10,8 @@ use finstack_quant_core::market_data::term_structures::{
 };
 use finstack_quant_core::money::Money;
 pub use finstack_quant_test_utils::assert::{approx_eq, relative_eq};
-use finstack_quant_valuations::instruments::credit_derivatives::cds_tranche::CDSTranche;
-use finstack_quant_valuations::instruments::credit_derivatives::cds_tranche::CDSTrancheParams;
+use finstack_quant_valuations::instruments::credit_derivatives::cds_tranche::CdsTranche;
+use finstack_quant_valuations::instruments::credit_derivatives::cds_tranche::CdsTrancheParams;
 use finstack_quant_valuations::instruments::PayReceive;
 use std::sync::Arc;
 use time::Month;
@@ -26,7 +26,7 @@ pub fn maturity_5y() -> Date {
     Date::from_calendar_date(2030, Month::January, 1).unwrap()
 }
 
-fn with_imm_dates(mut tranche: CDSTranche) -> CDSTranche {
+fn with_imm_dates(mut tranche: CdsTranche) -> CdsTranche {
     tranche.roll_rule = finstack_quant_cashflows::builder::specs::RollRule::CdsImm;
     tranche
 }
@@ -181,8 +181,8 @@ pub fn market_context_with_issuers(n: usize) -> MarketContext {
 }
 
 /// Create standard mezzanine tranche (3-7%)
-pub fn mezzanine_tranche() -> CDSTranche {
-    let tranche_params = CDSTrancheParams::mezzanine_tranche(
+pub fn mezzanine_tranche() -> CdsTranche {
+    let tranche_params = CdsTrancheParams::mezzanine_tranche(
         "CDX.NA.IG.42",
         42,
         Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
@@ -191,7 +191,7 @@ pub fn mezzanine_tranche() -> CDSTranche {
     );
     let schedule_params = ScheduleParams::quarterly_act360();
     with_imm_dates(
-        CDSTranche::new(
+        CdsTranche::new(
             "CDX_IG42_3_7_5Y",
             &tranche_params,
             &schedule_params,
@@ -204,8 +204,8 @@ pub fn mezzanine_tranche() -> CDSTranche {
 }
 
 /// Create equity tranche (0-3%)
-pub fn equity_tranche() -> CDSTranche {
-    let tranche_params = CDSTrancheParams::equity_tranche(
+pub fn equity_tranche() -> CdsTranche {
+    let tranche_params = CdsTrancheParams::equity_tranche(
         "CDX.NA.IG.42",
         42,
         Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
@@ -214,7 +214,7 @@ pub fn equity_tranche() -> CDSTranche {
     );
     let schedule_params = ScheduleParams::quarterly_act360();
     with_imm_dates(
-        CDSTranche::new(
+        CdsTranche::new(
             "CDX_IG42_0_3_5Y",
             &tranche_params,
             &schedule_params,
@@ -227,8 +227,8 @@ pub fn equity_tranche() -> CDSTranche {
 }
 
 /// Create senior tranche (7-10%)
-pub fn senior_tranche() -> CDSTranche {
-    let tranche_params = CDSTrancheParams::new(
+pub fn senior_tranche() -> CdsTranche {
+    let tranche_params = CdsTrancheParams::new(
         "CDX.NA.IG.42",
         42,
         7.0,
@@ -239,7 +239,7 @@ pub fn senior_tranche() -> CDSTranche {
     );
     let schedule_params = ScheduleParams::quarterly_act360();
     with_imm_dates(
-        CDSTranche::new(
+        CdsTranche::new(
             "CDX_IG42_7_10_5Y",
             &tranche_params,
             &schedule_params,
@@ -257,8 +257,8 @@ pub fn custom_tranche(
     detach_pct: f64,
     coupon_bp: f64,
     side: PayReceive,
-) -> CDSTranche {
-    let tranche_params = CDSTrancheParams::new(
+) -> CdsTranche {
+    let tranche_params = CdsTrancheParams::new(
         "CDX.NA.IG.42",
         42,
         attach_pct,
@@ -269,7 +269,7 @@ pub fn custom_tranche(
     );
     let schedule_params = ScheduleParams::quarterly_act360();
     with_imm_dates(
-        CDSTranche::new(
+        CdsTranche::new(
             "CDX_IG42_CUSTOM",
             &tranche_params,
             &schedule_params,

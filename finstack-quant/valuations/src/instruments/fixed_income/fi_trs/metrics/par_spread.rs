@@ -2,7 +2,7 @@
 
 use crate::instruments::common_impl::pricing::swap_legs::ANNUITY_EPSILON;
 use crate::instruments::common_impl::pricing::TrsEngine;
-use crate::instruments::fixed_income::fi_trs::FIIndexTotalReturnSwap;
+use crate::instruments::fixed_income::fi_trs::FiIndexTotalReturnSwap;
 use crate::metrics::{MetricCalculator, MetricContext, MetricId};
 use finstack_quant_core::{Error, Result};
 
@@ -30,7 +30,7 @@ impl MetricCalculator for ParSpreadCalculator {
         static CARRY_MODEL_WARNING: std::sync::Once = std::sync::Once::new();
         CARRY_MODEL_WARNING.call_once(|| {
             tracing::warn!(
-                "FIIndexTotalReturnSwap par spread is computed from a carry-only analytic \
+                "FiIndexTotalReturnSwap par spread is computed from a carry-only analytic \
                  model, not a full fixed-income index mark-to-market model"
             );
         });
@@ -41,7 +41,7 @@ impl MetricCalculator for ParSpreadCalculator {
             .ok_or_else(|| finstack_quant_core::InputError::NotFound {
                 id: "metric:financing_annuity".into(),
             })?;
-        let trs: &FIIndexTotalReturnSwap = context.instrument_as()?;
+        let trs: &FiIndexTotalReturnSwap = context.instrument_as()?;
         let curves = context.curves.as_ref();
         let as_of = context.as_of;
 

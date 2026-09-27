@@ -8,7 +8,7 @@
 use finstack_quant_cashflows::builder::FloatingRateSpec;
 use finstack_quant_valuations::instruments::rates::xccy_swap::XccySwap;
 use finstack_quant_valuations::instruments::{
-    CDSIndex, CreditDefaultSwap, EquityTotalReturnSwap, FIIndexTotalReturnSwap, InterestRateFuture,
+    CdsIndex, CreditDefaultSwap, EquityTotalReturnSwap, FiIndexTotalReturnSwap, InterestRateFuture,
     InterestRateSwap, ModelConfig,
 };
 use serde::de::DeserializeOwned;
@@ -81,7 +81,7 @@ fn cds_family_bare_leg_keys_are_rejected() {
     // schema-rejection-test: `premium` / `protection` are now `premium_leg` / `protection_leg`.
     assert_renamed_key_rejected(&cds, "", "premium_leg", "premium");
     assert_renamed_key_rejected(&cds, "", "protection_leg", "protection");
-    let index = CDSIndex::example();
+    let index = CdsIndex::example();
     assert_renamed_key_rejected(&index, "", "premium_leg", "premium");
     assert_renamed_key_rejected(&index, "", "protection_leg", "protection");
 }
@@ -91,7 +91,7 @@ fn trs_bare_financing_key_and_retired_compounding_are_rejected() {
     let equity = EquityTotalReturnSwap::example().expect("equity TRS");
     // schema-rejection-test: `financing` is now `financing_leg`.
     assert_renamed_key_rejected(&equity, "", "financing_leg", "financing");
-    let fi = FIIndexTotalReturnSwap::example().expect("FI TRS");
+    let fi = FiIndexTotalReturnSwap::example().expect("FI TRS");
     assert_renamed_key_rejected(&fi, "", "financing_leg", "financing");
     // schema-rejection-test: FinancingRateCompounding's `term_rate` / `overnight_compounded`.
     for retired in ["term_rate", "overnight_compounded"] {

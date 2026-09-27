@@ -4,7 +4,7 @@
 //! coupon) using the Gaussian Copula pricing engine if the required credit
 //! index data are available. Distinct from the contractual `upfront` field.
 
-use crate::instruments::credit_derivatives::cds_tranche::CDSTranche;
+use crate::instruments::credit_derivatives::cds_tranche::CdsTranche;
 use crate::metrics::{MetricCalculator, MetricContext};
 use finstack_quant_core::Result;
 
@@ -13,7 +13,7 @@ pub(crate) struct ModelUpfrontCalculator;
 
 impl MetricCalculator for ModelUpfrontCalculator {
     fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
-        let tranche: &CDSTranche = context.instrument_as()?;
+        let tranche: &CdsTranche = context.instrument_as()?;
         if context
             .curves
             .as_ref()

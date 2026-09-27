@@ -2,7 +2,7 @@
 
 use finstack_quant_core::money::Money;
 
-use super::config::PricingMode;
+use super::config::StructuredCreditPricingMode;
 use crate::instruments::fixed_income::structured_credit::types::TrancheSeniority;
 
 /// Stochastic pricing result for a structured credit deal.
@@ -58,7 +58,7 @@ pub struct StochasticPricingResult {
     pub num_paths: usize,
 
     /// Pricing mode used.
-    pub pricing_mode: PricingMode,
+    pub pricing_mode: StructuredCreditPricingMode,
 
     /// Tranche-level results
     pub tranche_results: Vec<TranchePricingResult>,
@@ -101,7 +101,7 @@ impl StochasticPricingResult {
         npv: Money,
         expected_loss: Money,
         num_paths: usize,
-        pricing_mode: PricingMode,
+        pricing_mode: StructuredCreditPricingMode,
     ) -> Self {
         let currency = npv.currency();
         Self {
@@ -302,7 +302,7 @@ mod tests {
         let npv = Money::from((1_000_000_i64, currency));
         let el = Money::from((50_000_i64, currency));
 
-        let result = StochasticPricingResult::new(npv, el, 1000, PricingMode::Tree);
+        let result = StochasticPricingResult::new(npv, el, 1000, StructuredCreditPricingMode::Tree);
 
         assert_eq!(result.num_paths, 1000);
         assert!(result.expected_loss.amount() > 0.0);
@@ -331,7 +331,7 @@ mod tests {
         let ul = Money::from((75_000_i64, currency));
         let es = Money::from((100_000_i64, currency));
 
-        let result = StochasticPricingResult::new(npv, el, 1000, PricingMode::Tree)
+        let result = StochasticPricingResult::new(npv, el, 1000, StructuredCreditPricingMode::Tree)
             .with_unexpected_loss(ul)
             .with_expected_shortfall(es, 0.99);
 

@@ -24,8 +24,8 @@ from finstack_quant.core.money import Money
 from finstack_quant.valuations.instruments import (
     AssetPool,
     CapFloor,
-    CDSIndex,
-    CDSTranche,
+    CdsIndex,
+    CdsTranche,
     ConvertibleBond,
     CreditDefaultSwap,
     EquityOption,
@@ -173,10 +173,10 @@ def build_cds() -> CreditDefaultSwap:
     )
 
 
-def build_cds_index() -> CDSIndex:
+def build_cds_index() -> CdsIndex:
     premium, protection = cds_legs()
     return (
-        CDSIndex
+        CdsIndex
         .builder()
         .id("CDX-IG-42")
         .index_name("CDX.NA.IG")
@@ -247,9 +247,9 @@ def build_equity_option() -> EquityOption:
     )
 
 
-def build_cds_tranche() -> CDSTranche:
+def build_cds_tranche() -> CdsTranche:
     return (
-        CDSTranche
+        CdsTranche
         .builder()
         .id("CDX-IG-42-3-7")
         .index_name("CDX.NA.IG")

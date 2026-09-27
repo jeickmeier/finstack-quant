@@ -30,9 +30,11 @@ use super::super::traits::{StateKey, StochasticProcess};
 
 /// Schwartz-Smith process parameters.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
 pub struct SchwartzSmithParams {
     /// Mean reversion speed for short-term deviation (κ_X)
-    pub kappa_x: f64,
+    pub kappa: f64,
     /// Volatility of short-term component (σ_X)
     pub sigma_x: f64,
     /// Drift of long-term trend (μ_Y)
@@ -40,7 +42,7 @@ pub struct SchwartzSmithParams {
     /// Volatility of long-term component (σ_Y)
     pub sigma_y: f64,
     /// Correlation between X and Y (ρ)
-    pub rho: f64,
+    pub rho_xy: f64,
     /// Constant risk-premium drift shift for the short-term factor (λ_X).
     ///
     /// Under the risk-neutral measure the short-term factor follows
@@ -55,26 +57,26 @@ impl SchwartzSmithParams {
     ///
     /// # Arguments
     ///
-    /// * `kappa_x` - Mean reversion speed (must be > 0)
+    /// * `kappa` - Mean reversion speed (must be > 0)
     /// * `sigma_x` - Short-term volatility (must be > 0)
     /// * `mu_y` - Long-term drift (must be finite)
     /// * `sigma_y` - Long-term volatility (must be > 0)
-    /// * `rho` - Correlation between X and Y (must be in [-1, 1])
+    /// * `rho_xy` - Correlation between X and Y (must be in [-1, 1])
     ///
     /// # Errors
     ///
     /// Returns an error when any positivity constraint is violated, when
-    /// `mu_y` is non-finite, or when `rho` falls outside `[-1, 1]`.
+    /// `mu_y` is non-finite, or when `rho_xy` falls outside `[-1, 1]`.
     pub fn new(
-        kappa_x: f64,
+        kappa: f64,
         sigma_x: f64,
         mu_y: f64,
         sigma_y: f64,
-        rho: f64,
+        rho_xy: f64,
     ) -> finstack_quant_core::Result<Self> {
-        if !(kappa_x > 0.0 && kappa_x.is_finite()) {
+        if !(kappa > 0.0 && kappa.is_finite()) {
             return Err(finstack_quant_core::Error::Validation(format!(
-                "Schwartz-Smith kappa_x must be finite and positive, got {kappa_x}"
+                "Schwartz-Smith kappa must be finite and positive, got {kappa}"
             )));
         }
         if !(sigma_x > 0.0 && sigma_x.is_finite()) {
@@ -92,18 +94,18 @@ impl SchwartzSmithParams {
                 "Schwartz-Smith sigma_y must be finite and positive, got {sigma_y}"
             )));
         }
-        if !(rho.is_finite() && (-1.0..=1.0).contains(&rho)) {
+        if !(rho_xy.is_finite() && (-1.0..=1.0).contains(&rho_xy)) {
             return Err(finstack_quant_core::Error::Validation(format!(
-                "Schwartz-Smith correlation rho must be finite and in [-1, 1], got {rho}"
+                "Schwartz-Smith correlation rho_xy must be finite and in [-1, 1], got {rho_xy}"
             )));
         }
 
         Ok(Self {
-            kappa_x,
+            kappa,
             sigma_x,
             mu_y,
             sigma_y,
-            rho,
+            rho_xy,
             lambda_x: 0.0,
         })
     }
@@ -224,14 +226,14 @@ impl SchwartzSmithProcess {
     #[must_use]
     pub fn futures_price(&self, tau: f64) -> f64 {
         let p = &self.params;
-        let kappa = p.kappa_x;
+        let kappa = p.kappa;
         // (1 − e^{−κτ})/κ via exp_m1, stable as κτ → 0.
         let one_minus_exp_over_kappa = -(-kappa * tau).exp_m1() / kappa;
         let exp_kappa_tau = (-kappa * tau).exp();
 
         let var_x = p.sigma_x * p.sigma_x * (-(-2.0 * kappa * tau).exp_m1()) / (2.0 * kappa);
         let var_y = p.sigma_y * p.sigma_y * tau;
-        let cov_xy = 2.0 * p.rho * p.sigma_x * p.sigma_y * one_minus_exp_over_kappa;
+        let cov_xy = 2.0 * p.rho_xy * p.sigma_x * p.sigma_y * one_minus_exp_over_kappa;
 
         let a_tau =
             p.mu_y * tau - p.lambda_x * one_minus_exp_over_kappa + 0.5 * (var_x + var_y + cov_xy);
@@ -251,7 +253,7 @@ impl StochasticProcess for SchwartzSmithProcess {
 
     fn drift(&self, _t: f64, x: &[f64], out: &mut [f64]) {
         // dX: -κ_X·X − λ_X (mean reversion plus constant risk-premium shift)
-        out[0] = -self.params.kappa_x * x[0] - self.params.lambda_x;
+        out[0] = -self.params.kappa * x[0] - self.params.lambda_x;
         // dY: μ_Y (constant drift)
         out[1] = self.params.mu_y;
     }
@@ -264,8 +266,8 @@ impl StochasticProcess for SchwartzSmithProcess {
     }
 
     fn factor_correlation(&self) -> Option<Vec<f64>> {
-        let rho = self.params.rho;
-        Some(vec![1.0, rho, rho, 1.0])
+        let rho_xy = self.params.rho_xy;
+        Some(vec![1.0, rho_xy, rho_xy, 1.0])
     }
 
     fn populate_path_state(&self, x: &[f64], state: &mut super::super::traits::PathState) {

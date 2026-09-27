@@ -4,7 +4,7 @@ use super::{
 };
 use finstack_quant_core::math::random::{Pcg64Rng, RandomNumberGenerator};
 use finstack_quant_core::{InputError, Result};
-use finstack_quant_models::credit::{AssetDynamics, BarrierType, CreditState};
+use finstack_quant_models::credit::{AssetDynamics, CreditState, MertonBarrierType};
 use smallvec::SmallVec;
 
 /// Contractual terms of the bond leg simulated by [`MertonMcEngine`].
@@ -163,15 +163,15 @@ impl MertonMcEngine {
         // Barrier parameters
         let debt_barrier = config.merton.debt_barrier();
         let (barrier_type, barrier_growth_rate) = match config.merton.barrier_type() {
-            BarrierType::FirstPassage {
+            MertonBarrierType::FirstPassage {
                 barrier_growth_rate,
             } => (
-                BarrierType::FirstPassage {
+                MertonBarrierType::FirstPassage {
                     barrier_growth_rate: *barrier_growth_rate,
                 },
                 *barrier_growth_rate,
             ),
-            BarrierType::Terminal => (BarrierType::Terminal, 0.0),
+            MertonBarrierType::Terminal => (MertonBarrierType::Terminal, 0.0),
         };
 
         // One base path (RNG stream) per independent estimator; antithetic
@@ -198,10 +198,10 @@ impl MertonMcEngine {
         // `t`), so precompute them once rather than evaluating two `exp()` per step
         // per path. Empty for `Terminal`, which uses the flat `debt_barrier`.
         let first_passage_barriers: Vec<f64> = match barrier_type {
-            BarrierType::FirstPassage { .. } => (0..=total_steps)
+            MertonBarrierType::FirstPassage { .. } => (0..=total_steps)
                 .map(|i| debt_barrier * (barrier_growth_rate * (i as f64 * dt)).exp())
                 .collect(),
-            BarrierType::Terminal => Vec::new(),
+            MertonBarrierType::Terminal => Vec::new(),
         };
 
         // The base-path loop is embarrassingly parallel: every path draws from
@@ -281,8 +281,8 @@ impl MertonMcEngine {
 
                         let v_prev = v;
                         let barrier_prev = match barrier_type {
-                            BarrierType::FirstPassage { .. } => first_passage_barriers[step],
-                            BarrierType::Terminal => debt_barrier,
+                            MertonBarrierType::FirstPassage { .. } => first_passage_barriers[step],
+                            MertonBarrierType::Terminal => debt_barrier,
                         };
 
                         // 1. Evolve asset value (GBM)
@@ -290,7 +290,7 @@ impl MertonMcEngine {
 
                         // 2. Check default
                         match barrier_type {
-                            BarrierType::Terminal => {
+                            MertonBarrierType::Terminal => {
                                 let is_final_step = step + 1 == total_steps;
                                 if is_final_step && v < debt_barrier {
                                     let recovery_rate = config
@@ -308,7 +308,7 @@ impl MertonMcEngine {
                                     break;
                                 }
                             }
-                            BarrierType::FirstPassage { .. } => {
+                            MertonBarrierType::FirstPassage { .. } => {
                                 let barrier = first_passage_barriers[step + 1];
                                 let crossed = if v < barrier {
                                     true

@@ -1,6 +1,6 @@
 //! Stochastic structured-credit scenario waterfall pricing engine.
 
-use super::config::{PricingMode, StochasticPricerConfig};
+use super::config::{StochasticPricerConfig, StructuredCreditPricingMode};
 use super::result::{StochasticPricingResult, TranchePricingResult};
 use crate::cashflow::builder::schedule::weighted_average_life_from_principal;
 use crate::instruments::fixed_income::structured_credit::pricing::simulation_engine::{
@@ -192,12 +192,12 @@ impl StochasticPricer {
     ) -> Result<StochasticPricingResult> {
         let prepared = self.prepare_run(instrument, context)?;
         match &self.config.pricing_mode {
-            PricingMode::Tree => self.price_tree(instrument, context, &prepared),
-            PricingMode::MonteCarlo {
+            StructuredCreditPricingMode::Tree => self.price_tree(instrument, context, &prepared),
+            StructuredCreditPricingMode::MonteCarlo {
                 num_paths,
                 antithetic,
             } => self.price_monte_carlo(instrument, context, *num_paths, *antithetic, &prepared),
-            PricingMode::Hybrid {
+            StructuredCreditPricingMode::Hybrid {
                 tree_periods,
                 num_paths,
             } => self.price_hybrid(instrument, context, *tree_periods, *num_paths, &prepared),
@@ -252,7 +252,7 @@ impl StochasticPricer {
             )?;
             collector.record_output(output);
         }
-        collector.finalize(self, PricingMode::Tree)
+        collector.finalize(self, StructuredCreditPricingMode::Tree)
     }
 
     fn price_monte_carlo(
@@ -285,7 +285,7 @@ impl StochasticPricer {
             context,
             |path_index| self.monte_carlo_path_factors(instrument, path_index, antithetic),
             simulated_paths,
-            PricingMode::MonteCarlo {
+            StructuredCreditPricingMode::MonteCarlo {
                 num_paths,
                 antithetic,
             },
@@ -363,7 +363,7 @@ impl StochasticPricer {
             context,
             hybrid_factors,
             total_paths,
-            PricingMode::Hybrid {
+            StructuredCreditPricingMode::Hybrid {
                 tree_periods,
                 num_paths,
             },
@@ -380,14 +380,14 @@ impl StochasticPricer {
         context: &MarketContext,
         path_factors: impl Fn(usize) -> Vec<f64> + Sync,
         total_paths: usize,
-        pricing_mode: PricingMode,
+        pricing_mode: StructuredCreditPricingMode,
         prepared: &PreparedRun,
     ) -> Result<StochasticPricingResult> {
         // Monte Carlo antithetic runs simulate `total_paths = 2 × num_paths`
         // paths as adjacent `(2k, 2k+1)` pairs. Hybrid mode draws no pairs.
         let antithetic = matches!(
             pricing_mode,
-            PricingMode::MonteCarlo {
+            StructuredCreditPricingMode::MonteCarlo {
                 antithetic: true,
                 ..
             }
@@ -1517,7 +1517,7 @@ impl ScenarioCollector {
     fn finalize(
         mut self,
         pricer: &StochasticPricer,
-        pricing_mode: PricingMode,
+        pricing_mode: StructuredCreditPricingMode,
     ) -> Result<StochasticPricingResult> {
         let mean_pv = self.deal_pv_stats.mean();
         let mean_loss = self.deal_loss_stats.mean();
@@ -1803,7 +1803,7 @@ mod tests {
             test_discount_curve(),
             ScenarioTreeConfig::new(test_date().months_until(instrument.maturity) as usize, 2),
         )
-        .with_pricing_mode(PricingMode::MonteCarlo {
+        .with_pricing_mode(StructuredCreditPricingMode::MonteCarlo {
             num_paths: 1,
             antithetic: false,
         });
@@ -1825,7 +1825,7 @@ mod tests {
             test_discount_curve(),
             ScenarioTreeConfig::new(test_date().months_until(instrument.maturity) as usize, 2),
         )
-        .with_pricing_mode(PricingMode::Hybrid {
+        .with_pricing_mode(StructuredCreditPricingMode::Hybrid {
             tree_periods: 3,
             num_paths: 100,
         });
@@ -1838,7 +1838,7 @@ mod tests {
         assert!(result.npv.amount().is_finite());
         assert_eq!(
             result.pricing_mode,
-            PricingMode::Hybrid {
+            StructuredCreditPricingMode::Hybrid {
                 tree_periods: 3,
                 num_paths: 100,
             }
@@ -1899,7 +1899,7 @@ mod tests {
         );
         let pricer = StochasticPricer::new(config);
         let result = collector
-            .finalize(&pricer, PricingMode::Tree)
+            .finalize(&pricer, StructuredCreditPricingMode::Tree)
             .expect("valid pricing result");
 
         // True population variance = delta² = 0.0025
@@ -2046,7 +2046,7 @@ mod tests {
                 StochasticDefaultSpec::intensity_process(0.10, 1.0, 0.5, 0.8);
             let config =
                 StochasticPricerConfig::new(test_date(), test_discount_curve(), tree_config)
-                    .with_pricing_mode(PricingMode::MonteCarlo {
+                    .with_pricing_mode(StructuredCreditPricingMode::MonteCarlo {
                         num_paths: 64,
                         antithetic: false,
                     });
@@ -2297,7 +2297,7 @@ mod per_name_copula_tests {
         let mut tree_config = ScenarioTreeConfig::new(num_periods, 2);
         tree_config.default_spec = StochasticDefaultSpec::gaussian_copula(base_cdr, correlation);
         StochasticPricerConfig::new(close(), discount_curve(), tree_config)
-            .with_pricing_mode(PricingMode::MonteCarlo {
+            .with_pricing_mode(StructuredCreditPricingMode::MonteCarlo {
                 num_paths,
                 antithetic: true,
             })
@@ -2331,7 +2331,7 @@ mod per_name_copula_tests {
         let mut tree_config = ScenarioTreeConfig::new(num_periods, 2);
         tree_config.default_spec = default_spec;
         StochasticPricerConfig::new(close(), discount_curve(), tree_config)
-            .with_pricing_mode(PricingMode::MonteCarlo {
+            .with_pricing_mode(StructuredCreditPricingMode::MonteCarlo {
                 num_paths,
                 antithetic: false,
             })

@@ -13,7 +13,7 @@ stochastic/
 ├── calibrations.rs  # registry-backed RMBS/CLO/CMBS/ABS presets
 ├── tree/config.rs   # valuation-owned scenario-tree configuration
 └── pricer/
-    ├── config.rs    # PricingMode and internal pricer configuration
+    ├── config.rs    # StructuredCreditPricingMode and internal pricer configuration
     ├── engine.rs    # path generation plus waterfall orchestration
     └── result.rs    # StochasticPricingResult and TranchePricingResult
 ```
@@ -48,19 +48,19 @@ clo.with_stochastic_prepay(StochasticPrepaySpec::factor_correlated(
 ## Pricing
 
 ```rust
-use finstack_quant_valuations::instruments::fixed_income::structured_credit::PricingMode;
+use finstack_quant_valuations::instruments::fixed_income::structured_credit::StructuredCreditPricingMode;
 
 let result = clo.price_stochastic_with_mode(
     &market,
     as_of,
-    PricingMode::MonteCarlo {
+    StructuredCreditPricingMode::MonteCarlo {
         num_paths: 25_000, // independent estimators: 50,000 antithetic paths
         antithetic: true,
     },
 )?;
 ```
 
-`PricingMode::default()` uses 5,000 antithetic estimators (10,000 simulated
+`StructuredCreditPricingMode::default()` uses 5,000 antithetic estimators (10,000 simulated
 paths); `num_paths` always counts independent estimators. Tree mode is
 bounded by its non-recombining node count and is intended only for short
 horizons. `StochasticPricingResult` and `TranchePricingResult` remain

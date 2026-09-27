@@ -1,10 +1,10 @@
-//! Bloomberg CDSO pricer for [`CDSOption`].
+//! Bloomberg CDSO pricer for [`CdsOption`].
 //!
 //! Pricing primitives — NPV, par spread, theta, implied volatility — that
 //! flow through the [`bloomberg_quadrature`](super::bloomberg_quadrature)
 //! numerical-quadrature engine. Greek metrics (delta, gamma, vega) live
 //! alongside their `MetricCalculator` definitions in the metrics module;
-//! the `CDSOption::{delta, gamma, vega}` methods are thin pass-throughs
+//! the `CdsOption::{delta, gamma, vega}` methods are thin pass-throughs
 //! to those canonical implementations.
 //!
 //! # References
@@ -23,7 +23,7 @@ use crate::instruments::common_impl::traits::Instrument;
 use crate::instruments::credit_derivatives::cds::{
     CdsValuationConvention, CreditDefaultSwap, PayReceive,
 };
-use crate::instruments::credit_derivatives::cds_option::CDSOption;
+use crate::instruments::credit_derivatives::cds_option::CdsOption;
 use crate::pricer::expect_inst;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::math::solver::{BrentSolver, Solver};
@@ -34,7 +34,7 @@ use finstack_quant_core::Result;
 /// quadrature model.
 #[tracing::instrument(skip(option, curves), fields(instrument_id = %option.id, as_of = %as_of))]
 pub(crate) fn npv(
-    option: &CDSOption,
+    option: &CdsOption,
     curves: &MarketContext,
     as_of: finstack_quant_core::dates::Date,
 ) -> Result<Money> {
@@ -49,7 +49,7 @@ pub(crate) fn npv(
 /// of the no-knockout forward CDS struck at expiry, on the bootstrapped
 /// hazard curve. This is what the CDSO terminal labels *ATM Fwd*.
 pub(crate) fn forward_spread_bp(
-    option: &CDSOption,
+    option: &CdsOption,
     curves: &MarketContext,
     as_of: finstack_quant_core::dates::Date,
 ) -> Result<f64> {
@@ -67,7 +67,7 @@ pub(crate) fn forward_spread_bp(
 /// shift is purely on the integrand's `t_expiry` argument.
 #[tracing::instrument(skip(option, curves), fields(instrument_id = %option.id, as_of = %as_of))]
 pub(crate) fn theta(
-    option: &CDSOption,
+    option: &CdsOption,
     curves: &MarketContext,
     as_of: finstack_quant_core::dates::Date,
 ) -> Result<f64> {
@@ -79,12 +79,12 @@ pub(crate) fn theta(
 }
 
 fn ensure_valuation_not_after_expiry(
-    option: &CDSOption,
+    option: &CdsOption,
     as_of: finstack_quant_core::dates::Date,
 ) -> Result<()> {
     if as_of > option.expiry {
         return Err(finstack_quant_core::Error::Validation(format!(
-            "CDSOption '{}' expired on {}; post-expiry valuation requires explicit exercise and settlement state",
+            "CdsOption '{}' expired on {}; post-expiry valuation requires explicit exercise and settlement state",
             option.id, option.expiry
         )));
     }
@@ -95,7 +95,7 @@ fn ensure_valuation_not_after_expiry(
     // (t = 0 intrinsic).
     if option.settlement == crate::instruments::SettlementType::Physical && as_of >= option.expiry {
         return Err(finstack_quant_core::Error::Validation(format!(
-            "CDSOption '{}' is physically settled and its expiry {} is at or \
+            "CdsOption '{}' is physically settled and its expiry {} is at or \
              before the valuation date; exercise/delivery lifecycle is not \
              modelled, so a cash-equivalent value would be misleading",
             option.id, option.expiry
@@ -109,7 +109,7 @@ fn ensure_valuation_not_after_expiry(
 /// in log-σ space (so `σ > 0` is enforced).
 #[tracing::instrument(skip(option, curves), fields(instrument_id = %option.id, as_of = %as_of, target_price))]
 pub(crate) fn implied_vol(
-    option: &CDSOption,
+    option: &CdsOption,
     curves: &MarketContext,
     as_of: finstack_quant_core::dates::Date,
     target_price: f64,
@@ -195,7 +195,7 @@ pub(crate) fn implied_vol(
 ///
 /// Enforces the `MAX_IMPLIED_VOL` ceiling on both paths.
 pub(crate) fn resolve_sigma(
-    option: &CDSOption,
+    option: &CdsOption,
     curves: &MarketContext,
     as_of: finstack_quant_core::dates::Date,
 ) -> Result<f64> {
@@ -240,7 +240,7 @@ pub(crate) fn resolve_sigma(
 /// the final ACT/360 period).
 #[doc(hidden)]
 pub(crate) fn synthetic_underlying_cds(
-    option: &CDSOption,
+    option: &CdsOption,
     as_of: finstack_quant_core::dates::Date,
 ) -> Result<CreditDefaultSwap> {
     // The contractual coupon `c` of the underlying CDS — for CDX it is
@@ -318,7 +318,7 @@ impl crate::pricer::Pricer for BloombergCdsoPricer {
         as_of: finstack_quant_core::dates::Date,
     ) -> std::result::Result<crate::results::ValuationResult, crate::pricer::PricingError> {
         let option =
-            expect_inst::<CDSOption>(instrument, crate::pricer::InstrumentType::CdsOption)?;
+            expect_inst::<CdsOption>(instrument, crate::pricer::InstrumentType::CdsOption)?;
 
         let pv = npv(option, market, as_of).map_err(|e| {
             crate::pricer::PricingError::model_failure_with_context(
@@ -348,7 +348,7 @@ mod lifecycle_tests {
 
     #[test]
     fn post_expiry_valuation_requires_explicit_settlement_state() {
-        let option = CDSOption::example().expect("CDS option example");
+        let option = CdsOption::example().expect("CDS option example");
         let as_of = option.expiry + Duration::days(1);
         let err = ensure_valuation_not_after_expiry(&option, as_of)
             .expect_err("post-expiry valuation must fail closed");
@@ -357,7 +357,7 @@ mod lifecycle_tests {
 
     #[test]
     fn physical_settlement_fails_at_and_after_exercise_boundary() {
-        let mut option = CDSOption::example().expect("CDS option example");
+        let mut option = CdsOption::example().expect("CDS option example");
         option.settlement = SettlementType::Physical;
 
         // Strictly before expiry: allowed.
@@ -370,7 +370,7 @@ mod lifecycle_tests {
         assert!(err.to_string().contains("physically settled"));
 
         // Cash settlement at expiry remains valid (t = 0 intrinsic).
-        let cash = CDSOption::example().expect("CDS option example");
+        let cash = CdsOption::example().expect("CDS option example");
         ensure_valuation_not_after_expiry(&cash, cash.expiry)
             .expect("cash valuation at expiry is supported");
     }
@@ -379,7 +379,7 @@ mod lifecycle_tests {
 #[cfg(test)]
 mod settlement_and_sigma_tests {
     use super::*;
-    use crate::instruments::credit_derivatives::cds_option::{CDSOptionParams, CDSOptionStrike};
+    use crate::instruments::credit_derivatives::cds_option::{CdsOptionParams, CdsOptionStrike};
     use crate::instruments::{CreditParams, OptionType, SettlementType};
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::{Date, DateExt};
@@ -421,9 +421,9 @@ mod settlement_and_sigma_tests {
             .insert(flat_hazard(as_of))
     }
 
-    fn spread_option(as_of: Date, settlement: SettlementType, vol: Option<f64>) -> CDSOption {
-        let params = CDSOptionParams::new(
-            CDSOptionStrike::Spread(Decimal::new(1, 2)),
+    fn spread_option(as_of: Date, settlement: SettlementType, vol: Option<f64>) -> CdsOption {
+        let params = CdsOptionParams::new(
+            CdsOptionStrike::Spread(Decimal::new(1, 2)),
             as_of.add_months(12),
             as_of.add_months(60),
             Money::from((10_000_000_i64, Currency::USD)),
@@ -432,7 +432,7 @@ mod settlement_and_sigma_tests {
         .expect("valid params")
         .with_settlement(settlement);
         let credit = CreditParams::corporate_standard("SN", "HZ-SN");
-        let mut option = CDSOption::new("CDSO-SETTLE", &params, &credit, "USD-OIS", "CDSO-VOL")
+        let mut option = CdsOption::new("CDSO-SETTLE", &params, &credit, "USD-OIS", "CDSO-VOL")
             .expect("valid option");
         option
             .instrument_pricing_overrides
@@ -441,9 +441,9 @@ mod settlement_and_sigma_tests {
         option
     }
 
-    fn price_strike_option(as_of: Date) -> CDSOption {
-        let params = CDSOptionParams::new(
-            CDSOptionStrike::CleanPricePct(Decimal::new(1070, 1)),
+    fn price_strike_option(as_of: Date) -> CdsOption {
+        let params = CdsOptionParams::new(
+            CdsOptionStrike::CleanPricePct(Decimal::new(1070, 1)),
             as_of.add_months(12),
             as_of.add_months(60),
             Money::from((10_000_000_i64, Currency::USD)),
@@ -456,7 +456,7 @@ mod settlement_and_sigma_tests {
         .expect("valid strike factor")
         .with_coupon_bp(Decimal::new(500, 0));
         let credit = CreditParams::corporate_standard("HY", "HZ-SN");
-        CDSOption::new("CDSO-HY-SIGMA", &params, &credit, "USD-OIS", "CDSO-VOL")
+        CdsOption::new("CDSO-HY-SIGMA", &params, &credit, "USD-OIS", "CDSO-VOL")
             .expect("valid option")
     }
 

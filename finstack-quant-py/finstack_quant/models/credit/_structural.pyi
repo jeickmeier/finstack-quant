@@ -24,10 +24,10 @@ from typing import Any
 
 __all__ = [
     "AssetDynamics",
-    "BarrierType",
     "CreditState",
     "DynamicRecoverySpec",
     "EndogenousHazardSpec",
+    "MertonBarrierType",
     "MertonModel",
     "RatingFactorTable",
     "SimulatedPaths",
@@ -250,26 +250,26 @@ class RatingFactorTable:
         """
         ...
 
-class BarrierType:
+class MertonBarrierType:
     """
     Default barrier monitoring convention for structural credit models.
 
     Examples
     --------
-    >>> from finstack_quant.models.credit import BarrierType
-    >>> BarrierType.terminal() is not None
+    >>> from finstack_quant.models.credit import MertonBarrierType
+    >>> MertonBarrierType.terminal() is not None
     True
 
     """
 
     @staticmethod
-    def terminal() -> BarrierType:
+    def terminal() -> MertonBarrierType:
         """
         Classic Merton barrier tested only at maturity.
 
         Returns
         -------
-        BarrierType
+        MertonBarrierType
             Terminal-barrier specification.
 
         Notes
@@ -278,15 +278,15 @@ class BarrierType:
 
         Examples
         --------
-        >>> from finstack_quant.models.credit import BarrierType
-        >>> bt = BarrierType.terminal()
+        >>> from finstack_quant.models.credit import MertonBarrierType
+        >>> bt = MertonBarrierType.terminal()
         >>> bt.to_json()
         '"terminal"'
         """
         ...
 
     @staticmethod
-    def first_passage(barrier_growth_rate: float) -> BarrierType:
+    def first_passage(barrier_growth_rate: float) -> MertonBarrierType:
         """
         Black-Cox first-passage barrier with optional growth rate.
 
@@ -298,7 +298,7 @@ class BarrierType:
 
         Returns
         -------
-        BarrierType
+        MertonBarrierType
             First-passage barrier specification.
 
         Notes
@@ -307,8 +307,8 @@ class BarrierType:
 
         Examples
         --------
-        >>> from finstack_quant.models.credit import BarrierType
-        >>> bt = BarrierType.first_passage(0.02)
+        >>> from finstack_quant.models.credit import MertonBarrierType
+        >>> bt = MertonBarrierType.first_passage(0.02)
         >>> "first_passage" in bt.to_json()
         True
 
@@ -319,7 +319,7 @@ class BarrierType:
         ...
 
     @staticmethod
-    def from_json(json: str) -> BarrierType:
+    def from_json(json: str) -> MertonBarrierType:
         """
         Deserialize a barrier type from canonical JSON.
 
@@ -330,7 +330,7 @@ class BarrierType:
 
         Returns
         -------
-        BarrierType
+        MertonBarrierType
             Parsed barrier type.
 
         Raises
@@ -340,8 +340,8 @@ class BarrierType:
 
         Examples
         --------
-        >>> from finstack_quant.models.credit import BarrierType
-        >>> restored = BarrierType.from_json(BarrierType.terminal().to_json())
+        >>> from finstack_quant.models.credit import MertonBarrierType
+        >>> restored = MertonBarrierType.from_json(MertonBarrierType.terminal().to_json())
         >>> restored.to_json()
         '"terminal"'
 
@@ -1012,7 +1012,7 @@ class MertonModel:
         debt_barrier: float,
         risk_free_rate: float,
         payout_rate: float,
-        barrier_type: BarrierType,
+        barrier_type: MertonBarrierType,
         dynamics: AssetDynamics,
     ) -> MertonModel:
         """
@@ -1030,7 +1030,7 @@ class MertonModel:
             Continuously compounded risk-free rate as a decimal.
         payout_rate : float
             Continuous payout rate on assets as a decimal.
-        barrier_type : BarrierType
+        barrier_type : MertonBarrierType
             Terminal or first-passage barrier monitoring.
         dynamics : AssetDynamics
             Asset return dynamics specification.
@@ -1049,7 +1049,7 @@ class MertonModel:
         --------
         >>> from finstack_quant.models.credit import (
         ...     AssetDynamics,
-        ...     BarrierType,
+        ...     MertonBarrierType,
         ...     MertonModel,
         ... )
         >>> model = MertonModel.new_with_dynamics(
@@ -1058,7 +1058,7 @@ class MertonModel:
         ...     80.0,
         ...     0.05,
         ...     0.0,
-        ...     BarrierType.first_passage(0.02),
+        ...     MertonBarrierType.first_passage(0.02),
         ...     AssetDynamics.geometric_brownian(),
         ... )
         >>> round(model.default_probability(1.0), 6)
@@ -1249,13 +1249,13 @@ class MertonModel:
         ...
 
     @property
-    def barrier_type(self) -> BarrierType:
+    def barrier_type(self) -> MertonBarrierType:
         """
         Barrier monitoring convention.
 
         Returns
         -------
-        BarrierType
+        MertonBarrierType
             Terminal or first-passage barrier specification.
 
         Notes

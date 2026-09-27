@@ -11,7 +11,7 @@
 //! pricing tests with extreme scenarios.
 
 use super::helpers::*;
-use finstack_quant_valuations::instruments::credit_derivatives::cds_tranche::CDSTranchePricer;
+use finstack_quant_valuations::instruments::credit_derivatives::cds_tranche::CdsTranchePricer;
 
 // ==================== Economic-Invariant Helpers ====================
 
@@ -39,7 +39,7 @@ fn flat_correlation_market(level: f64) -> finstack_quant_core::market_data::cont
 
 /// Undiscounted maturity EL (currency) of a tranche at a flat correlation.
 fn el_at_flat_corr(attach: f64, detach: f64, coupon_bp: f64, level: f64) -> f64 {
-    let pricer = CDSTranchePricer::new();
+    let pricer = CdsTranchePricer::new();
     let market = flat_correlation_market(level);
     let tranche = custom_tranche(
         attach,
@@ -155,7 +155,7 @@ fn test_full_capital_structure_el_reproduces_pool_el() {
 #[test]
 fn test_extreme_low_correlation_pricing() {
     // Arrange
-    let pricer = CDSTranchePricer::new();
+    let pricer = CdsTranchePricer::new();
     let base_market = standard_market_context();
     let index_data = base_market.get_credit_index("CDX.NA.IG.42").unwrap();
 
@@ -193,7 +193,7 @@ fn test_extreme_low_correlation_pricing() {
 #[test]
 fn test_extreme_high_correlation_pricing() {
     // Arrange
-    let pricer = CDSTranchePricer::new();
+    let pricer = CdsTranchePricer::new();
     let base_market = standard_market_context();
     let index_data = base_market.get_credit_index("CDX.NA.IG.42").unwrap();
 
@@ -233,7 +233,7 @@ fn test_extreme_high_correlation_pricing() {
 #[test]
 fn test_pricing_with_zero_recovery_rate() {
     // Arrange
-    let pricer = CDSTranchePricer::new();
+    let pricer = CdsTranchePricer::new();
     let base_market = standard_market_context();
     let index_data = base_market.get_credit_index("CDX.NA.IG.42").unwrap();
 
@@ -267,7 +267,7 @@ fn test_pricing_with_zero_recovery_rate() {
 #[test]
 fn test_pricing_with_high_recovery_rate() {
     // Arrange
-    let pricer = CDSTranchePricer::new();
+    let pricer = CdsTranchePricer::new();
     let base_market = standard_market_context();
     let index_data = base_market.get_credit_index("CDX.NA.IG.42").unwrap();
 
@@ -303,7 +303,7 @@ fn test_pricing_with_high_recovery_rate() {
 #[test]
 fn test_pricing_with_near_zero_default_probability() {
     // Arrange
-    let pricer = CDSTranchePricer::new();
+    let pricer = CdsTranchePricer::new();
     let base_market = standard_market_context();
 
     // Create hazard curve with very low hazard rates
@@ -350,7 +350,7 @@ fn test_pricing_with_near_zero_default_probability() {
 #[test]
 fn test_very_small_portfolio() {
     // Arrange
-    let pricer = CDSTranchePricer::new();
+    let pricer = CdsTranchePricer::new();
     let base_market = standard_market_context();
     let index_data = base_market.get_credit_index("CDX.NA.IG.42").unwrap();
 
@@ -380,7 +380,7 @@ fn test_very_small_portfolio() {
 #[test]
 fn test_very_large_portfolio() {
     // Arrange
-    let pricer = CDSTranchePricer::new();
+    let pricer = CdsTranchePricer::new();
     let base_market = standard_market_context();
     let index_data = base_market.get_credit_index("CDX.NA.IG.42").unwrap();
 

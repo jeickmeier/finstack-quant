@@ -53,7 +53,7 @@ use rust_decimal::Decimal;
 /// use finstack_quant_valuations::instruments::{
 ///     Attributes, FinancingLegSpec, IndexUnderlyingParams, PayReceive,
 /// };
-/// use finstack_quant_valuations::instruments::fixed_income::fi_trs::FIIndexTotalReturnSwap;
+/// use finstack_quant_valuations::instruments::fixed_income::fi_trs::FiIndexTotalReturnSwap;
 /// use finstack_quant_valuations::instruments::fixed_income::fi_trs::{
 ///     TrsScheduleSpec,
 /// };
@@ -61,7 +61,7 @@ use rust_decimal::Decimal;
 /// use time::macros::date;
 ///
 /// # fn main() -> finstack_quant_core::Result<()> {
-/// let trs = FIIndexTotalReturnSwap::builder()
+/// let trs = FiIndexTotalReturnSwap::builder()
 ///     .id(InstrumentId::new("CORP-TRS"))
 ///     .notional(Money::from((10_000_000_i64, Currency::USD)))
 ///     .underlying(
@@ -94,7 +94,7 @@ use rust_decimal::Decimal;
 )]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
-pub struct FIIndexTotalReturnSwap {
+pub struct FiIndexTotalReturnSwap {
     /// Unique instrument identifier.
     pub id: InstrumentId,
     /// Notional amount for the swap.
@@ -145,7 +145,7 @@ pub struct FIIndexTotalReturnSwap {
     pub attributes: Attributes,
 }
 
-impl FIIndexTotalReturnSwap {
+impl FiIndexTotalReturnSwap {
     /// Resolve the supplied index duration used by both risk metrics and margin.
     ///
     /// # Arguments
@@ -339,7 +339,7 @@ impl FIIndexTotalReturnSwap {
     }
 }
 
-impl crate::instruments::common_impl::traits::Instrument for FIIndexTotalReturnSwap {
+impl crate::instruments::common_impl::traits::Instrument for FiIndexTotalReturnSwap {
     impl_instrument_base!(crate::pricer::InstrumentType::FiIndexTotalReturnSwap);
 
     fn validate_invariants(&self) -> Result<()> {
@@ -397,7 +397,7 @@ impl crate::instruments::common_impl::traits::Instrument for FIIndexTotalReturnS
     crate::impl_focused_pricing_overrides!();
 }
 
-impl finstack_quant_cashflows::CashflowScheduleSource for FIIndexTotalReturnSwap {
+impl finstack_quant_cashflows::CashflowScheduleSource for FiIndexTotalReturnSwap {
     fn notional(&self) -> finstack_quant_core::Result<Option<Money>> {
         Ok(Some(self.notional))
     }

@@ -198,9 +198,9 @@ macro_rules! with_instrument_json_registry {
             plain: Deposit(Deposit) => "deposit" @ "rates" = Deposit::example();
             plain: Repo(Repo) => "repo" @ "rates" = infallible_example(Repo::example());
             plain: CreditDefaultSwap(CreditDefaultSwap) => "credit_default_swap" @ "credit_derivatives" = infallible_example(CreditDefaultSwap::example());
-            plain: CDSIndex(CDSIndex) => "cds_index" @ "credit_derivatives" = infallible_example(CDSIndex::example());
-            plain: CDSTranche(CDSTranche) => "cds_tranche" @ "credit_derivatives" = infallible_example(CDSTranche::example());
-            plain: CDSOption(CDSOption) => "cds_option" @ "credit_derivatives" = CDSOption::example();
+            plain: CdsIndex(CdsIndex) => "cds_index" @ "credit_derivatives" = infallible_example(CdsIndex::example());
+            plain: CdsTranche(CdsTranche) => "cds_tranche" @ "credit_derivatives" = infallible_example(CdsTranche::example());
+            plain: CdsOption(CdsOption) => "cds_option" @ "credit_derivatives" = CdsOption::example();
             plain: Equity(Equity) => "equity" @ "equity" = infallible_example(Equity::example());
             plain: EquityOption(EquityOption) => "equity_option" @ "equity" = EquityOption::example();
             plain: AsianOption(AsianOption) => "asian_option" @ "exotics" = AsianOption::example();
@@ -239,7 +239,7 @@ macro_rules! with_instrument_json_registry {
             plain: Snowball(Snowball) => "snowball" @ "exotics" = infallible_example(Snowball::example_snowball());
             plain: CmsSpreadOption(CmsSpreadOption) => "cms_spread_option" @ "rates" = infallible_example(CmsSpreadOption::example());
             plain: TrsEquity(EquityTotalReturnSwap) => "trs_equity" @ "equity" = EquityTotalReturnSwap::example();
-            plain: TrsFixedIncomeIndex(FIIndexTotalReturnSwap) => "trs_fixed_income_index" @ "fixed_income" = FIIndexTotalReturnSwap::example();
+            plain: TrsFixedIncomeIndex(FiIndexTotalReturnSwap) => "trs_fixed_income_index" @ "fixed_income" = FiIndexTotalReturnSwap::example();
             plain: Basket(Basket) => "basket" @ "exotics" = Basket::example();
             plain: PrivateMarketsFund(PrivateMarketsFund) => "private_markets_fund" @ "equity" = PrivateMarketsFund::example();
             plain: RealEstateAsset(RealEstateAsset) => "real_estate_asset" @ "equity" = RealEstateAsset::example();
@@ -1615,21 +1615,21 @@ mod tests {
     fn test_cds_tranche_default_business_day_convention_when_omitted() {
         use finstack_quant_core::dates::BusinessDayConvention;
 
-        let tranche = CDSTranche::example();
-        let mut json = serde_json::to_value(InstrumentJson::CDSTranche(tranche))
-            .expect("CDSTranche JSON serialization should succeed");
+        let tranche = CdsTranche::example();
+        let mut json = serde_json::to_value(InstrumentJson::CdsTranche(tranche))
+            .expect("CdsTranche JSON serialization should succeed");
         remove_spec_key(&mut json, "business_day_convention");
 
         let deserialized: InstrumentJson =
-            serde_json::from_value(json).expect("CDSTranche JSON deserialization should succeed");
+            serde_json::from_value(json).expect("CdsTranche JSON deserialization should succeed");
         match deserialized {
-            InstrumentJson::CDSTranche(i) => {
+            InstrumentJson::CdsTranche(i) => {
                 assert_eq!(
                     i.business_day_convention,
                     BusinessDayConvention::ModifiedFollowing
                 );
             }
-            _ => panic!("Expected CDSTranche variant"),
+            _ => panic!("Expected CdsTranche variant"),
         }
     }
 
@@ -1661,24 +1661,24 @@ mod tests {
 
     #[test]
     fn test_cds_option_defaults_when_optional_fields_omitted() {
-        let option = CDSOption::example().expect("CDSOption example is valid");
-        let mut json = serde_json::to_value(InstrumentJson::CDSOption(option))
-            .expect("CDSOption JSON serialization should succeed");
+        let option = CdsOption::example().expect("CdsOption example is valid");
+        let mut json = serde_json::to_value(InstrumentJson::CdsOption(option))
+            .expect("CdsOption JSON serialization should succeed");
         remove_spec_key(&mut json, "underlying_is_index");
         remove_spec_key(&mut json, "coupon_bp");
         remove_spec_key(&mut json, "index_factor");
         remove_spec_key(&mut json, "realized_loss");
 
         let deserialized: InstrumentJson =
-            serde_json::from_value(json).expect("CDSOption JSON deserialization should succeed");
+            serde_json::from_value(json).expect("CdsOption JSON deserialization should succeed");
         match deserialized {
-            InstrumentJson::CDSOption(i) => {
+            InstrumentJson::CdsOption(i) => {
                 assert!(!i.underlying_is_index);
                 assert!(i.coupon_bp.is_none());
                 assert_eq!(i.index_factor, 1.0);
                 assert_eq!(i.realized_loss, 0.0);
             }
-            _ => panic!("Expected CDSOption variant"),
+            _ => panic!("Expected CdsOption variant"),
         }
     }
 

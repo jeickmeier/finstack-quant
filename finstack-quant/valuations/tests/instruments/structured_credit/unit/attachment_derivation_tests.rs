@@ -11,8 +11,8 @@ use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::money::Money;
 use finstack_quant_valuations::instruments::fixed_income::loan_terms::RateSpec;
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
-    run_simulation, AssetPool, DealType, PoolAsset, PricingMode, StructuredCredit, Tranche,
-    TrancheSeniority, TrancheStructure,
+    run_simulation, AssetPool, DealType, PoolAsset, StructuredCredit, StructuredCreditPricingMode,
+    Tranche, TrancheSeniority, TrancheStructure,
 };
 use time::Month;
 
@@ -295,7 +295,7 @@ fn derived_structure_prices_like_the_declared_one() {
         );
     }
 
-    let mode = PricingMode::MonteCarlo {
+    let mode = StructuredCreditPricingMode::MonteCarlo {
         num_paths: 8,
         antithetic: true,
     };

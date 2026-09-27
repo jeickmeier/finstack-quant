@@ -724,7 +724,7 @@ pub(crate) fn cs01_reval(
 /// Behaves like [`GenericParallelCs01`] but reads the per-deal `doc_clause`
 /// and `cds_valuation_convention` (and optional pre-check / curve override)
 /// from the instrument via [`CdsCs01Conventions`]. Used by `CreditDefaultSwap`
-/// and `CDSOption`.
+/// and `CdsOption`.
 pub(crate) struct CreditParallelCs01<I> {
     _phantom: PhantomData<I>,
 }

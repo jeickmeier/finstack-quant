@@ -16,9 +16,9 @@ use finstack_quant_cashflows::builder::ScheduleParams;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
-use finstack_quant_valuations::instruments::credit_derivatives::cds_tranche::CDSTranche;
-use finstack_quant_valuations::instruments::credit_derivatives::cds_tranche::CDSTrancheParams;
-use finstack_quant_valuations::instruments::credit_derivatives::cds_tranche::CDSTranchePricer;
+use finstack_quant_valuations::instruments::credit_derivatives::cds_tranche::CdsTranche;
+use finstack_quant_valuations::instruments::credit_derivatives::cds_tranche::CdsTrancheParams;
+use finstack_quant_valuations::instruments::credit_derivatives::cds_tranche::CdsTranchePricer;
 use finstack_quant_valuations::instruments::PayReceive;
 use time::macros::date;
 
@@ -27,7 +27,7 @@ use time::macros::date;
 #[test]
 fn test_tranche_pricing_returns_valid_pv() {
     // Arrange
-    let pricer = CDSTranchePricer::new();
+    let pricer = CdsTranchePricer::new();
     let tranche = mezzanine_tranche();
     let market = standard_market_context();
     let as_of = base_date();
@@ -44,7 +44,7 @@ fn test_tranche_pricing_returns_valid_pv() {
 
 #[test]
 fn direct_pricer_rejects_mutated_invalid_tranche() {
-    let pricer = CDSTranchePricer::new();
+    let pricer = CdsTranchePricer::new();
     let mut tranche = mezzanine_tranche();
     tranche.detach_pct = tranche.attach_pct;
 
@@ -57,7 +57,7 @@ fn direct_pricer_rejects_mutated_invalid_tranche() {
 #[test]
 fn test_equity_tranche_pricing() {
     // Arrange
-    let pricer = CDSTranchePricer::new();
+    let pricer = CdsTranchePricer::new();
     let tranche = equity_tranche();
     let market = standard_market_context();
     let as_of = base_date();
@@ -74,7 +74,7 @@ fn test_equity_tranche_pricing() {
 #[test]
 fn test_senior_tranche_pricing() {
     // Arrange
-    let pricer = CDSTranchePricer::new();
+    let pricer = CdsTranchePricer::new();
     let tranche = senior_tranche();
     let market = standard_market_context();
     let as_of = base_date();
@@ -93,7 +93,7 @@ fn test_bespoke_seasoned_tranche_requires_effective_date_for_accrued_premium() {
     let market = standard_market_context();
     let as_of = date!(2025 - 02 - 01);
 
-    let tranche_params = CDSTrancheParams::new(
+    let tranche_params = CdsTrancheParams::new(
         "CDX.NA.IG.42",
         42,
         3.0,
@@ -104,7 +104,7 @@ fn test_bespoke_seasoned_tranche_requires_effective_date_for_accrued_premium() {
     );
     let schedule_params = ScheduleParams::quarterly_act360();
 
-    let mut explicit = CDSTranche::new(
+    let mut explicit = CdsTranche::new(
         "BESPOKE-SEASONED-EXPLICIT",
         &tranche_params,
         &schedule_params,
@@ -137,7 +137,7 @@ fn test_bespoke_seasoned_tranche_requires_effective_date_for_accrued_premium() {
 #[test]
 fn test_buy_sell_protection_symmetry() {
     // Arrange
-    let pricer = CDSTranchePricer::new();
+    let pricer = CdsTranchePricer::new();
     let market = standard_market_context();
     let as_of = base_date();
 
@@ -166,7 +166,7 @@ fn test_buy_sell_protection_symmetry() {
 #[test]
 fn test_sell_protection_pv_components() {
     // Arrange
-    let pricer = CDSTranchePricer::new();
+    let pricer = CdsTranchePricer::new();
     let tranche = custom_tranche(3.0, 7.0, 500.0, PayReceive::Receive);
     let market = standard_market_context();
     let as_of = base_date();
@@ -187,7 +187,7 @@ fn test_sell_protection_pv_components() {
 #[test]
 fn test_at_maturity_pricing() {
     // Arrange
-    let pricer = CDSTranchePricer::new();
+    let pricer = CdsTranchePricer::new();
     let tranche = mezzanine_tranche();
     let market = standard_market_context();
 
@@ -210,7 +210,7 @@ fn test_at_maturity_pricing() {
 
 #[test]
 fn test_missing_credit_index_errors_for_price_tranche() {
-    let pricer = CDSTranchePricer::new();
+    let pricer = CdsTranchePricer::new();
     let tranche = mezzanine_tranche();
     let market = MarketContext::new().insert(standard_discount_curve());
     let as_of = base_date();
@@ -225,7 +225,7 @@ fn test_missing_credit_index_errors_for_price_tranche() {
 
 #[test]
 fn test_fully_wiped_tranche_prices_to_zero() {
-    let pricer = CDSTranchePricer::new();
+    let pricer = CdsTranchePricer::new();
     let mut tranche = custom_tranche(3.0, 7.0, 500.0, PayReceive::Receive);
     tranche.realized_loss = tranche.detach_pct / 100.0;
 
@@ -239,7 +239,7 @@ fn test_fully_wiped_tranche_prices_to_zero() {
 
 #[test]
 fn test_same_day_upfront_has_opposite_sign_for_buy_and_sell() {
-    let pricer = CDSTranchePricer::new();
+    let pricer = CdsTranchePricer::new();
     let market = standard_market_context();
     let as_of = base_date();
     let upfront = Money::new(150_000.0, Currency::USD).expect("valid money fixture");
@@ -284,7 +284,7 @@ fn test_same_day_upfront_has_opposite_sign_for_buy_and_sell() {
 
 #[test]
 fn test_after_maturity_pricing_returns_zero() {
-    let pricer = CDSTranchePricer::new();
+    let pricer = CdsTranchePricer::new();
     let tranche = mezzanine_tranche();
     let market = standard_market_context();
     let as_of = tranche.maturity + time::Duration::days(1);
@@ -302,7 +302,7 @@ fn test_after_maturity_pricing_returns_zero() {
 #[test]
 fn test_pv_scales_with_notional() {
     // Arrange
-    let pricer = CDSTranchePricer::new();
+    let pricer = CdsTranchePricer::new();
     let market = standard_market_context();
     let as_of = base_date();
 

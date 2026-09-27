@@ -7,7 +7,7 @@
 //! `clawback`. Each retired key is rejected by `deny_unknown_fields`.
 
 use finstack_quant_valuations::instruments::equity::pe_fund::{
-    ClawbackSettle, ClawbackSpec, WaterfallSpec,
+    ClawbackSettle, ClawbackSpec, PeFundWaterfallSpec,
 };
 use finstack_quant_valuations::instruments::equity::{
     LeveredRealEstateEquity, PrivateMarketsFund, RealEstateAsset,
@@ -52,10 +52,10 @@ fn retired_levered_exit_date_is_rejected() {
 }
 
 #[test]
-// schema-rejection-test: WaterfallSpec `irr_basis`, `catchup_mode`, `irr`, `hurdle`
+// schema-rejection-test: PeFundWaterfallSpec `irr_basis`, `catchup_mode`, `irr`, `hurdle`
 fn retired_waterfall_spec_keys_are_rejected() {
     let fund = PrivateMarketsFund::example().expect("example");
-    let spec: &WaterfallSpec = &fund.waterfall_spec;
+    let spec: &PeFundWaterfallSpec = &fund.waterfall_spec;
     assert_rejected(spec, |w| {
         let map = object(w);
         let dc = map.remove("day_count").expect("day_count");

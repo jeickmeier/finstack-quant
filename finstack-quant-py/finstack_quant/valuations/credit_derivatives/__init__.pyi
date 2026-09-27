@@ -26,7 +26,7 @@ __all__ = [
 
 def cds_index_example_json() -> str:
     """
-    Example ``CDSIndex`` canonical instrument envelope.
+    Example ``CdsIndex`` canonical instrument envelope.
 
     Returns
     -------
@@ -49,7 +49,7 @@ def cds_index_example_json() -> str:
 
 def cds_option_example_json() -> str:
     """
-    Example ``CDSOption`` canonical instrument envelope.
+    Example ``CdsOption`` canonical instrument envelope.
 
     Returns
     -------
@@ -72,7 +72,7 @@ def cds_option_example_json() -> str:
 
 def cds_tranche_example_json() -> str:
     """
-    Example ``CDSTranche`` canonical instrument envelope.
+    Example ``CdsTranche`` canonical instrument envelope.
 
     Returns
     -------

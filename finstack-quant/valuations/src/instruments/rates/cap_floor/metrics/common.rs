@@ -11,7 +11,7 @@ use finstack_quant_models::volatility::VolatilityConvention;
 
 /// Per-caplet inputs passed to the aggregation closure.
 ///
-/// `fixing_t` is the year fraction from `as_of` to the option's fixing date.
+/// `time_to_fixing` is the year fraction from `as_of` to the option's fixing date.
 /// Fully fixed coupons are omitted because their stochastic Greeks are zero.
 pub(crate) struct CapletInputs {
     /// Atomic forward rate for the accrual period.
@@ -23,7 +23,7 @@ pub(crate) struct CapletInputs {
     /// Strike after the same displacement as `forward`.
     pub strike: f64,
     /// Year fraction to the option fixing date.
-    pub fixing_t: f64,
+    pub time_to_fixing: f64,
     /// Sensitivity of the optioned coupon to a parallel projected-forward shift.
     pub forward_sensitivity: f64,
     /// Second sensitivity to the same parallel projected-forward shift.
@@ -72,18 +72,19 @@ where
             continue;
         }
 
-        let fixing_t = resolved_inputs.time_to_fixing;
+        let time_to_fixing = resolved_inputs.time_to_fixing;
 
         let forward = projection.forward;
         let df = resolved_inputs.discount_factor;
-        let quote = resolve_caplet_volatility(option, context.curves.as_ref(), fixing_t, strike)?;
+        let quote =
+            resolve_caplet_volatility(option, context.curves.as_ref(), time_to_fixing, strike)?;
         let (forward, strike) = quote.model_rates(forward, strike)?;
         let per_unit = f(CapletInputs {
             forward,
             sigma: quote.sigma,
             convention: quote.convention,
             strike,
-            fixing_t,
+            time_to_fixing,
             forward_sensitivity: projection.parallel_forward_sensitivity,
             forward_second_sensitivity: projection.parallel_forward_second_sensitivity,
         });

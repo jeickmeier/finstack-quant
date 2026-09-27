@@ -10,7 +10,7 @@ fn test_itm_call_value() {
     let as_of = date!(2025 - 01 - 01);
     let market = standard_market(as_of);
 
-    let itm_option = CDSOptionBuilder::new()
+    let itm_option = CdsOptionBuilder::new()
         .call()
         .strike(50.0) // Well below forward (~200bp)
         .build(as_of);
@@ -20,7 +20,7 @@ fn test_itm_call_value() {
     assert_positive(pv, "ITM call value");
 
     // ITM option should be more valuable than ATM
-    let atm_option = CDSOptionBuilder::new().call().strike(200.0).build(as_of);
+    let atm_option = CdsOptionBuilder::new().call().strike(200.0).build(as_of);
     let atm_pv = atm_option.value(&market, as_of).unwrap().amount();
 
     assert!(
@@ -37,7 +37,7 @@ fn test_otm_call_value() {
     let as_of = date!(2025 - 01 - 01);
     let market = standard_market(as_of);
 
-    let otm_option = CDSOptionBuilder::new()
+    let otm_option = CdsOptionBuilder::new()
         .call()
         .strike(500.0) // Well above forward (~200bp)
         .build(as_of);
@@ -48,7 +48,7 @@ fn test_otm_call_value() {
     assert_positive(pv, "OTM call value (time value)");
 
     // OTM option should be less valuable than ATM
-    let atm_option = CDSOptionBuilder::new().call().strike(200.0).build(as_of);
+    let atm_option = CdsOptionBuilder::new().call().strike(200.0).build(as_of);
     let atm_pv = atm_option.value(&market, as_of).unwrap().amount();
 
     assert!(
@@ -65,7 +65,7 @@ fn test_atm_call_delta_positive() {
     let as_of = date!(2025 - 01 - 01);
     let market = standard_market(as_of);
 
-    let option = CDSOptionBuilder::new()
+    let option = CdsOptionBuilder::new()
         .call()
         .strike(200.0) // Near forward
         .build(as_of);
@@ -84,9 +84,9 @@ fn test_itm_call_delta_higher() {
     let as_of = date!(2025 - 01 - 01);
     let market = standard_market(as_of);
 
-    let itm_option = CDSOptionBuilder::new().call().strike(50.0).build(as_of);
+    let itm_option = CdsOptionBuilder::new().call().strike(50.0).build(as_of);
 
-    let atm_option = CDSOptionBuilder::new().call().strike(200.0).build(as_of);
+    let atm_option = CdsOptionBuilder::new().call().strike(200.0).build(as_of);
 
     let itm_delta = itm_option.delta(&market, as_of).unwrap();
     let atm_delta = atm_option.delta(&market, as_of).unwrap();
@@ -105,9 +105,9 @@ fn test_otm_call_delta_lower() {
     let as_of = date!(2025 - 01 - 01);
     let market = standard_market(as_of);
 
-    let otm_option = CDSOptionBuilder::new().call().strike(500.0).build(as_of);
+    let otm_option = CdsOptionBuilder::new().call().strike(500.0).build(as_of);
 
-    let atm_option = CDSOptionBuilder::new().call().strike(200.0).build(as_of);
+    let atm_option = CdsOptionBuilder::new().call().strike(200.0).build(as_of);
 
     let otm_delta = otm_option.delta(&market, as_of).unwrap();
     let atm_delta = atm_option.delta(&market, as_of).unwrap();
@@ -126,7 +126,7 @@ fn test_itm_put_value() {
     let as_of = date!(2025 - 01 - 01);
     let market = standard_market(as_of);
 
-    let itm_option = CDSOptionBuilder::new()
+    let itm_option = CdsOptionBuilder::new()
         .put()
         .strike(400.0) // Well above forward (~200bp)
         .build(as_of);
@@ -136,7 +136,7 @@ fn test_itm_put_value() {
     assert_positive(pv, "ITM put value");
 
     // ITM put should be more valuable than ATM
-    let atm_option = CDSOptionBuilder::new().put().strike(200.0).build(as_of);
+    let atm_option = CdsOptionBuilder::new().put().strike(200.0).build(as_of);
     let atm_pv = atm_option.value(&market, as_of).unwrap().amount();
 
     assert!(
@@ -153,7 +153,7 @@ fn test_otm_put_value() {
     let as_of = date!(2025 - 01 - 01);
     let market = standard_market(as_of);
 
-    let otm_option = CDSOptionBuilder::new()
+    let otm_option = CdsOptionBuilder::new()
         .put()
         .strike(100.0) // Well below forward (~200bp)
         .build(as_of);
@@ -164,7 +164,7 @@ fn test_otm_put_value() {
     assert_positive(pv, "OTM put value (time value)");
 
     // OTM put should be less valuable than ATM
-    let atm_option = CDSOptionBuilder::new().put().strike(200.0).build(as_of);
+    let atm_option = CdsOptionBuilder::new().put().strike(200.0).build(as_of);
     let atm_pv = atm_option.value(&market, as_of).unwrap().amount();
 
     assert!(
@@ -181,9 +181,9 @@ fn test_moneyness_value_ordering_calls() {
     let as_of = date!(2025 - 01 - 01);
     let market = standard_market(as_of);
 
-    let itm = CDSOptionBuilder::new().call().strike(100.0).build(as_of);
-    let atm = CDSOptionBuilder::new().call().strike(200.0).build(as_of);
-    let otm = CDSOptionBuilder::new().call().strike(400.0).build(as_of);
+    let itm = CdsOptionBuilder::new().call().strike(100.0).build(as_of);
+    let atm = CdsOptionBuilder::new().call().strike(200.0).build(as_of);
+    let otm = CdsOptionBuilder::new().call().strike(400.0).build(as_of);
 
     let itm_pv = itm.value(&market, as_of).unwrap().amount();
     let atm_pv = atm.value(&market, as_of).unwrap().amount();
@@ -204,9 +204,9 @@ fn test_moneyness_value_ordering_puts() {
     let as_of = date!(2025 - 01 - 01);
     let market = standard_market(as_of);
 
-    let itm = CDSOptionBuilder::new().put().strike(400.0).build(as_of);
-    let atm = CDSOptionBuilder::new().put().strike(200.0).build(as_of);
-    let otm = CDSOptionBuilder::new().put().strike(100.0).build(as_of);
+    let itm = CdsOptionBuilder::new().put().strike(400.0).build(as_of);
+    let atm = CdsOptionBuilder::new().put().strike(200.0).build(as_of);
+    let otm = CdsOptionBuilder::new().put().strike(100.0).build(as_of);
 
     let itm_pv = itm.value(&market, as_of).unwrap().amount();
     let atm_pv = atm.value(&market, as_of).unwrap().amount();
@@ -229,7 +229,7 @@ fn test_gamma_positive_all_strikes() {
     let market = standard_market(as_of);
 
     for strike in [100.0, 150.0, 200.0, 250.0, 400.0] {
-        let gamma = CDSOptionBuilder::new()
+        let gamma = CdsOptionBuilder::new()
             .strike(strike)
             .build(as_of)
             .gamma(&market, as_of)
@@ -247,7 +247,7 @@ fn test_vega_positive_all_strikes() {
     let market = standard_market(as_of);
 
     for strike in [100.0, 150.0, 200.0, 250.0, 400.0] {
-        let vega = CDSOptionBuilder::new()
+        let vega = CdsOptionBuilder::new()
             .strike(strike)
             .build(as_of)
             .vega(&market, as_of)

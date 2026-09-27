@@ -280,10 +280,10 @@ rationale = "CreditDefaultSwap.premium_leg: PremiumLegSpec lacks PartialEq acros
 tag = "cds_index"
 fixture = "json_examples/cds_index.json"
 lossless = false
-partial_eq_blocker = "CDSIndex.premium_leg: PremiumLegSpec"
+partial_eq_blocker = "CdsIndex.premium_leg: PremiumLegSpec"
 required_keys = ["id"]
 no_market_dependencies = false
-rationale = "CDSIndex.premium_leg: PremiumLegSpec lacks PartialEq across index premium schedule conventions."
+rationale = "CdsIndex.premium_leg: PremiumLegSpec lacks PartialEq across index premium schedule conventions."
 
 [[instrument]]
 tag = "cds_tranche"
@@ -593,10 +593,10 @@ rationale = "EquityTotalReturnSwap.underlying: EquityUnderlyingParams lacks Part
 tag = "trs_fixed_income_index"
 fixture = "json_examples/trs_fixed_income_index.json"
 lossless = false
-partial_eq_blocker = "FIIndexTotalReturnSwap.underlying: IndexUnderlyingParams"
+partial_eq_blocker = "FiIndexTotalReturnSwap.underlying: IndexUnderlyingParams"
 required_keys = ["id"]
 no_market_dependencies = false
-rationale = "FIIndexTotalReturnSwap.underlying: IndexUnderlyingParams lacks PartialEq across index price and currency identifiers."
+rationale = "FiIndexTotalReturnSwap.underlying: IndexUnderlyingParams lacks PartialEq across index price and currency identifiers."
 
 [[instrument]]
 tag = "structured_credit"

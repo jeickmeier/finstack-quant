@@ -109,7 +109,7 @@ pub(super) const PAR_SPREAD_TOLERANCE: f64 = 1e-6;
 /// - **Constant** (default): Fixed recovery rate
 /// - **Stochastic**: Recovery correlated with market factor
 #[derive(Debug, Clone)]
-pub struct CDSTranchePricerConfig {
+pub struct CdsTranchePricerConfig {
     // Model Selection
     /// Copula model specification (default: Gaussian)
     pub copula_spec: CopulaSpec,
@@ -164,7 +164,7 @@ pub struct CDSTranchePricerConfig {
     pub grid_step: f64,
 }
 
-impl Default for CDSTranchePricerConfig {
+impl Default for CdsTranchePricerConfig {
     fn default() -> Self {
         Self {
             // Model selection
@@ -195,7 +195,7 @@ impl Default for CDSTranchePricerConfig {
     }
 }
 
-impl CDSTranchePricerConfig {
+impl CdsTranchePricerConfig {
     /// Validate numerical and model parameters before constructing a pricer.
     ///
     /// # Errors
@@ -424,11 +424,11 @@ pub enum HeteroMethod {
 /// convergence budgets. Student-t uses the copula's product Gauss rule
 /// unless adaptive integration is enabled.
 ///
-/// Configuration is validated by [`CDSTranchePricer::with_params`] and remains
+/// Configuration is validated by [`CdsTranchePricer::with_params`] and remains
 /// immutable for the pricer's lifetime. The cached copula
 /// therefore cannot drift from the settings used by uncached calculations.
-pub struct CDSTranchePricer {
-    pub(super) params: CDSTranchePricerConfig,
+pub struct CdsTranchePricer {
+    pub(super) params: CdsTranchePricerConfig,
     pub(super) copula_cache: OnceLock<Box<dyn Copula + Send + Sync>>,
 }
 
@@ -505,15 +505,15 @@ pub(super) struct ProjectedDiscountedRow {
     pub(super) discount_at: DiscountAt,
 }
 
-impl Default for CDSTranchePricer {
+impl Default for CdsTranchePricer {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl CDSTranchePricer {
+impl CdsTranchePricer {
     /// Get the current configuration.
-    pub fn get_config(&self) -> &CDSTranchePricerConfig {
+    pub fn get_config(&self) -> &CdsTranchePricerConfig {
         &self.params
     }
 }

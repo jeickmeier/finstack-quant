@@ -3,8 +3,8 @@
 Covers the B1b remediation of the valuations parity audit: every typed
 wrapper exposes its Rust fields, the Rust convenience constructors and
 ``example()`` factories, ``price`` / ``metric`` on the instrument itself, the
-typed helper classes (``CDSIndexParams``, ``CDSIndexConstituent``,
-``CDSTrancheParams``, ``ConversionSpec``, ``CallPutSchedule``) and the loose
+typed helper classes (``CdsIndexParams``, ``CdsIndexConstituent``,
+``CdsTrancheParams``, ``ConversionSpec``, ``CallPutSchedule``) and the loose
 input forms (ISO date strings, ``float | Bps``, dict-or-JSON specs).
 """
 
@@ -33,11 +33,11 @@ from finstack_quant.core.types import Attributes, Bps
 from finstack_quant.valuations import ValuationResult
 from finstack_quant.valuations.instruments import (
     CallPutSchedule,
-    CDSIndex,
-    CDSIndexConstituent,
-    CDSIndexParams,
-    CDSTranche,
-    CDSTrancheParams,
+    CdsIndex,
+    CdsIndexConstituent,
+    CdsIndexParams,
+    CdsTranche,
+    CdsTrancheParams,
     ConversionSpec,
     ConvertibleBond,
     CreditDefaultSwap,
@@ -230,11 +230,11 @@ class TestCreditDefaultSwap:
         assert pickle.loads(pickle.dumps(cds)).to_json() == cds.to_json()  # noqa: S301
 
 
-class TestCDSIndex:
+class TestCdsIndex:
     def test_from_preset_mirrors_rust(self) -> None:
-        preset = CDSIndexParams.cdx_na_ig(42, 1, 100.0)
-        assert preset == CDSIndexParams("CDX.NA.IG", 42, 1, Bps(100.0), num_constituents=125)
-        index = CDSIndex.from_preset(
+        preset = CdsIndexParams.cdx_na_ig(42, 1, 100.0)
+        assert preset == CdsIndexParams("CDX.NA.IG", 42, 1, Bps(100.0), num_constituents=125)
+        index = CdsIndex.from_preset(
             preset,
             "CDX-IG-42-5Y",
             Money(10_000_000.0, USD),
@@ -262,19 +262,19 @@ class TestCDSIndex:
         assert 40.0 < index.par_spread(market, "2024-06-20") < 80.0
 
     def test_example_prices(self) -> None:
-        index = CDSIndex.example()
+        index = CdsIndex.example()
         assert index.id == "CDX-IG-42"
         result = index.price(_credit_market(), "2024-06-20", "hazard_rate")
         assert math.isfinite(result.price)
 
     def test_constituents_accept_typed_dict_and_json(self) -> None:
-        row = CDSIndexConstituent("ACME-CORP", 0.4, "CORP-HAZARD", 0.5)
+        row = CdsIndexConstituent("ACME-CORP", 0.4, "CORP-HAZARD", 0.5)
         as_dict = json.loads(row.to_json())
         premium, protection = _cds_legs()
 
-        def build(constituents: object) -> CDSIndex:
+        def build(constituents: object) -> CdsIndex:
             return (
-                CDSIndex
+                CdsIndex
                 .builder()
                 .id("CDX-CONS")
                 .index_name("CDX.NA.IG")
@@ -302,15 +302,15 @@ class TestCDSIndex:
 
     def test_params_reject_unknown_convention(self) -> None:
         with pytest.raises(ValueError, match="isda_na"):
-            CDSIndexParams("CDX.NA.IG", 42, 1, 100.0, convention="isda_2014")
+            CdsIndexParams("CDX.NA.IG", 42, 1, 100.0, convention="isda_2014")
 
 
-class TestCDSTranche:
+class TestCdsTranche:
     def test_standard_and_example(self) -> None:
-        params = CDSTrancheParams.mezzanine_tranche("CDX.NA.IG", 42, Money(10_000_000.0, USD), "2029-12-20", Bps(100.0))
+        params = CdsTrancheParams.mezzanine_tranche("CDX.NA.IG", 42, Money(10_000_000.0, USD), "2029-12-20", Bps(100.0))
         assert (params.attach_pct, params.detach_pct) == (3.0, 7.0)
         assert params.coupon_bp == 100.0
-        tranche = CDSTranche.standard("CDX-42-3X7", params, "USD-OIS", "CDX.NA.IG.HAZARD", "pay")
+        tranche = CdsTranche.standard("CDX-42-3X7", params, "USD-OIS", "CDX.NA.IG.HAZARD", "pay")
         assert tranche.side == "pay"
         assert tranche.day_count == "act_360"
         assert tranche.frequency == Tenor.quarterly()
@@ -318,13 +318,13 @@ class TestCDSTranche:
         assert tranche.maturity == datetime.date(2029, 12, 20)
         assert tranche.upfront is None
 
-        example = CDSTranche.example()
+        example = CdsTranche.example()
         assert (example.attach_pct, example.detach_pct) == (0.0, 3.0)
         assert example.to_dict()["index_name"] == "CDX.NA.IG"
 
     def test_builder_new_setters(self) -> None:
         tranche = (
-            CDSTranche
+            CdsTranche
             .builder()
             .id("CDX-BLD")
             .index_name("CDX.NA.IG")
@@ -348,7 +348,7 @@ class TestCDSTranche:
         assert tranche.upfront[0] == datetime.date(2024, 6, 25)
         assert tranche.business_day_convention == "modified_following"
         with pytest.raises(ValueError, match="realized_loss"):
-            CDSTrancheParams("CDX.NA.IG", 42, 0.0, 3.0, Money(1.0, USD), "2029-12-20", 100.0, realized_loss=2.0)
+            CdsTrancheParams("CDX.NA.IG", 42, 0.0, 3.0, Money(1.0, USD), "2029-12-20", 100.0, realized_loss=2.0)
 
 
 class TestConvertibleBond:

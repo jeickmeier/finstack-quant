@@ -40,7 +40,7 @@
 //! - CDX IG (125 names): $10M index with 40% recovery → JTD ≈ $48K per name default
 
 use crate::instruments::credit_derivatives::cds::PayReceive;
-use crate::instruments::credit_derivatives::cds_index::CDSIndex;
+use crate::instruments::credit_derivatives::cds_index::CdsIndex;
 use crate::metrics::{MetricCalculator, MetricContext};
 use finstack_quant_core::{Error, Result};
 
@@ -52,7 +52,7 @@ pub(crate) struct JumpToDefaultCalculator;
 /// Index pool sizes drift with series (iTraxx Crossover has been 75 names
 /// only since Series 9; CDX.NA.HY membership varies), so this is **only** a
 /// fallback when no explicit count was supplied. Prefer
-/// [`CDSIndex::with_num_constituents`] or a standard preset.
+/// [`CdsIndex::with_num_constituents`] or a standard preset.
 fn infer_constituent_count(index_name: &str) -> Option<f64> {
     let name = index_name.to_ascii_lowercase();
     if name.contains("cdx") && name.contains("na") && name.contains("ig") {
@@ -94,20 +94,20 @@ fn resolve_constituent_count(num_constituents: Option<u32>, index_name: &str) ->
                 inferred_count = n,
                 "CDS index has no explicit num_constituents; jump-to-default is using a \
                  name-substring guess of the pool size, which ignores per-series membership \
-                 drift. Set CDSIndex::with_num_constituents for an accurate JTD."
+                 drift. Set CdsIndex::with_num_constituents for an accurate JTD."
             );
             Ok(n)
         }
         None => Err(Error::Validation(format!(
             "Cannot determine constituent count for CDS index '{index_name}'. Set \
-             CDSIndex::with_num_constituents (or supply constituents)."
+             CdsIndex::with_num_constituents (or supply constituents)."
         ))),
     }
 }
 
 impl MetricCalculator for JumpToDefaultCalculator {
     fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
-        let index: &CDSIndex = context.instrument_as()?;
+        let index: &CdsIndex = context.instrument_as()?;
 
         // Check if we have constituent data for more accurate calculation
         if !index.constituents.is_empty() {

@@ -1,6 +1,6 @@
 //! Pricer registrations for fixed-income instruments.
 //!
-//! Covers: FIIndexTotalReturnSwap, Convertible, InflationLinkedBond,
+//! Covers: FiIndexTotalReturnSwap, Convertible, InflationLinkedBond,
 //! RevolvingCredit, TermLoan, AgencyMbsPassthrough, AgencyTba, DollarRoll,
 //! AgencyCmo.
 
@@ -15,7 +15,7 @@ pub(crate) fn register_fixed_income_pricers(
     register_generic!(
         registry,
         InstrumentType::FiIndexTotalReturnSwap,
-        crate::instruments::fixed_income::fi_trs::FIIndexTotalReturnSwap
+        crate::instruments::fixed_income::fi_trs::FiIndexTotalReturnSwap
     );
 
     // Convertible Bond

@@ -481,7 +481,7 @@ impl InflationCapFloor {
                 strike,
                 forward: forward_rate,
                 discount_factor: df,
-                volatility: quote.sigma,
+                sigma: quote.sigma,
                 time_to_fixing: t_fix,
                 accrual_year_fraction: accrual,
                 currency: self.notional.currency(),

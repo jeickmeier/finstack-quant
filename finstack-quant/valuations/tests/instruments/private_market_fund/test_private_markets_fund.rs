@@ -15,8 +15,8 @@ fn test_date(year: i32, month: u8, day: u8) -> Date {
 }
 
 /// Create a simple 2x return scenario for testing.
-fn simple_2x_scenario() -> (WaterfallSpec, Vec<FundEvent>) {
-    let spec = WaterfallSpec::builder()
+fn simple_2x_scenario() -> (PeFundWaterfallSpec, Vec<FundEvent>) {
+    let spec = PeFundWaterfallSpec::builder()
         .style(WaterfallStyle::European)
         .return_of_capital()
         .preferred_irr(0.08) // 8% hurdle
@@ -153,7 +153,7 @@ fn test_promote_split() {
 
 #[test]
 fn test_currency_mismatch_error() {
-    let spec = WaterfallSpec::builder()
+    let spec = PeFundWaterfallSpec::builder()
         .return_of_capital()
         .build()
         .unwrap();
@@ -209,7 +209,7 @@ fn test_american_vs_european_style() {
     ];
 
     // European style - aggregate at fund level
-    let euro_spec = WaterfallSpec::builder()
+    let euro_spec = PeFundWaterfallSpec::builder()
         .style(WaterfallStyle::European)
         .return_of_capital()
         .promote_tier(0.0, 0.8, 0.2)
@@ -220,7 +220,7 @@ fn test_american_vs_european_style() {
     let euro_ledger = euro_engine.run(&events).unwrap();
 
     // American style - allocate per deal
-    let american_spec = WaterfallSpec::builder()
+    let american_spec = PeFundWaterfallSpec::builder()
         .style(WaterfallStyle::American)
         .return_of_capital()
         .promote_tier(0.0, 0.8, 0.2)
@@ -266,7 +266,7 @@ fn test_american_vs_european_style() {
 #[test]
 fn test_waterfall_spec_validation() {
     // Valid spec should pass
-    let valid_spec = WaterfallSpec::builder()
+    let valid_spec = PeFundWaterfallSpec::builder()
         .return_of_capital()
         .preferred_irr(0.08)
         .promote_tier(0.0, 0.8, 0.2)
@@ -274,9 +274,9 @@ fn test_waterfall_spec_validation() {
     assert!(valid_spec.is_ok());
 
     // Invalid promote shares (don't sum to 1.0)
-    let invalid_spec = WaterfallSpec {
+    let invalid_spec = PeFundWaterfallSpec {
         style: WaterfallStyle::European,
-        tranches: smallvec::smallvec![Tranche::PromoteTier {
+        tranches: smallvec::smallvec![PeFundWaterfallTranche::PromoteTier {
             hurdle_irr: 0.0,
             lp_share: 0.7,
             gp_share: 0.4, // 0.7 + 0.4 = 1.1 > 1.0
@@ -288,9 +288,9 @@ fn test_waterfall_spec_validation() {
     assert!(invalid_spec.validate().is_err());
 
     // Negative shares should fail
-    let negative_spec = WaterfallSpec {
+    let negative_spec = PeFundWaterfallSpec {
         style: WaterfallStyle::European,
-        tranches: smallvec::smallvec![Tranche::PromoteTier {
+        tranches: smallvec::smallvec![PeFundWaterfallTranche::PromoteTier {
             hurdle_irr: 0.0,
             lp_share: -0.2, // Negative share
             gp_share: 1.2,
@@ -408,7 +408,7 @@ fn property_gp_carry_monotonic() {
 /// Test complex waterfall with multiple tiers.
 #[test]
 fn test_multi_tier_waterfall() {
-    let spec = WaterfallSpec::builder()
+    let spec = PeFundWaterfallSpec::builder()
         .style(WaterfallStyle::European)
         .return_of_capital()
         .preferred_irr(0.08) // 8% hurdle
@@ -448,7 +448,7 @@ fn test_multi_tier_waterfall() {
 /// Golden test: serialize and deserialize waterfall spec.
 #[test]
 fn test_waterfall_spec_serde_stability() {
-    let spec = WaterfallSpec::builder()
+    let spec = PeFundWaterfallSpec::builder()
         .style(WaterfallStyle::European)
         .return_of_capital()
         .preferred_irr(0.08)
@@ -465,7 +465,7 @@ fn test_waterfall_spec_serde_stability() {
     let json = serde_json::to_string(&spec).unwrap();
 
     // Deserialize back
-    let deserialized: WaterfallSpec = serde_json::from_str(&json).unwrap();
+    let deserialized: PeFundWaterfallSpec = serde_json::from_str(&json).unwrap();
 
     // Should be identical
     assert_eq!(spec, deserialized);

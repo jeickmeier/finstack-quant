@@ -32,9 +32,9 @@ fn caplet_delta(is_cap: bool, c: CapletInputs) -> f64 {
     use finstack_quant_models::volatility::VolatilityConvention;
     let coupon_delta = match c.convention {
         VolatilityConvention::Normal => {
-            normal::delta(is_cap, c.strike, c.forward, c.sigma, c.fixing_t)
+            normal::delta(is_cap, c.strike, c.forward, c.sigma, c.time_to_fixing)
         }
-        _ => black::delta(is_cap, c.strike, c.forward, c.sigma, c.fixing_t),
+        _ => black::delta(is_cap, c.strike, c.forward, c.sigma, c.time_to_fixing),
     };
     coupon_delta * c.forward_sensitivity
 }

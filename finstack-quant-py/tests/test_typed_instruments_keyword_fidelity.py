@@ -9,7 +9,7 @@ ONLY keyword arguments, so a name mismatch shows up as a ``TypeError``
 ("unexpected keyword argument") instead of silently passing.
 
 ``InterestRateSwap``/``FixedLegSpec``/``FloatLegSpec`` (rates) and
-``CreditDefaultSwap``/``CDSIndex`` (credit) already have dedicated
+``CreditDefaultSwap``/``CdsIndex`` (credit) already have dedicated
 all-keyword tests in their own family modules
 (``test_typed_rates_instruments.py``, ``test_typed_credit_instruments.py``);
 this module covers the remaining families plus the structured-credit spec
@@ -29,7 +29,7 @@ from finstack_quant.core.money import Money
 from finstack_quant.valuations.instruments import (
     AssetPool,
     CapFloor,
-    CDSTranche,
+    CdsTranche,
     ConvertibleBond,
     EquityOption,
     FixedLegSpec,
@@ -211,7 +211,7 @@ def test_equity_option_builder_setters_accept_keyword_value() -> None:
 
 def test_cds_tranche_builder_setters_accept_keyword_value() -> None:
     tranche = (
-        CDSTranche
+        CdsTranche
         .builder()
         .id(value="CDXTR-KW")
         .index_name(value="CDX.NA.IG")

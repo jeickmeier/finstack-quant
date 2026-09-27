@@ -29,8 +29,8 @@ both route through `market_anchored`; and by both host bindings — see
 | File | Contents |
 |------|----------|
 | [`mod.rs`](mod.rs) | Re-exports |
-| [`merton/mod.rs`](merton/mod.rs) | Re-exports `MertonModel`, `AssetDynamics`, `BarrierType`, `SimulatedPaths` |
-| [`merton/dynamics.rs`](merton/dynamics.rs) | `AssetDynamics`, `BarrierType` |
+| [`merton/mod.rs`](merton/mod.rs) | Re-exports `MertonModel`, `AssetDynamics`, `MertonBarrierType`, `SimulatedPaths` |
+| [`merton/dynamics.rs`](merton/dynamics.rs) | `AssetDynamics`, `MertonBarrierType` |
 | [`merton/model.rs`](merton/model.rs) | `MertonModel`, `RawMertonModel`, constructors, accessors |
 | [`merton/default_probability.rs`](merton/default_probability.rs) | Distance-to-default, PD, KMV default point |
 | [`merton/spreads.rs`](merton/spreads.rs) | `implied_spread`, `debt_spread`, `cds_par_spread` |
@@ -42,7 +42,7 @@ both route through `market_anchored`; and by both host bindings — see
 | [`toggle_exercise.rs`](toggle_exercise.rs) | `ToggleExerciseModel`, `CreditState`, `ThresholdToggle`, `StochasticToggle`, `OptimalToggle` |
 | [`market_anchored.rs`](market_anchored.rs) | `CreditVolatilityConversion` and the fractional-to-absolute credit-vol mappings |
 
-Re-exported at the `credit` root: `AssetDynamics`, `BarrierType`,
+Re-exported at the `credit` root: `AssetDynamics`, `MertonBarrierType`,
 `MertonModel`, `SimulatedPaths`, `DynamicRecoverySpec`, `EndogenousHazardSpec`,
 `CreditVolatilityConversion`, `CreditState`, `CreditStateVariable`,
 `OptimalToggle`, `ThresholdDirection`, `ToggleExerciseModel`. `ThresholdToggle`
@@ -109,11 +109,10 @@ and `mean_recovery` within `[0, 1]`.
 
 ### Barrier
 
-`BarrierType::Terminal` (classic Merton, assessed at maturity only) or
-`BarrierType::FirstPassage { barrier_growth_rate }` (Black-Cox, continuous
-monitoring with an exponentially growing barrier). This is **not** the
-barrier-option `finstack_quant_core::types::BarrierType`; the schema name is
-`MertonBarrierType` to keep them apart on the wire.
+`MertonBarrierType::Terminal` (classic Merton, assessed at maturity only) or
+`MertonBarrierType::FirstPassage { barrier_growth_rate }` (Black-Cox, continuous
+monitoring with an exponentially growing barrier). It is distinct from the
+barrier-option `finstack_quant_core::types::BarrierType`.
 
 The barrier and the dynamics must agree, and mismatches are rejected at
 construction:
@@ -128,7 +127,7 @@ construction:
 | Constructor | Arguments |
 |-------------|-----------|
 | `new` | `(asset_value, asset_vol, debt_barrier, risk_free_rate)` |
-| `new_with_dynamics` | adds `(payout_rate, BarrierType, AssetDynamics)` |
+| `new_with_dynamics` | adds `(payout_rate, MertonBarrierType, AssetDynamics)` |
 | `from_equity` | `(equity_value, equity_vol, total_debt, risk_free_rate, payout_rate, maturity)` — KMV fixed-point |
 | `from_cds_spread` | `(cds_spread_bp, recovery, total_debt, risk_free_rate, maturity, asset_value, payout_rate)` — scan-then-Brent solve on σ |
 | `from_target_pd` | `(asset_value, asset_vol, risk_free_rate, payout_rate, target_pd, maturity)` — Brent solve on the barrier |
@@ -340,7 +339,7 @@ schedule on the config takes precedence.
 ```rust
 use finstack_quant_models::credit::{
     toggle_exercise::{CreditStateVariable, ThresholdDirection},
-    AssetDynamics, BarrierType, CreditVolatilityConversion, DynamicRecoverySpec,
+    AssetDynamics, MertonBarrierType, CreditVolatilityConversion, DynamicRecoverySpec,
     EndogenousHazardSpec, MertonModel, ToggleExerciseModel,
 };
 
@@ -373,7 +372,7 @@ let black_cox = MertonModel::new_with_dynamics(
     80.0,
     0.05,
     0.0,
-    BarrierType::FirstPassage { barrier_growth_rate: 0.02 },
+    MertonBarrierType::FirstPassage { barrier_growth_rate: 0.02 },
     AssetDynamics::GeometricBrownian,
 )?;
 // Continuous monitoring can only default at least as often as terminal-only.
@@ -414,7 +413,7 @@ assert!((conv.hazard_volatility - 0.0105).abs() < 1e-12);
 - Rates, hazards, recoveries, and volatilities are decimals; `from_cds_spread`
   is the one exception and takes basis points.
 - Horizons and maturities are year fractions.
-- `MertonModel`, `AssetDynamics`, `BarrierType`, `DynamicRecoverySpec`,
+- `MertonModel`, `AssetDynamics`, `MertonBarrierType`, `DynamicRecoverySpec`,
   `EndogenousHazardSpec`, `CreditState`, and `ToggleExerciseModel` all derive
   `Serialize`/`Deserialize`/`JsonSchema`, so a whole `MertonMcConfig`
   round-trips through the wire format. `CreditVolatilityConversion` is a
@@ -431,7 +430,7 @@ assert!((conv.hazard_volatility - 0.0105).abs() < 1e-12);
 ## Binding exposure
 
 **Python** — `finstack_quant.models.credit` exposes `MertonModel`,
-`AssetDynamics`, `BarrierType`, `SimulatedPaths`, `DynamicRecoverySpec`,
+`AssetDynamics`, `MertonBarrierType`, `SimulatedPaths`, `DynamicRecoverySpec`,
 `EndogenousHazardSpec`, `CreditState`, and `ToggleExerciseModel`.
 `MertonMcConfig` and `MertonMcResult` live one namespace over in
 `finstack_quant.valuations.instruments`; `MertonMcConfig` is a fluent builder
@@ -449,7 +448,7 @@ The wire and export surface is not uniform across the eight classes:
 | `EndogenousHazardSpec` | yes | yes |
 | `CreditState` | yes | yes |
 | `AssetDynamics` | yes | no |
-| `BarrierType` | yes | no |
+| `MertonBarrierType` | yes | no |
 | `ToggleExerciseModel` | yes | no |
 | `SimulatedPaths` | no | no |
 

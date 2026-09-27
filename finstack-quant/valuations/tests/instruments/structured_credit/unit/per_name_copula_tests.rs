@@ -28,8 +28,8 @@ use finstack_quant_models::credit::pool::{
 };
 use finstack_quant_valuations::instruments::fixed_income::loan_terms::RateSpec;
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
-    AssetPool, DealType, PoolAsset, PricingMode, StochasticPricingResult, StructuredCredit,
-    Tranche, TrancheSeniority, TrancheStructure,
+    AssetPool, DealType, PoolAsset, StochasticPricingResult, StructuredCredit,
+    StructuredCreditPricingMode, Tranche, TrancheSeniority, TrancheStructure,
 };
 use time::Month;
 
@@ -139,7 +139,7 @@ fn price(sc: &StructuredCredit, num_paths: usize) -> StochasticPricingResult {
     sc.price_stochastic_with_mode(
         &market(),
         close(),
-        PricingMode::MonteCarlo {
+        StructuredCreditPricingMode::MonteCarlo {
             num_paths,
             antithetic: false,
         },

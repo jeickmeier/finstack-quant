@@ -548,7 +548,7 @@ class TestCalibrationNamespace:
 
         for name in (
             "AssetDynamics",
-            "BarrierType",
+            "MertonBarrierType",
             "CreditState",
             "DynamicRecoverySpec",
             "EndogenousHazardSpec",

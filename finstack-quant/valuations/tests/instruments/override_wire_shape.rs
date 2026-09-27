@@ -1,7 +1,7 @@
 //! Focused pricing-override bags use the three canonical wire keys.
 
 use finstack_quant_valuations::instruments::{
-    Autocallable, Bond, CDSOption, CapFloor, CommoditySwaption, FxForward,
+    Autocallable, Bond, CapFloor, CdsOption, CommoditySwaption, FxForward,
 };
 use serde::de::DeserializeOwned;
 use serde::Serialize;
@@ -113,7 +113,7 @@ fn focused_overrides_use_canonical_wire_shape() {
         "fx_forward",
     );
 
-    let mut option = CDSOption::example().expect("cds option example");
+    let mut option = CdsOption::example().expect("cds option example");
     option
         .instrument_pricing_overrides
         .market_quotes

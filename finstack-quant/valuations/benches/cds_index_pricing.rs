@@ -18,7 +18,7 @@ use finstack_quant_core::market_data::term_structures::{DiscountCurve, HazardCur
 use finstack_quant_core::money::Money;
 use finstack_quant_valuations::instruments::credit_derivatives::cds::PayReceive;
 use finstack_quant_valuations::instruments::credit_derivatives::cds_index::{
-    CDSIndex, CDSIndexConstituent, CDSIndexParams, IndexPricing,
+    CdsIndex, CdsIndexConstituent, CdsIndexParams, IndexPricing,
 };
 use finstack_quant_valuations::instruments::CreditParams;
 use finstack_quant_valuations::instruments::Instrument;
@@ -26,13 +26,13 @@ use finstack_quant_valuations::metrics::MetricId;
 use std::hint::black_box;
 use time::Month;
 
-fn create_cds_index_single_curve(tenor_years: i32) -> CDSIndex {
+fn create_cds_index_single_curve(tenor_years: i32) -> CdsIndex {
     let start = Date::from_calendar_date(2025, Month::January, 1).unwrap();
     let end = Date::from_calendar_date(2025 + tenor_years, Month::January, 1).unwrap();
 
-    let preset = CDSIndexParams::cdx_na_ig(42, 1, 100.0);
+    let preset = CdsIndexParams::cdx_na_ig(42, 1, 100.0);
 
-    CDSIndex::from_preset(
+    CdsIndex::from_preset(
         &preset,
         format!("CDX-{}Y", tenor_years),
         Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
@@ -46,14 +46,14 @@ fn create_cds_index_single_curve(tenor_years: i32) -> CDSIndex {
     .expect("valid benchmark parameters")
 }
 
-fn create_cds_index_constituents(tenor_years: i32, num_names: usize) -> CDSIndex {
+fn create_cds_index_constituents(tenor_years: i32, num_names: usize) -> CdsIndex {
     let mut index = create_cds_index_single_curve(tenor_years);
 
     let weight = 1.0 / (num_names as f64);
     let mut constituents = Vec::with_capacity(num_names);
 
     for i in 0..num_names {
-        constituents.push(CDSIndexConstituent {
+        constituents.push(CdsIndexConstituent {
             credit: CreditParams {
                 reference_entity: format!("ISSUER-{:03}", i + 1),
                 credit_curve_id: format!("HAZARD-{:03}", i + 1).into(),

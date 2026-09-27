@@ -69,14 +69,14 @@ pub(crate) fn register_commodity_pricers(
     registry.register(
         crate::instruments::commodity::commodity_option::pricer::CommodityOptionMcPricer::new(
             crate::instruments::commodity::commodity_option::CommodityMcParams {
-                model: crate::instruments::commodity::commodity_option::CommodityPricingModel::SchwartzSmith {
+                model: crate::instruments::commodity::commodity_option::CommodityPricingModel::SchwartzSmith(finstack_quant_models::monte_carlo::process::schwartz_smith::SchwartzSmithParams {
                     kappa: 1.0,
                     sigma_x: 0.3,
                     sigma_y: 0.15,
                     rho_xy: 0.3,
                     mu_y: 0.0,
                     lambda_x: 0.0,
-                },
+                }),
                 num_paths: 100_000,
                 num_steps: 252,
                 seed: None,

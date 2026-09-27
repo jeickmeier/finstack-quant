@@ -173,9 +173,9 @@ fn timing_curve_defaults_sum_to_the_lifetime_rate_on_a_level_pay_pool() {
 /// instead of silently approximating.
 #[test]
 fn stochastic_pricing_rejects_lifetime_curves_and_severity_vectors() {
-    use finstack_quant_valuations::instruments::fixed_income::structured_credit::PricingMode;
+    use finstack_quant_valuations::instruments::fixed_income::structured_credit::StructuredCreditPricingMode;
 
-    let mode = PricingMode::MonteCarlo {
+    let mode = StructuredCreditPricingMode::MonteCarlo {
         num_paths: 8,
         antithetic: false,
     };

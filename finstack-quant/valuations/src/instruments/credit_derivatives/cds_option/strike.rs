@@ -1,13 +1,13 @@
-//! Typed strike representation for [`CDSOption`](super::CDSOption).
+//! Typed strike representation for [`CdsOption`](super::CdsOption).
 //!
 //! CDS options are struck either on a forward par spread (single-name,
 //! CDX IG, iTraxx) or on a clean index price (CDX HY market convention).
 //! The two conventions carry different units and different payoff algebra,
 //! so the strike is a typed enum rather than a bare decimal:
 //!
-//! - [`CDSOptionStrike::Spread`] is a decimal annual rate: `0.0325` means
+//! - [`CdsOptionStrike::Spread`] is a decimal annual rate: `0.0325` means
 //!   325 bp.
-//! - [`CDSOptionStrike::CleanPricePct`] is quoted in percentage-price
+//! - [`CdsOptionStrike::CleanPricePct`] is quoted in percentage-price
 //!   points: `107.0` means a clean-price fraction `K = 1.07`.
 //!
 //! # Wire format
@@ -28,7 +28,7 @@
 //! # Volatility-surface coordinate
 //!
 //! Surface lookup uses the native displayed coordinate returned by
-//! [`CDSOptionStrike::native_surface_coordinate`]: the decimal spread
+//! [`CdsOptionStrike::native_surface_coordinate`]: the decimal spread
 //! (`0.0325`) for a spread strike and the percentage price (`107.0`) for a
 //! clean-price strike. Stored surface values remain lognormal
 //! forward-spread model volatilities in both cases — a clean-price strike
@@ -45,21 +45,21 @@ use rust_decimal::Decimal;
 /// # Examples
 ///
 /// ```rust
-/// use finstack_quant_valuations::instruments::credit_derivatives::cds_option::CDSOptionStrike;
+/// use finstack_quant_valuations::instruments::credit_derivatives::cds_option::CdsOptionStrike;
 /// use rust_decimal::Decimal;
 ///
-/// let spread = CDSOptionStrike::Spread(Decimal::new(325, 4)); // 0.0325 = 325 bp
+/// let spread = CdsOptionStrike::Spread(Decimal::new(325, 4)); // 0.0325 = 325 bp
 /// assert!(spread.spread_decimal().is_some());
 /// assert_eq!(spread.native_surface_coordinate().unwrap(), 0.0325);
 ///
-/// let price = CDSOptionStrike::CleanPricePct(Decimal::new(1070, 1)); // 107.0
+/// let price = CdsOptionStrike::CleanPricePct(Decimal::new(1070, 1)); // 107.0
 /// assert_eq!(price.native_surface_coordinate().unwrap(), 107.0);
 /// assert!((price.clean_price_fraction().unwrap() - 1.07).abs() < 1e-15);
 /// ```
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(rename_all = "snake_case")]
-pub enum CDSOptionStrike {
+pub enum CdsOptionStrike {
     /// Strike forward spread as a decimal annual rate (`0.0325` = 325 bp).
     Spread(
         #[serde(with = "finstack_quant_core::wire::decimal")]
@@ -81,17 +81,17 @@ pub enum CDSOptionStrike {
     ),
 }
 
-/// Discriminant of a [`CDSOptionStrike`], for branching metric and pricing
+/// Discriminant of a [`CdsOptionStrike`], for branching metric and pricing
 /// paths without repeated pattern matches on the payload.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum CDSOptionStrikeKind {
+pub enum CdsOptionStrikeKind {
     /// Forward-spread strike.
     Spread,
     /// Clean-price strike.
     CleanPricePct,
 }
 
-impl std::fmt::Display for CDSOptionStrikeKind {
+impl std::fmt::Display for CdsOptionStrikeKind {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Spread => write!(f, "spread"),
@@ -100,12 +100,12 @@ impl std::fmt::Display for CDSOptionStrikeKind {
     }
 }
 
-impl CDSOptionStrike {
+impl CdsOptionStrike {
     /// Strike kind discriminant.
-    pub fn kind(&self) -> CDSOptionStrikeKind {
+    pub fn kind(&self) -> CdsOptionStrikeKind {
         match self {
-            Self::Spread(_) => CDSOptionStrikeKind::Spread,
-            Self::CleanPricePct(_) => CDSOptionStrikeKind::CleanPricePct,
+            Self::Spread(_) => CdsOptionStrikeKind::Spread,
+            Self::CleanPricePct(_) => CdsOptionStrikeKind::CleanPricePct,
         }
     }
 
@@ -191,31 +191,31 @@ mod tests {
 
     #[test]
     fn spread_variant_round_trips_canonical_json() {
-        let strike = CDSOptionStrike::Spread(Decimal::new(325, 4));
+        let strike = CdsOptionStrike::Spread(Decimal::new(325, 4));
         let json = serde_json::to_value(strike).expect("serialize");
         assert_eq!(json, serde_json::json!({ "spread": "0.0325" }));
-        let back: CDSOptionStrike = serde_json::from_value(json).expect("deserialize");
+        let back: CdsOptionStrike = serde_json::from_value(json).expect("deserialize");
         assert_eq!(back, strike);
     }
 
     #[test]
     fn clean_price_variant_round_trips_canonical_json() {
-        let strike = CDSOptionStrike::CleanPricePct(Decimal::new(1070, 1));
+        let strike = CdsOptionStrike::CleanPricePct(Decimal::new(1070, 1));
         let json = serde_json::to_value(strike).expect("serialize");
         assert_eq!(json, serde_json::json!({ "clean_price_pct": "107.0" }));
-        let back: CDSOptionStrike = serde_json::from_value(json).expect("deserialize");
+        let back: CdsOptionStrike = serde_json::from_value(json).expect("deserialize");
         assert_eq!(back, strike);
     }
 
     #[test]
     fn old_bare_decimal_strike_is_rejected() {
-        assert!(serde_json::from_value::<CDSOptionStrike>(serde_json::json!("0.0325")).is_err());
-        assert!(serde_json::from_value::<CDSOptionStrike>(serde_json::json!(0.0325)).is_err());
+        assert!(serde_json::from_value::<CdsOptionStrike>(serde_json::json!("0.0325")).is_err());
+        assert!(serde_json::from_value::<CdsOptionStrike>(serde_json::json!(0.0325)).is_err());
     }
 
     #[test]
     fn unknown_variant_is_rejected() {
-        let err = serde_json::from_value::<CDSOptionStrike>(serde_json::json!({
+        let err = serde_json::from_value::<CdsOptionStrike>(serde_json::json!({
             "price": "107.0"
         }))
         .expect_err("unknown variant must fail");
@@ -224,32 +224,32 @@ mod tests {
 
     #[test]
     fn native_surface_coordinates_use_displayed_units() {
-        let spread = CDSOptionStrike::Spread(Decimal::new(325, 4));
+        let spread = CdsOptionStrike::Spread(Decimal::new(325, 4));
         assert!((spread.native_surface_coordinate().unwrap() - 0.0325).abs() < 1e-15);
 
-        let price = CDSOptionStrike::CleanPricePct(Decimal::new(1070, 1));
+        let price = CdsOptionStrike::CleanPricePct(Decimal::new(1070, 1));
         assert!((price.native_surface_coordinate().unwrap() - 107.0).abs() < 1e-12);
     }
 
     #[test]
     fn clean_price_fraction_converts_percent_points_once() {
-        let price = CDSOptionStrike::CleanPricePct(Decimal::new(1070, 1));
+        let price = CdsOptionStrike::CleanPricePct(Decimal::new(1070, 1));
         assert!((price.clean_price_fraction().unwrap() - 1.07).abs() < 1e-15);
 
-        let spread = CDSOptionStrike::Spread(Decimal::new(325, 4));
+        let spread = CdsOptionStrike::Spread(Decimal::new(325, 4));
         assert!(spread.clean_price_fraction().is_err());
         assert!(price.spread_f64().is_err());
     }
 
     #[test]
     fn kind_and_accessors_are_consistent() {
-        let spread = CDSOptionStrike::Spread(Decimal::new(1, 2));
-        assert_eq!(spread.kind(), CDSOptionStrikeKind::Spread);
+        let spread = CdsOptionStrike::Spread(Decimal::new(1, 2));
+        assert_eq!(spread.kind(), CdsOptionStrikeKind::Spread);
         assert_eq!(spread.spread_decimal(), Some(Decimal::new(1, 2)));
         assert_eq!(spread.clean_price_pct_decimal(), None);
 
-        let price = CDSOptionStrike::CleanPricePct(Decimal::new(1070, 1));
-        assert_eq!(price.kind(), CDSOptionStrikeKind::CleanPricePct);
+        let price = CdsOptionStrike::CleanPricePct(Decimal::new(1070, 1));
+        assert_eq!(price.kind(), CdsOptionStrikeKind::CleanPricePct);
         assert_eq!(price.spread_decimal(), None);
         assert_eq!(price.clean_price_pct_decimal(), Some(Decimal::new(1070, 1)));
     }

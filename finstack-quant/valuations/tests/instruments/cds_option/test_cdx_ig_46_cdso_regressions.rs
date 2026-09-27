@@ -8,7 +8,7 @@ use finstack_quant_calibration::api::schema::CalibrationEnvelope;
 use finstack_quant_calibration::recalibration::bump_hazard_spreads;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_valuations::instruments::credit_derivatives::cds::CdsValuationConvention;
-use finstack_quant_valuations::instruments::credit_derivatives::cds_option::CDSOption;
+use finstack_quant_valuations::instruments::credit_derivatives::cds_option::CdsOption;
 use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::market::conventions::ids::CdsDocClause;
 use finstack_quant_valuations::recalibration::QuoteBump;
@@ -37,7 +37,7 @@ fn bootstrap_market(fixture: &Value) -> MarketContext {
     MarketContext::try_from(result.result.final_market).expect("rehydrate market")
 }
 
-fn load_option(fixture: &Value) -> CDSOption {
+fn load_option(fixture: &Value) -> CdsOption {
     serde_json::from_value(fixture["instrument"]["instrument"]["spec"].clone())
         .expect("parse cds option spec")
 }

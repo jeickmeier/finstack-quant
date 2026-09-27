@@ -11,7 +11,7 @@
 use super::common::*;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
-use finstack_quant_valuations::instruments::credit_derivatives::cds_option::CDSOption;
+use finstack_quant_valuations::instruments::credit_derivatives::cds_option::CdsOption;
 use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::instruments::OptionType;
 use finstack_quant_valuations::metrics::MetricId;
@@ -24,8 +24,8 @@ const STRIKE_FACTOR: f64 = 1.0;
 const CURRENT_FACTOR: f64 = 0.99;
 const REALIZED_LOSS: f64 = 0.004;
 
-fn hy_option(option_type: OptionType, strike_price_pct: f64, as_of: Date) -> CDSOption {
-    let mut builder = CDSOptionBuilder::new()
+fn hy_option(option_type: OptionType, strike_price_pct: f64, as_of: Date) -> CdsOption {
+    let mut builder = CdsOptionBuilder::new()
         .id("CDX-HY-PRICE-STRIKE")
         .clean_price_strike(strike_price_pct)
         .with_index(CURRENT_FACTOR)
@@ -40,7 +40,7 @@ fn hy_option(option_type: OptionType, strike_price_pct: f64, as_of: Date) -> CDS
     builder.build(as_of)
 }
 
-fn price_delta(option: &CDSOption, market: &MarketContext, as_of: Date) -> f64 {
+fn price_delta(option: &CdsOption, market: &MarketContext, as_of: Date) -> f64 {
     option
         .price_with_metrics(
             market,

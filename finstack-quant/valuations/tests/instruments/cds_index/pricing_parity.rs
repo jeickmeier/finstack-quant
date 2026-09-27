@@ -28,7 +28,7 @@ use finstack_quant_valuations::metrics::MetricId;
 use time::macros::date;
 
 fn metric_value(
-    index: &finstack_quant_valuations::instruments::credit_derivatives::cds_index::CDSIndex,
+    index: &finstack_quant_valuations::instruments::credit_derivatives::cds_index::CdsIndex,
     market: &finstack_quant_core::market_data::context::MarketContext,
     as_of: finstack_quant_core::dates::Date,
     metric: MetricId,

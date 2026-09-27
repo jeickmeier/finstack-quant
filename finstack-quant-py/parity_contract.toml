@@ -1126,17 +1126,17 @@ public = [
     "Bond",
     "BondBuilder",
     "BorrowingBaseRules",
-    "CDSIndex",
-    "CDSIndexBuilder",
-    "CDSIndexConstituent",
-    "CDSIndexParams",
-    "CDSTranche",
-    "CDSTrancheBuilder",
-    "CDSTrancheParams",
     "CallAssumption",
     "CallPutSchedule",
     "CapFloor",
     "CapFloorBuilder",
+    "CdsIndex",
+    "CdsIndexBuilder",
+    "CdsIndexConstituent",
+    "CdsIndexParams",
+    "CdsTranche",
+    "CdsTrancheBuilder",
+    "CdsTrancheParams",
     "ConcentrationLimit",
     "ConversionSpec",
     "ConvertibleBond",
@@ -1209,14 +1209,14 @@ public = [
     "validate_instrument_json",
     "validate_typed_instrument_json",
 ]
-note = "Typed rates/fixed-income instruments (Bond, TermLoan, InterestRateSwap, Swaption, CapFloor) carry one getter per public Rust field, the Instrument trait surface (default_model, expiry, attributes, market_dependencies()), to_dict(), and price()/metric() twins of price_instrument/pricer::metric_value. InterestRateSwap.from_conventions binds Rust ConventionSwapParams; Bond.fixed(..., convention=) binds the BondConvention presets. Leg specs (FixedLegSpec/FloatLegSpec/PremiumLegSpec/ProtectionLegSpec) carry to_json/from_json/to_dict/pickle and field getters. PremiumLegSpec requires roll_rule explicitly in its Python constructor and JSON: RollRule.CDS_IMM (cds_imm) selects prescribed quarterly CDS dates, RollRule.NONE (none) honors bespoke frequency/stub terms, and RollRule.IMM is rejected at pricing. BondBuilder/TermLoanBuilder bind the Rust FinancialBuilder derives. WASM stays JSON-first for all of these (no new WASM bindings). Typed credit/equity/FX wrappers (CreditDefaultSwap, CDSIndex, CDSTranche, ConvertibleBond, EquityOption, FxForward, FxOption) expose every public Rust field as a getter (Money -> Money, dates -> datetime.date, enums -> serde string, legs -> typed leg specs, margin_spec/coupon specs -> dict), the Instrument-trait surface (market_dependencies(), default_model, expiry, attributes), to_dict(), price(...)/metric(...) sharing the price_instrument pipeline, and the Rust accessors CreditDefaultSwap.par_spread/doc_clause_effective/protection_start, CDSIndex.par_spread/risky_pv01/cs01, CDSTranche.expected_loss/jump_to_default, ConvertibleBond.conversion_ratio/effective_conversion_ratio/parity/conversion_premium/greeks, EquityOption.greeks/delta/gamma/vega/theta/rho/implied_vol, FxOption.implied_vol, FxForward.market_forward_rate. Convenience constructors mirror Rust one-for-one: CreditDefaultSwap.example, CDSIndex.example/from_preset(CDSIndexParams, ...), CDSIndexParams.cdx_na_ig/cdx_na_hy/itraxx_europe, CDSTranche.example/standard(CDSTrancheParams, ...), CDSTrancheParams.equity_tranche/mezzanine_tranche, ConvertibleBond.example/example_mandatory, EquityOption.example/european_call (market-data ids default to the Rust european_call ids), FxOption.example/european, FxForward.example/from_trade_date/with_forward_points/with_forward_pips/standard_settlement_days. Builders carry one setter per Rust FinancialBuilder setter except the three *_pricing_overrides fields (Rust-only; use metric_pricing_overrides on price): CreditDefaultSwapBuilder.upfront/valuation_convention/margin_spec/attributes, CDSIndexBuilder.constituents (list[CDSIndexConstituent|dict] | str; the former constituents_json setter is renamed)/upfront/margin_spec/attributes, CDSTrancheBuilder.business_day_convention/roll_rule/stub/upfront/attributes, ConvertibleBondBuilder.conversion/call_put/soft_call_trigger/cashflow_spec (typed class | dict | str; the former *_json setters are renamed)/attributes, EquityOptionBuilder.quantity/currency/day_count/attributes, FxForwardBuilder.attributes, FxOptionBuilder.day_count/attributes. Python build() runs only the Rust build() validation. Rust-only by design: CreditDefaultSwap::new_isda (pub(crate); no CreditDefaultSwap.standard), CDSIndex::with_constituents/with_constituents_equal_weight/with_index_factor (builder setters cover them), the *_detailed index results (IndexResult/ConstituentResult/IndexParSpreadResult), CDSTranche::correlation_delta/jump_to_default_detail/expected_loss_curve, EquityOption::new/european_call_with_market_data (folded into european_call keywords), EquityOptionParams/EquityOptionMarketData/EquityUnderlyingParams/FxUnderlyingParams parameter bundles, FxOption::atm_dns_strike_for_convention, FxDeltaConvention as a type (spelled as the (kind, premium_currency, venue) triple / dict), PriceTrigger/CashflowSpec/DilutionEvent/CallPut as types (dict/JSON shapes), ConvertibleTreeType (greeks uses the binomial tree; its step count is model_config.tree_steps), and EquityOptionGreeks/ConvertibleGreeks as types (returned as dicts). The MetricMetadata Rust DTO is represented as serialized records rather than a new Python runtime class. validate_instrument_json(json, metric_pricing_overrides=None) applies the canonical metric-pricing override merge before validation in both hosts."
+note = "Typed rates/fixed-income instruments (Bond, TermLoan, InterestRateSwap, Swaption, CapFloor) carry one getter per public Rust field, the Instrument trait surface (default_model, expiry, attributes, market_dependencies()), to_dict(), and price()/metric() twins of price_instrument/pricer::metric_value. InterestRateSwap.from_conventions binds Rust ConventionSwapParams; Bond.fixed(..., convention=) binds the BondConvention presets. Leg specs (FixedLegSpec/FloatLegSpec/PremiumLegSpec/ProtectionLegSpec) carry to_json/from_json/to_dict/pickle and field getters. PremiumLegSpec requires roll_rule explicitly in its Python constructor and JSON: RollRule.CDS_IMM (cds_imm) selects prescribed quarterly CDS dates, RollRule.NONE (none) honors bespoke frequency/stub terms, and RollRule.IMM is rejected at pricing. BondBuilder/TermLoanBuilder bind the Rust FinancialBuilder derives. WASM stays JSON-first for all of these (no new WASM bindings). Typed credit/equity/FX wrappers (CreditDefaultSwap, CdsIndex, CdsTranche, ConvertibleBond, EquityOption, FxForward, FxOption) expose every public Rust field as a getter (Money -> Money, dates -> datetime.date, enums -> serde string, legs -> typed leg specs, margin_spec/coupon specs -> dict), the Instrument-trait surface (market_dependencies(), default_model, expiry, attributes), to_dict(), price(...)/metric(...) sharing the price_instrument pipeline, and the Rust accessors CreditDefaultSwap.par_spread/doc_clause_effective/protection_start, CdsIndex.par_spread/risky_pv01/cs01, CdsTranche.expected_loss/jump_to_default, ConvertibleBond.conversion_ratio/effective_conversion_ratio/parity/conversion_premium/greeks, EquityOption.greeks/delta/gamma/vega/theta/rho/implied_vol, FxOption.implied_vol, FxForward.market_forward_rate. Convenience constructors mirror Rust one-for-one: CreditDefaultSwap.example, CdsIndex.example/from_preset(CdsIndexParams, ...), CdsIndexParams.cdx_na_ig/cdx_na_hy/itraxx_europe, CdsTranche.example/standard(CdsTrancheParams, ...), CdsTrancheParams.equity_tranche/mezzanine_tranche, ConvertibleBond.example/example_mandatory, EquityOption.example/european_call (market-data ids default to the Rust european_call ids), FxOption.example/european, FxForward.example/from_trade_date/with_forward_points/with_forward_pips/standard_settlement_days. Builders carry one setter per Rust FinancialBuilder setter except the three *_pricing_overrides fields (Rust-only; use metric_pricing_overrides on price): CreditDefaultSwapBuilder.upfront/valuation_convention/margin_spec/attributes, CdsIndexBuilder.constituents (list[CdsIndexConstituent|dict] | str; the former constituents_json setter is renamed)/upfront/margin_spec/attributes, CdsTrancheBuilder.business_day_convention/roll_rule/stub/upfront/attributes, ConvertibleBondBuilder.conversion/call_put/soft_call_trigger/cashflow_spec (typed class | dict | str; the former *_json setters are renamed)/attributes, EquityOptionBuilder.quantity/currency/day_count/attributes, FxForwardBuilder.attributes, FxOptionBuilder.day_count/attributes. Python build() runs only the Rust build() validation. Rust-only by design: CreditDefaultSwap::new_isda (pub(crate); no CreditDefaultSwap.standard), CdsIndex::with_constituents/with_constituents_equal_weight/with_index_factor (builder setters cover them), the *_detailed index results (IndexResult/ConstituentResult/IndexParSpreadResult), CdsTranche::correlation_delta/jump_to_default_detail/expected_loss_curve, EquityOption::new/european_call_with_market_data (folded into european_call keywords), EquityOptionParams/EquityOptionMarketData/EquityUnderlyingParams/FxUnderlyingParams parameter bundles, FxOption::atm_dns_strike_for_convention, FxDeltaConvention as a type (spelled as the (kind, premium_currency, venue) triple / dict), PriceTrigger/CashflowSpec/DilutionEvent/CallPut as types (dict/JSON shapes), ConvertibleTreeType (greeks uses the binomial tree; its step count is model_config.tree_steps), and EquityOptionGreeks/ConvertibleGreeks as types (returned as dicts). The MetricMetadata Rust DTO is represented as serialized records rather than a new Python runtime class. validate_instrument_json(json, metric_pricing_overrides=None) applies the canonical metric-pricing override merge before validation in both hosts."
 
 # ---------------------------------------------------------------------------
 # [wasm_valuations_subset.nested_python_only] instruments = [ ... ]
 # ADD (keep sorted):
-#     "CDSIndexConstituent",
-#     "CDSIndexParams",
-#     "CDSTrancheParams",
+#     "CdsIndexConstituent",
+#     "CdsIndexParams",
+#     "CdsTrancheParams",
 #     "CallPutSchedule",
 #     "ConversionSpec"
 
@@ -1250,10 +1250,10 @@ note = "Typed rates/fixed-income instruments (Bond, TermLoan, InterestRateSwap, 
 python_package = "finstack_quant.models.credit"
 public = [
     "AssetDynamics",
-    "BarrierType",
     "CreditState",
     "DynamicRecoverySpec",
     "EndogenousHazardSpec",
+    "MertonBarrierType",
     "MertonModel",
     "RatingFactorTable",
     "SimulatedPaths",
@@ -3284,7 +3284,7 @@ instruments = [
 #
 # Known asymmetry (do not add WASM typed IRS/CDS/equity wrappers): Python
 # has full typed instrument families — rates (InterestRateSwap/Swaption/
-# CapFloor), credit (CreditDefaultSwap/CDSIndex/CDSTranche), equity
+# CapFloor), credit (CreditDefaultSwap/CdsIndex/CdsTranche), equity
 # (EquityOption/ConvertibleBond), legs (FixedLegSpec/FloatLegSpec/
 # PremiumLegSpec/ProtectionLegSpec), and structured credit (StructuredCredit
 # + component types: PoolAsset, RepLine, AssetPool, Tranche, TrancheStructure,
@@ -3332,17 +3332,17 @@ instruments = [
     "BarrierCrossing",
     "BondBuilder",
     "BorrowingBaseRules",
-    "CDSIndex",
-    "CDSIndexBuilder",
-    "CDSIndexConstituent",
-    "CDSIndexParams",
-    "CDSTranche",
-    "CDSTrancheBuilder",
-    "CDSTrancheParams",
     "CallAssumption",
     "CallPutSchedule",
     "CapFloor",
     "CapFloorBuilder",
+    "CdsIndex",
+    "CdsIndexBuilder",
+    "CdsIndexConstituent",
+    "CdsIndexParams",
+    "CdsTranche",
+    "CdsTrancheBuilder",
+    "CdsTrancheParams",
     "ConcentrationLimit",
     "ConversionSpec",
     "ConvertibleBond",

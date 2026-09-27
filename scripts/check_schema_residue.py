@@ -74,14 +74,6 @@ ENUM_NAMING_EXCEPTIONS = {
         "CalibrationSchema",
     ): "exact namespaced schema marker",
     (
-        "finstack-quant/valuations/src/instruments/fixed_income/mbs_passthrough/types.rs",
-        "AgencyProgram",
-    ): "external agency program codes",
-    (
-        "finstack-quant/valuations/src/instruments/fx/ndf/types.rs",
-        "NdfFixingSource",
-    ): "external fixing-source codes",
-    (
         "finstack-quant/valuations/src/instruments/json_loader.rs",
         "InstrumentSchema",
     ): "exact namespaced schema marker",

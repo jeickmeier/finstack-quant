@@ -8,7 +8,7 @@ import pytest
 
 from finstack_quant.models.credit import (
     AssetDynamics,
-    BarrierType,
+    MertonBarrierType,
     MertonModel,
 )
 
@@ -81,10 +81,10 @@ def test_new_with_dynamics_first_passage() -> None:
         80.0,
         0.05,
         0.0,
-        BarrierType.first_passage(0.0),
+        MertonBarrierType.first_passage(0.0),
         AssetDynamics.geometric_brownian(),
     )
-    assert isinstance(model.barrier_type, BarrierType)
+    assert isinstance(model.barrier_type, MertonBarrierType)
     assert isinstance(model.dynamics, AssetDynamics)
     terminal = MertonModel(100.0, 0.25, 80.0, 0.05)
     assert model.default_probability(1.0) >= terminal.default_probability(1.0)

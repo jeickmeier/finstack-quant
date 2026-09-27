@@ -121,7 +121,7 @@ impl MetricCalculator for ImpliedVolCalculator {
             strike,
             forward: forward_rate,
             discount_factor,
-            volatility: 0.0, // Will be varied in solver
+            sigma: 0.0, // Will be varied in solver
             time_to_fixing,
             accrual_year_fraction: accrual_fraction,
             currency: option.notional.currency(),

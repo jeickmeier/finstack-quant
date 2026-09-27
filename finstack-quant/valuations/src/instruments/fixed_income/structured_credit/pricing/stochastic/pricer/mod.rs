@@ -60,7 +60,7 @@ mod config;
 mod engine;
 mod result;
 
-pub use config::PricingMode;
 pub(crate) use config::StochasticPricerConfig;
+pub use config::StructuredCreditPricingMode;
 pub(crate) use engine::StochasticPricer;
 pub use result::{StochasticPricingResult, TranchePricingResult};

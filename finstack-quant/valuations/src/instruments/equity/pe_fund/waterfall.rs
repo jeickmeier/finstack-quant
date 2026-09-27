@@ -50,9 +50,7 @@ pub enum CatchUpMode {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(rename_all = "snake_case", deny_unknown_fields)]
-// Distinct from the structured-credit capital-structure `Tranche`.
-#[cfg_attr(feature = "json-schema", schemars(rename = "PeFundWaterfallTranche"))]
-pub enum Tranche {
+pub enum PeFundWaterfallTranche {
     /// Return LP capital contributions before any profit sharing
     ReturnOfCapital,
     /// Preferred return to LPs at specified IRR
@@ -76,7 +74,7 @@ pub enum Tranche {
     /// is paid at 100% until the LP-net IRR reaches this tier's `hurdle_irr`;
     /// only cash above the hurdle is split `lp_share`/`gp_share` (cascading
     /// to the next tier once the next tier's hurdle is reached). If a
-    /// [`Tranche::CatchUp`] precedes a promote tier whose `hurdle_irr` sits above
+    /// [`PeFundWaterfallTranche::CatchUp`] precedes a promote tier whose `hurdle_irr` sits above
     /// the preferred return, the LP-100% infill between the catch-up and the
     /// hurdle dilutes the GP's realized share back below the catch-up
     /// target. LPAs where all post-catch-up dollars split continuously at
@@ -123,14 +121,15 @@ pub struct ClawbackSpec {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
-// Distinct from the statements capital-structure `WaterfallSpec`.
-#[cfg_attr(feature = "json-schema", schemars(rename = "PeFundWaterfallSpec"))]
-pub struct WaterfallSpec {
+pub struct PeFundWaterfallSpec {
     /// Allocation style (European vs American)
     pub style: WaterfallStyle,
     /// Ordered sequence of waterfall tranches
-    #[cfg_attr(feature = "json-schema", schemars(with = "Vec<Tranche>"))]
-    pub tranches: SmallVec<[Tranche; 8]>,
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "Vec<PeFundWaterfallTranche>")
+    )]
+    pub tranches: SmallVec<[PeFundWaterfallTranche; 8]>,
     /// Clawback specification; `None` means no clawback (presence is the switch)
     #[serde(default)]
     pub clawback: Option<ClawbackSpec>,
@@ -147,7 +146,7 @@ fn default_day_count() -> DayCount {
     DayCount::Act365F
 }
 
-impl WaterfallSpec {
+impl PeFundWaterfallSpec {
     /// Create a new waterfall specification builder.
     #[must_use]
     pub fn builder() -> WaterfallSpecBuilder {
@@ -171,22 +170,22 @@ impl WaterfallSpec {
 
         for tranche in &self.tranches {
             match tranche {
-                Tranche::ReturnOfCapital => {}
-                Tranche::PreferredIrr { hurdle_irr: irr } => {
+                PeFundWaterfallTranche::ReturnOfCapital => {}
+                PeFundWaterfallTranche::PreferredIrr { hurdle_irr: irr } => {
                     if !irr.is_finite() {
                         return Err(finstack_quant_core::Error::Validation(format!(
                             "tranches[].preferred_irr.hurdle_irr must be finite, got {irr}"
                         )));
                     }
                 }
-                Tranche::CatchUp { gp_share } => {
+                PeFundWaterfallTranche::CatchUp { gp_share } => {
                     if !gp_share.is_finite() || !(0.0..=1.0).contains(gp_share) {
                         return Err(finstack_quant_core::Error::Validation(format!(
                             "catch-up GP share must be in [0, 1], got {gp_share}"
                         )));
                     }
                 }
-                Tranche::PromoteTier {
+                PeFundWaterfallTranche::PromoteTier {
                     hurdle_irr: rate,
                     lp_share,
                     gp_share,
@@ -228,7 +227,7 @@ impl WaterfallSpec {
 /// Builder for waterfall specifications.
 pub struct WaterfallSpecBuilder {
     style: WaterfallStyle,
-    tranches: SmallVec<[Tranche; 8]>,
+    tranches: SmallVec<[PeFundWaterfallTranche; 8]>,
     clawback: Option<ClawbackSpec>,
     day_count: DayCount,
     catch_up_mode: CatchUpMode,
@@ -282,7 +281,7 @@ impl WaterfallSpecBuilder {
 
     /// return of capital.
     pub fn return_of_capital(mut self) -> Self {
-        self.tranches.push(Tranche::ReturnOfCapital);
+        self.tranches.push(PeFundWaterfallTranche::ReturnOfCapital);
         self
     }
 
@@ -295,7 +294,7 @@ impl WaterfallSpecBuilder {
     ///   `build()` rejects non-finite rates.
     pub fn preferred_irr(mut self, irr: f64) -> Self {
         self.tranches
-            .push(Tranche::PreferredIrr { hurdle_irr: irr });
+            .push(PeFundWaterfallTranche::PreferredIrr { hurdle_irr: irr });
         self
     }
 
@@ -304,16 +303,17 @@ impl WaterfallSpecBuilder {
     /// # Arguments
     ///
     /// * `gp_share` - GP share of each catch-up dollar as a decimal in
-    ///   `[0, 1]` (see [`Tranche::CatchUp`] for mode-dependent semantics);
+    ///   `[0, 1]` (see [`PeFundWaterfallTranche::CatchUp`] for mode-dependent semantics);
     ///   `build()` rejects values outside that range.
     pub fn catch_up(mut self, gp_share: f64) -> Self {
-        self.tranches.push(Tranche::CatchUp { gp_share });
+        self.tranches
+            .push(PeFundWaterfallTranche::CatchUp { gp_share });
         self
     }
 
     /// Append a promote tier with an IRR hurdle and LP/GP split.
     ///
-    /// See [`Tranche::PromoteTier`] for the hard-hurdle gating semantics:
+    /// See [`PeFundWaterfallTranche::PromoteTier`] for the hard-hurdle gating semantics:
     /// the LP is paid at 100% until `hurdle_irr` is reached, then cash
     /// splits `lp_share`/`gp_share`.
     ///
@@ -326,7 +326,7 @@ impl WaterfallSpecBuilder {
     /// * `gp_share` - GP share of each split dollar, in `[0, 1]`; must sum
     ///   to 1 with `lp_share`.
     pub fn promote_tier(mut self, hurdle_irr: f64, lp_share: f64, gp_share: f64) -> Self {
-        self.tranches.push(Tranche::PromoteTier {
+        self.tranches.push(PeFundWaterfallTranche::PromoteTier {
             hurdle_irr,
             lp_share,
             gp_share,
@@ -341,8 +341,8 @@ impl WaterfallSpecBuilder {
     }
 
     /// build.
-    pub fn build(self) -> finstack_quant_core::Result<WaterfallSpec> {
-        let spec = WaterfallSpec {
+    pub fn build(self) -> finstack_quant_core::Result<PeFundWaterfallSpec> {
+        let spec = PeFundWaterfallSpec {
             style: self.style,
             tranches: self.tranches,
             clawback: self.clawback,
@@ -451,7 +451,7 @@ pub struct AllocationRow {
     pub period_key: Option<Arc<str>>,
     /// Deal ID for American-style waterfalls
     pub deal_id: Option<Arc<str>>,
-    /// Tranche name/description
+    /// PeFundWaterfallTranche name/description
     pub tranche: Arc<str>,
     /// Amount allocated to LP
     pub to_lp: Money,
@@ -583,13 +583,13 @@ struct AllocationParams<'e> {
 
 /// Equity waterfall calculation engine.
 pub struct EquityWaterfallEngine<'a> {
-    spec: &'a WaterfallSpec,
+    spec: &'a PeFundWaterfallSpec,
     periods: Option<Vec<finstack_quant_core::dates::Period>>,
 }
 
 impl<'a> EquityWaterfallEngine<'a> {
     /// Create a new waterfall engine.
-    pub fn new(spec: &'a WaterfallSpec) -> Self {
+    pub fn new(spec: &'a PeFundWaterfallSpec) -> Self {
         Self {
             spec,
             periods: None,
@@ -846,7 +846,7 @@ impl<'a> EquityWaterfallEngine<'a> {
             }
 
             let (to_lp, to_gp_paid, tranche_name, gp_carry_cum_after) = match tranche {
-                Tranche::ReturnOfCapital => {
+                PeFundWaterfallTranche::ReturnOfCapital => {
                     let allocation = remaining_amount.min(lp_unreturned);
                     lp_unreturned -= allocation;
                     remaining_amount -= allocation;
@@ -859,7 +859,7 @@ impl<'a> EquityWaterfallEngine<'a> {
                     )
                 }
 
-                Tranche::PreferredIrr { hurdle_irr: irr } => {
+                PeFundWaterfallTranche::PreferredIrr { hurdle_irr: irr } => {
                     // `calculate_preferred_amount` returns the total LP amount needed at
                     // `allocation_date` to reach `target_irr`, based on the LP-net
                     // ledger history.  Earlier tranches within this same distribution
@@ -882,11 +882,11 @@ impl<'a> EquityWaterfallEngine<'a> {
                     )
                 }
 
-                Tranche::CatchUp { gp_share } => {
+                PeFundWaterfallTranche::CatchUp { gp_share } => {
                     // Determine target cumulative GP share from the next promote tier if available
                     let mut target_gp_share: f64 = *gp_share; // fallback
                     for next in self.spec.tranches.iter().skip(idx + 1) {
-                        if let Tranche::PromoteTier { gp_share, .. } = next {
+                        if let PeFundWaterfallTranche::PromoteTier { gp_share, .. } = next {
                             target_gp_share = *gp_share;
                             break;
                         }
@@ -940,7 +940,7 @@ impl<'a> EquityWaterfallEngine<'a> {
                     (0.0, to_gp_paid, Arc::from("Catch-Up"), gp_carry_cum)
                 }
 
-                Tranche::PromoteTier {
+                PeFundWaterfallTranche::PromoteTier {
                     lp_share,
                     gp_share,
                     hurdle_irr: hurdle_rate,
@@ -972,7 +972,9 @@ impl<'a> EquityWaterfallEngine<'a> {
                             .iter()
                             .skip(idx + 1)
                             .find_map(|t| match t {
-                                Tranche::PromoteTier { hurdle_irr, .. } => Some(*hurdle_irr),
+                                PeFundWaterfallTranche::PromoteTier { hurdle_irr, .. } => {
+                                    Some(*hurdle_irr)
+                                }
                                 _ => None,
                             });
                     let split_amount = match next_hurdle_rate {
@@ -1263,7 +1265,7 @@ impl<'a> EquityWaterfallEngine<'a> {
     /// lifetime test, also for American deal-by-deal funds), and the gross GP
     /// allocations are summed. This respects
     /// [`CatchUpMode::Full`]/[`CatchUpMode::Partial`], the presence or
-    /// absence of a [`Tranche::CatchUp`] tranche, and promote-tier hurdles —
+    /// absence of a [`PeFundWaterfallTranche::CatchUp`] tranche, and promote-tier hurdles —
     /// i.e. it equals "what a from-scratch waterfall would have paid the
     /// GP", rather than `profit_total × first_promote_tier.gp_share` (which
     /// over-releases to the GP under partial or missing catch-up).
@@ -1453,7 +1455,7 @@ mod tests {
 
     #[test]
     fn waterfall_spec_builder() {
-        let spec = WaterfallSpec::builder()
+        let spec = PeFundWaterfallSpec::builder()
             .style(WaterfallStyle::European)
             .return_of_capital()
             .preferred_irr(0.08)
@@ -1488,7 +1490,7 @@ mod tests {
 
     #[test]
     fn simple_waterfall_allocation() {
-        let spec = WaterfallSpec::builder()
+        let spec = PeFundWaterfallSpec::builder()
             .return_of_capital()
             .promote_tier(0.0, 0.8, 0.2) // Simple 80/20 split
             .build()
@@ -1525,7 +1527,7 @@ mod tests {
 
     #[test]
     fn mixed_currency_events_rejected() {
-        let spec = WaterfallSpec::builder()
+        let spec = PeFundWaterfallSpec::builder()
             .return_of_capital()
             .promote_tier(0.0, 0.8, 0.2)
             .build()
@@ -1554,7 +1556,7 @@ mod tests {
 
     #[test]
     fn american_waterfall_processes_deals_chronologically() {
-        let spec = WaterfallSpec::builder()
+        let spec = PeFundWaterfallSpec::builder()
             .style(WaterfallStyle::American)
             .return_of_capital()
             .promote_tier(0.0, 0.8, 0.2)
@@ -1600,7 +1602,7 @@ mod tests {
 
     #[test]
     fn american_waterfall_invariant_to_input_order() {
-        let spec = WaterfallSpec::builder()
+        let spec = PeFundWaterfallSpec::builder()
             .style(WaterfallStyle::American)
             .return_of_capital()
             .promote_tier(0.0, 0.8, 0.2)
@@ -1639,7 +1641,7 @@ mod tests {
 
     #[test]
     fn ledger_to_tabular_conversion() {
-        let spec = WaterfallSpec::builder()
+        let spec = PeFundWaterfallSpec::builder()
             .return_of_capital()
             .build()
             .expect("Operation succeeded");
@@ -1669,16 +1671,16 @@ mod tests {
     #[test]
     fn validate_waterfall_spec() {
         // Valid spec
-        let valid_spec = WaterfallSpec::builder()
+        let valid_spec = PeFundWaterfallSpec::builder()
             .return_of_capital()
             .promote_tier(0.0, 0.8, 0.2)
             .build();
         assert!(valid_spec.is_ok());
 
         // Invalid spec - promote shares don't sum to 1.0
-        let invalid_spec = WaterfallSpec {
+        let invalid_spec = PeFundWaterfallSpec {
             style: WaterfallStyle::European,
-            tranches: smallvec![Tranche::PromoteTier {
+            tranches: smallvec![PeFundWaterfallTranche::PromoteTier {
                 hurdle_irr: 0.0,
                 lp_share: 0.7,
                 gp_share: 0.4, // 0.7 + 0.4 = 1.1 > 1.0
@@ -1702,7 +1704,7 @@ mod tests {
     #[test]
     fn incomplete_spec_with_residual_cash_errors_instead_of_dropping_it() {
         // ROC + 8% pref only — no residual-splitting tier.
-        let spec = WaterfallSpec::builder()
+        let spec = PeFundWaterfallSpec::builder()
             .style(WaterfallStyle::European)
             .return_of_capital()
             .preferred_irr(0.08)
@@ -1734,7 +1736,7 @@ mod tests {
 
         // The same spec WITH a terminal promote tier allocates everything and
         // must keep working.
-        let complete = WaterfallSpec::builder()
+        let complete = PeFundWaterfallSpec::builder()
             .style(WaterfallStyle::European)
             .return_of_capital()
             .preferred_irr(0.08)
@@ -1757,7 +1759,7 @@ mod tests {
 
     #[test]
     fn catchup_precise_reaches_target_split() {
-        let spec = WaterfallSpec::builder()
+        let spec = PeFundWaterfallSpec::builder()
             .style(WaterfallStyle::European)
             .return_of_capital()
             .preferred_irr(0.08)
@@ -1807,7 +1809,7 @@ mod tests {
     /// only the excess is split at lp/gp shares.
     #[test]
     fn promote_tier_hurdle_gates_gp_split() {
-        let spec = WaterfallSpec::builder()
+        let spec = PeFundWaterfallSpec::builder()
             .return_of_capital()
             .promote_tier(0.20, 0.8, 0.2)
             .build()
@@ -1852,7 +1854,7 @@ mod tests {
     /// hurdle IRR, the GP receives nothing from the promote tier.
     #[test]
     fn promote_tier_below_hurdle_pays_lp_only() {
-        let spec = WaterfallSpec::builder()
+        let spec = PeFundWaterfallSpec::builder()
             .return_of_capital()
             .promote_tier(0.20, 0.8, 0.2)
             .build()
@@ -1885,7 +1887,7 @@ mod tests {
     /// applies only between its own hurdle and the next tier's hurdle.
     #[test]
     fn promote_tiers_cascade_at_next_hurdle() {
-        let spec = WaterfallSpec::builder()
+        let spec = PeFundWaterfallSpec::builder()
             .return_of_capital()
             .promote_tier(0.08, 0.8, 0.2)
             .promote_tier(0.20, 0.7, 0.3)
@@ -1953,7 +1955,7 @@ mod tests {
     /// gross fund events that include GP carry.
     #[test]
     fn lp_irr_to_date_uses_ledger_net_flows() {
-        let spec = WaterfallSpec::builder()
+        let spec = PeFundWaterfallSpec::builder()
             .return_of_capital()
             .promote_tier(0.0, 0.8, 0.2)
             .build()
@@ -2003,7 +2005,7 @@ mod tests {
             settle_on: ClawbackSettle::FundEnd,
         };
 
-        let spec = WaterfallSpec::builder()
+        let spec = PeFundWaterfallSpec::builder()
             .style(WaterfallStyle::European)
             .return_of_capital()
             .promote_tier(0.0, 0.8, 0.2)
@@ -2048,7 +2050,7 @@ mod tests {
             settle_on: ClawbackSettle::FundEnd,
         };
 
-        let spec = WaterfallSpec::builder()
+        let spec = PeFundWaterfallSpec::builder()
             .style(WaterfallStyle::European)
             .return_of_capital()
             .preferred_irr(0.08)
@@ -2103,7 +2105,7 @@ mod tests {
             settle_on: ClawbackSettle::FundEnd,
         };
 
-        let spec = WaterfallSpec::builder()
+        let spec = PeFundWaterfallSpec::builder()
             .style(WaterfallStyle::European)
             .return_of_capital()
             .preferred_irr(0.08)
@@ -2158,7 +2160,7 @@ mod tests {
 
     #[test]
     fn period_support_quarterly() {
-        let spec = WaterfallSpec::builder()
+        let spec = PeFundWaterfallSpec::builder()
             .return_of_capital()
             .promote_tier(0.0, 0.8, 0.2)
             .build()
@@ -2196,7 +2198,7 @@ mod tests {
 
     #[test]
     fn period_support_outside_range() {
-        let spec = WaterfallSpec::builder()
+        let spec = PeFundWaterfallSpec::builder()
             .return_of_capital()
             .build()
             .expect("Operation succeeded");
@@ -2231,7 +2233,7 @@ mod tests {
             settle_on: ClawbackSettle::FundEnd,
         };
 
-        let spec = WaterfallSpec::builder()
+        let spec = PeFundWaterfallSpec::builder()
             .return_of_capital()
             .promote_tier(0.0, 0.8, 0.2)
             .clawback(claw)
@@ -2273,7 +2275,7 @@ mod tests {
             settle_on: ClawbackSettle::Periodic,
         };
 
-        let spec = WaterfallSpec::builder()
+        let spec = PeFundWaterfallSpec::builder()
             .style(WaterfallStyle::European)
             .return_of_capital()
             .promote_tier(0.0, 0.8, 0.2)
@@ -2315,7 +2317,7 @@ mod tests {
 
     #[test]
     fn period_support_no_periods_configured() {
-        let spec = WaterfallSpec::builder()
+        let spec = PeFundWaterfallSpec::builder()
             .return_of_capital()
             .build()
             .expect("Operation succeeded");
@@ -2360,7 +2362,7 @@ mod tests {
     /// its share of the remaining profit.
     #[test]
     fn preferred_irr_does_not_double_count_same_date_roc() {
-        let spec = WaterfallSpec::builder()
+        let spec = PeFundWaterfallSpec::builder()
             .style(WaterfallStyle::European)
             .return_of_capital()
             .preferred_irr(0.08)
@@ -2424,7 +2426,7 @@ mod tests {
     fn non_finite_preferred_irr_rejected_at_build() {
         // Bad hurdle inputs must fail loudly at construction, not mid-solve.
         for bad in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
-            let result = WaterfallSpec::builder().preferred_irr(bad).build();
+            let result = PeFundWaterfallSpec::builder().preferred_irr(bad).build();
             assert!(
                 matches!(result, Err(finstack_quant_core::Error::Validation(_))),
                 "non-finite preferred IRR {bad} must be rejected at build"
@@ -2435,7 +2437,7 @@ mod tests {
     #[test]
     fn out_of_range_catchup_share_rejected_at_build() {
         for bad in [-0.1, 1.5, f64::NAN] {
-            let result = WaterfallSpec::builder()
+            let result = PeFundWaterfallSpec::builder()
                 .return_of_capital()
                 .catch_up(bad)
                 .promote_tier(0.0, 0.8, 0.2)
@@ -2450,7 +2452,7 @@ mod tests {
     #[test]
     fn out_of_range_holdback_pct_rejected_at_build() {
         for bad in [-0.1, 1.5, f64::NAN] {
-            let result = WaterfallSpec::builder()
+            let result = PeFundWaterfallSpec::builder()
                 .return_of_capital()
                 .promote_tier(0.0, 0.8, 0.2)
                 .clawback(ClawbackSpec {
@@ -2467,7 +2469,7 @@ mod tests {
 
     #[test]
     fn american_rejects_events_without_deal_id() {
-        let spec = WaterfallSpec::builder()
+        let spec = PeFundWaterfallSpec::builder()
             .style(WaterfallStyle::American)
             .return_of_capital()
             .promote_tier(0.0, 0.8, 0.2)
@@ -2493,7 +2495,7 @@ mod tests {
 
     #[test]
     fn american_tracks_carry_independently_by_deal() {
-        let spec = WaterfallSpec::builder()
+        let spec = PeFundWaterfallSpec::builder()
             .style(WaterfallStyle::American)
             .return_of_capital()
             .promote_tier(0.0, 0.8, 0.2)
@@ -2549,7 +2551,7 @@ mod tests {
         // A same-date contribution and distribution must produce the same
         // economics regardless of caller input order: contributions are
         // canonically processed first.
-        let spec = WaterfallSpec::builder()
+        let spec = PeFundWaterfallSpec::builder()
             .return_of_capital()
             .promote_tier(0.0, 0.8, 0.2)
             .build()

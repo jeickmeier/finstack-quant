@@ -64,7 +64,7 @@ use rust_decimal::Decimal;
 use time::macros::date;
 
 use crate::impl_instrument_base;
-use crate::instruments::credit_derivatives::cds::pricing::CDSPricer;
+use crate::instruments::credit_derivatives::cds::pricing::CdsPricer;
 
 pub use crate::instruments::common_impl::parameters::legs::PayReceive;
 
@@ -392,7 +392,7 @@ impl CreditDefaultSwap {
         crate::instruments::common_impl::traits::Instrument::validate_for_pricing(self)?;
         let discount = market.get_discount(self.premium_leg.discount_curve_id.as_str())?;
         let hazard = market.get_hazard(self.protection_leg.credit_curve_id.as_str())?;
-        super::pricing::CDSPricer::with_config(super::pricing::CDSPricerConfig::from_cds(self))
+        super::pricing::CdsPricer::with_config(super::pricing::CdsPricerConfig::from_cds(self))
             .par_spread(self, discount.as_ref(), hazard.as_ref(), as_of)
     }
 
@@ -672,7 +672,7 @@ impl CreditDefaultSwap {
                 "premium.coupon_bp cannot be represented as f64".to_string(),
             )
         })? / 10_000.0;
-        let pricer = CDSPricer::new();
+        let pricer = CdsPricer::new();
         let payment_accruals = if self.uses_adjusted_premium_accrual_dates() {
             pricer.premium_cashflow_accruals(self, self.premium_leg.start)?
         } else {
@@ -729,7 +729,7 @@ impl CreditDefaultSwap {
     ///   maturity date.
     pub fn isda_coupon_schedule(&self) -> finstack_quant_core::Result<Vec<Date>> {
         self.validate()?;
-        let pricer = CDSPricer::new();
+        let pricer = CdsPricer::new();
         pricer.generate_isda_schedule(self)
     }
 
@@ -741,7 +741,7 @@ impl CreditDefaultSwap {
         self.validate()?;
         let disc = market.get_discount(&self.premium_leg.discount_curve_id)?;
         let surv = market.get_hazard(&self.protection_leg.credit_curve_id)?;
-        CDSPricer::new().npv_full(self, disc.as_ref(), surv.as_ref(), as_of)
+        CdsPricer::new().npv_full(self, disc.as_ref(), surv.as_ref(), as_of)
     }
 
     // (no public/raw-NPV helper; use `Instrument::value_raw()` instead)

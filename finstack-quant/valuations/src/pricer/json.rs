@@ -669,7 +669,7 @@ fn instrument_json_for_pricing<'a>(
 mod tests {
     use super::*;
     use crate::instruments::commodity::commodity_option::CommodityOption;
-    use crate::instruments::credit_derivatives::cds_option::CDSOption;
+    use crate::instruments::credit_derivatives::cds_option::CdsOption;
     use crate::instruments::equity::equity_option::EquityOption;
     use crate::instruments::equity::pe_fund::PrivateMarketsFund;
     use crate::instruments::fixed_income::bond::Bond;
@@ -1015,9 +1015,9 @@ mod tests {
 
     #[test]
     fn validate_instrument_json_rejects_credit_and_convertible_invariants() {
-        let mut cds_option = CDSOption::example().expect("CDS option");
+        let mut cds_option = CdsOption::example().expect("CDS option");
         cds_option.exercise_style = crate::instruments::ExerciseStyle::American;
-        let json = envelope_json(InstrumentJson::CDSOption(cds_option));
+        let json = envelope_json(InstrumentJson::CdsOption(cds_option));
         assert!(validate_instrument_json(&json, None)
             .expect_err("unsupported exercise style must fail")
             .to_string()

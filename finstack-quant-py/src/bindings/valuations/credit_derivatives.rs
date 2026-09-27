@@ -11,9 +11,9 @@
 
 use crate::errors::core_to_py;
 use finstack_quant_valuations::instruments::credit_derivatives::cds::CreditDefaultSwap;
-use finstack_quant_valuations::instruments::credit_derivatives::cds_index::CDSIndex;
-use finstack_quant_valuations::instruments::credit_derivatives::cds_option::CDSOption;
-use finstack_quant_valuations::instruments::credit_derivatives::cds_tranche::CDSTranche;
+use finstack_quant_valuations::instruments::credit_derivatives::cds_index::CdsIndex;
+use finstack_quant_valuations::instruments::credit_derivatives::cds_option::CdsOption;
+use finstack_quant_valuations::instruments::credit_derivatives::cds_tranche::CdsTranche;
 use finstack_quant_valuations::instruments::InstrumentJson;
 use pyo3::prelude::*;
 use pyo3::types::{PyList, PyModule};
@@ -36,7 +36,7 @@ fn credit_default_swap_example_json() -> PyResult<String> {
     )
 }
 
-/// Example ``CDSIndex`` instrument envelope.
+/// Example ``CdsIndex`` instrument envelope.
 ///
 /// Returns
 /// -------
@@ -47,12 +47,12 @@ fn credit_default_swap_example_json() -> PyResult<String> {
 #[pyo3(text_signature = "()")]
 fn cds_index_example_json() -> PyResult<String> {
     serialize_typed_instrument_json(
-        InstrumentJson::CDSIndex(CDSIndex::example()),
-        "CDSIndex example",
+        InstrumentJson::CdsIndex(CdsIndex::example()),
+        "CdsIndex example",
     )
 }
 
-/// Example ``CDSTranche`` instrument envelope.
+/// Example ``CdsTranche`` instrument envelope.
 ///
 /// Returns
 /// -------
@@ -63,12 +63,12 @@ fn cds_index_example_json() -> PyResult<String> {
 #[pyo3(text_signature = "()")]
 fn cds_tranche_example_json() -> PyResult<String> {
     serialize_typed_instrument_json(
-        InstrumentJson::CDSTranche(CDSTranche::example()),
-        "CDSTranche example",
+        InstrumentJson::CdsTranche(CdsTranche::example()),
+        "CdsTranche example",
     )
 }
 
-/// Example ``CDSOption`` instrument envelope.
+/// Example ``CdsOption`` instrument envelope.
 ///
 /// Returns
 /// -------
@@ -78,8 +78,8 @@ fn cds_tranche_example_json() -> PyResult<String> {
 #[pyfunction]
 #[pyo3(text_signature = "()")]
 fn cds_option_example_json() -> PyResult<String> {
-    let option = CDSOption::example().map_err(core_to_py)?;
-    serialize_typed_instrument_json(InstrumentJson::CDSOption(option), "CDSOption example")
+    let option = CdsOption::example().map_err(core_to_py)?;
+    serialize_typed_instrument_json(InstrumentJson::CdsOption(option), "CdsOption example")
 }
 
 pub(super) fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {

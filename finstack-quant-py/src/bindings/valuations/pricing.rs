@@ -524,8 +524,8 @@ pub(crate) fn market_history_json(
 /// Parameters
 /// ----------
 /// instrument : str | Bond | TermLoan | InterestRateSwap | Swaption |
-///     CapFloor | CreditDefaultSwap | CDSIndex | FxForward | FxOption |
-///     CDSTranche | ConvertibleBond | EquityOption | StructuredCredit |
+///     CapFloor | CreditDefaultSwap | CdsIndex | FxForward | FxOption |
+///     CdsTranche | ConvertibleBond | EquityOption | StructuredCredit |
 ///     CompositeInstrument
 ///     A typed instrument instance or a ``finstack_quant.instrument/1``
 ///     JSON envelope.
@@ -786,8 +786,8 @@ fn listed_product_catalog<'py>(
 /// Parameters
 /// ----------
 /// instrument : str | Bond | TermLoan | InterestRateSwap | Swaption |
-///     CapFloor | CreditDefaultSwap | CDSIndex | FxForward | FxOption |
-///     CDSTranche | ConvertibleBond | EquityOption | StructuredCredit |
+///     CapFloor | CreditDefaultSwap | CdsIndex | FxForward | FxOption |
+///     CdsTranche | ConvertibleBond | EquityOption | StructuredCredit |
 ///     CompositeInstrument
 ///     A typed instrument instance or a ``finstack_quant.instrument/1``
 ///     JSON envelope.

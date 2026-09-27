@@ -14,8 +14,8 @@ use finstack_quant_models::credit::pool::{
 };
 use finstack_quant_valuations::instruments::fixed_income::loan_terms::RateSpec;
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
-    AssetPool, DealType, PoolAsset, PricingMode, StochasticPricingResult, StructuredCredit,
-    Tranche, TrancheSeniority, TrancheStructure,
+    AssetPool, DealType, PoolAsset, StochasticPricingResult, StructuredCredit,
+    StructuredCreditPricingMode, Tranche, TrancheSeniority, TrancheStructure,
 };
 use finstack_quant_valuations::instruments::{
     InstrumentEnvelope, InstrumentJson, InstrumentPricingOverrides,
@@ -261,7 +261,7 @@ fn invalid_attachment_detachment_errors_locally() {
         .price_stochastic_with_mode(
             &market,
             as_of(),
-            PricingMode::MonteCarlo {
+            StructuredCreditPricingMode::MonteCarlo {
                 num_paths: 1,
                 antithetic: false,
             },
@@ -283,7 +283,7 @@ fn floating_coupon_market_data_error_propagates() {
         .price_stochastic_with_mode(
             &market_without_forward,
             as_of(),
-            PricingMode::MonteCarlo {
+            StructuredCreditPricingMode::MonteCarlo {
                 num_paths: 1,
                 antithetic: false,
             },
@@ -309,7 +309,7 @@ fn junior_expected_loss_comes_from_writedowns() {
         .price_stochastic_with_mode(
             &market,
             as_of(),
-            PricingMode::MonteCarlo {
+            StructuredCreditPricingMode::MonteCarlo {
                 num_paths: 1,
                 antithetic: false,
             },
@@ -338,7 +338,7 @@ fn oversized_explicit_tree_errors_before_pricing() {
     let market = fixed_market();
 
     let err = sc
-        .price_stochastic_with_mode(&market, as_of(), PricingMode::Tree)
+        .price_stochastic_with_mode(&market, as_of(), StructuredCreditPricingMode::Tree)
         .expect_err("oversized path-preserving tree should fail");
 
     assert!(
@@ -350,7 +350,7 @@ fn oversized_explicit_tree_errors_before_pricing() {
 #[test]
 fn stochastic_default_volatility_changes_loss_dispersion() {
     let market = fixed_market();
-    let pricing_mode = PricingMode::MonteCarlo {
+    let pricing_mode = StructuredCreditPricingMode::MonteCarlo {
         num_paths: 128,
         antithetic: false,
     };
@@ -414,7 +414,7 @@ fn non_pik_deferred_interest_cannot_consume_principal() {
         .price_stochastic_with_mode(
             &market,
             as_of(),
-            PricingMode::MonteCarlo {
+            StructuredCreditPricingMode::MonteCarlo {
                 num_paths: 1,
                 antithetic: false,
             },
@@ -453,7 +453,7 @@ fn market_correlated_recovery_moves_equity_pv() {
             .expect("recovery spec"),
     );
     let market = fixed_market();
-    let mode = PricingMode::MonteCarlo {
+    let mode = StructuredCreditPricingMode::MonteCarlo {
         num_paths: 32,
         antithetic: true,
     };
@@ -490,7 +490,7 @@ fn average_life_counts_only_paths_that_return_principal() {
         .price_stochastic_with_mode(
             &fixed_market(),
             as_of(),
-            PricingMode::MonteCarlo {
+            StructuredCreditPricingMode::MonteCarlo {
                 num_paths: 4,
                 antithetic: false,
             },

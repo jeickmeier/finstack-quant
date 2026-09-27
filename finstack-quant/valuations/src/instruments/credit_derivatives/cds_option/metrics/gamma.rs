@@ -1,4 +1,4 @@
-//! Gamma for [`CDSOption`], branched by strike kind.
+//! Gamma for [`CdsOption`], branched by strike kind.
 //!
 //! - **Spread strikes**: Bloomberg's CDSO terminal reports Γ as the
 //!   (±5 bp) finite difference of the Black-76 N(d₁) delta in the
@@ -8,7 +8,7 @@
 //!   under the same ±5 bp screen spread bump, applied as a par-quote
 //!   hazard bump with rebootstrap and sticky-strike/sticky-surface rules.
 //!
-//! This module is the single source of truth; [`CDSOption::gamma`] is a
+//! This module is the single source of truth; [`CdsOption::gamma`] is a
 //! thin pass-through to [`gamma`].
 
 use super::delta::{black_delta_ratio, price_strike_delta};
@@ -16,7 +16,7 @@ use crate::instruments::credit_derivatives::cds_option::bloomberg_quadrature::Fo
 use crate::instruments::credit_derivatives::cds_option::pricer::{
     resolve_sigma, synthetic_underlying_cds,
 };
-use crate::instruments::credit_derivatives::cds_option::{CDSOption, CDSOptionStrikeKind};
+use crate::instruments::credit_derivatives::cds_option::{CdsOption, CdsOptionStrikeKind};
 use crate::metrics::{MetricCalculator, MetricContext};
 use crate::recalibration::{
     HazardRecalibrationAction, HazardRecalibrationRequest, QuoteBump, RecalibrationProvider,
@@ -36,8 +36,8 @@ pub(crate) struct GammaCalculator;
 
 impl MetricCalculator for GammaCalculator {
     fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
-        let option: &CDSOption = context.instrument_as()?;
-        let provider = if option.strike.kind() == CDSOptionStrikeKind::CleanPricePct {
+        let option: &CdsOption = context.instrument_as()?;
+        let provider = if option.strike.kind() == CdsOptionStrikeKind::CleanPricePct {
             Some(context.recalibration_provider("cds_option_gamma")?)
         } else {
             None
@@ -48,7 +48,7 @@ impl MetricCalculator for GammaCalculator {
 
 /// CDS option Γ, branched by strike kind (see the module docs).
 pub(crate) fn gamma(
-    option: &CDSOption,
+    option: &CdsOption,
     curves: &MarketContext,
     as_of: finstack_quant_core::dates::Date,
 ) -> Result<f64> {
@@ -56,7 +56,7 @@ pub(crate) fn gamma(
 }
 
 fn gamma_with_provider(
-    option: &CDSOption,
+    option: &CdsOption,
     curves: &MarketContext,
     as_of: finstack_quant_core::dates::Date,
     provider: Option<&dyn RecalibrationProvider>,
@@ -67,8 +67,8 @@ fn gamma_with_provider(
         return Ok(0.0);
     }
     match option.strike.kind() {
-        CDSOptionStrikeKind::Spread => spread_black_gamma(option, curves, as_of, t),
-        CDSOptionStrikeKind::CleanPricePct => {
+        CdsOptionStrikeKind::Spread => spread_black_gamma(option, curves, as_of, t),
+        CdsOptionStrikeKind::CleanPricePct => {
             let provider = provider
                 .ok_or_else(|| crate::recalibration::provider_missing("cds_option_gamma"))?;
             price_strike_gamma(option, curves, as_of, provider)
@@ -79,7 +79,7 @@ fn gamma_with_provider(
 /// Bloomberg CDSO Γ — central difference of the Black-76 N(d₁) delta
 /// across a ±5 bp move in the displayed ATM forward (spread strikes).
 fn spread_black_gamma(
-    option: &CDSOption,
+    option: &CdsOption,
     curves: &MarketContext,
     as_of: finstack_quant_core::dates::Date,
     t: f64,
@@ -111,7 +111,7 @@ fn spread_black_gamma(
 /// a ±5 bp par-quote spread bump with rebootstrap. The surface is not
 /// bumped, so each nested delta resolves the same sticky volatility.
 fn price_strike_gamma(
-    option: &CDSOption,
+    option: &CdsOption,
     curves: &MarketContext,
     as_of: finstack_quant_core::dates::Date,
     provider: &dyn RecalibrationProvider,

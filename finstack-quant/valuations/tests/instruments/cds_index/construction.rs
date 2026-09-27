@@ -13,7 +13,7 @@ use finstack_quant_core::currency::Currency;
 use finstack_quant_core::money::Money;
 use finstack_quant_valuations::instruments::credit_derivatives::cds::PayReceive;
 use finstack_quant_valuations::instruments::credit_derivatives::cds_index::{
-    CDSIndex, CDSIndexConstituent, CDSIndexParams, IndexPricing,
+    CdsIndex, CdsIndexConstituent, CdsIndexParams, IndexPricing,
 };
 use finstack_quant_valuations::instruments::CreditParams;
 use finstack_quant_valuations::instruments::Instrument;
@@ -48,8 +48,8 @@ fn test_construction_with_index_factor() {
     let end = date!(2030 - 01 - 01);
     let factor = 0.95; // 95% surviving notional
 
-    let idx = CDSIndex::from_preset(
-        &CDSIndexParams::cdx_na_ig(42, 1, 100.0),
+    let idx = CdsIndex::from_preset(
+        &CdsIndexParams::cdx_na_ig(42, 1, 100.0),
         "CDX-FACTOR",
         Money::new(TEST_NOTIONAL, Currency::USD).expect("valid money fixture"),
         PayReceive::Pay,
@@ -117,17 +117,17 @@ fn test_builder_with_explicit_weights() {
     let idx = standard_single_curve_index("CDX-EXPLICIT", start, end, 10_000_000.0);
 
     let constituents = vec![
-        CDSIndexConstituent {
+        CdsIndexConstituent {
             credit: CreditParams::corporate_standard("N1", "HZ1"),
             weight: 0.5,
             defaulted: false,
         },
-        CDSIndexConstituent {
+        CdsIndexConstituent {
             credit: CreditParams::corporate_standard("N2", "HZ2"),
             weight: 0.3,
             defaulted: false,
         },
-        CDSIndexConstituent {
+        CdsIndexConstituent {
             credit: CreditParams::corporate_standard("N3", "HZ3"),
             weight: 0.2,
             defaulted: false,
@@ -166,13 +166,13 @@ fn test_weight_sum_validation() {
 
     // Create index with weights summing to ~1.0
     let constituents = vec![
-        CDSIndexConstituent::active(CreditParams::corporate_standard("N1", "HZ1"), 0.34),
-        CDSIndexConstituent::active(CreditParams::corporate_standard("N2", "HZ2"), 0.33),
-        CDSIndexConstituent::active(CreditParams::corporate_standard("N3", "HZ3"), 0.33),
+        CdsIndexConstituent::active(CreditParams::corporate_standard("N1", "HZ1"), 0.34),
+        CdsIndexConstituent::active(CreditParams::corporate_standard("N2", "HZ2"), 0.33),
+        CdsIndexConstituent::active(CreditParams::corporate_standard("N3", "HZ3"), 0.33),
     ];
 
-    let idx = CDSIndex::from_preset(
-        &CDSIndexParams::cdx_na_ig(42, 1, 100.0),
+    let idx = CdsIndex::from_preset(
+        &CdsIndexParams::cdx_na_ig(42, 1, 100.0),
         "CDX-WEIGHTS",
         Money::new(TEST_NOTIONAL, Currency::USD).expect("valid money fixture"),
         PayReceive::Pay,
@@ -201,7 +201,7 @@ fn test_weight_sum_validation() {
 #[test]
 fn test_cdx_na_ig_params() {
     // Test: CDX NA IG constructor
-    let params = CDSIndexParams::cdx_na_ig(42, 1, 100.0);
+    let params = CdsIndexParams::cdx_na_ig(42, 1, 100.0);
 
     assert_eq!(params.index_name, "CDX.NA.IG");
     assert_eq!(params.series, 42);
@@ -212,7 +212,7 @@ fn test_cdx_na_ig_params() {
 #[test]
 fn test_cdx_na_hy_params() {
     // Test: CDX NA HY constructor
-    let params = CDSIndexParams::cdx_na_hy(39, 2, 500.0);
+    let params = CdsIndexParams::cdx_na_hy(39, 2, 500.0);
 
     assert_eq!(params.index_name, "CDX.NA.HY");
     assert_eq!(params.series, 39);
@@ -223,7 +223,7 @@ fn test_cdx_na_hy_params() {
 #[test]
 fn test_itraxx_europe_params() {
     // Test: iTraxx Europe constructor
-    let params = CDSIndexParams::itraxx_europe(41, 1, 25.0);
+    let params = CdsIndexParams::itraxx_europe(41, 1, 25.0);
 
     assert_eq!(params.index_name, "iTraxx Europe");
     assert_eq!(params.series, 41);
@@ -302,13 +302,13 @@ fn test_multiple_index_types_construction() {
     let end = date!(2030 - 01 - 01);
 
     let indices = vec![
-        ("CDX.NA.IG", CDSIndexParams::cdx_na_ig(42, 1, 100.0)),
-        ("CDX.NA.HY", CDSIndexParams::cdx_na_hy(39, 1, 500.0)),
-        ("iTraxx Europe", CDSIndexParams::itraxx_europe(41, 1, 25.0)),
+        ("CDX.NA.IG", CdsIndexParams::cdx_na_ig(42, 1, 100.0)),
+        ("CDX.NA.HY", CdsIndexParams::cdx_na_hy(39, 1, 500.0)),
+        ("iTraxx Europe", CdsIndexParams::itraxx_europe(41, 1, 25.0)),
     ];
 
     for (name, params) in indices {
-        let idx = CDSIndex::from_preset(
+        let idx = CdsIndex::from_preset(
             &params,
             format!("{}-TEST", name),
             Money::new(TEST_NOTIONAL, Currency::USD).expect("valid money fixture"),

@@ -5,7 +5,7 @@
 //! rate curves (discount + forward) in line with market convention.
 
 use finstack_quant_valuations::instruments::{
-    EquityTotalReturnSwap, FIIndexTotalReturnSwap, Instrument,
+    EquityTotalReturnSwap, FiIndexTotalReturnSwap, Instrument,
 };
 
 #[test]
@@ -30,7 +30,7 @@ fn equity_trs_declares_discount_and_forward_curves() {
 
 #[test]
 fn fi_index_trs_declares_discount_and_forward_curves() {
-    let trs = FIIndexTotalReturnSwap::example().unwrap();
+    let trs = FiIndexTotalReturnSwap::example().unwrap();
     let deps = trs
         .market_dependencies()
         .expect("market_dependencies")

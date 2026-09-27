@@ -12,6 +12,7 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, InstrumentId, PriceId};
 use finstack_quant_core::Result;
+use finstack_quant_models::monte_carlo::process::schwartz_smith::SchwartzSmithParams;
 use finstack_quant_models::trees::binomial_tree::BinomialTree;
 
 /// Monte Carlo configuration for commodity option pricing.
@@ -47,24 +48,11 @@ pub enum CommodityPricingModel {
     /// Models commodity prices as S(t) = exp(X(t) + Y(t)) where:
     /// - X(t): short-term mean-reverting deviation (OU process)
     /// - Y(t): long-term equilibrium trend (arithmetic Brownian motion)
-    SchwartzSmith {
-        /// Mean reversion speed for short-term component (kappa).
-        kappa: f64,
-        /// Volatility of short-term component (sigma_x).
-        sigma_x: f64,
-        /// Volatility of long-term component (sigma_y).
-        sigma_y: f64,
-        /// Correlation between short-term and long-term factors (rho_xy).
-        rho_xy: f64,
-        /// Drift of long-term trend (mu_y).
-        mu_y: f64,
-        /// Risk premium for short-term factor (lambda_x).
-        ///
-        /// Under the risk-neutral measure the short-term factor receives a
-        /// constant drift shift at unchanged mean-reversion speed
-        /// (Schwartz & Smith 2000): dX = (-kappa·X - lambda_x) dt + sigma_x dW*_X
-        lambda_x: f64,
-    },
+    ///
+    /// Parameters use the Schwartz & Smith (2000) notation: `kappa`,
+    /// `sigma_x`, `mu_y`, `sigma_y`, `rho_xy` and the risk-neutral drift shift
+    /// `lambda_x` (dX = (-kappa·X - lambda_x) dt + sigma_x dW*_X).
+    SchwartzSmith(SchwartzSmithParams),
 }
 
 /// Commodity option (option on commodity forward or spot).
@@ -438,9 +426,7 @@ impl CommodityOption {
         use finstack_quant_models::monte_carlo::discretization::ExactSchwartzSmith;
         use finstack_quant_models::monte_carlo::engine::{McEngine, McEngineConfig};
         use finstack_quant_models::monte_carlo::payoff::vanilla::{EuropeanCall, EuropeanPut};
-        use finstack_quant_models::monte_carlo::process::schwartz_smith::{
-            SchwartzSmithParams, SchwartzSmithProcess,
-        };
+        use finstack_quant_models::monte_carlo::process::schwartz_smith::SchwartzSmithProcess;
         use finstack_quant_models::monte_carlo::rng::philox::PhiloxRng;
         use finstack_quant_models::monte_carlo::TimeGrid;
 
@@ -492,14 +478,7 @@ impl CommodityOption {
                     None,
                 ))
             }
-            CommodityPricingModel::SchwartzSmith {
-                kappa,
-                sigma_x,
-                sigma_y,
-                rho_xy,
-                mu_y,
-                lambda_x,
-            } => {
+            CommodityPricingModel::SchwartzSmith(p) => {
                 // Build risk-neutral Schwartz-Smith process. Schwartz & Smith
                 // (2000) risk-neutralize the short-term factor with a
                 // CONSTANT drift shift at unchanged mean-reversion speed:
@@ -507,8 +486,8 @@ impl CommodityOption {
                 // (inflating kappa by lambda_x would distort the futures
                 // volatility term structure e^{-kappa·tau}).
                 let ss_params =
-                    SchwartzSmithParams::new(*kappa, *sigma_x, *mu_y, *sigma_y, *rho_xy)?
-                        .with_lambda_x(*lambda_x)?;
+                    SchwartzSmithParams::new(p.kappa, p.sigma_x, p.mu_y, p.sigma_y, p.rho_xy)?
+                        .with_lambda_x(p.lambda_x)?;
 
                 let initial_spot = if let Some(spot) = self.spot_price(market)? {
                     spot
@@ -531,13 +510,13 @@ impl CommodityOption {
                     let model_forward = process.futures_price(t);
                     let mu_adjustment = (market_forward / model_forward).ln() / t;
                     let pinned_params = SchwartzSmithParams::new(
-                        *kappa,
-                        *sigma_x,
-                        *mu_y + mu_adjustment,
-                        *sigma_y,
-                        *rho_xy,
+                        p.kappa,
+                        p.sigma_x,
+                        p.mu_y + mu_adjustment,
+                        p.sigma_y,
+                        p.rho_xy,
                     )?
-                    .with_lambda_x(*lambda_x)?;
+                    .with_lambda_x(p.lambda_x)?;
                     process = SchwartzSmithProcess::from_spot(pinned_params, initial_spot, None);
                 }
                 let disc_scheme = ExactSchwartzSmith::from_process(&process)?;

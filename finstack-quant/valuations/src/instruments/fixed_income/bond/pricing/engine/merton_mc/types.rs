@@ -1,5 +1,5 @@
 use finstack_quant_models::credit::{
-    BarrierType, DynamicRecoverySpec, EndogenousHazardSpec, MertonModel, ToggleExerciseModel,
+    DynamicRecoverySpec, EndogenousHazardSpec, MertonBarrierType, MertonModel, ToggleExerciseModel,
 };
 
 // PIK schedule types
@@ -177,7 +177,7 @@ pub struct MertonMcConfig {
     pub toggle_model: Option<ToggleExerciseModel>,
     /// Time steps per year for the simulation grid.
     pub steps_per_year: usize,
-    /// Barrier-crossing policy used for `BarrierType::FirstPassage`.
+    /// Barrier-crossing policy used for `MertonBarrierType::FirstPassage`.
     ///
     /// Default: `BrownianBridge` when the Merton model uses `FirstPassage`,
     /// otherwise `Discrete`.
@@ -226,8 +226,8 @@ impl MertonMcConfig {
             .rust
             .merton_pik_bond;
         let barrier_crossing = match merton.barrier_type() {
-            BarrierType::FirstPassage { .. } => BarrierCrossing::BrownianBridge,
-            BarrierType::Terminal => BarrierCrossing::Discrete,
+            MertonBarrierType::FirstPassage { .. } => BarrierCrossing::BrownianBridge,
+            MertonBarrierType::Terminal => BarrierCrossing::Discrete,
         };
         Ok(Self {
             merton,
