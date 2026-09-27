@@ -113,12 +113,12 @@ impl PrivateMarketsFund {
     pub fn example() -> finstack_quant_core::Result<Self> {
         use super::waterfall::{WaterfallSpec, WaterfallStyle};
         use finstack_quant_core::currency::Currency;
-        // Build a simple European-style waterfall: Return of capital -> 8% pref -> 50% catchup -> 80/20 promote
+        // Build a simple European-style waterfall: Return of capital -> 8% pref -> 50% catch-up -> 80/20 promote
         let spec = WaterfallSpec::builder()
             .style(WaterfallStyle::European)
             .return_of_capital()
             .preferred_irr(0.08)
-            .catchup(0.5)
+            .catch_up(0.5)
             .promote_tier(0.12, 0.8, 0.2)
             .build()?;
         // Define a few cashflow events: contributions in year 1, proceeds in year 3, distribution in year 4

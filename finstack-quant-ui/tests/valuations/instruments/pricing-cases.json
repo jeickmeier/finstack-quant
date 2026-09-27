@@ -1361,7 +1361,7 @@
       "type": "discounted_cash_flow",
       "instrumentSource": {
         "path": "finstack-quant/valuations/tests/instruments/json_examples/discounted_cash_flow.json",
-        "sha256": "4f6c8b15b92de2b4a6d3f66d0e97553d9c06ee6707612ca4ebf4c90e9305329d",
+        "sha256": "ec48d35a85219478d5464639ed8d272970704c6500f251dea0ff46a020e71b6b",
         "pointer": []
       },
       "instrumentPatches": [],
@@ -2278,7 +2278,7 @@
       "type": "levered_real_estate_equity",
       "instrumentSource": {
         "path": "finstack-quant/valuations/tests/instruments/json_examples/levered_real_estate_equity.json",
-        "sha256": "249da7a828c9fff2fd7e50c3f610d1678a9c5fca2a9a33d4ffd8481f630caf79",
+        "sha256": "2ef661259b46e30f84a838562910753199ee3d369e7184297e32ac5af822ad89",
         "pointer": []
       },
       "instrumentPatches": [],
@@ -2392,7 +2392,7 @@
       "type": "private_markets_fund",
       "instrumentSource": {
         "path": "finstack-quant/valuations/tests/instruments/json_examples/private_markets_fund.json",
-        "sha256": "b68a1b1598b31ac166219859d22d172153007e5616dbdff9d52c33b786ca9606",
+        "sha256": "16a922db0cb38afa2d9e8f190e28ebf5059790ed0a9b937aa90c8dd12cb982e1",
         "pointer": []
       },
       "instrumentPatches": [],
@@ -2506,7 +2506,7 @@
       "type": "real_estate_asset",
       "instrumentSource": {
         "path": "finstack-quant/valuations/tests/instruments/json_examples/real_estate_asset.json",
-        "sha256": "6c7905ee448ac8fd60a2a240deb7c46d18ed0de268aa3a6a4c3cc127b3db0f28",
+        "sha256": "fa5e4bb02961cfefa920af01bf70becfcd2d894b7a3612d2f78767947015b303",
         "pointer": []
       },
       "instrumentPatches": [],

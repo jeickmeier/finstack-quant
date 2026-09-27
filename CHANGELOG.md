@@ -2,6 +2,35 @@
 
 ## [Unreleased]
 
+### Private markets and DCF (2026-09-24)
+
+`RealEstateAsset` prices against the caller's `as_of` and stores no valuation
+date; the sale date, acquisition costs and the DCF EV-to-equity bridge each
+have one channel; the PE-fund waterfall spells its hurdle `hurdle_irr`, its
+day count `day_count` and its catch-up `catch_up`.
+
+#### Changed (BREAKING)
+
+- `TerminalValueSpec::GordonGrowth.growth_rate` (now `stable_growth_rate`, matching `HModel`): Rust, JSON `terminal_value.stable_growth_rate`, Python `TerminalValueSpec.gordon_growth(stable_growth_rate)`.
+- `DiscountedCashFlow.equity_bridge` is now a required `EquityBridge` (Rust/JSON) and the only EV-to-equity channel; a flat net-debt deduction is written `{"total_debt": x, "cash": y}`. `validate()` now rejects non-finite bridge amounts (`equity_bridge.<field>`). `effective_net_debt()` is `equity_bridge.net_adjustment()`.
+- statements-analytics `evaluate_dcf` / `dcf_sensitivity` / `CorporateAnalysisBuilder`: when `DcfOptions.equity_bridge` is set, the model debt/cash (and `net_debt_override`) are no longer read, so a model without balance-sheet nodes no longer errors; otherwise `net_debt_override` becomes the bridge `total_debt` and the model's debt and cash become `total_debt`/`cash`.
+- `Tranche::PreferredIrr.irr` (now `hurdle_irr`) and `Tranche::PromoteTier.hurdle: Hurdle::Irr { rate }` (now a flat `hurdle_irr`): Rust, JSON `tranches[].preferred_irr.hurdle_irr` / `tranches[].promote_tier.hurdle_irr`.
+- `WaterfallSpec.irr_basis` (now `day_count`) and builder `irr_basis()` (now `day_count()`): Rust, JSON.
+- `WaterfallSpec.catchup_mode` (now `catch_up_mode`), builder `catchup_mode()` / `catchup()` (now `catch_up_mode()` / `catch_up()`): Rust, JSON.
+- `RealEstateAsset.sale_date` may now equal `as_of` (the old check required it strictly after the stored `valuation_date`); pricing still rejects a horizon before `as_of`.
+
+#### Removed
+
+- `RealEstateAsset.valuation_date` (Rust/JSON; the pricer already discounted from `as_of`) and the builder `.valuation_date(...)`.
+- `RealEstateAsset.acquisition_cost` (scalar); use the `acquisition_costs: Vec<Money>` line items.
+- `LeveredRealEstateEquity.exit_date`; the levered exit, schedule and metrics follow the asset horizon (`asset.sale_date`, else the last NOI date), the same horizon as PV.
+- `DiscountedCashFlow.net_debt` (Rust/JSON/builder).
+- `pe_fund::Hurdle` enum and `ClawbackSpec.enable` (presence of `waterfall_spec.clawback` is the switch) plus `impl Default for ClawbackSpec`.
+
+#### Numbers change
+
+- None observed in fixtures or goldens: `RealEstateAsset.valuation_date` was never read by the pricer (it already discounted from `as_of`), and every levered fixture set `exit_date` equal to the asset horizon. A levered position whose `exit_date` differed from `asset.sale_date` now exits on `sale_date`, so its cashflow schedule and DSCR/IRR metrics match its PV horizon.
+
 ### Composite and basket (2026-09-24)
 
 #### Changed (BREAKING)

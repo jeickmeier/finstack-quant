@@ -48,7 +48,7 @@ fn build_unlevered_cashflow_map(
 }
 
 /// Unlevered IRR (XIRR-style) computed from:
-/// - initial purchase price + acquisition_cost at `as_of` (negative)
+/// - initial purchase price + Σ acquisition_costs at `as_of` (negative)
 /// - unlevered net cash flows `NOI - CapEx`
 /// - terminal sale proceeds from exit cap rate (positive)
 #[derive(Debug, Default)]

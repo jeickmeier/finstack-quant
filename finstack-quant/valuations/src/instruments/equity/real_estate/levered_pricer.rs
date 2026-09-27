@@ -53,16 +53,13 @@ pub(crate) fn validate_currency(inst: &LeveredRealEstateEquity) -> finstack_quan
     Ok(())
 }
 
-/// Exit date for levered metrics: explicit `exit_date` when set, otherwise the
-/// asset's valuation horizon (`sale_date` when set, else the last NOI date),
-/// so levered metrics use the same holding period as the asset PV.
+/// Exit date for levered metrics: the asset's valuation horizon
+/// (`asset.sale_date` when set, else the last NOI date on/after `as_of`), so
+/// PV, the equity cashflow schedule and levered metrics share one holding period.
 pub(crate) fn resolve_exit_date(
     inst: &LeveredRealEstateEquity,
     as_of: Date,
 ) -> finstack_quant_core::Result<Date> {
-    if let Some(d) = inst.exit_date {
-        return Ok(d);
-    }
     super::pricer::horizon_date(&inst.asset, as_of)
 }
 

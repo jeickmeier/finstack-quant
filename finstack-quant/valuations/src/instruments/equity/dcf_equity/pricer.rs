@@ -109,7 +109,9 @@ impl Pricer for DcfPricer {
 mod tests {
     use super::*;
     use crate::instruments::common_impl::traits::Instrument;
-    use crate::instruments::equity::dcf_equity::types::{DiscountedCashFlow, TerminalValueSpec};
+    use crate::instruments::equity::dcf_equity::types::{
+        DiscountedCashFlow, EquityBridge, TerminalValueSpec,
+    };
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::Date;
     use finstack_quant_core::market_data::context::MarketContext;
@@ -127,12 +129,13 @@ mod tests {
             currency: Currency::USD,
             flows: vec![(flow_date, 100.0)],
             wacc: 0.10,
-            terminal_value: TerminalValueSpec::GordonGrowth { growth_rate: 0.02 },
-            net_debt: 0.0,
+            terminal_value: TerminalValueSpec::GordonGrowth {
+                stable_growth_rate: 0.02,
+            },
             valuation_date,
             mid_year_convention: false,
             terminal_flow_override: None,
-            equity_bridge: None,
+            equity_bridge: EquityBridge::default(),
             shares_outstanding: None,
             dilution_securities: Vec::new(),
             valuation_discounts: None,

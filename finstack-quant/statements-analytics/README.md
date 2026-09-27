@@ -66,7 +66,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .build();
 
     let analysis = CorporateAnalysisBuilder::new(model)
-        .dcf(0.10, TerminalValueSpec::GordonGrowth { growth_rate: 0.02 })
+        .dcf(0.10, TerminalValueSpec::GordonGrowth { stable_growth_rate: 0.02 })
         .net_debt_override(20_000_000.0)
         .checks(checks)
         .analyze()?;

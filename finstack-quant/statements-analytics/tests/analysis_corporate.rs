@@ -54,7 +54,9 @@ fn test_dcf_evaluation_gordon_growth() {
     let result = evaluate_dcf_with_market(
         &model,
         0.10,
-        TerminalValueSpec::GordonGrowth { growth_rate: 0.02 },
+        TerminalValueSpec::GordonGrowth {
+            stable_growth_rate: 0.02,
+        },
         "ufcf",
         Some(50_000.0),
         &DcfOptions::default(),
@@ -86,7 +88,9 @@ fn test_dcf_rejects_scalar_ufcf_node() {
     let error = evaluate_dcf_with_market(
         &model,
         0.10,
-        TerminalValueSpec::GordonGrowth { growth_rate: 0.02 },
+        TerminalValueSpec::GordonGrowth {
+            stable_growth_rate: 0.02,
+        },
         "ufcf",
         Some(0.0),
         &DcfOptions::default(),
@@ -211,7 +215,9 @@ fn test_dcf_with_market_context() {
     let result_no_market = evaluate_dcf_with_market(
         &model,
         0.10,
-        TerminalValueSpec::GordonGrowth { growth_rate: 0.02 },
+        TerminalValueSpec::GordonGrowth {
+            stable_growth_rate: 0.02,
+        },
         "ufcf",
         Some(0.0),
         &options,
@@ -228,7 +234,9 @@ fn test_dcf_with_market_context() {
     let missing_as_of = evaluate_dcf_with_market(
         &model,
         0.10,
-        TerminalValueSpec::GordonGrowth { growth_rate: 0.02 },
+        TerminalValueSpec::GordonGrowth {
+            stable_growth_rate: 0.02,
+        },
         "ufcf",
         Some(0.0),
         &options,
@@ -243,7 +251,9 @@ fn test_dcf_with_market_context() {
     let result_with_market = evaluate_dcf_with_market(
         &model,
         0.10,
-        TerminalValueSpec::GordonGrowth { growth_rate: 0.02 },
+        TerminalValueSpec::GordonGrowth {
+            stable_growth_rate: 0.02,
+        },
         "ufcf",
         Some(0.0),
         &options,
@@ -294,7 +304,9 @@ fn test_dcf_excludes_historical_periods_from_explicit_flows() {
     let result = evaluate_dcf_with_market(
         &model,
         0.10,
-        TerminalValueSpec::GordonGrowth { growth_rate: 0.02 },
+        TerminalValueSpec::GordonGrowth {
+            stable_growth_rate: 0.02,
+        },
         "ufcf",
         Some(0.0),
         &DcfOptions::default(),
@@ -391,7 +403,9 @@ fn test_dcf_uses_as_of_for_valuation_date_and_auto_net_debt() {
     let result = evaluate_dcf_with_market(
         &model,
         0.10,
-        TerminalValueSpec::GordonGrowth { growth_rate: 0.02 },
+        TerminalValueSpec::GordonGrowth {
+            stable_growth_rate: 0.02,
+        },
         "ufcf",
         None,
         &DcfOptions::default(),
@@ -500,7 +514,9 @@ fn test_dcf_forecast_only_requires_opening_balance_or_override() {
     let result = evaluate_dcf_with_market(
         &model,
         0.10,
-        TerminalValueSpec::GordonGrowth { growth_rate: 0.02 },
+        TerminalValueSpec::GordonGrowth {
+            stable_growth_rate: 0.02,
+        },
         "ufcf",
         None,
         &DcfOptions::default(),
@@ -547,7 +563,9 @@ fn make_simple_dcf_model() -> finstack_quant_statements::types::FinancialModelSp
 fn parity_orchestrator_dcf_matches_standalone() {
     use finstack_quant_statements_analytics::analysis::CorporateAnalysisBuilder;
     let model = make_simple_dcf_model();
-    let tv = TerminalValueSpec::GordonGrowth { growth_rate: 0.02 };
+    let tv = TerminalValueSpec::GordonGrowth {
+        stable_growth_rate: 0.02,
+    };
 
     let standalone = evaluate_dcf_with_market(
         &model,
@@ -590,7 +608,9 @@ fn quarterly_gordon_terminal_value_uses_annualized_flow() {
     let result = evaluate_dcf_with_market(
         &model,
         0.10,
-        TerminalValueSpec::GordonGrowth { growth_rate: 0.02 },
+        TerminalValueSpec::GordonGrowth {
+            stable_growth_rate: 0.02,
+        },
         "ufcf",
         Some(0.0),
         &DcfOptions::default(),
@@ -641,7 +661,9 @@ fn annual_gordon_terminal_value_unchanged() {
     let result = evaluate_dcf_with_market(
         &model,
         0.10,
-        TerminalValueSpec::GordonGrowth { growth_rate: 0.02 },
+        TerminalValueSpec::GordonGrowth {
+            stable_growth_rate: 0.02,
+        },
         "ufcf",
         Some(0.0),
         &DcfOptions::default(),
@@ -676,7 +698,9 @@ fn usd_discount_curve_does_not_mix_discounting_bases() {
     let with_market = evaluate_dcf_with_market(
         &model,
         0.10,
-        TerminalValueSpec::GordonGrowth { growth_rate: 0.02 },
+        TerminalValueSpec::GordonGrowth {
+            stable_growth_rate: 0.02,
+        },
         "ufcf",
         Some(net_debt),
         &DcfOptions::default(),
@@ -688,7 +712,9 @@ fn usd_discount_curve_does_not_mix_discounting_bases() {
     let without_market = evaluate_dcf_with_market(
         &model,
         0.10,
-        TerminalValueSpec::GordonGrowth { growth_rate: 0.02 },
+        TerminalValueSpec::GordonGrowth {
+            stable_growth_rate: 0.02,
+        },
         "ufcf",
         Some(net_debt),
         &DcfOptions::default(),
@@ -726,7 +752,7 @@ fn nan_terminal_value_parameters_error() {
         &model,
         0.10,
         TerminalValueSpec::GordonGrowth {
-            growth_rate: f64::NAN,
+            stable_growth_rate: f64::NAN,
         },
         "ufcf",
         Some(0.0),
@@ -747,7 +773,9 @@ fn stable_growth_above_policy_ceiling_is_rejected() {
     let error = evaluate_dcf_with_market(
         &model,
         0.10,
-        TerminalValueSpec::GordonGrowth { growth_rate: 0.04 },
+        TerminalValueSpec::GordonGrowth {
+            stable_growth_rate: 0.04,
+        },
         "ufcf",
         Some(0.0),
         &options,
@@ -820,7 +848,9 @@ fn evaluate_dcf_with_market_uses_curve_for_cs_interest() {
     let no_market = evaluate_dcf_with_market(
         &model,
         0.10,
-        TerminalValueSpec::GordonGrowth { growth_rate: 0.02 },
+        TerminalValueSpec::GordonGrowth {
+            stable_growth_rate: 0.02,
+        },
         "ufcf",
         Some(0.0),
         &DcfOptions::default(),
@@ -835,7 +865,9 @@ fn evaluate_dcf_with_market_uses_curve_for_cs_interest() {
     let missing_as_of = evaluate_dcf_with_market(
         &model,
         0.10,
-        TerminalValueSpec::GordonGrowth { growth_rate: 0.02 },
+        TerminalValueSpec::GordonGrowth {
+            stable_growth_rate: 0.02,
+        },
         "ufcf",
         Some(0.0),
         &DcfOptions::default(),
@@ -850,7 +882,9 @@ fn evaluate_dcf_with_market_uses_curve_for_cs_interest() {
     let result = evaluate_dcf_with_market(
         &model,
         0.10,
-        TerminalValueSpec::GordonGrowth { growth_rate: 0.02 },
+        TerminalValueSpec::GordonGrowth {
+            stable_growth_rate: 0.02,
+        },
         "ufcf",
         Some(0.0),
         &DcfOptions::default(),

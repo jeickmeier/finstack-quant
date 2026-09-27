@@ -8573,7 +8573,7 @@ class TerminalValueSpec:
     """Terminal value method for a DCF.
 
     Build with one of the constructors; the wire form is the tagged serde enum
-    (``{"type": "gordon_growth", "growth_rate": 0.02}``).
+    (``{"type": "gordon_growth", "stable_growth_rate": 0.02}``).
 
     Examples
     --------
@@ -8584,7 +8584,7 @@ class TerminalValueSpec:
     9.0
     """
     @staticmethod
-    def gordon_growth(growth_rate: float) -> TerminalValueSpec:
+    def gordon_growth(stable_growth_rate: float) -> TerminalValueSpec:
         """
         Gordon growth: ``TV = FCF_terminal * (1 + g) / (WACC - g)``.
 
@@ -8592,8 +8592,8 @@ class TerminalValueSpec:
 
         Parameters
         ----------
-        growth_rate : float
-            Perpetual growth rate ``g`` in decimal form (``0.02`` = 2%).
+        stable_growth_rate : float
+            Perpetual stable growth rate ``g`` in decimal form (``0.02`` = 2%).
         Returns
         -------
         TerminalValueSpec
@@ -10228,7 +10228,7 @@ def evaluate_dcf(
         Weighted average cost of capital in decimal form (``0.10`` = 10%).
     terminal_value : TerminalValueSpec | dict | str
         Terminal value method (typed, serde dict, or tagged JSON such as
-        ``{"type": "gordon_growth", "growth_rate": 0.02}``).
+        ``{"type": "gordon_growth", "stable_growth_rate": 0.02}``).
     ufcf_node : str
         Node id containing unlevered free cash flow. Default ``"ufcf"``.
     net_debt_override : float | None

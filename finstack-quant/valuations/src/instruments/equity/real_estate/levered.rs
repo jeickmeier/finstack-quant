@@ -62,10 +62,10 @@ impl RealEstateFinancing {
 /// - `PV_equity = PV_asset - PV_financing` (financing valued from lender perspective).
 ///
 /// Return/coverage metrics are computed from a simplified equity cashflow schedule:
-/// - Initial outflow: `-(purchase_price + acquisition_cost)` at `as_of`
+/// - Initial outflow: `-(purchase_price + Σ acquisition_costs)` at `as_of`
 /// - Financing funding legs on/after `as_of` are included as equity inflows
 /// - Interim equity CFs: `(NOI - CapEx) - debt_service_cash`
-/// - Exit: `(sale_proceeds - financing_payoff)` at `exit_date`
+/// - Exit: `(sale_proceeds - financing_payoff)` at the asset horizon (`asset.sale_date`, else the last NOI date)
 #[derive(
     Clone,
     Debug,
@@ -87,16 +87,6 @@ pub struct LeveredRealEstateEquity {
     #[builder(default)]
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub financing: Vec<RealEstateFinancing>,
-    /// Optional explicit exit/sale date. Defaults to the asset's valuation
-    /// horizon: `asset.sale_date` when set, else the last NOI date on/after `as_of`.
-    #[builder(optional)]
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    #[serde(with = "finstack_quant_core::wire::optional_date")]
-    #[cfg_attr(
-        feature = "json-schema",
-        schemars(with = "Option<finstack_quant_core::wire::DateWire>")
-    )]
-    pub exit_date: Option<Date>,
     /// Instrument-owned pricing inputs.
     #[builder(default)]
     #[serde(
@@ -133,15 +123,6 @@ impl LeveredRealEstateEquity {
                 expected: self.asset.currency,
                 actual: self.currency,
             });
-        }
-        if self
-            .exit_date
-            .is_some_and(|exit| exit < self.asset.valuation_date)
-        {
-            return Err(finstack_quant_core::Error::Validation(format!(
-                "LeveredRealEstateEquity '{}' exit_date cannot precede asset valuation_date {}",
-                self.id, self.asset.valuation_date
-            )));
         }
         for financing in &self.financing {
             financing.as_instrument().validate_for_pricing()?;
@@ -276,7 +257,6 @@ mod tests {
         let asset = RealEstateAsset::builder()
             .id(InstrumentId::new("RE-LEVERED-ASSET"))
             .currency(Currency::USD)
-            .valuation_date(as_of)
             .valuation_method(RealEstateValuationMethod::Dcf)
             .noi_schedule(vec![(noi1, 100.0), (noi2, 100.0)])
             .purchase_price_opt(Some(Money::from((1_000_i64, Currency::USD))))

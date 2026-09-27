@@ -46,23 +46,10 @@ pub enum CatchUpMode {
     Partial,
 }
 
-/// Hurdle types for waterfall tiers.
-#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
-#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(rename_all = "snake_case")]
-pub enum Hurdle {
-    /// IRR-based hurdle (annual rate)
-    Irr {
-        /// Rate.
-        rate: f64,
-    },
-    // Future: Moic { multiple: F } - can be added without breaking serde
-}
-
 /// Individual tranche in the waterfall.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(rename_all = "snake_case")]
+#[serde(rename_all = "snake_case", deny_unknown_fields)]
 // Distinct from the structured-credit capital-structure `Tranche`.
 #[cfg_attr(feature = "json-schema", schemars(rename = "PeFundWaterfallTranche"))]
 pub enum Tranche {
@@ -70,8 +57,9 @@ pub enum Tranche {
     ReturnOfCapital,
     /// Preferred return to LPs at specified IRR
     PreferredIrr {
-        /// Irr.
-        irr: f64,
+        /// LP preferred-return hurdle as an annual decimal IRR (`0.08` = 8%),
+        /// compounded on the spec's `day_count`.
+        hurdle_irr: f64,
     },
     /// Catch-up allocation to GP
     CatchUp {
@@ -85,10 +73,10 @@ pub enum Tranche {
     /// Promote tier with hurdle and LP/GP split.
     ///
     /// **Hard-hurdle gating semantics**: before the split activates, the LP
-    /// is paid at 100% until the LP-net IRR reaches this tier's `hurdle`;
+    /// is paid at 100% until the LP-net IRR reaches this tier's `hurdle_irr`;
     /// only cash above the hurdle is split `lp_share`/`gp_share` (cascading
     /// to the next tier once the next tier's hurdle is reached). If a
-    /// [`Tranche::CatchUp`] precedes a promote tier whose hurdle sits above
+    /// [`Tranche::CatchUp`] precedes a promote tier whose `hurdle_irr` sits above
     /// the preferred return, the LP-100% infill between the catch-up and the
     /// hurdle dilutes the GP's realized share back below the catch-up
     /// target. LPAs where all post-catch-up dollars split continuously at
@@ -96,9 +84,9 @@ pub enum Tranche {
     /// preceding preferred return (or `0.0` when there is no gap to fill),
     /// so the LP-100% infill is empty.
     PromoteTier {
-        /// IRR hurdle the LP must reach (at 100% payout) before this tier's
-        /// split activates.
-        hurdle: Hurdle,
+        /// Annual decimal IRR hurdle (`0.12` = 12%) the LP must reach (at
+        /// 100% payout) before this tier's split activates.
+        hurdle_irr: f64,
         /// LP share of each split dollar, in `[0, 1]`; must sum to 1 with
         /// `gp_share`.
         lp_share: f64,
@@ -124,23 +112,11 @@ pub enum ClawbackSettle {
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct ClawbackSpec {
-    /// Whether clawback is enabled
-    pub enable: bool,
     /// Optional share of GP carry held back until settlement, as a decimal
     /// fraction in `[0, 1]` (`0.2` = 20%)
     pub holdback_decimal: Option<f64>,
     /// When to settle clawback
     pub settle_on: ClawbackSettle,
-}
-
-impl Default for ClawbackSpec {
-    fn default() -> Self {
-        Self {
-            enable: false,
-            holdback_decimal: None,
-            settle_on: ClawbackSettle::FundEnd,
-        }
-    }
 }
 
 /// Complete waterfall specification.
@@ -155,18 +131,19 @@ pub struct WaterfallSpec {
     /// Ordered sequence of waterfall tranches
     #[cfg_attr(feature = "json-schema", schemars(with = "Vec<Tranche>"))]
     pub tranches: SmallVec<[Tranche; 8]>,
-    /// Optional clawback specification
+    /// Clawback specification; `None` means no clawback (presence is the switch)
     #[serde(default)]
     pub clawback: Option<ClawbackSpec>,
-    /// Day count basis for IRR calculations
-    #[serde(default = "default_irr_basis")]
-    pub irr_basis: DayCount,
+    /// Day count for LP/fund IRR year fractions and hurdle compounding
+    /// `(1 + hurdle_irr)^years` (default Act/365F)
+    #[serde(default = "default_day_count")]
+    pub day_count: DayCount,
     /// Catch-up mode
     #[serde(default)]
-    pub catchup_mode: CatchUpMode,
+    pub catch_up_mode: CatchUpMode,
 }
 
-fn default_irr_basis() -> DayCount {
+fn default_day_count() -> DayCount {
     DayCount::Act365F
 }
 
@@ -195,10 +172,10 @@ impl WaterfallSpec {
         for tranche in &self.tranches {
             match tranche {
                 Tranche::ReturnOfCapital => {}
-                Tranche::PreferredIrr { irr } => {
+                Tranche::PreferredIrr { hurdle_irr: irr } => {
                     if !irr.is_finite() {
                         return Err(finstack_quant_core::Error::Validation(format!(
-                            "preferred return IRR must be finite, got {irr}"
+                            "tranches[].preferred_irr.hurdle_irr must be finite, got {irr}"
                         )));
                     }
                 }
@@ -210,13 +187,13 @@ impl WaterfallSpec {
                     }
                 }
                 Tranche::PromoteTier {
-                    hurdle: Hurdle::Irr { rate },
+                    hurdle_irr: rate,
                     lp_share,
                     gp_share,
                 } => {
                     if !rate.is_finite() {
                         return Err(finstack_quant_core::Error::Validation(format!(
-                            "promote tier hurdle IRR must be finite, got {rate}"
+                            "tranches[].promote_tier.hurdle_irr must be finite, got {rate}"
                         )));
                     }
                     let sum = lp_share + gp_share;
@@ -253,8 +230,8 @@ pub struct WaterfallSpecBuilder {
     style: WaterfallStyle,
     tranches: SmallVec<[Tranche; 8]>,
     clawback: Option<ClawbackSpec>,
-    irr_basis: DayCount,
-    catchup_mode: CatchUpMode,
+    day_count: DayCount,
+    catch_up_mode: CatchUpMode,
 }
 
 impl Default for WaterfallSpecBuilder {
@@ -263,8 +240,8 @@ impl Default for WaterfallSpecBuilder {
             style: WaterfallStyle::default(),
             tranches: SmallVec::new(),
             clawback: None,
-            irr_basis: default_irr_basis(),
-            catchup_mode: CatchUpMode::default(),
+            day_count: default_day_count(),
+            catch_up_mode: CatchUpMode::default(),
         }
     }
 }
@@ -281,15 +258,25 @@ impl WaterfallSpecBuilder {
         self
     }
 
-    /// irr basis.
-    pub fn irr_basis(mut self, basis: DayCount) -> Self {
-        self.irr_basis = basis;
+    /// Set the IRR / hurdle-compounding day count.
+    ///
+    /// # Arguments
+    ///
+    /// * `day_count` - Day count for LP IRR year fractions and hurdle
+    ///   compounding (default Act/365F).
+    pub fn day_count(mut self, day_count: DayCount) -> Self {
+        self.day_count = day_count;
         self
     }
 
-    /// catchup mode.
-    pub fn catchup_mode(mut self, mode: CatchUpMode) -> Self {
-        self.catchup_mode = mode;
+    /// Set the catch-up mode.
+    ///
+    /// # Arguments
+    ///
+    /// * `mode` - Full (GP takes 100% of catch-up dollars) or partial (GP
+    ///   takes the tranche's `gp_share`).
+    pub fn catch_up_mode(mut self, mode: CatchUpMode) -> Self {
+        self.catch_up_mode = mode;
         self
     }
 
@@ -304,10 +291,11 @@ impl WaterfallSpecBuilder {
     /// # Arguments
     ///
     /// * `irr` - Annual preferred-return hurdle as a decimal rate (`0.08` =
-    ///   8%), compounded per the spec's `irr_basis` day count. Must be finite;
+    ///   8%), compounded per the spec's `day_count` day count. Must be finite;
     ///   `build()` rejects non-finite rates.
     pub fn preferred_irr(mut self, irr: f64) -> Self {
-        self.tranches.push(Tranche::PreferredIrr { irr });
+        self.tranches
+            .push(Tranche::PreferredIrr { hurdle_irr: irr });
         self
     }
 
@@ -318,7 +306,7 @@ impl WaterfallSpecBuilder {
     /// * `gp_share` - GP share of each catch-up dollar as a decimal in
     ///   `[0, 1]` (see [`Tranche::CatchUp`] for mode-dependent semantics);
     ///   `build()` rejects values outside that range.
-    pub fn catchup(mut self, gp_share: f64) -> Self {
+    pub fn catch_up(mut self, gp_share: f64) -> Self {
         self.tranches.push(Tranche::CatchUp { gp_share });
         self
     }
@@ -339,7 +327,7 @@ impl WaterfallSpecBuilder {
     ///   to 1 with `lp_share`.
     pub fn promote_tier(mut self, hurdle_irr: f64, lp_share: f64, gp_share: f64) -> Self {
         self.tranches.push(Tranche::PromoteTier {
-            hurdle: Hurdle::Irr { rate: hurdle_irr },
+            hurdle_irr,
             lp_share,
             gp_share,
         });
@@ -358,8 +346,8 @@ impl WaterfallSpecBuilder {
             style: self.style,
             tranches: self.tranches,
             clawback: self.clawback,
-            irr_basis: self.irr_basis,
-            catchup_mode: self.catchup_mode,
+            day_count: self.day_count,
+            catch_up_mode: self.catch_up_mode,
         };
         spec.validate()?;
         Ok(spec)
@@ -683,9 +671,7 @@ impl<'a> EquityWaterfallEngine<'a> {
 
         // Apply clawback if specified
         if let Some(clawback_spec) = &self.spec.clawback {
-            if clawback_spec.enable {
-                self.apply_clawback(&sorted_events, &mut ledger_rows, clawback_spec)?;
-            }
+            self.apply_clawback(&sorted_events, &mut ledger_rows, clawback_spec)?;
         }
 
         let config = FinstackConfig::default();
@@ -847,9 +833,9 @@ impl<'a> EquityWaterfallEngine<'a> {
         let lp_history =
             self.lp_net_history(params.all_events, params.prior_rows, params.allocation_date)?;
 
-        // Precompute holdback percent (0.0 if none or clawback disabled)
+        // Precompute holdback percent (0.0 if no clawback or no holdback)
         let holdback_decimal: f64 = (match &self.spec.clawback {
-            Some(c) if c.enable => c.holdback_decimal.unwrap_or(0.0),
+            Some(c) => c.holdback_decimal.unwrap_or(0.0),
             _ => 0.0,
         })
         .clamp(0.0, 1.0);
@@ -873,7 +859,7 @@ impl<'a> EquityWaterfallEngine<'a> {
                     )
                 }
 
-                Tranche::PreferredIrr { irr } => {
+                Tranche::PreferredIrr { hurdle_irr: irr } => {
                     // `calculate_preferred_amount` returns the total LP amount needed at
                     // `allocation_date` to reach `target_irr`, based on the LP-net
                     // ledger history.  Earlier tranches within this same distribution
@@ -932,7 +918,7 @@ impl<'a> EquityWaterfallEngine<'a> {
                     };
 
                     let needed_gp_gross = needed_gp_gross.max(0.0);
-                    let to_gp_gross = match self.spec.catchup_mode {
+                    let to_gp_gross = match self.spec.catch_up_mode {
                         CatchUpMode::Full => needed_gp_gross.min(remaining_amount),
                         CatchUpMode::Partial => (remaining_amount * gp_share).min(needed_gp_gross),
                     };
@@ -957,14 +943,13 @@ impl<'a> EquityWaterfallEngine<'a> {
                 Tranche::PromoteTier {
                     lp_share,
                     gp_share,
-                    hurdle,
+                    hurdle_irr: hurdle_rate,
                 } => {
                     // Gate the promote split on the LP actually reaching the
                     // tier's hurdle IRR : pay the LP at
                     // 100% until the hurdle is met, then split at
                     // lp_share/gp_share, cascading to the next tier once the
                     // next hurdle is reached.
-                    let Hurdle::Irr { rate: hurdle_rate } = hurdle;
 
                     // 1) 100% to LP until this tier's hurdle IRR is met.
                     let gross_required = self.calculate_preferred_amount(
@@ -987,10 +972,7 @@ impl<'a> EquityWaterfallEngine<'a> {
                             .iter()
                             .skip(idx + 1)
                             .find_map(|t| match t {
-                                Tranche::PromoteTier {
-                                    hurdle: Hurdle::Irr { rate },
-                                    ..
-                                } => Some(*rate),
+                                Tranche::PromoteTier { hurdle_irr, .. } => Some(*hurdle_irr),
                                 _ => None,
                             });
                     let split_amount = match next_hurdle_rate {
@@ -1220,7 +1202,7 @@ impl<'a> EquityWaterfallEngine<'a> {
                     let contrib_amount = lp_flows[0].1.amount().abs();
                     // Day-count failures are real input errors; propagate
                     // instead of silently assuming a 1-year horizon.
-                    let years = self.spec.irr_basis.year_fraction(
+                    let years = self.spec.day_count.year_fraction(
                         base_date,
                         current_date,
                         finstack_quant_core::dates::DayCountContext::default(),
@@ -1242,7 +1224,7 @@ impl<'a> EquityWaterfallEngine<'a> {
     ///
     /// Delegates to the standalone [`super::metrics::calculate_irr`] routine
     /// (same `(1 + r)^{-t}` discounting, day-count error propagation, and
-    /// multiple-root guard) using the waterfall's `irr_basis`.
+    /// multiple-root guard) using the waterfall's `day_count`.
     ///
     /// `base_date` must be the date of the first flow — the shared routine
     /// anchors year fractions there.
@@ -1256,7 +1238,7 @@ impl<'a> EquityWaterfallEngine<'a> {
             "waterfall IRR base_date must be the first flow's date"
         );
         let _ = base_date;
-        super::metrics::calculate_irr(flows, self.spec.irr_basis)
+        super::metrics::calculate_irr(flows, self.spec.day_count)
     }
 
     /// Calculate LP IRR to date from an LP-net cashflow history
@@ -1475,14 +1457,14 @@ mod tests {
             .style(WaterfallStyle::European)
             .return_of_capital()
             .preferred_irr(0.08)
-            .catchup(1.0)
+            .catch_up(1.0)
             .promote_tier(0.0, 0.8, 0.2)
             .build()
             .expect("Operation succeeded");
 
         assert_eq!(spec.style, WaterfallStyle::European);
         assert_eq!(spec.tranches.len(), 4);
-        assert_eq!(spec.irr_basis, DayCount::Act365F);
+        assert_eq!(spec.day_count, DayCount::Act365F);
     }
 
     #[test]
@@ -1697,13 +1679,13 @@ mod tests {
         let invalid_spec = WaterfallSpec {
             style: WaterfallStyle::European,
             tranches: smallvec![Tranche::PromoteTier {
-                hurdle: Hurdle::Irr { rate: 0.0 },
+                hurdle_irr: 0.0,
                 lp_share: 0.7,
                 gp_share: 0.4, // 0.7 + 0.4 = 1.1 > 1.0
             }],
             clawback: None,
-            irr_basis: DayCount::Act365F,
-            catchup_mode: CatchUpMode::Full,
+            day_count: DayCount::Act365F,
+            catch_up_mode: CatchUpMode::Full,
         };
 
         assert!(invalid_spec.validate().is_err());
@@ -1779,7 +1761,7 @@ mod tests {
             .style(WaterfallStyle::European)
             .return_of_capital()
             .preferred_irr(0.08)
-            .catchup(1.0)
+            .catch_up(1.0)
             .promote_tier(0.0, 0.8, 0.2)
             .build()
             .expect("Operation succeeded");
@@ -2017,7 +1999,6 @@ mod tests {
     #[test]
     fn clawback_fund_end_overdistribution() {
         let claw = ClawbackSpec {
-            enable: true,
             holdback_decimal: None,
             settle_on: ClawbackSettle::FundEnd,
         };
@@ -2063,7 +2044,6 @@ mod tests {
         // profit × gp_share. The old formula released 10 (= 50 × 0.2); the
         // catch-up-aware replay releases only (50 − pref) × 0.2.
         let claw = ClawbackSpec {
-            enable: true,
             holdback_decimal: Some(1.0), // all carry held back until settlement
             settle_on: ClawbackSettle::FundEnd,
         };
@@ -2119,7 +2099,6 @@ mod tests {
         // dollar, so lifetime GP entitlement is below the full-catch-up
         // profit × promote-share figure the old settlement formula used.
         let claw = ClawbackSpec {
-            enable: true,
             holdback_decimal: Some(1.0),
             settle_on: ClawbackSettle::FundEnd,
         };
@@ -2128,9 +2107,9 @@ mod tests {
             .style(WaterfallStyle::European)
             .return_of_capital()
             .preferred_irr(0.08)
-            .catchup(0.5)
+            .catch_up(0.5)
             .promote_tier(0.0, 0.8, 0.2)
-            .catchup_mode(CatchUpMode::Partial)
+            .catch_up_mode(CatchUpMode::Partial)
             .clawback(claw)
             .build()
             .expect("spec");
@@ -2248,7 +2227,6 @@ mod tests {
     #[test]
     fn period_support_clawback_settlement() {
         let claw = ClawbackSpec {
-            enable: true,
             holdback_decimal: Some(0.1),
             settle_on: ClawbackSettle::FundEnd,
         };
@@ -2291,7 +2269,6 @@ mod tests {
     #[test]
     fn periodic_clawback_overdistribution() {
         let claw = ClawbackSpec {
-            enable: true,
             holdback_decimal: None,
             settle_on: ClawbackSettle::Periodic,
         };
@@ -2460,7 +2437,7 @@ mod tests {
         for bad in [-0.1, 1.5, f64::NAN] {
             let result = WaterfallSpec::builder()
                 .return_of_capital()
-                .catchup(bad)
+                .catch_up(bad)
                 .promote_tier(0.0, 0.8, 0.2)
                 .build();
             assert!(
@@ -2477,7 +2454,6 @@ mod tests {
                 .return_of_capital()
                 .promote_tier(0.0, 0.8, 0.2)
                 .clawback(ClawbackSpec {
-                    enable: true,
                     holdback_decimal: Some(bad),
                     settle_on: ClawbackSettle::FundEnd,
                 })

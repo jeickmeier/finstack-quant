@@ -63,7 +63,7 @@ impl MetricCalculator for LpIrrCalculator {
             flows.push((context.as_of, nav));
         }
 
-        calculate_irr(&flows, pe.waterfall_spec.irr_basis)
+        calculate_irr(&flows, pe.waterfall_spec.day_count)
     }
 }
 

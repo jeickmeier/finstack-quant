@@ -51,7 +51,7 @@ const CREDIT_COLUMNS: [ColumnSchema<'static>; 6] = [
 /// Terminal value method for a DCF.
 ///
 /// Build with one of the constructors; the wire form is the tagged serde enum
-/// (``{"type": "gordon_growth", "growth_rate": 0.02}``).
+/// (``{"type": "gordon_growth", "stable_growth_rate": 0.02}``).
 ///
 /// Examples
 /// --------
@@ -77,13 +77,13 @@ impl PyTerminalValueSpec {
     ///
     /// Parameters
     /// ----------
-    /// growth_rate : float
-    ///     Perpetual growth rate ``g`` in decimal form (``0.02`` = 2%).
+    /// stable_growth_rate : float
+    ///     Perpetual stable growth rate ``g`` in decimal form (``0.02`` = 2%).
     #[staticmethod]
-    #[pyo3(text_signature = "(growth_rate)")]
-    fn gordon_growth(growth_rate: f64) -> Self {
+    #[pyo3(text_signature = "(stable_growth_rate)")]
+    fn gordon_growth(stable_growth_rate: f64) -> Self {
         Self {
-            inner: TerminalValueSpec::GordonGrowth { growth_rate },
+            inner: TerminalValueSpec::GordonGrowth { stable_growth_rate },
         }
     }
 
@@ -1091,7 +1091,7 @@ impl PyCorporateAnalysis {
 ///     Weighted average cost of capital in decimal form (``0.10`` = 10%).
 /// terminal_value : TerminalValueSpec | dict | str
 ///     Terminal value method (typed, serde dict, or tagged JSON such as
-///     ``{"type": "gordon_growth", "growth_rate": 0.02}``).
+///     ``{"type": "gordon_growth", "stable_growth_rate": 0.02}``).
 /// ufcf_node : str
 ///     Node id containing unlevered free cash flow. Default ``"ufcf"``.
 /// net_debt_override : float | None

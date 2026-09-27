@@ -55,7 +55,8 @@ pub struct CorporateValuationResult {
 pub struct DcfOptions {
     /// Enable mid-year discounting convention (default: false).
     pub mid_year_convention: bool,
-    /// Structured equity bridge (replaces flat net_debt when `Some`).
+    /// Structured equity bridge; when `Some` it is used as-is and the model's
+    /// debt/cash (and any net-debt override) are not consulted.
     pub equity_bridge: Option<EquityBridge>,
     /// Basic shares outstanding for per-share value.
     pub shares_outstanding: Option<f64>,
@@ -234,7 +235,7 @@ pub(crate) struct DcfEvalContext<'a> {
 /// let result = evaluate_dcf_with_market(
 ///     &model,
 ///     0.10,
-///     TerminalValueSpec::GordonGrowth { growth_rate: 0.02 },
+///     TerminalValueSpec::GordonGrowth { stable_growth_rate: 0.02 },
 ///     "ufcf",
 ///     Some(4_000_000.0),
 ///     &DcfOptions::default(),
@@ -387,7 +388,7 @@ pub struct DcfSensitivityResult {
 /// let tornado = dcf_sensitivity(
 ///     model,
 ///     0.10,
-///     TerminalValueSpec::GordonGrowth { growth_rate: 0.02 },
+///     TerminalValueSpec::GordonGrowth { stable_growth_rate: 0.02 },
 ///     "ufcf",
 ///     Some(0.0),
 ///     &DcfOptions::default(),
@@ -447,8 +448,8 @@ pub fn dcf_sensitivity(
     let bump = options.wacc_sensitivity_bump.abs();
     let epsilon = options.wacc_denominator_epsilon.max(0.0);
     let growth_floor: f64 = match &terminal_value {
-        TerminalValueSpec::GordonGrowth { growth_rate } => *growth_rate,
-        TerminalValueSpec::HModel {
+        TerminalValueSpec::GordonGrowth { stable_growth_rate }
+        | TerminalValueSpec::HModel {
             stable_growth_rate, ..
         } => *stable_growth_rate,
         TerminalValueSpec::ExitMultiple { .. } => f64::NEG_INFINITY,
@@ -473,8 +474,8 @@ pub fn dcf_sensitivity(
     let mut terminal_growth_up_clamped = false;
 
     match &terminal_value {
-        TerminalValueSpec::GordonGrowth { growth_rate } => {
-            let up_raw = growth_rate + bump;
+        TerminalValueSpec::GordonGrowth { stable_growth_rate } => {
+            let up_raw = stable_growth_rate + bump;
             let up = up_raw.min(growth_ceiling);
             terminal_growth_up = Some(up);
             terminal_growth_up_clamped = (up - up_raw).abs() > SENSITIVITY_CLAMP_EPSILON;
@@ -482,12 +483,14 @@ pub fn dcf_sensitivity(
                 parameter_id: SENSITIVITY_PARAM_TERMINAL_GROWTH.to_string(),
                 downside: enterprise_value(
                     TerminalValueSpec::GordonGrowth {
-                        growth_rate: growth_rate - bump,
+                        stable_growth_rate: stable_growth_rate - bump,
                     },
                     wacc,
                 )? - baseline,
                 upside: enterprise_value(
-                    TerminalValueSpec::GordonGrowth { growth_rate: up },
+                    TerminalValueSpec::GordonGrowth {
+                        stable_growth_rate: up,
+                    },
                     wacc,
                 )? - baseline,
             });
@@ -800,19 +803,19 @@ pub(crate) fn evaluate_dcf_from_results_impl(
     }
     use std::cmp::Ordering;
     match &terminal_value {
-        TerminalValueSpec::GordonGrowth { growth_rate } => {
-            if growth_rate.partial_cmp(&context.options.max_stable_growth_rate)
+        TerminalValueSpec::GordonGrowth { stable_growth_rate } => {
+            if stable_growth_rate.partial_cmp(&context.options.max_stable_growth_rate)
                 == Some(Ordering::Greater)
             {
                 return Err(finstack_quant_statements::error::Error::Eval(format!(
-                    "Gordon Growth rate ({growth_rate:.4}) exceeds the configured stable-growth \
+                    "Gordon Growth stable_growth_rate ({stable_growth_rate:.4}) exceeds the configured stable-growth \
                      ceiling ({:.4})",
                     context.options.max_stable_growth_rate
                 )));
             }
-            if growth_rate.partial_cmp(&wacc) != Some(Ordering::Less) {
+            if stable_growth_rate.partial_cmp(&wacc) != Some(Ordering::Less) {
                 return Err(finstack_quant_statements::error::Error::Eval(format!(
-                    "Gordon Growth terminal value requires growth_rate ({growth_rate:.4}) < \
+                    "Gordon Growth terminal value requires stable_growth_rate ({stable_growth_rate:.4}) < \
                      WACC ({wacc:.4}). A growth rate >= WACC produces an infinite terminal value."
                 )));
             }
@@ -897,10 +900,17 @@ pub(crate) fn evaluate_dcf_from_results_impl(
         .filter(|period| period.end - time::Duration::days(1) <= valuation_date)
         .max_by_key(|period| period.end)
         .map(|period| period.id);
-    let net_debt = if let Some(override_val) = context.net_debt_override {
-        override_val
+    // One EV-to-equity channel: an explicit bridge wins; otherwise a flat
+    // net-debt override (debt only); otherwise debt and cash from the model.
+    let equity_bridge = if let Some(bridge) = &context.options.equity_bridge {
+        bridge.clone()
+    } else if let Some(override_val) = context.net_debt_override {
+        EquityBridge {
+            total_debt: override_val,
+            ..EquityBridge::default()
+        }
     } else {
-        calculate_net_debt_from_model(model, results, net_debt_period)?
+        equity_bridge_from_model(model, results, net_debt_period)?
     };
 
     // The discount curve id is risk-attribution metadata only: the DCF
@@ -916,15 +926,12 @@ pub(crate) fn evaluate_dcf_from_results_impl(
         .flows(flows)
         .wacc(wacc)
         .terminal_value(terminal_value)
-        .net_debt(net_debt)
+        .equity_bridge(equity_bridge)
         .valuation_date(valuation_date)
         .mid_year_convention(context.options.mid_year_convention)
         .terminal_flow_override_opt(terminal_flow_override)
         .attributes(Attributes::new());
 
-    if let Some(ref bridge) = context.options.equity_bridge {
-        builder = builder.equity_bridge(bridge.clone());
-    }
     if let Some(shares) = context.options.shares_outstanding {
         builder = builder.shares_outstanding(shares);
     }
@@ -996,16 +1003,16 @@ pub(crate) fn extract_currency_from_model(model: &FinancialModelSpec) -> Result<
     )))
 }
 
-/// Calculate net debt from the model.
+/// Build the debt-and-cash equity bridge from the model's balance sheet.
 ///
 /// Net Debt = Total Debt - Cash
 ///
 /// This function attempts to find debt and cash nodes in the model results.
-fn calculate_net_debt_from_model(
+fn equity_bridge_from_model(
     model: &FinancialModelSpec,
     results: &finstack_quant_statements::evaluator::StatementResult,
     balance_sheet_period: Option<finstack_quant_core::dates::PeriodId>,
-) -> Result<f64> {
+) -> Result<EquityBridge> {
     // A future forecast balance cannot stand in for the opening balance sheet.
     let selected_period_id = balance_sheet_period.ok_or_else(|| finstack_quant_statements::error::Error::Eval(
         "No balance-sheet period ends on or before the valuation date; provide an opening balance or net_debt_override".into()
@@ -1023,7 +1030,11 @@ fn calculate_net_debt_from_model(
     let total_debt = component(["total_debt", "debt"])?;
     let cash = component(["cash", "cash_and_equivalents"])?;
 
-    Ok(total_debt - cash)
+    Ok(EquityBridge {
+        total_debt,
+        cash,
+        ..EquityBridge::default()
+    })
 }
 
 /// Replace an exit-multiple `terminal_metric` with the last forecast
@@ -1155,7 +1166,9 @@ mod tests {
         let result = evaluate_dcf_with_market(
             &model,
             0.10,
-            TerminalValueSpec::GordonGrowth { growth_rate: 0.02 },
+            TerminalValueSpec::GordonGrowth {
+                stable_growth_rate: 0.02,
+            },
             "ufcf",
             None,
             &DcfOptions::default(),
@@ -1190,7 +1203,9 @@ mod tests {
         let result = evaluate_dcf_with_market(
             &model,
             0.10,
-            TerminalValueSpec::GordonGrowth { growth_rate: 0.02 },
+            TerminalValueSpec::GordonGrowth {
+                stable_growth_rate: 0.02,
+            },
             "ufcf",
             None,
             &DcfOptions::default(),
@@ -1235,7 +1250,9 @@ mod tests {
         let result = dcf_sensitivity(
             &model,
             0.10,
-            TerminalValueSpec::GordonGrowth { growth_rate: 0.02 },
+            TerminalValueSpec::GordonGrowth {
+                stable_growth_rate: 0.02,
+            },
             "ufcf",
             Some(0.0),
             &DcfOptions::default(),
@@ -1291,7 +1308,9 @@ mod tests {
         let result = dcf_sensitivity(
             &model,
             0.06,
-            TerminalValueSpec::GordonGrowth { growth_rate: 0.055 },
+            TerminalValueSpec::GordonGrowth {
+                stable_growth_rate: 0.055,
+            },
             "ufcf",
             Some(0.0),
             &options,

@@ -74,7 +74,7 @@ struct DcfSpec {
 ///     .build();
 ///
 /// let _result = CorporateAnalysisBuilder::new(model)
-///     .dcf(0.10, TerminalValueSpec::GordonGrowth { growth_rate: 0.02 })
+///     .dcf(0.10, TerminalValueSpec::GordonGrowth { stable_growth_rate: 0.02 })
 ///     .net_debt_override(450_000.0)
 ///     .checks(checks)
 ///     .analyze()?;
@@ -187,7 +187,7 @@ impl CorporateAnalysisBuilder {
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// let model = ModelBuilder::new("demo").periods("2025Q1..Q4", None)?.build()?;
     /// let _builder = CorporateAnalysisBuilder::new(model)
-    ///     .dcf(0.10, TerminalValueSpec::GordonGrowth { growth_rate: 0.02 });
+    ///     .dcf(0.10, TerminalValueSpec::GordonGrowth { stable_growth_rate: 0.02 });
     /// # Ok(())
     /// # }
     /// ```
@@ -617,7 +617,12 @@ mod tests {
             .expect("model");
 
         let result = CorporateAnalysisBuilder::new(model)
-            .dcf(0.10, TerminalValueSpec::GordonGrowth { growth_rate: 0.02 })
+            .dcf(
+                0.10,
+                TerminalValueSpec::GordonGrowth {
+                    stable_growth_rate: 0.02,
+                },
+            )
             .net_debt_override(50_000.0)
             .checks(non_finite_suite())
             .analyze()
@@ -647,7 +652,12 @@ mod tests {
             .expect("model");
 
         let error = CorporateAnalysisBuilder::new(model)
-            .dcf(0.10, TerminalValueSpec::GordonGrowth { growth_rate: 0.02 })
+            .dcf(
+                0.10,
+                TerminalValueSpec::GordonGrowth {
+                    stable_growth_rate: 0.02,
+                },
+            )
             .net_debt_override(0.0)
             .analyze()
             .expect_err("unchecked valuation must fail");
@@ -666,7 +676,12 @@ mod tests {
             .expect("model");
 
         let error = CorporateAnalysisBuilder::new(model)
-            .dcf(0.10, TerminalValueSpec::GordonGrowth { growth_rate: 0.02 })
+            .dcf(
+                0.10,
+                TerminalValueSpec::GordonGrowth {
+                    stable_growth_rate: 0.02,
+                },
+            )
             .net_debt_override(0.0)
             .checks(non_finite_suite())
             .analyze()
@@ -691,7 +706,12 @@ mod tests {
             .expect("model");
 
         let result = CorporateAnalysisBuilder::new(model)
-            .dcf(0.10, TerminalValueSpec::GordonGrowth { growth_rate: 0.02 })
+            .dcf(
+                0.10,
+                TerminalValueSpec::GordonGrowth {
+                    stable_growth_rate: 0.02,
+                },
+            )
             .net_debt_override(0.0)
             .checks(non_finite_suite())
             .analyze()
@@ -746,7 +766,12 @@ mod tests {
         let result = CorporateAnalysisBuilder::new(model)
             .market(market)
             .as_of(as_of)
-            .dcf(0.10, TerminalValueSpec::GordonGrowth { growth_rate: 0.02 })
+            .dcf(
+                0.10,
+                TerminalValueSpec::GordonGrowth {
+                    stable_growth_rate: 0.02,
+                },
+            )
             .net_debt_override(0.0)
             .cfads_node("ufcf")
             .interest_coverage_node("revenue")

@@ -239,7 +239,9 @@ fn dcf_opening_debt_is_available_on_the_inclusive_reporting_date() {
         let result = evaluate_dcf_with_market(
             &model,
             0.10,
-            TerminalValueSpec::GordonGrowth { growth_rate: 0.02 },
+            TerminalValueSpec::GordonGrowth {
+                stable_growth_rate: 0.02,
+            },
             "ufcf",
             None,
             &DcfOptions::default(),
@@ -253,7 +255,9 @@ fn dcf_opening_debt_is_available_on_the_inclusive_reporting_date() {
     let result = evaluate_dcf_with_market(
         &mixed,
         0.10,
-        TerminalValueSpec::GordonGrowth { growth_rate: 0.02 },
+        TerminalValueSpec::GordonGrowth {
+            stable_growth_rate: 0.02,
+        },
         "ufcf",
         None,
         &DcfOptions::default(),

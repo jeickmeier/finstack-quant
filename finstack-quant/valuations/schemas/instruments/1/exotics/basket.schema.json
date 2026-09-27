@@ -4733,10 +4733,6 @@
       "additionalProperties": false,
       "description": "Clawback specification for GP carry reconciliation.",
       "properties": {
-        "enable": {
-          "description": "Whether clawback is enabled",
-          "type": "boolean"
-        },
         "holdback_decimal": {
           "description": "Optional share of GP carry held back until settlement, as a decimal\nfraction in `[0, 1]` (`0.2` = 20%)",
           "format": "double",
@@ -4751,7 +4747,6 @@
         }
       },
       "required": [
-        "enable",
         "settle_on"
       ],
       "type": "object"
@@ -8752,7 +8747,7 @@
     },
     "DiscountedCashFlow": {
       "additionalProperties": false,
-      "description": "Discounted Cash Flow instrument for corporate valuation.\n\nDCF values a company by discounting projected free cash flows and terminal value.\nThe equity value is calculated as: Enterprise Value - Net Debt (or structured bridge).\n\n# Equity Bridge\n\nWhen [`equity_bridge`](Self::equity_bridge) is `Some`, it takes precedence over\nthe flat [`net_debt`](Self::net_debt) field for the EV-to-equity conversion.\n\n# Mid-Year Convention\n\nWhen [`mid_year_convention`](Self::mid_year_convention) is `true`, cash flows are\ndiscounted at `t` minus half the average flow spacing instead of `t` years,\nreflecting the assumption that cash flows arrive mid-period (standard IB/PE\npractice). For annual grids this is the classic `(t - 0.5)`; for sub-annual\ngrids the shift is half a period. `ExitMultiple` terminal values always\ndiscount at the full horizon (a point-in-time sale price).\n\n# Valuation Discounts\n\nPrivate company valuations can apply DLOM, DLOC, and other discounts via\n[`valuation_discounts`](Self::valuation_discounts). These discounts apply\nafter the EV-to-equity bridge, so the reported enterprise value remains a\npre-discount enterprise value and does not equal discounted equity value\nplus net debt.",
+      "description": "Discounted Cash Flow instrument for corporate valuation.\n\nDCF values a company by discounting projected free cash flows and terminal value.\nThe equity value is calculated as: Enterprise Value - Net Debt (or structured bridge).\n\n# Equity Bridge\n\n[`equity_bridge`](Self::equity_bridge) is the single EV-to-equity channel; a\nflat net-debt deduction sets only its `total_debt` and `cash`.\n\n# Mid-Year Convention\n\nWhen [`mid_year_convention`](Self::mid_year_convention) is `true`, cash flows are\ndiscounted at `t` minus half the average flow spacing instead of `t` years,\nreflecting the assumption that cash flows arrive mid-period (standard IB/PE\npractice). For annual grids this is the classic `(t - 0.5)`; for sub-annual\ngrids the shift is half a period. `ExitMultiple` terminal values always\ndiscount at the full horizon (a point-in-time sale price).\n\n# Valuation Discounts\n\nPrivate company valuations can apply DLOM, DLOC, and other discounts via\n[`valuation_discounts`](Self::valuation_discounts). These discounts apply\nafter the EV-to-equity bridge, so the reported enterprise value remains a\npre-discount enterprise value and does not equal discounted equity value\nplus net debt.",
       "properties": {
         "attributes": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/attributes.schema.json",
@@ -8771,16 +8766,8 @@
           "type": "array"
         },
         "equity_bridge": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/EquityBridge"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "description": "Structured equity bridge for EV-to-equity conversion.\n\nWhen present, takes precedence over the flat `net_debt` field."
+          "$ref": "#/$defs/EquityBridge",
+          "description": "Equity bridge from enterprise value to equity value (debt, cash,\npreferred equity, minority interest, non-operating assets and other\nadjustments), in instrument currency."
         },
         "flows": {
           "description": "Explicit period free cash flows (date, amount pairs).",
@@ -8820,11 +8807,6 @@
           "default": false,
           "description": "Discount curve identifier, used for risk attribution only.\n\nDiscounting always uses [`wacc`](Self::wacc) via `(1 + wacc)^{-t}`\nregardless of whether this curve is loaded (the\nprevious behavior silently switched risky flows to risk-free curve\ndiscounting). WACC sensitivity is exposed separately as `dcf::wacc01`.\nMid-year discounting convention (default: `false` = end-of-period).\n\nWhen `true`, each flow is discounted at `t` minus half the average\nflow spacing instead of `t` (the classic `t - 0.5` for annual\ngrids; half a period for sub-annual grids), reflecting the\nassumption that cash flows arrive mid-period. This is the standard\nconvention in IB/PE practice (Koller et al.). Exit-multiple\nterminal values are not shifted (point-in-time sale at the horizon).",
           "type": "boolean"
-        },
-        "net_debt": {
-          "description": "Net debt (debt - cash) to subtract from enterprise value.\n\nIgnored when [`equity_bridge`](Self::equity_bridge) is `Some`.",
-          "format": "double",
-          "type": "number"
         },
         "scenario_pricing_overrides": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/scenario_pricing_overrides.schema.json",
@@ -8881,8 +8863,8 @@
         "flows",
         "wacc",
         "terminal_value",
-        "net_debt",
         "valuation_date",
+        "equity_bridge",
         "attributes"
       ],
       "type": "object"
@@ -9345,7 +9327,7 @@
     },
     "EquityBridge": {
       "additionalProperties": false,
-      "description": "Structured equity bridge for converting Enterprise Value to Equity Value.\n\nStandard professional bridge:\n```text\nEquity = EV - Total Debt + Cash - Preferred Equity - Minority Interest\n         + Non-Operating Assets + Σ(other adjustments)\n```\n\nWhen attached to a [`DiscountedCashFlow`], this takes precedence over the\nflat `net_debt` scalar.",
+      "description": "Structured equity bridge for converting Enterprise Value to Equity Value.\n\nStandard professional bridge:\n```text\nEquity = EV - Total Debt + Cash - Preferred Equity - Minority Interest\n         + Non-Operating Assets + Σ(other adjustments)\n```\n\nEvery [`DiscountedCashFlow`] carries one; a flat net-debt deduction is\nwritten as `EquityBridge { total_debt, cash, ..Default::default() }`.",
       "properties": {
         "cash": {
           "default": 0.0,
@@ -12883,29 +12865,6 @@
       ],
       "type": "object"
     },
-    "Hurdle": {
-      "additionalProperties": false,
-      "description": "Hurdle types for waterfall tiers.",
-      "properties": {
-        "irr": {
-          "properties": {
-            "rate": {
-              "description": "Rate.",
-              "format": "double",
-              "type": "number"
-            }
-          },
-          "required": [
-            "rate"
-          ],
-          "type": "object"
-        }
-      },
-      "required": [
-        "irr"
-      ],
-      "type": "object"
-    },
     "ImMethodology": {
       "description": "Initial margin calculation methodology.\n\nDifferent methodologies are used depending on regulatory requirements,\nproduct type, and whether trades are cleared or bilateral.\n\n# BCBS-IOSCO Standards\n\nFor bilateral (uncleared) OTC derivatives, either SIMM or the regulatory\nschedule approach may be used. SIMM is the industry standard for large\ndealers due to its risk-sensitivity.",
       "oneOf": [
@@ -15433,7 +15392,7 @@
     },
     "LeveredRealEstateEquity": {
       "additionalProperties": false,
-      "description": "Levered real estate equity = unlevered asset + financing.\n\nValue convention:\n- `PV_equity = PV_asset - PV_financing` (financing valued from lender perspective).\n\nReturn/coverage metrics are computed from a simplified equity cashflow schedule:\n- Initial outflow: `-(purchase_price + acquisition_cost)` at `as_of`\n- Financing funding legs on/after `as_of` are included as equity inflows\n- Interim equity CFs: `(NOI - CapEx) - debt_service_cash`\n- Exit: `(sale_proceeds - financing_payoff)` at `exit_date`",
+      "description": "Levered real estate equity = unlevered asset + financing.\n\nValue convention:\n- `PV_equity = PV_asset - PV_financing` (financing valued from lender perspective).\n\nReturn/coverage metrics are computed from a simplified equity cashflow schedule:\n- Initial outflow: `-(purchase_price + Σ acquisition_costs)` at `as_of`\n- Financing funding legs on/after `as_of` are included as equity inflows\n- Interim equity CFs: `(NOI - CapEx) - debt_service_cash`\n- Exit: `(sale_proceeds - financing_payoff)` at the asset horizon (`asset.sale_date`, else the last NOI date)",
       "properties": {
         "asset": {
           "$ref": "#/$defs/RealEstateAsset",
@@ -15446,17 +15405,6 @@
         "currency": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/currency.schema.json",
           "description": "Currency (must match asset currency; financing PV is validated at valuation time)."
-        },
-        "exit_date": {
-          "anyOf": [
-            {
-              "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "Optional explicit exit/sale date. Defaults to the asset's valuation\nhorizon: `asset.sale_date` when set, else the last NOI date on/after `as_of`."
         },
         "financing": {
           "description": "Supported borrower liabilities, valued from the lender perspective and\nnetted from asset PV.",
@@ -17257,7 +17205,7 @@
       "additionalProperties": false,
       "description": "Complete waterfall specification.",
       "properties": {
-        "catchup_mode": {
+        "catch_up_mode": {
           "$ref": "#/$defs/CatchUpMode",
           "default": "full",
           "description": "Catch-up mode"
@@ -17272,12 +17220,12 @@
             }
           ],
           "default": null,
-          "description": "Optional clawback specification"
+          "description": "Clawback specification; `None` means no clawback (presence is the switch)"
         },
-        "irr_basis": {
+        "day_count": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/day_count.schema.json",
           "default": "act_365f",
-          "description": "Day count basis for IRR calculations"
+          "description": "Day count for LP/fund IRR year fractions and hurdle compounding\n`(1 + hurdle_irr)^years` (default Act/365F)"
         },
         "style": {
           "$ref": "#/$defs/WaterfallStyle",
@@ -17310,15 +17258,16 @@
           "description": "Preferred return to LPs at specified IRR",
           "properties": {
             "preferred_irr": {
+              "additionalProperties": false,
               "properties": {
-                "irr": {
-                  "description": "Irr.",
+                "hurdle_irr": {
+                  "description": "LP preferred-return hurdle as an annual decimal IRR (`0.08` = 8%),\ncompounded on the spec's `day_count`.",
                   "format": "double",
                   "type": "number"
                 }
               },
               "required": [
-                "irr"
+                "hurdle_irr"
               ],
               "type": "object"
             }
@@ -17333,6 +17282,7 @@
           "description": "Catch-up allocation to GP",
           "properties": {
             "catch_up": {
+              "additionalProperties": false,
               "properties": {
                 "gp_share": {
                   "description": "GP share of each catch-up dollar, in `[0, 1]`. In\n[`CatchUpMode::Partial`] this caps the GP's take per dollar; in\n[`CatchUpMode::Full`] the GP takes 100% of catch-up dollars and\nthis value is only the fallback target share when no promote tier\nfollows.",
@@ -17353,18 +17303,20 @@
         },
         {
           "additionalProperties": false,
-          "description": "Promote tier with hurdle and LP/GP split.\n\n**Hard-hurdle gating semantics**: before the split activates, the LP\nis paid at 100% until the LP-net IRR reaches this tier's `hurdle`;\nonly cash above the hurdle is split `lp_share`/`gp_share` (cascading\nto the next tier once the next tier's hurdle is reached). If a\n[`Tranche::CatchUp`] precedes a promote tier whose hurdle sits above\nthe preferred return, the LP-100% infill between the catch-up and the\nhurdle dilutes the GP's realized share back below the catch-up\ntarget. LPAs where all post-catch-up dollars split continuously at\n`lp_share`/`gp_share` should set this tier's hurdle equal to the\npreceding preferred return (or `0.0` when there is no gap to fill),\nso the LP-100% infill is empty.",
+          "description": "Promote tier with hurdle and LP/GP split.\n\n**Hard-hurdle gating semantics**: before the split activates, the LP\nis paid at 100% until the LP-net IRR reaches this tier's `hurdle_irr`;\nonly cash above the hurdle is split `lp_share`/`gp_share` (cascading\nto the next tier once the next tier's hurdle is reached). If a\n[`Tranche::CatchUp`] precedes a promote tier whose `hurdle_irr` sits above\nthe preferred return, the LP-100% infill between the catch-up and the\nhurdle dilutes the GP's realized share back below the catch-up\ntarget. LPAs where all post-catch-up dollars split continuously at\n`lp_share`/`gp_share` should set this tier's hurdle equal to the\npreceding preferred return (or `0.0` when there is no gap to fill),\nso the LP-100% infill is empty.",
           "properties": {
             "promote_tier": {
+              "additionalProperties": false,
               "properties": {
                 "gp_share": {
                   "description": "GP share of each split dollar, in `[0, 1]`; must sum to 1 with\n`lp_share`.",
                   "format": "double",
                   "type": "number"
                 },
-                "hurdle": {
-                  "$ref": "#/$defs/Hurdle",
-                  "description": "IRR hurdle the LP must reach (at 100% payout) before this tier's\nsplit activates."
+                "hurdle_irr": {
+                  "description": "Annual decimal IRR hurdle (`0.12` = 12%) the LP must reach (at\n100% payout) before this tier's split activates.",
+                  "format": "double",
+                  "type": "number"
                 },
                 "lp_share": {
                   "description": "LP share of each split dollar, in `[0, 1]`; must sum to 1 with\n`gp_share`.",
@@ -17373,7 +17325,7 @@
                 }
               },
               "required": [
-                "hurdle",
+                "hurdle_irr",
                 "lp_share",
                 "gp_share"
               ],
@@ -18952,18 +18904,9 @@
       "additionalProperties": false,
       "description": "Real estate asset valuation instrument.\n\nSupports DCF (explicit NOI schedule) and direct capitalization valuation.",
       "properties": {
-        "acquisition_cost": {
-          "default": null,
-          "description": "Optional one-time acquisition cost deducted at `as_of` in DCF valuation.\n\nThis is intended for closing costs, fees, and other transaction costs.",
-          "format": "double",
-          "type": [
-            "number",
-            "null"
-          ]
-        },
         "acquisition_costs": {
           "default": [],
-          "description": "Optional detailed acquisition cost line items (positive outflows) deducted at `as_of`.",
+          "description": "Acquisition (closing) cost line items in instrument currency, as\npositive outflow magnitudes deducted at `as_of` in DCF valuation.",
           "items": {
             "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json"
           },
@@ -19165,10 +19108,6 @@
             "null"
           ]
         },
-        "valuation_date": {
-          "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
-          "description": "Valuation date (base date for discounting)."
-        },
         "valuation_method": {
           "$ref": "#/$defs/RealEstateValuationMethod",
           "description": "Valuation method (DCF or DirectCap)."
@@ -19177,7 +19116,6 @@
       "required": [
         "id",
         "currency",
-        "valuation_date",
         "valuation_method",
         "noi_schedule",
         "day_count"
@@ -22450,8 +22388,8 @@
         {
           "description": "Gordon Growth Model: TV = FCF_terminal × (1 + g) / (WACC - g)",
           "properties": {
-            "growth_rate": {
-              "description": "Perpetual growth rate (e.g., 0.02 for 2%)",
+            "stable_growth_rate": {
+              "description": "Perpetual stable growth rate as an annual decimal (e.g., 0.02 for\n2%). Must be < WACC.",
               "format": "double",
               "type": "number"
             },
@@ -22462,7 +22400,7 @@
           },
           "required": [
             "type",
-            "growth_rate"
+            "stable_growth_rate"
           ],
           "type": "object"
         },

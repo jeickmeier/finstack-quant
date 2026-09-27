@@ -95,7 +95,12 @@ fn test_full_lbo_analysis() {
     let analysis = CorporateAnalysisBuilder::new(model)
         .market(market)
         .as_of(time::macros::date!(2025 - 01 - 01))
-        .dcf(0.10, TerminalValueSpec::GordonGrowth { growth_rate: 0.02 })
+        .dcf(
+            0.10,
+            TerminalValueSpec::GordonGrowth {
+                stable_growth_rate: 0.02,
+            },
+        )
         .net_debt_override(20_000_000.0)
         .cfads_node("ufcf")
         .interest_coverage_node("ebitda")

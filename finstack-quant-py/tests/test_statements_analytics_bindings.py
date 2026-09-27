@@ -129,7 +129,7 @@ class TestEvaluateDcf:
             [("2025", Money(100.0, "USD")), ("2026", Money(110.0, "USD"))],
         )
         b.with_meta("currency", '"USD"')
-        terminal = '{"type":"gordon_growth","growth_rate":0.02}'
+        terminal = '{"type":"gordon_growth","stable_growth_rate":0.02}'
         with pytest.raises(ValueError, match="as_of"):
             evaluate_dcf(
                 b.build(),

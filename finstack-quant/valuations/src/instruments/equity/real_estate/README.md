@@ -24,7 +24,7 @@ Import path: `finstack_quant_valuations::instruments::equity::real_estate`
 | `RealEstateValuationMethod` | `Dcf` or `DirectCap`. |
 | `RealEstatePropertyType` | `Office`, `Multifamily`, `Retail`, `Industrial`, `Hospitality`, `MixedUse`, `Other`. |
 | `RealEstateFinancing` | Supported financing union: bond, term loan, revolving credit, or repo. |
-| `LeveredRealEstateEquity` | Asset + `Vec<RealEstateFinancing>` with an optional `exit_date`. |
+| `LeveredRealEstateEquity` | Asset + `Vec<RealEstateFinancing>`; its exit follows the asset `sale_date`. |
 
 ## Module layout
 
@@ -51,7 +51,7 @@ cashflow helpers used by `LeveredRealEstateEquity`.
 ## Levered equity composition
 
 `LeveredRealEstateEquity` holds `asset: RealEstateAsset`,
-`financing: Vec<RealEstateFinancing>` and an optional `exit_date`.
+`financing: Vec<RealEstateFinancing>`; its exit is the asset horizon (`sale_date`, else the last NOI date).
 
 - **Value convention**: `PV_equity = PV_asset − PV_financing`, with financing
   valued from the lender's perspective.
@@ -79,10 +79,8 @@ cashflow helpers used by `LeveredRealEstateEquity`.
 - **Horizon**: with `sale_date` set, DCF valuation, the cashflow schedule and
   every return metric truncate at `sale_date` and realize terminal proceeds
   there. Otherwise the horizon is the last NOI date on or after `as_of`. Flows
-  dated exactly on `as_of` are included undiscounted. `validate()` requires
-  `sale_date` to be **strictly after `valuation_date`** — note that the check is
-  against the instrument's own `valuation_date`, not the `as_of` passed at
-  pricing time.
+  dated exactly on `as_of` are included undiscounted. Pricing requires `sale_date` on or after `as_of`; the
+  instrument stores no valuation date of its own.
 - **Terminal value**:
   - `sale_price` set → gross proceeds are `sale_price`, realized at `sale_date`
     (or the last NOI date). Cap-rate sensitivity is then zero by construction.
@@ -100,11 +98,11 @@ cashflow helpers used by `LeveredRealEstateEquity`.
 
 | Group | Fields |
 |-------|--------|
-| Core | `id`, `currency`, `valuation_date`, `valuation_method`, `noi_schedule`, `day_count` |
+| Core | `id`, `currency`, `valuation_method`, `noi_schedule`, `day_count` |
 | DCF | `discount_rate` (required), `terminal_cap_rate`, `terminal_growth_rate` |
 | Direct cap | `cap_rate` (required), `stabilized_noi` |
 | Sale modeling | `sale_date`, `sale_price` |
-| Transaction | `purchase_price`, `acquisition_cost` (scalar) and/or `acquisition_costs` (line items), `disposition_cost_decimal` and/or `disposition_costs` |
+| Transaction | `purchase_price`, `acquisition_costs` (line items), `disposition_cost_decimal` and/or `disposition_costs` |
 | Cashflow realism | `capex_schedule` |
 | Override | `appraisal_value` |
 
@@ -127,7 +125,6 @@ let noi_schedule: Vec<(Date, f64)> = vec![
 let asset = RealEstateAsset::builder()
     .id(InstrumentId::new("RE-OFFICE-DCF"))
     .currency(Currency::USD)
-    .valuation_date(date!(2025 - 01 - 01))
     .valuation_method(RealEstateValuationMethod::Dcf)
     .property_type_opt(Some(RealEstatePropertyType::Office))
     .noi_schedule(noi_schedule)

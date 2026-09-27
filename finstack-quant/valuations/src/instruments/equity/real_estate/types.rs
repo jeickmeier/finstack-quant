@@ -60,13 +60,6 @@ pub struct RealEstateAsset {
     pub id: InstrumentId,
     /// Currency for valuation.
     pub currency: Currency,
-    /// Valuation date (base date for discounting).
-    #[serde(with = "finstack_quant_core::wire::date")]
-    #[cfg_attr(
-        feature = "json-schema",
-        schemars(with = "finstack_quant_core::wire::DateWire")
-    )]
-    pub valuation_date: Date,
     /// Valuation method (DCF or DirectCap).
     pub valuation_method: RealEstateValuationMethod,
     /// Optional property type classification (for reporting).
@@ -146,13 +139,8 @@ pub struct RealEstateAsset {
     #[builder(optional)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub purchase_price: Option<Money>,
-    /// Optional one-time acquisition cost deducted at `as_of` in DCF valuation.
-    ///
-    /// This is intended for closing costs, fees, and other transaction costs.
-    #[builder(optional)]
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub acquisition_cost: Option<f64>,
-    /// Optional detailed acquisition cost line items (positive outflows) deducted at `as_of`.
+    /// Acquisition (closing) cost line items in instrument currency, as
+    /// positive outflow magnitudes deducted at `as_of` in DCF valuation.
     #[builder(default)]
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub acquisition_costs: Vec<Money>,
@@ -209,13 +197,6 @@ struct RealEstateAssetUnchecked {
     id: InstrumentId,
     /// Currency for valuation.
     currency: Currency,
-    /// Valuation date (base date for discounting).
-    #[serde(with = "finstack_quant_core::wire::date")]
-    #[cfg_attr(
-        feature = "json-schema",
-        schemars(with = "finstack_quant_core::wire::DateWire")
-    )]
-    valuation_date: Date,
     /// Valuation method (DCF or DirectCap).
     valuation_method: RealEstateValuationMethod,
     /// Optional property type classification (for reporting).
@@ -276,12 +257,8 @@ struct RealEstateAssetUnchecked {
     /// Optional purchase price (useful for IRR / cap rate metrics).
     #[serde(default)]
     purchase_price: Option<Money>,
-    /// Optional one-time acquisition cost deducted at `as_of` in DCF valuation.
-    ///
-    /// This is intended for closing costs, fees, and other transaction costs.
-    #[serde(default)]
-    acquisition_cost: Option<f64>,
-    /// Optional detailed acquisition cost line items (positive outflows) deducted at `as_of`.
+    /// Acquisition (closing) cost line items in instrument currency, as
+    /// positive outflow magnitudes deducted at `as_of` in DCF valuation.
     #[serde(default)]
     acquisition_costs: Vec<Money>,
     /// Optional disposition cost percentage applied to terminal value.
@@ -318,7 +295,6 @@ impl TryFrom<RealEstateAssetUnchecked> for RealEstateAsset {
         let inst = Self {
             id: value.id,
             currency: value.currency,
-            valuation_date: value.valuation_date,
             valuation_method: value.valuation_method,
             property_type: value.property_type,
             noi_schedule: value.noi_schedule,
@@ -331,7 +307,6 @@ impl TryFrom<RealEstateAssetUnchecked> for RealEstateAsset {
             sale_date: value.sale_date,
             sale_price: value.sale_price,
             purchase_price: value.purchase_price,
-            acquisition_cost: value.acquisition_cost,
             acquisition_costs: value.acquisition_costs,
             disposition_cost_decimal: value.disposition_cost_decimal,
             disposition_costs: value.disposition_costs,
@@ -366,8 +341,7 @@ impl RealEstateAsset {
     /// - `terminal_growth_rate` is set but outside `[-1.0, 0.20]` (sanity band:
     ///   prevents `1 + g <= 0` and unreasonably high terminal growth)
     /// - `disposition_cost_decimal` is set but outside `[0.0, 1.0)`
-    /// - `acquisition_cost` is set but non-finite or negative, or any
-    ///   `acquisition_costs` / `disposition_costs` line item is non-finite or
+    /// - any `acquisition_costs` / `disposition_costs` line item is non-finite or
     ///   negative (all cost inputs are magnitude-positive outflows; the pricer
     ///   applies the outflow sign)
     /// - `valuation_method == DirectCap` without `cap_rate` (unless an
@@ -375,7 +349,6 @@ impl RealEstateAsset {
     /// - `valuation_method == Dcf` without `discount_rate` (unless an
     ///   `appraisal_value` short-circuits pricing) — DCF always discounts at
     ///   the property rate
-    /// - `sale_date` (when set) is on or before `valuation_date`
     pub fn validate(&self) -> finstack_quant_core::Result<()> {
         if self.noi_schedule.is_empty() {
             return Err(finstack_quant_core::Error::Validation(format!(
@@ -497,16 +470,6 @@ impl RealEstateAsset {
                 )));
             }
         }
-        if let Some(cost) = self.acquisition_cost {
-            if !cost.is_finite() || cost < 0.0 {
-                return Err(finstack_quant_core::Error::Validation(format!(
-                    "RealEstateAsset '{}' acquisition_cost must be a finite, non-negative \
-                     outflow magnitude, got {}",
-                    self.id.as_str(),
-                    cost
-                )));
-            }
-        }
         for (label, items) in [
             ("acquisition_costs", &self.acquisition_costs),
             ("disposition_costs", &self.disposition_costs),
@@ -545,16 +508,6 @@ impl RealEstateAsset {
                 self.id.as_str()
             )));
         }
-        if let Some(sd) = self.sale_date {
-            if sd <= self.valuation_date {
-                return Err(finstack_quant_core::Error::Validation(format!(
-                    "RealEstateAsset '{}' sale_date {} must be after valuation_date {}",
-                    self.id.as_str(),
-                    sd,
-                    self.valuation_date
-                )));
-            }
-        }
         Ok(())
     }
 
@@ -565,7 +518,6 @@ impl RealEstateAsset {
     pub fn example() -> finstack_quant_core::Result<Self> {
         use finstack_quant_core::dates::DayCount;
 
-        let valuation_date = time::macros::date!(2025 - 01 - 01);
         let noi_schedule: Vec<(Date, f64)> = (1..=5)
             .map(|y| {
                 Date::from_calendar_date(2025 + y, time::Month::January, 1)
@@ -577,7 +529,6 @@ impl RealEstateAsset {
         Self::builder()
             .id(InstrumentId::new("RE-OFFICE-DCF"))
             .currency(Currency::USD)
-            .valuation_date(valuation_date)
             .valuation_method(RealEstateValuationMethod::Dcf)
             .property_type_opt(Some(RealEstatePropertyType::Office))
             .noi_schedule(noi_schedule)
@@ -592,12 +543,12 @@ impl RealEstateAsset {
         pricer::acquisition_cost_total(self)
     }
 
-    /// Compute net sale proceeds (undiscounted) realized at `exit_date`, if configured.
+    /// Compute net sale proceeds (undiscounted) realized at `horizon`, if configured.
     ///
     /// Precedence:
     /// - If `sale_price` is set: use it as the gross proceeds.
     /// - Else if `terminal_cap_rate` is set: use exit-cap convention `TV = NOI_{N+1} / cap_rate_exit`
-    ///   with NOI taken as the last schedule entry on/before `exit_date`.
+    ///   with NOI taken as the last schedule entry on/before `horizon`.
     ///
     /// Then apply:
     /// - `disposition_cost_decimal` (pct of gross proceeds), and
@@ -605,9 +556,9 @@ impl RealEstateAsset {
     pub(crate) fn sale_proceeds_at(
         &self,
         as_of: Date,
-        exit_date: Date,
+        horizon: Date,
     ) -> finstack_quant_core::Result<Option<(Date, f64)>> {
-        pricer::sale_proceeds_at(self, as_of, exit_date)
+        pricer::sale_proceeds_at(self, as_of, horizon)
     }
 
     /// First future NOI amount on/after `as_of`.
@@ -718,7 +669,6 @@ mod tests {
         let asset = RealEstateAsset::builder()
             .id(InstrumentId::new("RE-SCHEDULE"))
             .currency(Currency::USD)
-            .valuation_date(valuation_date)
             .valuation_method(RealEstateValuationMethod::Dcf)
             .noi_schedule(vec![(noi1, 100.0), (noi2, 100.0)])
             .discount_rate_opt(Some(0.10))
@@ -744,13 +694,11 @@ mod tests {
     }
 
     fn build_dcf_asset() -> RealEstateAsset {
-        let valuation_date = Date::from_calendar_date(2025, time::Month::January, 1).unwrap();
         let n1 = Date::from_calendar_date(2026, time::Month::January, 1).unwrap();
         let n2 = Date::from_calendar_date(2027, time::Month::January, 1).unwrap();
         RealEstateAsset::builder()
             .id(InstrumentId::new("RE-VALID"))
             .currency(Currency::USD)
-            .valuation_date(valuation_date)
             .valuation_method(RealEstateValuationMethod::Dcf)
             .noi_schedule(vec![(n1, 100.0), (n2, 100.0)])
             .discount_rate_opt(Some(0.08))
@@ -842,13 +790,6 @@ mod tests {
     fn validate_rejects_disposition_cost_pct_at_one() {
         let mut asset = build_dcf_asset();
         asset.disposition_cost_decimal = Some(1.0);
-        assert!(asset.validate().is_err());
-    }
-
-    #[test]
-    fn validate_rejects_sale_date_on_or_before_valuation_date() {
-        let mut asset = build_dcf_asset();
-        asset.sale_date = Some(asset.valuation_date);
         assert!(asset.validate().is_err());
     }
 }

@@ -88,7 +88,6 @@ fn retired_decimal_pct_keys_are_rejected() {
     assert_rejects(&asset, "disposition_cost_decimal", "disposition_cost_pct");
 
     let clawback = ClawbackSpec {
-        enable: true,
         holdback_decimal: Some(0.2),
         settle_on: ClawbackSettle::FundEnd,
     };

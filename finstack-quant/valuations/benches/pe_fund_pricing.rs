@@ -11,7 +11,7 @@
 //! Scenarios:
 //! - Event count scaling (10 / 30 / 60 / 100 events) — waterfall + IRR cost
 //! - Waterfall complexity: simple (RoC + residual LP split) vs. standard
-//!   (RoC + pref + catchup + promote) vs. clawback (RoC + promote + clawback)
+//!   (RoC + pref + catch-up + promote) vs. clawback (RoC + promote + clawback)
 //! - Style: European vs. American waterfall
 //! - IRR iteration: direct `run_waterfall()` vs. full `value()` with NAV discounting
 
@@ -60,7 +60,7 @@ fn standard_waterfall() -> WaterfallSpec {
         .style(WaterfallStyle::European)
         .return_of_capital()
         .preferred_irr(0.08)
-        .catchup(0.5)
+        .catch_up(0.5)
         .promote_tier(0.12, 0.80, 0.20)
         .build()
         .unwrap()
@@ -72,7 +72,6 @@ fn full_waterfall_with_clawback() -> WaterfallSpec {
         .return_of_capital()
         .promote_tier(0.0, 0.80, 0.20)
         .clawback(ClawbackSpec {
-            enable: true,
             holdback_decimal: Some(0.20),
             settle_on: ClawbackSettle::FundEnd,
         })
@@ -85,7 +84,7 @@ fn american_waterfall() -> WaterfallSpec {
         .style(WaterfallStyle::American)
         .return_of_capital()
         .preferred_irr(0.08)
-        .catchup(0.5)
+        .catch_up(0.5)
         .promote_tier(0.12, 0.80, 0.20)
         .build()
         .unwrap()

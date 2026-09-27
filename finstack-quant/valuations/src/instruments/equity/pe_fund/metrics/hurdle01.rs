@@ -16,14 +16,14 @@
 //! # Note
 //!
 //! Hurdle rates appear in:
-//! - `Tranche::PreferredIrr { irr }` - preferred return hurdle
-//! - `Tranche::PromoteTier { hurdle: Hurdle::Irr { rate }, ... }` - promote tier hurdle
+//! - `Tranche::PreferredIrr { hurdle_irr }` - preferred return hurdle
+//! - `Tranche::PromoteTier { hurdle_irr, ... }` - promote tier hurdle
 //!
 //! Higher hurdle rates increase the LP preferred return, potentially reducing GP carry
 //! and affecting LP valuation.
 
 use crate::instruments::common_impl::traits::Instrument;
-use crate::instruments::equity::pe_fund::waterfall::{Hurdle, Tranche, WaterfallSpec};
+use crate::instruments::equity::pe_fund::waterfall::{Tranche, WaterfallSpec};
 use crate::instruments::equity::pe_fund::PrivateMarketsFund;
 use crate::metrics::{MetricCalculator, MetricContext};
 use finstack_quant_core::Result;
@@ -36,10 +36,8 @@ fn bumped_spec(spec: &WaterfallSpec, delta: f64) -> WaterfallSpec {
     let mut bumped = spec.clone();
     for tranche in &mut bumped.tranches {
         match tranche {
-            Tranche::PreferredIrr { irr } => *irr += delta,
-            Tranche::PromoteTier { hurdle, .. } => {
-                let Hurdle::Irr { rate } = hurdle;
-                *rate += delta;
+            Tranche::PreferredIrr { hurdle_irr } | Tranche::PromoteTier { hurdle_irr, .. } => {
+                *hurdle_irr += delta
             }
             _ => {}
         }

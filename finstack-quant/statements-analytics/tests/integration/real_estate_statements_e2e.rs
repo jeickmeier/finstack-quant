@@ -85,7 +85,6 @@ fn e2e_statements_to_real_estate_asset_cashflows_prices() {
     let asset = RealEstateAsset::builder()
         .id(InstrumentId::new("RE-E2E"))
         .currency(Currency::USD)
-        .valuation_date(as_of)
         .valuation_method(RealEstateValuationMethod::Dcf)
         .noi_schedule(noi_sched)
         .capex_schedule_opt(Some(capex_sched))

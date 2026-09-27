@@ -1853,7 +1853,7 @@
     },
     "LeveredRealEstateEquity": {
       "additionalProperties": false,
-      "description": "Levered real estate equity = unlevered asset + financing.\n\nValue convention:\n- `PV_equity = PV_asset - PV_financing` (financing valued from lender perspective).\n\nReturn/coverage metrics are computed from a simplified equity cashflow schedule:\n- Initial outflow: `-(purchase_price + acquisition_cost)` at `as_of`\n- Financing funding legs on/after `as_of` are included as equity inflows\n- Interim equity CFs: `(NOI - CapEx) - debt_service_cash`\n- Exit: `(sale_proceeds - financing_payoff)` at `exit_date`",
+      "description": "Levered real estate equity = unlevered asset + financing.\n\nValue convention:\n- `PV_equity = PV_asset - PV_financing` (financing valued from lender perspective).\n\nReturn/coverage metrics are computed from a simplified equity cashflow schedule:\n- Initial outflow: `-(purchase_price + Σ acquisition_costs)` at `as_of`\n- Financing funding legs on/after `as_of` are included as equity inflows\n- Interim equity CFs: `(NOI - CapEx) - debt_service_cash`\n- Exit: `(sale_proceeds - financing_payoff)` at the asset horizon (`asset.sale_date`, else the last NOI date)",
       "properties": {
         "asset": {
           "$ref": "#/$defs/RealEstateAsset",
@@ -1866,17 +1866,6 @@
         "currency": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/currency.schema.json",
           "description": "Currency (must match asset currency; financing PV is validated at valuation time)."
-        },
-        "exit_date": {
-          "anyOf": [
-            {
-              "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "Optional explicit exit/sale date. Defaults to the asset's valuation\nhorizon: `asset.sale_date` when set, else the last NOI date on/after `as_of`."
         },
         "financing": {
           "description": "Supported borrower liabilities, valued from the lender perspective and\nnetted from asset PV.",
@@ -2458,18 +2447,9 @@
       "additionalProperties": false,
       "description": "Real estate asset valuation instrument.\n\nSupports DCF (explicit NOI schedule) and direct capitalization valuation.",
       "properties": {
-        "acquisition_cost": {
-          "default": null,
-          "description": "Optional one-time acquisition cost deducted at `as_of` in DCF valuation.\n\nThis is intended for closing costs, fees, and other transaction costs.",
-          "format": "double",
-          "type": [
-            "number",
-            "null"
-          ]
-        },
         "acquisition_costs": {
           "default": [],
-          "description": "Optional detailed acquisition cost line items (positive outflows) deducted at `as_of`.",
+          "description": "Acquisition (closing) cost line items in instrument currency, as\npositive outflow magnitudes deducted at `as_of` in DCF valuation.",
           "items": {
             "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json"
           },
@@ -2671,10 +2651,6 @@
             "null"
           ]
         },
-        "valuation_date": {
-          "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
-          "description": "Valuation date (base date for discounting)."
-        },
         "valuation_method": {
           "$ref": "#/$defs/RealEstateValuationMethod",
           "description": "Valuation method (DCF or DirectCap)."
@@ -2683,7 +2659,6 @@
       "required": [
         "id",
         "currency",
-        "valuation_date",
         "valuation_method",
         "noi_schedule",
         "day_count"
@@ -3877,7 +3852,6 @@
             ],
             "property_type": "office",
             "terminal_cap_rate": 0.055,
-            "valuation_date": "2025-01-01",
             "valuation_method": "dcf"
           },
           "attributes": {},

@@ -20,7 +20,7 @@ fn simple_2x_scenario() -> (WaterfallSpec, Vec<FundEvent>) {
         .style(WaterfallStyle::European)
         .return_of_capital()
         .preferred_irr(0.08) // 8% hurdle
-        .catchup(1.0) // 100% to GP catch-up
+        .catch_up(1.0) // 100% to GP catch-up
         .promote_tier(0.0, 0.8, 0.2) // 80/20 split after catch-up
         .build()
         .unwrap();
@@ -277,13 +277,13 @@ fn test_waterfall_spec_validation() {
     let invalid_spec = WaterfallSpec {
         style: WaterfallStyle::European,
         tranches: smallvec::smallvec![Tranche::PromoteTier {
-            hurdle: Hurdle::Irr { rate: 0.0 },
+            hurdle_irr: 0.0,
             lp_share: 0.7,
             gp_share: 0.4, // 0.7 + 0.4 = 1.1 > 1.0
         }],
         clawback: None,
-        irr_basis: DayCount::Act365F,
-        catchup_mode: CatchUpMode::Full,
+        day_count: DayCount::Act365F,
+        catch_up_mode: CatchUpMode::Full,
     };
     assert!(invalid_spec.validate().is_err());
 
@@ -291,13 +291,13 @@ fn test_waterfall_spec_validation() {
     let negative_spec = WaterfallSpec {
         style: WaterfallStyle::European,
         tranches: smallvec::smallvec![Tranche::PromoteTier {
-            hurdle: Hurdle::Irr { rate: 0.0 },
+            hurdle_irr: 0.0,
             lp_share: -0.2, // Negative share
             gp_share: 1.2,
         }],
         clawback: None,
-        irr_basis: DayCount::Act365F,
-        catchup_mode: CatchUpMode::Full,
+        day_count: DayCount::Act365F,
+        catch_up_mode: CatchUpMode::Full,
     };
     assert!(negative_spec.validate().is_err());
 }
@@ -412,7 +412,7 @@ fn test_multi_tier_waterfall() {
         .style(WaterfallStyle::European)
         .return_of_capital()
         .preferred_irr(0.08) // 8% hurdle
-        .catchup(1.0) // 100% catch-up
+        .catch_up(1.0) // 100% catch-up
         .promote_tier(0.12, 0.8, 0.2) // 80/20 up to 12% IRR
         .promote_tier(0.15, 0.7, 0.3) // 70/30 above 15% IRR
         .build()
@@ -452,10 +452,9 @@ fn test_waterfall_spec_serde_stability() {
         .style(WaterfallStyle::European)
         .return_of_capital()
         .preferred_irr(0.08)
-        .catchup(1.0)
+        .catch_up(1.0)
         .promote_tier(0.0, 0.8, 0.2)
         .clawback(ClawbackSpec {
-            enable: true,
             holdback_decimal: Some(0.1),
             settle_on: ClawbackSettle::FundEnd,
         })
@@ -474,7 +473,7 @@ fn test_waterfall_spec_serde_stability() {
     // Verify key fields are preserved
     assert_eq!(deserialized.style, WaterfallStyle::European);
     assert_eq!(deserialized.tranches.len(), 4);
-    assert_eq!(deserialized.irr_basis, DayCount::Act365F);
+    assert_eq!(deserialized.day_count, DayCount::Act365F);
     assert!(deserialized.clawback.is_some());
 }
 

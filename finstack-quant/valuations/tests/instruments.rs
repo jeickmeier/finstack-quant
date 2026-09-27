@@ -26,6 +26,8 @@ mod fx_money_market_wire_keys;
 mod listed_future_wire_keys;
 #[path = "instruments/loan_facility_wire_keys.rs"]
 mod loan_facility_wire_keys;
+#[path = "instruments/private_markets_wire_keys.rs"]
+mod private_markets_wire_keys;
 #[path = "instruments/rates_projection_wire_keys.rs"]
 mod rates_projection_wire_keys;
 #[path = "instruments/registry_coverage.rs"]

@@ -45,7 +45,6 @@ fn test_real_estate_dcf_pricing() {
     let asset = RealEstateAsset::builder()
         .id(InstrumentId::new("RE-DCF"))
         .currency(Currency::USD)
-        .valuation_date(valuation_date)
         .valuation_method(RealEstateValuationMethod::Dcf)
         .noi_schedule(vec![(noi1, 100.0), (noi2, 100.0)])
         .discount_rate_opt(Some(0.10))
@@ -86,7 +85,6 @@ fn test_real_estate_direct_cap_pricing() {
     let asset = RealEstateAsset::builder()
         .id(InstrumentId::new("RE-CAP"))
         .currency(Currency::USD)
-        .valuation_date(valuation_date)
         .valuation_method(RealEstateValuationMethod::DirectCap)
         .noi_schedule(vec![(noi1, 120.0)])
         .cap_rate_opt(Some(0.06))
@@ -111,7 +109,6 @@ fn test_real_estate_direct_cap_uses_first_future_noi_when_not_stabilized() {
     let asset = RealEstateAsset::builder()
         .id(InstrumentId::new("RE-CAP-FIRST-NOI"))
         .currency(Currency::USD)
-        .valuation_date(valuation_date)
         .valuation_method(RealEstateValuationMethod::DirectCap)
         .noi_schedule(vec![(noi1, 100.0), (noi2, 200.0)])
         .cap_rate_opt(Some(0.10))
@@ -133,7 +130,6 @@ fn test_real_estate_terminal_growth_applies_to_exit_value() {
     let asset = RealEstateAsset::builder()
         .id(InstrumentId::new("RE-DCF-TV-GROWTH"))
         .currency(Currency::USD)
-        .valuation_date(valuation_date)
         .valuation_method(RealEstateValuationMethod::Dcf)
         .noi_schedule(vec![(noi1, 100.0)])
         .discount_rate_opt(Some(0.10))
@@ -167,7 +163,6 @@ fn test_real_estate_dcf_pv_identical_with_and_without_curve() {
     let asset = RealEstateAsset::builder()
         .id(InstrumentId::new("RE-DCF-CURVE"))
         .currency(Currency::USD)
-        .valuation_date(valuation_date)
         .valuation_method(RealEstateValuationMethod::Dcf)
         .noi_schedule(vec![(noi1, 100.0)])
         .discount_rate_opt(Some(0.10))
@@ -205,7 +200,6 @@ fn test_real_estate_dcf_pv_identical_with_and_without_curve() {
 
 #[test]
 fn test_real_estate_value_uses_as_of_for_filtering_flows() {
-    let valuation_date = date(2025, 1, 1);
     let as_of = date(2026, 6, 1);
     let noi1 = date(2026, 1, 1);
     let noi2 = date(2027, 1, 1);
@@ -213,7 +207,6 @@ fn test_real_estate_value_uses_as_of_for_filtering_flows() {
     let asset = RealEstateAsset::builder()
         .id(InstrumentId::new("RE-ASOF"))
         .currency(Currency::USD)
-        .valuation_date(valuation_date)
         .valuation_method(RealEstateValuationMethod::Dcf)
         .noi_schedule(vec![(noi1, 100.0), (noi2, 100.0)])
         .discount_rate_opt(Some(0.10))
@@ -241,7 +234,6 @@ fn test_real_estate_appraisal_override() {
     let asset = RealEstateAsset::builder()
         .id(InstrumentId::new("RE-APPRAISAL"))
         .currency(Currency::USD)
-        .valuation_date(valuation_date)
         .valuation_method(RealEstateValuationMethod::Dcf)
         .noi_schedule(vec![(noi1, 100.0)])
         .discount_rate_opt(Some(0.10))
@@ -269,7 +261,6 @@ fn test_real_estate_custom_metrics_compute() {
     let asset = RealEstateAsset::builder()
         .id(InstrumentId::new("RE-METRICS"))
         .currency(Currency::USD)
-        .valuation_date(valuation_date)
         .valuation_method(RealEstateValuationMethod::Dcf)
         .noi_schedule(vec![(noi1, 100.0)])
         .purchase_price_opt(Some(
@@ -320,7 +311,6 @@ fn test_real_estate_unlevered_metrics_include_acquisition_cost_line_items() {
     let asset = RealEstateAsset::builder()
         .id(InstrumentId::new("RE-METRICS-ACQ-COSTS"))
         .currency(Currency::USD)
-        .valuation_date(as_of)
         .valuation_method(RealEstateValuationMethod::Dcf)
         .noi_schedule(vec![(noi1, 100.0)])
         .purchase_price_opt(Some(
@@ -385,7 +375,6 @@ fn test_real_estate_terminal_only_sale_price_is_allowed() {
     let asset = RealEstateAsset::builder()
         .id(InstrumentId::new("RE-TERMINAL-ONLY"))
         .currency(Currency::USD)
-        .valuation_date(as_of)
         .valuation_method(RealEstateValuationMethod::Dcf)
         .noi_schedule(vec![(noi1, 100.0)])
         .discount_rate_opt(Some(0.10))
@@ -425,7 +414,6 @@ fn test_real_estate_sensitivities_metrics_compute_and_have_expected_signs() {
     let asset = RealEstateAsset::builder()
         .id(InstrumentId::new("RE-SENS"))
         .currency(Currency::USD)
-        .valuation_date(as_of)
         .valuation_method(RealEstateValuationMethod::Dcf)
         .noi_schedule(vec![(noi1, 100.0), (noi2, 100.0)])
         .discount_rate_opt(Some(0.10))
@@ -473,7 +461,6 @@ fn test_levered_real_estate_equity_value_is_asset_minus_debt() {
     let asset = RealEstateAsset::builder()
         .id(InstrumentId::new("RE-ASSET"))
         .currency(Currency::USD)
-        .valuation_date(as_of)
         .valuation_method(RealEstateValuationMethod::Dcf)
         .noi_schedule(vec![(noi1, 100.0), (noi2, 100.0)])
         .purchase_price_opt(Some(
@@ -519,7 +506,6 @@ fn test_levered_real_estate_equity_value_is_asset_minus_debt() {
             RealEstateFinancing::TermLoan(loan.clone()),
             RealEstateFinancing::Bond(bond.clone()),
         ])
-        .exit_date_opt(Some(noi2))
         .attributes(Attributes::new())
         .build()
         .expect("levered build");
@@ -552,7 +538,6 @@ fn test_levered_real_estate_equity_custom_metrics_compute() {
     let asset = RealEstateAsset::builder()
         .id(InstrumentId::new("RE-ASSET-2"))
         .currency(Currency::USD)
-        .valuation_date(as_of)
         .valuation_method(RealEstateValuationMethod::Dcf)
         .noi_schedule(vec![(noi1, 120.0), (noi2, 120.0)])
         .purchase_price_opt(Some(
@@ -593,7 +578,6 @@ fn test_levered_real_estate_equity_custom_metrics_compute() {
         .currency(Currency::USD)
         .asset(asset)
         .financing(vec![RealEstateFinancing::TermLoan(loan)])
-        .exit_date_opt(Some(noi2))
         .attributes(Attributes::new())
         .build()
         .expect("levered build");
@@ -636,7 +620,6 @@ fn test_levered_real_estate_sensitivities_metrics_compute() {
     let asset = RealEstateAsset::builder()
         .id(InstrumentId::new("RE-ASSET-SENS-L"))
         .currency(Currency::USD)
-        .valuation_date(as_of)
         .valuation_method(RealEstateValuationMethod::Dcf)
         .noi_schedule(vec![(noi1, 120.0), (noi2, 120.0)])
         .purchase_price_opt(Some(
@@ -679,7 +662,6 @@ fn test_levered_real_estate_sensitivities_metrics_compute() {
         .currency(Currency::USD)
         .asset(asset)
         .financing(vec![RealEstateFinancing::TermLoan(loan)])
-        .exit_date_opt(Some(noi2))
         .attributes(Attributes::new())
         .build()
         .expect("levered build");
@@ -707,7 +689,6 @@ fn test_levered_real_estate_sensitivities_metrics_compute() {
 }
 
 fn build_mid_sale_dcf_asset() -> RealEstateAsset {
-    let as_of = date(2025, 1, 1);
     let noi1 = date(2026, 1, 1);
     let noi2 = date(2027, 1, 1);
     let noi3 = date(2028, 1, 1);
@@ -715,7 +696,6 @@ fn build_mid_sale_dcf_asset() -> RealEstateAsset {
     RealEstateAsset::builder()
         .id(InstrumentId::new("RE-MID-SALE"))
         .currency(Currency::USD)
-        .valuation_date(as_of)
         .valuation_method(RealEstateValuationMethod::Dcf)
         .noi_schedule(vec![(noi1, 100.0), (noi2, 100.0), (noi3, 100.0)])
         .purchase_price_opt(Some(
@@ -797,8 +777,8 @@ fn test_real_estate_unlevered_metrics_truncate_at_sale_date() {
     );
 }
 
-/// When `exit_date` is not set on the levered wrapper, it must default to the
-/// asset's `sale_date` (the asset PV horizon), not the last NOI date.
+/// The levered exit follows the asset's `sale_date` (the asset PV horizon),
+/// not the last NOI date.
 #[test]
 fn test_levered_exit_defaults_to_asset_sale_date() {
     use finstack_quant_cashflows::CashflowProvider;
@@ -842,7 +822,6 @@ fn test_dscr_min_excludes_balloon_principal_at_maturity() {
     let asset = RealEstateAsset::builder()
         .id(InstrumentId::new("RE-ASSET-DSCR"))
         .currency(Currency::USD)
-        .valuation_date(as_of)
         .valuation_method(RealEstateValuationMethod::Dcf)
         .noi_schedule(vec![(noi1, 120.0), (noi2, 120.0)])
         .purchase_price_opt(Some(
@@ -884,7 +863,6 @@ fn test_dscr_min_excludes_balloon_principal_at_maturity() {
         .currency(Currency::USD)
         .asset(asset)
         .financing(vec![RealEstateFinancing::TermLoan(loan)])
-        .exit_date_opt(Some(noi2))
         .attributes(Attributes::new())
         .build()
         .expect("levered build");
@@ -916,13 +894,11 @@ fn test_dscr_min_excludes_balloon_principal_at_maturity() {
 
 #[test]
 fn test_real_estate_validate_rejects_bad_cost_inputs() {
-    let as_of = date(2025, 1, 1);
     let noi1 = date(2026, 1, 1);
 
     let base = RealEstateAsset::builder()
         .id(InstrumentId::new("RE-VALIDATE-COSTS"))
         .currency(Currency::USD)
-        .valuation_date(as_of)
         .valuation_method(RealEstateValuationMethod::Dcf)
         .noi_schedule(vec![(noi1, 100.0)])
         .discount_rate_opt(Some(0.10))
@@ -931,10 +907,6 @@ fn test_real_estate_validate_rejects_bad_cost_inputs() {
         .attributes(Attributes::new())
         .build()
         .expect("asset build");
-
-    let mut negative_scalar = base.clone();
-    negative_scalar.acquisition_cost = Some(-10.0);
-    assert!(negative_scalar.validate().is_err());
 
     let mut negative_line_item = base.clone();
     negative_line_item.acquisition_costs =
@@ -961,7 +933,6 @@ fn test_real_estate_direct_cap_appraisal_without_cap_rate() {
     let asset = RealEstateAsset::builder()
         .id(InstrumentId::new("RE-CAP-APPRAISAL"))
         .currency(Currency::USD)
-        .valuation_date(as_of)
         .valuation_method(RealEstateValuationMethod::DirectCap)
         .noi_schedule(vec![(noi1, 100.0)])
         .appraisal_value_opt(Some(
@@ -992,7 +963,6 @@ fn cap_rate01_matches_direct_cap_closed_form() {
     let asset = RealEstateAsset::builder()
         .id(InstrumentId::new("RE-CAP01"))
         .currency(Currency::USD)
-        .valuation_date(as_of)
         .valuation_method(RealEstateValuationMethod::DirectCap)
         .noi_schedule(vec![(date(2026, 1, 1), noi)])
         .cap_rate_opt(Some(cap))
@@ -1032,7 +1002,6 @@ fn cap_rate01_errors_for_dcf_without_cap_rate_dependence() {
         RealEstateAsset::builder()
             .id(InstrumentId::new("RE-CAP01-NA"))
             .currency(Currency::USD)
-            .valuation_date(as_of)
             .valuation_method(RealEstateValuationMethod::Dcf)
             .noi_schedule(vec![(date(2026, 1, 1), 100.0), (date(2027, 1, 1), 100.0)])
             .discount_rate_opt(Some(0.10))
@@ -1078,7 +1047,6 @@ fn levered_discount_rate01_equals_asset_discount_rate01() {
     let asset = RealEstateAsset::builder()
         .id(InstrumentId::new("RE-DR01"))
         .currency(Currency::USD)
-        .valuation_date(as_of)
         .valuation_method(RealEstateValuationMethod::Dcf)
         .noi_schedule(vec![(date(2026, 1, 1), 100.0), (noi2, 100.0)])
         .purchase_price_opt(Some(Money::new(1_000.0, Currency::USD).expect("money")))
@@ -1103,7 +1071,6 @@ fn levered_discount_rate01_equals_asset_discount_rate01() {
         .currency(Currency::USD)
         .asset(asset.clone())
         .financing(vec![RealEstateFinancing::Bond(loan)])
-        .exit_date_opt(Some(noi2))
         .attributes(Attributes::new())
         .build()
         .expect("levered build");
@@ -1139,7 +1106,6 @@ fn retired_real_estate_sensitivity_keys_are_not_registered() {
     let asset = RealEstateAsset::builder()
         .id(InstrumentId::new("RE-RETIRED"))
         .currency(Currency::USD)
-        .valuation_date(as_of)
         .valuation_method(RealEstateValuationMethod::DirectCap)
         .noi_schedule(vec![(date(2026, 1, 1), 100.0)])
         .cap_rate_opt(Some(0.06))

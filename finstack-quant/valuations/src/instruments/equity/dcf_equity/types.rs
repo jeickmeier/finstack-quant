@@ -39,8 +39,9 @@ const SUB_ANNUAL_GRID_SPACING_THRESHOLD_YEARS: f64 = 0.75;
 pub enum TerminalValueSpec {
     /// Gordon Growth Model: TV = FCF_terminal × (1 + g) / (WACC - g)
     GordonGrowth {
-        /// Perpetual growth rate (e.g., 0.02 for 2%)
-        growth_rate: f64,
+        /// Perpetual stable growth rate as an annual decimal (e.g., 0.02 for
+        /// 2%). Must be < WACC.
+        stable_growth_rate: f64,
     },
     /// Exit Multiple: TV = Terminal_Metric × Multiple
     ExitMultiple {
@@ -78,8 +79,8 @@ pub enum TerminalValueSpec {
 ///          + Non-Operating Assets + Σ(other adjustments)
 /// ```
 ///
-/// When attached to a [`DiscountedCashFlow`], this takes precedence over the
-/// flat `net_debt` scalar.
+/// Every [`DiscountedCashFlow`] carries one; a flat net-debt deduction is
+/// written as `EquityBridge { total_debt, cash, ..Default::default() }`.
 #[derive(Clone, Debug, Default, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
@@ -204,8 +205,8 @@ pub struct DilutionSecurity {
 ///
 /// # Equity Bridge
 ///
-/// When [`equity_bridge`](Self::equity_bridge) is `Some`, it takes precedence over
-/// the flat [`net_debt`](Self::net_debt) field for the EV-to-equity conversion.
+/// [`equity_bridge`](Self::equity_bridge) is the single EV-to-equity channel; a
+/// flat net-debt deduction sets only its `total_debt` and `cash`.
 ///
 /// # Mid-Year Convention
 ///
@@ -248,10 +249,6 @@ pub struct DiscountedCashFlow {
     pub wacc: f64,
     /// Terminal value specification.
     pub terminal_value: TerminalValueSpec,
-    /// Net debt (debt - cash) to subtract from enterprise value.
-    ///
-    /// Ignored when [`equity_bridge`](Self::equity_bridge) is `Some`.
-    pub net_debt: f64,
     /// Valuation date (as-of date for the DCF).
     #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
@@ -284,12 +281,10 @@ pub struct DiscountedCashFlow {
     #[builder(optional)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub terminal_flow_override: Option<f64>,
-    /// Structured equity bridge for EV-to-equity conversion.
-    ///
-    /// When present, takes precedence over the flat `net_debt` field.
-    #[builder(optional)]
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub equity_bridge: Option<EquityBridge>,
+    /// Equity bridge from enterprise value to equity value (debt, cash,
+    /// preferred equity, minority interest, non-operating assets and other
+    /// adjustments), in instrument currency.
+    pub equity_bridge: EquityBridge,
     /// Basic shares outstanding for per-share value calculation.
     #[builder(optional)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -348,10 +343,6 @@ struct DiscountedCashFlowUnchecked {
     wacc: f64,
     /// Terminal value specification.
     terminal_value: TerminalValueSpec,
-    /// Net debt (debt - cash) to subtract from enterprise value.
-    ///
-    /// Ignored when [`equity_bridge`](Self::equity_bridge) is `Some`.
-    net_debt: f64,
     /// Valuation date (as-of date for the DCF).
     #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
@@ -388,11 +379,10 @@ struct DiscountedCashFlowUnchecked {
     /// Ignored by `ExitMultiple` terminal values.
     #[serde(default)]
     terminal_flow_override: Option<f64>,
-    /// Structured equity bridge for EV-to-equity conversion.
-    ///
-    /// When present, takes precedence over the flat `net_debt` field.
-    #[serde(default)]
-    equity_bridge: Option<EquityBridge>,
+    /// Equity bridge from enterprise value to equity value (debt, cash,
+    /// preferred equity, minority interest, non-operating assets and other
+    /// adjustments), in instrument currency.
+    equity_bridge: EquityBridge,
     /// Basic shares outstanding for per-share value calculation.
     #[serde(default)]
     shares_outstanding: Option<f64>,
@@ -425,7 +415,6 @@ impl TryFrom<DiscountedCashFlowUnchecked> for DiscountedCashFlow {
             flows: value.flows,
             wacc: value.wacc,
             terminal_value: value.terminal_value,
-            net_debt: value.net_debt,
             valuation_date: value.valuation_date,
             mid_year_convention: value.mid_year_convention,
             terminal_flow_override: value.terminal_flow_override,
@@ -460,7 +449,7 @@ impl DiscountedCashFlow {
     ///   years), and `terminal_flow_override` is not set — capitalizing a
     ///   period flow as an annual flow would silently understate the
     ///   terminal value
-    /// - `net_debt` is non-finite
+    /// - any `equity_bridge` amount (including `other_adjustments`) is non-finite
     /// - any explicit `flows` amount is non-finite
     /// - `flows` are not sorted by date (strictly increasing)
     /// - any flow date is on or before `valuation_date`
@@ -471,7 +460,7 @@ impl DiscountedCashFlow {
     ///   `validate()` (each discount in `[0, 1]`)
     ///
     /// Terminal-value-specific checks (Gordon Growth requires
-    /// `wacc > growth_rate`; H-Model requires the same plus
+    /// `wacc > stable_growth_rate`; H-Model requires the same plus
     /// `high_growth_rate >= stable_growth_rate`) are enforced inside
     /// [`Self::calculate_terminal_value`] at pricing time, since they cross
     /// `wacc` with the terminal-value variant.
@@ -507,12 +496,32 @@ impl DiscountedCashFlow {
                 self.wacc / 100.0
             )));
         }
-        if !self.net_debt.is_finite() {
-            return Err(CoreError::Validation(format!(
-                "DCF '{}' net_debt must be finite, got {}",
-                self.id.as_str(),
-                self.net_debt
-            )));
+        let bridge = &self.equity_bridge;
+        for (field, value) in [
+            ("total_debt", bridge.total_debt),
+            ("cash", bridge.cash),
+            ("preferred_equity", bridge.preferred_equity),
+            ("minority_interest", bridge.minority_interest),
+            ("non_operating_assets", bridge.non_operating_assets),
+        ] {
+            if !value.is_finite() {
+                return Err(CoreError::Validation(format!(
+                    "DCF '{}' equity_bridge.{} must be finite, got {}",
+                    self.id.as_str(),
+                    field,
+                    value
+                )));
+            }
+        }
+        for (name, value) in &bridge.other_adjustments {
+            if !value.is_finite() {
+                return Err(CoreError::Validation(format!(
+                    "DCF '{}' equity_bridge.other_adjustments '{}' must be finite, got {}",
+                    self.id.as_str(),
+                    name,
+                    value
+                )));
+            }
         }
         for (i, (date, amount)) in self.flows.iter().enumerate() {
             if !amount.is_finite() {
@@ -617,12 +626,12 @@ impl DiscountedCashFlow {
     /// valuations.
     fn validate_terminal_value_spec(&self) -> finstack_quant_core::Result<()> {
         match &self.terminal_value {
-            TerminalValueSpec::GordonGrowth { growth_rate } => {
-                if !growth_rate.is_finite() {
+            TerminalValueSpec::GordonGrowth { stable_growth_rate } => {
+                if !stable_growth_rate.is_finite() {
                     return Err(CoreError::Validation(format!(
-                        "DCF '{}' Gordon Growth growth_rate must be finite, got {}",
+                        "DCF '{}' terminal_value.stable_growth_rate (gordon_growth) must be finite, got {}",
                         self.id.as_str(),
-                        growth_rate
+                        stable_growth_rate
                     )));
                 }
             }
@@ -692,8 +701,13 @@ impl DiscountedCashFlow {
             .currency(Currency::USD)
             .flows(flows)
             .wacc(0.10)
-            .terminal_value(TerminalValueSpec::GordonGrowth { growth_rate: 0.02 })
-            .net_debt(15_000_000.0)
+            .terminal_value(TerminalValueSpec::GordonGrowth {
+                stable_growth_rate: 0.02,
+            })
+            .equity_bridge(EquityBridge {
+                total_debt: 15_000_000.0,
+                ..EquityBridge::default()
+            })
             .valuation_date(valuation_date)
             .mid_year_convention(true)
             .shares_outstanding_opt(Some(10_000_000.0))
@@ -726,7 +740,7 @@ impl DiscountedCashFlow {
     /// # Errors
     ///
     /// - `GordonGrowth` / `HModel`: returns `Err` if flows are empty (last FCF is needed).
-    /// - `GordonGrowth`: WACC must be > growth_rate.
+    /// - `GordonGrowth`: WACC must be > stable_growth_rate.
     /// - `HModel`: WACC must be > stable_growth_rate; high_growth_rate must be
     ///   >= stable_growth_rate; half_life_years must be > 0.
     /// - `ExitMultiple`: never fails (does not depend on flows).
@@ -743,18 +757,18 @@ impl DiscountedCashFlow {
     /// [`Self::calculate_terminal_value`].
     pub(crate) fn terminal_value_at_wacc(&self, wacc: f64) -> finstack_quant_core::Result<f64> {
         match &self.terminal_value {
-            TerminalValueSpec::GordonGrowth { growth_rate } => {
+            TerminalValueSpec::GordonGrowth { stable_growth_rate } => {
                 let (_, last_fcf) = self.flows.last().ok_or_else(|| {
                     CoreError::Validation(
                         "DCF has no explicit flows; cannot compute terminal value".into(),
                     )
                 })?;
-                let g = *growth_rate;
+                let g = *stable_growth_rate;
                 // Fail-closed: NaN parameters compare as None and must
                 // error rather than silently producing NaN values.
                 if wacc.partial_cmp(&g) != Some(std::cmp::Ordering::Greater) {
                     return Err(CoreError::Validation(format!(
-                        "Gordon Growth requires WACC ({:.6}) > growth_rate ({:.6})",
+                        "Gordon Growth requires WACC ({:.6}) > stable_growth_rate ({:.6})",
                         wacc, g
                     )));
                 }
@@ -765,7 +779,7 @@ impl DiscountedCashFlow {
                 if spread < GORDON_GROWTH_NEAR_SINGULARITY_THRESHOLD {
                     tracing::warn!(
                         wacc,
-                        growth_rate = g,
+                        stable_growth_rate = g,
                         wacc_minus_g = spread,
                         "Gordon Growth: WACC − g = {:.4} bp is within near-singularity \
                          threshold ({:.0} bp); terminal value is extremely sensitive to \
@@ -876,14 +890,10 @@ impl DiscountedCashFlow {
 
     /// Effective net debt amount for the EV-to-equity bridge.
     ///
-    /// Uses [`equity_bridge`](Self::equity_bridge) when present, otherwise
-    /// falls back to [`net_debt`](Self::net_debt).
+    /// Equals [`EquityBridge::net_adjustment`] of
+    /// [`equity_bridge`](Self::equity_bridge), in instrument currency.
     pub fn effective_net_debt(&self) -> f64 {
-        if let Some(ref bridge) = self.equity_bridge {
-            bridge.net_adjustment()
-        } else {
-            self.net_debt
-        }
+        self.equity_bridge.net_adjustment()
     }
 
     /// Apply valuation discounts (DLOM, DLOC, other) to an equity value.
@@ -1122,12 +1132,13 @@ mod tests {
             currency: Currency::USD,
             flows: vec![(cf_date, 100.0)],
             wacc: 0.10,
-            terminal_value: TerminalValueSpec::GordonGrowth { growth_rate: 0.02 },
-            net_debt: 0.0,
+            terminal_value: TerminalValueSpec::GordonGrowth {
+                stable_growth_rate: 0.02,
+            },
             valuation_date,
             mid_year_convention: false,
             terminal_flow_override: None,
-            equity_bridge: None,
+            equity_bridge: EquityBridge::default(),
             shares_outstanding: None,
             dilution_securities: Vec::new(),
             valuation_discounts: None,
@@ -1224,7 +1235,7 @@ mod tests {
         // NaN Gordon growth must fail validation (would bypass wacc > g).
         let mut dcf = build_simple_dcf_gordon();
         dcf.terminal_value = TerminalValueSpec::GordonGrowth {
-            growth_rate: f64::NAN,
+            stable_growth_rate: f64::NAN,
         };
         assert!(dcf.validate().is_err());
 
@@ -1322,7 +1333,7 @@ mod tests {
         // NaN growth must error at terminal-value time, not produce NaN.
         let mut dcf = build_simple_dcf_gordon();
         dcf.terminal_value = TerminalValueSpec::GordonGrowth {
-            growth_rate: f64::NAN,
+            stable_growth_rate: f64::NAN,
         };
         assert!(dcf.calculate_terminal_value().is_err());
 
@@ -1473,11 +1484,10 @@ mod tests {
                 terminal_metric: 150.0,
                 multiple: 8.0,
             },
-            net_debt: 0.0,
             valuation_date,
             mid_year_convention: false,
             terminal_flow_override: None,
-            equity_bridge: None,
+            equity_bridge: EquityBridge::default(),
             shares_outstanding: None,
             dilution_securities: Vec::new(),
             valuation_discounts: None,
@@ -1539,14 +1549,15 @@ mod tests {
             id: InstrumentId::new("TEST-DCF-BAD-G"),
             currency: Currency::USD,
             flows: vec![(cf_date, 100.0)],
-            // WACC <= growth_rate should be rejected
+            // WACC <= stable_growth_rate should be rejected
             wacc: 0.02,
-            terminal_value: TerminalValueSpec::GordonGrowth { growth_rate: 0.03 },
-            net_debt: 0.0,
+            terminal_value: TerminalValueSpec::GordonGrowth {
+                stable_growth_rate: 0.03,
+            },
             valuation_date,
             mid_year_convention: false,
             terminal_flow_override: None,
-            equity_bridge: None,
+            equity_bridge: EquityBridge::default(),
             shares_outstanding: None,
             dilution_securities: Vec::new(),
             valuation_discounts: None,
@@ -1826,15 +1837,17 @@ mod tests {
     fn equity_bridge_matches_flat_net_debt_when_simple() {
         // EquityBridge with only total_debt and cash should match a flat net_debt
         let mut dcf_flat = build_simple_dcf_gordon();
-        dcf_flat.net_debt = 50.0;
+        dcf_flat.equity_bridge = EquityBridge {
+            total_debt: 50.0,
+            ..Default::default()
+        };
 
         let mut dcf_bridge = build_simple_dcf_gordon();
-        dcf_bridge.net_debt = 999.0; // Should be ignored
-        dcf_bridge.equity_bridge = Some(EquityBridge {
+        dcf_bridge.equity_bridge = EquityBridge {
             total_debt: 80.0,
             cash: 30.0,
             ..Default::default()
-        });
+        };
 
         let market = MarketContext::new();
         let val_flat = dcf_flat
@@ -1855,19 +1868,16 @@ mod tests {
     #[test]
     fn equity_bridge_with_preferred_and_minority() {
         let mut dcf = build_simple_dcf_gordon();
-        dcf.equity_bridge = Some(EquityBridge {
+        dcf.equity_bridge = EquityBridge {
             total_debt: 100.0,
             cash: 20.0,
             preferred_equity: 30.0,
             minority_interest: 10.0,
             non_operating_assets: 5.0,
             other_adjustments: vec![("pension".into(), -15.0)], // negative = reduces equity
-        });
+        };
 
-        let bridge = dcf
-            .equity_bridge
-            .as_ref()
-            .expect("equity_bridge should be set in this test");
+        let bridge = &dcf.equity_bridge;
         // net_adjustment = 100 - 20 + 30 + 10 - 5 - (-15) = 130
         let expected = 100.0 - 20.0 + 30.0 + 10.0 - 5.0 + 15.0;
         assert!(
@@ -2042,7 +2052,7 @@ mod tests {
         let dcf2: DiscountedCashFlow = serde_json::from_str(&json).expect("deserialize");
         assert_eq!(dcf.id, dcf2.id);
         assert!(!dcf2.mid_year_convention);
-        assert!(dcf2.equity_bridge.is_none());
+        assert_eq!(dcf2.equity_bridge.net_adjustment(), 0.0);
         assert!(dcf2.shares_outstanding.is_none());
         assert!(dcf2.dilution_securities.is_empty());
         assert!(dcf2.valuation_discounts.is_none());
@@ -2052,14 +2062,14 @@ mod tests {
     fn serde_roundtrip_full_dcf() {
         let mut dcf = build_simple_dcf_gordon();
         dcf.mid_year_convention = true;
-        dcf.equity_bridge = Some(EquityBridge {
+        dcf.equity_bridge = EquityBridge {
             total_debt: 100.0,
             cash: 20.0,
             preferred_equity: 30.0,
             minority_interest: 5.0,
             non_operating_assets: 10.0,
             other_adjustments: vec![("pension".into(), -8.0)],
-        });
+        };
         dcf.shares_outstanding = Some(1_000_000.0);
         dcf.dilution_securities = vec![DilutionSecurity {
             name: "Options".into(),
@@ -2075,7 +2085,7 @@ mod tests {
         let json = serde_json::to_string_pretty(&dcf).expect("serialize");
         let dcf2: DiscountedCashFlow = serde_json::from_str(&json).expect("deserialize");
         assert!(dcf2.mid_year_convention);
-        assert!(dcf2.equity_bridge.is_some());
+        assert_eq!(dcf2.equity_bridge.other_adjustments.len(), 1);
         assert_eq!(dcf2.shares_outstanding, Some(1_000_000.0));
         assert_eq!(dcf2.dilution_securities.len(), 1);
         assert!(dcf2.valuation_discounts.is_some());
@@ -2095,8 +2105,8 @@ mod tests {
             "currency": "USD",
             "flows": [["2026-01-01", 100.0]],
             "wacc": 0.10,
-            "terminal_value": {"type": "gordon_growth", "growth_rate": 0.02},
-            "net_debt": 50.0,
+            "terminal_value": {"type": "gordon_growth", "stable_growth_rate": 0.02},
+            "equity_bridge": {"total_debt": 50.0},
             "valuation_date": "2025-01-01",
             "attributes": {"tags": [], "meta": {}}
         }"#;
@@ -2105,10 +2115,60 @@ mod tests {
             serde_json::from_str(json).expect("minimal DCF JSON should parse");
         assert_eq!(dcf.id.as_str(), "TEST-OLD");
         assert!(!dcf.mid_year_convention);
-        assert!(dcf.equity_bridge.is_none());
+        assert_eq!(dcf.equity_bridge.net_adjustment(), 50.0);
         assert!(dcf.shares_outstanding.is_none());
         assert!(dcf.dilution_securities.is_empty());
         assert!(dcf.valuation_discounts.is_none());
+    }
+
+    #[test]
+    fn validate_rejects_non_finite_equity_bridge() {
+        let mut dcf = build_simple_dcf_gordon();
+        dcf.equity_bridge.total_debt = f64::NAN;
+        let err = dcf.validate().expect_err("NaN total_debt must be rejected");
+        assert!(
+            err.to_string().contains("equity_bridge.total_debt"),
+            "{err}"
+        );
+
+        let mut dcf = build_simple_dcf_gordon();
+        dcf.equity_bridge.other_adjustments = vec![("pension".into(), f64::INFINITY)];
+        assert!(dcf.validate().is_err());
+    }
+
+    fn minimal_dcf_json(extra: &str, terminal_value: &str) -> String {
+        format!(
+            r#"{{
+            "id": "TEST",
+            "currency": "USD",
+            "flows": [["2026-01-01", 100.0]],
+            "wacc": 0.10,
+            "terminal_value": {terminal_value},
+            "valuation_date": "2025-01-01",
+            {extra}
+            "attributes": {{"tags": [], "meta": {{}}}}
+        }}"#
+        )
+    }
+
+    #[test]
+    // schema-rejection-test: retired `net_debt` (now `equity_bridge`)
+    fn retired_net_debt_key_is_rejected() {
+        let json = minimal_dcf_json(
+            r#""net_debt": 50.0, "equity_bridge": {"total_debt": 50.0},"#,
+            r#"{"type": "gordon_growth", "stable_growth_rate": 0.02}"#,
+        );
+        assert!(serde_json::from_str::<DiscountedCashFlow>(&json).is_err());
+    }
+
+    #[test]
+    // schema-rejection-test: retired `growth_rate` (now `stable_growth_rate`)
+    fn retired_gordon_growth_rate_key_is_rejected() {
+        let json = minimal_dcf_json(
+            r#""equity_bridge": {"total_debt": 50.0},"#,
+            r#"{"type": "gordon_growth", "growth_rate": 0.02}"#,
+        );
+        assert!(serde_json::from_str::<DiscountedCashFlow>(&json).is_err());
     }
 
     #[test]
@@ -2261,8 +2321,9 @@ mod tests {
             .currency(Currency::USD)
             .flows(vec![(cf_date, 100.0)])
             .wacc(0.10)
-            .terminal_value(TerminalValueSpec::GordonGrowth { growth_rate: 0.02 })
-            .net_debt(50.0)
+            .terminal_value(TerminalValueSpec::GordonGrowth {
+                stable_growth_rate: 0.02,
+            })
             .valuation_date(valuation_date)
             .mid_year_convention(true)
             .equity_bridge(EquityBridge {
@@ -2279,7 +2340,7 @@ mod tests {
             .expect("builder should succeed");
 
         assert!(dcf.mid_year_convention);
-        assert!(dcf.equity_bridge.is_some());
+        assert_eq!(dcf.equity_bridge.net_adjustment(), 50.0);
         assert_eq!(dcf.shares_outstanding, Some(1_000_000.0));
         assert!(dcf.valuation_discounts.is_some());
     }

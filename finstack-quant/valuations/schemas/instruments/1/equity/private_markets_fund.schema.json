@@ -34,10 +34,6 @@
       "additionalProperties": false,
       "description": "Clawback specification for GP carry reconciliation.",
       "properties": {
-        "enable": {
-          "description": "Whether clawback is enabled",
-          "type": "boolean"
-        },
         "holdback_decimal": {
           "description": "Optional share of GP carry held back until settlement, as a decimal\nfraction in `[0, 1]` (`0.2` = 20%)",
           "format": "double",
@@ -52,7 +48,6 @@
         }
       },
       "required": [
-        "enable",
         "settle_on"
       ],
       "type": "object"
@@ -108,29 +103,6 @@
         }
       ]
     },
-    "Hurdle": {
-      "additionalProperties": false,
-      "description": "Hurdle types for waterfall tiers.",
-      "properties": {
-        "irr": {
-          "properties": {
-            "rate": {
-              "description": "Rate.",
-              "format": "double",
-              "type": "number"
-            }
-          },
-          "required": [
-            "rate"
-          ],
-          "type": "object"
-        }
-      },
-      "required": [
-        "irr"
-      ],
-      "type": "object"
-    },
     "InstrumentSchema": {
       "const": "finstack_quant.instrument/1",
       "description": "Canonical schema marker for persisted instrument envelopes.",
@@ -140,7 +112,7 @@
       "additionalProperties": false,
       "description": "Complete waterfall specification.",
       "properties": {
-        "catchup_mode": {
+        "catch_up_mode": {
           "$ref": "#/$defs/CatchUpMode",
           "default": "full",
           "description": "Catch-up mode"
@@ -155,12 +127,12 @@
             }
           ],
           "default": null,
-          "description": "Optional clawback specification"
+          "description": "Clawback specification; `None` means no clawback (presence is the switch)"
         },
-        "irr_basis": {
+        "day_count": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/day_count.schema.json",
           "default": "act_365f",
-          "description": "Day count basis for IRR calculations"
+          "description": "Day count for LP/fund IRR year fractions and hurdle compounding\n`(1 + hurdle_irr)^years` (default Act/365F)"
         },
         "style": {
           "$ref": "#/$defs/WaterfallStyle",
@@ -193,15 +165,16 @@
           "description": "Preferred return to LPs at specified IRR",
           "properties": {
             "preferred_irr": {
+              "additionalProperties": false,
               "properties": {
-                "irr": {
-                  "description": "Irr.",
+                "hurdle_irr": {
+                  "description": "LP preferred-return hurdle as an annual decimal IRR (`0.08` = 8%),\ncompounded on the spec's `day_count`.",
                   "format": "double",
                   "type": "number"
                 }
               },
               "required": [
-                "irr"
+                "hurdle_irr"
               ],
               "type": "object"
             }
@@ -216,6 +189,7 @@
           "description": "Catch-up allocation to GP",
           "properties": {
             "catch_up": {
+              "additionalProperties": false,
               "properties": {
                 "gp_share": {
                   "description": "GP share of each catch-up dollar, in `[0, 1]`. In\n[`CatchUpMode::Partial`] this caps the GP's take per dollar; in\n[`CatchUpMode::Full`] the GP takes 100% of catch-up dollars and\nthis value is only the fallback target share when no promote tier\nfollows.",
@@ -236,18 +210,20 @@
         },
         {
           "additionalProperties": false,
-          "description": "Promote tier with hurdle and LP/GP split.\n\n**Hard-hurdle gating semantics**: before the split activates, the LP\nis paid at 100% until the LP-net IRR reaches this tier's `hurdle`;\nonly cash above the hurdle is split `lp_share`/`gp_share` (cascading\nto the next tier once the next tier's hurdle is reached). If a\n[`Tranche::CatchUp`] precedes a promote tier whose hurdle sits above\nthe preferred return, the LP-100% infill between the catch-up and the\nhurdle dilutes the GP's realized share back below the catch-up\ntarget. LPAs where all post-catch-up dollars split continuously at\n`lp_share`/`gp_share` should set this tier's hurdle equal to the\npreceding preferred return (or `0.0` when there is no gap to fill),\nso the LP-100% infill is empty.",
+          "description": "Promote tier with hurdle and LP/GP split.\n\n**Hard-hurdle gating semantics**: before the split activates, the LP\nis paid at 100% until the LP-net IRR reaches this tier's `hurdle_irr`;\nonly cash above the hurdle is split `lp_share`/`gp_share` (cascading\nto the next tier once the next tier's hurdle is reached). If a\n[`Tranche::CatchUp`] precedes a promote tier whose `hurdle_irr` sits above\nthe preferred return, the LP-100% infill between the catch-up and the\nhurdle dilutes the GP's realized share back below the catch-up\ntarget. LPAs where all post-catch-up dollars split continuously at\n`lp_share`/`gp_share` should set this tier's hurdle equal to the\npreceding preferred return (or `0.0` when there is no gap to fill),\nso the LP-100% infill is empty.",
           "properties": {
             "promote_tier": {
+              "additionalProperties": false,
               "properties": {
                 "gp_share": {
                   "description": "GP share of each split dollar, in `[0, 1]`; must sum to 1 with\n`lp_share`.",
                   "format": "double",
                   "type": "number"
                 },
-                "hurdle": {
-                  "$ref": "#/$defs/Hurdle",
-                  "description": "IRR hurdle the LP must reach (at 100% payout) before this tier's\nsplit activates."
+                "hurdle_irr": {
+                  "description": "Annual decimal IRR hurdle (`0.12` = 12%) the LP must reach (at\n100% payout) before this tier's split activates.",
+                  "format": "double",
+                  "type": "number"
                 },
                 "lp_share": {
                   "description": "LP share of each split dollar, in `[0, 1]`; must sum to 1 with\n`gp_share`.",
@@ -256,7 +232,7 @@
                 }
               },
               "required": [
-                "hurdle",
+                "hurdle_irr",
                 "lp_share",
                 "gp_share"
               ],
@@ -425,15 +401,15 @@
           ],
           "id": "PMF-EXAMPLE",
           "waterfall_spec": {
-            "catchup_mode": "full",
+            "catch_up_mode": "full",
             "clawback": null,
-            "irr_basis": "act_365f",
+            "day_count": "act_365f",
             "style": "european",
             "tranches": [
               "return_of_capital",
               {
                 "preferred_irr": {
-                  "irr": 0.08
+                  "hurdle_irr": 0.08
                 }
               },
               {
@@ -444,11 +420,7 @@
               {
                 "promote_tier": {
                   "gp_share": 0.2,
-                  "hurdle": {
-                    "irr": {
-                      "rate": 0.12
-                    }
-                  },
+                  "hurdle_irr": 0.12,
                   "lp_share": 0.8
                 }
               }

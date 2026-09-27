@@ -227,7 +227,7 @@ pub(crate) fn unlevered_flows(
 }
 
 pub(crate) fn acquisition_cost_total(asset: &RealEstateAsset) -> finstack_quant_core::Result<f64> {
-    let mut total = asset.acquisition_cost.unwrap_or(0.0);
+    let mut total = 0.0;
     for money in &asset.acquisition_costs {
         if money.currency() != asset.currency {
             return Err(CoreError::Validation(
@@ -255,11 +255,11 @@ pub(crate) fn disposition_cost_total(asset: &RealEstateAsset) -> finstack_quant_
 pub(crate) fn sale_proceeds_at(
     asset: &RealEstateAsset,
     as_of: Date,
-    exit_date: Date,
+    horizon: Date,
 ) -> finstack_quant_core::Result<Option<(Date, f64)>> {
-    if exit_date < as_of {
+    if horizon < as_of {
         return Err(CoreError::Validation(
-            "exit_date must be on/after as_of".into(),
+            "horizon must be on/after as_of".into(),
         ));
     }
 
@@ -279,10 +279,10 @@ pub(crate) fn sale_proceeds_at(
         let terminal_noi_n = future_noi_flows(asset, as_of)?
             .iter()
             .copied()
-            .rfind(|(date, _)| *date <= exit_date)
+            .rfind(|(date, _)| *date <= horizon)
             .map(|(_, amount)| amount)
             .ok_or_else(|| {
-                CoreError::Validation("No NOI on/before exit_date for terminal value".into())
+                CoreError::Validation("No NOI on/before horizon for terminal value".into())
             })?;
         let growth = asset.terminal_growth_rate.unwrap_or(0.0);
         if !(-1.0..=0.20).contains(&growth) {
@@ -307,7 +307,7 @@ pub(crate) fn sale_proceeds_at(
     }
     net -= disposition_cost_total(asset)?;
 
-    Ok(Some((exit_date, net)))
+    Ok(Some((horizon, net)))
 }
 
 pub(crate) fn first_noi(asset: &RealEstateAsset, as_of: Date) -> finstack_quant_core::Result<f64> {
@@ -369,7 +369,6 @@ mod tests {
         let asset = RealEstateAsset::builder()
             .id(InstrumentId::new("RE-DCF-UNIT"))
             .currency(Currency::USD)
-            .valuation_date(valuation_date)
             .valuation_method(RealEstateValuationMethod::Dcf)
             .noi_schedule(vec![(noi1, 100.0), (noi2, 100.0)])
             .discount_rate_opt(Some(0.10))
