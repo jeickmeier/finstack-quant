@@ -18,7 +18,6 @@ from finstack_quant.finstack_quant import valuations as _valuations
 _composite = _valuations.composite
 
 CompositeExposureReport = _composite.CompositeExposureReport
-CompositeHistoryEngine = _composite.CompositeHistoryEngine
 CompositeHistoryResult = _composite.CompositeHistoryResult
 CompositeInstrument = _composite.CompositeInstrument
 CompositeLegSpec = _composite.CompositeLegSpec
@@ -27,10 +26,11 @@ CompositeSpec = _composite.CompositeSpec
 CompositeState = _composite.CompositeState
 RebalanceRule = _composite.RebalanceRule
 WeightingMethod = _composite.WeightingMethod
+history = _composite.history
+history_from_spec = _composite.history_from_spec
 
 __all__: list[str] = [
     "CompositeExposureReport",
-    "CompositeHistoryEngine",
     "CompositeHistoryResult",
     "CompositeInstrument",
     "CompositeLegSpec",
@@ -39,4 +39,6 @@ __all__: list[str] = [
     "CompositeState",
     "RebalanceRule",
     "WeightingMethod",
+    "history",
+    "history_from_spec",
 ]

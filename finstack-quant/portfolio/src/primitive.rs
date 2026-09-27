@@ -93,7 +93,7 @@ pub struct PortfolioPrimitiveExposureReport {
 ///
 /// Returns an error for conflicting primitive definitions, non-additive metrics,
 /// missing market or FX inputs, invalid composites, or valuation failures.
-pub fn primitive_exposure_report(
+pub fn primitive_exposures(
     portfolio: &Portfolio,
     market: &MarketContext,
     metrics: &[MetricId],
@@ -162,7 +162,7 @@ fn position_primitive_report(
         .downcast_ref::<CompositeInstrument>()
     {
         let report = composite
-            .primitive_exposure_report(market, portfolio.as_of, metrics)
+            .primitive_exposures(market, portfolio.as_of, metrics)
             .map_err(|err| Error::valuation(position.position_id.clone(), err.to_string()))?;
         let mut paths = Vec::with_capacity(report.paths.len());
         let mut definitions = Vec::with_capacity(report.paths.len());
@@ -346,7 +346,7 @@ mod tests {
             .position(direct_position)
             .build()?;
 
-        let report = primitive_exposure_report(&portfolio, &MarketContext::new(), &[])?;
+        let report = primitive_exposures(&portfolio, &MarketContext::new(), &[])?;
         let long = report
             .aggregates
             .iter()

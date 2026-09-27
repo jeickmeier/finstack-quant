@@ -2,6 +2,26 @@
 
 ## [Unreleased]
 
+### Composite and basket (2026-09-24)
+
+#### Changed (BREAKING)
+
+- `CompositeLegSpec.weight` (now `score`): Rust field and `CompositeLegSpec::new` argument, JSON key `legs[i].score`, Python `CompositeLegSpec(instrument_id, instrument, score)` and `.score`, WASM JSON. The user-defined expression column `leg.{id}.weight` is now `leg.{id}.score`.
+- `RebalanceRule::Calendar.frequency` is now a `Tenor` (`{count, unit}` on the wire) instead of the `daily`/`weekly`/`monthly`/`quarterly` string; any cadence such as `6M` or `2W` is accepted. Python `RebalanceRule.calendar(start, frequency: Tenor | str, ...)` takes a `Tenor` or tenor string (`"1M"`).
+- `WeightingMethod::UserDefined` gains a required `annualization_factor` (Rust/JSON) replacing the hard-coded `sqrt(252)` behind the `leg.{id}.volatility` column; both volatility columns now share one definition (sample std × `sqrt(annualization_factor)`).
+- `weighting_inputs["leg.{id}.notional"]` is the signed reporting-currency notional under `NotionalWeighted` too (previously `abs`); only the quantity formula takes the absolute value.
+- `Basket.currency` (now `reporting_currency`): Rust field, builder `.reporting_currency(...)`, JSON key.
+- `CompositeInstrument::primitive_exposure_report` (now `primitive_exposures`) in Rust, matching Python/WASM; portfolio `primitive_exposure_report` (now `primitive_exposures`).
+- `CompositeValuationDetails.exposure_report` (now `exposures`): Rust field and valuation-result JSON key, matching `CompositeHistoryRow.exposures`.
+- `CompositeHistoryEngine::run` / `run_from_spec` (now free functions `composite::history` / `history_from_spec`): Rust and Python (`finstack_quant.valuations.composite.history` / `history_from_spec`); WASM already used `history` / `historyFromSpec`.
+- Python `CompositeSpec.reporting_currency` returns a `Currency` (was `str`), matching `CompositeExposureReport.reporting_currency`.
+- Python `CompositeState.resolved_quantities` (now `resolved_legs`), matching the Rust field and wire key.
+
+#### Removed
+
+- `RebalanceFrequency` (Rust/JSON schema) and `CompositeHistoryEngine` (Rust/Python).
+- WASM `index.d.ts` `CompositePrimitivePath` / `CompositePrimitiveAggregate`; the facade re-exports the generated `PrimitiveExposure` / `PrimitiveAggregate` / `CompositeExposureReport` types.
+
 ### Structured-credit deal terms (2026-09-24)
 
 A pool asset's agency rating is `rating` (as on `Tranche`) and its default

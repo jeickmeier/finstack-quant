@@ -29,14 +29,16 @@ pub struct CompositeLegSpec {
     pub instrument_id: InstrumentId,
     /// Canonical typed definition of the underlying instrument.
     pub instrument: Box<InstrumentJson>,
-    /// Signed quantity for fixed weighting or signed target score for dynamic weighting.
-    pub weight: f64,
+    /// Signed leg score: the resolved unit quantity under
+    /// [`WeightingMethod::FixedQuantity`] and a scale-free signed target score
+    /// that every dynamic method normalizes.
+    pub score: f64,
 }
 
 impl CompositeLegSpec {
     /// Construct a self-contained composite leg.
     ///
-    /// `weight` is the resolved quantity under [`WeightingMethod::FixedQuantity`]
+    /// `score` is the resolved quantity under [`WeightingMethod::FixedQuantity`]
     /// and the signed target score for every dynamic method. Validation requires
     /// a finite value with absolute magnitude greater than `1e-12`.
     ///
@@ -46,44 +48,18 @@ impl CompositeLegSpec {
     ///   the embedded definition is boxed.
     /// * `instrument` - Canonical typed underlying instrument; nested
     ///   composites are permitted within [`MAX_COMPOSITE_DEPTH`].
-    /// * `weight` - Signed fixed quantity or dynamic target score; must be
+    /// * `score` - Signed fixed quantity or dynamic target score; must be
     ///   finite and non-zero.
     #[must_use]
     pub fn new(
         instrument_id: impl Into<InstrumentId>,
         instrument: InstrumentJson,
-        weight: f64,
+        score: f64,
     ) -> Self {
         Self {
             instrument_id: instrument_id.into(),
             instrument: Box::new(instrument),
-            weight,
-        }
-    }
-}
-
-/// Calendar cadence for automatic composite rebalancing.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(rename_all = "snake_case")]
-pub enum RebalanceFrequency {
-    /// Every calendar day, adjusted by the configured business-day convention.
-    Daily,
-    /// Every seven calendar days from the schedule start.
-    Weekly,
-    /// Every calendar month from the schedule start.
-    Monthly,
-    /// Every three calendar months from the schedule start.
-    Quarterly,
-}
-
-impl RebalanceFrequency {
-    fn tenor(self) -> Result<Tenor> {
-        match self {
-            Self::Daily => Tenor::parse("1D"),
-            Self::Weekly => Ok(Tenor::weekly()),
-            Self::Monthly => Ok(Tenor::monthly()),
-            Self::Quarterly => Ok(Tenor::quarterly()),
+            score,
         }
     }
 }
@@ -121,8 +97,8 @@ pub enum RebalanceRule {
             schemars(with = "Option<finstack_quant_core::wire::DateWire>")
         )]
         end: Option<Date>,
-        /// Daily, weekly, monthly, or quarterly cadence.
-        frequency: RebalanceFrequency,
+        /// Rebalance cadence as a tenor (for example `1D`, `1W`, `1M`, `3M`).
+        frequency: Tenor,
         /// Registered holiday-calendar identifier.
         calendar_id: String,
         /// Business-day adjustment applied to each generated date.
@@ -166,7 +142,7 @@ impl RebalanceRule {
                 }
                 let horizon = end.unwrap_or(*start);
                 let _ = ScheduleBuilder::new(*start, horizon)?
-                    .frequency(frequency.tenor()?)
+                    .frequency(*frequency)
                     .adjust_with_id(*business_day_convention, calendar_id)
                     .build()?;
                 Ok(())
@@ -209,7 +185,7 @@ impl RebalanceRule {
                 }
                 let schedule_end = end.map_or(horizon, |end| end.min(horizon));
                 let schedule = ScheduleBuilder::new(*start, schedule_end)?
-                    .frequency(frequency.tenor()?)
+                    .frequency(*frequency)
                     .adjust_with_id(*business_day_convention, calendar_id)
                     .build()?;
                 Ok(schedule
@@ -224,7 +200,7 @@ impl RebalanceRule {
 
 /// Policy used to resolve signed leg quantities at initialization or rebalance.
 ///
-/// Each variant consumes the signed `weight` on [`CompositeLegSpec`] as either
+/// Each variant consumes the signed `score` on [`CompositeLegSpec`] as either
 /// the quantity itself or a target score. Resolution happens only in
 /// [`CompositeSpec::initialize`] / [`CompositeSpec::initialize_fixed`] or
 /// [`CompositeInstrument::rebalance`].
@@ -259,7 +235,7 @@ impl RebalanceRule {
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
 pub enum WeightingMethod {
-    /// Use each leg's signed `weight` directly as its resolved quantity.
+    /// Use each leg's signed `score` directly as its resolved quantity.
     FixedQuantity,
     /// Allocate signed scores across a fixed gross reporting-currency notional.
     NotionalWeighted {
@@ -296,12 +272,16 @@ pub enum WeightingMethod {
         required_metrics: Vec<MetricId>,
         /// One scalar expression per leg, keyed by instrument identifier.
         ///
-        /// Available columns: `as_of_days`, `leg.{id}.weight`,
+        /// Available columns: `as_of_days`, `leg.{id}.score`,
         /// `leg.{id}.value`, `leg.{id}.fx_rate`, optional `leg.{id}.notional`,
         /// `leg.{id}.metric.{metric}` for each required metric, and
         /// `leg.{id}.volatility` when history has at least three observations
-        /// (annualized with `sqrt(252)`).
+        /// (annualized with `sqrt(annualization_factor)`). `leg.{id}.notional`
+        /// is the signed reporting-currency notional.
         quantity_expressions: IndexMap<String, Expr>,
+        /// Positive periods-per-year factor used to annualize the
+        /// `leg.{id}.volatility` column (for example `252.0` for daily history).
+        annualization_factor: f64,
     },
 }
 
@@ -481,17 +461,17 @@ impl CompositeMarketObservation {
 
 pub(super) fn normalized_scores(legs: &[CompositeLegSpec], neutralize: bool) -> Result<Vec<f64>> {
     if !neutralize {
-        return Ok(legs.iter().map(|leg| leg.weight).collect());
+        return Ok(legs.iter().map(|leg| leg.score).collect());
     }
     let positive = legs
         .iter()
-        .filter(|leg| leg.weight > 0.0)
-        .map(|leg| leg.weight)
+        .filter(|leg| leg.score > 0.0)
+        .map(|leg| leg.score)
         .sum::<f64>();
     let negative = legs
         .iter()
-        .filter(|leg| leg.weight < 0.0)
-        .map(|leg| leg.weight.abs())
+        .filter(|leg| leg.score < 0.0)
+        .map(|leg| leg.score.abs())
         .sum::<f64>();
     if !positive.is_finite()
         || !negative.is_finite()
@@ -505,10 +485,10 @@ pub(super) fn normalized_scores(legs: &[CompositeLegSpec], neutralize: bool) -> 
     Ok(legs
         .iter()
         .map(|leg| {
-            if leg.weight > 0.0 {
-                leg.weight / positive
+            if leg.score > 0.0 {
+                leg.score / positive
             } else {
-                leg.weight / negative
+                leg.score / negative
             }
         })
         .collect())

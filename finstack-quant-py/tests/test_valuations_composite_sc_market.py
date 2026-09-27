@@ -21,12 +21,13 @@ from finstack_quant.core.dates import DayCount, Tenor
 from finstack_quant.core.market_data import DiscountCurve, ForwardCurve, MarketContext, ScalarTimeSeries
 from finstack_quant.core.money import Money
 from finstack_quant.valuations.composite import (
-    CompositeHistoryEngine,
     CompositeInstrument,
     CompositeLegSpec,
     CompositeSpec,
     RebalanceRule,
     WeightingMethod,
+    history,
+    history_from_spec,
 )
 from finstack_quant.valuations.instruments import (
     AssetPool,
@@ -104,10 +105,10 @@ def test_rebalance_rule_accepts_date_objects_and_strings() -> None:
     via_dates = RebalanceRule.dates([dt.date(2025, 1, 31), pd.Timestamp("2025-02-28"), "2025-03-31"])
     via_strings = RebalanceRule.dates(["2025-01-31", "2025-02-28", "2025-03-31"])
     assert via_dates.to_json() == via_strings.to_json()
-    calendar = RebalanceRule.calendar(dt.date(2025, 1, 1), "monthly", "weekends_only", "following", "2026-01-01")
+    calendar = RebalanceRule.calendar(dt.date(2025, 1, 1), "1M", "weekends_only", "following", "2026-01-01")
     assert (
         calendar.to_json()
-        == RebalanceRule.calendar("2025-01-01", "monthly", "weekends_only", "following", dt.date(2026, 1, 1)).to_json()
+        == RebalanceRule.calendar("2025-01-01", "1M", "weekends_only", "following", dt.date(2026, 1, 1)).to_json()
     )
     assert repr(RebalanceRule.manual()) == "RebalanceRule(kind='manual')"
     with pytest.raises(ValueError, match=r"strictly increasing"):
@@ -117,13 +118,13 @@ def test_rebalance_rule_accepts_date_objects_and_strings() -> None:
 def test_history_engine_accepts_observation_lists() -> None:
     state = json.loads(MarketContext().to_json())
     observations = [{"date": "2025-01-01", "state": state}, {"date": "2025-01-02", "state": state}]
-    via_list = CompositeHistoryEngine.run_from_spec(_fixed_spec(), observations)
-    via_json = CompositeHistoryEngine.run_from_spec(_fixed_spec(), json.dumps(observations))
+    via_list = history_from_spec(_fixed_spec(), observations)
+    via_json = history_from_spec(_fixed_spec(), json.dumps(observations))
     assert via_list.to_json() == via_json.to_json()
     assert via_list.dates == ["2025-01-01", "2025-01-02"]
     assert list(via_list.to_dataframe()["return_index"]) == [100.0, 100.0]
     resolved = _fixed_spec().initialize(MarketContext(), dt.date(2025, 1, 1)).instrument
-    assert len(CompositeHistoryEngine.run(resolved, observations)) == 2
+    assert len(history(resolved, observations)) == 2
 
 
 def test_composite_reprs_and_spec_getters() -> None:
@@ -134,7 +135,7 @@ def test_composite_reprs_and_spec_getters() -> None:
     assert repr(spec.weighting_method) == "WeightingMethod(kind='fixed_quantity')"
     assert repr(spec.rebalance_rule) == "RebalanceRule(kind='manual')"
     leg = spec.legs[0]
-    assert repr(leg) == "CompositeLegSpec(instrument_id='A', instrument_type='equity', weight=1)"
+    assert repr(leg) == "CompositeLegSpec(instrument_id='A', instrument_type='equity', score=1)"
     assert leg.instrument_dict() == json.loads(leg.instrument_json)
     resolved = spec.initialize(MarketContext(), dt.date(2025, 1, 1)).instrument
     assert repr(resolved) == "CompositeInstrument(id='A-B', effective_date='2025-01-01', legs=2)"

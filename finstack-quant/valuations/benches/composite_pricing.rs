@@ -66,7 +66,7 @@ fn benchmark_composite_pricing(c: &mut Criterion) {
                 b.iter(|| {
                     black_box(
                         instrument
-                            .primitive_exposure_report(
+                            .primitive_exposures(
                                 black_box(&market),
                                 black_box(as_of),
                                 black_box(&[]),

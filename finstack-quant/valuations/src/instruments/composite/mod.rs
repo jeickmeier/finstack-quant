@@ -20,10 +20,10 @@
 //!
 //! # Weighting
 //!
-//! [`WeightingMethod`] converts each leg's signed `weight` into a quantity only
+//! [`WeightingMethod`] converts each leg's signed `score` into a quantity only
 //! at initialization or rebalance:
 //!
-//! - [`WeightingMethod::FixedQuantity`]: `quantity = weight`.
+//! - [`WeightingMethod::FixedQuantity`]: `quantity = score`.
 //! - [`WeightingMethod::NotionalWeighted`]: allocate a target gross
 //!   reporting-currency notional by absolute score, then divide by each
 //!   leg's unit notional.
@@ -38,7 +38,7 @@
 //!
 //! # History
 //!
-//! [`CompositeHistoryEngine`] walks strictly increasing dated market snapshots.
+//! [`history()`] and [`history_from_spec`] walk strictly increasing dated market snapshots.
 //! Warmup observations are visible to dynamic weighting but are not emitted.
 //! Each output row values the state held *into* that close. A scheduled
 //! rebalance is close-effective: the row still reports pre-trade P&L, then the
@@ -82,7 +82,7 @@
 //!
 //! - [`CompositeSpec`] for the unresolved definition and weighting policy
 //! - [`CompositeInstrument`] for the priceable resolved state
-//! - [`CompositeHistoryEngine`] for dated total-return and rebalance history
+//! - [`history()`] / [`history_from_spec`] for dated total-return and rebalance history
 //! - [`crate::instruments::Instrument`] for generic pricing and metric dispatch
 //!
 //! # References
@@ -93,11 +93,10 @@
 mod history;
 mod types;
 
-pub use history::{CompositeHistoryEngine, CompositeHistoryRow};
+pub use history::{history, history_from_spec, CompositeHistoryRow};
 pub use types::{
     CompositeExposureReport, CompositeInstrument, CompositeLegSpec, CompositeLegValuation,
     CompositeMarketObservation, CompositeRebalanceResult, CompositeSpec, CompositeState,
     CompositeTrade, CompositeValuationDetails, PrimitiveAggregate, PrimitiveExposure,
-    RebalanceFrequency, RebalanceRule, ResolvedCompositeLeg, WeightingMethod, MAX_COMPOSITE_DEPTH,
-    MAX_COMPOSITE_LEGS,
+    RebalanceRule, ResolvedCompositeLeg, WeightingMethod, MAX_COMPOSITE_DEPTH, MAX_COMPOSITE_LEGS,
 };

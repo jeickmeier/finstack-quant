@@ -346,7 +346,7 @@
       "type": "basket",
       "instrumentSource": {
         "path": "finstack-quant/valuations/tests/instruments/json_examples/basket.json",
-        "sha256": "7bdb4bfedb9c4141834c099f0ee47875fc568e87bd0ef7ef153edb706ba343f0",
+        "sha256": "0e1c23b8c7122cc38db0ed346b6d36904987f61f662bda4f1b5ce93191a32a4f",
         "pointer": []
       },
       "instrumentPatches": [],
@@ -1209,7 +1209,7 @@
       "type": "composite",
       "instrumentSource": {
         "path": "finstack-quant/valuations/tests/instruments/json_examples/composite.json",
-        "sha256": "a35a1721822bf63e122ba9f268134e577d55b5a96ff6b57b07591be80cca2581",
+        "sha256": "9b508c9851488d6ff79d9c9f9fe75b1a309b8a67417f2922f97061d638355f13",
         "pointer": []
       },
       "instrumentPatches": [],

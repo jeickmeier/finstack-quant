@@ -22,7 +22,7 @@ use finstack_quant_portfolio::fi_attribution::{
 };
 use finstack_quant_portfolio::grid_attribution::{grid_attribution, GridPosition};
 use finstack_quant_portfolio::grouping::aggregate_by_book;
-use finstack_quant_portfolio::primitive_exposure_report;
+use finstack_quant_portfolio::primitive_exposures;
 use finstack_quant_portfolio::valuation::{
     value_portfolio, PortfolioValuationOptions, RequestedMetrics,
 };
@@ -113,7 +113,7 @@ fn bench_primitive_exposure(c: &mut Criterion) {
             &num_positions,
             |b, _| {
                 b.iter(|| {
-                    primitive_exposure_report(
+                    primitive_exposures(
                         black_box(&portfolio),
                         black_box(&market),
                         black_box(metrics.as_slice()),

@@ -13,8 +13,8 @@ pub use reporting::{
 pub use spec::CompositeSpec;
 pub(crate) use spec_support::{cashflows_between, validate_history};
 pub use spec_support::{
-    CompositeLegSpec, CompositeMarketObservation, CompositeState, RebalanceFrequency,
-    RebalanceRule, ResolvedCompositeLeg, WeightingMethod, MAX_COMPOSITE_DEPTH, MAX_COMPOSITE_LEGS,
+    CompositeLegSpec, CompositeMarketObservation, CompositeState, RebalanceRule,
+    ResolvedCompositeLeg, WeightingMethod, MAX_COMPOSITE_DEPTH, MAX_COMPOSITE_LEGS,
 };
 
 #[cfg(test)]
@@ -37,7 +37,7 @@ mod tests {
     use std::sync::Arc;
     use time::macros::date;
 
-    fn equity_leg(id: &str, shares: f64, price: f64, weight: f64) -> CompositeLegSpec {
+    fn equity_leg(id: &str, shares: f64, price: f64, score: f64) -> CompositeLegSpec {
         CompositeLegSpec::new(
             id,
             InstrumentJson::Equity(
@@ -45,7 +45,7 @@ mod tests {
                     .with_quantity(shares)
                     .with_quoted_spot(price),
             ),
-            weight,
+            score,
         )
     }
 
@@ -266,6 +266,7 @@ mod tests {
             WeightingMethod::UserDefined {
                 required_metrics: Vec::new(),
                 quantity_expressions: expressions,
+                annualization_factor: 252.0,
             },
             RebalanceRule::Manual,
         );
@@ -329,7 +330,7 @@ mod tests {
         .instrument;
 
         let report =
-            outer.primitive_exposure_report(&MarketContext::new(), date!(2025 - 01 - 02), &[])?;
+            outer.primitive_exposures(&MarketContext::new(), date!(2025 - 01 - 02), &[])?;
         assert_eq!(report.paths.len(), 3);
         let a = report
             .aggregates
@@ -380,7 +381,7 @@ mod tests {
     fn non_additive_metrics_are_rejected_at_composite_level() -> Result<()> {
         let composite = CompositeInstrument::example()?;
         let error = composite
-            .primitive_exposure_report(
+            .primitive_exposures(
                 &MarketContext::new(),
                 date!(2025 - 01 - 02),
                 &[MetricId::DurationMod],
@@ -587,6 +588,198 @@ mod tests {
                 "spec.{key}: {error}"
             );
         }
+        Ok(())
+    }
+
+    fn price_history(prices: &[f64]) -> Vec<CompositeMarketObservation> {
+        prices
+            .iter()
+            .enumerate()
+            .map(|(offset, price)| {
+                let date = date!(2025 - 01 - 01) + time::Duration::days(offset as i64);
+                let market = MarketContext::new()
+                    .insert_price("A", MarketScalar::Unitless(*price))
+                    .insert_price("B", MarketScalar::Unitless(*price));
+                CompositeMarketObservation::new(date, &market)
+            })
+            .collect()
+    }
+
+    #[test]
+    fn user_defined_volatility_column_uses_annualization_factor() -> Result<()> {
+        // Unit P&L increments of 100, 102, 99, 103 are 2, -3, 4: mean 1, sum of
+        // squared deviations 26, sample variance 13. With 52 periods per year the
+        // annualized volatility is sqrt(13 * 52) = 26 exactly (hand-computed).
+        let legs = vec![
+            CompositeLegSpec::new(
+                "A",
+                InstrumentJson::Equity(
+                    crate::instruments::Equity::new("A", "A", Currency::USD).with_spot_id("A"),
+                ),
+                1.0,
+            ),
+            CompositeLegSpec::new(
+                "B",
+                InstrumentJson::Equity(
+                    crate::instruments::Equity::new("B", "B", Currency::USD).with_spot_id("B"),
+                ),
+                -1.0,
+            ),
+        ];
+        let expressions = IndexMap::from([
+            ("A".to_string(), Expr::column("leg.A.volatility")),
+            ("B".to_string(), Expr::literal(-1.0)),
+        ]);
+        let spec = CompositeSpec::new(
+            "EXPR-VOL",
+            Currency::USD,
+            Money::from((100_i64, Currency::USD)),
+            legs,
+            WeightingMethod::UserDefined {
+                required_metrics: Vec::new(),
+                quantity_expressions: expressions,
+                annualization_factor: 52.0,
+            },
+            RebalanceRule::Manual,
+        );
+        let history = price_history(&[100.0, 102.0, 99.0, 103.0]);
+        let market = history
+            .last()
+            .ok_or_else(|| Error::Internal("test history is empty".to_string()))?
+            .restore()?;
+        let resolved = spec.initialize(&market, date!(2025 - 01 - 04), &history)?;
+        // Tolerance covers only floating-point summation error.
+        assert!((resolved.instrument.state.resolved_legs[0].quantity - 26.0).abs() < 1.0e-9);
+        assert!(
+            (resolved.instrument.state.weighting_inputs["leg.A.volatility"] - 26.0).abs() < 1.0e-9
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn user_defined_rejects_non_positive_annualization_factor() {
+        let spec = CompositeSpec::new(
+            "EXPR-BAD",
+            Currency::USD,
+            Money::from((100_i64, Currency::USD)),
+            vec![
+                equity_leg("A", 1.0, 100.0, 1.0),
+                equity_leg("B", 1.0, 100.0, -1.0),
+            ],
+            WeightingMethod::UserDefined {
+                required_metrics: Vec::new(),
+                quantity_expressions: IndexMap::from([
+                    ("A".to_string(), Expr::literal(1.0)),
+                    ("B".to_string(), Expr::literal(-1.0)),
+                ]),
+                annualization_factor: 0.0,
+            },
+            RebalanceRule::Manual,
+        );
+        assert!(spec.validate().is_err());
+    }
+
+    #[test]
+    fn notional_weighting_records_signed_notional() -> Result<()> {
+        // Leg A is short two shares at 100: signed notional -200. The recorded
+        // input keeps the sign; only the quantity formula uses |notional|.
+        let spec = CompositeSpec::new(
+            "SIGNED-NOTIONAL",
+            Currency::USD,
+            Money::from((100_i64, Currency::USD)),
+            vec![
+                equity_leg("A", -2.0, 100.0, 1.0),
+                equity_leg("B", 1.0, 50.0, -1.0),
+            ],
+            WeightingMethod::NotionalWeighted {
+                gross_notional: Money::from((1_000_i64, Currency::USD)),
+            },
+            RebalanceRule::Manual,
+        );
+        let resolved = spec.initialize(&MarketContext::new(), date!(2025 - 01 - 01), &[])?;
+        let state = &resolved.instrument.state;
+        assert_eq!(state.weighting_inputs["leg.A.notional"], -200.0);
+        assert_eq!(state.weighting_inputs["leg.B.notional"], 50.0);
+        // q_A = +1 * 1000 * 0.5 / 200, q_B = -1 * 1000 * 0.5 / 50.
+        assert_eq!(state.resolved_legs[0].quantity, 2.5);
+        assert_eq!(state.resolved_legs[1].quantity, -10.0);
+        Ok(())
+    }
+
+    #[test]
+    fn calendar_rebalance_accepts_any_tenor_cadence() -> Result<()> {
+        let rule = RebalanceRule::Calendar {
+            start: date!(2025 - 01 - 01),
+            end: Some(date!(2026 - 01 - 01)),
+            frequency: Tenor::parse("6M")?,
+            calendar_id: "weekends_only".to_string(),
+            business_day_convention: finstack_quant_core::dates::BusinessDayConvention::Following,
+        };
+        rule.validate()?;
+        let dates = rule.dates_through(date!(2026 - 01 - 01))?;
+        assert_eq!(
+            dates,
+            vec![
+                date!(2025 - 01 - 01),
+                date!(2025 - 07 - 01),
+                date!(2026 - 01 - 01)
+            ]
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn retired_composite_wire_keys_are_rejected() -> Result<()> {
+        let composite = CompositeInstrument::example()?;
+        let mut leg = serde_json::to_value(&composite.spec.legs[0])
+            .map_err(|error| Error::Internal(error.to_string()))?;
+        let object = leg
+            .as_object_mut()
+            .ok_or_else(|| Error::Internal("leg is not an object".to_string()))?;
+        let score = object
+            .remove("score")
+            .ok_or_else(|| Error::Internal("leg has no score".to_string()))?;
+        // schema-rejection-test: the retired `weight` spelling of `score`.
+        object.insert("weight".to_string(), score);
+        assert!(serde_json::from_value::<CompositeLegSpec>(leg).is_err());
+
+        let calendar = serde_json::json!({
+            "kind": "calendar",
+            "start": "2025-01-01",
+            // schema-rejection-test: the retired `RebalanceFrequency` string cadence.
+            "frequency": "monthly",
+            "calendar_id": "weekends_only",
+            "business_day_convention": "following"
+        });
+        assert!(serde_json::from_value::<RebalanceRule>(calendar).is_err());
+
+        let user_defined = serde_json::json!({
+            "kind": "user_defined",
+            "required_metrics": [],
+            "quantity_expressions": {}
+        });
+        assert!(serde_json::from_value::<WeightingMethod>(user_defined).is_err());
+
+        let result = composite.price_with_metrics(
+            &MarketContext::new(),
+            date!(2025 - 01 - 02),
+            &[],
+            PricingOptions::default(),
+        )?;
+        let Some(crate::results::ValuationDetails::Composite(details)) = result.details else {
+            return Err(Error::Internal("composite details are missing".to_string()));
+        };
+        let mut details =
+            serde_json::to_value(&details).map_err(|error| Error::Internal(error.to_string()))?;
+        let object = details
+            .as_object_mut()
+            .ok_or_else(|| Error::Internal("details is not an object".to_string()))?;
+        let exposures = object
+            .remove("exposures")
+            .ok_or_else(|| Error::Internal("details has no exposures".to_string()))?;
+        // schema-rejection-test: the retired `exposure_report` spelling of `exposures`.
+        object.insert("exposure_report".to_string(), exposures);
+        assert!(serde_json::from_value::<CompositeValuationDetails>(details).is_err());
         Ok(())
     }
 }

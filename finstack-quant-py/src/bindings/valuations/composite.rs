@@ -13,9 +13,9 @@ use crate::bindings::pandas_utils::{serde_to_py, ColumnSchema};
 use crate::errors::core_to_py;
 use finstack_quant_core::types::InstrumentId;
 use finstack_quant_valuations::instruments::composite::{
-    CompositeExposureReport, CompositeHistoryEngine, CompositeHistoryRow, CompositeInstrument,
+    history, history_from_spec, CompositeExposureReport, CompositeHistoryRow, CompositeInstrument,
     CompositeLegSpec, CompositeMarketObservation, CompositeRebalanceResult, CompositeSpec,
-    CompositeState, RebalanceFrequency, RebalanceRule, WeightingMethod,
+    CompositeState, RebalanceRule, WeightingMethod,
 };
 use finstack_quant_valuations::instruments::{Instrument, InstrumentEnvelope, InstrumentJson};
 use finstack_quant_valuations::metrics::MetricId;
@@ -147,22 +147,23 @@ impl PyCompositeLegSpec {
     ///     Identifier that must equal the embedded instrument's identifier.
     /// instrument : object | str
     ///     Typed Python instrument or canonical ``finstack_quant.instrument/1`` JSON.
-    /// weight : float
-    ///     Non-zero signed quantity or relative weighting score.
+    /// score : float
+    ///     Non-zero signed leg score: the unit quantity under fixed-quantity
+    ///     weighting, or a scale-free signed target score under dynamic methods.
     ///
     /// Raises
     /// ------
     /// ValueError
     ///     If the instrument payload is malformed.
     #[new]
-    #[pyo3(text_signature = "(instrument_id, instrument, weight)")]
-    fn new(instrument_id: &str, instrument: &Bound<'_, PyAny>, weight: f64) -> PyResult<Self> {
+    #[pyo3(text_signature = "(instrument_id, instrument, score)")]
+    fn new(instrument_id: &str, instrument: &Bound<'_, PyAny>, score: f64) -> PyResult<Self> {
         let envelope = extract_instrument_json(instrument)?;
         let instrument =
             finstack_quant_valuations::pricer::json::parse_instrument_from_json(&envelope)
                 .map_err(core_to_py)?;
         Ok(Self {
-            inner: CompositeLegSpec::new(instrument_id, instrument, weight),
+            inner: CompositeLegSpec::new(instrument_id, instrument, score),
         })
     }
 
@@ -234,8 +235,8 @@ impl PyCompositeLegSpec {
     /// -----
     /// This accessor does not raise; it returns the validated stored value.
     #[getter]
-    fn weight(&self) -> f64 {
-        self.inner.weight
+    fn score(&self) -> f64 {
+        self.inner.score
     }
 
     /// Return the embedded instrument as a canonical v1 envelope.
@@ -278,10 +279,10 @@ impl PyCompositeLegSpec {
     /// Return ``repr(self)``.
     fn __repr__(&self) -> String {
         format!(
-            "CompositeLegSpec(instrument_id='{}', instrument_type='{}', weight={})",
+            "CompositeLegSpec(instrument_id='{}', instrument_type='{}', score={})",
             self.inner.instrument_id,
             self.inner.instrument.type_tag(),
-            self.inner.weight
+            self.inner.score
         )
     }
 }
@@ -606,14 +607,15 @@ impl PyRebalanceRule {
         Ok(Self { inner })
     }
 
-    /// Build a calendar-adjusted daily, weekly, monthly, or quarterly cadence.
+    /// Build a calendar-adjusted rebalance cadence from a tenor.
     ///
     /// Parameters
     /// ----------
     /// start : datetime.date | datetime.datetime | pandas.Timestamp | str
     ///     Unadjusted schedule start date (date-like or ISO-8601 string).
-    /// frequency : str
-    ///     One of ``daily``, ``weekly``, ``monthly``, or ``quarterly``.
+    /// frequency : Tenor | str
+    ///     Rebalance cadence as a ``Tenor`` or tenor string such as ``"1D"``,
+    ///     ``"1W"``, ``"1M"`` or ``"3M"``.
     /// calendar_id : str
     ///     Registered calendar identifier such as ``weekends_only``.
     /// business_day_convention : str
@@ -634,7 +636,7 @@ impl PyRebalanceRule {
     #[pyo3(signature = (start, frequency, calendar_id, business_day_convention, end=None))]
     fn calendar(
         start: &Bound<'_, PyAny>,
-        frequency: &str,
+        frequency: &Bound<'_, PyAny>,
         calendar_id: &str,
         business_day_convention: &str,
         end: Option<&Bound<'_, PyAny>>,
@@ -645,10 +647,7 @@ impl PyRebalanceRule {
                 .filter(|value| !value.is_none())
                 .map(crate::bindings::date_utils::extract_date)
                 .transpose()?,
-            frequency: super::instruments::enum_from_str::<RebalanceFrequency>(
-                frequency,
-                "rebalance frequency",
-            )?,
+            frequency: crate::bindings::core::dates::tenor::extract_tenor(frequency)?,
             calendar_id: calendar_id.to_string(),
             business_day_convention: super::instruments::enum_from_str(
                 business_day_convention,
@@ -827,19 +826,19 @@ impl PyCompositeSpec {
         self.inner.id.to_string()
     }
 
-    /// Return the ISO code used for values, risk, P&L, and returns.
+    /// Return the currency used for values, risk, P&L, and returns.
     ///
     /// Returns
     /// -------
-    /// str
-    ///     Three-letter reporting-currency code.
+    /// Currency
+    ///     Reporting currency of the composite.
     ///
     /// Notes
     /// -----
     /// This accessor does not raise; it returns the validated stored currency.
     #[getter]
-    fn reporting_currency(&self) -> String {
-        self.inner.reporting_currency.to_string()
+    fn reporting_currency(&self) -> PyCurrency {
+        PyCurrency::from_inner(self.inner.reporting_currency)
     }
 
     /// Return the capital denominator (``Money`` in the reporting currency).
@@ -1010,6 +1009,15 @@ impl PyCompositeState {
         self.inner.effective_date.to_string()
     }
 
+    /// Return ``repr(self)``.
+    fn __repr__(&self) -> String {
+        format!(
+            "CompositeState(effective_date='{}', legs={})",
+            self.inner.effective_date,
+            self.inner.resolved_legs.len()
+        )
+    }
+
     /// Return signed top-level quantities keyed by leg identifier.
     ///
     /// Returns
@@ -1020,17 +1028,8 @@ impl PyCompositeState {
     /// Notes
     /// -----
     /// This accessor does not raise; it copies the validated resolved legs.
-    /// Return ``repr(self)``.
-    fn __repr__(&self) -> String {
-        format!(
-            "CompositeState(effective_date='{}', legs={})",
-            self.inner.effective_date,
-            self.inner.resolved_legs.len()
-        )
-    }
-
     #[getter]
-    fn resolved_quantities(&self) -> std::collections::BTreeMap<String, f64> {
+    fn resolved_legs(&self) -> std::collections::BTreeMap<String, f64> {
         self.inner
             .resolved_legs
             .iter()
@@ -1225,7 +1224,7 @@ impl PyCompositeInstrument {
             .collect::<Result<Vec<_>, _>>()
             .map_err(core_to_py)?;
         self.inner
-            .primitive_exposure_report(&market, as_of, &metrics)
+            .primitive_exposures(&market, as_of, &metrics)
             .map(PyCompositeExposureReport::from_inner)
             .map_err(core_to_py)
     }
@@ -1694,114 +1693,109 @@ impl PyCompositeHistoryResult {
     }
 }
 
-/// Dated-market engine for composite P&L, returns, exposures, and rebalances.
-#[pyclass(
-    name = "CompositeHistoryEngine",
-    module = "finstack_quant.valuations.composite",
-    frozen,
-    skip_from_py_object
-)]
-pub struct PyCompositeHistoryEngine;
+/// Initialize at the first observation and calculate chronological rows.
+///
+/// Warmup observations feed dynamic weighting only. The first output row
+/// has ``return_index = 100`` and zero P&L. Scheduled rebalances are
+/// close-effective.
+///
+/// Parameters
+/// ----------
+/// spec : CompositeSpec
+///     Unresolved definition initialized using only available warmup and first-date information.
+/// observations : list[dict] | str
+///     Non-empty strictly increasing complete market-observation array
+///     (list of dicts or JSON string).
+/// warmup : list[dict] | str | None
+///     Optional strictly earlier complete observations used for weighting only.
+/// metrics : list[str] | None
+///     Optional canonical additive metric keys included on every output row.
+///
+/// Returns
+/// -------
+/// CompositeHistoryResult
+///     Dated value, cashflow, P&L, return, index, exposure, state, and trade rows.
+///
+/// Raises
+/// ------
+/// ValueError
+///     If metrics, observations, warmup, initialization, pricing, FX, or rebalancing fail.
+#[pyfunction]
+#[pyo3(
+        name = "history_from_spec",
+        signature = (spec, observations, warmup=None, metrics=None),
+        text_signature = "(spec, observations, warmup=None, metrics=None)"
+    )]
+fn py_history_from_spec(
+    py: Python<'_>,
+    spec: &PyCompositeSpec,
+    observations: &Bound<'_, PyAny>,
+    warmup: Option<&Bound<'_, PyAny>>,
+    metrics: Option<Vec<String>>,
+) -> PyResult<PyCompositeHistoryResult> {
+    let observations = observations_from_py(py, Some(observations), "composite observations")?;
+    let warmup = observations_from_py(py, warmup, "composite warmup")?;
+    let metrics = metrics
+        .unwrap_or_default()
+        .into_iter()
+        .map(MetricId::try_from)
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(core_to_py)?;
+    history_from_spec(&spec.inner, &warmup, &observations, &metrics)
+        .map(|inner| PyCompositeHistoryResult { inner })
+        .map_err(core_to_py)
+}
 
-#[pymethods]
-impl PyCompositeHistoryEngine {
-    /// Initialize at the first observation and calculate chronological rows.
-    ///
-    /// Warmup observations feed dynamic weighting only. The first output row
-    /// has ``return_index = 100`` and zero P&L. Scheduled rebalances are
-    /// close-effective.
-    ///
-    /// Parameters
-    /// ----------
-    /// spec : CompositeSpec
-    ///     Unresolved definition initialized using only available warmup and first-date information.
-    /// observations : list[dict] | str
-    ///     Non-empty strictly increasing complete market-observation array
-    ///     (list of dicts or JSON string).
-    /// warmup : list[dict] | str | None
-    ///     Optional strictly earlier complete observations used for weighting only.
-    /// metrics : list[str] | None
-    ///     Optional canonical additive metric keys included on every output row.
-    ///
-    /// Returns
-    /// -------
-    /// CompositeHistoryResult
-    ///     Dated value, cashflow, P&L, return, index, exposure, state, and trade rows.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If metrics, observations, warmup, initialization, pricing, FX, or rebalancing fail.
-    #[staticmethod]
-    #[pyo3(signature = (spec, observations, warmup=None, metrics=None))]
-    fn run_from_spec(
-        py: Python<'_>,
-        spec: &PyCompositeSpec,
-        observations: &Bound<'_, PyAny>,
-        warmup: Option<&Bound<'_, PyAny>>,
-        metrics: Option<Vec<String>>,
-    ) -> PyResult<PyCompositeHistoryResult> {
-        let observations = observations_from_py(py, Some(observations), "composite observations")?;
-        let warmup = observations_from_py(py, warmup, "composite warmup")?;
-        let metrics = metrics
-            .unwrap_or_default()
-            .into_iter()
-            .map(MetricId::try_from)
-            .collect::<Result<Vec<_>, _>>()
-            .map_err(core_to_py)?;
-        CompositeHistoryEngine::run_from_spec(&spec.inner, &warmup, &observations, &metrics)
-            .map(|inner| PyCompositeHistoryResult { inner })
-            .map_err(core_to_py)
-    }
-
-    /// Calculate chronological rows from an already-resolved initial state.
-    ///
-    /// Period return is ``pnl / capital``. The initial effective date must be
-    /// on or before the first observation.
-    ///
-    /// Parameters
-    /// ----------
-    /// instrument : CompositeInstrument
-    ///     Immutable resolved state held from the first supplied observation.
-    /// observations : list[dict] | str
-    ///     Non-empty strictly increasing complete market-observation array
-    ///     (list of dicts or JSON string).
-    /// metrics : list[str] | None
-    ///     Optional canonical additive metric keys included on every output row.
-    ///
-    /// Returns
-    /// -------
-    /// CompositeHistoryResult
-    ///     Dated total-return rows with close-effective rebalance transitions.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If metrics, state, observations, market inputs, pricing, FX, or rebalancing fail.
-    #[staticmethod]
-    #[pyo3(signature = (instrument, observations, metrics=None))]
-    fn run(
-        py: Python<'_>,
-        instrument: &PyCompositeInstrument,
-        observations: &Bound<'_, PyAny>,
-        metrics: Option<Vec<String>>,
-    ) -> PyResult<PyCompositeHistoryResult> {
-        let observations = observations_from_py(py, Some(observations), "composite observations")?;
-        let metrics = metrics
-            .unwrap_or_default()
-            .into_iter()
-            .map(MetricId::try_from)
-            .collect::<Result<Vec<_>, _>>()
-            .map_err(core_to_py)?;
-        CompositeHistoryEngine::run(&instrument.inner, &observations, &metrics)
-            .map(|inner| PyCompositeHistoryResult { inner })
-            .map_err(core_to_py)
-    }
+/// Calculate chronological rows from an already-resolved initial state.
+///
+/// Period return is ``pnl / capital``. The initial effective date must be
+/// on or before the first observation.
+///
+/// Parameters
+/// ----------
+/// instrument : CompositeInstrument
+///     Immutable resolved state held from the first supplied observation.
+/// observations : list[dict] | str
+///     Non-empty strictly increasing complete market-observation array
+///     (list of dicts or JSON string).
+/// metrics : list[str] | None
+///     Optional canonical additive metric keys included on every output row.
+///
+/// Returns
+/// -------
+/// CompositeHistoryResult
+///     Dated total-return rows with close-effective rebalance transitions.
+///
+/// Raises
+/// ------
+/// ValueError
+///     If metrics, state, observations, market inputs, pricing, FX, or rebalancing fail.
+#[pyfunction]
+#[pyo3(
+        name = "history",
+        signature = (instrument, observations, metrics=None),
+        text_signature = "(instrument, observations, metrics=None)"
+    )]
+fn py_history(
+    py: Python<'_>,
+    instrument: &PyCompositeInstrument,
+    observations: &Bound<'_, PyAny>,
+    metrics: Option<Vec<String>>,
+) -> PyResult<PyCompositeHistoryResult> {
+    let observations = observations_from_py(py, Some(observations), "composite observations")?;
+    let metrics = metrics
+        .unwrap_or_default()
+        .into_iter()
+        .map(MetricId::try_from)
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(core_to_py)?;
+    history(&instrument.inner, &observations, &metrics)
+        .map(|inner| PyCompositeHistoryResult { inner })
+        .map_err(core_to_py)
 }
 
 pub(crate) const EXPORTS: &[&str] = &[
     "CompositeExposureReport",
-    "CompositeHistoryEngine",
     "CompositeHistoryResult",
     "CompositeInstrument",
     "CompositeLegSpec",
@@ -1810,6 +1804,8 @@ pub(crate) const EXPORTS: &[&str] = &[
     "CompositeState",
     "RebalanceRule",
     "WeightingMethod",
+    "history",
+    "history_from_spec",
 ];
 
 /// Register the ``finstack_quant.valuations.composite`` submodule.
@@ -1834,7 +1830,8 @@ pub(crate) fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult
     module.add_class::<PyCompositeRebalanceResult>()?;
     module.add_class::<PyCompositeExposureReport>()?;
     module.add_class::<PyCompositeHistoryResult>()?;
-    module.add_class::<PyCompositeHistoryEngine>()?;
+    module.add_function(wrap_pyfunction!(py_history, &module)?)?;
+    module.add_function(wrap_pyfunction!(py_history_from_spec, &module)?)?;
     module.setattr("__all__", PyList::new(py, EXPORTS)?)?;
     crate::bindings::module_utils::register_submodule_at(py, parent, &module, &qual)
 }

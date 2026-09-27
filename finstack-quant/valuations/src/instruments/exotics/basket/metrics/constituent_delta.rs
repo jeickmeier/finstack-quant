@@ -81,7 +81,7 @@ fn get_constituent_price_money(
             match scalar {
                 finstack_quant_core::market_data::scalars::MarketScalar::Price(money) => Ok(*money),
                 finstack_quant_core::market_data::scalars::MarketScalar::Unitless(v) => {
-                    Ok(Money::new(*v, basket.currency)?)
+                    Ok(Money::new(*v, basket.reporting_currency)?)
                 }
             }
         }

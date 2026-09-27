@@ -246,10 +246,10 @@ pub use common_impl::listed::{
 };
 
 pub use composite::{
-    CompositeExposureReport, CompositeHistoryEngine, CompositeHistoryRow, CompositeInstrument,
-    CompositeLegSpec, CompositeMarketObservation, CompositeRebalanceResult, CompositeSpec,
-    CompositeState, CompositeTrade, CompositeValuationDetails, PrimitiveAggregate,
-    PrimitiveExposure, RebalanceFrequency, RebalanceRule, ResolvedCompositeLeg, WeightingMethod,
+    CompositeExposureReport, CompositeHistoryRow, CompositeInstrument, CompositeLegSpec,
+    CompositeMarketObservation, CompositeRebalanceResult, CompositeSpec, CompositeState,
+    CompositeTrade, CompositeValuationDetails, PrimitiveAggregate, PrimitiveExposure,
+    RebalanceRule, ResolvedCompositeLeg, WeightingMethod,
 };
 
 pub use exotics::{

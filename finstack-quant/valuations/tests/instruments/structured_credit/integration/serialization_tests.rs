@@ -806,7 +806,7 @@ fn pool_asset_uses_rating_and_defaulted_keys() {
     assert_eq!(json["defaulted"], serde_json::json!(false));
 
     // `defaulted` is optional on the wire, like `CDSIndexConstituent.defaulted`.
-    let mut without_flag = json.clone();
+    let mut without_flag = json;
     without_flag.as_object_mut().unwrap().remove("defaulted");
     let asset: PoolAsset = serde_json::from_value(without_flag).unwrap();
     assert!(!asset.defaulted);

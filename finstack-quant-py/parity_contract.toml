@@ -988,7 +988,6 @@ public = [
 python_package = "finstack_quant.valuations.composite"
 public = [
     "CompositeExposureReport",
-    "CompositeHistoryEngine",
     "CompositeHistoryResult",
     "CompositeInstrument",
     "CompositeLegSpec",
@@ -997,6 +996,8 @@ public = [
     "CompositeState",
     "RebalanceRule",
     "WeightingMethod",
+    "history",
+    "history_from_spec",
 ]
 
 # Symbol-level pinning for finstack_quant.valuations.schema. Names mirror the
@@ -3279,7 +3280,7 @@ instruments = [
 # entries must appear in [crates.valuations.instruments].public;
 # `composite` entries must appear in [crates.valuations.composite].public.
 # WASM composite is JSON-first (`executionTrades` / `history` / …);
-# the ten Python composite classes have no WASM typed twins.
+# the nine Python composite classes have no WASM typed twins.
 #
 # Known asymmetry (do not add WASM typed IRS/CDS/equity wrappers): Python
 # has full typed instrument families — rates (InterestRateSwap/Swaption/
@@ -3312,7 +3313,6 @@ market = [
 ]
 composite = [
     "CompositeExposureReport",
-    "CompositeHistoryEngine",
     "CompositeHistoryResult",
     "CompositeInstrument",
     "CompositeLegSpec",

@@ -780,10 +780,7 @@ pub(super) fn run_period(
         let input = model.names[i];
         let bucket = schedule.periods.get(k).unwrap_or(&empty);
         let balance = state.pool_state.balances[i].max(0.0);
-        let simulated = schedule
-            .revolver
-            .as_ref()
-            .and_then(|terms| input.utilization.map(|u| (terms, u)));
+        let simulated = schedule.revolver.as_ref().zip(input.utilization);
         if balance <= 0.0 && bucket.draw <= 0.0 && bucket.pik <= 0.0 && simulated.is_none() {
             continue;
         }

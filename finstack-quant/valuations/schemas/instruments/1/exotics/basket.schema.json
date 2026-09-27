@@ -2417,10 +2417,6 @@
           },
           "type": "array"
         },
-        "currency": {
-          "$ref": "https://finstack_quant.dev/schemas/common/1/currency.schema.json",
-          "description": "Base currency of the basket"
-        },
         "discount_curve_id": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
           "description": "Discount curve identifier for present value calculations"
@@ -2450,6 +2446,10 @@
           "$ref": "#/$defs/BasketPricingConfig",
           "description": "Pricing configuration"
         },
+        "reporting_currency": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/currency.schema.json",
+          "description": "Reporting currency of the basket: NAV and PV are stated in it and every\nconstituent in another currency is FX-converted into it."
+        },
         "scenario_pricing_overrides": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/scenario_pricing_overrides.schema.json",
           "description": "Scenario-only pricing adjustments."
@@ -2459,7 +2459,7 @@
         "id",
         "constituents",
         "expense_ratio",
-        "currency",
+        "reporting_currency",
         "notional",
         "discount_curve_id",
         "attributes",
@@ -6812,8 +6812,8 @@
           "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
           "description": "Stable identifier of the embedded instrument; must equal `instrument.id()`."
         },
-        "weight": {
-          "description": "Signed quantity for fixed weighting or signed target score for dynamic weighting.",
+        "score": {
+          "description": "Signed leg score: the resolved unit quantity under\n[`WeightingMethod::FixedQuantity`] and a scale-free signed target score\nthat every dynamic method normalizes.",
           "format": "double",
           "type": "number"
         }
@@ -6821,7 +6821,7 @@
       "required": [
         "instrument_id",
         "instrument",
-        "weight"
+        "score"
       ],
       "type": "object"
     },
@@ -19346,31 +19346,6 @@
         }
       ]
     },
-    "RebalanceFrequency": {
-      "description": "Calendar cadence for automatic composite rebalancing.",
-      "oneOf": [
-        {
-          "const": "daily",
-          "description": "Every calendar day, adjusted by the configured business-day convention.",
-          "type": "string"
-        },
-        {
-          "const": "weekly",
-          "description": "Every seven calendar days from the schedule start.",
-          "type": "string"
-        },
-        {
-          "const": "monthly",
-          "description": "Every calendar month from the schedule start.",
-          "type": "string"
-        },
-        {
-          "const": "quarterly",
-          "description": "Every three calendar months from the schedule start.",
-          "type": "string"
-        }
-      ]
-    },
     "RebalanceRule": {
       "description": "Rule controlling when dynamic quantities may be explicitly recalculated.",
       "oneOf": [
@@ -19435,8 +19410,8 @@
               "description": "Optional final unadjusted schedule date."
             },
             "frequency": {
-              "$ref": "#/$defs/RebalanceFrequency",
-              "description": "Daily, weekly, monthly, or quarterly cadence."
+              "$ref": "https://finstack_quant.dev/schemas/common/1/tenor.schema.json",
+              "description": "Rebalance cadence as a tenor (for example `1D`, `1W`, `1M`, `3M`)."
             },
             "kind": {
               "const": "calendar",
@@ -23481,11 +23456,11 @@
       "type": "object"
     },
     "WeightingMethod": {
-      "description": "Policy used to resolve signed leg quantities at initialization or rebalance.\n\nEach variant consumes the signed `weight` on [`CompositeLegSpec`] as either\nthe quantity itself or a target score. Resolution happens only in\n[`CompositeSpec::initialize`] / [`CompositeSpec::initialize_fixed`] or\n[`CompositeInstrument::rebalance`].\n\n[`CompositeSpec::initialize`]: crate::instruments::composite::CompositeSpec::initialize\n[`CompositeSpec::initialize_fixed`]: crate::instruments::composite::CompositeSpec::initialize_fixed\n[`CompositeInstrument::rebalance`]: crate::instruments::composite::CompositeInstrument::rebalance\n\n# Formulas\n\nLet `w_i` be the leg score, `G` a positive reporting-currency gross\nnotional, `N_i` the absolute unit notional, `m_i` the unit metric, `s_i`\nthe (optionally neutralized) score, and `σ_i` annualized unit-P&L\nvolatility. With an anchor quantity `q_a`:\n\n```text\nFixedQuantity:     q_i = w_i\nNotionalWeighted:  q_i = sign(w_i) · G · |w_i| / Σ|w| / N_i\nMetricWeighted:    q_i = (s_i / s_a) · (q_a · m_a) / m_i\nVolatilityWeighted:q_i = (w_i / w_a) · q_a · σ_a / σ_i\n```\n\nNeutralization rescales positive scores to sum to `+1` and negative scores\nto sum to `-1` before metric weighting. User-defined expressions replace\nthese closed forms and must return a finite non-zero quantity per leg.\n\n# References\n\n- DV01-neutral and duration-weighted curve trades:\n  `docs/REFERENCES.md#tuckman-serrat-fixed-income`",
+      "description": "Policy used to resolve signed leg quantities at initialization or rebalance.\n\nEach variant consumes the signed `score` on [`CompositeLegSpec`] as either\nthe quantity itself or a target score. Resolution happens only in\n[`CompositeSpec::initialize`] / [`CompositeSpec::initialize_fixed`] or\n[`CompositeInstrument::rebalance`].\n\n[`CompositeSpec::initialize`]: crate::instruments::composite::CompositeSpec::initialize\n[`CompositeSpec::initialize_fixed`]: crate::instruments::composite::CompositeSpec::initialize_fixed\n[`CompositeInstrument::rebalance`]: crate::instruments::composite::CompositeInstrument::rebalance\n\n# Formulas\n\nLet `w_i` be the leg score, `G` a positive reporting-currency gross\nnotional, `N_i` the absolute unit notional, `m_i` the unit metric, `s_i`\nthe (optionally neutralized) score, and `σ_i` annualized unit-P&L\nvolatility. With an anchor quantity `q_a`:\n\n```text\nFixedQuantity:     q_i = w_i\nNotionalWeighted:  q_i = sign(w_i) · G · |w_i| / Σ|w| / N_i\nMetricWeighted:    q_i = (s_i / s_a) · (q_a · m_a) / m_i\nVolatilityWeighted:q_i = (w_i / w_a) · q_a · σ_a / σ_i\n```\n\nNeutralization rescales positive scores to sum to `+1` and negative scores\nto sum to `-1` before metric weighting. User-defined expressions replace\nthese closed forms and must return a finite non-zero quantity per leg.\n\n# References\n\n- DV01-neutral and duration-weighted curve trades:\n  `docs/REFERENCES.md#tuckman-serrat-fixed-income`",
       "oneOf": [
         {
           "additionalProperties": false,
-          "description": "Use each leg's signed `weight` directly as its resolved quantity.",
+          "description": "Use each leg's signed `score` directly as its resolved quantity.",
           "properties": {
             "kind": {
               "const": "fixed_quantity",
@@ -23600,6 +23575,11 @@
           "additionalProperties": false,
           "description": "Deterministic expression-defined quantities.",
           "properties": {
+            "annualization_factor": {
+              "description": "Positive periods-per-year factor used to annualize the\n`leg.{id}.volatility` column (for example `252.0` for daily history).",
+              "format": "double",
+              "type": "number"
+            },
             "kind": {
               "const": "user_defined",
               "type": "string"
@@ -23608,7 +23588,7 @@
               "additionalProperties": {
                 "$ref": "#/$defs/Expr"
               },
-              "description": "One scalar expression per leg, keyed by instrument identifier.\n\nAvailable columns: `as_of_days`, `leg.{id}.weight`,\n`leg.{id}.value`, `leg.{id}.fx_rate`, optional `leg.{id}.notional`,\n`leg.{id}.metric.{metric}` for each required metric, and\n`leg.{id}.volatility` when history has at least three observations\n(annualized with `sqrt(252)`).",
+              "description": "One scalar expression per leg, keyed by instrument identifier.\n\nAvailable columns: `as_of_days`, `leg.{id}.score`,\n`leg.{id}.value`, `leg.{id}.fx_rate`, optional `leg.{id}.notional`,\n`leg.{id}.metric.{metric}` for each required metric, and\n`leg.{id}.volatility` when history has at least three observations\n(annualized with `sqrt(annualization_factor)`). `leg.{id}.notional`\nis the signed reporting-currency notional.",
               "type": "object"
             },
             "required_metrics": {
@@ -23622,7 +23602,8 @@
           "required": [
             "kind",
             "required_metrics",
-            "quantity_expressions"
+            "quantity_expressions",
+            "annualization_factor"
           ],
           "type": "object"
         }
@@ -23960,7 +23941,6 @@
               "weight": 0.4
             }
           ],
-          "currency": "USD",
           "discount_curve_id": "USD-OIS",
           "expense_ratio": 0.0025,
           "id": "BASKET-60-40",
@@ -23971,7 +23951,8 @@
           "pricing_config": {
             "days_in_year": 365.25,
             "fx_policy": "cashflow_date"
-          }
+          },
+          "reporting_currency": "USD"
         },
         "type": "basket"
       },

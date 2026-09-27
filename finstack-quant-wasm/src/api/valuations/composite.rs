@@ -8,7 +8,7 @@
 
 use crate::utils::{to_js_err, to_js_value};
 use finstack_quant_valuations::instruments::composite::{
-    CompositeHistoryEngine, CompositeInstrument, CompositeMarketObservation,
+    history, history_from_spec, CompositeInstrument, CompositeMarketObservation,
     CompositeRebalanceResult, CompositeSpec,
 };
 use finstack_quant_valuations::instruments::{InstrumentEnvelope, InstrumentJson};
@@ -176,7 +176,7 @@ pub fn composite_primitive_exposures(
     let date = finstack_quant_core::dates::parse_iso_date(as_of).map_err(to_js_err)?;
     let metrics = parse_metrics(metrics)?;
     let report = instrument
-        .primitive_exposure_report(&market, date, &metrics)
+        .primitive_exposures(&market, date, &metrics)
         .map_err(to_js_err)?;
     to_js_value(&report)
 }
@@ -252,8 +252,7 @@ pub fn composite_history_from_spec(
     let observations = parse_observations(Some(observations_json))?;
     let warmup = parse_observations(warmup_json.as_deref())?;
     let metrics = parse_metrics(metrics)?;
-    let rows = CompositeHistoryEngine::run_from_spec(&spec, &warmup, &observations, &metrics)
-        .map_err(to_js_err)?;
+    let rows = history_from_spec(&spec, &warmup, &observations, &metrics).map_err(to_js_err)?;
     to_js_value(&rows)
 }
 
@@ -290,7 +289,6 @@ pub fn composite_history(
     let instrument = parse_composite(instrument_json)?;
     let observations = parse_observations(Some(observations_json))?;
     let metrics = parse_metrics(metrics)?;
-    let rows =
-        CompositeHistoryEngine::run(&instrument, &observations, &metrics).map_err(to_js_err)?;
+    let rows = history(&instrument, &observations, &metrics).map_err(to_js_err)?;
     to_js_value(&rows)
 }

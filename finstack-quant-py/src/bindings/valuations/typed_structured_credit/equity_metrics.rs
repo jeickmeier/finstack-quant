@@ -46,7 +46,7 @@ impl PyEquityMetrics {
     /// ISO-4217 code of the currency ``invested`` is denominated in.
     #[getter]
     fn currency(&self) -> String {
-        self.inner.currency.clone()
+        self.inner.currency.to_string()
     }
 
     /// Amount invested on the valuation date (balance × purchase price), in

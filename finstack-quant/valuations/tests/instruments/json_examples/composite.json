@@ -26,7 +26,7 @@
               "type": "equity"
             },
             "instrument_id": "COMPOSITE-LONG",
-            "weight": 1.0
+            "score": 1.0
           },
           {
             "instrument": {
@@ -45,7 +45,7 @@
               "type": "equity"
             },
             "instrument_id": "COMPOSITE-SHORT",
-            "weight": -1.0
+            "score": -1.0
           }
         ],
         "rebalance_rule": {

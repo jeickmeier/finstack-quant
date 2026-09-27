@@ -544,8 +544,8 @@ impl PyTrancheMetrics {
 
     /// ISO-4217 code of the currency ``pv`` and ``cs01`` are denominated in.
     #[getter]
-    fn currency(&self) -> &str {
-        &self.inner.currency
+    fn currency(&self) -> String {
+        self.inner.currency.to_string()
     }
 
     /// Present value of the tranche, in ``currency`` units.

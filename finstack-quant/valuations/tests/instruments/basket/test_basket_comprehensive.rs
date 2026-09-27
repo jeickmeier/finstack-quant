@@ -123,7 +123,7 @@ fn simple_equity_basket() -> Basket {
             },
         ])
         .expense_ratio(0.001)
-        .currency(Currency::USD)
+        .reporting_currency(Currency::USD)
         .notional(usd(1_000_000.0))
         .discount_curve_id("USD-OIS".into())
         .instrument_pricing_overrides(Default::default())
@@ -153,7 +153,7 @@ fn test_basket_creation_with_minimal_fields() {
             ticker: None,
         }])
         .expense_ratio(0.0)
-        .currency(Currency::USD)
+        .reporting_currency(Currency::USD)
         .notional(usd(1_000_000.0))
         .discount_curve_id("USD-OIS".into())
         .instrument_pricing_overrides(Default::default())
@@ -167,7 +167,7 @@ fn test_basket_creation_with_minimal_fields() {
     // Assert
     assert_eq!(basket.id.as_str(), "TEST_BASKET");
     assert_eq!(basket.expense_ratio, 0.0);
-    assert_eq!(basket.currency, Currency::USD);
+    assert_eq!(basket.reporting_currency, Currency::USD);
     assert_eq!(basket.constituents.len(), 1);
 }
 
@@ -176,7 +176,7 @@ fn test_basket_builder_pattern() {
     // Arrange & Act
     let basket = Basket::builder()
         .id("BUILDER_BASKET".into())
-        .currency(Currency::USD)
+        .reporting_currency(Currency::USD)
         .notional(usd(1_000_000.0))
         .discount_curve_id("USD-OIS".into())
         .expense_ratio(0.0025)
@@ -238,7 +238,7 @@ fn test_basket_validation_empty_constituents() {
         .id("EMPTY_BASKET".into())
         .constituents(vec![])
         .expense_ratio(0.001)
-        .currency(Currency::USD)
+        .reporting_currency(Currency::USD)
         .notional(usd(1_000_000.0))
         .discount_curve_id("USD-OIS".into())
         .instrument_pricing_overrides(Default::default())
@@ -315,7 +315,7 @@ fn test_custom_pricing_config() {
     // Act
     let basket = Basket::builder()
         .id("TEST".into())
-        .currency(Currency::USD)
+        .reporting_currency(Currency::USD)
         .notional(usd(1_000_000.0))
         .discount_curve_id("USD-OIS".into())
         .expense_ratio(0.001)
@@ -368,7 +368,7 @@ fn test_pricing_with_explicit_units() {
             },
         ])
         .expense_ratio(0.0)
-        .currency(Currency::USD)
+        .reporting_currency(Currency::USD)
         .notional(usd(1_000_000.0))
         .discount_curve_id("USD-OIS".into())
         .instrument_pricing_overrides(Default::default())
@@ -411,7 +411,7 @@ fn test_nav_calculation_with_units() {
             ticker: None,
         }])
         .expense_ratio(0.0)
-        .currency(Currency::USD)
+        .reporting_currency(Currency::USD)
         .notional(usd(1_000_000.0))
         .discount_curve_id("USD-OIS".into())
         .instrument_pricing_overrides(Default::default())
@@ -569,7 +569,7 @@ fn test_fx_conversion_eur_to_usd() {
             ticker: None,
         }])
         .expense_ratio(0.0)
-        .currency(Currency::USD)
+        .reporting_currency(Currency::USD)
         .notional(usd(1_000_000.0))
         .discount_curve_id("USD-OIS".into())
         .instrument_pricing_overrides(Default::default())
@@ -634,7 +634,7 @@ fn test_fx_conversion_multiple_currencies() {
             },
         ])
         .expense_ratio(0.0)
-        .currency(Currency::USD)
+        .reporting_currency(Currency::USD)
         .notional(usd(1_000_000.0))
         .discount_curve_id("USD-OIS".into())
         .instrument_pricing_overrides(Default::default())
@@ -677,7 +677,7 @@ fn test_fx_conversion_error_without_fx_provider() {
             ticker: None,
         }])
         .expense_ratio(0.0)
-        .currency(Currency::USD)
+        .reporting_currency(Currency::USD)
         .notional(usd(1_000_000.0))
         .discount_curve_id("USD-OIS".into())
         .instrument_pricing_overrides(Default::default())
@@ -733,7 +733,7 @@ fn test_mixed_units_and_weights_with_aum() {
             },
         ])
         .expense_ratio(0.0)
-        .currency(Currency::USD)
+        .reporting_currency(Currency::USD)
         .notional(usd(1_000_000.0))
         .discount_curve_id("USD-OIS".into())
         .instrument_pricing_overrides(Default::default())
@@ -790,7 +790,7 @@ fn test_constituent_reference_with_bond_instrument() {
             ticker: None,
         }])
         .expense_ratio(0.0)
-        .currency(Currency::USD)
+        .reporting_currency(Currency::USD)
         .notional(usd(1_000_000.0))
         .discount_curve_id("USD-OIS".into())
         .instrument_pricing_overrides(Default::default())
@@ -855,7 +855,7 @@ fn test_basket_with_multiple_asset_types() {
             },
         ])
         .expense_ratio(0.0)
-        .currency(Currency::USD)
+        .reporting_currency(Currency::USD)
         .notional(usd(1_000_000.0))
         .discount_curve_id("USD-OIS".into())
         .instrument_pricing_overrides(Default::default())
@@ -956,7 +956,7 @@ fn test_basket_value_with_zero_shares() {
             ticker: None,
         }])
         .expense_ratio(0.0)
-        .currency(Currency::USD)
+        .reporting_currency(Currency::USD)
         .notional(usd(1_000_000.0))
         .discount_curve_id("USD-OIS".into())
         .instrument_pricing_overrides(Default::default())
@@ -996,7 +996,7 @@ fn test_basket_value_with_negative_shares() {
             ticker: None,
         }])
         .expense_ratio(0.0)
-        .currency(Currency::USD)
+        .reporting_currency(Currency::USD)
         .notional(usd(1_000_000.0))
         .discount_curve_id("USD-OIS".into())
         .instrument_pricing_overrides(Default::default())
@@ -1112,7 +1112,7 @@ fn test_single_constituent_basket() {
             ticker: None,
         }])
         .expense_ratio(0.0)
-        .currency(Currency::USD)
+        .reporting_currency(Currency::USD)
         .notional(usd(1_000_000.0))
         .discount_curve_id("USD-OIS".into())
         .instrument_pricing_overrides(Default::default())
@@ -1144,7 +1144,7 @@ fn test_unitless_scalar_defaults_to_basket_currency() {
             ticker: None,
         }])
         .expense_ratio(0.0)
-        .currency(Currency::USD)
+        .reporting_currency(Currency::USD)
         .notional(usd(1_000_000.0))
         .discount_curve_id("USD-OIS".into())
         .instrument_pricing_overrides(Default::default())
@@ -1184,7 +1184,7 @@ fn test_basket_serialization_roundtrip() {
     // Assert
     assert_eq!(basket.id, deserialized.id);
     assert_eq!(basket.expense_ratio, deserialized.expense_ratio);
-    assert_eq!(basket.currency, deserialized.currency);
+    assert_eq!(basket.reporting_currency, deserialized.reporting_currency);
     assert_eq!(basket.constituents.len(), deserialized.constituents.len());
 }
 
@@ -1247,7 +1247,7 @@ fn test_basket_with_mixed_constituents_serialization() {
             },
         ])
         .expense_ratio(0.001)
-        .currency(Currency::USD)
+        .reporting_currency(Currency::USD)
         .notional(usd(1_000_000.0))
         .discount_curve_id("USD-OIS".into())
         .instrument_pricing_overrides(Default::default())
@@ -1265,7 +1265,7 @@ fn test_basket_with_mixed_constituents_serialization() {
     // Assert
     assert_eq!(basket.id, deserialized.id);
     assert_eq!(basket.expense_ratio, deserialized.expense_ratio);
-    assert_eq!(basket.currency, deserialized.currency);
+    assert_eq!(basket.reporting_currency, deserialized.reporting_currency);
     assert_eq!(basket.constituents.len(), deserialized.constituents.len());
     assert_eq!(basket.constituents.len(), 2);
 
@@ -1369,7 +1369,7 @@ fn test_basket_envelope_roundtrip_with_instruments() {
             ticker: None,
         }])
         .expense_ratio(0.001)
-        .currency(Currency::USD)
+        .reporting_currency(Currency::USD)
         .notional(usd(1_000_000.0))
         .discount_curve_id("USD-OIS".into())
         .instrument_pricing_overrides(Default::default())
@@ -1455,7 +1455,7 @@ fn test_full_pricing_workflow_units_based() {
         ])
         .expense_ratio(0.01)
         .// 1% annual
-        currency(Currency::USD)
+        reporting_currency(Currency::USD)
         .notional(usd(1_000_000.0))
         .discount_curve_id("USD-OIS".into())
         .instrument_pricing_overrides(Default::default())
@@ -1565,7 +1565,7 @@ fn test_real_world_etf_scenario() {
         ])
         .expense_ratio(0.0009)
         .// 9 bp (typical for equity ETF)
-        currency(Currency::USD)
+        reporting_currency(Currency::USD)
         .notional(usd(1_000_000.0))
         .discount_curve_id("USD-OIS".into())
         .instrument_pricing_overrides(Default::default())
@@ -1664,7 +1664,7 @@ fn constituent_delta_is_pv_change_per_one_percent_move() {
             },
         ])
         .expense_ratio(0.0)
-        .currency(Currency::USD)
+        .reporting_currency(Currency::USD)
         .notional(usd(1.0))
         .discount_curve_id("USD-OIS".into())
         .instrument_pricing_overrides(Default::default())
@@ -1693,4 +1693,15 @@ fn constituent_delta_is_pv_change_per_one_percent_move() {
     );
     let aapl = *result.measures.get("constituent_delta::AAPL").unwrap();
     assert!((aapl - 15.0).abs() < 1e-9, "AAPL constituent delta {aapl}");
+}
+
+#[test]
+fn basket_rejects_retired_currency_key() {
+    let basket = Basket::example().unwrap();
+    let mut json = serde_json::to_value(&basket).unwrap();
+    let object = json.as_object_mut().unwrap();
+    let currency = object.remove("reporting_currency").unwrap();
+    // schema-rejection-test: the retired `currency` spelling of `reporting_currency`.
+    object.insert("currency".to_string(), currency);
+    assert!(serde_json::from_value::<Basket>(json).is_err());
 }

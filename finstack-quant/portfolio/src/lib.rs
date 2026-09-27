@@ -248,7 +248,7 @@ pub use performance::{
 };
 pub use portfolio::PortfolioSpec;
 pub use position::{Position, PositionUnit};
-pub use primitive::primitive_exposure_report;
+pub use primitive::primitive_exposures;
 pub use results::PortfolioResult;
 pub use valuation::{
     value_portfolio, PortfolioValuation, PortfolioValuationOptions, RequestedMetrics,

@@ -7320,90 +7320,15 @@ export interface CompositeRebalanceResult {
 }
 
 /**
- * One primitive exposure path in a resolved composite.
+ * Recursive primitive exposure report for one resolved composite, with its
+ * path (`PrimitiveExposure`) and aggregate (`PrimitiveAggregate`) rows. These
+ * are the generated valuation-result contract types, re-exported unchanged.
  */
-export interface CompositePrimitivePath {
-  /**
-   * Composite/leg identifiers from root to primitive.
-   */
-  path: string[];
-  /**
-   * Primitive instrument identifier.
-   */
-  instrument_id: string;
-  /**
-   * Canonical primitive instrument discriminator.
-   */
-  instrument_type: string;
-  /**
-   * Signed frozen primitive quantity.
-   */
-  quantity: number;
-  /**
-   * Signed value in composite reporting currency.
-   */
-  value: MoneyValue;
-  /**
-   * Additive risk amounts keyed by canonical metric identifier.
-   */
-  measures: Record<string, number>;
-}
-
-/**
- * Net and gross concentration for one primitive identifier.
- */
-export interface CompositePrimitiveAggregate {
-  /**
-   * Primitive instrument identifier.
-   */
-  instrument_id: string;
-  /**
-   * Canonical primitive instrument discriminator.
-   */
-  instrument_type: string;
-  /**
-   * Algebraic primitive quantity across paths.
-   */
-  net_quantity: number;
-  /**
-   * Sum of absolute path quantities.
-   */
-  gross_quantity: number;
-  /**
-   * Algebraic value in composite reporting currency.
-   */
-  net_value: MoneyValue;
-  /**
-   * Sum of absolute path values.
-   */
-  gross_value: MoneyValue;
-  /**
-   * Algebraic additive risk by metric.
-   */
-  net_measures: Record<string, number>;
-  /**
-   * Sum of absolute additive risk by metric.
-   */
-  gross_measures: Record<string, number>;
-}
-
-/**
- * Recursive primitive exposure report for one resolved composite.
- */
-export interface CompositeExposureReport {
-  /**
-   * ISO reporting-currency code.
-   */
-  reporting_currency: string;
-  /**
-   * Path-level primitive exposures before overlap netting.
-   */
-  paths: CompositePrimitivePath[];
-  /**
-   * Net and gross aggregates ordered by primitive identifier.
-   */
-  aggregates: CompositePrimitiveAggregate[];
-}
+export type CompositeExposureReport = import('./types/valuation-result').CompositeExposureReport;
+/** One primitive exposure path in a resolved composite. */
+export type PrimitiveExposure = import('./types/valuation-result').PrimitiveExposure;
+/** Net and gross concentration for one primitive identifier. */
+export type PrimitiveAggregate = import('./types/valuation-result').PrimitiveAggregate;
 
 /**
  * One dated composite total-return and rebalance observation.

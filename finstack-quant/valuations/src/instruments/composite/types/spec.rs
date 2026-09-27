@@ -21,6 +21,14 @@ use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
+/// Sample standard deviation (n-1) of unit P&L annualized by `sqrt(annualization_factor)`.
+///
+/// Shared by volatility weighting and the user-defined `leg.{id}.volatility` column
+/// so both record one definition.
+fn annualized_volatility(pnl: &[f64], annualization_factor: f64) -> Result<f64> {
+    Ok(sample_std_dev(pnl)? * annualization_factor.sqrt())
+}
+
 struct VolatilityWeightingConfig<'a> {
     anchor_leg_id: &'a InstrumentId,
     anchor_quantity: f64,
@@ -151,9 +159,9 @@ impl CompositeSpec {
                     self.id
                 )));
             }
-            if !leg.weight.is_finite() || leg.weight.abs() <= MIN_ABS_INPUT {
+            if !leg.score.is_finite() || leg.score.abs() <= MIN_ABS_INPUT {
                 return Err(Error::Validation(format!(
-                    "composite leg '{}' weight must be finite and non-zero",
+                    "composite leg '{}' score must be finite and non-zero",
                     leg.instrument_id
                 )));
             }
@@ -230,8 +238,8 @@ impl CompositeSpec {
             } => {
                 validate_anchor(anchor_leg_id, *anchor_quantity)?;
                 if *neutralize {
-                    let positive = self.legs.iter().any(|leg| leg.weight > 0.0);
-                    let negative = self.legs.iter().any(|leg| leg.weight < 0.0);
+                    let positive = self.legs.iter().any(|leg| leg.score > 0.0);
+                    let negative = self.legs.iter().any(|leg| leg.score < 0.0);
                     if !(positive && negative) {
                         return Err(Error::Validation(
                             "neutral composite weighting requires both positive and negative scores"
@@ -264,8 +272,15 @@ impl CompositeSpec {
             }
             WeightingMethod::UserDefined {
                 quantity_expressions,
+                annualization_factor,
                 ..
             } => {
+                if !annualization_factor.is_finite() || *annualization_factor <= 0.0 {
+                    return Err(Error::Validation(
+                        "user-defined weighting requires a positive annualization factor"
+                            .to_string(),
+                    ));
+                }
                 if quantity_expressions.len() != self.legs.len() {
                     return Err(Error::Validation(
                         "user-defined weighting requires exactly one expression per leg"
@@ -312,7 +327,7 @@ impl CompositeSpec {
                 "initialize_fixed is available only for fixed-quantity composites".to_string(),
             ));
         }
-        let quantities: Vec<f64> = self.legs.iter().map(|leg| leg.weight).collect();
+        let quantities: Vec<f64> = self.legs.iter().map(|leg| leg.score).collect();
         self.build_rebalance_result(effective_date, quantities, IndexMap::new(), None)
     }
 
@@ -321,7 +336,8 @@ impl CompositeSpec {
     /// Volatility weighting requires `history` to be strictly increasing and
     /// to end on `as_of`. User-defined expressions populate
     /// `leg.{id}.volatility` only when `history` has at least three
-    /// observations (two unit-P&L increments), annualized with `sqrt(252)`.
+    /// observations (two unit-P&L increments), annualized with
+    /// `sqrt(annualization_factor)` from [`WeightingMethod::UserDefined`].
     ///
     /// # Arguments
     ///
@@ -408,7 +424,7 @@ impl CompositeSpec {
     ) -> Result<(Vec<f64>, IndexMap<String, f64>)> {
         match &self.weighting_method {
             WeightingMethod::FixedQuantity => Ok((
-                self.legs.iter().map(|leg| leg.weight).collect(),
+                self.legs.iter().map(|leg| leg.score).collect(),
                 IndexMap::new(),
             )),
             WeightingMethod::NotionalWeighted { gross_notional } => {
@@ -447,12 +463,14 @@ impl CompositeSpec {
             WeightingMethod::UserDefined {
                 required_metrics,
                 quantity_expressions,
+                annualization_factor,
             } => self.resolve_user_defined(
                 market,
                 as_of,
                 history,
                 required_metrics,
                 quantity_expressions,
+                *annualization_factor,
             ),
         }
     }
@@ -463,7 +481,7 @@ impl CompositeSpec {
         as_of: Date,
         gross_notional: Money,
     ) -> Result<(Vec<f64>, IndexMap<String, f64>)> {
-        let score_total = self.legs.iter().map(|leg| leg.weight.abs()).sum::<f64>();
+        let score_total = self.legs.iter().map(|leg| leg.score.abs()).sum::<f64>();
         if !score_total.is_finite() || score_total <= MIN_ABS_INPUT {
             return Err(Error::Validation(
                 "composite absolute score total must be finite and non-zero".to_string(),
@@ -485,23 +503,22 @@ impl CompositeSpec {
                 notional.currency(),
                 self.reporting_currency,
                 as_of,
-            )?
-            .abs();
-            if !converted.is_finite() || converted <= MIN_ABS_INPUT {
+            )?;
+            if !converted.is_finite() || converted.abs() <= MIN_ABS_INPUT {
                 return Err(Error::Validation(format!(
                     "instrument '{}' has zero or non-finite weighting notional",
                     leg.instrument_id
                 )));
             }
             inputs.insert(format!("leg.{}.notional", leg.instrument_id), converted);
-            notionals.push(converted);
+            notionals.push(converted.abs());
         }
         let quantities = self
             .legs
             .iter()
             .zip(notionals)
             .map(|(leg, notional)| {
-                leg.weight.signum() * gross_notional.amount() * leg.weight.abs()
+                leg.score.signum() * gross_notional.amount() * leg.score.abs()
                     / score_total
                     / notional
             })
@@ -601,7 +618,7 @@ impl CompositeSpec {
                     config.min_observations
                 )));
             }
-            let volatility = sample_std_dev(sample)? * config.annualization_factor.sqrt();
+            let volatility = annualized_volatility(sample, config.annualization_factor)?;
             if !volatility.is_finite() || volatility <= MIN_ABS_INPUT {
                 return Err(Error::Validation(format!(
                     "leg '{}' has zero or non-finite unit-P&L volatility",
@@ -612,7 +629,7 @@ impl CompositeSpec {
             volatilities.push(volatility);
         }
         let anchor_index = leg_index(&self.legs, config.anchor_leg_id)?;
-        let anchor_score = self.legs[anchor_index].weight;
+        let anchor_score = self.legs[anchor_index].score;
         if config.anchor_quantity.signum() != anchor_score.signum() {
             return Err(Error::Validation(
                 "anchor quantity must have the anchor score's sign".to_string(),
@@ -624,8 +641,7 @@ impl CompositeSpec {
             .iter()
             .zip(volatilities)
             .map(|(leg, volatility)| {
-                (leg.weight / anchor_score) * config.anchor_quantity * anchor_volatility
-                    / volatility
+                (leg.score / anchor_score) * config.anchor_quantity * anchor_volatility / volatility
             })
             .collect();
         Ok((quantities, inputs))
@@ -638,6 +654,7 @@ impl CompositeSpec {
         history: &[CompositeMarketObservation],
         required_metrics: &[MetricId],
         quantity_expressions: &IndexMap<String, Expr>,
+        annualization_factor: f64,
     ) -> Result<(Vec<f64>, IndexMap<String, f64>)> {
         let mut columns = IndexMap::<String, f64>::new();
         columns.insert("as_of_days".to_string(), f64::from(as_of.to_julian_day()));
@@ -663,7 +680,7 @@ impl CompositeSpec {
                 self.reporting_currency,
                 as_of,
             )?;
-            columns.insert(format!("leg.{}.weight", leg.instrument_id), leg.weight);
+            columns.insert(format!("leg.{}.score", leg.instrument_id), leg.score);
             columns.insert(format!("leg.{}.value", leg.instrument_id), value);
             columns.insert(format!("leg.{}.fx_rate", leg.instrument_id), fx_rate);
             if let Some(notional) = instrument.notional()? {
@@ -694,7 +711,7 @@ impl CompositeSpec {
             if history.len() >= 3 {
                 let pnl =
                     unit_pnl_series(leg.instrument.as_ref(), self.reporting_currency, history)?;
-                let volatility = sample_std_dev(&pnl)? * 252.0_f64.sqrt();
+                let volatility = annualized_volatility(&pnl, annualization_factor)?;
                 columns.insert(format!("leg.{}.volatility", leg.instrument_id), volatility);
             }
         }

@@ -41,7 +41,8 @@ fn bumped_instrument_quote(
         *forward.quoted_spot.as_mut()? *= 1.0 + relative;
     } else if let Some(spot) = bumped.as_any_mut().downcast_mut::<FxSpot>() {
         *spot.quoted_spot.as_mut()? *= 1.0 + relative;
-    } else if let Some(ndf) = bumped.as_any_mut().downcast_mut::<Ndf>() {
+    } else {
+        let ndf = bumped.as_any_mut().downcast_mut::<Ndf>()?;
         if ndf.observed_fixing.is_none() {
             let quote = if ndf.quoted_forward.is_some() {
                 ndf.quoted_forward.as_mut()?
@@ -53,8 +54,6 @@ fn bumped_instrument_quote(
                 NdfQuoteConvention::BasePerSettlement => *quote /= 1.0 + relative,
             }
         }
-    } else {
-        return None;
     }
     Some(bumped)
 }

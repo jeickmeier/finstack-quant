@@ -137,8 +137,9 @@ pub struct Basket {
     /// Total expense ratio (as decimal, e.g., 0.0025 = 0.25%)
     /// This affects pricing through expense drag calculations
     pub expense_ratio: f64,
-    /// Base currency of the basket
-    pub currency: Currency,
+    /// Reporting currency of the basket: NAV and PV are stated in it and every
+    /// constituent in another currency is FX-converted into it.
+    pub reporting_currency: Currency,
     /// Position notional used to scale basket NAV to portfolio PV.
     pub notional: Money,
     /// Discount curve identifier for present value calculations
@@ -206,7 +207,7 @@ impl Basket {
             .id(InstrumentId::new("BASKET-60-40"))
             .constituents(constituents)
             .expense_ratio(0.0025)
-            .currency(Currency::USD)
+            .reporting_currency(Currency::USD)
             .notional(Money::from((1_000_000_i64, Currency::USD)))
             .discount_curve_id(finstack_quant_core::types::CurveId::new("USD-OIS"))
             .attributes(Attributes::new())
@@ -299,7 +300,7 @@ impl Basket {
             .id(InstrumentId::new("BASKET-MIXED"))
             .constituents(constituents)
             .expense_ratio(0.001)
-            .currency(Currency::USD)
+            .reporting_currency(Currency::USD)
             .notional(Money::from((1_000_000_i64, Currency::USD)))
             .discount_curve_id(finstack_quant_core::types::CurveId::new("USD-OIS"))
             .attributes(Attributes::new())
@@ -356,8 +357,8 @@ impl Basket {
         )?;
 
         validation::require(
-            self.notional.currency() == self.currency,
-            "basket notional currency must match basket currency",
+            self.notional.currency() == self.reporting_currency,
+            "basket notional currency must match basket reporting_currency",
         )?;
 
         Ok(())
@@ -425,7 +426,7 @@ mod tests {
             id: InstrumentId::new("TEST_BASKET"),
             constituents: vec![],
             expense_ratio: 0.001,
-            currency: Currency::USD,
+            reporting_currency: Currency::USD,
             notional: Money::from((1_000_000_i64, Currency::USD)),
             discount_curve_id: "USD-OIS".into(),
             instrument_pricing_overrides: Default::default(),
@@ -467,7 +468,7 @@ mod tests {
                 },
             ],
             expense_ratio: 0.001,
-            currency: Currency::USD,
+            reporting_currency: Currency::USD,
             notional: Money::from((1_000_000_i64, Currency::USD)),
             discount_curve_id: "USD-OIS".into(),
             instrument_pricing_overrides: Default::default(),

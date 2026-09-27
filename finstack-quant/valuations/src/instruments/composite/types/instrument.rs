@@ -346,21 +346,16 @@ impl CompositeInstrument {
     ///
     /// Returns an error for non-additive metrics, invalid embedded instruments,
     /// missing market data, or a metric unsupported by every primitive.
-    pub fn primitive_exposure_report(
+    pub fn primitive_exposures(
         &self,
         market: &MarketContext,
         as_of: Date,
         metrics: &[MetricId],
     ) -> Result<CompositeExposureReport> {
-        self.primitive_exposure_report_with_options(
-            market,
-            as_of,
-            metrics,
-            PricingOptions::default(),
-        )
+        self.primitive_exposures_with_options(market, as_of, metrics, PricingOptions::default())
     }
 
-    pub(crate) fn primitive_exposure_report_with_options(
+    pub(crate) fn primitive_exposures_with_options(
         &self,
         market: &MarketContext,
         as_of: Date,
@@ -456,7 +451,7 @@ impl CompositeInstrument {
         options: PricingOptions,
     ) -> Result<(IndexMap<MetricId, f64>, CompositeValuationDetails)> {
         let report =
-            self.primitive_exposure_report_with_options(market, as_of, metrics, options.clone())?;
+            self.primitive_exposures_with_options(market, as_of, metrics, options.clone())?;
         let leg_results = self.top_level_leg_results(market, as_of, metrics, options)?;
         let mut measures = IndexMap::<MetricId, f64>::new();
         for path in &report.paths {
@@ -472,7 +467,7 @@ impl CompositeInstrument {
                 resolved_legs: self.state.resolved_legs.clone(),
                 weighting_inputs: self.state.weighting_inputs.clone(),
                 leg_results,
-                exposure_report: report,
+                exposures: report,
             },
         ))
     }
@@ -637,9 +632,9 @@ impl Instrument for CompositeInstrument {
         market: &MarketContext,
         as_of: Date,
     ) -> Option<crate::results::ValuationDetails> {
-        self.primitive_exposure_report(market, as_of, &[])
+        self.primitive_exposures(market, as_of, &[])
             .ok()
-            .and_then(|exposure_report| {
+            .and_then(|exposures| {
                 let leg_results = self
                     .top_level_leg_results(market, as_of, &[], PricingOptions::default())
                     .ok()?;
@@ -650,7 +645,7 @@ impl Instrument for CompositeInstrument {
                         resolved_legs: self.state.resolved_legs.clone(),
                         weighting_inputs: self.state.weighting_inputs.clone(),
                         leg_results,
-                        exposure_report,
+                        exposures,
                     },
                 ))
             })

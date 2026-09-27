@@ -78,7 +78,7 @@ impl BasketCalculator {
         // Apply expense ratio drag to per-share value
         let expense_drag = self.calculate_expense_drag(basket, per_share, as_of)?;
         let per_share_after_fees = per_share - expense_drag;
-        Money::new(per_share_after_fees, basket.currency)
+        Money::new(per_share_after_fees, basket.reporting_currency)
     }
 
     /// Calculate total basket value (gross, without per-share division).
@@ -111,7 +111,7 @@ impl BasketCalculator {
             total += c.amount();
         }
         let expense_drag = self.calculate_expense_drag(basket, total, as_of)?;
-        Money::new(total - expense_drag, basket.currency)
+        Money::new(total - expense_drag, basket.reporting_currency)
     }
 
     /// Calculate Net Asset Value per share using an explicit AUM.
@@ -133,14 +133,15 @@ impl BasketCalculator {
         aum: Money,
         shares_outstanding: f64,
     ) -> Result<Money> {
-        let aum_basket = self.to_basket_currency(basket, aum, basket.currency, context, as_of)?;
+        let aum_basket =
+            self.to_basket_currency(basket, aum, basket.reporting_currency, context, as_of)?;
         let total = self.basket_value_with_aum(basket, context, as_of, aum_basket)?;
         let nav_value = if shares_outstanding > 0.0 {
             total.amount() / shares_outstanding
         } else {
             total.amount()
         };
-        Money::new(nav_value, basket.currency)
+        Money::new(nav_value, basket.reporting_currency)
     }
 
     /// Calculate total basket value using an explicit AUM for weight-based constituents.
@@ -192,7 +193,7 @@ impl BasketCalculator {
             sum
         };
         let expense_drag = self.calculate_expense_drag(basket, total, as_of)?;
-        Money::new(total - expense_drag, basket.currency)
+        Money::new(total - expense_drag, basket.reporting_currency)
     }
 
     /// Value a single constituent based on the given mode.
@@ -215,8 +216,13 @@ impl BasketCalculator {
                     context,
                     as_of,
                 )?;
-                let base_value =
-                    self.to_basket_currency(basket, raw_value, basket.currency, context, as_of)?;
+                let base_value = self.to_basket_currency(
+                    basket,
+                    raw_value,
+                    basket.reporting_currency,
+                    context,
+                    as_of,
+                )?;
                 if let Some(units) = constituent.units {
                     let s = shares.ok_or(finstack_quant_core::Error::Input(
                         finstack_quant_core::InputError::Invalid,
@@ -244,13 +250,13 @@ impl BasketCalculator {
                     let base_value = self.to_basket_currency(
                         basket,
                         raw_value,
-                        basket.currency,
+                        basket.reporting_currency,
                         context,
                         as_of,
                     )?;
                     base_value * units
                 } else if let Some(a) = aum {
-                    Money::new(a * constituent.weight, basket.currency)?
+                    Money::new(a * constituent.weight, basket.reporting_currency)?
                 } else if let Some(s) = shares {
                     // Weight-only contribution scaled by shares × price
                     let raw_value = self.get_constituent_price(
@@ -263,7 +269,7 @@ impl BasketCalculator {
                     let base_value = self.to_basket_currency(
                         basket,
                         raw_value,
-                        basket.currency,
+                        basket.reporting_currency,
                         context,
                         as_of,
                     )?;
@@ -304,7 +310,7 @@ impl BasketCalculator {
                     }
                     finstack_quant_core::market_data::scalars::MarketScalar::Unitless(v) => {
                         // For unitless scalars, use the basket currency by default
-                        Ok(Money::new(*v, basket.currency)?)
+                        Ok(Money::new(*v, basket.reporting_currency)?)
                     }
                 }
             }
@@ -408,7 +414,7 @@ mod tests {
             constituents,
             // Zero expense ratio so the assertion isolates the weight-sum fix.
             expense_ratio: 0.0,
-            currency: Currency::USD,
+            reporting_currency: Currency::USD,
             notional: Money::from((1_i64, Currency::USD)),
             discount_curve_id: "USD-OIS".into(),
             instrument_pricing_overrides: Default::default(),

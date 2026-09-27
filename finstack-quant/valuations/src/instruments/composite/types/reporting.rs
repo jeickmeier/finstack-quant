@@ -137,7 +137,7 @@ pub struct CompositeValuationDetails {
     /// Native and reporting-currency results for every top-level leg.
     pub leg_results: Vec<CompositeLegValuation>,
     /// Recursive path-level and net/gross primitive exposures.
-    pub exposure_report: CompositeExposureReport,
+    pub exposures: CompositeExposureReport,
 }
 
 /// One top-level leg result retained in composite valuation details.
