@@ -25,8 +25,8 @@ under their default names.
 ```toml
 # finstack-quant/valuations/Cargo.toml
 [dependencies]
-finstack-quant-valuations-macros = { path = "macros", version = "0.8.0" }
-finstack-quant-core = { path = "../core", version = "0.8.0" }
+finstack-quant-valuations-macros = { path = "macros", version = "0.9.0" }
+finstack-quant-core = { path = "../core", version = "0.9.0" }
 time = { workspace = true }
 ```
 

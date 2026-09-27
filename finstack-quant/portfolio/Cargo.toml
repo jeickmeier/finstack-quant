@@ -10,14 +10,14 @@ description = "Portfolio aggregation for Finstack Quant: positions, books, and d
 autobenches = false
 
 [dependencies]
-finstack-quant-core = { path = "../core", version = "0.8.0", default-features = false }
-finstack-quant-attribution = { path = "../attribution", version = "0.8.0", default-features = false }
-finstack-quant-calibration = { path = "../calibration", version = "0.8.0", default-features = false }
-finstack-quant-cashflows = { path = "../cashflows", version = "0.8.0", default-features = false }
-finstack-quant-margin = { path = "../margin", version = "0.8.0", default-features = false }
-finstack-quant-models = { path = "../models", version = "0.8.0", default-features = false }
-finstack-quant-valuations = { path = "../valuations", version = "0.8.0", default-features = false }
-finstack-quant-scenarios = { path = "../scenarios", version = "0.8.0", default-features = false }
+finstack-quant-core = { path = "../core", version = "0.9.0", default-features = false }
+finstack-quant-attribution = { path = "../attribution", version = "0.9.0", default-features = false }
+finstack-quant-calibration = { path = "../calibration", version = "0.9.0", default-features = false }
+finstack-quant-cashflows = { path = "../cashflows", version = "0.9.0", default-features = false }
+finstack-quant-margin = { path = "../margin", version = "0.9.0", default-features = false }
+finstack-quant-models = { path = "../models", version = "0.9.0", default-features = false }
+finstack-quant-valuations = { path = "../valuations", version = "0.9.0", default-features = false }
+finstack-quant-scenarios = { path = "../scenarios", version = "0.9.0", default-features = false }
 thiserror = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }

@@ -1,0 +1,44 @@
+name: Full Rust Benchmarks
+
+on:
+  schedule:
+    - cron: "0 6 * * 3"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  full-benchmarks:
+    name: Full Criterion suite
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    env:
+      CARGO_BUILD_JOBS: 4
+      CARGO_INCREMENTAL: 1
+      CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUSTFLAGS: "-C debuginfo=0 -C strip=symbols -C linker=cc -C link-arg=-fuse-ld=bfd"
+    steps:
+      - uses: actions/checkout@v5
+      - name: Set up swap space
+        uses: pierotofy/set-swap-space@fc79b3f67fa8a838184ce84a674ca12238d2c761 # v1.0 line, master @ 2025-05-08
+        with:
+          swap-size-gb: 10
+      - uses: jdx/mise-action@v4
+        with:
+          cache: true
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: full-rust-benchmarks
+      - name: Run every Rust benchmark
+        run: mise run rust-bench
+      - name: Upload Criterion report
+        if: always()
+        uses: actions/upload-artifact@v5
+        with:
+          name: full-criterion-report
+          path: target/criterion
+          retention-days: 7

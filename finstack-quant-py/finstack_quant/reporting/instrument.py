@@ -621,7 +621,7 @@ def instrument_tearsheet(
     ...         "rounding": rounding,
     ...         "fx_policy_applied": None,
     ...         "timestamp": "2026-06-20T12:19:44Z",
-    ...         "version": "0.8.0",
+    ...         "version": "0.9.0",
     ...     },
     ...     "covenants": None,
     ... }

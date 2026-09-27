@@ -268,13 +268,13 @@ mise run all-audit
 mise run all-lint
 ```
 
-### 6c. MSRV verification
+### 6c. Rust toolchain verification
 
-Confirm the crate compiles on the declared minimum supported Rust version:
+Confirm mise and the workspace use the declared minimum Rust 1.97.1:
 
 ```bash
-# rust-version = "1.90" declared in Cargo.toml
-rustup run 1.90.0 cargo check --workspace --exclude finstack-quant-py --exclude finstack-quant-wasm
+mise exec -- rustc --version
+mise run rust-build
 ```
 
 ### 6d. Publish dry-run

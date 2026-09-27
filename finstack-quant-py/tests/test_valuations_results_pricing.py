@@ -373,7 +373,7 @@ def test_metric_metadata_describes_canonical_keys() -> None:
     assert metadata[3]["components"] == ["USD-OIS"]
     assert metadata[3]["bucketed"] is False
     assert metric_metadata([]) == []
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="noncanonical composite metric key"):
         metric_metadata(["pv01::USD_x2dOIS"])
 
 
@@ -382,13 +382,10 @@ def test_validate_instrument_json_merges_overrides_before_validation() -> None:
     document["instrument"]["spec"]["metric_pricing_overrides"] = {"theta_period": "invalid"}
     raw = json.dumps(document)
 
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="Invalid input data"):
         validate_instrument_json(raw)
     prepared = validate_instrument_json(raw, pricing_options='{"theta_period":"1W"}')
-    assert (
-        json.loads(prepared)["instrument"]["spec"]["metric_pricing_overrides"]["theta_period"]
-        == "1W"
-    )
+    assert json.loads(prepared)["instrument"]["spec"]["metric_pricing_overrides"]["theta_period"] == "1W"
     assert validate_instrument_json(prepared) == prepared
     with pytest.raises(ValueError, match="invalid pricing options JSON"):
         validate_instrument_json(raw, pricing_options="{")

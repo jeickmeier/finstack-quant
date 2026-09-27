@@ -82,7 +82,7 @@
 //! Serde is always enabled. WASM builds this crate with `default-features = false`.
 //!
 //! # Minimum Supported Rust Version (MSRV)
-//! This crate targets **Rust 1.90**.  It is tested in CI and follows the
+//! This crate targets **Rust 1.97.1**. It is tested in CI and follows the
 //! standard *cargo-semver* guideline: MSRV may only bump in a **minor** release.
 //!
 //! # References

@@ -1,7 +1,7 @@
 # finstack-quant
 
 ![License](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue)
-![Rust](https://img.shields.io/badge/rust-1.90%2B-orange)
+![Rust](https://img.shields.io/badge/rust-1.97.1%2B-orange)
 ![Python](https://img.shields.io/badge/python-3.12%2B-blue)
 ![WASM](https://img.shields.io/badge/wasm-ready-purple)
 ![Status](https://img.shields.io/badge/status-alpha-yellow)
@@ -337,9 +337,8 @@ mise run python-examples
 exact stable Rust with `clippy`, `rustfmt`, and the `wasm32-unknown-unknown`
 target, plus nightly (needed only for the rustdoc JSON that `cargo-public-api`
 consumes), Node, `wasm-pack`, `cargo-nextest`, `cargo-llvm-cov`, `cargo-deny`,
-`cargo-public-api`, `flamegraph`, `maturin`, and `osv-scanner`. The pinned
-toolchain is ahead of the declared MSRV; `mise run rust-msrv` checks production
-targets against Rust 1.90.
+`cargo-public-api`, `flamegraph`, `maturin`, and `osv-scanner`. Rust 1.97.1 is
+also the minimum supported version declared by every library crate.
 
 ```bash
 # Install mise on macOS or Linux
@@ -371,6 +370,8 @@ rest are narrower (`goldens-*`, `wheel-*`, `pre-commit-*`, `materialization-*`,
 
 | Command | Purpose |
 |---|---|
+| `mise run all` | Run the complete test and lint gates without a separate preliminary build |
+| `mise run all-build` | Explicitly build Rust, Python, and WASM artifacts |
 | `mise run all-lint` | Lint Rust, Python, and WASM (check-only) |
 | `mise run all-fmt` | Format and auto-fix Rust, Python, and WASM (mutating) |
 | `mise run all-test` | Run Rust, Python, and WASM tests |
@@ -379,7 +380,6 @@ rest are narrower (`goldens-*`, `wheel-*`, `pre-commit-*`, `materialization-*`,
 | `mise run rust-test` | Run native Rust tests via `cargo nextest` |
 | `mise run rust-lint` | `cargo fmt --check` plus clippy with `-D warnings` across the workspace |
 | `mise run rust-doc` | Build workspace docs, enforce input docs, and run doctests |
-| `mise run rust-msrv` | Check production targets against the declared Rust 1.90 MSRV |
 | `mise run rust-bench` | Run Criterion benchmarks with reduced measurement timing |
 | `mise run rust-flamegraph` | Generate a CPU flamegraph (`cargo flamegraph --profile bench`; pass extra args after `--`) |
 | `mise run gen-write` | Regenerate checked-in schemas, fixtures, and TypeScript bindings |
@@ -408,9 +408,15 @@ Do not run `cargo test` directly: it pulls in doc tests, which are owned by
 `mise run rust-doc`. Use `mise run rust-test` (nextest) for unit and integration
 tests.
 
+Release and full-suite Criterion builds use fat LTO and one codegen unit, so
+their links are deliberately slow. Use the scoped Rust tasks and the dev-profile
+`python-build` for normal iteration. The four-case PR benchmark gate uses thin
+LTO and 16 codegen units on both base and head to shorten linking; the weekly
+full benchmark suite keeps the release-like profile.
+
 Benchmarks are measurement tasks and stay outside `all-test`, nextest,
-`rust-fmt`, `rust-lint`, and wall-clock-gated PR CI. Run `mise run rust-bench`,
-or a specific `cargo bench -p <crate> --bench <target>`, to compile and measure.
+`rust-fmt`, and `rust-lint`. PR CI compares four fixed cases; the full suite runs
+weekly. Run `mise run rust-bench` or `mise run rust-bench-crate` to measure locally.
 `mise run python-bench-portfolio` is the materialization-specific Python
 benchmark path; see
 [`benchmarks/MATERIALIZATION_BENCHMARKS.md`](benchmarks/MATERIALIZATION_BENCHMARKS.md).

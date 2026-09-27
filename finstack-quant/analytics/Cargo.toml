@@ -10,7 +10,7 @@ description = "Risk metrics and portfolio analytics for Finstack Quant: Sharpe, 
 autobenches = false
 
 [dependencies]
-finstack-quant-core = { path = "../core", version = "0.8.0", default-features = false }
+finstack-quant-core = { path = "../core", version = "0.9.0", default-features = false }
 nalgebra = { version = "0.34", default-features = false, features = ["std"] }
 serde = { workspace = true }
 tracing = { version = "0.1", default-features = false, features = ["attributes"] }

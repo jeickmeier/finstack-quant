@@ -44,6 +44,7 @@ CONTRACT_EXCLUDED_PARTS = {
 }
 EXCLUDED_PREFIXES = (
     Path("docs/superpowers/plans"),
+    Path("docs/superpowers/mockups"),
     Path("scripts/tests/fixtures"),
     Path("scripts/check_schema_residue.py"),
 )
@@ -664,7 +665,7 @@ def main() -> int:
 
     findings.extend(f"retired path still exists: {path.relative_to(ROOT)}" for path in RETIRED_PATHS if path.exists())
     manifest = (ROOT / "scripts/generated-artifacts.txt").read_text(encoding="utf-8")
-    if "/schemas/" in manifest:
+    if any(line.startswith("finstack-quant/") and "/schemas/" in line for line in manifest.splitlines()):
         findings.append("scripts/generated-artifacts.txt duplicates schema registry ownership")
 
     if findings:

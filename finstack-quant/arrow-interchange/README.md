@@ -26,8 +26,8 @@ This is a supporting crate, not one of the 14 domain crates:
 
 ```toml
 [dependencies]
-finstack-quant-arrow = { path = "../arrow-interchange", version = "0.8.0" }
-finstack-quant-core = { path = "../core", version = "0.8.0" }
+finstack-quant-arrow = { path = "../arrow-interchange", version = "0.9.0" }
+finstack-quant-core = { path = "../core", version = "0.9.0" }
 ```
 
 ```rust

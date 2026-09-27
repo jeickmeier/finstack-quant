@@ -157,53 +157,6 @@ jobs:
         run: mise run rust-test
 
   # ============================================
-  # Rust MSRV — compile production targets with the declared minimum toolchain
-  # ============================================
-  rust-msrv:
-    name: Rust MSRV (1.90)
-    runs-on: ubuntu-latest
-    timeout-minutes: 50
-    needs: prime-cache
-
-    env:
-      CARGO_BUILD_JOBS: 4
-      CARGO_INCREMENTAL: 1
-      CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUSTFLAGS: "-C debuginfo=0 -C strip=symbols -C linker=cc -C link-arg=-fuse-ld=bfd"
-      PYO3_PYTHON: python3
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v5
-
-      - name: Set up swap space
-        uses: pierotofy/set-swap-space@fc79b3f67fa8a838184ce84a674ca12238d2c761 # v1.0 line, master @ 2025-05-08
-        with:
-          swap-size-gb: 10
-
-      - name: Provision current toolchain (mise)
-        uses: jdx/mise-action@v4
-        with:
-          cache: true
-          cache_save: false
-
-      - name: Set up Python 3.12 for PyO3
-        uses: actions/setup-python@v7
-        with:
-          python-version: "3.12"
-
-      - name: Install Rust 1.90
-        run: rustup toolchain install 1.90 --profile minimal
-
-      - name: Cache Rust build artifacts
-        uses: Swatinem/rust-cache@v2
-        with:
-          shared-key: rust-msrv-1.90
-          save-if: ${{ github.ref == 'refs/heads/master' }}
-
-      - name: Check declared MSRV
-        run: mise run rust-msrv
-
-  # ============================================
   # Rust release build — current toolchain production-build ownership
   # ============================================
   rust-release-build:
@@ -359,16 +312,22 @@ jobs:
     env:
       CARGO_BUILD_JOBS: 4
       CARGO_INCREMENTAL: 1
+      RUSTUP_TOOLCHAIN: "1.97.1"
       FQ_BENCH_SAMPLE_SIZE: "10"
       FQ_BENCH_WARM_UP_TIME: "1"
       FQ_BENCH_MEASUREMENT_TIME: "1"
       FQ_BENCH_NRESAMPLES: "1000"
 
     steps:
-      - name: Checkout PR base
+      - name: Checkout PR head to stage benchmark runner
         uses: actions/checkout@v5
         with:
-          ref: ${{ github.event.pull_request.base.sha }}
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: Stage benchmark runner outside the checkout
+        run: |
+          mkdir -p "$RUNNER_TEMP/pr-bench/scripts"
+          cp scripts/__init__.py scripts/pr_benchmarks.py scripts/check_criterion_regressions.py "$RUNNER_TEMP/pr-bench/scripts/"
 
       - name: Set up swap space
         uses: pierotofy/set-swap-space@fc79b3f67fa8a838184ce84a674ca12238d2c761 # v1.0 line, master @ 2025-05-08
@@ -386,6 +345,22 @@ jobs:
         with:
           shared-key: rust-benchmarks
 
+      - name: Checkout PR base
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+
+      - name: Establish base benchmark
+        run: PYTHONPATH="$RUNNER_TEMP/pr-bench" python3 "$RUNNER_TEMP/pr-bench/scripts/pr_benchmarks.py" baseline
+
+      # Preserve target/criterion, including the named `pr-base` baseline, while
+      # switching tracked source files to the exact PR head revision.
+      - name: Checkout PR head
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          clean: false
+
       - name: Install uv
         uses: astral-sh/setup-uv@v9.0.0
 
@@ -395,19 +370,10 @@ jobs:
           echo "${{ github.workspace }}/.venv/bin" >> "$GITHUB_PATH"
           uv sync --no-install-project
 
-      - name: Establish base benchmark
-        run: mise run rust-bench-baseline
-
-      # Preserve target/criterion, including the named `main` baseline, while
-      # switching tracked source files to the exact PR head revision.
-      - name: Checkout PR head
-        uses: actions/checkout@v5
-        with:
-          ref: ${{ github.event.pull_request.head.sha }}
-          clean: false
-
       - name: Compare PR benchmarks
-        run: mise run rust-bench-compare
+        run: |
+          uv run --no-sync pytest scripts/tests/test_pr_benchmarks.py -q
+          PYTHONPATH="$RUNNER_TEMP/pr-bench" python3 "$RUNNER_TEMP/pr-bench/scripts/pr_benchmarks.py" compare
 
       - name: Upload Criterion report
         if: failure()
@@ -511,7 +477,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 50
     if: github.event_name == 'pull_request'
-    needs: [prime-cache, lint, test-rust, test-python, test-wasm]
+    needs: prime-cache
 
     env:
       CARGO_BUILD_JOBS: 4
