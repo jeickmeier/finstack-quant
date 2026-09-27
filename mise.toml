@@ -735,7 +735,7 @@ run = [
   "cargo run -p finstack-quant-portfolio --bin gen_materialization_schemas -- --check",
   "uv run --no-sync python scripts/check_schema_generation.py",
   "cargo test -p finstack-quant-cashflows --test cashflows schema_roundtrip:: --no-fail-fast",
-  "cargo test -p finstack-quant-portfolio --test materialization_schema --no-fail-fast",
+  "cargo test -p finstack-quant-portfolio --test portfolio materialization_schema --no-fail-fast",
   "cargo test -p finstack-quant-margin --test schema_parity --no-fail-fast",
   "cargo test -p finstack-quant-attribution --test attribution attribution::schema_contract:: --no-fail-fast",
   "cargo test -p finstack-quant-calibration --test calibration schema_parity --no-fail-fast",

@@ -3,9 +3,7 @@
 //! Tests quantity scaling, netting-set aggregation and FX conversion through
 //! `PortfolioMarginAggregator::calculate`.
 
-mod common;
-
-use common::base_date;
+use crate::common::base_date;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
@@ -431,7 +429,7 @@ fn calculate_converts_foreign_currency_netting_set_to_base() {
     );
     let mixed = run_margin_for(
         &[usd_instrument("irs-usd", usd_set.clone(), 500_000.0), eur],
-        &common::market_with_eur_and_fx(1.10),
+        &crate::common::market_with_eur_and_fx(1.10),
     );
 
     // Every stored row and every total is in the base currency.

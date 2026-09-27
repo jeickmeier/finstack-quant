@@ -1,8 +1,6 @@
 //! Attribution golden tests for portfolio.
 
-mod common;
-
-use common::*;
+use crate::common::*;
 use finstack_quant_attribution::AttributionMethod;
 use finstack_quant_core::config::FinstackConfig;
 use finstack_quant_core::currency::Currency;

@@ -108,8 +108,8 @@ fn report(
 ## Tests
 
 ```bash
-cargo nextest run -p finstack-quant-portfolio --test margin_aggregation
-cargo nextest run -p finstack-quant-portfolio --test margin_serialization
+cargo nextest run -p finstack-quant-portfolio --test portfolio margin_aggregation
+cargo nextest run -p finstack-quant-portfolio --test portfolio margin_serialization
 ```
 
 ## References
