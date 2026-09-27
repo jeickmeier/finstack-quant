@@ -64,8 +64,8 @@
           "description": "Notional amount."
         },
         "option_type": {
-          "$ref": "#/$defs/CmsSpreadOptionType",
-          "description": "Call or put on the spread."
+          "$ref": "#/$defs/OptionType",
+          "description": "Call or put on the spread `CMS_long - CMS_short`: a call pays\n`max(spread - strike, 0)`, a put pays `max(strike - spread, 0)`."
         },
         "payment_date": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
@@ -151,21 +151,6 @@
       ],
       "type": "object"
     },
-    "CmsSpreadOptionType": {
-      "description": "Call or put on a CMS spread.",
-      "oneOf": [
-        {
-          "const": "call",
-          "description": "max(CMS_long - CMS_short - K, 0)",
-          "type": "string"
-        },
-        {
-          "const": "put",
-          "description": "max(K - (CMS_long - CMS_short), 0)",
-          "type": "string"
-        }
-      ]
-    },
     "CorrelationWire": {
       "description": "Finite correlation coefficient in the closed interval `[-1, 1]`.",
       "format": "double",
@@ -177,6 +162,21 @@
       "const": "finstack_quant.instrument/1",
       "description": "Canonical schema marker for persisted instrument envelopes.",
       "type": "string"
+    },
+    "OptionType": {
+      "description": "Option payoff direction used by analytical and numerical model engines.",
+      "oneOf": [
+        {
+          "const": "call",
+          "description": "Call option.",
+          "type": "string"
+        },
+        {
+          "const": "put",
+          "description": "Put option.",
+          "type": "string"
+        }
+      ]
     },
     "cms_spread_option": {
       "additionalProperties": false,

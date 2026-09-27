@@ -10,7 +10,7 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::scalars::MarketScalar;
 use finstack_quant_core::money::Money;
 use finstack_quant_valuations::instruments::Instrument;
-use finstack_quant_valuations::instruments::TrsSide;
+use finstack_quant_valuations::instruments::PayReceive;
 use rust_decimal::Decimal;
 
 // Construction and Validation Tests
@@ -24,7 +24,7 @@ fn test_fi_index_trs_builder_defaults() {
     assert_eq!(trs.id.as_str(), "TEST-FI-TRS-001");
     assert_eq!(trs.notional.amount(), 10_000_000.0);
     assert_eq!(trs.notional.currency(), USD);
-    assert_eq!(trs.side, TrsSide::ReceiveTotalReturn);
+    assert_eq!(trs.side, PayReceive::Receive);
 }
 
 #[test]
@@ -34,14 +34,14 @@ fn test_fi_index_trs_builder_custom_params() {
         .id("CUSTOM-FI-TRS-001")
         .notional(Money::new(25_000_000.0, USD).expect("valid money fixture"))
         .spread_bp(150.0)
-        .side(TrsSide::PayTotalReturn)
+        .side(PayReceive::Pay)
         .build();
 
     // Assert
     assert_eq!(trs.id.as_str(), "CUSTOM-FI-TRS-001");
     assert_eq!(trs.notional.amount(), 25_000_000.0);
     assert_eq!(trs.financing.spread_bp, Decimal::from(150));
-    assert_eq!(trs.side, TrsSide::PayTotalReturn);
+    assert_eq!(trs.side, PayReceive::Pay);
 }
 
 #[test]
@@ -102,7 +102,7 @@ fn test_fi_index_trs_npv_receive_side() {
     let market = create_market_context();
     let as_of = as_of_date();
     let trs = TestFIIndexTrsBuilder::new()
-        .side(TrsSide::ReceiveTotalReturn)
+        .side(PayReceive::Receive)
         .spread_bp(100.0)
         .build();
 
@@ -120,7 +120,7 @@ fn test_fi_index_trs_npv_pay_side() {
     let market = create_market_context();
     let as_of = as_of_date();
     let trs = TestFIIndexTrsBuilder::new()
-        .side(TrsSide::PayTotalReturn)
+        .side(PayReceive::Pay)
         .spread_bp(100.0)
         .build();
 
@@ -139,12 +139,12 @@ fn test_fi_index_trs_npv_pay_vs_receive_symmetry() {
     let as_of = as_of_date();
 
     let trs_receive = TestFIIndexTrsBuilder::new()
-        .side(TrsSide::ReceiveTotalReturn)
+        .side(PayReceive::Receive)
         .spread_bp(75.0)
         .build();
 
     let trs_pay = TestFIIndexTrsBuilder::new()
-        .side(TrsSide::PayTotalReturn)
+        .side(PayReceive::Pay)
         .spread_bp(75.0)
         .build();
 
@@ -222,7 +222,7 @@ fn test_fi_index_trs_npv_equals_legs_difference() {
     let market = create_market_context();
     let as_of = as_of_date();
     let trs = TestFIIndexTrsBuilder::new()
-        .side(TrsSide::ReceiveTotalReturn)
+        .side(PayReceive::Receive)
         .spread_bp(100.0)
         .build();
 
@@ -290,7 +290,7 @@ fn test_fi_index_trs_sensitivity_to_yield() {
     let market_base = create_market_context();
 
     let trs = TestFIIndexTrsBuilder::new()
-        .side(TrsSide::ReceiveTotalReturn)
+        .side(PayReceive::Receive)
         .spread_bp(100.0)
         .build();
 
@@ -317,7 +317,7 @@ fn test_fi_index_trs_sensitivity_to_duration() {
     let market_base = create_market_context();
 
     let trs = TestFIIndexTrsBuilder::new()
-        .side(TrsSide::ReceiveTotalReturn)
+        .side(PayReceive::Receive)
         .spread_bp(100.0)
         .build();
 
@@ -342,7 +342,7 @@ fn test_fi_index_trs_sensitivity_to_interest_rates() {
     // Arrange
     let as_of = as_of_date();
     let trs = TestFIIndexTrsBuilder::new()
-        .side(TrsSide::ReceiveTotalReturn)
+        .side(PayReceive::Receive)
         .spread_bp(100.0)
         .build();
 
@@ -591,7 +591,7 @@ fn test_fi_index_trs_analytical_flat_rate_flat_yield() {
         .insert_price("HY-INDEX-DURATION", MarketScalar::Unitless(4.5));
 
     let trs = TestFIIndexTrsBuilder::new()
-        .side(TrsSide::ReceiveTotalReturn)
+        .side(PayReceive::Receive)
         .spread_bp(spread_bp_val)
         .tenor_months(12)
         .build();
@@ -883,7 +883,7 @@ fn seasoned_fi_trs(
             d(2025, 4, 2),
             ScheduleParams::quarterly_act360(),
         ))
-        .side(TrsSide::ReceiveTotalReturn)
+        .side(PayReceive::Receive)
         .initial_level_opt(initial_level)
         .attributes(Attributes::new())
         .build()

@@ -10,29 +10,29 @@ use finstack_quant_core::dates::{Tenor, TenorUnit};
 use finstack_quant_models::volatility::SabrParameters;
 use finstack_quant_valuations::instruments::pricing_overrides::VolSurfaceExtrapolation;
 use finstack_quant_valuations::instruments::rates::swaption::{
-    BermudanSchedule, BermudanSwaption, CashSettlementMethod, Swaption, SwaptionExercise,
-    SwaptionSettlement, VolatilityModel,
+    BermudanSchedule, BermudanSwaption, CashSettlementMethod, Swaption,
 };
+use finstack_quant_valuations::instruments::{ExerciseStyle, SettlementType, VolatilityModel};
 use time::macros::date;
 
 #[test]
 fn test_swaption_settlement_and_exercise_from_str() {
-    let physical: SwaptionSettlement = "physical".parse().unwrap();
-    let cash: SwaptionSettlement = "cash".parse().unwrap();
+    let physical: SettlementType = "physical".parse().unwrap();
+    let cash: SettlementType = "cash".parse().unwrap();
     assert_eq!(physical.to_string(), "physical");
     assert_eq!(cash.to_string(), "cash");
 
-    let european: SwaptionExercise = "european".parse().unwrap();
-    let bermudan: SwaptionExercise = "bermudan".parse().unwrap();
-    let american: SwaptionExercise = "american".parse().unwrap();
+    let european: ExerciseStyle = "european".parse().unwrap();
+    let bermudan: ExerciseStyle = "bermudan".parse().unwrap();
+    let american: ExerciseStyle = "american".parse().unwrap();
     assert_eq!(european.to_string(), "european");
     assert_eq!(bermudan.to_string(), "bermudan");
     assert_eq!(american.to_string(), "american");
 
-    assert!("unknown".parse::<SwaptionSettlement>().is_err());
-    assert!("invalid".parse::<SwaptionExercise>().is_err());
-    assert!("CASH".parse::<SwaptionSettlement>().is_err());
-    assert!("BERMUDAN".parse::<SwaptionExercise>().is_err());
+    assert!("unknown".parse::<SettlementType>().is_err());
+    assert!("invalid".parse::<ExerciseStyle>().is_err());
+    assert!("CASH".parse::<SettlementType>().is_err());
+    assert!("BERMUDAN".parse::<ExerciseStyle>().is_err());
 }
 
 #[test]
@@ -108,7 +108,7 @@ fn test_bermudan_schedule_co_terminal_excludes_maturity() {
 fn test_swaption_cash_annuity_zero_forward_and_invalid_frequency() {
     let (_, expiry, swap_start, swap_end) = standard_dates();
     let mut swaption = create_standard_payer_swaption(expiry, swap_start, swap_end, 0.05);
-    swaption.settlement = SwaptionSettlement::Cash;
+    swaption.settlement = SettlementType::Cash;
 
     let expected = swaption
         .get_fixed_day_count()
@@ -186,19 +186,19 @@ fn test_sabr_parameter_constructors_and_internal_conversion() {
 #[test]
 fn test_swaption_example_and_builder_helpers() {
     let example = Swaption::example();
-    assert_eq!(example.exercise_style, SwaptionExercise::European);
-    assert_eq!(example.settlement, SwaptionSettlement::Cash);
+    assert_eq!(example.exercise_style, ExerciseStyle::European);
+    assert_eq!(example.settlement, SettlementType::Cash);
     assert_eq!(
         example.cash_settlement_method,
         CashSettlementMethod::CollateralizedCashPrice
     );
 
     let updated = example
-        .with_settlement(SwaptionSettlement::Cash)
+        .with_settlement(SettlementType::Cash)
         .with_option_type(finstack_quant_valuations::instruments::OptionType::Put)
         .with_cash_settlement_method(CashSettlementMethod::ZeroCoupon)
         .with_calendar("nyse");
-    assert_eq!(updated.settlement, SwaptionSettlement::Cash);
+    assert_eq!(updated.settlement, SettlementType::Cash);
     assert_eq!(
         updated.option_type,
         finstack_quant_valuations::instruments::OptionType::Put
@@ -290,7 +290,7 @@ fn test_bermudan_builder_helpers_and_time_accessors() {
     .with_float_frequency(Tenor::semi_annual())
     .with_fixed_day_count(finstack_quant_core::dates::DayCount::Act365F)
     .with_float_day_count(finstack_quant_core::dates::DayCount::Act365F)
-    .with_settlement(SwaptionSettlement::Cash)
+    .with_settlement(SettlementType::Cash)
     .with_calendar("nyse");
 
     assert_eq!(
@@ -303,7 +303,7 @@ fn test_bermudan_builder_helpers_and_time_accessors() {
     );
     assert!(berm.time_to_first_exercise(as_of).unwrap() > 0.0);
     assert!(berm.time_to_maturity(as_of).unwrap() > berm.time_to_first_exercise(as_of).unwrap());
-    assert_eq!(berm.settlement, SwaptionSettlement::Cash);
+    assert_eq!(berm.settlement, SettlementType::Cash);
     assert_eq!(berm.get_fixed_frequency(), Tenor::annual());
     assert_eq!(berm.get_float_frequency(), Tenor::semi_annual());
 }

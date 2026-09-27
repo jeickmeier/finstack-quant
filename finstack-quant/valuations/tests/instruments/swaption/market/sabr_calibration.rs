@@ -49,8 +49,7 @@ fn test_sabr_beta_range() {
         let mut swaption =
             create_standard_payer_swaption(expiry, swap_start, swap_end, 0.05).with_sabr(params);
         if beta == 0.0 {
-            swaption.vol_model =
-                finstack_quant_valuations::instruments::rates::swaption::VolatilityModel::Normal;
+            swaption.vol_model = finstack_quant_valuations::instruments::VolatilityModel::Normal;
         }
 
         let pv = swaption.value(&market, as_of).unwrap().amount();

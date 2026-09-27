@@ -44,8 +44,8 @@ are also re-exported flat at `finstack_quant_valuations::instruments`:
 `FxTouchOption`, `TouchType`, `BarrierDirection`, `PayoutTiming`,
 `FxVarianceSwap`, `QuantoOption`.
 
-Family-path-only types include `fx_option::{FxAtmDeltaConvention,
-FxDeltaConvention, FxDeltaConventionKind, FxOptionBuilder}`,
+Family-path-only types include `fx_option::{FxDeltaConvention,
+FxDeltaConventionKind, FxOptionBuilder}`,
 `fx_forward::FxForwardBuilder`, `fx_barrier_option::Monitoring`,
 `fx_variance_swap::FxVarianceSwapBuilder`, and
 `ndf::{NdfQuoteConvention, NdfFixingSource}`. Monte Carlo payoff kernels and

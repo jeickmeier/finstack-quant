@@ -22,8 +22,7 @@ use time::macros::date;
 fn test_simple_swaption_normal_pricer_uses_bachelier_formula() {
     let (as_of, expiry, swap_start, swap_end) = standard_dates();
     let mut swaption = create_standard_payer_swaption(expiry, swap_start, swap_end, 0.05);
-    swaption.vol_model =
-        finstack_quant_valuations::instruments::rates::swaption::VolatilityModel::Normal;
+    swaption.vol_model = finstack_quant_valuations::instruments::VolatilityModel::Normal;
     swaption.instrument_pricing_overrides = swaption
         .instrument_pricing_overrides
         .clone()
@@ -46,8 +45,7 @@ fn test_simple_swaption_normal_pricer_uses_bachelier_formula() {
 fn test_simple_swaption_pricers_reject_volatility_model_mismatch() {
     let (as_of, expiry, swap_start, swap_end) = standard_dates();
     let mut swaption = create_standard_payer_swaption(expiry, swap_start, swap_end, 0.05);
-    swaption.vol_model =
-        finstack_quant_valuations::instruments::rates::swaption::VolatilityModel::Normal;
+    swaption.vol_model = finstack_quant_valuations::instruments::VolatilityModel::Normal;
     swaption.instrument_pricing_overrides = swaption
         .instrument_pricing_overrides
         .clone()
@@ -59,8 +57,7 @@ fn test_simple_swaption_pricers_reject_volatility_model_mismatch() {
         .expect_err("Black-76 route must reject a normal-volatility instrument");
     assert!(black_error.to_string().contains("incompatible"));
 
-    swaption.vol_model =
-        finstack_quant_valuations::instruments::rates::swaption::VolatilityModel::Black;
+    swaption.vol_model = finstack_quant_valuations::instruments::VolatilityModel::Black;
     let normal_error = SimpleSwaptionNormalPricer
         .price_dyn(&swaption, &market, as_of)
         .expect_err("normal route must reject a Black-volatility instrument");

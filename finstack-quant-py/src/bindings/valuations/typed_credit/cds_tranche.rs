@@ -11,9 +11,8 @@ use crate::bindings::date_utils::{date_to_py, extract_date};
 use crate::bindings::extract::extract_market;
 use crate::errors::core_to_py;
 use finstack_quant_core::types::{CurveId, InstrumentId};
-use finstack_quant_valuations::instruments::credit_derivatives::cds_tranche::{
-    CDSTrancheParams, TrancheSide,
-};
+use finstack_quant_valuations::instruments::credit_derivatives::cds_tranche::CDSTrancheParams;
+use finstack_quant_valuations::instruments::PayReceive;
 use finstack_quant_valuations::instruments::{Instrument, InstrumentJson};
 
 use super::super::convert::{
@@ -327,7 +326,7 @@ impl PyCDSTrancheParams {
 /// >>> from finstack_quant.valuations.instruments import CDSTranche
 /// >>> tranche = CDSTranche.example()
 /// >>> (tranche.attach_pct, tranche.detach_pct, tranche.side)
-/// (0.0, 3.0, 'buy_protection')
+/// (0.0, 3.0, 'pay')
 #[pyclass(
     module = "finstack_quant.valuations.instruments",
     name = "CDSTranche",
@@ -393,8 +392,8 @@ impl PyCDSTranche {
     ///     Discount curve identifier.
     /// credit_index_id : str
     ///     Credit index identifier for the loss distribution.
-    /// side : {"buy_protection", "sell_protection"}
-    ///     Tranche side.
+    /// side : {"pay", "receive"}
+    ///     Tranche side: ``"pay"`` buys protection, ``"receive"`` sells it.
     ///
     /// Returns
     /// -------
@@ -415,7 +414,7 @@ impl PyCDSTranche {
         credit_index_id: &str,
         side: &str,
     ) -> PyResult<Self> {
-        let side: TrancheSide = enum_from_str(side, "side")?;
+        let side: PayReceive = enum_from_str(side, "side")?;
         let inner = finstack_quant_valuations::instruments::CDSTranche::standard(
             InstrumentId::new(id.to_string()),
             &params.inner,
@@ -568,7 +567,7 @@ impl PyCDSTranche {
         self.inner.credit_index_id.to_string()
     }
 
-    /// ``"buy_protection"`` or ``"sell_protection"``.
+    /// ``"pay"`` (buy protection) or ``"receive"`` (sell protection).
     #[getter]
     fn side(&self) -> PyResult<String> {
         enum_to_py_string(&self.inner.side)
@@ -1015,12 +1014,12 @@ impl PyCDSTrancheBuilder {
         )
     }
 
-    /// Set the tranche side (buy/sell protection).
+    /// Set the tranche side (``"pay"`` buys protection, ``"receive"`` sells it).
     ///
     /// Parameters
     /// ----------
-    /// value : {"buy_protection", "sell_protection"}
-    ///     Tranche side.
+    /// value : {"pay", "receive"}
+    ///     Tranche side: ``"pay"`` buys protection, ``"receive"`` sells it.
     ///
     /// Returns
     /// -------
@@ -1033,7 +1032,7 @@ impl PyCDSTrancheBuilder {
     ///     If ``value`` is not a recognized side.
     #[pyo3(text_signature = "($self, value)")]
     fn side<'py>(mut slf: PyRefMut<'py, Self>, value: &str) -> PyResult<PyRefMut<'py, Self>> {
-        let side: TrancheSide = enum_from_str(value, "side")?;
+        let side: PayReceive = enum_from_str(value, "side")?;
         tranche_set!(
             slf,
             side,

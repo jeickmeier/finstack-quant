@@ -7,8 +7,9 @@ use finstack_quant_core::dates::BusinessDayConvention;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::CurveId;
 use finstack_quant_core::Result;
-use finstack_quant_valuations::instruments::rates::xccy_swap::{LegSide, XccySwap, XccySwapLeg};
+use finstack_quant_valuations::instruments::rates::xccy_swap::{XccySwap, XccySwapLeg};
 use finstack_quant_valuations::instruments::Instrument;
+use finstack_quant_valuations::instruments::PayReceive;
 use finstack_quant_valuations::instruments::{adjust_joint_calendar, fx_spot_date_for_pair};
 use finstack_quant_valuations::market::conventions::ConventionRegistry;
 use rust_decimal::Decimal;
@@ -105,7 +106,7 @@ pub fn build_xccy_instrument(quote: &XccyQuote, ctx: &BuildCtx) -> Result<Box<dy
     let leg1 = XccySwapLeg {
         currency: conv.base_currency,
         notional: Money::new(base_notional, conv.base_currency)?,
-        side: LegSide::Receive,
+        side: PayReceive::Receive,
         forward_curve_id: CurveId::new(foreign_forward),
         discount_curve_id: CurveId::new(foreign_discount),
         start: spot,
@@ -126,7 +127,7 @@ pub fn build_xccy_instrument(quote: &XccyQuote, ctx: &BuildCtx) -> Result<Box<dy
     let leg2 = XccySwapLeg {
         currency: conv.quote_currency,
         notional: Money::new(quote_notional, conv.quote_currency)?,
-        side: LegSide::Pay,
+        side: PayReceive::Pay,
         forward_curve_id: CurveId::new(domestic_forward),
         discount_curve_id: CurveId::new(domestic_discount),
         start: spot,

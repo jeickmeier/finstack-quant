@@ -90,21 +90,6 @@
       "description": "Canonical schema marker for persisted instrument envelopes.",
       "type": "string"
     },
-    "LegSide": {
-      "description": "Whether the holder pays or receives a leg.",
-      "oneOf": [
-        {
-          "const": "receive",
-          "description": "Receive the leg's coupons (and final notional, if exchanged).",
-          "type": "string"
-        },
-        {
-          "const": "pay",
-          "description": "Pay the leg's coupons (and final notional, if exchanged).",
-          "type": "string"
-        }
-      ]
-    },
     "NotionalExchange": {
       "description": "Notional exchange convention for XCCY swaps.",
       "oneOf": [
@@ -144,6 +129,21 @@
             "mtm_resetting"
           ],
           "type": "object"
+        }
+      ]
+    },
+    "PayReceive": {
+      "description": "Direction for instrument legs (universal for IRS, CDS, variance swaps, etc.)\n\nFor interest rate swaps: Pay = pay fixed/receive floating, Receive = receive fixed/pay floating\nFor credit default swaps: Pay = buy protection (pay premium), Receive = sell protection (receive premium)\nFor variance swaps: Pay = short variance, Receive = long variance",
+      "oneOf": [
+        {
+          "const": "pay",
+          "description": "Pay the primary leg (fixed rate in IRS, protection premium in CDS, short variance)",
+          "type": "string"
+        },
+        {
+          "const": "receive",
+          "description": "Receive the primary leg (fixed rate in IRS, protection premium in CDS, long variance)",
+          "type": "string"
         }
       ]
     },
@@ -316,7 +316,7 @@
           ]
         },
         "side": {
-          "$ref": "#/$defs/LegSide",
+          "$ref": "#/$defs/PayReceive",
           "description": "Pay/receive direction for this leg."
         },
         "spread_bp": {

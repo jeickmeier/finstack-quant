@@ -1548,7 +1548,7 @@
           "model_config": {
             "asw_forward_curve_id": "USD-SOFRRATE",
             "tree_steps": 200,
-            "vol_model": "black",
+            "tree_model": "black_derman_toy",
             "bdt_sigma": 0.2223,
             "tree_discount_curve_id": "USD-OAS-S23",
             "oas_quote_compounding": "semi_annual",

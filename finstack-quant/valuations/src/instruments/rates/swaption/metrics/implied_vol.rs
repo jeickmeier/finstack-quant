@@ -7,7 +7,8 @@
 //! failure or non-converged residual) an error is returned rather than a
 //! fabricated bound value, so risk systems never receive a fake vol.
 
-use crate::instruments::rates::swaption::{Swaption, VolatilityModel};
+use crate::instruments::rates::swaption::Swaption;
+use crate::instruments::VolatilityModel;
 use crate::metrics::{MetricCalculator, MetricContext};
 use finstack_quant_core::math::solver::BrentSolver;
 use finstack_quant_core::{Error, Result};

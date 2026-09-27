@@ -487,8 +487,8 @@ fn bdt_tree_accepts_more_than_one_thousand_steps() {
     });
     bond.instrument_pricing_overrides = InstrumentPricingOverrides::default();
     bond.instrument_pricing_overrides.model_config.bdt_sigma = Some(0.20);
-    bond.instrument_pricing_overrides.model_config.vol_model =
-        Some(crate::instruments::common_impl::parameters::VolatilityModel::Black);
+    bond.instrument_pricing_overrides.model_config.tree_model =
+        Some(crate::instruments::ShortRateTreeModel::BlackDermanToy);
     let mut config = super::bond_tree_config(&bond, &create_test_market_context()).expect("config");
     config.tree_steps = 1200;
     let market = create_test_market_context();
@@ -627,7 +627,7 @@ fn bond_tree_reads_hw1f_parameters_from_market_scalars() {
 fn bond_bdt_tree_reads_bdt_sigma() {
     let mut bond = bare_callable_bond();
     bond.instrument_pricing_overrides.model_config = serde_json::from_value(serde_json::json!({
-        "vol_model": "black",
+        "tree_model": "black_derman_toy",
         "bdt_sigma": 0.20
     }))
     .expect("bdt_sigma is a model_config field");
@@ -649,7 +649,7 @@ fn bond_bdt_tree_reads_bdt_sigma() {
     option_vol_only
         .instrument_pricing_overrides
         .model_config
-        .vol_model = Some(crate::instruments::common_impl::parameters::VolatilityModel::Black);
+        .tree_model = Some(crate::instruments::ShortRateTreeModel::BlackDermanToy);
     option_vol_only
         .instrument_pricing_overrides
         .market_quotes
@@ -788,4 +788,18 @@ fn risk_free_floating_callable_prices_on_deterministic_hull_white_tree() {
             .contains("instrument_pricing_overrides.model_config.hw1f_mean_reversion"),
         "{error}"
     );
+}
+
+#[test]
+fn bond_tree_model_selector_rejects_retired_vol_model_key() {
+    let hull_white: crate::instruments::ModelConfig =
+        serde_json::from_value(serde_json::json!({ "tree_model": "hull_white" }))
+            .expect("tree_model is a model_config field");
+    assert_eq!(
+        hull_white.tree_model,
+        Some(crate::instruments::ShortRateTreeModel::HullWhite)
+    );
+    // schema-rejection-test: `vol_model` is now `tree_model`
+    let retired = serde_json::json!({ "vol_model": "black", "bdt_sigma": 0.20 });
+    assert!(serde_json::from_value::<crate::instruments::ModelConfig>(retired).is_err());
 }

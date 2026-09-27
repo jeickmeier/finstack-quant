@@ -3,21 +3,21 @@
 use finstack_quant_core::{currency::Currency, market_data::context::MarketContext, money::Money};
 use finstack_quant_margin::Marginable;
 use finstack_quant_valuations::instruments::{
-    EquityTotalReturnSwap, FIIndexTotalReturnSwap, InterestRateSwap, TrsSide,
+    EquityTotalReturnSwap, FIIndexTotalReturnSwap, InterestRateSwap, PayReceive,
 };
 
 #[test]
 fn equity_delta_is_one_percent_of_the_directional_trade_exposure() {
     let mut instrument = EquityTotalReturnSwap::example().expect("equity TRS");
     instrument.notional = Money::from((1_000_000_i64, Currency::USD));
-    instrument.side = TrsSide::ReceiveTotalReturn;
+    instrument.side = PayReceive::Receive;
     let as_of = instrument.schedule.start;
     let market = MarketContext::new();
     let long = instrument
         .simm_sensitivities(&market, as_of)
         .expect("long sensitivity");
     assert_eq!(long.total_equity_delta(), 10_000.0);
-    instrument.side = TrsSide::PayTotalReturn;
+    instrument.side = PayReceive::Pay;
     let short = instrument
         .simm_sensitivities(&market, as_of)
         .expect("short sensitivity");

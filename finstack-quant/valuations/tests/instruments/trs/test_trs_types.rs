@@ -1,93 +1,39 @@
 //! Unit tests for TRS core types.
 //!
-//! Tests for TrsSide, TrsScheduleSpec, and related type functionality.
+//! Tests for the TRS side, TrsScheduleSpec, and related type functionality.
 
 use super::test_utils::*;
 use finstack_quant_cashflows::builder::ScheduleParams;
 use finstack_quant_core::dates::{BusinessDayConvention, DayCount, StubKind, Tenor};
-use finstack_quant_valuations::instruments::{TrsScheduleSpec, TrsSide};
+use finstack_quant_valuations::instruments::{PayReceive, TrsScheduleSpec};
 
-// TrsSide Tests
-
-#[test]
-fn test_trs_side_display() {
-    // Arrange
-    let receive = TrsSide::ReceiveTotalReturn;
-    let pay = TrsSide::PayTotalReturn;
-
-    // Act & Assert
-    assert_eq!(receive.to_string(), "receive_total_return");
-    assert_eq!(pay.to_string(), "pay_total_return");
-}
+// Trade side
 
 #[test]
-fn test_trs_side_from_str_canonical() {
-    // Arrange & Act
-    let receive = "receive_total_return".parse::<TrsSide>().unwrap();
-    let pay = "pay_total_return".parse::<TrsSide>().unwrap();
+fn test_trs_side_rejects_retired_total_return_spellings() {
+    use finstack_quant_valuations::instruments::equity::equity_trs::EquityTotalReturnSwap;
+    use finstack_quant_valuations::instruments::fixed_income::fi_trs::FIIndexTotalReturnSwap;
 
-    // Assert
-    assert_eq!(receive, TrsSide::ReceiveTotalReturn);
-    assert_eq!(pay, TrsSide::PayTotalReturn);
-}
-
-#[test]
-fn test_trs_side_rejects_noncanonical_spellings() {
+    let equity = serde_json::to_value(EquityTotalReturnSwap::example().unwrap()).unwrap();
+    let fi = serde_json::to_value(FIIndexTotalReturnSwap::example().unwrap()).unwrap();
     for retired in [
-        "receive",
-        "pay",
-        "RECEIVE_TOTAL_RETURN",
-        "Pay_Total_Return",
-        "receive-total-return",
-        "pay-total-return",
+        "receive_total_return", // schema-rejection-test: now `receive`
+        "pay_total_return",     // schema-rejection-test: now `pay`
     ] {
-        assert!(retired.parse::<TrsSide>().is_err());
+        let mut value = equity.clone();
+        value["side"] = serde_json::json!(retired);
+        assert!(serde_json::from_value::<EquityTotalReturnSwap>(value).is_err());
+        let mut value = fi.clone();
+        value["side"] = serde_json::json!(retired);
+        assert!(serde_json::from_value::<FIIndexTotalReturnSwap>(value).is_err());
     }
 }
 
 #[test]
-fn test_trs_side_from_str_invalid() {
-    // Arrange & Act
-    let result = "invalid_side".parse::<TrsSide>();
-
-    // Assert
-    assert!(result.is_err());
-    assert!(result.unwrap_err().contains("Unknown TRS side"));
-}
-
-#[test]
-fn test_trs_side_sign() {
-    // Arrange
-    let receive = TrsSide::ReceiveTotalReturn;
-    let pay = TrsSide::PayTotalReturn;
-
-    // Act & Assert
-    assert_eq!(receive.sign(), 1.0);
-    assert_eq!(pay.sign(), -1.0);
-}
-
-#[test]
-fn test_trs_side_equality() {
-    // Arrange
-    let receive1 = TrsSide::ReceiveTotalReturn;
-    let receive2 = TrsSide::ReceiveTotalReturn;
-    let pay = TrsSide::PayTotalReturn;
-
-    // Act & Assert
-    assert_eq!(receive1, receive2);
-    assert_ne!(receive1, pay);
-}
-
-#[test]
-fn test_trs_side_clone_and_copy() {
-    // Arrange
-    let side = TrsSide::ReceiveTotalReturn;
-
-    // Act
-    let copied = side;
-
-    // Assert
-    assert_eq!(side, copied);
+fn test_trs_side_receive_is_long_total_return() {
+    // Receive = receive the total-return leg, the same +1 sign TrsSide carried.
+    assert_eq!(PayReceive::Receive.sign(), 1.0);
+    assert_eq!(PayReceive::Pay.sign(), -1.0);
 }
 
 // TrsScheduleSpec Tests

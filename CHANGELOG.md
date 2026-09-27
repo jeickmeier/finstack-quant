@@ -2,6 +2,40 @@
 
 ## [Unreleased]
 
+### Option and direction enums (2026-09-24)
+
+#### Changed (BREAKING)
+
+- `CDSTranche.side` is now `PayReceive` (Rust, Python, WASM, JSON): `buy_protection`
+  (now `pay`) and `sell_protection` (now `receive`), matching CDS and CDS index.
+- `EquityTotalReturnSwap.side` and `FIIndexTotalReturnSwap.side` are now
+  `PayReceive` (Rust, Python, JSON): `receive_total_return` (now `receive`) and
+  `pay_total_return` (now `pay`).
+- `XccySwapLeg.side` is now `PayReceive` (Rust only; wire unchanged).
+- `ModelConfig.vol_model` (now `tree_model`) on the bond tree (Rust, Python,
+  JSON `instrument_pricing_overrides.model_config`): the value is the new
+  `ShortRateTreeModel` (`hull_white` / `black_derman_toy`); `black` becomes
+  `black_derman_toy` and an absent value still selects Hull-White.
+- `InflationCapFloor.option_type` (now `rate_option_type`, typed
+  `RateOptionType`) (Rust, JSON).
+- `Swaption.exercise_style` is now `ExerciseStyle`, and `Swaption.settlement` /
+  `BermudanSwaption.settlement` are now `SettlementType` (Rust; wire unchanged,
+  `settlement` stays required). `Swaption.vol_model` and `SwaptionParams.vol_model`
+  use the shared `VolatilityModel`, now re-exported at
+  `finstack_quant_valuations::instruments` (Rust; wire unchanged).
+- `CmsSpreadOption.option_type` is now `OptionType` (Rust, WASM; wire unchanged).
+- `FxOption::atm_dns_strike_for_convention` takes `FxDeltaConventionKind`
+  (Rust only).
+
+#### Removed
+
+- `TrancheSide`, `TrsSide`, `LegSide` (use `PayReceive`).
+- `swaption::VolatilityModel` (schema `SwaptionVolatilityModel`),
+  `SwaptionSettlement`, `SwaptionExercise` (use `VolatilityModel`,
+  `SettlementType`, `ExerciseStyle`).
+- `InflationCapFloorType` (use `RateOptionType`), `CmsSpreadOptionType` (use
+  `OptionType`), `FxAtmDeltaConvention` (use `FxDeltaConventionKind`).
+
 ### Private markets and DCF (2026-09-24)
 
 `RealEstateAsset` prices against the caller's `as_of` and stores no valuation

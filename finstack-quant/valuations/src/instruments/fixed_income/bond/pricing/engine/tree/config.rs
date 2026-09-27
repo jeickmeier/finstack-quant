@@ -233,7 +233,7 @@ pub(crate) fn bond_tree_settings(bond: &Bond) -> TreePricerConfig {
 /// straight leg of an option decomposition is valued on the same lattice as
 /// the optioned bond:
 ///
-/// - `model_config.vol_model = black` selects Black-Derman-Toy with the
+/// - `model_config.tree_model = black_derman_toy` selects Black-Derman-Toy with the
 ///   lognormal volatility `model_config.bdt_sigma`.
 /// - Otherwise the Hull-White tree takes `(κ, σ)` from
 ///   [`resolve_hw1f_params`]: a complete `model_config.hw1f_mean_reversion` /
@@ -286,15 +286,15 @@ pub fn bond_tree_config(
 ) -> finstack_quant_core::Result<TreePricerConfig> {
     let model = &bond.instrument_pricing_overrides.model_config;
     let uses_black_lognormal = matches!(
-        model.vol_model,
-        Some(crate::instruments::common_impl::parameters::VolatilityModel::Black)
+        model.tree_model,
+        Some(crate::instruments::ShortRateTreeModel::BlackDermanToy)
     );
 
     let tree_model = if uses_black_lognormal {
         let Some(sigma) = model.bdt_sigma else {
             return Err(finstack_quant_core::Error::Validation(format!(
                 "Bond '{}' selects the Black-Derman-Toy tree \
-                 (instrument_pricing_overrides.model_config.vol_model = black) but provides \
+                 (instrument_pricing_overrides.model_config.tree_model = black_derman_toy) but provides \
                  no instrument_pricing_overrides.model_config.bdt_sigma. BDT requires an \
                  explicit lognormal short-rate volatility (e.g. 0.20 for 20%).",
                 bond.id.as_str()
@@ -306,7 +306,7 @@ pub fn bond_tree_config(
             return Err(finstack_quant_core::Error::Validation(format!(
                 "Bond '{}' sets instrument_pricing_overrides.model_config.bdt_sigma but \
                  selects the Hull-White tree; set \
-                 instrument_pricing_overrides.model_config.vol_model = black for BDT or \
+                 instrument_pricing_overrides.model_config.tree_model = black_derman_toy for BDT or \
                  remove bdt_sigma",
                 bond.id.as_str()
             )));
@@ -385,8 +385,8 @@ fn tree_config_with_model(bond: &Bond, tree_model: TreeModelChoice) -> TreePrice
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::instruments::common_impl::parameters::VolatilityModel;
     use crate::instruments::fixed_income::bond::{CallPut, CallPutSchedule, ReturnFloorSpec};
+    use crate::instruments::ShortRateTreeModel;
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::money::Money;
     use time::macros::date;
@@ -412,7 +412,8 @@ mod tests {
             }],
             puts: vec![],
         });
-        bond.instrument_pricing_overrides.model_config.vol_model = Some(VolatilityModel::Black);
+        bond.instrument_pricing_overrides.model_config.tree_model =
+            Some(ShortRateTreeModel::BlackDermanToy);
         bond.instrument_pricing_overrides.model_config.bdt_sigma = Some(0.20);
 
         let config = bond_tree_config(&bond, &MarketContext::new())
@@ -446,7 +447,8 @@ mod tests {
             }],
             puts: vec![],
         });
-        bond.instrument_pricing_overrides.model_config.vol_model = Some(VolatilityModel::Black);
+        bond.instrument_pricing_overrides.model_config.tree_model =
+            Some(ShortRateTreeModel::BlackDermanToy);
 
         let err =
             bond_tree_config(&bond, &MarketContext::new()).expect_err("missing BDT vol must error");
@@ -468,7 +470,8 @@ mod tests {
         )
         .expect("fixed bond should build");
         bond.return_floor = Some(ReturnFloorSpec::moic(1.0));
-        bond.instrument_pricing_overrides.model_config.vol_model = Some(VolatilityModel::Black);
+        bond.instrument_pricing_overrides.model_config.tree_model =
+            Some(ShortRateTreeModel::BlackDermanToy);
 
         let err = bond_tree_config(&bond, &MarketContext::new())
             .expect_err("floor-only BDT bond needs a volatility");

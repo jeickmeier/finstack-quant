@@ -33,7 +33,7 @@ pub struct SwaptionParams {
     /// Optional override: floating-leg accrual day count.
     pub float_day_count: Option<DayCount>,
     /// Optional override: volatility model.
-    pub vol_model: Option<crate::instruments::rates::swaption::types::VolatilityModel>,
+    pub vol_model: Option<crate::instruments::VolatilityModel>,
 }
 
 impl SwaptionParams {
@@ -118,10 +118,7 @@ impl SwaptionParams {
     }
 
     /// Override volatility model
-    pub fn with_vol_model(
-        mut self,
-        model: crate::instruments::rates::swaption::types::VolatilityModel,
-    ) -> Self {
+    pub fn with_vol_model(mut self, model: crate::instruments::VolatilityModel) -> Self {
         self.vol_model = Some(model);
         self
     }
@@ -144,8 +141,8 @@ fn strike_decimal(strike: f64) -> Result<Decimal> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::instruments::rates::swaption::types::VolatilityModel;
     use crate::instruments::rates::swaption::Swaption;
+    use crate::instruments::VolatilityModel;
     use finstack_quant_core::currency::Currency;
     use time::macros::date;
 

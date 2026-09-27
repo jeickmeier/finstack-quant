@@ -126,6 +126,13 @@ pub enum RateOptionType {
     Floorlet,
 }
 
+impl RateOptionType {
+    /// Returns `true` for `Cap` and `Caplet`, `false` for `Floor` and `Floorlet`.
+    pub(crate) fn is_cap(self) -> bool {
+        matches!(self, RateOptionType::Cap | RateOptionType::Caplet)
+    }
+}
+
 impl std::fmt::Display for RateOptionType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {

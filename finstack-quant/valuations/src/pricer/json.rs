@@ -834,7 +834,7 @@ mod tests {
         }
 
         let mut normal_swaption = Swaption::example();
-        normal_swaption.vol_model = crate::instruments::rates::swaption::VolatilityModel::Normal;
+        normal_swaption.vol_model = crate::instruments::VolatilityModel::Normal;
         assert_eq!(
             resolve_model_key(&normal_swaption, "default").expect("model"),
             ModelKey::Normal

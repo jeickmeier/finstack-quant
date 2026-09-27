@@ -1,9 +1,26 @@
 //! Pricing overrides for market-quoted instruments.
 
-use crate::instruments::common_impl::parameters::VolatilityModel;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::CurveId;
 use finstack_quant_models::credit::pool::PoolGranularity;
+
+/// Short-rate lattice used by the rates-only bond tree.
+///
+/// Selected by `instrument_pricing_overrides.model_config.tree_model`; when the
+/// field is absent the bond tree uses Hull-White.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(rename_all = "snake_case")]
+#[non_exhaustive]
+pub enum ShortRateTreeModel {
+    /// Hull-White one-factor (normal short rate) with `(κ, σ)` from
+    /// `model_config.hw1f_mean_reversion` / `model_config.hw1f_sigma` or the
+    /// pre-fitted market scalars.
+    HullWhite,
+    /// Black-Derman-Toy (lognormal short rate) with volatility
+    /// `model_config.bdt_sigma`.
+    BlackDermanToy,
+}
 
 /// Policy for evaluating volatility surfaces outside their calibrated grid.
 ///
@@ -419,11 +436,10 @@ pub struct ModelConfig {
     /// Volatility surface extrapolation policy when `implied_volatility` is not set.
     #[serde(default)]
     pub vol_surface_extrapolation: VolSurfaceExtrapolation,
-    /// Volatility model choice for option pricing.
-    ///
-    /// When set, overrides the default Black (lognormal) model.
+    /// Short-rate lattice for the rates-only bond tree (`hull_white` or
+    /// `black_derman_toy`). `None` selects Hull-White.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub vol_model: Option<VolatilityModel>,
+    pub tree_model: Option<ShortRateTreeModel>,
     /// Number of time steps for tree-based pricing (e.g., 100)
     pub tree_steps: Option<usize>,
     /// Merton Monte Carlo configuration for structural credit PIK pricing.
@@ -493,7 +509,7 @@ pub struct ModelConfig {
     /// Black-Derman-Toy lognormal short-rate volatility (σ), as an annual
     /// decimal proportion of the short rate (`0.20` = 20%).
     ///
-    /// Read only by the rates-only bond tree when `vol_model = black` selects
+    /// Read only by the rates-only bond tree when `tree_model = black_derman_toy` selects
     /// BDT for a bond with embedded exercise rights, where it is required.
     /// It is a relative (lognormal) volatility, unlike the absolute
     /// [`Self::hw1f_sigma`]; typical values are 0.10–0.40. The BDT lattice has
@@ -825,7 +841,7 @@ impl InstrumentPricingOverrides {
 
     /// Set the Black-Derman-Toy lognormal short-rate volatility σ.
     ///
-    /// Read only by the rates-only bond tree when `vol_model = black`.
+    /// Read only by the rates-only bond tree when `tree_model = black_derman_toy`.
     ///
     /// # Arguments
     ///

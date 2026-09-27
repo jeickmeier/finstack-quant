@@ -16,7 +16,7 @@ use finstack_quant_valuations::instruments::EquityUnderlyingParams;
 use finstack_quant_valuations::instruments::FinancingLegSpec;
 use finstack_quant_valuations::instruments::IndexUnderlyingParams;
 use finstack_quant_valuations::instruments::Instrument;
-use finstack_quant_valuations::instruments::{TrsScheduleSpec, TrsSide};
+use finstack_quant_valuations::instruments::{PayReceive, TrsScheduleSpec};
 use rust_decimal::Decimal;
 
 // Currency Mismatch Tests
@@ -377,7 +377,7 @@ fn test_equity_trs_with_past_start_date() {
             end,
             ScheduleParams::quarterly_act360(),
         ))
-        .side(TrsSide::ReceiveTotalReturn)
+        .side(PayReceive::Receive)
         .dividend_settlement(
             finstack_quant_valuations::instruments::equity::TrsDividendSettlement::OnDividendDate,
         )
@@ -418,7 +418,7 @@ fn test_equity_trs_with_very_short_tenor_1_day() {
             end,
             ScheduleParams::quarterly_act360(),
         ))
-        .side(TrsSide::ReceiveTotalReturn)
+        .side(PayReceive::Receive)
         .dividend_settlement(
             finstack_quant_valuations::instruments::equity::TrsDividendSettlement::OnDividendDate,
         )
@@ -459,7 +459,7 @@ fn test_fi_index_trs_maturity_equals_valuation_date() {
             end,
             ScheduleParams::quarterly_act360(),
         ))
-        .side(TrsSide::ReceiveTotalReturn)
+        .side(PayReceive::Receive)
         .build()
         .unwrap();
 
@@ -541,7 +541,7 @@ fn test_equity_trs_with_zero_contract_size() {
             d(2026, 1, 2),
             ScheduleParams::quarterly_act360(),
         ))
-        .side(TrsSide::ReceiveTotalReturn)
+        .side(PayReceive::Receive)
         .dividend_settlement(
             finstack_quant_valuations::instruments::equity::TrsDividendSettlement::OnDividendDate,
         )
@@ -587,7 +587,7 @@ fn test_equity_trs_with_fractional_contract_size() {
             d(2026, 1, 2),
             ScheduleParams::quarterly_act360(),
         ))
-        .side(TrsSide::ReceiveTotalReturn)
+        .side(PayReceive::Receive)
         .dividend_settlement(
             finstack_quant_valuations::instruments::equity::TrsDividendSettlement::OnDividendDate,
         )

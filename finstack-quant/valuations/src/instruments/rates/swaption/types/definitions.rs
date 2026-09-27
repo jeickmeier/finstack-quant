@@ -3,57 +3,6 @@
 use finstack_quant_core::dates::{BusinessDayConvention, Date, DayCount, StubKind, Tenor};
 use finstack_quant_core::Result;
 
-/// Volatility model for pricing
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, serde::Serialize, serde::Deserialize)]
-#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(rename_all = "snake_case")]
-#[non_exhaustive]
-// Distinct from the shared `common_impl::parameters::volatility::VolatilityModel`.
-#[cfg_attr(feature = "json-schema", schemars(rename = "SwaptionVolatilityModel"))]
-pub enum VolatilityModel {
-    /// Black (Lognormal) model (1976)
-    #[default]
-    Black,
-    /// Bachelier (Normal) model
-    Normal,
-}
-
-impl std::fmt::Display for VolatilityModel {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            VolatilityModel::Black => write!(f, "black"),
-            VolatilityModel::Normal => write!(f, "normal"),
-        }
-    }
-}
-
-impl std::str::FromStr for VolatilityModel {
-    type Err = String;
-
-    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
-        match s {
-            "black" => Ok(Self::Black),
-            "normal" => Ok(Self::Normal),
-            _ => Err(format!(
-                "Unknown volatility model: '{}'. Valid: black, normal",
-                s
-            )),
-        }
-    }
-}
-
-/// Swaption settlement method
-#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(rename_all = "snake_case")]
-#[non_exhaustive]
-pub enum SwaptionSettlement {
-    /// Physical settlement (enter into underlying swap)
-    Physical,
-    /// Cash settlement (receive NPV of swap)
-    Cash,
-}
-
 /// Cash settlement annuity method for cash-settled swaptions.
 ///
 /// The trade confirmation or ISDA settlement matrix determines the method.
@@ -119,65 +68,6 @@ impl std::str::FromStr for CashSettlementMethod {
                 "Unknown cash settlement method: '{s}'. Valid: \
                  collateralized_cash_price, par_yield, isda_par_par, zero_coupon"
             )),
-        }
-    }
-}
-
-impl std::fmt::Display for SwaptionSettlement {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            SwaptionSettlement::Physical => write!(f, "physical"),
-            SwaptionSettlement::Cash => write!(f, "cash"),
-        }
-    }
-}
-
-impl std::str::FromStr for SwaptionSettlement {
-    type Err = String;
-
-    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
-        match s {
-            "physical" => Ok(SwaptionSettlement::Physical),
-            "cash" => Ok(SwaptionSettlement::Cash),
-            _ => Err(format!("Unknown swaption settlement: {s}")),
-        }
-    }
-}
-
-/// Swaption exercise style
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, serde::Serialize, serde::Deserialize)]
-#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(rename_all = "snake_case")]
-#[non_exhaustive]
-pub enum SwaptionExercise {
-    /// European exercise (only at expiry)
-    #[default]
-    European,
-    /// Bermudan exercise (at discrete dates)
-    Bermudan,
-    /// American exercise (any time before expiry)
-    American,
-}
-
-impl std::fmt::Display for SwaptionExercise {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            SwaptionExercise::European => write!(f, "european"),
-            SwaptionExercise::Bermudan => write!(f, "bermudan"),
-            SwaptionExercise::American => write!(f, "american"),
-        }
-    }
-}
-
-impl std::str::FromStr for SwaptionExercise {
-    type Err = String;
-
-    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
-        match s {
-            "european" => Ok(SwaptionExercise::European),
-            "bermudan" => Ok(SwaptionExercise::Bermudan),
-            "american" => Ok(SwaptionExercise::American),
-            _ => Err(format!("Unknown swaption exercise: {s}")),
         }
     }
 }

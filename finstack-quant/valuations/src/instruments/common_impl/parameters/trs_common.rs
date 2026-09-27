@@ -6,65 +6,6 @@
 use crate::cashflow::builder::ScheduleParams;
 use finstack_quant_core::dates::{Date, DateExt, Schedule};
 
-/// Side of the TRS trade from the party's perspective.
-///
-/// Determines whether the party receives or pays the total return leg.
-///
-/// # Examples
-///
-/// ```
-/// use finstack_quant_valuations::instruments::TrsSide;
-///
-/// let side = TrsSide::ReceiveTotalReturn;
-/// assert_eq!(side.sign(), 1.0);
-///
-/// let side = TrsSide::PayTotalReturn;
-/// assert_eq!(side.sign(), -1.0);
-/// ```
-#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(rename_all = "snake_case")]
-pub enum TrsSide {
-    /// Receive total return, pay financing.
-    ReceiveTotalReturn,
-    /// Pay total return, receive financing.
-    PayTotalReturn,
-}
-
-impl std::fmt::Display for TrsSide {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            TrsSide::ReceiveTotalReturn => write!(f, "receive_total_return"),
-            TrsSide::PayTotalReturn => write!(f, "pay_total_return"),
-        }
-    }
-}
-
-impl std::str::FromStr for TrsSide {
-    type Err = String;
-
-    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
-        match s {
-            "receive_total_return" => Ok(TrsSide::ReceiveTotalReturn),
-            "pay_total_return" => Ok(TrsSide::PayTotalReturn),
-            _ => Err(format!("Unknown TRS side: {s}")),
-        }
-    }
-}
-
-impl TrsSide {
-    /// Gets the sign multiplier for present value calculation.
-    ///
-    /// # Returns
-    /// 1.0 for ReceiveTotalReturn, -1.0 for PayTotalReturn.
-    pub fn sign(&self) -> f64 {
-        match self {
-            TrsSide::ReceiveTotalReturn => 1.0,
-            TrsSide::PayTotalReturn => -1.0,
-        }
-    }
-}
-
 /// Schedule specification for TRS payment periods.
 ///
 /// Defines the payment schedule and frequency for both legs of the TRS.

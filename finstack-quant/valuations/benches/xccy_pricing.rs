@@ -25,9 +25,10 @@ use finstack_quant_core::money::fx::{FxMatrix, SimpleFxProvider};
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::CurveId;
 use finstack_quant_valuations::instruments::rates::xccy_swap::{
-    LegSide, NotionalExchange, XccySwap, XccySwapLeg,
+    NotionalExchange, XccySwap, XccySwapLeg,
 };
 use finstack_quant_valuations::instruments::Instrument;
+use finstack_quant_valuations::instruments::PayReceive;
 use rust_decimal::Decimal;
 use std::hint::black_box;
 use std::sync::Arc;
@@ -103,7 +104,7 @@ fn make_xccy(base: Date, maturity: Date, exchange: NotionalExchange) -> XccySwap
     let leg_usd = XccySwapLeg {
         currency: Currency::USD,
         notional: Money::new(usd_notional, Currency::USD).expect("valid money fixture"),
-        side: LegSide::Receive,
+        side: PayReceive::Receive,
         forward_curve_id: CurveId::from("USD-SOFR-3M"),
         discount_curve_id: CurveId::from("USD-OIS"),
         start: base,
@@ -123,7 +124,7 @@ fn make_xccy(base: Date, maturity: Date, exchange: NotionalExchange) -> XccySwap
     let leg_eur = XccySwapLeg {
         currency: Currency::EUR,
         notional: Money::new(eur_notional, Currency::EUR).expect("valid money fixture"),
-        side: LegSide::Pay,
+        side: PayReceive::Pay,
         forward_curve_id: CurveId::from("EUR-EURIBOR-3M"),
         discount_curve_id: CurveId::from("EUR-OIS"),
         start: base,

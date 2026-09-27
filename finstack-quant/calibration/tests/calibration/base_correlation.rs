@@ -14,11 +14,10 @@ use finstack_quant_core::market_data::term_structures::{
 };
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::CurveId;
+use finstack_quant_valuations::instruments::credit_derivatives::cds_tranche::CDSTranche;
 use finstack_quant_valuations::instruments::credit_derivatives::cds_tranche::CDSTranchePricer;
-use finstack_quant_valuations::instruments::credit_derivatives::cds_tranche::{
-    CDSTranche, TrancheSide,
-};
 use finstack_quant_valuations::instruments::Attributes;
+use finstack_quant_valuations::instruments::PayReceive;
 use finstack_quant_valuations::market::conventions::ids::{CdsConventionKey, CdsDocClause};
 
 use crate::calibration_support as cal_utils;
@@ -103,7 +102,7 @@ fn tranche_upfront_frac(
         .calendar_id_opt(None)
         .discount_curve_id(CurveId::from("USD-OIS"))
         .credit_index_id(CurveId::from("CDX"))
-        .side(TrancheSide::BuyProtection)
+        .side(PayReceive::Pay)
         .start_date_opt(None)
         .realized_loss(0.0)
         .roll_rule(finstack_quant_cashflows::builder::specs::RollRule::CdsImm)

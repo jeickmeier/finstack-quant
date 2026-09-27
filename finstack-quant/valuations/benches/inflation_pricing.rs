@@ -17,9 +17,7 @@ use finstack_quant_core::types::{CurveId, InstrumentId};
 use finstack_quant_valuations::instruments::fixed_income::inflation_linked_bond::{
     DeflationProtection, IndexationMethod, InflationLinkedBond,
 };
-use finstack_quant_valuations::instruments::rates::inflation_cap_floor::{
-    InflationCapFloor, InflationCapFloorType,
-};
+use finstack_quant_valuations::instruments::rates::inflation_cap_floor::InflationCapFloor;
 use finstack_quant_valuations::instruments::rates::inflation_swap::{
     InflationSwap, InflationSwapBuilder,
 };
@@ -27,6 +25,7 @@ use finstack_quant_valuations::instruments::Attributes;
 use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::instruments::InstrumentPricingOverrides;
 use finstack_quant_valuations::instruments::PayReceive;
+use finstack_quant_valuations::instruments::RateOptionType;
 use finstack_quant_valuations::metrics::MetricId;
 use rust_decimal::Decimal;
 use std::hint::black_box;
@@ -137,13 +136,13 @@ fn inflation_swap(as_of: Date, maturity: Date, id: &str) -> InflationSwap {
 
 fn inflation_cap_floor(
     id: &str,
-    option_type: InflationCapFloorType,
+    rate_option_type: RateOptionType,
     as_of: Date,
     maturity: Date,
 ) -> InflationCapFloor {
     InflationCapFloor::builder()
         .id(InstrumentId::new(id))
-        .option_type(option_type)
+        .rate_option_type(rate_option_type)
         .notional(standard_notional())
         .strike(Decimal::try_from(0.02).expect("valid decimal"))
         .start_date(as_of)
@@ -212,7 +211,7 @@ fn inflation_cap_floor_pv(c: &mut Criterion) {
 
     let cap_5y = inflation_cap_floor(
         "INF-CAP-5Y",
-        InflationCapFloorType::Cap,
+        RateOptionType::Cap,
         as_of,
         Date::from_calendar_date(2030, Month::January, 1).unwrap(),
     );
@@ -222,7 +221,7 @@ fn inflation_cap_floor_pv(c: &mut Criterion) {
 
     let floor_5y = inflation_cap_floor(
         "INF-FLOOR-5Y",
-        InflationCapFloorType::Floor,
+        RateOptionType::Floor,
         as_of,
         Date::from_calendar_date(2030, Month::January, 1).unwrap(),
     );

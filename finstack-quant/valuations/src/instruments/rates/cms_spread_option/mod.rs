@@ -13,11 +13,10 @@
 //! # See Also
 //!
 //! - [`CmsSpreadOption`] for instrument definition
-//! - [`CmsSpreadOptionType`] for call/put selection
 
 pub(crate) mod metrics;
 pub(crate) mod pricer;
 pub(crate) mod types;
 
 pub use pricer::CmsSpreadOptionPricer;
-pub use types::{CmsSpreadOption, CmsSpreadOptionType};
+pub use types::CmsSpreadOption;

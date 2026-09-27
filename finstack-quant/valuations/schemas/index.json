@@ -66,7 +66,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json",
-      "bytes": 60007,
+      "bytes": 60395,
       "kind": "component",
       "path": "schemas/common/1/instrument_pricing_overrides.schema.json",
       "summary": "Instrument-owned market quote and model configuration overrides.",
@@ -178,7 +178,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/composite/composite.schema.json",
-      "bytes": 1017167,
+      "bytes": 1013957,
       "kind": "input",
       "path": "schemas/instruments/1/composite/composite.schema.json",
       "summary": "Resolved cross-asset synthetic instrument with immutable leg quantities.",
@@ -202,7 +202,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_tranche.schema.json",
-      "bytes": 13143,
+      "bytes": 13546,
       "kind": "input",
       "path": "schemas/instruments/1/credit_derivatives/cds_tranche.schema.json",
       "summary": "Synthetic index tranche priced with a correlation model.",
@@ -306,7 +306,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/equity/trs_equity.schema.json",
-      "bytes": 43794,
+      "bytes": 43853,
       "kind": "input",
       "path": "schemas/instruments/1/equity/trs_equity.schema.json",
       "summary": "Equity total-return swap versus a funding leg.",
@@ -354,7 +354,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/exotics/basket.schema.json",
-      "bytes": 1016144,
+      "bytes": 1012934,
       "kind": "input",
       "path": "schemas/instruments/1/exotics/basket.schema.json",
       "summary": "Weighted basket of constituents priced as one position.",
@@ -498,7 +498,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/trs_fixed_income_index.schema.json",
-      "bytes": 41596,
+      "bytes": 41741,
       "kind": "input",
       "path": "schemas/instruments/1/fixed_income/trs_fixed_income_index.schema.json",
       "summary": "Total-return swap on a fixed-income index versus a funding leg.",
@@ -602,7 +602,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/instrument.schema.json",
-      "bytes": 1106187,
+      "bytes": 1102945,
       "kind": "input",
       "path": "schemas/instruments/1/instrument.schema.json",
       "summary": "The seventy-branch union of every instrument type. Prefer the per-type schema beside it: this document is too large to hand to a model.",
@@ -618,7 +618,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/rates/bermudan_swaption.schema.json",
-      "bytes": 28657,
+      "bytes": 28638,
       "kind": "input",
       "path": "schemas/instruments/1/rates/bermudan_swaption.schema.json",
       "summary": "Bermudan-exercise swaption valued on a short-rate lattice.",
@@ -642,7 +642,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/rates/cms_spread_option.schema.json",
-      "bytes": 9203,
+      "bytes": 9286,
       "kind": "input",
       "path": "schemas/instruments/1/rates/cms_spread_option.schema.json",
       "summary": "Option on the spread between two CMS rates.",
@@ -674,7 +674,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/rates/inflation_cap_floor.schema.json",
-      "bytes": 14463,
+      "bytes": 14518,
       "kind": "input",
       "path": "schemas/instruments/1/rates/inflation_cap_floor.schema.json",
       "summary": "Cap or floor on realised inflation.",
@@ -722,7 +722,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/rates/swaption.schema.json",
-      "bytes": 31130,
+      "bytes": 31155,
       "kind": "input",
       "path": "schemas/instruments/1/rates/swaption.schema.json",
       "summary": "European option to enter an interest-rate swap.",
@@ -730,7 +730,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/rates/xccy_swap.schema.json",
-      "bytes": 21395,
+      "bytes": 21757,
       "kind": "input",
       "path": "schemas/instruments/1/rates/xccy_swap.schema.json",
       "summary": "Cross-currency swap with notional exchange and a basis spread.",

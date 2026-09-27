@@ -9,8 +9,8 @@ use finstack_quant_core::money::Money;
 use finstack_quant_valuations::instruments::rates::irs::{
     FixedLegSpec, FloatLegSpec, FloatingLegCompounding, InterestRateSwap, PayReceive,
 };
-use finstack_quant_valuations::instruments::rates::swaption::VolatilityModel;
 use finstack_quant_valuations::instruments::Instrument;
+use finstack_quant_valuations::instruments::VolatilityModel;
 use finstack_quant_valuations::metrics::MetricId;
 use rust_decimal::Decimal;
 use time::macros::date;

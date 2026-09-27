@@ -4,7 +4,7 @@ use crate::impl_instrument_base;
 use crate::{
     cashflow::builder::ScheduleParams,
     instruments::common_impl::parameters::{
-        legs::FinancingLegSpec, trs_common::TrsScheduleSpec, trs_common::TrsSide,
+        legs::FinancingLegSpec, legs::PayReceive, trs_common::TrsScheduleSpec,
         underlying::IndexUnderlyingParams,
     },
     instruments::Attributes,
@@ -51,11 +51,11 @@ use rust_decimal::Decimal;
 /// };
 /// use finstack_quant_cashflows::builder::ScheduleParams;
 /// use finstack_quant_valuations::instruments::{
-///     Attributes, FinancingLegSpec, IndexUnderlyingParams,
+///     Attributes, FinancingLegSpec, IndexUnderlyingParams, PayReceive,
 /// };
 /// use finstack_quant_valuations::instruments::fixed_income::fi_trs::FIIndexTotalReturnSwap;
 /// use finstack_quant_valuations::instruments::fixed_income::fi_trs::{
-///     TrsScheduleSpec, TrsSide,
+///     TrsScheduleSpec,
 /// };
 /// use rust_decimal::Decimal;
 /// use time::macros::date;
@@ -77,7 +77,7 @@ use rust_decimal::Decimal;
 ///         date!(2027 - 01 - 02),
 ///         ScheduleParams::quarterly_act360(),
 ///     ))
-///     .side(TrsSide::ReceiveTotalReturn)
+///     .side(PayReceive::Receive)
 ///     .initial_level_opt(None)
 ///     .attributes(Attributes::new())
 ///     .build()?;
@@ -105,8 +105,9 @@ pub struct FIIndexTotalReturnSwap {
     pub financing: FinancingLegSpec,
     /// Schedule specification (payment dates and frequency).
     pub schedule: TrsScheduleSpec,
-    /// Trade side (receive/pay total return).
-    pub side: TrsSide,
+    /// Trade side: `receive` receives the total-return leg and pays financing;
+    /// `pay` pays the total return and receives financing.
+    pub side: PayReceive,
     /// Index level at the reset of the return period in progress, in the
     /// index's own units.
     ///
@@ -234,7 +235,7 @@ impl FIIndexTotalReturnSwap {
             .underlying(underlying)
             .financing(financing)
             .schedule(sched)
-            .side(TrsSide::ReceiveTotalReturn)
+            .side(PayReceive::Receive)
             .initial_level_opt(None)
             .attributes(Attributes::new())
             .build()
@@ -278,7 +279,7 @@ impl FIIndexTotalReturnSwap {
             .underlying(underlying)
             .financing(financing)
             .schedule(schedule)
-            .side(TrsSide::ReceiveTotalReturn)
+            .side(PayReceive::Receive)
             .initial_level_opt(None)
             .attributes(Attributes::new())
             .build()
@@ -374,8 +375,8 @@ impl crate::instruments::common_impl::traits::Instrument for FIIndexTotalReturnS
 
         // Net PV depends on side
         let net_pv = match self.side {
-            TrsSide::ReceiveTotalReturn => total_return_pv.checked_sub(financing_pv)?,
-            TrsSide::PayTotalReturn => financing_pv.checked_sub(total_return_pv)?,
+            PayReceive::Receive => total_return_pv.checked_sub(financing_pv)?,
+            PayReceive::Pay => financing_pv.checked_sub(total_return_pv)?,
         };
 
         Ok(net_pv)

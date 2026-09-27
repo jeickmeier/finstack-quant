@@ -710,13 +710,12 @@ fn m4_inflation_zero_strike_requires_normal_quotes_without_fabricated_conversion
         surfaces::{VolQuoteType, VolSurface},
         term_structures::InflationCurve,
     };
-    use finstack_quant_valuations::instruments::rates::inflation_cap_floor::{
-        InflationCapFloor, InflationCapFloorType,
-    };
+    use finstack_quant_valuations::instruments::rates::inflation_cap_floor::InflationCapFloor;
+    use finstack_quant_valuations::instruments::RateOptionType;
     use finstack_quant_valuations::pricer::ModelKey;
     let as_of = date!(2024 - 01 - 15);
     let mut option = InflationCapFloor::example();
-    option.option_type = InflationCapFloorType::Floorlet;
+    option.rate_option_type = RateOptionType::Floorlet;
     option.start_date = date!(2025 - 01 - 15);
     option.maturity = date!(2026 - 01 - 15);
     option.strike = rust_decimal::Decimal::ZERO;

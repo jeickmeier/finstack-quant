@@ -33,7 +33,7 @@
         },
         "start": "2024-01-01"
       },
-      "side": "receive_total_return",
+      "side": "receive",
       "underlying": {
         "contract_size": 1.0,
         "currency": "USD",

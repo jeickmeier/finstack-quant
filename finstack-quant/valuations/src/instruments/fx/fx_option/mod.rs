@@ -111,6 +111,4 @@ pub(crate) mod pricer;
 mod types;
 
 pub use crate::instruments::common_impl::parameters::FxUnderlyingParams;
-pub use types::{
-    FxAtmDeltaConvention, FxDeltaConvention, FxDeltaConventionKind, FxOption, FxOptionBuilder,
-};
+pub use types::{FxDeltaConvention, FxDeltaConventionKind, FxOption, FxOptionBuilder};

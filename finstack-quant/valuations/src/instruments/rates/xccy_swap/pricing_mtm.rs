@@ -22,7 +22,9 @@
 use crate::cashflow::builder::periods::{build_periods, BuildPeriodsParams};
 use crate::instruments::common_impl::numeric::decimal_to_f64;
 use crate::instruments::common_impl::pricing::time::relative_df_discount_curve;
-use crate::instruments::rates::xccy_swap::types::{ResettingSide, XccySwap};
+use crate::instruments::rates::xccy_swap::types::{
+    initial_principal_sign, ResettingSide, XccySwap,
+};
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::math::summation::NeumaierAccumulator;
 use finstack_quant_core::money::fx::FxQuery;
@@ -207,10 +209,10 @@ pub(crate) fn pv_mtm_reset(
         let df_c0 = relative_df_discount_curve(disc_c.as_ref(), as_of, constant_leg.start)?;
         let df_r0 = relative_df_discount_curve(disc_r.as_ref(), as_of, resetting_leg.start)?;
 
-        let cf_c = constant_leg.side.initial_principal_sign() * n_c * df_c0;
+        let cf_c = initial_principal_sign(constant_leg.side) * n_c * df_c0;
         pv.add(convert(cf_c, constant_leg.currency)?);
 
-        let cf_r = resetting_leg.side.initial_principal_sign() * n_r_initial * df_r0;
+        let cf_r = initial_principal_sign(resetting_leg.side) * n_r_initial * df_r0;
         pv.add(convert(cf_r, resetting_leg.currency)?);
     }
 
@@ -230,8 +232,7 @@ pub(crate) fn pv_mtm_reset(
         )?;
         let df = relative_df_discount_curve(disc_c.as_ref(), as_of, period.payment_date)?;
         let df = require_positive_df(df, &swap.id, "constant-leg", period.payment_date)?;
-        let coupon =
-            constant_leg.side.coupon_sign() * projected.unsigned_coupon(n_c, spread_c) * df;
+        let coupon = constant_leg.side.sign() * projected.unsigned_coupon(n_c, spread_c) * df;
         pv.add(convert(coupon, constant_leg.currency)?);
     }
 
@@ -301,7 +302,7 @@ pub(crate) fn pv_mtm_reset(
         )?;
         let spread_decimal =
             decimal_to_f64(resetting_leg.spread_bp, "XccySwap resetting leg spread_bp")? / 10_000.0;
-        let coupon_r = resetting_leg.side.coupon_sign()
+        let coupon_r = resetting_leg.side.sign()
             * projected_r.unsigned_coupon(n_r_j, spread_decimal)
             * df_r_pay;
         pv.add(convert(coupon_r, resetting_leg.currency)?);
@@ -330,7 +331,7 @@ pub(crate) fn pv_mtm_reset(
                 ))
             })?;
             let delta_n_r = n_r_j - n_r_prev;
-            let rebal_r = resetting_leg.side.initial_principal_sign() * delta_n_r * df_r_reset;
+            let rebal_r = initial_principal_sign(resetting_leg.side) * delta_n_r * df_r_reset;
             pv.add(convert(rebal_r, resetting_leg.currency)?);
         }
 
@@ -344,10 +345,10 @@ pub(crate) fn pv_mtm_reset(
         let df_r_end = relative_df_discount_curve(disc_r.as_ref(), as_of, resetting_leg.end)?;
         let df_r_end = require_positive_df(df_r_end, &swap.id, "resetting-leg", resetting_leg.end)?;
 
-        let cf_c_final = constant_leg.side.final_principal_sign() * n_c * df_c_end;
+        let cf_c_final = constant_leg.side.sign() * n_c * df_c_end;
         pv.add(convert(cf_c_final, constant_leg.currency)?);
 
-        let cf_r_final = resetting_leg.side.final_principal_sign() * n_r_prev * df_r_end;
+        let cf_r_final = resetting_leg.side.sign() * n_r_prev * df_r_end;
         pv.add(convert(cf_r_final, resetting_leg.currency)?);
     }
 
@@ -453,14 +454,14 @@ pub(crate) fn mtm_cashflow_schedule(
         constant_leg.start,
         None,
         Money::new(
-            constant_leg.side.initial_principal_sign() * n_c,
+            initial_principal_sign(constant_leg.side) * n_c,
             constant_leg.currency,
         )?,
         CFKind::Notional,
         0.0,
         None,
     ));
-    let cf_initial_amount = resetting_leg.side.initial_principal_sign() * n_r_initial;
+    let cf_initial_amount = initial_principal_sign(resetting_leg.side) * n_r_initial;
     flows.push(CashFlow::new(
         resetting_leg.start,
         None,
@@ -489,7 +490,7 @@ pub(crate) fn mtm_cashflow_schedule(
             period.payment_date,
             projected.fixing_date.or(period.reset_date),
             Money::new(
-                constant_leg.side.coupon_sign() * projected.unsigned_coupon(n_c, spread_c),
+                constant_leg.side.sign() * projected.unsigned_coupon(n_c, spread_c),
                 constant_leg.currency,
             )?,
             CFKind::FloatReset,
@@ -545,8 +546,8 @@ pub(crate) fn mtm_cashflow_schedule(
                 as_of,
                 Some(&mut projected_fixings),
             )?;
-            let coupon_amount = resetting_leg.side.coupon_sign()
-                * projected_r.unsigned_coupon(n_r_j, spread_decimal);
+            let coupon_amount =
+                resetting_leg.side.sign() * projected_r.unsigned_coupon(n_r_j, spread_decimal);
             flows.push(CashFlow::new(
                 period.payment_date,
                 projected_r.fixing_date.or(period.reset_date),
@@ -560,7 +561,7 @@ pub(crate) fn mtm_cashflow_schedule(
         // Rebalancing at the START of this period (j ≥ 1 only).
         if j > 0 && period.accrual_start > as_of {
             let delta_n_r = n_r_j - n_r_prev;
-            let rebal_amount = resetting_leg.side.initial_principal_sign() * delta_n_r;
+            let rebal_amount = initial_principal_sign(resetting_leg.side) * delta_n_r;
             if rebal_amount != 0.0 {
                 flows.push(CashFlow::new(
                     period.accrual_start,
@@ -580,15 +581,12 @@ pub(crate) fn mtm_cashflow_schedule(
     flows.push(CashFlow::new(
         constant_leg.end,
         None,
-        Money::new(
-            constant_leg.side.final_principal_sign() * n_c,
-            constant_leg.currency,
-        )?,
+        Money::new(constant_leg.side.sign() * n_c, constant_leg.currency)?,
         CFKind::Notional,
         0.0,
         None,
     ));
-    let cf_final_amount = resetting_leg.side.final_principal_sign() * n_r_prev;
+    let cf_final_amount = resetting_leg.side.sign() * n_r_prev;
     flows.push(CashFlow::new(
         resetting_leg.end,
         None,

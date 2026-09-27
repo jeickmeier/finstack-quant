@@ -579,7 +579,7 @@ fn test_embedded_option_value_uses_as_of_oas_pricing_basis() {
         },
         "model_config": {
             "tree_steps": 80,
-            "vol_model": "black",
+            "tree_model": "black_derman_toy",
             "bdt_sigma": 0.20
         }
     }))
@@ -709,7 +709,7 @@ fn test_callable_bond_oas_and_vega_use_explicit_bdt_tree_path() {
         },
         "model_config": {
             "tree_steps": 40,
-            "vol_model": "black",
+            "tree_model": "black_derman_toy",
             "bdt_sigma": 0.20
         }
     }))
@@ -793,7 +793,7 @@ fn test_callable_bond_vega_is_invariant_to_vol_bump_size() {
         },
         "model_config": {
             "tree_steps": 40,
-            "vol_model": "black",
+            "tree_model": "black_derman_toy",
             "bdt_sigma": 0.20
         }
     }))
@@ -855,7 +855,7 @@ fn test_callable_bdt_oas_recovers_settlement_date_clean_price() {
     bond.instrument_pricing_overrides = serde_json::from_value(serde_json::json!({
         "model_config": {
             "tree_steps": 80,
-            "vol_model": "black",
+            "tree_model": "black_derman_toy",
             "bdt_sigma": 0.20
         }
     }))
@@ -930,7 +930,7 @@ fn test_callable_bond_value_uses_same_bdt_tree_dispatch_as_oas_pricer() {
     bond.instrument_pricing_overrides = serde_json::from_value(serde_json::json!({
         "model_config": {
             "tree_steps": 40,
-            "vol_model": "black",
+            "tree_model": "black_derman_toy",
             "bdt_sigma": 0.20
         }
     }))

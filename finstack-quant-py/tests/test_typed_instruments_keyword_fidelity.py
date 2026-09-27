@@ -227,7 +227,7 @@ def test_cds_tranche_builder_setters_accept_keyword_value() -> None:
         .calendar_id(value="NYSE")
         .discount_curve_id(value="USD-OIS")
         .credit_index_id(value="CDX-IG-42-CURVE")
-        .side(value="buy_protection")
+        .side(value="pay")
         .start_date(value=datetime.date(2024, 6, 20))
         .realized_loss(value=0.01)
         .roll_rule(value=RollRule.NONE)

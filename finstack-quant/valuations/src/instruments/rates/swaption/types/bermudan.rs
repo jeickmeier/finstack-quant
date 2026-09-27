@@ -14,11 +14,9 @@ use finstack_quant_core::{Error, Result};
 use rust_decimal::prelude::ToPrimitive;
 use rust_decimal::Decimal;
 
-use super::definitions::{
-    BermudanSchedule, BermudanType, CashSettlementMethod, SwaptionExercise, SwaptionSettlement,
-    VolatilityModel,
-};
+use super::definitions::{BermudanSchedule, BermudanType, CashSettlementMethod};
 use super::swaption::{vanilla_underlier, Swaption, VanillaSwaptionUnderlier};
+use crate::instruments::{ExerciseStyle, SettlementType, VolatilityModel};
 
 // Bermudan Swaption Instrument
 
@@ -45,8 +43,9 @@ use super::swaption::{vanilla_underlier, Swaption, VanillaSwaptionUnderlier};
 ///
 /// ```
 /// use finstack_quant_valuations::instruments::rates::swaption::{
-///     BermudanSwaption, BermudanSchedule, BermudanType, SwaptionSettlement,
+///     BermudanSwaption, BermudanSchedule, BermudanType,
 /// };
+/// use finstack_quant_valuations::instruments::SettlementType;
 ///
 /// // Create a 10NC2 (10-year swap, callable after 2 years)
 /// let swaption = BermudanSwaption::example();
@@ -62,7 +61,7 @@ pub struct BermudanSwaption {
     /// Notional amount of underlying swap
     pub notional: Money,
     /// Settlement method (physical or cash)
-    pub settlement: SwaptionSettlement,
+    pub settlement: SettlementType,
     /// Volatility surface ID for calibration
     pub vol_surface_id: CurveId,
     /// Bermudan exercise schedule
@@ -192,7 +191,7 @@ impl BermudanSwaption {
             id: InstrumentId::new("BERM-10NC2-USD"),
             option_type: OptionType::Call,
             notional: Money::from((10_000_000_i64, Currency::USD)),
-            settlement: SwaptionSettlement::Physical,
+            settlement: SettlementType::Physical,
             vol_surface_id: CurveId::new("USD-SWPNVOL"),
             exercise_schedule: BermudanSchedule::co_terminal(
                 first_exercise,
@@ -257,7 +256,7 @@ impl BermudanSwaption {
             id: id.into(),
             option_type,
             notional,
-            settlement: SwaptionSettlement::Physical,
+            settlement: SettlementType::Physical,
             vol_surface_id: vol_surface_id.into(),
             exercise_schedule,
             bermudan_type: BermudanType::CoTerminal,
@@ -342,7 +341,7 @@ impl BermudanSwaption {
     }
 
     /// Set settlement method.
-    pub fn with_settlement(mut self, settlement: SwaptionSettlement) -> Self {
+    pub fn with_settlement(mut self, settlement: SettlementType) -> Self {
         self.settlement = settlement;
         self
     }
@@ -572,7 +571,7 @@ impl BermudanSwaption {
             option_type: self.option_type,
             notional: self.notional,
             expiry: first_ex,
-            exercise_style: SwaptionExercise::European,
+            exercise_style: ExerciseStyle::European,
             settlement: self.settlement,
             cash_settlement_method: CashSettlementMethod::default(),
             vol_model: VolatilityModel::Black,

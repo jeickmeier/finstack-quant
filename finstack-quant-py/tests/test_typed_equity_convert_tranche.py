@@ -141,7 +141,7 @@ class TestCDSTrancheTyped:
             .calendar_id("NYSE")
             .discount_curve_id("USD-OIS")
             .credit_index_id("CDX-IG-42-CURVE")
-            .side("sell_protection")
+            .side("receive")
             .start_date(datetime.date(2024, 6, 20))
             .realized_loss(0.01)
             .roll_rule(RollRule.NONE)
@@ -152,7 +152,7 @@ class TestCDSTrancheTyped:
 
     def test_invalid_side_case_raises(self) -> None:
         with pytest.raises(ValueError, match="invalid side"):
-            CDSTranche.builder().side("BuyProtection")
+            CDSTranche.builder().side("buy_protection")  # schema-rejection-test: now "pay"
 
 
 class TestConvertibleBondTyped:

@@ -78,7 +78,7 @@
 //! # See Also
 //!
 //! - [`CDSTranche`] for instrument struct
-//! - [`crate::instruments::credit_derivatives::cds_tranche::TrancheSide`] for buyer vs seller
+//! - [`crate::instruments::PayReceive`] for buyer (`Pay`) vs seller (`Receive`)
 //! - [`finstack_quant_models::correlation::copula`] for copula model implementations
 //! - [`finstack_quant_models::correlation::recovery`] for stochastic recovery models
 //! - Base correlation calibration via plan-driven `calibration::api`
@@ -92,6 +92,6 @@ mod types;
 pub use finstack_quant_models::correlation::copula::CopulaSpec;
 pub use finstack_quant_models::correlation::recovery::RecoverySpec;
 pub use parameters::CDSTrancheParams;
-pub use types::{CDSTranche, CDSTrancheBuilder, TrancheSide};
+pub use types::{CDSTranche, CDSTrancheBuilder};
 
 pub use pricing::{CDSTranchePricer, CDSTranchePricerConfig, HeteroMethod};

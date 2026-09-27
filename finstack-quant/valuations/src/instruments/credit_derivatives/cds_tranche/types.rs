@@ -3,6 +3,7 @@
 use crate::cashflow::builder::specs::RollRule;
 use crate::cashflow::builder::ScheduleParams;
 use crate::instruments::common_impl::traits::{Attributes, Instrument};
+use crate::instruments::PayReceive;
 use finstack_quant_core::dates::{
     is_cds_date, BusinessDayConvention, Date, DayCount, StubKind, Tenor,
 };
@@ -13,38 +14,6 @@ use finstack_quant_core::types::{CurveId, InstrumentId};
 use super::parameters::CDSTrancheParams;
 use super::pricing;
 use crate::impl_instrument_base;
-
-/// Buyer/seller perspective for CDS tranche premium/protection
-#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(rename_all = "snake_case")]
-pub enum TrancheSide {
-    /// Buy protection on the tranche (pay running, receive protection)
-    BuyProtection,
-    /// Sell protection on the tranche (receive running, pay protection)
-    SellProtection,
-}
-
-impl std::fmt::Display for TrancheSide {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            TrancheSide::BuyProtection => write!(f, "buy_protection"),
-            TrancheSide::SellProtection => write!(f, "sell_protection"),
-        }
-    }
-}
-
-impl std::str::FromStr for TrancheSide {
-    type Err = String;
-
-    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
-        match s {
-            "buy_protection" => Ok(TrancheSide::BuyProtection),
-            "sell_protection" => Ok(TrancheSide::SellProtection),
-            _ => Err(format!("Unknown tranche side: {s}")),
-        }
-    }
-}
 
 /// CDS Tranche instrument definition (boilerplate)
 #[derive(
@@ -93,8 +62,9 @@ pub struct CDSTranche {
     pub discount_curve_id: CurveId,
     /// Credit index identifier for survival/loss modeling (placeholder)
     pub credit_index_id: CurveId,
-    /// Tranche side (buy/sell protection)
-    pub side: TrancheSide,
+    /// Tranche side, as on CDS and CDSIndex: `pay` buys protection (pays the
+    /// running premium), `receive` sells protection (receives the premium).
+    pub side: PayReceive,
     /// Optional effective date for schedule anchoring (if None, uses as_of date)
     #[serde(default, with = "finstack_quant_core::wire::optional_date")]
     #[cfg_attr(
@@ -256,7 +226,7 @@ impl CDSTranche {
             &params,
             CurveId::new("USD-OIS"),
             CurveId::new("CDX.NA.IG.HAZARD"),
-            TrancheSide::BuyProtection,
+            PayReceive::Pay,
         )
         .expect("Valid tranche parameters")
     }
@@ -278,7 +248,7 @@ impl CDSTranche {
     ///   currency.
     /// * `credit_index_id` - Credit-index / hazard identifier used for
     ///   survival and expected-loss.
-    /// * `side` - Buy or sell protection.
+    /// * `side` - `Pay` buys protection, `Receive` sells protection.
     ///
     /// # Errors
     ///
@@ -292,7 +262,7 @@ impl CDSTranche {
         schedule_params: &ScheduleParams,
         discount_curve_id: impl Into<CurveId>,
         credit_index_id: impl Into<CurveId>,
-        side: TrancheSide,
+        side: PayReceive,
     ) -> finstack_quant_core::Result<Self> {
         if tranche_params.attach_pct >= tranche_params.detach_pct {
             return Err(finstack_quant_core::Error::Validation(format!(
@@ -367,7 +337,7 @@ impl CDSTranche {
     ///   currency.
     /// * `credit_index_id` - Credit-index / hazard identifier used for
     ///   survival and expected-loss.
-    /// * `side` - Buy or sell protection.
+    /// * `side` - `Pay` buys protection, `Receive` sells protection.
     ///
     /// # Errors
     ///
@@ -378,7 +348,7 @@ impl CDSTranche {
         tranche_params: &CDSTrancheParams,
         discount_curve_id: impl Into<CurveId>,
         credit_index_id: impl Into<CurveId>,
-        side: TrancheSide,
+        side: PayReceive,
     ) -> finstack_quant_core::Result<Self> {
         use crate::cashflow::builder::specs::RollRule;
         use crate::cashflow::builder::ScheduleParams;

@@ -793,7 +793,7 @@
           "description": "Optional forward curve identifier for asset-swap spread metrics.\n\nWhen set, ASW par/market metrics project the floating receiver leg from\nthis forward curve instead of using a discount-curve par-rate proxy."
         },
         "bdt_sigma": {
-          "description": "Black-Derman-Toy lognormal short-rate volatility (σ), as an annual\ndecimal proportion of the short rate (`0.20` = 20%).\n\nRead only by the rates-only bond tree when `vol_model = black` selects\nBDT for a bond with embedded exercise rights, where it is required.\nIt is a relative (lognormal) volatility, unlike the absolute\n[`Self::hw1f_sigma`]; typical values are 0.10–0.40. The BDT lattice has\nno mean reversion. Must be finite and non-negative; `0.0` prices on the\ndeterministic curve.",
+          "description": "Black-Derman-Toy lognormal short-rate volatility (σ), as an annual\ndecimal proportion of the short rate (`0.20` = 20%).\n\nRead only by the rates-only bond tree when `tree_model = black_derman_toy` selects\nBDT for a bond with embedded exercise rights, where it is required.\nIt is a relative (lognormal) volatility, unlike the absolute\n[`Self::hw1f_sigma`]; typical values are 0.10–0.40. The BDT lattice has\nno mean reversion. Must be finite and non-negative; `0.0` prices on the\ndeterministic curve.",
           "format": "double",
           "type": [
             "number",
@@ -942,6 +942,17 @@
           ],
           "description": "Optional discount curve identifier for tree-based option/OAS models.\n\nSome vendor OAS screens use a model curve distinct from the bond's pricing\nor spread curve. When set, tree pricers calibrate to this curve while\nnon-tree spread metrics continue to use the instrument's discount curve."
         },
+        "tree_model": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ShortRateTreeModel"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Short-rate lattice for the rates-only bond tree (`hull_white` or\n`black_derman_toy`). `None` selects Hull-White."
+        },
         "tree_steps": {
           "default": null,
           "description": "Number of time steps for tree-based pricing (e.g., 100)",
@@ -951,17 +962,6 @@
             "integer",
             "null"
           ]
-        },
-        "vol_model": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/VolatilityModel"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "Volatility model choice for option pricing.\n\nWhen set, overrides the default Black (lognormal) model."
         },
         "vol_surface_extrapolation": {
           "$ref": "#/$defs/VolSurfaceExtrapolation",
@@ -1263,6 +1263,21 @@
         }
       ]
     },
+    "ShortRateTreeModel": {
+      "description": "Short-rate lattice used by the rates-only bond tree.\n\nSelected by `instrument_pricing_overrides.model_config.tree_model`; when the\nfield is absent the bond tree uses Hull-White.",
+      "oneOf": [
+        {
+          "const": "hull_white",
+          "description": "Hull-White one-factor (normal short rate) with `(κ, σ)` from\n`model_config.hw1f_mean_reversion` / `model_config.hw1f_sigma` or the\npre-fitted market scalars.",
+          "type": "string"
+        },
+        {
+          "const": "black_derman_toy",
+          "description": "Black-Derman-Toy (lognormal short rate) with volatility\n`model_config.bdt_sigma`.",
+          "type": "string"
+        }
+      ]
+    },
     "StochasticToggle": {
       "description": "Stochastic (sigmoid) toggle configuration.",
       "properties": {
@@ -1387,21 +1402,6 @@
         {
           "const": "linear_in_variance",
           "description": "Linear extrapolation in total variance space (σ²T).\n\nThis is the market-standard approach for equity and FX volatility surfaces\nbecause it preserves the no-arbitrage condition that total variance must\nincrease with time. The extrapolated volatility is computed as:\n\n```text\nσ(T_extrap) = sqrt(σ²(T_edge) * T_edge / T_extrap + slope * (T_extrap - T_edge) / T_extrap)\n```\n\nwhere `slope` is derived from the variance gradient at the edge.\n\n# When to Use\n\n- Long-dated option pricing where expiries exceed the calibrated grid\n- Scenario analysis requiring extrapolation to extreme tenors\n- Bootstrapping procedures that need consistent variance behavior\n\n# References\n\n- Gatheral, J. (2006). *The Volatility Surface*. Chapter 3. `docs/REFERENCES.md#gatheral-volatility-surface`\n- Fengler, M. R. (2009). \"Arbitrage-free smoothing of the implied volatility surface.\"",
-          "type": "string"
-        }
-      ]
-    },
-    "VolatilityModel": {
-      "description": "Volatility model for option pricing.",
-      "oneOf": [
-        {
-          "const": "black",
-          "description": "Black (lognormal).",
-          "type": "string"
-        },
-        {
-          "const": "normal",
-          "description": "Bachelier / normal model.",
           "type": "string"
         }
       ]

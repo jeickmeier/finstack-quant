@@ -581,12 +581,10 @@ fn test_quantlib_parity_physical_vs_cash_settlement() {
     let swap_end = date!(2030 - 01 - 01);
 
     let mut physical = create_standard_payer_swaption(expiry, swap_start, swap_end, 0.05);
-    physical.settlement =
-        finstack_quant_valuations::instruments::rates::swaption::SwaptionSettlement::Physical;
+    physical.settlement = finstack_quant_valuations::instruments::SettlementType::Physical;
 
     let mut cash = create_standard_payer_swaption(expiry, swap_start, swap_end, 0.05);
-    cash.settlement =
-        finstack_quant_valuations::instruments::rates::swaption::SwaptionSettlement::Cash;
+    cash.settlement = finstack_quant_valuations::instruments::SettlementType::Cash;
 
     let market = create_flat_market(as_of, 0.05, 0.20);
 

@@ -10,10 +10,9 @@ use finstack_quant_core::market_data::term_structures::{
 };
 use finstack_quant_core::money::Money;
 pub use finstack_quant_test_utils::assert::{approx_eq, relative_eq};
+use finstack_quant_valuations::instruments::credit_derivatives::cds_tranche::CDSTranche;
 use finstack_quant_valuations::instruments::credit_derivatives::cds_tranche::CDSTrancheParams;
-use finstack_quant_valuations::instruments::credit_derivatives::cds_tranche::{
-    CDSTranche, TrancheSide,
-};
+use finstack_quant_valuations::instruments::PayReceive;
 use std::sync::Arc;
 use time::Month;
 
@@ -198,7 +197,7 @@ pub fn mezzanine_tranche() -> CDSTranche {
             &schedule_params,
             finstack_quant_core::types::CurveId::from("USD-OIS"),
             finstack_quant_core::types::CurveId::from("CDX.NA.IG.42"),
-            TrancheSide::SellProtection,
+            PayReceive::Receive,
         )
         .expect("Valid tranche parameters"),
     )
@@ -221,7 +220,7 @@ pub fn equity_tranche() -> CDSTranche {
             &schedule_params,
             finstack_quant_core::types::CurveId::from("USD-OIS"),
             finstack_quant_core::types::CurveId::from("CDX.NA.IG.42"),
-            TrancheSide::SellProtection,
+            PayReceive::Receive,
         )
         .expect("Valid tranche parameters"),
     )
@@ -246,7 +245,7 @@ pub fn senior_tranche() -> CDSTranche {
             &schedule_params,
             finstack_quant_core::types::CurveId::from("USD-OIS"),
             finstack_quant_core::types::CurveId::from("CDX.NA.IG.42"),
-            TrancheSide::SellProtection,
+            PayReceive::Receive,
         )
         .expect("Valid tranche parameters"),
     )
@@ -257,7 +256,7 @@ pub fn custom_tranche(
     attach_pct: f64,
     detach_pct: f64,
     coupon_bp: f64,
-    side: TrancheSide,
+    side: PayReceive,
 ) -> CDSTranche {
     let tranche_params = CDSTrancheParams::new(
         "CDX.NA.IG.42",

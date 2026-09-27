@@ -22,9 +22,8 @@ use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::CurveId;
 use finstack_quant_core::HashMap;
-use finstack_quant_valuations::instruments::rates::swaption::{
-    Swaption, SwaptionParams, VolatilityModel,
-};
+use finstack_quant_valuations::instruments::rates::swaption::{Swaption, SwaptionParams};
+use finstack_quant_valuations::instruments::VolatilityModel;
 use finstack_quant_valuations::market::conventions::ids::SwaptionConventionId;
 
 use crate::calibration_support as cal_utils;

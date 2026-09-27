@@ -1,6 +1,6 @@
 //! Convention-level tests for FX ATM strike helpers.
 
-use finstack_quant_valuations::instruments::fx::fx_option::{FxAtmDeltaConvention, FxOption};
+use finstack_quant_valuations::instruments::fx::fx_option::{FxDeltaConventionKind, FxOption};
 
 #[test]
 fn test_atm_dns_unadjusted_spot_and_forward_share_same_strike() {
@@ -14,13 +14,13 @@ fn test_atm_dns_unadjusted_spot_and_forward_share_same_strike() {
         forward,
         vol,
         time_to_expiry,
-        FxAtmDeltaConvention::Spot,
+        FxDeltaConventionKind::Spot,
     );
     let forward_dns = FxOption::atm_dns_strike_for_convention(
         forward,
         vol,
         time_to_expiry,
-        FxAtmDeltaConvention::Forward,
+        FxDeltaConventionKind::Forward,
     );
 
     assert!(
@@ -45,13 +45,13 @@ fn test_atm_dns_premium_adjusted_uses_negative_half_variance() {
         forward,
         vol,
         time_to_expiry,
-        FxAtmDeltaConvention::PremiumAdjustedSpot,
+        FxDeltaConventionKind::PremiumAdjustedSpot,
     );
     let pa_forward_dns = FxOption::atm_dns_strike_for_convention(
         forward,
         vol,
         time_to_expiry,
-        FxAtmDeltaConvention::PremiumAdjustedForward,
+        FxDeltaConventionKind::PremiumAdjustedForward,
     );
 
     assert!(

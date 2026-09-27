@@ -10,7 +10,7 @@ use crate::instruments::equity::equity_trs::EquityTotalReturnSwap;
 use crate::instruments::fixed_income::fi_trs::FIIndexTotalReturnSwap;
 use crate::instruments::rates::irs::InterestRateSwap;
 use crate::instruments::rates::repo::Repo;
-use crate::instruments::TrsSide;
+use crate::instruments::PayReceive;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
@@ -512,8 +512,8 @@ impl Marginable for EquityTotalReturnSwap {
         // For Equity TRS, main sensitivity is equity delta
         // SIMM delta is P&L per 1% relative underlying move, not full notional.
         let delta = match self.side {
-            TrsSide::ReceiveTotalReturn => self.notional.amount(),
-            TrsSide::PayTotalReturn => -self.notional.amount(),
+            PayReceive::Receive => self.notional.amount(),
+            PayReceive::Pay => -self.notional.amount(),
         };
 
         // Use the underlier as the equity identifier
@@ -555,8 +555,8 @@ impl Marginable for FIIndexTotalReturnSwap {
         let dv01 = self.notional.amount().abs() * duration * ONE_BP;
 
         let signed_dv01 = match self.side {
-            TrsSide::ReceiveTotalReturn => -dv01, // Long bond = short rates
-            TrsSide::PayTotalReturn => dv01,      // Short bond = long rates
+            PayReceive::Receive => -dv01, // Long bond = short rates
+            PayReceive::Pay => dv01,      // Short bond = long rates
         };
 
         // Map duration to appropriate tenor bucket

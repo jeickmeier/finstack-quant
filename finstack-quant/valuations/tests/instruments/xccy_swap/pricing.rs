@@ -4,9 +4,8 @@ use super::fixtures::*;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::StubKind;
 use finstack_quant_core::money::Money;
-use finstack_quant_valuations::instruments::rates::xccy_swap::{
-    LegSide, NotionalExchange, XccySwap,
-};
+use finstack_quant_valuations::instruments::rates::xccy_swap::{NotionalExchange, XccySwap};
+use finstack_quant_valuations::instruments::PayReceive;
 use rust_decimal::Decimal;
 
 #[test]
@@ -442,9 +441,9 @@ fn receive_vs_pay_legs_have_opposite_signs() {
 
     // USD pay / EUR receive (flip the sides)
     let mut leg_usd_pay = leg_usd_receive(base, maturity);
-    leg_usd_pay.side = LegSide::Pay;
+    leg_usd_pay.side = PayReceive::Pay;
     let mut leg_eur_receive = leg_eur_pay(base, maturity);
-    leg_eur_receive.side = LegSide::Receive;
+    leg_eur_receive.side = PayReceive::Receive;
 
     let swap_usd_pay = XccySwap::new("XCCY-USD-PAY", leg_usd_pay, leg_eur_receive, Currency::USD)
         .with_notional_exchange(NotionalExchange::None);

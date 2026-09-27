@@ -39,6 +39,26 @@
       "minimum": -1.0,
       "type": "number"
     },
+    "ExerciseStyle": {
+      "description": "Exercise schedule convention for option models.",
+      "oneOf": [
+        {
+          "const": "european",
+          "description": "Exercise only at expiry.",
+          "type": "string"
+        },
+        {
+          "const": "american",
+          "description": "Exercise at any eligible time through expiry.",
+          "type": "string"
+        },
+        {
+          "const": "bermudan",
+          "description": "Exercise on a finite schedule of eligible dates.",
+          "type": "string"
+        }
+      ]
+    },
     "FixedLegSpec": {
       "additionalProperties": false,
       "description": "Specification for fixed rate legs in interest rate swaps",
@@ -397,6 +417,21 @@
       ],
       "type": "object"
     },
+    "SettlementType": {
+      "description": "Settlement type for options",
+      "oneOf": [
+        {
+          "const": "physical",
+          "description": "Physical delivery",
+          "type": "string"
+        },
+        {
+          "const": "cash",
+          "description": "Cash settlement",
+          "type": "string"
+        }
+      ]
+    },
     "StubKind": {
       "description": "Stub period handling when start/end dates don't align with payment frequency.\n\nControls how schedules are generated when the start and end dates don't\ndivide evenly by the payment frequency, resulting in an irregular period\n(stub) at the beginning or end of the schedule.\n\n# Variants\n\n- **`None`**: No stub allowed (default). Generates regular periods from\n  start to end and returns an error\n  ([`InputError::NonIntegerScheduleTenor`]) when the dates don't divide\n  evenly by the frequency. Use a stub variant for misaligned schedules.\n\n[`InputError::NonIntegerScheduleTenor`]: crate::error::InputError::NonIntegerScheduleTenor\n- **`ShortFront`**: Short stub period at the start. Schedule is built\n  backward from the end date, creating a short first period.\n- **`ShortBack`**: Short stub period at the end. Schedule is built forward\n  from the start date, creating a short final period.\n- **`LongFront`**: Long stub period at the start. Combines the first two\n  periods into a single longer period.\n- **`LongBack`**: Long stub period at the end. Combines the last two periods\n  into a single longer period.\n\n# Financial Context\n\nStub conventions are important for:\n- Interest accrual calculations (short/long first coupons)\n- Cash flow present value computations\n- Matching market conventions for specific instruments\n\n# Examples\n\n```rust\nuse finstack_quant_core::dates::{ScheduleBuilder, Tenor, StubKind};\nuse time::{Date, Month};\n\nlet start = Date::from_calendar_date(2025, Month::January, 10)?;\nlet end = Date::from_calendar_date(2025, Month::December, 15)?;\n\n// Short stub at front\nlet sched = ScheduleBuilder::new(start, end)?\n    .frequency(Tenor::quarterly())\n    .stub_rule(StubKind::ShortFront)\n    .build()?;\n# Ok::<(), Box<dyn std::error::Error>>(())\n```\n\n# See Also\n\n- [`ScheduleBuilder::stub_rule`] to configure stub behavior",
       "oneOf": [
@@ -440,7 +475,7 @@
           "description": "Cash settlement annuity method (only used when settlement = Cash).\n\n- `CollateralizedCashPrice` (default): Actual collateral-discounted fixed-leg annuity\n- `ParYield`: Legacy flat-yield cash annuity\n- `IsdaParPar`: Legacy par-par annuity from the discount curve\n- `ZeroCoupon`: Single discount to swap maturity"
         },
         "exercise_style": {
-          "$ref": "#/$defs/SwaptionExercise",
+          "$ref": "#/$defs/ExerciseStyle",
           "description": "Exercise style (European, Bermudan, American). Defaults to European."
         },
         "expiry": {
@@ -483,7 +518,7 @@
           "description": "Scenario-only pricing adjustments."
         },
         "settlement": {
-          "$ref": "#/$defs/SwaptionSettlement",
+          "$ref": "#/$defs/SettlementType",
           "description": "Settlement method (physical or cash)"
         },
         "underlying_fixed_leg": {
@@ -495,7 +530,7 @@
           "description": "Complete floating leg of the underlying swap."
         },
         "vol_model": {
-          "$ref": "#/$defs/SwaptionVolatilityModel",
+          "$ref": "#/$defs/VolatilityModel",
           "description": "Volatility model (Black or Normal)"
         },
         "vol_surface_id": {
@@ -519,52 +554,17 @@
       ],
       "type": "object"
     },
-    "SwaptionExercise": {
-      "description": "Swaption exercise style",
-      "oneOf": [
-        {
-          "const": "european",
-          "description": "European exercise (only at expiry)",
-          "type": "string"
-        },
-        {
-          "const": "bermudan",
-          "description": "Bermudan exercise (at discrete dates)",
-          "type": "string"
-        },
-        {
-          "const": "american",
-          "description": "American exercise (any time before expiry)",
-          "type": "string"
-        }
-      ]
-    },
-    "SwaptionSettlement": {
-      "description": "Swaption settlement method",
-      "oneOf": [
-        {
-          "const": "physical",
-          "description": "Physical settlement (enter into underlying swap)",
-          "type": "string"
-        },
-        {
-          "const": "cash",
-          "description": "Cash settlement (receive NPV of swap)",
-          "type": "string"
-        }
-      ]
-    },
-    "SwaptionVolatilityModel": {
-      "description": "Volatility model for pricing",
+    "VolatilityModel": {
+      "description": "Volatility convention (Black lognormal or Bachelier normal) used to price\na swaption. Wire values: `black`, `normal`.",
       "oneOf": [
         {
           "const": "black",
-          "description": "Black (Lognormal) model (1976)",
+          "description": "Black (lognormal).",
           "type": "string"
         },
         {
           "const": "normal",
-          "description": "Bachelier (Normal) model",
+          "description": "Bachelier / normal model.",
           "type": "string"
         }
       ]

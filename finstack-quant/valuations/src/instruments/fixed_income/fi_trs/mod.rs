@@ -11,4 +11,4 @@ mod types;
 
 pub use types::FIIndexTotalReturnSwap;
 
-pub use crate::instruments::common_impl::parameters::trs_common::{TrsScheduleSpec, TrsSide};
+pub use crate::instruments::common_impl::parameters::trs_common::TrsScheduleSpec;

@@ -4,31 +4,12 @@ use crate::impl_instrument_base;
 use crate::instruments::common_impl::traits::Attributes;
 use crate::instruments::common_impl::validation;
 use crate::instruments::rates::cms_common::CmsReferenceSwap;
+use crate::instruments::OptionType;
 use finstack_quant_core::dates::{Date, DayCount, Tenor};
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::IndexId;
 use finstack_quant_core::types::{CurveId, InstrumentId};
 use rust_decimal::Decimal;
-
-/// Call or put on a CMS spread.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(rename_all = "snake_case")]
-pub enum CmsSpreadOptionType {
-    /// max(CMS_long - CMS_short - K, 0)
-    Call,
-    /// max(K - (CMS_long - CMS_short), 0)
-    Put,
-}
-
-impl std::fmt::Display for CmsSpreadOptionType {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            CmsSpreadOptionType::Call => write!(f, "call"),
-            CmsSpreadOptionType::Put => write!(f, "put"),
-        }
-    }
-}
 
 /// CMS Spread Option.
 ///
@@ -68,8 +49,9 @@ pub struct CmsSpreadOption {
         schemars(with = "finstack_quant_core::wire::DecimalWire")
     )]
     pub strike: Decimal,
-    /// Call or put on the spread.
-    pub option_type: CmsSpreadOptionType,
+    /// Call or put on the spread `CMS_long - CMS_short`: a call pays
+    /// `max(spread - strike, 0)`, a put pays `max(strike - spread, 0)`.
+    pub option_type: OptionType,
     /// Notional amount.
     pub notional: Money,
     /// Option expiry date.
@@ -229,7 +211,7 @@ impl CmsSpreadOption {
             short_cms_tenor: Tenor::new(2, finstack_quant_core::dates::TenorUnit::Years)
                 .expect("valid example tenor"),
             strike: Decimal::new(5, 3), // 50bp
-            option_type: CmsSpreadOptionType::Call,
+            option_type: OptionType::Call,
             notional: Money::from((10_000_000_i64, Currency::USD)),
             expiry: Date::from_calendar_date(2027, Month::March, 29).expect("valid"),
             payment_date: Date::from_calendar_date(2027, Month::March, 31).expect("valid"),

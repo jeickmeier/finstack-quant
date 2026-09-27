@@ -98,9 +98,9 @@
           "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
           "description": "Notional amount in quote currency."
         },
-        "option_type": {
-          "$ref": "#/$defs/InflationCapFloorType",
-          "description": "Cap/floor type (cap, floor, caplet, floorlet)."
+        "rate_option_type": {
+          "$ref": "#/$defs/RateOptionType",
+          "description": "Cap/floor type (cap, floor, caplet, floorlet). Caplet and floorlet price a\nsingle period."
         },
         "scenario_pricing_overrides": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/scenario_pricing_overrides.schema.json",
@@ -126,7 +126,7 @@
       },
       "required": [
         "id",
-        "option_type",
+        "rate_option_type",
         "notional",
         "strike",
         "start_date",
@@ -139,31 +139,6 @@
         "attributes"
       ],
       "type": "object"
-    },
-    "InflationCapFloorType": {
-      "description": "Inflation option type.",
-      "oneOf": [
-        {
-          "const": "cap",
-          "description": "Cap (portfolio of caplets).",
-          "type": "string"
-        },
-        {
-          "const": "floor",
-          "description": "Floor (portfolio of floorlets).",
-          "type": "string"
-        },
-        {
-          "const": "caplet",
-          "description": "Single-period caplet.",
-          "type": "string"
-        },
-        {
-          "const": "floorlet",
-          "description": "Single-period floorlet.",
-          "type": "string"
-        }
-      ]
     },
     "InflationInterpolation": {
       "description": "Interpolation method for CPI/RPI values between monthly observations.\n\nDetermines how index values are computed for dates between published\nmonthly levels. Different markets use different conventions.\n\n# Market Conventions\n\n- **US TIPS**: Linear interpolation (daily pro-rata)\n- **UK Index-Linked Gilts**: Linear interpolation with 3-month lag\n- **Euro inflation bonds**: Varies by issuer (typically linear)\n\n# Examples\n\n```rust\nuse finstack_quant_core::market_data::scalars::InflationInterpolation;\n\nlet linear = InflationInterpolation::Linear; // TIPS standard\nlet step = InflationInterpolation::Step;     // Conservative approach\n```",
@@ -226,6 +201,31 @@
       "const": "finstack_quant.instrument/1",
       "description": "Canonical schema marker for persisted instrument envelopes.",
       "type": "string"
+    },
+    "RateOptionType": {
+      "description": "Type of interest rate option",
+      "oneOf": [
+        {
+          "const": "cap",
+          "description": "Cap (series of caplets)",
+          "type": "string"
+        },
+        {
+          "const": "floor",
+          "description": "Floor (series of floorlets)",
+          "type": "string"
+        },
+        {
+          "const": "caplet",
+          "description": "Caplet (single period cap)",
+          "type": "string"
+        },
+        {
+          "const": "floorlet",
+          "description": "Floorlet (single period floor)",
+          "type": "string"
+        }
+      ]
     },
     "StubKind": {
       "description": "Stub period handling when start/end dates don't align with payment frequency.\n\nControls how schedules are generated when the start and end dates don't\ndivide evenly by the payment frequency, resulting in an irregular period\n(stub) at the beginning or end of the schedule.\n\n# Variants\n\n- **`None`**: No stub allowed (default). Generates regular periods from\n  start to end and returns an error\n  ([`InputError::NonIntegerScheduleTenor`]) when the dates don't divide\n  evenly by the frequency. Use a stub variant for misaligned schedules.\n\n[`InputError::NonIntegerScheduleTenor`]: crate::error::InputError::NonIntegerScheduleTenor\n- **`ShortFront`**: Short stub period at the start. Schedule is built\n  backward from the end date, creating a short first period.\n- **`ShortBack`**: Short stub period at the end. Schedule is built forward\n  from the start date, creating a short final period.\n- **`LongFront`**: Long stub period at the start. Combines the first two\n  periods into a single longer period.\n- **`LongBack`**: Long stub period at the end. Combines the last two periods\n  into a single longer period.\n\n# Financial Context\n\nStub conventions are important for:\n- Interest accrual calculations (short/long first coupons)\n- Cash flow present value computations\n- Matching market conventions for specific instruments\n\n# Examples\n\n```rust\nuse finstack_quant_core::dates::{ScheduleBuilder, Tenor, StubKind};\nuse time::{Date, Month};\n\nlet start = Date::from_calendar_date(2025, Month::January, 10)?;\nlet end = Date::from_calendar_date(2025, Month::December, 15)?;\n\n// Short stub at front\nlet sched = ScheduleBuilder::new(start, end)?\n    .frequency(Tenor::quarterly())\n    .stub_rule(StubKind::ShortFront)\n    .build()?;\n# Ok::<(), Box<dyn std::error::Error>>(())\n```\n\n# See Also\n\n- [`ScheduleBuilder::stub_rule`] to configure stub behavior",
@@ -303,7 +303,7 @@
             "amount": "1000000",
             "currency": "USD"
           },
-          "option_type": "cap",
+          "rate_option_type": "cap",
           "start_date": "2024-01-15",
           "strike": "0.03",
           "stub": "short_front",

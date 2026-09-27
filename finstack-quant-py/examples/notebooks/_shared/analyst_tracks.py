@@ -210,7 +210,7 @@ def structured_index_inputs() -> dict[str, dict[str, Any]]:
             "notional": {"amount": "1000000", "currency": "USD"},
             "coupon_bp": 500.0,
             "series": 43,
-            "side": "buy_protection",
+            "side": "pay",
             "roll_rule": "cds_imm",
             "upfront": None,
         },

@@ -8,7 +8,7 @@ use finstack_quant_core::currency::Currency::*;
 use finstack_quant_core::market_data::scalars::MarketScalar;
 use finstack_quant_core::money::Money;
 use finstack_quant_valuations::instruments::Instrument;
-use finstack_quant_valuations::instruments::TrsSide;
+use finstack_quant_valuations::instruments::PayReceive;
 use finstack_quant_valuations::metrics::MetricId;
 
 // Par Spread Tests
@@ -169,12 +169,12 @@ fn test_par_spread_sign_based_on_side() {
     let as_of = as_of_date();
 
     let trs_receive = TestEquityTrsBuilder::new()
-        .side(TrsSide::ReceiveTotalReturn)
+        .side(PayReceive::Receive)
         .spread_bp(0.0)
         .build();
 
     let trs_pay = TestEquityTrsBuilder::new()
-        .side(TrsSide::PayTotalReturn)
+        .side(PayReceive::Pay)
         .spread_bp(0.0)
         .build();
 
@@ -380,7 +380,7 @@ fn test_equity_trs_ir01_positive() {
     let market = create_market_context();
     let as_of = as_of_date();
     let trs = TestEquityTrsBuilder::new()
-        .side(TrsSide::ReceiveTotalReturn)
+        .side(PayReceive::Receive)
         .build();
 
     // Act
@@ -406,7 +406,7 @@ fn test_fi_index_trs_ir01_positive() {
     let market = create_market_context();
     let as_of = as_of_date();
     let trs = TestFIIndexTrsBuilder::new()
-        .side(TrsSide::ReceiveTotalReturn)
+        .side(PayReceive::Receive)
         .build();
 
     // Act
@@ -476,7 +476,7 @@ fn test_equity_trs_index_delta_zero_before_start_for_receive() {
     let market = create_market_context();
     let as_of = as_of_date();
     let trs = TestEquityTrsBuilder::new()
-        .side(TrsSide::ReceiveTotalReturn)
+        .side(PayReceive::Receive)
         .build();
 
     // Act
@@ -499,9 +499,7 @@ fn test_equity_trs_index_delta_zero_before_start_for_pay() {
     // Arrange
     let market = create_market_context();
     let as_of = as_of_date();
-    let trs = TestEquityTrsBuilder::new()
-        .side(TrsSide::PayTotalReturn)
-        .build();
+    let trs = TestEquityTrsBuilder::new().side(PayReceive::Pay).build();
 
     // Act
     let result = trs
@@ -527,7 +525,7 @@ fn test_equity_trs_delta_magnitude_check() {
 
     let trs = TestEquityTrsBuilder::new()
         .notional(Money::new(notional, USD).expect("valid money fixture"))
-        .side(TrsSide::ReceiveTotalReturn)
+        .side(PayReceive::Receive)
         .build();
 
     // Act
@@ -572,11 +570,9 @@ fn test_fi_index_trs_duration_dv01_based_on_duration() {
     let market = create_market_context();
     let as_of = as_of_date();
     let receive = TestFIIndexTrsBuilder::new()
-        .side(TrsSide::ReceiveTotalReturn)
+        .side(PayReceive::Receive)
         .build();
-    let pay = TestFIIndexTrsBuilder::new()
-        .side(TrsSide::PayTotalReturn)
-        .build();
+    let pay = TestFIIndexTrsBuilder::new().side(PayReceive::Pay).build();
 
     // Act
     let options = finstack_quant_valuations::instruments::PricingOptions::default;
@@ -877,11 +873,9 @@ fn test_dividend01_zero_without_div_yield_id() {
 #[test]
 fn test_dividend01_sign_flips_pay_vs_receive() {
     let receive = TestEquityTrsBuilder::new()
-        .side(TrsSide::ReceiveTotalReturn)
+        .side(PayReceive::Receive)
         .build();
-    let pay = TestEquityTrsBuilder::new()
-        .side(TrsSide::PayTotalReturn)
-        .build();
+    let pay = TestEquityTrsBuilder::new().side(PayReceive::Pay).build();
 
     let div01_receive = dividend01(&receive);
     let div01_pay = dividend01(&pay);

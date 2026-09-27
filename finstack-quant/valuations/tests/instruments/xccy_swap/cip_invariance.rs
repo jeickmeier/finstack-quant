@@ -16,9 +16,10 @@ use finstack_quant_core::money::fx::{FxMatrix, SimpleFxProvider};
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::CurveId;
 use finstack_quant_valuations::instruments::rates::xccy_swap::{
-    LegSide, NotionalExchange, ResettingSide, XccySwap, XccySwapLeg,
+    NotionalExchange, ResettingSide, XccySwap, XccySwapLeg,
 };
 use finstack_quant_valuations::instruments::Instrument;
+use finstack_quant_valuations::instruments::PayReceive;
 use rust_decimal::Decimal;
 use std::sync::Arc;
 use time::Month;
@@ -89,7 +90,7 @@ fn build_swap(notional_exchange: NotionalExchange, spread_bp: Decimal) -> XccySw
     let eur_leg = XccySwapLeg {
         currency: Currency::EUR,
         notional: Money::new(N_EUR_INITIAL, Currency::EUR).expect("valid money fixture"),
-        side: LegSide::Receive,
+        side: PayReceive::Receive,
         forward_curve_id: CurveId::new("EUR-EURIBOR-3M"),
         discount_curve_id: CurveId::new("EUR-OIS"),
         start,
@@ -108,7 +109,7 @@ fn build_swap(notional_exchange: NotionalExchange, spread_bp: Decimal) -> XccySw
     let usd_leg = XccySwapLeg {
         currency: Currency::USD,
         notional: Money::new(N_USD, Currency::USD).expect("valid money fixture"),
-        side: LegSide::Pay,
+        side: PayReceive::Pay,
         forward_curve_id: CurveId::new("USD-SOFR-3M"),
         discount_curve_id: CurveId::new("USD-OIS"),
         start,

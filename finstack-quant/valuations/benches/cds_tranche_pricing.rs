@@ -21,9 +21,10 @@ use finstack_quant_core::math::interp::InterpStyle;
 use finstack_quant_core::money::Money;
 use finstack_quant_valuations::instruments::credit_derivatives::cds_tranche::CDSTrancheParams;
 use finstack_quant_valuations::instruments::credit_derivatives::cds_tranche::{
-    CDSTranche, CDSTranchePricer, CDSTranchePricerConfig, TrancheSide,
+    CDSTranche, CDSTranchePricer, CDSTranchePricerConfig,
 };
 use finstack_quant_valuations::instruments::Instrument;
+use finstack_quant_valuations::instruments::PayReceive;
 use finstack_quant_valuations::metrics::MetricId;
 #[allow(dead_code, unused_imports, clippy::expect_used, clippy::unwrap_used)]
 #[path = "../tests/support/credit.rs"]
@@ -54,7 +55,7 @@ fn create_tranche(attach_pct: f64, detach_pct: f64, tenor_years: i32) -> CDSTran
         &schedule_params,
         "USD-OIS",
         "CDX.NA.IG.42",
-        TrancheSide::SellProtection,
+        PayReceive::Receive,
     )
     .expect("Valid tranche parameters");
     tranche.roll_rule = finstack_quant_cashflows::builder::specs::RollRule::CdsImm;

@@ -4,7 +4,7 @@ use crate::impl_instrument_base;
 use crate::{
     cashflow::builder::ScheduleParams,
     instruments::common_impl::parameters::{
-        legs::FinancingLegSpec, trs_common::TrsScheduleSpec, trs_common::TrsSide,
+        legs::FinancingLegSpec, legs::PayReceive, trs_common::TrsScheduleSpec,
         underlying::EquityUnderlyingParams,
     },
     instruments::Attributes,
@@ -47,10 +47,10 @@ pub enum TrsDividendSettlement {
 /// };
 /// use finstack_quant_cashflows::builder::ScheduleParams;
 /// use finstack_quant_valuations::instruments::{
-///     Attributes, EquityUnderlyingParams, FinancingLegSpec,
+///     Attributes, EquityUnderlyingParams, FinancingLegSpec, PayReceive,
 /// };
 /// use finstack_quant_valuations::instruments::equity::equity_trs::{
-///     EquityTotalReturnSwap, TrsDividendSettlement, TrsScheduleSpec, TrsSide,
+///     EquityTotalReturnSwap, TrsDividendSettlement, TrsScheduleSpec,
 /// };
 /// use rust_decimal::Decimal;
 /// use time::macros::date;
@@ -71,7 +71,7 @@ pub enum TrsDividendSettlement {
 ///         date!(2027 - 01 - 02),
 ///         ScheduleParams::quarterly_act360(),
 ///     ))
-///     .side(TrsSide::ReceiveTotalReturn)
+///     .side(PayReceive::Receive)
 ///     .dividend_settlement(TrsDividendSettlement::OnDividendDate)
 ///     .initial_level_opt(None)
 ///     .attributes(Attributes::new())
@@ -101,8 +101,9 @@ pub struct EquityTotalReturnSwap {
     pub financing: FinancingLegSpec,
     /// Schedule specification (payment dates and frequency).
     pub schedule: TrsScheduleSpec,
-    /// Trade side (receive/pay total return).
-    pub side: TrsSide,
+    /// Trade side: `receive` receives the total-return leg and pays financing;
+    /// `pay` pays the total return and receives financing.
+    pub side: PayReceive,
     /// Optional first-period start level.
     ///
     /// Pricing uses this only when the first period is in progress and no
@@ -206,7 +207,7 @@ struct EquityTotalReturnSwapUnchecked {
     /// Schedule specification (payment dates and frequency).
     schedule: TrsScheduleSpec,
     /// Trade side (receive/pay total return).
-    side: TrsSide,
+    side: PayReceive,
     /// Optional first-period start level.
     ///
     /// Pricing uses this only when the first period is in progress and no
@@ -338,7 +339,7 @@ impl EquityTotalReturnSwap {
                     roll_rule: crate::cashflow::builder::specs::RollRule::None,
                 },
             ))
-            .side(TrsSide::ReceiveTotalReturn)
+            .side(PayReceive::Receive)
             .dividend_settlement(TrsDividendSettlement::OnDividendDate)
             .initial_level_opt(None)
             .attributes(Attributes::new())
@@ -393,7 +394,7 @@ impl EquityTotalReturnSwap {
             .underlying(underlying)
             .financing(financing)
             .schedule(schedule)
-            .side(TrsSide::ReceiveTotalReturn)
+            .side(PayReceive::Receive)
             .dividend_settlement(TrsDividendSettlement::OnDividendDate)
             .initial_level_opt(None)
             .attributes(Attributes::new())
@@ -601,8 +602,8 @@ impl crate::instruments::common_impl::traits::Instrument for EquityTotalReturnSw
 
         // Net PV depends on side
         let net_pv = match self.side {
-            TrsSide::ReceiveTotalReturn => total_return_pv.checked_sub(financing_pv)?,
-            TrsSide::PayTotalReturn => financing_pv.checked_sub(total_return_pv)?,
+            PayReceive::Receive => total_return_pv.checked_sub(financing_pv)?,
+            PayReceive::Pay => financing_pv.checked_sub(total_return_pv)?,
         };
 
         Ok(net_pv)

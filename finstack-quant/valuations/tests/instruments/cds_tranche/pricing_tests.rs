@@ -19,7 +19,7 @@ use finstack_quant_core::money::Money;
 use finstack_quant_valuations::instruments::credit_derivatives::cds_tranche::CDSTranche;
 use finstack_quant_valuations::instruments::credit_derivatives::cds_tranche::CDSTrancheParams;
 use finstack_quant_valuations::instruments::credit_derivatives::cds_tranche::CDSTranchePricer;
-use finstack_quant_valuations::instruments::credit_derivatives::cds_tranche::TrancheSide;
+use finstack_quant_valuations::instruments::PayReceive;
 use time::macros::date;
 
 // ==================== Basic Pricing Tests ====================
@@ -110,7 +110,7 @@ fn test_bespoke_seasoned_tranche_requires_effective_date_for_accrued_premium() {
         &schedule_params,
         "USD-OIS",
         "CDX.NA.IG.42",
-        TrancheSide::SellProtection,
+        PayReceive::Receive,
     )
     .expect("bespoke tranche");
     explicit.start_date = Some(date!(2024 - 11 - 15));
@@ -141,8 +141,8 @@ fn test_buy_sell_protection_symmetry() {
     let market = standard_market_context();
     let as_of = base_date();
 
-    let sell_tranche = custom_tranche(3.0, 7.0, 500.0, TrancheSide::SellProtection);
-    let buy_tranche = custom_tranche(3.0, 7.0, 500.0, TrancheSide::BuyProtection);
+    let sell_tranche = custom_tranche(3.0, 7.0, 500.0, PayReceive::Receive);
+    let buy_tranche = custom_tranche(3.0, 7.0, 500.0, PayReceive::Pay);
 
     // Act
     let sell_pv = pricer
@@ -167,7 +167,7 @@ fn test_buy_sell_protection_symmetry() {
 fn test_sell_protection_pv_components() {
     // Arrange
     let pricer = CDSTranchePricer::new();
-    let tranche = custom_tranche(3.0, 7.0, 500.0, TrancheSide::SellProtection);
+    let tranche = custom_tranche(3.0, 7.0, 500.0, PayReceive::Receive);
     let market = standard_market_context();
     let as_of = base_date();
 
@@ -226,7 +226,7 @@ fn test_missing_credit_index_errors_for_price_tranche() {
 #[test]
 fn test_fully_wiped_tranche_prices_to_zero() {
     let pricer = CDSTranchePricer::new();
-    let mut tranche = custom_tranche(3.0, 7.0, 500.0, TrancheSide::SellProtection);
+    let mut tranche = custom_tranche(3.0, 7.0, 500.0, PayReceive::Receive);
     tranche.realized_loss = tranche.detach_pct / 100.0;
 
     let pv = pricer
@@ -244,10 +244,10 @@ fn test_same_day_upfront_has_opposite_sign_for_buy_and_sell() {
     let as_of = base_date();
     let upfront = Money::new(150_000.0, Currency::USD).expect("valid money fixture");
 
-    let sell_base = custom_tranche(3.0, 7.0, 500.0, TrancheSide::SellProtection);
-    let buy_base = custom_tranche(3.0, 7.0, 500.0, TrancheSide::BuyProtection);
-    let mut sell = custom_tranche(3.0, 7.0, 500.0, TrancheSide::SellProtection);
-    let mut buy = custom_tranche(3.0, 7.0, 500.0, TrancheSide::BuyProtection);
+    let sell_base = custom_tranche(3.0, 7.0, 500.0, PayReceive::Receive);
+    let buy_base = custom_tranche(3.0, 7.0, 500.0, PayReceive::Pay);
+    let mut sell = custom_tranche(3.0, 7.0, 500.0, PayReceive::Receive);
+    let mut buy = custom_tranche(3.0, 7.0, 500.0, PayReceive::Pay);
     sell.upfront = Some((as_of, upfront));
     buy.upfront = Some((as_of, upfront));
 

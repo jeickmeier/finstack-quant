@@ -4,7 +4,7 @@ use crate::swaption::common::*;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_models::SabrParameters;
-use finstack_quant_valuations::instruments::rates::swaption::SwaptionExercise;
+use finstack_quant_valuations::instruments::ExerciseStyle;
 use finstack_quant_valuations::instruments::{Instrument, PricingOptions};
 use finstack_quant_valuations::metrics::MetricId;
 use finstack_quant_valuations::pricer::ModelKey;
@@ -95,7 +95,7 @@ fn unsupported_exercise_style_is_not_masked_by_expiry() {
     let expiry = time::macros::date!(2023 - 12 - 01);
     let swap_end = time::macros::date!(2028 - 12 - 01);
     let swaption = create_standard_payer_swaption(expiry, expiry, swap_end, 0.05)
-        .with_exercise_style(SwaptionExercise::Bermudan);
+        .with_exercise_style(ExerciseStyle::Bermudan);
     let market = MarketContext::new();
 
     let direct_error = swaption

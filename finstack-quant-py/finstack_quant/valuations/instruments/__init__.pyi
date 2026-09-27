@@ -9755,7 +9755,7 @@ class CDSTranche:
     >>> from finstack_quant.valuations.instruments import CDSTranche
     >>> tranche = CDSTranche.example()
     >>> (tranche.attach_pct, tranche.detach_pct, tranche.side)
-    (0.0, 3.0, 'buy_protection')
+    (0.0, 3.0, 'pay')
     """
 
     @staticmethod
@@ -10018,7 +10018,7 @@ class CDSTranche:
         params: CDSTrancheParams,
         discount_curve_id: str,
         credit_index_id: str,
-        side: Literal["buy_protection", "sell_protection"],
+        side: Literal["pay", "receive"],
     ) -> CDSTranche:
         """
         Build a tranche on the standard schedule (mirrors Rust
@@ -10035,8 +10035,8 @@ class CDSTranche:
             Discount curve identifier.
         credit_index_id : str
             Credit index identifier for the loss distribution.
-        side : {"buy_protection", "sell_protection"}
-            Tranche side.
+        side : {"pay", "receive"}
+            Tranche side: ``"pay"`` buys protection, ``"receive"`` sells it.
 
         Returns
         -------
@@ -10057,7 +10057,7 @@ class CDSTranche:
         >>> params = CDSTrancheParams.mezzanine_tranche(
         ...     "CDX.NA.IG", 42, Money(1e7, Currency("USD")), "2029-12-20", 100.0
         ... )
-        >>> tranche = CDSTranche.standard("CDX-42-3X7", params, "USD-OIS", "CDX.NA.IG.HAZARD", "buy_protection")
+        >>> tranche = CDSTranche.standard("CDX-42-3X7", params, "USD-OIS", "CDX.NA.IG.HAZARD", "pay")
         >>> (tranche.day_count, tranche.business_day_convention)
         ('act_360', 'following')
         """
@@ -10317,9 +10317,10 @@ class CDSTranche:
         Returns
         -------
         str
-            Serde string, either ``"buy_protection"`` (pays the running
+            Serde string, either ``"pay"`` (buys protection: pays the running
             coupon and receives tranche loss payments) or
-            ``"sell_protection"`` (receives the coupon and pays losses).
+            ``"receive"`` (sells protection: receives the coupon and pays
+            losses), matching the CDS and CDS index ``side``.
 
         Notes
         -----
@@ -10419,7 +10420,7 @@ class CDSTranche:
         ...
     def __repr__(self) -> str:
         """
-        Python-style rendering of the key economics, e.g. ``CDSTranche(id='CDXIG-42-0X3', index_name='CDX.NA.IG', series=42, attach_pct=0.0, detach_pct=3.0, side='buy_protection', ...)``.
+        Python-style rendering of the key economics, e.g. ``CDSTranche(id='CDXIG-42-0X3', index_name='CDX.NA.IG', series=42, attach_pct=0.0, detach_pct=3.0, side='pay', ...)``.
 
         Returns
         -------
@@ -10467,7 +10468,7 @@ class CDSTrancheBuilder:
     ...     .day_count(DayCount.ACT_360)
     ...     .discount_curve_id("USD-OIS")
     ...     .credit_index_id("CDX-IG-42-CURVE")
-    ...     .side("buy_protection")
+    ...     .side("pay")
     ...     .build()
     ... )
     >>> tranche.coupon_bp
@@ -10756,13 +10757,13 @@ class CDSTrancheBuilder:
             If the builder was already consumed by ``build()``.
         """
         ...
-    def side(self, value: Literal["buy_protection", "sell_protection"]) -> CDSTrancheBuilder:
+    def side(self, value: Literal["pay", "receive"]) -> CDSTrancheBuilder:
         """
-        Set the tranche side (buy/sell protection).
+        Set the tranche side (``"pay"`` buys protection, ``"receive"`` sells it).
 
         Parameters
         ----------
-        value : Literal["buy_protection", "sell_protection"]
+        value : Literal["pay", "receive"]
             Tranche side.
 
         Returns

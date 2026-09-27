@@ -888,9 +888,8 @@ mod tests {
         use finstack_quant_core::dates::{Date, DayCount, Tenor, TenorUnit};
         use finstack_quant_core::money::Money;
         use finstack_quant_core::types::{CurveId, InstrumentId};
-        use finstack_quant_valuations::instruments::rates::cms_spread_option::{
-            CmsSpreadOption, CmsSpreadOptionType,
-        };
+        use finstack_quant_valuations::instruments::rates::cms_spread_option::CmsSpreadOption;
+        use finstack_quant_valuations::instruments::OptionType;
         use finstack_quant_valuations::instruments::{InstrumentJson, InstrumentPricingOverrides};
         use time::Month;
 
@@ -899,7 +898,7 @@ mod tests {
             long_cms_tenor: Tenor::new(10, TenorUnit::Years).expect("valid tenor fixture"),
             short_cms_tenor: Tenor::new(2, TenorUnit::Years).expect("valid tenor fixture"),
             strike: "0.005".parse().expect("strike"),
-            option_type: CmsSpreadOptionType::Call,
+            option_type: OptionType::Call,
             notional: Money::new(10_000_000.0, finstack_quant_core::currency::Currency::USD)
                 .expect("valid money fixture"),
             expiry: Date::from_calendar_date(2026, Month::January, 1).expect("date"),

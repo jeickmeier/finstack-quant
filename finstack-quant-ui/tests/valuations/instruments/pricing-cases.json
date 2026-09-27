@@ -698,13 +698,13 @@
       "type": "cds_tranche",
       "instrumentSource": {
         "path": "finstack-quant/valuations/tests/fixtures/production_credit_tranche.json",
-        "sha256": "9c06615b9e68544246dffa0246f964114c1e1a8c94357cbbb4de249124bebdd6",
+        "sha256": "9c1ce78a60e886f923836f96e0b101a4062bdf1706c5bc27568cacdce763ab42",
         "pointer": ["instrument"]
       },
       "instrumentPatches": [],
       "marketSource": {
         "path": "finstack-quant/valuations/tests/fixtures/production_credit_tranche.json",
-        "sha256": "9c06615b9e68544246dffa0246f964114c1e1a8c94357cbbb4de249124bebdd6",
+        "sha256": "9c1ce78a60e886f923836f96e0b101a4062bdf1706c5bc27568cacdce763ab42",
         "pointer": ["market"]
       },
       "marketPatches": [],
@@ -2045,7 +2045,7 @@
       "type": "inflation_cap_floor",
       "instrumentSource": {
         "path": "finstack-quant/valuations/tests/instruments/json_examples/inflation_cap_floor.json",
-        "sha256": "cc43e1732d7d3849f3ba8de921feb5f16fa4b19d4457a867c66ee82ce66d4984",
+        "sha256": "8ce228fcddbe7eff8955601d8a45b10537c7e67eb2d3810503d60e257a5ea953",
         "pointer": []
       },
       "instrumentPatches": [],
@@ -2843,7 +2843,7 @@
       "type": "trs_equity",
       "instrumentSource": {
         "path": "finstack-quant/valuations/tests/instruments/json_examples/trs_equity.json",
-        "sha256": "11e8a49290c27247a5db544bfbd40c0bc4b446bdc6bb9a11bc9226a8fa2cfba4",
+        "sha256": "f6713a6b200a5317972378814ec41b3d608b19c8b92fe2a3267d9f1d7fc23aa3",
         "pointer": []
       },
       "instrumentPatches": [],
@@ -2881,7 +2881,7 @@
       "type": "trs_fixed_income_index",
       "instrumentSource": {
         "path": "finstack-quant/valuations/tests/instruments/json_examples/trs_fixed_income_index.json",
-        "sha256": "7ece04ce3f837e577463cfe606117ce02a23039216a31e4aaee404c042dae038",
+        "sha256": "4b6394a0edd9a5efe25a6d1d54d831b9d5c55b8141ad7a83507b6fdac786b80d",
         "pointer": []
       },
       "instrumentPatches": [],

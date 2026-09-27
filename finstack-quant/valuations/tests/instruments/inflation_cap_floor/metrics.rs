@@ -9,9 +9,8 @@ use finstack_quant_core::dates::{
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::CurveId;
-use finstack_quant_valuations::instruments::rates::inflation_cap_floor::{
-    InflationCapFloor, InflationCapFloorType,
-};
+use finstack_quant_valuations::instruments::rates::inflation_cap_floor::InflationCapFloor;
+use finstack_quant_valuations::instruments::RateOptionType;
 use finstack_quant_valuations::instruments::{
     Attributes, Instrument, InstrumentPricingOverrides, PricingOptions,
 };
@@ -24,7 +23,7 @@ fn build_caplet() -> InflationCapFloor {
     let end = Date::from_calendar_date(2027, Month::January, 2).unwrap();
     InflationCapFloor::builder()
         .id("INF-CAP-VEGA".into())
-        .option_type(InflationCapFloorType::Caplet)
+        .rate_option_type(RateOptionType::Caplet)
         .notional(Money::new(5_000_000.0, Currency::USD).expect("valid money fixture"))
         .strike(Decimal::try_from(0.025).expect("valid decimal"))
         .start_date(start)
@@ -92,12 +91,12 @@ fn vega_is_per_vol_point() {
 
 /// Build a 1Y inflation cap/floor of the given type and strike (otherwise
 /// identical to `build_caplet`).
-fn build_option(option_type: InflationCapFloorType, strike: f64) -> InflationCapFloor {
+fn build_option(rate_option_type: RateOptionType, strike: f64) -> InflationCapFloor {
     let start = Date::from_calendar_date(2026, Month::January, 2).unwrap();
     let end = Date::from_calendar_date(2027, Month::January, 2).unwrap();
     InflationCapFloor::builder()
         .id("INF-CF".into())
-        .option_type(option_type)
+        .rate_option_type(rate_option_type)
         .notional(Money::new(5_000_000.0, Currency::USD).expect("valid money fixture"))
         .strike(Decimal::try_from(strike).expect("valid decimal"))
         .start_date(start)
@@ -183,19 +182,19 @@ fn test_cap_value_falls_and_floor_rises_with_strike() {
     let as_of = Date::from_calendar_date(2025, Month::January, 2).unwrap();
     let market = build_market(as_of, 0.02);
 
-    let cap_low = build_option(InflationCapFloorType::Caplet, 0.02)
+    let cap_low = build_option(RateOptionType::Caplet, 0.02)
         .value(&market, as_of)
         .unwrap()
         .amount();
-    let cap_high = build_option(InflationCapFloorType::Caplet, 0.03)
+    let cap_high = build_option(RateOptionType::Caplet, 0.03)
         .value(&market, as_of)
         .unwrap()
         .amount();
-    let floor_low = build_option(InflationCapFloorType::Floorlet, 0.02)
+    let floor_low = build_option(RateOptionType::Floorlet, 0.02)
         .value(&market, as_of)
         .unwrap()
         .amount();
-    let floor_high = build_option(InflationCapFloorType::Floorlet, 0.03)
+    let floor_high = build_option(RateOptionType::Floorlet, 0.03)
         .value(&market, as_of)
         .unwrap()
         .amount();
@@ -229,13 +228,11 @@ fn test_cap_floor_parity_strike_difference_is_vol_independent() {
 
     let strike_diff = |vol: f64| -> f64 {
         let market = build_market(as_of, vol);
-        let v = |ty: InflationCapFloorType, k: f64| {
+        let v = |ty: RateOptionType, k: f64| {
             build_option(ty, k).value(&market, as_of).unwrap().amount()
         };
-        let parity_k1 =
-            v(InflationCapFloorType::Caplet, k1) - v(InflationCapFloorType::Floorlet, k1);
-        let parity_k2 =
-            v(InflationCapFloorType::Caplet, k2) - v(InflationCapFloorType::Floorlet, k2);
+        let parity_k1 = v(RateOptionType::Caplet, k1) - v(RateOptionType::Floorlet, k1);
+        let parity_k2 = v(RateOptionType::Caplet, k2) - v(RateOptionType::Floorlet, k2);
         parity_k1 - parity_k2
     };
 

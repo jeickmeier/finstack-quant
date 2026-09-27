@@ -7,7 +7,8 @@
 
 use crate::instruments::common_impl::pricing::time::relative_df_discount_curve;
 use crate::instruments::common_impl::traits::Instrument;
-use crate::instruments::rates::cms_spread_option::{CmsSpreadOption, CmsSpreadOptionType};
+use crate::instruments::rates::cms_spread_option::CmsSpreadOption;
+use crate::instruments::OptionType;
 use crate::market::resolve_vol_source;
 use crate::metrics::MetricId;
 use crate::pricer::{
@@ -364,16 +365,11 @@ impl Pricer for CmsSpreadOptionPricer {
     }
 }
 
-fn cms_spread_payoff(
-    long_rate: f64,
-    short_rate: f64,
-    strike: f64,
-    option_type: CmsSpreadOptionType,
-) -> f64 {
+fn cms_spread_payoff(long_rate: f64, short_rate: f64, strike: f64, option_type: OptionType) -> f64 {
     let spread = long_rate - short_rate;
     match option_type {
-        CmsSpreadOptionType::Call => (spread - strike).max(0.0),
-        CmsSpreadOptionType::Put => (strike - spread).max(0.0),
+        OptionType::Call => (spread - strike).max(0.0),
+        OptionType::Put => (strike - spread).max(0.0),
     }
 }
 
@@ -509,7 +505,7 @@ mod tests {
         inst.expiry = expiry;
         inst.payment_date = payment;
         inst.strike = rust_decimal::Decimal::ZERO;
-        inst.option_type = CmsSpreadOptionType::Call;
+        inst.option_type = OptionType::Call;
 
         let market = MarketContext::new()
             .insert(flat_discount_with_tenor("USD-OIS", as_of, 0.03, 1.0))

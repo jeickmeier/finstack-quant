@@ -456,7 +456,7 @@ impl CDSTranchePricer {
     /// Uses Newton-Raphson iteration to find the spread that makes NPV = 0:
     /// 1. Seed with `|protection_pv| / |premium_per_bp|` — both legs are signed by
     ///    `project_discountable_rows` (opposite polarities per side), so unsigned magnitudes
-    ///    give a correct positive starting point for both `BuyProtection` and `SellProtection`.
+    ///    give a correct positive starting point for both `Pay` (buy protection) and `Receive` (sell protection).
     /// 2. Iterate: `spread_new = spread - NPV(spread) / Spread_DV01`
     /// 3. Converge when `|NPV| < tolerance` or max iterations reached.
     ///
@@ -475,7 +475,7 @@ impl CDSTranchePricer {
 
         // Initial guess: unsigned magnitude of protection PV divided by premium per bp.
         // Both quantities are signed by project_discountable_rows (opposite polarities for
-        // BuyProtection vs SellProtection), so we use their absolute values to guarantee a
+        // Pay vs Receive), so we use their absolute values to guarantee a
         // positive seed for both protection sides.
         let mut unit_tranche = tranche.clone();
         unit_tranche.coupon_bp = 1.0;
@@ -510,7 +510,7 @@ impl CDSTranchePricer {
         //
         // `project_discountable_rows` applies a side-dependent sign to every cashflow
         // (`premium_sign = -1 / +1` and `protection_sign = +1 / -1` for
-        // `BuyProtection` / `SellProtection`).  Consequently both `protection_pv` and
+        // `Pay` / `Receive`).  Consequently both `protection_pv` and
         // `premium_per_bp` are signed with opposite polarities, making their raw ratio
         // always negative.  Taking unsigned magnitudes produces the correct positive
         // initial guess for both sides.

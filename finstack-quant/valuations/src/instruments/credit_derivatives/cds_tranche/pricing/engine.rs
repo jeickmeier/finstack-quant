@@ -7,7 +7,8 @@ use super::config::{
 use crate::cashflow::builder::{CashFlowMeta, CashFlowSchedule};
 use crate::cashflow::primitives::{CFKind, CashFlow};
 use crate::constants::BASIS_POINTS_PER_UNIT;
-use crate::instruments::credit_derivatives::cds_tranche::{CDSTranche, TrancheSide};
+use crate::instruments::credit_derivatives::cds_tranche::CDSTranche;
+use crate::instruments::PayReceive;
 use finstack_quant_core::dates::{calendar_by_id, Date, DateExt, HolidayCalendar};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::traits::Discounting;
@@ -145,8 +146,8 @@ impl CDSTranchePricer {
             // a separately contracted upfront can still be due.
             if let Some((date, amount)) = tranche.upfront.filter(|(date, _)| *date >= as_of) {
                 let premium_sign = match tranche.side {
-                    TrancheSide::BuyProtection => -1.0,
-                    TrancheSide::SellProtection => 1.0,
+                    PayReceive::Pay => -1.0,
+                    PayReceive::Receive => 1.0,
                 };
                 amount.amount() * premium_sign * discount_curve.df_between_dates(as_of, date)?
             } else {
@@ -236,8 +237,8 @@ impl CDSTranchePricer {
         let coupon = tranche.coupon_bp / BASIS_POINTS_PER_UNIT;
         let tranche_notional = tranche.notional.amount();
         let premium_sign = match tranche.side {
-            TrancheSide::BuyProtection => -1.0,
-            TrancheSide::SellProtection => 1.0,
+            PayReceive::Pay => -1.0,
+            PayReceive::Receive => 1.0,
         };
         let protection_sign = -premium_sign;
 

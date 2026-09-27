@@ -17,6 +17,7 @@ use crate::cashflow::primitives::CFKind;
 use crate::impl_instrument_base;
 use crate::instruments::common_impl::numeric::decimal_to_f64;
 use crate::instruments::common_impl::pricing::time::relative_df_discount_curve;
+use crate::instruments::PayReceive;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{BusinessDayConvention, Date, DayCount, StubKind, Tenor};
 use finstack_quant_core::market_data::context::MarketContext;
@@ -70,81 +71,23 @@ impl ProjectedXccyPeriod {
     }
 }
 
-/// Whether the holder pays or receives a leg.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(rename_all = "snake_case")]
-#[non_exhaustive]
-pub enum LegSide {
-    /// Receive the leg's coupons (and final notional, if exchanged).
-    Receive,
-    /// Pay the leg's coupons (and final notional, if exchanged).
-    Pay,
-}
-
-impl std::fmt::Display for LegSide {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::Pay => write!(f, "pay"),
-            Self::Receive => write!(f, "receive"),
-        }
-    }
-}
-
-impl std::str::FromStr for LegSide {
-    type Err = String;
-
-    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
-        match s {
-            "pay" => Ok(Self::Pay),
-            "receive" => Ok(Self::Receive),
-            _ => Err(format!("Unknown leg side: '{}'. Valid: pay, receive", s)),
-        }
-    }
-}
-
-impl LegSide {
-    /// Returns the sign multiplier for coupon cashflows.
-    ///
-    /// `Receive` leg coupons flow in (`+1.0`); `Pay` leg coupons flow out (`-1.0`).
-    #[inline]
-    pub(crate) fn coupon_sign(self) -> f64 {
-        match self {
-            Self::Receive => 1.0,
-            Self::Pay => -1.0,
-        }
-    }
-
-    /// Returns the sign for initial principal exchange.
-    ///
-    /// # Market Convention
-    ///
-    /// The leg you "receive" is economically a lending position:
-    /// - **At start**: you pay out principal (negative cashflow) to the counterparty
-    /// - **During**: you receive interest coupons (positive cashflows)
-    /// - **At end**: you receive principal back (positive cashflow)
-    ///
-    /// # Example
-    ///
-    /// For a USD/EUR XCCY swap where you receive USD:
-    /// - Initial exchange: you pay USD notional to counterparty (-1.0 sign)
-    /// - Final exchange: you receive USD notional back (+1.0 sign)
-    ///
-    /// This follows ISDA conventions where the receiver of a leg provides
-    /// the initial funding in that currency.
-    #[inline]
-    pub(crate) fn initial_principal_sign(self) -> f64 {
-        match self {
-            Self::Receive => -1.0,
-            Self::Pay => 1.0,
-        }
-    }
-
-    /// Returns the sign for final principal exchange (opposite of initial).
-    #[inline]
-    pub(crate) fn final_principal_sign(self) -> f64 {
-        -self.initial_principal_sign()
-    }
+/// Returns the sign of a leg's initial principal exchange.
+///
+/// # Market Convention
+///
+/// The leg you receive is economically a lending position: you pay out the
+/// principal at the start (`-1.0`), receive coupons, and receive the principal
+/// back at the end. For a USD/EUR XCCY swap where you receive USD, the initial
+/// exchange pays USD notional to the counterparty. This follows the ISDA
+/// convention that the receiver of a leg provides the initial funding in that
+/// currency.
+///
+/// # Arguments
+///
+/// * `side` - Whether the holder pays or receives the leg's coupons.
+#[inline]
+pub(crate) fn initial_principal_sign(side: PayReceive) -> f64 {
+    -side.sign()
 }
 
 /// Notional exchange convention for XCCY swaps.
@@ -240,7 +183,7 @@ pub struct XccySwapLeg {
     /// Leg notional (in leg currency).
     pub notional: Money,
     /// Pay/receive direction for this leg.
-    pub side: LegSide,
+    pub side: PayReceive,
     /// Projection forward curve.
     pub forward_curve_id: CurveId,
     /// Discount curve for PV in leg currency.
@@ -387,7 +330,7 @@ impl XccySwap {
         let usd_leg = XccySwapLeg {
             currency: Currency::USD,
             notional: Money::from((10_000_000_i64, Currency::USD)),
-            side: LegSide::Receive,
+            side: PayReceive::Receive,
             forward_curve_id: CurveId::new("USD-SOFR-3M"),
             discount_curve_id: CurveId::new("USD-OIS"),
             start,
@@ -407,7 +350,7 @@ impl XccySwap {
         let eur_leg = XccySwapLeg {
             currency: Currency::EUR,
             notional: Money::from((9_200_000_i64, Currency::EUR)),
-            side: LegSide::Pay,
+            side: PayReceive::Pay,
             forward_curve_id: CurveId::new("EUR-EURIBOR-3M"),
             discount_curve_id: CurveId::new("EUR-OIS"),
             start,
@@ -801,8 +744,7 @@ impl XccySwap {
                 Some(&mut projected_fixings),
             )?;
             let all_in = projected.all_in_rate(spread);
-            let amount =
-                leg.side.coupon_sign() * projected.unsigned_coupon(leg.notional.amount(), spread);
+            let amount = leg.side.sign() * projected.unsigned_coupon(leg.notional.amount(), spread);
             flows.push(crate::cashflow::primitives::CashFlow::new(
                 period.payment_date,
                 projected.fixing_date.or(period.reset_date),
@@ -833,7 +775,7 @@ impl XccySwap {
             self.notional_exchange,
             NotionalExchange::InitialAndFinal | NotionalExchange::MtmResetting { .. }
         ) {
-            let initial_amount = leg.side.initial_principal_sign() * leg.notional.amount();
+            let initial_amount = initial_principal_sign(leg.side) * leg.notional.amount();
             let _ = builder.add_principal_event(
                 leg.start,
                 leg.start,
@@ -849,7 +791,7 @@ impl XccySwap {
                 | NotionalExchange::InitialAndFinal
                 | NotionalExchange::MtmResetting { .. }
         ) {
-            let final_amount = leg.side.final_principal_sign() * leg.notional.amount();
+            let final_amount = leg.side.sign() * leg.notional.amount();
             let _ = builder.add_principal_event(
                 leg.end,
                 leg.end,
@@ -943,7 +885,7 @@ impl XccySwap {
         ) && leg.start > as_of
         {
             let df = relative_df_discount_curve(disc.as_ref(), as_of, leg.start)?;
-            let cf_leg_currency = leg.side.initial_principal_sign() * leg.notional.amount() * df;
+            let cf_leg_currency = initial_principal_sign(leg.side) * leg.notional.amount() * df;
             let cf_rep = convert_pv(cf_leg_currency)?;
             pv.add(cf_rep);
         }
@@ -957,7 +899,7 @@ impl XccySwap {
         ) && leg.end > as_of
         {
             let df = relative_df_discount_curve(disc.as_ref(), as_of, leg.end)?;
-            let cf_leg_currency = leg.side.final_principal_sign() * leg.notional.amount() * df;
+            let cf_leg_currency = leg.side.sign() * leg.notional.amount() * df;
             let cf_rep = convert_pv(cf_leg_currency)?;
             pv.add(cf_rep);
         }
@@ -984,8 +926,7 @@ impl XccySwap {
             }
 
             let spread = decimal_to_f64(leg.spread_bp, "XccySwap leg spread_bp")? / 10_000.0;
-            let coupon =
-                leg.side.coupon_sign() * projected.unsigned_coupon(leg.notional.amount(), spread);
+            let coupon = leg.side.sign() * projected.unsigned_coupon(leg.notional.amount(), spread);
 
             // Use relative date-based discounting for numerical stability.
             let df = relative_df_discount_curve(disc.as_ref(), as_of, period.payment_date)?;
@@ -1205,7 +1146,7 @@ mod tests {
             XccySwapLeg {
                 currency: Currency::USD,
                 notional: Money::from((1_000_000_i64, Currency::USD)),
-                side: LegSide::Receive,
+                side: PayReceive::Receive,
                 forward_curve_id: CurveId::new("USD-SOFR-3M"),
                 discount_curve_id: CurveId::new("USD-OIS"),
                 start,
@@ -1224,7 +1165,7 @@ mod tests {
             XccySwapLeg {
                 currency: Currency::EUR,
                 notional: Money::from((900_000_i64, Currency::EUR)),
-                side: LegSide::Pay,
+                side: PayReceive::Pay,
                 forward_curve_id: CurveId::new("EUR-EURIBOR-3M"),
                 discount_curve_id: CurveId::new("EUR-OIS"),
                 start,
@@ -1304,7 +1245,7 @@ mod tests {
             XccySwapLeg {
                 currency: Currency::USD,
                 notional: Money::from((1_000_000_i64, Currency::USD)),
-                side: LegSide::Receive,
+                side: PayReceive::Receive,
                 forward_curve_id: CurveId::new("USD-SOFR-3M"),
                 discount_curve_id: CurveId::new("USD-OIS"),
                 start,
@@ -1323,7 +1264,7 @@ mod tests {
             XccySwapLeg {
                 currency: Currency::EUR,
                 notional: Money::from((900_000_i64, Currency::EUR)),
-                side: LegSide::Pay,
+                side: PayReceive::Pay,
                 forward_curve_id: CurveId::new("EUR-EURIBOR-3M"),
                 discount_curve_id: CurveId::new("EUR-OIS"),
                 start,
@@ -1354,22 +1295,6 @@ mod tests {
             msg.contains("fx_matrix") || msg.contains("FX path"),
             "error must explain that FX is required, got: {msg}"
         );
-    }
-
-    #[test]
-    fn leg_side_fromstr_display_roundtrip() {
-        use std::str::FromStr;
-
-        let variants = [LegSide::Pay, LegSide::Receive];
-        for v in variants {
-            let s = v.to_string();
-            let parsed = LegSide::from_str(&s).expect("roundtrip parse should succeed");
-            assert_eq!(v, parsed, "roundtrip failed for {s}");
-        }
-        for noncanonical in ["rec", "payer", "Receive", " receive"] {
-            assert!(LegSide::from_str(noncanonical).is_err());
-        }
-        assert!(LegSide::from_str("invalid").is_err());
     }
 
     #[test]
@@ -1448,7 +1373,7 @@ mod tests {
         let leg1 = XccySwapLeg {
             currency: Currency::EUR,
             notional: Money::from((9_200_000_i64, Currency::EUR)),
-            side: LegSide::Receive,
+            side: PayReceive::Receive,
             forward_curve_id: CurveId::new("EUR-EURIBOR-3M"),
             discount_curve_id: CurveId::new("EUR-OIS"),
             start,
@@ -1467,7 +1392,7 @@ mod tests {
         let mut leg2 = leg1.clone();
         leg2.currency = Currency::USD;
         leg2.notional = Money::from((10_000_000_i64, Currency::USD));
-        leg2.side = LegSide::Pay;
+        leg2.side = PayReceive::Pay;
         leg2.forward_curve_id = CurveId::new("USD-SOFR-3M");
         leg2.discount_curve_id = CurveId::new("USD-OIS");
         leg2.start = start_off; // misaligned start
@@ -1497,7 +1422,7 @@ mod tests {
         let leg1 = XccySwapLeg {
             currency: Currency::EUR,
             notional: Money::from((9_200_000_i64, Currency::EUR)),
-            side: LegSide::Receive,
+            side: PayReceive::Receive,
             forward_curve_id: CurveId::new("EUR-EURIBOR-3M"),
             discount_curve_id: CurveId::new("EUR-OIS"),
             start,
@@ -1516,7 +1441,7 @@ mod tests {
         let mut leg2 = leg1.clone();
         leg2.currency = Currency::USD;
         leg2.notional = Money::from((10_000_000_i64, Currency::USD));
-        leg2.side = LegSide::Pay;
+        leg2.side = PayReceive::Pay;
         leg2.forward_curve_id = CurveId::new("USD-SOFR-3M");
         leg2.discount_curve_id = CurveId::new("USD-OIS");
         leg2.frequency = Tenor::semi_annual();
@@ -1694,7 +1619,7 @@ mod tests {
         let leg = XccySwapLeg {
             currency: Currency::EUR,
             notional: Money::from((1_000_000_i64, Currency::EUR)),
-            side: LegSide::Pay,
+            side: PayReceive::Pay,
             forward_curve_id: CurveId::new("EUR-ESTR-OIS"),
             discount_curve_id: CurveId::new("EUR-OIS"),
             start,
@@ -1773,7 +1698,7 @@ mod tests {
         let mut leg = XccySwapLeg {
             currency: Currency::EUR,
             notional: Money::from((1_000_000_i64, Currency::EUR)),
-            side: LegSide::Pay,
+            side: PayReceive::Pay,
             forward_curve_id: CurveId::new("EUR-ESTR-OIS"),
             discount_curve_id: CurveId::new("EUR-OIS"),
             start,

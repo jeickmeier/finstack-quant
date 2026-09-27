@@ -207,10 +207,10 @@ pub use fixed_income::{
 };
 
 pub use rates::{
-    BasisSwap, BermudanSwaption, CapFloor, CmsOption, CmsSpreadOption, CmsSpreadOptionType,
-    CmsSwap, CollateralSpec, CollateralType, Deposit, ForwardRateAgreement, InflationCapFloor,
-    InflationCapFloorType, InflationSwap, InterestRateFuture, InterestRateSwap,
-    RateAveragingMethod, RateOptionType, Repo, RepoType, Swaption, XccySwap, YoYInflationSwap,
+    BasisSwap, BermudanSwaption, CapFloor, CmsOption, CmsSpreadOption, CmsSwap, CollateralSpec,
+    CollateralType, Deposit, ForwardRateAgreement, InflationCapFloor, InflationSwap,
+    InterestRateFuture, InterestRateSwap, RateAveragingMethod, RateOptionType, Repo, RepoType,
+    Swaption, XccySwap, YoYInflationSwap,
 };
 
 pub use credit_derivatives::{CDSIndex, CDSOption, CDSTranche, CreditDefaultSwap};
@@ -273,16 +273,17 @@ pub use common_impl::parameters::{
     ExerciseStyle, FinancingLegSpec, FinancingRateCompounding, FixedLegSpec, FloatLegSpec,
     FxUnderlyingParams, IndexUnderlyingParams, Monitoring, OptionMarketParams, OptionType,
     ParRateMethod, PayReceive, PremiumLegSpec, ProtectionLegSpec, QuantoSpec, ScheduleSpec,
-    SettlementType, TotalReturnLegSpec,
+    SettlementType, TotalReturnLegSpec, VolatilityModel,
 };
 
-pub use common_impl::parameters::trs_common::{TrsScheduleSpec, TrsSide};
+pub use common_impl::parameters::trs_common::TrsScheduleSpec;
 
 /// Pricing overrides module.
 pub mod pricing_overrides;
 pub use pricing_overrides::{
     BondRiskBasis, BumpConfig, InstrumentPricingOverrides, MarketQuoteOverrides,
-    MetricPricingOverrides, ModelConfig, ScenarioPricingOverrides, ThetaDayBasis,
+    MetricPricingOverrides, ModelConfig, ScenarioPricingOverrides, ShortRateTreeModel,
+    ThetaDayBasis,
 };
 
 pub mod json_loader;

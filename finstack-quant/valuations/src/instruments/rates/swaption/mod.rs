@@ -95,12 +95,12 @@
 //! # See Also
 //!
 //! - [`crate::instruments::rates::swaption::Swaption`] for swaption instrument struct
-//! - [`crate::instruments::rates::swaption::SwaptionExercise`] for exercise style specification
-//! - [`crate::instruments::rates::swaption::SwaptionSettlement`] for settlement type
+//! - [`crate::instruments::ExerciseStyle`] for exercise style specification
+//! - [`crate::instruments::SettlementType`] for settlement type
 //! - swaption metrics module for risk metrics
 //! - [`crate::instruments::rates::swaption::SimpleSwaptionBlackPricer`] for Black-76 pricing
 //! - [`crate::instruments::rates::swaption::SimpleSwaptionNormalPricer`] for Bachelier pricing
-//! - [`crate::instruments::rates::swaption::VolatilityModel`] for selecting Black vs Normal
+//! - [`crate::instruments::VolatilityModel`] for selecting Black vs Normal
 
 use finstack_quant_core::dates::Date;
 
@@ -135,7 +135,7 @@ pub use pricer::{SimpleSwaptionBlackPricer, SimpleSwaptionNormalPricer};
 pub use pricing::BermudanSwaptionTreeValuator;
 pub use types::{
     BermudanSchedule, BermudanSwaption, BermudanType, CashSettlementMethod, GreekInputs, Swaption,
-    SwaptionBuilder, SwaptionExercise, SwaptionSettlement, VolatilityModel,
+    SwaptionBuilder,
 };
 
 /// Convert effective swap dates to the canonical market tenor coordinate.

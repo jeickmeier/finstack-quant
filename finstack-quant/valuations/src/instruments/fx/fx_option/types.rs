@@ -221,21 +221,6 @@ pub struct FxOption {
 
 // Declare canonical market dependencies for the DV01 calculator.
 // FxOption uses both domestic and foreign curves for Garman-Kohlhagen pricing
-/// Delta conventions relevant for FX ATM DNS strikes.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(rename_all = "snake_case")]
-pub enum FxAtmDeltaConvention {
-    /// Unadjusted spot delta convention.
-    Spot,
-    /// Unadjusted forward delta convention.
-    Forward,
-    /// Premium-adjusted spot delta convention.
-    PremiumAdjustedSpot,
-    /// Premium-adjusted forward delta convention.
-    PremiumAdjustedForward,
-}
-
 impl FxOption {
     /// Validate FX option currency invariants.
     pub fn validate(&self) -> finstack_quant_core::Result<()> {
@@ -384,13 +369,14 @@ impl FxOption {
     /// * `forward` - Forward FX rate `S · DF_foreign / DF_domestic`
     /// * `vol` - ATM volatility (decimal, e.g., 0.10 for 10%)
     /// * `time_to_expiry` - Time to expiry in years
-    /// * `convention` - ATM delta convention determining the DNS formula variant
+    /// * `convention` - Delta convention kind (usually `option.delta_convention.kind`);
+    ///   only whether it is premium-adjusted changes the DNS formula
     ///
     /// # Example
     ///
     /// ```
     /// use finstack_quant_valuations::instruments::fx::fx_option::{
-    ///     FxAtmDeltaConvention, FxOption,
+    ///     FxDeltaConventionKind, FxOption,
     /// };
     ///
     /// let forward = 1.111;
@@ -399,12 +385,12 @@ impl FxOption {
     ///
     /// // Spot delta DNS (Bloomberg default)
     /// let k_dns_spot = FxOption::atm_dns_strike_for_convention(
-    ///     forward, vol, t, FxAtmDeltaConvention::Spot,
+    ///     forward, vol, t, FxDeltaConventionKind::Spot,
     /// );
     ///
     /// // Forward delta DNS (interbank standard)
     /// let k_dns_fwd = FxOption::atm_dns_strike_for_convention(
-    ///     forward, vol, t, FxAtmDeltaConvention::Forward,
+    ///     forward, vol, t, FxDeltaConventionKind::Forward,
     /// );
     ///
     /// // Both DNS strikes sit above the forward by half the variance.
@@ -420,15 +406,17 @@ impl FxOption {
         forward: f64,
         vol: f64,
         time_to_expiry: f64,
-        convention: FxAtmDeltaConvention,
+        convention: FxDeltaConventionKind,
     ) -> f64 {
         let variance = vol * vol * time_to_expiry;
         match convention {
-            FxAtmDeltaConvention::Spot | FxAtmDeltaConvention::Forward => {
+            FxDeltaConventionKind::Spot | FxDeltaConventionKind::Forward => {
                 forward * (0.5_f64 * variance).exp()
             }
-            FxAtmDeltaConvention::PremiumAdjustedSpot
-            | FxAtmDeltaConvention::PremiumAdjustedForward => forward * (-0.5_f64 * variance).exp(),
+            FxDeltaConventionKind::PremiumAdjustedSpot
+            | FxDeltaConventionKind::PremiumAdjustedForward => {
+                forward * (-0.5_f64 * variance).exp()
+            }
         }
     }
 }

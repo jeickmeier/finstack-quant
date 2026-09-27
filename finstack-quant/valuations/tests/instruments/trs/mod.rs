@@ -1,7 +1,7 @@
 //! Unit tests for Total Return Swap (TRS) instruments.
 //!
 //! This test module provides comprehensive coverage of TRS functionality including:
-//! - Core types and enums (TrsSide, TrsScheduleSpec)
+//! - Core types and enums (TrsScheduleSpec, PayReceive side)
 //! - Equity TRS instrument creation, pricing, and risk metrics
 //! - Fixed Income Index TRS instrument creation, pricing, and risk metrics
 //! - Risk metrics (Par Spread, Financing Annuity, IR01, Index Delta, Theta, Bucketed DV01)

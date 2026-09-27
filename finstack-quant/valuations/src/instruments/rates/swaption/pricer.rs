@@ -2,7 +2,8 @@
 
 use crate::instruments::common_impl::helpers::year_fraction;
 use crate::instruments::common_impl::traits::Instrument;
-use crate::instruments::rates::swaption::{Swaption, VolatilityModel};
+use crate::instruments::rates::swaption::Swaption;
+use crate::instruments::VolatilityModel;
 use crate::pricer::{
     InstrumentType, ModelKey, Pricer, PricerKey, PricingError, PricingErrorContext,
 };

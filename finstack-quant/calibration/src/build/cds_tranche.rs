@@ -12,9 +12,10 @@ use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, InstrumentId};
 use finstack_quant_core::{Error, Result};
 use finstack_quant_valuations::instruments::credit_derivatives::cds_tranche::{
-    CDSTranche, CDSTrancheParams, TrancheSide,
+    CDSTranche, CDSTrancheParams,
 };
 use finstack_quant_valuations::instruments::Instrument;
+use finstack_quant_valuations::instruments::PayReceive;
 use finstack_quant_valuations::market::conventions::ConventionRegistry;
 
 /// Overrides for CDS tranche schedule conventions.
@@ -263,7 +264,7 @@ pub fn build_cds_tranche_instrument(
 
     // Quote-built tranches are constructed as buy-protection (pay premium),
     // the standard orientation for calibration instruments.
-    let side = TrancheSide::BuyProtection;
+    let side = PayReceive::Pay;
 
     let mut instrument = CDSTranche::new(
         InstrumentId::new(id.as_str()),

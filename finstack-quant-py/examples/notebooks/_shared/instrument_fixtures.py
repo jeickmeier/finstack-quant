@@ -288,7 +288,7 @@ def cds_tranche(idx: int) -> tuple[str, dict]:
             "calendar_id": "weekends_only",
             "discount_curve_id": "USD-OIS",
             "credit_index_id": "CDX.NA.IG.HAZARD",
-            "side": "buy_protection",
+            "side": "pay",
             "realized_loss": 0.0,
             "roll_rule": "none",
             "attributes": {"tags": ["structured-credit"], "meta": {}},

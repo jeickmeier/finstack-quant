@@ -46,7 +46,7 @@ numeric-serde helpers that keep instrument invariants uniform.
 | `conventions.rs` | `BondConvention`, `CommodityConvention` |
 | `contract.rs` | `ScheduleSpec` |
 | `quanto.rs` | `QuantoSpec` (validated correlation in `[-1, 1]`) |
-| `trs_common.rs` | `TrsSide`, `TrsScheduleSpec` — shared by equity and fixed-income TRS |
+| `trs_common.rs` | `TrsScheduleSpec` — shared by equity and fixed-income TRS |
 | `volatility.rs` | `VolatilityModel` plus a re-export of `crate::models::volatility::SABRParameters` |
 
 `OptionMarketParams` is re-exported directly from `finstack-quant-models`, its
@@ -74,7 +74,7 @@ Everything below is re-exported by `instruments/mod.rs`; the module paths under
   `OptionGreekKind`, `OptionGreeks`, `OptionGreeksProvider`,
   `OptionGreeksRequest`; `MarketDependencies`, `InstrumentCurves`,
   `RatesCurveKind`, `FxPair`, `VolatilityDependency`; `TrsEngine`,
-  `TrsReturnModel`, `TotalReturnLegParams`; `TrsScheduleSpec`, `TrsSide`;
+  `TrsReturnModel`, `TotalReturnLegParams`; `TrsScheduleSpec`;
   `fx_spot_date_for_pair`, `add_joint_business_days`, `adjust_joint_calendar`,
   `ResolvedCalendarPair`; and the `parameters` subset listed in
   `instruments/mod.rs` (`FixedLegSpec`, `FloatLegSpec`, `BasisSwapLeg`,

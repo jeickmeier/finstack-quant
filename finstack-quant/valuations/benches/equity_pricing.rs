@@ -39,7 +39,7 @@ use finstack_quant_valuations::instruments::{
     FutureOptionSettlement, FutureOptionTerms, ListedFutureTerms,
 };
 use finstack_quant_valuations::instruments::{
-    EquityUnderlyingParams, FinancingLegSpec, TrsScheduleSpec, TrsSide,
+    EquityUnderlyingParams, FinancingLegSpec, TrsScheduleSpec,
 };
 use rust_decimal::Decimal;
 use std::hint::black_box;
@@ -164,7 +164,7 @@ fn equity_trs(tenor_years: i32) -> EquityTotalReturnSwap {
         .underlying(underlying)
         .financing(financing)
         .schedule(schedule)
-        .side(TrsSide::ReceiveTotalReturn)
+        .side(PayReceive::Receive)
         .dividend_settlement(
             finstack_quant_valuations::instruments::equity::TrsDividendSettlement::OnDividendDate,
         )

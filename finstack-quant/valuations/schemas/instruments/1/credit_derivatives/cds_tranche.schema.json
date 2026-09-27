@@ -101,8 +101,8 @@
           "type": "integer"
         },
         "side": {
-          "$ref": "#/$defs/TrancheSide",
-          "description": "Tranche side (buy/sell protection)"
+          "$ref": "#/$defs/PayReceive",
+          "description": "Tranche side, as on CDS and CDSIndex: `pay` buys protection (pays the\nrunning premium), `receive` sells protection (receives the premium)."
         },
         "start_date": {
           "anyOf": [
@@ -164,6 +164,21 @@
       "description": "Canonical schema marker for persisted instrument envelopes.",
       "type": "string"
     },
+    "PayReceive": {
+      "description": "Direction for instrument legs (universal for IRS, CDS, variance swaps, etc.)\n\nFor interest rate swaps: Pay = pay fixed/receive floating, Receive = receive fixed/pay floating\nFor credit default swaps: Pay = buy protection (pay premium), Receive = sell protection (receive premium)\nFor variance swaps: Pay = short variance, Receive = long variance",
+      "oneOf": [
+        {
+          "const": "pay",
+          "description": "Pay the primary leg (fixed rate in IRS, protection premium in CDS, short variance)",
+          "type": "string"
+        },
+        {
+          "const": "receive",
+          "description": "Receive the primary leg (fixed rate in IRS, protection premium in CDS, long variance)",
+          "type": "string"
+        }
+      ]
+    },
     "RollRule": {
       "description": "Roll-date rule applied when generating schedule anchors.\n\nSelects the core `ScheduleBuilder` date-generation mode. The IMM modes\nforce a quarterly grid: the schedule frequency and stub rule configured on\n[`ScheduleParams`] are overridden with quarterly / short-back, matching\n`ScheduleBuilder::imm` and `ScheduleBuilder::cds_imm`.\n\n# Variants\n\n- **`None`**: plain tenor stepping from the schedule boundaries (default).\n- **`Imm`**: quarterly third Wednesdays of Mar/Jun/Sep/Dec (CME IMM dates\n  for rate, currency, and equity index futures).\n- **`CdsImm`**: 20th of Mar/Jun/Sep/Dec (post-Big-Bang standard CDS roll\n  dates). When the start date is not itself a roll date, the first period\n  accrues from the roll date immediately **preceding** the start (standard\n  front accrual per the ISDA Big Bang Protocol, April 2009).\n\n# Examples\n\n```rust\nuse finstack_quant_cashflows::builder::specs::RollRule;\n\nlet rule = RollRule::default();\nassert_eq!(rule, RollRule::None);\n```\n\n# References\n\n- `docs/REFERENCES.md#isda-cds-standard-model`\n- CME IMM date rules (third Wednesday of the contract month)",
       "oneOf": [
@@ -210,21 +225,6 @@
         {
           "const": "long_back",
           "description": "Long stub period at the end of the schedule (merges final two periods).",
-          "type": "string"
-        }
-      ]
-    },
-    "TrancheSide": {
-      "description": "Buyer/seller perspective for CDS tranche premium/protection",
-      "oneOf": [
-        {
-          "const": "buy_protection",
-          "description": "Buy protection on the tranche (pay running, receive protection)",
-          "type": "string"
-        },
-        {
-          "const": "sell_protection",
-          "description": "Sell protection on the tranche (receive running, pay protection)",
           "type": "string"
         }
       ]
@@ -278,7 +278,7 @@
           "realized_loss": 0.0,
           "roll_rule": "cds_imm",
           "series": 42,
-          "side": "buy_protection",
+          "side": "pay",
           "start_date": null,
           "stub": "short_front",
           "upfront": null

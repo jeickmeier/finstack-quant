@@ -46,30 +46,28 @@ re-exported flat at `finstack_quant_valuations::instruments`:
 
 `InterestRateSwap`, `BasisSwap`, `XccySwap`, `CapFloor`, `RateOptionType`,
 `Swaption`, `BermudanSwaption`, `CmsSwap`, `CmsOption`, `CmsSpreadOption`,
-`CmsSpreadOptionType`, `Deposit`, `ForwardRateAgreement`, `InterestRateFuture`,
+`Deposit`, `ForwardRateAgreement`, `InterestRateFuture`,
 `Repo`, `RepoType`, `CollateralSpec`, `CollateralType`,
-`InflationSwap`, `YoYInflationSwap`, `InflationCapFloor`,
-`InflationCapFloorType`.
+`InflationSwap`, `YoYInflationSwap`, `InflationCapFloor`.
 
 Reachable only under the family path — not exhaustive, but the types callers
 actually reach for: the builders (`CapFloorBuilder`,
 `SwaptionBuilder`, `RepoBuilder`, `InflationSwapBuilder`,
 `YoYInflationSwapBuilder`, `InflationCapFloorBuilder`), `CapFloorVolType`,
 `OvernightCouponConvention`, `OvernightSpreadCompounding`,
-`irs::FloatingLegCompounding`, `swaption::{SwaptionExercise, SwaptionSettlement,
-VolatilityModel, SABRParameters, BermudanSchedule, BermudanType,
+`irs::FloatingLegCompounding`, `swaption::{SABRParameters, BermudanSchedule, BermudanType,
 CashSettlementMethod, BermudanPricingMethod, BermudanSwaptionPricer,
 BermudanSwaptionTreeValuator, SimpleSwaptionBlackPricer, SimpleSwaptionNormalPricer, SwaptionParams}`,
-`xccy_swap::{LegSide, NotionalExchange, ResettingSide,
+`xccy_swap::{NotionalExchange, ResettingSide,
 XccySwapLeg}`, `cms_swap::{FundingLeg, FundingLegSpec}`,
 `deposit::ConventionDepositParams`, `fra::ConventionFraParams`,
 `ir_future::FutureContractSpecs`, and `hw1f`.
 Reusable `HullWhiteParams` and Hull-White equations live at
 `finstack_quant_models::rates::hull_white`.
 
-`swaption::VolatilityModel` (`Black` / `Normal`, schema name
-`SwaptionVolatilityModel`) is deliberately a different type from the shared
-`VolatilityModel` used by pricing overrides. Do not collapse them.
+Swaptions use the shared `ExerciseStyle`, `SettlementType` and
+`VolatilityModel` (`black` / `normal`) re-exported at
+`finstack_quant_valuations::instruments`.
 
 Inside a leaf, `metrics/`, `types.rs`/`types/`, `pricer.rs`/`pricing/` and the
 model-specific pricers (`hw_pricer.rs`, `lmm_pricer.rs`, `bermudan/`) are `pub(crate)` or private; supported

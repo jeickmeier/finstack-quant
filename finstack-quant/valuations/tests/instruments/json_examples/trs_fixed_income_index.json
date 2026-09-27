@@ -31,7 +31,7 @@
         },
         "start": "2024-01-01"
       },
-      "side": "receive_total_return",
+      "side": "receive",
       "underlying": {
         "currency": "USD",
         "duration_id": "US-CORP-DURATION",

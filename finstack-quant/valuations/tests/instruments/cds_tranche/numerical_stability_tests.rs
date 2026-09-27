@@ -45,7 +45,7 @@ fn el_at_flat_corr(attach: f64, detach: f64, coupon_bp: f64, level: f64) -> f64 
         attach,
         detach,
         coupon_bp,
-        finstack_quant_valuations::instruments::credit_derivatives::cds_tranche::TrancheSide::SellProtection,
+        finstack_quant_valuations::instruments::PayReceive::Receive,
     );
     pricer.calculate_expected_loss(&tranche, &market).unwrap()
 }

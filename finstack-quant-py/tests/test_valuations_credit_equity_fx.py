@@ -310,8 +310,8 @@ class TestCDSTranche:
         params = CDSTrancheParams.mezzanine_tranche("CDX.NA.IG", 42, Money(10_000_000.0, USD), "2029-12-20", Bps(100.0))
         assert (params.attach_pct, params.detach_pct) == (3.0, 7.0)
         assert params.coupon_bp == 100.0
-        tranche = CDSTranche.standard("CDX-42-3X7", params, "USD-OIS", "CDX.NA.IG.HAZARD", "buy_protection")
-        assert tranche.side == "buy_protection"
+        tranche = CDSTranche.standard("CDX-42-3X7", params, "USD-OIS", "CDX.NA.IG.HAZARD", "pay")
+        assert tranche.side == "pay"
         assert tranche.day_count == "act_360"
         assert tranche.frequency == Tenor.quarterly()
         assert tranche.business_day_convention == "following"
@@ -339,7 +339,7 @@ class TestCDSTranche:
             .business_day_convention("modified_following")
             .discount_curve_id("USD-OIS")
             .credit_index_id("CDX-IG-42-CURVE")
-            .side("buy_protection")
+            .side("pay")
             .upfront(("2024-06-25", Money(100_000.0, USD)))
             .attributes(Attributes())
             .build()

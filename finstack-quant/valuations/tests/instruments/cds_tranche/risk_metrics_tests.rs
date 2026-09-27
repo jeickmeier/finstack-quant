@@ -12,8 +12,8 @@
 
 use super::helpers::*;
 use finstack_quant_valuations::instruments::credit_derivatives::cds_tranche::CDSTranchePricer;
-use finstack_quant_valuations::instruments::credit_derivatives::cds_tranche::TrancheSide;
 use finstack_quant_valuations::instruments::Instrument;
+use finstack_quant_valuations::instruments::PayReceive;
 use finstack_quant_valuations::metrics::MetricId;
 use std::sync::Arc;
 
@@ -41,7 +41,7 @@ fn test_standard_cs01_requires_replay_recipe() {
 fn test_cs01_sell_protection_typically_positive() {
     // Arrange
     let mut tranche = mezzanine_tranche();
-    tranche.side = TrancheSide::SellProtection;
+    tranche.side = PayReceive::Receive;
     let market = replayable_market_context();
     let as_of = base_date();
 
@@ -68,8 +68,8 @@ fn test_cs01_buy_sell_opposite_sign() {
     let market = replayable_market_context();
     let as_of = base_date();
 
-    let sell_tranche = custom_tranche(3.0, 7.0, 500.0, TrancheSide::SellProtection);
-    let buy_tranche = custom_tranche(3.0, 7.0, 500.0, TrancheSide::BuyProtection);
+    let sell_tranche = custom_tranche(3.0, 7.0, 500.0, PayReceive::Receive);
+    let buy_tranche = custom_tranche(3.0, 7.0, 500.0, PayReceive::Pay);
 
     // Act
     let cs01_sell = sell_tranche
@@ -283,7 +283,7 @@ fn test_jump_to_default_senior_can_be_zero() {
     let as_of = base_date();
 
     // Senior tranche with high attachment point
-    let senior = custom_tranche(15.0, 30.0, 50.0, TrancheSide::SellProtection);
+    let senior = custom_tranche(15.0, 30.0, 50.0, PayReceive::Receive);
 
     // Act
     let jtd = pricer
@@ -363,7 +363,7 @@ fn test_spread_dv01_positive_for_sell_protection() {
     // Arrange
     let pricer = CDSTranchePricer::new();
     let mut tranche = mezzanine_tranche();
-    tranche.side = TrancheSide::SellProtection;
+    tranche.side = PayReceive::Receive;
     let market = standard_market_context();
     let as_of = base_date();
 
@@ -525,8 +525,8 @@ fn test_par_spread_positive_and_side_invariant() {
     let as_of = base_date();
 
     // Same mezzanine tranche, two sides
-    let tranche_sell = custom_tranche(3.0, 7.0, 500.0, TrancheSide::SellProtection);
-    let tranche_buy = custom_tranche(3.0, 7.0, 500.0, TrancheSide::BuyProtection);
+    let tranche_sell = custom_tranche(3.0, 7.0, 500.0, PayReceive::Receive);
+    let tranche_buy = custom_tranche(3.0, 7.0, 500.0, PayReceive::Pay);
 
     let par_sell = pricer
         .calculate_par_spread(&tranche_sell, &market, as_of)

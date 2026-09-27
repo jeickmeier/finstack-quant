@@ -16,7 +16,7 @@ use finstack_quant_core::money::Money;
 use finstack_quant_valuations::instruments::credit_derivatives::cds_tranche::CDSTranche;
 use finstack_quant_valuations::instruments::credit_derivatives::cds_tranche::CDSTrancheParams;
 use finstack_quant_valuations::instruments::credit_derivatives::cds_tranche::CDSTranchePricer;
-use finstack_quant_valuations::instruments::credit_derivatives::cds_tranche::TrancheSide;
+use finstack_quant_valuations::instruments::PayReceive;
 use time::macros::date;
 
 // ==================== Standard Tranche Structure Tests ====================
@@ -138,7 +138,7 @@ fn test_standard_tranche_derives_contractual_effective_date_for_seasoned_trade()
         &params,
         "USD-OIS",
         "CDX.NA.IG.42",
-        TrancheSide::SellProtection,
+        PayReceive::Receive,
     )
     .expect("standard tranche");
     explicit.start_date = Some(date!(2024 - 12 - 20));
@@ -406,7 +406,7 @@ fn test_spread_dv01_sign_convention() {
     let pricer =
         finstack_quant_valuations::instruments::credit_derivatives::cds_tranche::CDSTranchePricer::new();
     let mut tranche = mezzanine_tranche();
-    tranche.side = finstack_quant_valuations::instruments::credit_derivatives::cds_tranche::TrancheSide::SellProtection;
+    tranche.side = finstack_quant_valuations::instruments::PayReceive::Receive;
     let market = standard_market_context();
     let as_of = base_date();
 

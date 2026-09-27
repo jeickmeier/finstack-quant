@@ -3,7 +3,8 @@ use crate::cashflow::builder::periods::{build_periods, period_accrual, BuildPeri
 use crate::cashflow::builder::specs::RollRule;
 use crate::instruments::common_impl::numeric::decimal_to_f64;
 use crate::instruments::common_impl::parameters::{FixedLegSpec, FloatLegSpec, OptionType};
-use crate::instruments::rates::swaption::{CashSettlementMethod, SwaptionSettlement};
+use crate::instruments::rates::swaption::CashSettlementMethod;
+use crate::instruments::SettlementType;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::Result;
@@ -175,7 +176,7 @@ impl HwSwaptionCashflows {
             .sum();
         let swap_rate = floating / annuity;
         let payoff_annuity = match (terms.settlement, terms.cash_method) {
-            (SwaptionSettlement::Cash, CashSettlementMethod::ParYield) => {
+            (SettlementType::Cash, CashSettlementMethod::ParYield) => {
                 let mut discount = 1.0;
                 self.fixed
                     .iter()
@@ -189,7 +190,7 @@ impl HwSwaptionCashflows {
                     })
                     .sum()
             }
-            (SwaptionSettlement::Cash, CashSettlementMethod::ZeroCoupon) => {
+            (SettlementType::Cash, CashSettlementMethod::ZeroCoupon) => {
                 self.fixed.iter().map(|&(_, tau)| tau).sum::<f64>() * bond(self.horizon())
             }
             _ => annuity,
@@ -218,7 +219,7 @@ pub(crate) struct HwExerciseTerms {
     pub strike: f64,
     pub notional: f64,
     pub option_type: OptionType,
-    pub settlement: SwaptionSettlement,
+    pub settlement: SettlementType,
     pub cash_method: CashSettlementMethod,
 }
 
@@ -235,7 +236,7 @@ mod tests {
             strike: 0.0,
             notional: 1.0,
             option_type: OptionType::Call,
-            settlement: SwaptionSettlement::Physical,
+            settlement: SettlementType::Physical,
             cash_method: CashSettlementMethod::CollateralizedCashPrice,
         };
         // Integrate the Brownian loading products directly. Under the payment

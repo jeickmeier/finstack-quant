@@ -265,7 +265,7 @@ def build_cds_tranche() -> CDSTranche:
         .day_count(DayCount.ACT_360)
         .discount_curve_id("USD-OIS")
         .credit_index_id("CDX-IG-42-CURVE")
-        .side("buy_protection")
+        .side("pay")
         .build()
     )
 

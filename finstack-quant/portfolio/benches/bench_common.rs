@@ -33,10 +33,8 @@ use finstack_quant_valuations::instruments::credit_derivatives::cds::{
 use finstack_quant_valuations::instruments::credit_derivatives::cds_option::{
     CDSOption, CDSOptionParams,
 };
+use finstack_quant_valuations::instruments::credit_derivatives::cds_tranche::CDSTranche;
 use finstack_quant_valuations::instruments::credit_derivatives::cds_tranche::CDSTrancheParams;
-use finstack_quant_valuations::instruments::credit_derivatives::cds_tranche::{
-    CDSTranche, TrancheSide,
-};
 use finstack_quant_valuations::instruments::equity::equity_option::{
     EquityOption, EquityOptionParams,
 };
@@ -927,7 +925,7 @@ pub fn create_institutional_portfolio(num_positions: usize) -> Portfolio {
             &schedule_params,
             "USD-OIS",
             "CORP-HAZARD",
-            TrancheSide::BuyProtection,
+            PayReceive::Pay,
         )
         .expect("Valid tranche parameters");
         tranche.roll_rule = finstack_quant_cashflows::builder::specs::RollRule::CdsImm;

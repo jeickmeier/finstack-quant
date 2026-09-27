@@ -13,7 +13,7 @@ use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, PriceId};
 use finstack_quant_valuations::instruments::{
-    EquityUnderlyingParams, FinancingLegSpec, Instrument, TrsScheduleSpec, TrsSide,
+    EquityUnderlyingParams, FinancingLegSpec, Instrument, PayReceive, TrsScheduleSpec,
 };
 use rust_decimal::Decimal;
 
@@ -28,7 +28,7 @@ fn test_equity_trs_builder_defaults() {
     assert_eq!(trs.id.as_str(), "TEST-EQ-TRS-001");
     assert_eq!(trs.notional.amount(), 10_000_000.0);
     assert_eq!(trs.notional.currency(), USD);
-    assert_eq!(trs.side, TrsSide::ReceiveTotalReturn);
+    assert_eq!(trs.side, PayReceive::Receive);
     assert_eq!(trs.underlying.contract_size, 1.0);
 }
 
@@ -39,7 +39,7 @@ fn test_equity_trs_builder_custom_params() {
         .id("CUSTOM-TRS-001")
         .notional(Money::new(5_000_000.0, USD).expect("valid money fixture"))
         .spread_bp(50.0)
-        .side(TrsSide::PayTotalReturn)
+        .side(PayReceive::Pay)
         .initial_level(5100.0)
         .build();
 
@@ -47,7 +47,7 @@ fn test_equity_trs_builder_custom_params() {
     assert_eq!(trs.id.as_str(), "CUSTOM-TRS-001");
     assert_eq!(trs.notional.amount(), 5_000_000.0);
     assert_eq!(trs.financing.spread_bp, Decimal::from(50));
-    assert_eq!(trs.side, TrsSide::PayTotalReturn);
+    assert_eq!(trs.side, PayReceive::Pay);
     assert_eq!(trs.initial_level, Some(5100.0));
 }
 
@@ -68,7 +68,7 @@ fn test_equity_trs_npv_receive_side() {
     let market = create_market_context();
     let as_of = as_of_date();
     let trs = TestEquityTrsBuilder::new()
-        .side(TrsSide::ReceiveTotalReturn)
+        .side(PayReceive::Receive)
         .spread_bp(25.0)
         .build();
 
@@ -86,7 +86,7 @@ fn test_equity_trs_npv_pay_side() {
     let market = create_market_context();
     let as_of = as_of_date();
     let trs = TestEquityTrsBuilder::new()
-        .side(TrsSide::PayTotalReturn)
+        .side(PayReceive::Pay)
         .spread_bp(25.0)
         .build();
 
@@ -105,12 +105,12 @@ fn test_equity_trs_npv_pay_vs_receive_symmetry() {
     let as_of = as_of_date();
 
     let trs_receive = TestEquityTrsBuilder::new()
-        .side(TrsSide::ReceiveTotalReturn)
+        .side(PayReceive::Receive)
         .spread_bp(25.0)
         .build();
 
     let trs_pay = TestEquityTrsBuilder::new()
-        .side(TrsSide::PayTotalReturn)
+        .side(PayReceive::Pay)
         .spread_bp(25.0)
         .build();
 
@@ -152,7 +152,7 @@ fn completed_period_remains_valued_until_lagged_payment_date() {
             DayCount::Act360,
         ))
         .schedule(schedule)
-        .side(TrsSide::ReceiveTotalReturn)
+        .side(PayReceive::Receive)
         .dividend_settlement(
             finstack_quant_valuations::instruments::equity::TrsDividendSettlement::OnDividendDate,
         )
@@ -349,7 +349,7 @@ fn test_equity_trs_npv_equals_legs_difference() {
     let market = create_market_context();
     let as_of = as_of_date();
     let trs = TestEquityTrsBuilder::new()
-        .side(TrsSide::ReceiveTotalReturn)
+        .side(PayReceive::Receive)
         .spread_bp(25.0)
         .build();
 
@@ -399,7 +399,7 @@ fn test_equity_trs_sensitivity_to_spot_price() {
 
     // Create TRS with explicit initial level to lock it in
     let trs = TestEquityTrsBuilder::new()
-        .side(TrsSide::ReceiveTotalReturn)
+        .side(PayReceive::Receive)
         .initial_level(5000.0) // Lock initial level
         .build();
 
@@ -423,7 +423,7 @@ fn test_equity_trs_sensitivity_to_dividend_yield() {
     let market = create_market_context();
     let as_of = as_of_date();
     let trs = TestEquityTrsBuilder::new()
-        .side(TrsSide::ReceiveTotalReturn)
+        .side(PayReceive::Receive)
         .build();
 
     let _div_base = 0.015;
@@ -454,7 +454,7 @@ fn test_equity_trs_sensitivity_to_interest_rates() {
     // Arrange
     let as_of = as_of_date();
     let trs = TestEquityTrsBuilder::new()
-        .side(TrsSide::ReceiveTotalReturn)
+        .side(PayReceive::Receive)
         .build();
 
     // Base market

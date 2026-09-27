@@ -224,7 +224,7 @@
     },
     "EquityTotalReturnSwap": {
       "additionalProperties": false,
-      "description": "Equity total-return swap exchanging price and net dividend return against\nfloating-rate financing plus a contractual spread.\n\nSeasoned trades require the observed level at the current period start in\n`past_fixings`, except that `initial_level` may anchor the first period.\n\n# Construction\n\n```\nuse finstack_quant_core::{\n    currency::Currency, dates::DayCount, money::Money, types::InstrumentId,\n};\nuse finstack_quant_cashflows::builder::ScheduleParams;\nuse finstack_quant_valuations::instruments::{\n    Attributes, EquityUnderlyingParams, FinancingLegSpec,\n};\nuse finstack_quant_valuations::instruments::equity::equity_trs::{\n    EquityTotalReturnSwap, TrsDividendSettlement, TrsScheduleSpec, TrsSide,\n};\nuse rust_decimal::Decimal;\nuse time::macros::date;\n\n# fn main() -> finstack_quant_core::Result<()> {\nlet trs = EquityTotalReturnSwap::builder()\n    .id(InstrumentId::new(\"SPX-TRS\"))\n    .notional(Money::from((10_000_000_i64, Currency::USD)))\n    .underlying(\n        EquityUnderlyingParams::new(\"SPX\", \"SPX-SPOT\", Currency::USD)\n            .with_dividend_yield(\"SPX-DIV\"),\n    )\n    .financing(FinancingLegSpec::new(\n        \"USD-OIS\", \"USD-SOFR-3M\", Decimal::from(50), DayCount::Act360,\n    ))\n    .schedule(TrsScheduleSpec::from_params(\n        date!(2026 - 01 - 02),\n        date!(2027 - 01 - 02),\n        ScheduleParams::quarterly_act360(),\n    ))\n    .side(TrsSide::ReceiveTotalReturn)\n    .dividend_settlement(TrsDividendSettlement::OnDividendDate)\n    .initial_level_opt(None)\n    .attributes(Attributes::new())\n    .build()?;\nassert_eq!(trs.notional.currency(), Currency::USD);\n# Ok(())\n# }\n```",
+      "description": "Equity total-return swap exchanging price and net dividend return against\nfloating-rate financing plus a contractual spread.\n\nSeasoned trades require the observed level at the current period start in\n`past_fixings`, except that `initial_level` may anchor the first period.\n\n# Construction\n\n```\nuse finstack_quant_core::{\n    currency::Currency, dates::DayCount, money::Money, types::InstrumentId,\n};\nuse finstack_quant_cashflows::builder::ScheduleParams;\nuse finstack_quant_valuations::instruments::{\n    Attributes, EquityUnderlyingParams, FinancingLegSpec, PayReceive,\n};\nuse finstack_quant_valuations::instruments::equity::equity_trs::{\n    EquityTotalReturnSwap, TrsDividendSettlement, TrsScheduleSpec,\n};\nuse rust_decimal::Decimal;\nuse time::macros::date;\n\n# fn main() -> finstack_quant_core::Result<()> {\nlet trs = EquityTotalReturnSwap::builder()\n    .id(InstrumentId::new(\"SPX-TRS\"))\n    .notional(Money::from((10_000_000_i64, Currency::USD)))\n    .underlying(\n        EquityUnderlyingParams::new(\"SPX\", \"SPX-SPOT\", Currency::USD)\n            .with_dividend_yield(\"SPX-DIV\"),\n    )\n    .financing(FinancingLegSpec::new(\n        \"USD-OIS\", \"USD-SOFR-3M\", Decimal::from(50), DayCount::Act360,\n    ))\n    .schedule(TrsScheduleSpec::from_params(\n        date!(2026 - 01 - 02),\n        date!(2027 - 01 - 02),\n        ScheduleParams::quarterly_act360(),\n    ))\n    .side(PayReceive::Receive)\n    .dividend_settlement(TrsDividendSettlement::OnDividendDate)\n    .initial_level_opt(None)\n    .attributes(Attributes::new())\n    .build()?;\nassert_eq!(trs.notional.currency(), Currency::USD);\n# Ok(())\n# }\n```",
       "properties": {
         "attributes": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/attributes.schema.json",
@@ -332,7 +332,7 @@
           "description": "Schedule specification (payment dates and frequency)."
         },
         "side": {
-          "$ref": "#/$defs/TrsSide",
+          "$ref": "#/$defs/PayReceive",
           "description": "Trade side (receive/pay total return)."
         },
         "underlying": {
@@ -653,6 +653,21 @@
       ],
       "type": "object"
     },
+    "PayReceive": {
+      "description": "Direction for instrument legs (universal for IRS, CDS, variance swaps, etc.)\n\nFor interest rate swaps: Pay = pay fixed/receive floating, Receive = receive fixed/pay floating\nFor credit default swaps: Pay = buy protection (pay premium), Receive = sell protection (receive premium)\nFor variance swaps: Pay = short variance, Receive = long variance",
+      "oneOf": [
+        {
+          "const": "pay",
+          "description": "Pay the primary leg (fixed rate in IRS, protection premium in CDS, short variance)",
+          "type": "string"
+        },
+        {
+          "const": "receive",
+          "description": "Receive the primary leg (fixed rate in IRS, protection premium in CDS, long variance)",
+          "type": "string"
+        }
+      ]
+    },
     "SimmCreditClassification": {
       "description": "Explicit ISDA SIMM credit risk-class and bucket assignment.\n\nCorporate, sovereign, and index credit exposures belong to credit\nqualifying, including high-yield sectors represented by SIMM buckets 7-12.\nCredit non-qualifying is reserved for securitizations and other exposures\ngoverned by the non-qualifying risk class.",
       "oneOf": [
@@ -800,21 +815,6 @@
       ],
       "type": "object"
     },
-    "TrsSide": {
-      "description": "Side of the TRS trade from the party's perspective.\n\nDetermines whether the party receives or pays the total return leg.\n\n# Examples\n\n```\nuse finstack_quant_valuations::instruments::TrsSide;\n\nlet side = TrsSide::ReceiveTotalReturn;\nassert_eq!(side.sign(), 1.0);\n\nlet side = TrsSide::PayTotalReturn;\nassert_eq!(side.sign(), -1.0);\n```",
-      "oneOf": [
-        {
-          "const": "receive_total_return",
-          "description": "Receive total return, pay financing.",
-          "type": "string"
-        },
-        {
-          "const": "pay_total_return",
-          "description": "Pay total return, receive financing.",
-          "type": "string"
-        }
-      ]
-    },
     "VmParameters": {
       "additionalProperties": false,
       "description": "Variation margin parameters.\n\nThese parameters govern the daily (or periodic) exchange of variation margin\nunder a CSA agreement. VM is exchanged to eliminate mark-to-market exposure.\n\n# ISDA CSA Standard Terms\n\nThe 2016 VM CSA introduced standardized terms for variation margin:\n- Zero threshold for in-scope entities\n- Daily exchange with T+1 settlement\n- Cash or highly liquid securities as collateral\n\n# Example\n\n```\nuse finstack_quant_margin::{MarginTenor, VmParameters};\nuse finstack_quant_core::currency::Currency;\nuse finstack_quant_core::money::Money;\n\nlet vm_params = VmParameters {\n    threshold: Money::from((10_000_000_i64, Currency::USD)),\n    mta: Money::from((500_000_i64, Currency::USD)),\n    rounding: Money::from((10_000_i64, Currency::USD)),\n    independent_amount: Money::from((0_i64, Currency::USD)),\n    frequency: MarginTenor::Daily,\n    settlement_lag: 1,\n};\n```",
@@ -914,7 +914,7 @@
             },
             "start": "2024-01-01"
           },
-          "side": "receive_total_return",
+          "side": "receive",
           "underlying": {
             "contract_size": 1.0,
             "currency": "USD",

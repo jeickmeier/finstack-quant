@@ -26,9 +26,8 @@ use rust_decimal::prelude::ToPrimitive;
 use rust_decimal::Decimal;
 
 use super::super::parameters::SwaptionParams;
-use super::definitions::{
-    CashSettlementMethod, SwaptionExercise, SwaptionSettlement, VolatilityModel,
-};
+use super::definitions::CashSettlementMethod;
+use crate::instruments::{ExerciseStyle, SettlementType, VolatilityModel};
 
 /// Swaption instrument
 ///
@@ -65,9 +64,9 @@ pub struct Swaption {
     pub expiry: Date,
     /// Exercise style (European, Bermudan, American). Defaults to European.
     #[builder(default)]
-    pub exercise_style: SwaptionExercise,
+    pub exercise_style: ExerciseStyle,
     /// Settlement method (physical or cash)
-    pub settlement: SwaptionSettlement,
+    pub settlement: SettlementType,
     /// Cash settlement annuity method (only used when settlement = Cash).
     ///
     /// - `CollateralizedCashPrice` (default): Actual collateral-discounted fixed-leg annuity
@@ -314,8 +313,8 @@ impl Swaption {
             notional: Money::from((10_000_000_i64, Currency::USD)),
             expiry: Date::from_calendar_date(2027, time::Month::January, 15)
                 .expect("Valid example date"),
-            exercise_style: SwaptionExercise::European,
-            settlement: SwaptionSettlement::Cash,
+            exercise_style: ExerciseStyle::European,
+            settlement: SettlementType::Cash,
             cash_settlement_method: CashSettlementMethod::default(),
             vol_model: VolatilityModel::Black,
             vol_surface_id: CurveId::new("USD-SWPNVOL"),
@@ -360,8 +359,8 @@ impl Swaption {
             option_type: OptionType::Call,
             notional: Money::from((10_000_000_i64, Currency::USD)),
             expiry: first_exercise,
-            exercise_style: SwaptionExercise::Bermudan,
-            settlement: SwaptionSettlement::Physical,
+            exercise_style: ExerciseStyle::Bermudan,
+            settlement: SettlementType::Physical,
             cash_settlement_method: CashSettlementMethod::default(),
             vol_model: VolatilityModel::Normal,
             vol_surface_id: CurveId::new("USD-SWPNVOL"),
@@ -426,8 +425,8 @@ impl Swaption {
             },
             notional: params.notional,
             expiry: params.expiry,
-            exercise_style: SwaptionExercise::European,
-            settlement: SwaptionSettlement::Physical,
+            exercise_style: ExerciseStyle::European,
+            settlement: SettlementType::Physical,
             cash_settlement_method: CashSettlementMethod::default(),
             vol_surface_id: vol_surface_id.into(),
             underlying_fixed_leg,
@@ -448,13 +447,13 @@ impl Swaption {
     }
 
     /// Override the exercise style (default: European).
-    pub fn with_exercise_style(mut self, style: SwaptionExercise) -> Self {
+    pub fn with_exercise_style(mut self, style: ExerciseStyle) -> Self {
         self.exercise_style = style;
         self
     }
 
     /// Override the settlement type (default: Physical).
-    pub fn with_settlement(mut self, settlement: SwaptionSettlement) -> Self {
+    pub fn with_settlement(mut self, settlement: SettlementType) -> Self {
         self.settlement = settlement;
         self
     }
@@ -516,7 +515,7 @@ impl Swaption {
 
     /// Set the cash settlement annuity method.
     ///
-    /// Only affects pricing when `settlement` is `SwaptionSettlement::Cash`.
+    /// Only affects pricing when `settlement` is `SettlementType::Cash`.
     ///
     /// # Example
     ///
@@ -546,15 +545,13 @@ impl Swaption {
 
     fn validate_european_exercise(&self) -> Result<()> {
         match self.exercise_style {
-            SwaptionExercise::European => Ok(()),
-            SwaptionExercise::Bermudan | SwaptionExercise::American => {
-                Err(Error::Validation(format!(
-                    "Swaption '{}' has exercise_style={}; the generic Swaption pricer only \
+            ExerciseStyle::European => Ok(()),
+            ExerciseStyle::Bermudan | ExerciseStyle::American => Err(Error::Validation(format!(
+                "Swaption '{}' has exercise_style={}; the generic Swaption pricer only \
                      supports European exercise. Use the LMM or Hull-White early-exercise \
                      pricer for Bermudan/American swaptions.",
-                    self.id, self.exercise_style
-                )))
-            }
+                self.id, self.exercise_style
+            ))),
         }
     }
 
@@ -776,8 +773,8 @@ impl Swaption {
     ///   cash methods.
     pub fn annuity(&self, disc: &dyn Discounting, as_of: Date, forward_rate: f64) -> Result<f64> {
         match self.settlement {
-            SwaptionSettlement::Physical => self.swap_annuity(disc, as_of),
-            SwaptionSettlement::Cash => match self.cash_settlement_method {
+            SettlementType::Physical => self.swap_annuity(disc, as_of),
+            SettlementType::Cash => match self.cash_settlement_method {
                 CashSettlementMethod::CollateralizedCashPrice
                 | CashSettlementMethod::IsdaParPar => self.swap_annuity(disc, as_of),
                 CashSettlementMethod::ParYield => {

@@ -3081,7 +3081,7 @@
     },
     "BermudanSwaption": {
       "additionalProperties": false,
-      "description": "Bermudan swaption with multiple exercise dates.\n\nA Bermudan swaption gives the holder the right to enter into an interest rate\nswap at any of a set of predetermined exercise dates. This is the most common\ntype of exotic swaption in the market, used extensively for:\n\n- Callable bond hedging\n- Mortgage prepayment risk management\n- Structured product hedging\n\n# Pricing Methods\n\nBermudan swaptions require numerical methods for pricing:\n- **Hull-White Tree** (default): Industry standard, calibrated to swaption\n  volatility. Official PV and risk use this path unless a caller selects\n  [`crate::pricer::ModelKey::MonteCarloHullWhite1F`].\n- **LSMC**: Longstaff-Schwartz Monte Carlo, opt-in for path-dependent\n  validation and model comparison.\n\n# Example\n\n```\nuse finstack_quant_valuations::instruments::rates::swaption::{\n    BermudanSwaption, BermudanSchedule, BermudanType, SwaptionSettlement,\n};\n\n// Create a 10NC2 (10-year swap, callable after 2 years)\nlet swaption = BermudanSwaption::example();\n```",
+      "description": "Bermudan swaption with multiple exercise dates.\n\nA Bermudan swaption gives the holder the right to enter into an interest rate\nswap at any of a set of predetermined exercise dates. This is the most common\ntype of exotic swaption in the market, used extensively for:\n\n- Callable bond hedging\n- Mortgage prepayment risk management\n- Structured product hedging\n\n# Pricing Methods\n\nBermudan swaptions require numerical methods for pricing:\n- **Hull-White Tree** (default): Industry standard, calibrated to swaption\n  volatility. Official PV and risk use this path unless a caller selects\n  [`crate::pricer::ModelKey::MonteCarloHullWhite1F`].\n- **LSMC**: Longstaff-Schwartz Monte Carlo, opt-in for path-dependent\n  validation and model comparison.\n\n# Example\n\n```\nuse finstack_quant_valuations::instruments::rates::swaption::{\n    BermudanSwaption, BermudanSchedule, BermudanType,\n};\nuse finstack_quant_valuations::instruments::SettlementType;\n\n// Create a 10NC2 (10-year swap, callable after 2 years)\nlet swaption = BermudanSwaption::example();\n```",
       "properties": {
         "attributes": {
           "$ref": "#/$defs/Attributes",
@@ -3120,7 +3120,7 @@
           "description": "Scenario-only pricing adjustments."
         },
         "settlement": {
-          "$ref": "#/$defs/SwaptionSettlement",
+          "$ref": "#/$defs/SettlementType",
           "description": "Settlement method (physical or cash)"
         },
         "underlying_fixed_leg": {
@@ -4400,8 +4400,8 @@
           "type": "integer"
         },
         "side": {
-          "$ref": "#/$defs/TrancheSide",
-          "description": "Tranche side (buy/sell protection)"
+          "$ref": "#/$defs/PayReceive",
+          "description": "Tranche side, as on CDS and CDSIndex: `pay` buys protection (pays the\nrunning premium), `receive` sells protection (receives the premium)."
         },
         "start_date": {
           "anyOf": [
@@ -6210,8 +6210,8 @@
           "description": "Notional amount."
         },
         "option_type": {
-          "$ref": "#/$defs/CmsSpreadOptionType",
-          "description": "Call or put on the spread."
+          "$ref": "#/$defs/OptionType",
+          "description": "Call or put on the spread `CMS_long - CMS_short`: a call pays\n`max(spread - strike, 0)`, a put pays `max(strike - spread, 0)`."
         },
         "payment_date": {
           "$ref": "#/$defs/DateWire",
@@ -6296,21 +6296,6 @@
         "attributes"
       ],
       "type": "object"
-    },
-    "CmsSpreadOptionType": {
-      "description": "Call or put on a CMS spread.",
-      "oneOf": [
-        {
-          "const": "call",
-          "description": "max(CMS_long - CMS_short - K, 0)",
-          "type": "string"
-        },
-        {
-          "const": "put",
-          "description": "max(K - (CMS_long - CMS_short), 0)",
-          "type": "string"
-        }
-      ]
     },
     "CmsSwap": {
       "additionalProperties": false,
@@ -12859,7 +12844,7 @@
     },
     "EquityTotalReturnSwap": {
       "additionalProperties": false,
-      "description": "Equity total-return swap exchanging price and net dividend return against\nfloating-rate financing plus a contractual spread.\n\nSeasoned trades require the observed level at the current period start in\n`past_fixings`, except that `initial_level` may anchor the first period.\n\n# Construction\n\n```\nuse finstack_quant_core::{\n    currency::Currency, dates::DayCount, money::Money, types::InstrumentId,\n};\nuse finstack_quant_cashflows::builder::ScheduleParams;\nuse finstack_quant_valuations::instruments::{\n    Attributes, EquityUnderlyingParams, FinancingLegSpec,\n};\nuse finstack_quant_valuations::instruments::equity::equity_trs::{\n    EquityTotalReturnSwap, TrsDividendSettlement, TrsScheduleSpec, TrsSide,\n};\nuse rust_decimal::Decimal;\nuse time::macros::date;\n\n# fn main() -> finstack_quant_core::Result<()> {\nlet trs = EquityTotalReturnSwap::builder()\n    .id(InstrumentId::new(\"SPX-TRS\"))\n    .notional(Money::from((10_000_000_i64, Currency::USD)))\n    .underlying(\n        EquityUnderlyingParams::new(\"SPX\", \"SPX-SPOT\", Currency::USD)\n            .with_dividend_yield(\"SPX-DIV\"),\n    )\n    .financing(FinancingLegSpec::new(\n        \"USD-OIS\", \"USD-SOFR-3M\", Decimal::from(50), DayCount::Act360,\n    ))\n    .schedule(TrsScheduleSpec::from_params(\n        date!(2026 - 01 - 02),\n        date!(2027 - 01 - 02),\n        ScheduleParams::quarterly_act360(),\n    ))\n    .side(TrsSide::ReceiveTotalReturn)\n    .dividend_settlement(TrsDividendSettlement::OnDividendDate)\n    .initial_level_opt(None)\n    .attributes(Attributes::new())\n    .build()?;\nassert_eq!(trs.notional.currency(), Currency::USD);\n# Ok(())\n# }\n```",
+      "description": "Equity total-return swap exchanging price and net dividend return against\nfloating-rate financing plus a contractual spread.\n\nSeasoned trades require the observed level at the current period start in\n`past_fixings`, except that `initial_level` may anchor the first period.\n\n# Construction\n\n```\nuse finstack_quant_core::{\n    currency::Currency, dates::DayCount, money::Money, types::InstrumentId,\n};\nuse finstack_quant_cashflows::builder::ScheduleParams;\nuse finstack_quant_valuations::instruments::{\n    Attributes, EquityUnderlyingParams, FinancingLegSpec, PayReceive,\n};\nuse finstack_quant_valuations::instruments::equity::equity_trs::{\n    EquityTotalReturnSwap, TrsDividendSettlement, TrsScheduleSpec,\n};\nuse rust_decimal::Decimal;\nuse time::macros::date;\n\n# fn main() -> finstack_quant_core::Result<()> {\nlet trs = EquityTotalReturnSwap::builder()\n    .id(InstrumentId::new(\"SPX-TRS\"))\n    .notional(Money::from((10_000_000_i64, Currency::USD)))\n    .underlying(\n        EquityUnderlyingParams::new(\"SPX\", \"SPX-SPOT\", Currency::USD)\n            .with_dividend_yield(\"SPX-DIV\"),\n    )\n    .financing(FinancingLegSpec::new(\n        \"USD-OIS\", \"USD-SOFR-3M\", Decimal::from(50), DayCount::Act360,\n    ))\n    .schedule(TrsScheduleSpec::from_params(\n        date!(2026 - 01 - 02),\n        date!(2027 - 01 - 02),\n        ScheduleParams::quarterly_act360(),\n    ))\n    .side(PayReceive::Receive)\n    .dividend_settlement(TrsDividendSettlement::OnDividendDate)\n    .initial_level_opt(None)\n    .attributes(Attributes::new())\n    .build()?;\nassert_eq!(trs.notional.currency(), Currency::USD);\n# Ok(())\n# }\n```",
       "properties": {
         "attributes": {
           "$ref": "#/$defs/Attributes",
@@ -12967,7 +12952,7 @@
           "description": "Schedule specification (payment dates and frequency)."
         },
         "side": {
-          "$ref": "#/$defs/TrsSide",
+          "$ref": "#/$defs/PayReceive",
           "description": "Trade side (receive/pay total return)."
         },
         "underlying": {
@@ -13310,7 +13295,7 @@
     },
     "FIIndexTotalReturnSwap": {
       "additionalProperties": false,
-      "description": "Fixed-income index total-return swap priced with a carry analytic.\n\nFor each scheduled period, the total-return leg uses\n`exp(y × accrual_fraction) - 1`, where `y` is an annual continuously\ncompounded decimal yield and the accrual fraction uses the schedule day\ncount. Both legs are discounted with `financing.discount_curve_id`; the\nfinancing leg projects `financing.forward_curve_id` plus `spread_bp`.\nReceive-total-return value is `PV(total return) - PV(financing)`;\npay-total-return value reverses that sign.\n\n# Model limitations\n\nThis deterministic carry analytic omits roll-down, underlying rate/spread\nmark-to-market, stochastic credit, constituent decomposition, early\ntermination, and bespoke fees. The period in progress on the valuation\ndate is valued from the live index level (`underlying.index_id`) against\n`initial_level`, then carried at the index yield to period end; a period\nthat has ended but is not yet paid stays in the PV at its projected carry.\nCashflow-schedule APIs\nreturn payment dates with zero amounts; use\n[`Self::pv_total_return_leg`] and [`Self::pv_financing_leg`] for projected\nleg values.\n\n# Construction\n\n```\nuse finstack_quant_core::{\n    currency::Currency, dates::DayCount, money::Money, types::InstrumentId,\n};\nuse finstack_quant_cashflows::builder::ScheduleParams;\nuse finstack_quant_valuations::instruments::{\n    Attributes, FinancingLegSpec, IndexUnderlyingParams,\n};\nuse finstack_quant_valuations::instruments::fixed_income::fi_trs::FIIndexTotalReturnSwap;\nuse finstack_quant_valuations::instruments::fixed_income::fi_trs::{\n    TrsScheduleSpec, TrsSide,\n};\nuse rust_decimal::Decimal;\nuse time::macros::date;\n\n# fn main() -> finstack_quant_core::Result<()> {\nlet trs = FIIndexTotalReturnSwap::builder()\n    .id(InstrumentId::new(\"CORP-TRS\"))\n    .notional(Money::from((10_000_000_i64, Currency::USD)))\n    .underlying(\n        IndexUnderlyingParams::new(\"US-CORP\", Currency::USD)\n            .with_yield(\"US-CORP-YIELD\")\n            .with_duration(\"US-CORP-DURATION\"),\n    )\n    .financing(FinancingLegSpec::new(\n        \"USD-OIS\", \"USD-SOFR-3M\", Decimal::from(35), DayCount::Act360,\n    ))\n    .schedule(TrsScheduleSpec::from_params(\n        date!(2026 - 01 - 02),\n        date!(2027 - 01 - 02),\n        ScheduleParams::quarterly_act360(),\n    ))\n    .side(TrsSide::ReceiveTotalReturn)\n    .initial_level_opt(None)\n    .attributes(Attributes::new())\n    .build()?;\nassert_eq!(trs.notional.currency(), Currency::USD);\n# Ok(())\n# }\n```",
+      "description": "Fixed-income index total-return swap priced with a carry analytic.\n\nFor each scheduled period, the total-return leg uses\n`exp(y × accrual_fraction) - 1`, where `y` is an annual continuously\ncompounded decimal yield and the accrual fraction uses the schedule day\ncount. Both legs are discounted with `financing.discount_curve_id`; the\nfinancing leg projects `financing.forward_curve_id` plus `spread_bp`.\nReceive-total-return value is `PV(total return) - PV(financing)`;\npay-total-return value reverses that sign.\n\n# Model limitations\n\nThis deterministic carry analytic omits roll-down, underlying rate/spread\nmark-to-market, stochastic credit, constituent decomposition, early\ntermination, and bespoke fees. The period in progress on the valuation\ndate is valued from the live index level (`underlying.index_id`) against\n`initial_level`, then carried at the index yield to period end; a period\nthat has ended but is not yet paid stays in the PV at its projected carry.\nCashflow-schedule APIs\nreturn payment dates with zero amounts; use\n[`Self::pv_total_return_leg`] and [`Self::pv_financing_leg`] for projected\nleg values.\n\n# Construction\n\n```\nuse finstack_quant_core::{\n    currency::Currency, dates::DayCount, money::Money, types::InstrumentId,\n};\nuse finstack_quant_cashflows::builder::ScheduleParams;\nuse finstack_quant_valuations::instruments::{\n    Attributes, FinancingLegSpec, IndexUnderlyingParams, PayReceive,\n};\nuse finstack_quant_valuations::instruments::fixed_income::fi_trs::FIIndexTotalReturnSwap;\nuse finstack_quant_valuations::instruments::fixed_income::fi_trs::{\n    TrsScheduleSpec,\n};\nuse rust_decimal::Decimal;\nuse time::macros::date;\n\n# fn main() -> finstack_quant_core::Result<()> {\nlet trs = FIIndexTotalReturnSwap::builder()\n    .id(InstrumentId::new(\"CORP-TRS\"))\n    .notional(Money::from((10_000_000_i64, Currency::USD)))\n    .underlying(\n        IndexUnderlyingParams::new(\"US-CORP\", Currency::USD)\n            .with_yield(\"US-CORP-YIELD\")\n            .with_duration(\"US-CORP-DURATION\"),\n    )\n    .financing(FinancingLegSpec::new(\n        \"USD-OIS\", \"USD-SOFR-3M\", Decimal::from(35), DayCount::Act360,\n    ))\n    .schedule(TrsScheduleSpec::from_params(\n        date!(2026 - 01 - 02),\n        date!(2027 - 01 - 02),\n        ScheduleParams::quarterly_act360(),\n    ))\n    .side(PayReceive::Receive)\n    .initial_level_opt(None)\n    .attributes(Attributes::new())\n    .build()?;\nassert_eq!(trs.notional.currency(), Currency::USD);\n# Ok(())\n# }\n```",
       "properties": {
         "attributes": {
           "$ref": "#/$defs/Attributes",
@@ -13364,8 +13349,8 @@
           "description": "Schedule specification (payment dates and frequency)."
         },
         "side": {
-          "$ref": "#/$defs/TrsSide",
-          "description": "Trade side (receive/pay total return)."
+          "$ref": "#/$defs/PayReceive",
+          "description": "Trade side: `receive` receives the total-return leg and pays financing;\n`pay` pays the total return and receives financing."
         },
         "underlying": {
           "$ref": "#/$defs/IndexUnderlyingParams",
@@ -17098,9 +17083,9 @@
           "$ref": "#/$defs/Money",
           "description": "Notional amount in quote currency."
         },
-        "option_type": {
-          "$ref": "#/$defs/InflationCapFloorType",
-          "description": "Cap/floor type (cap, floor, caplet, floorlet)."
+        "rate_option_type": {
+          "$ref": "#/$defs/RateOptionType",
+          "description": "Cap/floor type (cap, floor, caplet, floorlet). Caplet and floorlet price a\nsingle period."
         },
         "scenario_pricing_overrides": {
           "$ref": "#/$defs/ScenarioPricingOverrides",
@@ -17126,7 +17111,7 @@
       },
       "required": [
         "id",
-        "option_type",
+        "rate_option_type",
         "notional",
         "strike",
         "start_date",
@@ -17139,31 +17124,6 @@
         "attributes"
       ],
       "type": "object"
-    },
-    "InflationCapFloorType": {
-      "description": "Inflation option type.",
-      "oneOf": [
-        {
-          "const": "cap",
-          "description": "Cap (portfolio of caplets).",
-          "type": "string"
-        },
-        {
-          "const": "floor",
-          "description": "Floor (portfolio of floorlets).",
-          "type": "string"
-        },
-        {
-          "const": "caplet",
-          "description": "Single-period caplet.",
-          "type": "string"
-        },
-        {
-          "const": "floorlet",
-          "description": "Single-period floorlet.",
-          "type": "string"
-        }
-      ]
     },
     "InflationIndex": {
       "additionalProperties": false,
@@ -19576,21 +19536,6 @@
       ],
       "type": "object"
     },
-    "LegSide": {
-      "description": "Whether the holder pays or receives a leg.",
-      "oneOf": [
-        {
-          "const": "receive",
-          "description": "Receive the leg's coupons (and final notional, if exchanged).",
-          "type": "string"
-        },
-        {
-          "const": "pay",
-          "description": "Pay the leg's coupons (and final notional, if exchanged).",
-          "type": "string"
-        }
-      ]
-    },
     "LetterOfCreditSpec": {
       "additionalProperties": false,
       "description": "Letter-of-credit sub-facility of a revolving credit facility.\n\nOutstanding letters of credit reduce availability and the commitment-fee\nbase, count as usage for fee tiers, accrue an LC fee plus a fronting fee,\nand are contingent exposure at default. LC usage is deterministic in both\npricing modes; a stochastic utilization process is capped at\n`1 − LC(t) / C(t)`.",
@@ -21357,7 +21302,7 @@
           "description": "Optional forward curve identifier for asset-swap spread metrics.\n\nWhen set, ASW par/market metrics project the floating receiver leg from\nthis forward curve instead of using a discount-curve par-rate proxy."
         },
         "bdt_sigma": {
-          "description": "Black-Derman-Toy lognormal short-rate volatility (σ), as an annual\ndecimal proportion of the short rate (`0.20` = 20%).\n\nRead only by the rates-only bond tree when `vol_model = black` selects\nBDT for a bond with embedded exercise rights, where it is required.\nIt is a relative (lognormal) volatility, unlike the absolute\n[`Self::hw1f_sigma`]; typical values are 0.10–0.40. The BDT lattice has\nno mean reversion. Must be finite and non-negative; `0.0` prices on the\ndeterministic curve.",
+          "description": "Black-Derman-Toy lognormal short-rate volatility (σ), as an annual\ndecimal proportion of the short rate (`0.20` = 20%).\n\nRead only by the rates-only bond tree when `tree_model = black_derman_toy` selects\nBDT for a bond with embedded exercise rights, where it is required.\nIt is a relative (lognormal) volatility, unlike the absolute\n[`Self::hw1f_sigma`]; typical values are 0.10–0.40. The BDT lattice has\nno mean reversion. Must be finite and non-negative; `0.0` prices on the\ndeterministic curve.",
           "format": "double",
           "type": [
             "number",
@@ -21506,6 +21451,17 @@
           ],
           "description": "Optional discount curve identifier for tree-based option/OAS models.\n\nSome vendor OAS screens use a model curve distinct from the bond's pricing\nor spread curve. When set, tree pricers calibrate to this curve while\nnon-tree spread metrics continue to use the instrument's discount curve."
         },
+        "tree_model": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ShortRateTreeModel"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Short-rate lattice for the rates-only bond tree (`hull_white` or\n`black_derman_toy`). `None` selects Hull-White."
+        },
         "tree_steps": {
           "default": null,
           "description": "Number of time steps for tree-based pricing (e.g., 100)",
@@ -21515,17 +21471,6 @@
             "integer",
             "null"
           ]
-        },
-        "vol_model": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/VolatilityModel"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "Volatility model choice for option pricing.\n\nWhen set, overrides the default Black (lognormal) model."
         },
         "vol_surface_extrapolation": {
           "$ref": "#/$defs/VolSurfaceExtrapolation",
@@ -27399,6 +27344,21 @@
       ],
       "type": "object"
     },
+    "ShortRateTreeModel": {
+      "description": "Short-rate lattice used by the rates-only bond tree.\n\nSelected by `instrument_pricing_overrides.model_config.tree_model`; when the\nfield is absent the bond tree uses Hull-White.",
+      "oneOf": [
+        {
+          "const": "hull_white",
+          "description": "Hull-White one-factor (normal short rate) with `(κ, σ)` from\n`model_config.hw1f_mean_reversion` / `model_config.hw1f_sigma` or the\npre-fitted market scalars.",
+          "type": "string"
+        },
+        {
+          "const": "black_derman_toy",
+          "description": "Black-Derman-Toy (lognormal short rate) with volatility\n`model_config.bdt_sigma`.",
+          "type": "string"
+        }
+      ]
+    },
     "SifmaSettlementClass": {
       "description": "SIFMA MBS settlement class.\n\nSIFMA publishes distinct settlement dates for four classes of agency MBS.\nThe class determines which specific settlement date applies within a given\nmonth. See <https://www.sifma.org/resources/general/mbs-notification-and-settlement-dates/>.",
       "oneOf": [
@@ -28648,7 +28608,7 @@
           "description": "Cash settlement annuity method (only used when settlement = Cash).\n\n- `CollateralizedCashPrice` (default): Actual collateral-discounted fixed-leg annuity\n- `ParYield`: Legacy flat-yield cash annuity\n- `IsdaParPar`: Legacy par-par annuity from the discount curve\n- `ZeroCoupon`: Single discount to swap maturity"
         },
         "exercise_style": {
-          "$ref": "#/$defs/SwaptionExercise",
+          "$ref": "#/$defs/ExerciseStyle",
           "description": "Exercise style (European, Bermudan, American). Defaults to European."
         },
         "expiry": {
@@ -28691,7 +28651,7 @@
           "description": "Scenario-only pricing adjustments."
         },
         "settlement": {
-          "$ref": "#/$defs/SwaptionSettlement",
+          "$ref": "#/$defs/SettlementType",
           "description": "Settlement method (physical or cash)"
         },
         "underlying_fixed_leg": {
@@ -28703,7 +28663,7 @@
           "description": "Complete floating leg of the underlying swap."
         },
         "vol_model": {
-          "$ref": "#/$defs/SwaptionVolatilityModel",
+          "$ref": "#/$defs/VolatilityModel",
           "description": "Volatility model (Black or Normal)"
         },
         "vol_surface_id": {
@@ -28726,56 +28686,6 @@
         "attributes"
       ],
       "type": "object"
-    },
-    "SwaptionExercise": {
-      "description": "Swaption exercise style",
-      "oneOf": [
-        {
-          "const": "european",
-          "description": "European exercise (only at expiry)",
-          "type": "string"
-        },
-        {
-          "const": "bermudan",
-          "description": "Bermudan exercise (at discrete dates)",
-          "type": "string"
-        },
-        {
-          "const": "american",
-          "description": "American exercise (any time before expiry)",
-          "type": "string"
-        }
-      ]
-    },
-    "SwaptionSettlement": {
-      "description": "Swaption settlement method",
-      "oneOf": [
-        {
-          "const": "physical",
-          "description": "Physical settlement (enter into underlying swap)",
-          "type": "string"
-        },
-        {
-          "const": "cash",
-          "description": "Cash settlement (receive NPV of swap)",
-          "type": "string"
-        }
-      ]
-    },
-    "SwaptionVolatilityModel": {
-      "description": "Volatility model for pricing",
-      "oneOf": [
-        {
-          "const": "black",
-          "description": "Black (Lognormal) model (1976)",
-          "type": "string"
-        },
-        {
-          "const": "normal",
-          "description": "Bachelier (Normal) model",
-          "type": "string"
-        }
-      ]
     },
     "TargetOcSpec": {
       "additionalProperties": false,
@@ -29604,21 +29514,6 @@
         }
       ]
     },
-    "TrancheSide": {
-      "description": "Buyer/seller perspective for CDS tranche premium/protection",
-      "oneOf": [
-        {
-          "const": "buy_protection",
-          "description": "Buy protection on the tranche (pay running, receive protection)",
-          "type": "string"
-        },
-        {
-          "const": "sell_protection",
-          "description": "Sell protection on the tranche (receive running, pay protection)",
-          "type": "string"
-        }
-      ]
-    },
     "TrancheStructure": {
       "additionalProperties": false,
       "description": "Collection of tranches forming the capital structure",
@@ -29699,21 +29594,6 @@
         "params"
       ],
       "type": "object"
-    },
-    "TrsSide": {
-      "description": "Side of the TRS trade from the party's perspective.\n\nDetermines whether the party receives or pays the total return leg.\n\n# Examples\n\n```\nuse finstack_quant_valuations::instruments::TrsSide;\n\nlet side = TrsSide::ReceiveTotalReturn;\nassert_eq!(side.sign(), 1.0);\n\nlet side = TrsSide::PayTotalReturn;\nassert_eq!(side.sign(), -1.0);\n```",
-      "oneOf": [
-        {
-          "const": "receive_total_return",
-          "description": "Receive total return, pay financing.",
-          "type": "string"
-        },
-        {
-          "const": "pay_total_return",
-          "description": "Pay total return, receive financing.",
-          "type": "string"
-        }
-      ]
     },
     "UnaryOp": {
       "description": "Unary operators for expressions.",
@@ -30396,7 +30276,7 @@
       "type": "object"
     },
     "VolatilityModel": {
-      "description": "Volatility model for option pricing.",
+      "description": "Volatility convention (Black lognormal or Bachelier normal) used to price\na swaption. Wire values: `black`, `normal`.",
       "oneOf": [
         {
           "const": "black",
@@ -30888,7 +30768,7 @@
           ]
         },
         "side": {
-          "$ref": "#/$defs/LegSide",
+          "$ref": "#/$defs/PayReceive",
           "description": "Pay/receive direction for this leg."
         },
         "spread_bp": {

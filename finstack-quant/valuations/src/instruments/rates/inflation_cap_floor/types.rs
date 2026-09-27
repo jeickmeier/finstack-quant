@@ -38,6 +38,7 @@ use crate::instruments::common_impl::vol_resolution::{
 };
 use crate::instruments::rates::cap_floor::pricing::payoff::CapletFloorletInputs;
 use crate::instruments::rates::cap_floor::pricing::pricer::price_caplet_quote;
+use crate::instruments::rates::cap_floor::RateOptionType;
 use crate::pricer::ModelKey;
 use finstack_quant_core::dates::{
     BusinessDayConvention, Date, DayCount, DayCountContext, StubKind, Tenor,
@@ -48,56 +49,6 @@ use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, InstrumentId};
 use finstack_quant_models::volatility::VolatilityConvention;
 use rust_decimal::Decimal;
-
-/// Inflation option type.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(rename_all = "snake_case")]
-#[non_exhaustive]
-pub enum InflationCapFloorType {
-    /// Cap (portfolio of caplets).
-    Cap,
-    /// Floor (portfolio of floorlets).
-    Floor,
-    /// Single-period caplet.
-    Caplet,
-    /// Single-period floorlet.
-    Floorlet,
-}
-
-impl InflationCapFloorType {
-    fn is_cap(self) -> bool {
-        matches!(
-            self,
-            InflationCapFloorType::Cap | InflationCapFloorType::Caplet
-        )
-    }
-}
-
-impl std::fmt::Display for InflationCapFloorType {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            InflationCapFloorType::Cap => write!(f, "cap"),
-            InflationCapFloorType::Floor => write!(f, "floor"),
-            InflationCapFloorType::Caplet => write!(f, "caplet"),
-            InflationCapFloorType::Floorlet => write!(f, "floorlet"),
-        }
-    }
-}
-
-impl std::str::FromStr for InflationCapFloorType {
-    type Err = String;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
-            "cap" => Ok(InflationCapFloorType::Cap),
-            "floor" => Ok(InflationCapFloorType::Floor),
-            "caplet" => Ok(InflationCapFloorType::Caplet),
-            "floorlet" => Ok(InflationCapFloorType::Floorlet),
-            _ => Err(format!("Unknown inflation option type: {s}")),
-        }
-    }
-}
 
 /// YoY inflation cap/floor instrument.
 #[derive(
@@ -113,8 +64,9 @@ impl std::str::FromStr for InflationCapFloorType {
 pub struct InflationCapFloor {
     /// Unique instrument identifier.
     pub id: InstrumentId,
-    /// Cap/floor type (cap, floor, caplet, floorlet).
-    pub option_type: InflationCapFloorType,
+    /// Cap/floor type (cap, floor, caplet, floorlet). Caplet and floorlet price a
+    /// single period.
+    pub rate_option_type: RateOptionType,
     /// Notional amount in quote currency.
     pub notional: Money,
     /// Strike (annualized, decimal).
@@ -227,7 +179,7 @@ impl InflationCapFloor {
 
         InflationCapFloor::builder()
             .id(InstrumentId::new("INFLCAP-USD-5Y"))
-            .option_type(InflationCapFloorType::Cap)
+            .rate_option_type(RateOptionType::Cap)
             .notional(Money::from((1_000_000_i64, Currency::USD)))
             .strike(Decimal::try_from(0.03).expect("valid decimal"))
             .start_date(
@@ -337,8 +289,8 @@ impl InflationCapFloor {
 
     fn schedule(&self) -> finstack_quant_core::Result<Vec<(Date, Date, Date)>> {
         if matches!(
-            self.option_type,
-            InflationCapFloorType::Caplet | InflationCapFloorType::Floorlet
+            self.rate_option_type,
+            RateOptionType::Caplet | RateOptionType::Floorlet
         ) {
             let pay = crate::cashflow::builder::calendar::adjust_date(
                 self.maturity,
@@ -524,7 +476,7 @@ impl InflationCapFloor {
             };
 
             let inputs = CapletFloorletInputs {
-                is_cap: self.option_type.is_cap(),
+                is_cap: self.rate_option_type.is_cap(),
                 notional: self.notional.amount(),
                 strike,
                 forward: forward_rate,

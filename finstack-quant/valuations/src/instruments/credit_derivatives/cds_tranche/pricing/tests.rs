@@ -4,7 +4,8 @@ use super::config::{DiscountAt, DEFAULT_INTEGRATION_TOLERANCE};
 use super::*;
 use crate::cashflow::primitives::CFKind;
 use crate::instruments::credit_derivatives::cds_tranche::parameters::CDSTrancheParams;
-use crate::instruments::credit_derivatives::cds_tranche::{CDSTranche, TrancheSide};
+use crate::instruments::credit_derivatives::cds_tranche::CDSTranche;
+use crate::instruments::PayReceive;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DateExt};
 use finstack_quant_core::market_data::context::MarketContext;
@@ -159,7 +160,7 @@ fn sample_tranche() -> CDSTranche {
             &schedule_params,
             finstack_quant_core::types::CurveId::from("USD-OIS"),
             finstack_quant_core::types::CurveId::from("CDX.NA.IG.42"),
-            TrancheSide::SellProtection,
+            PayReceive::Receive,
         )
         .expect("Valid tranche parameters");
         tranche.roll_rule = crate::cashflow::builder::specs::RollRule::CdsImm;
@@ -195,7 +196,7 @@ fn upfront_uses_protection_side_and_survives_wipeout() {
     assert!((seller_with.amount() - seller_base.amount() - upfront.amount()).abs() < 1e-9);
 
     let mut buyer = seller;
-    buyer.side = TrancheSide::BuyProtection;
+    buyer.side = PayReceive::Pay;
     buyer.upfront = None;
     let buyer_base = pricer
         .price_tranche(&buyer, &market, as_of)
@@ -344,7 +345,7 @@ fn test_equity_helper_matches_explicit_params_pv() {
         &schedule_params,
         finstack_quant_core::types::CurveId::from("USD-OIS"),
         finstack_quant_core::types::CurveId::from("CDX.NA.IG.42"),
-        TrancheSide::SellProtection,
+        PayReceive::Receive,
     )
     .expect("Valid tranche parameters");
 
@@ -363,7 +364,7 @@ fn test_equity_helper_matches_explicit_params_pv() {
         &schedule_params,
         finstack_quant_core::types::CurveId::from("USD-OIS"),
         finstack_quant_core::types::CurveId::from("CDX.NA.IG.42"),
-        TrancheSide::SellProtection,
+        PayReceive::Receive,
     )
     .expect("Valid tranche parameters");
 
@@ -444,7 +445,7 @@ fn test_hetero_spa_vs_exact_convolution_small_pool() {
         &schedule_params,
         finstack_quant_core::types::CurveId::from("USD-OIS"),
         finstack_quant_core::types::CurveId::from("CDX.NA.IG.42"),
-        TrancheSide::SellProtection,
+        PayReceive::Receive,
     )
     .expect("Valid tranche parameters");
 
@@ -492,7 +493,7 @@ fn price_hetero_tranche(
         &schedule_params,
         finstack_quant_core::types::CurveId::from("USD-OIS"),
         finstack_quant_core::types::CurveId::from("CDX.NA.IG.42"),
-        TrancheSide::SellProtection,
+        PayReceive::Receive,
     )
     .expect("Valid tranche parameters");
     let mut pricer = CDSTranchePricer::new();
@@ -651,7 +652,7 @@ fn homogeneity_detection_uses_consistent_tolerance() {
         &schedule_params,
         finstack_quant_core::types::CurveId::from("USD-OIS"),
         finstack_quant_core::types::CurveId::from("CDX.NA.IG.42"),
-        TrancheSide::SellProtection,
+        PayReceive::Receive,
     )
     .expect("Valid tranche parameters");
 
@@ -701,7 +702,7 @@ fn test_grid_step_refines_exact_convolution() {
         &schedule_params,
         finstack_quant_core::types::CurveId::from("USD-OIS"),
         finstack_quant_core::types::CurveId::from("CDX.NA.IG.42"),
-        TrancheSide::SellProtection,
+        PayReceive::Receive,
     )
     .expect("Valid tranche parameters");
 
@@ -836,7 +837,7 @@ fn new_honors_monthly_schedule_params() {
         &schedule_params,
         finstack_quant_core::types::CurveId::from("USD-OIS"),
         finstack_quant_core::types::CurveId::from("CDX.NA.IG.42"),
-        TrancheSide::SellProtection,
+        PayReceive::Receive,
     )
     .expect("Valid tranche parameters");
 
@@ -886,7 +887,7 @@ fn standard_constructor_uses_imm_cds_dates() {
         &tranche_params,
         finstack_quant_core::types::CurveId::from("USD-OIS"),
         finstack_quant_core::types::CurveId::from("CDX.NA.IG.42"),
-        TrancheSide::SellProtection,
+        PayReceive::Receive,
     )
     .expect("Valid tranche parameters");
 
@@ -1020,11 +1021,11 @@ fn test_pv_decomposition_consistency() {
     assert!(premium.is_finite());
     assert!(protection.is_finite());
     match tranche.side {
-        TrancheSide::SellProtection => {
+        PayReceive::Receive => {
             assert!(premium >= 0.0);
             assert!(protection <= 0.0);
         }
-        TrancheSide::BuyProtection => {
+        PayReceive::Pay => {
             assert!(premium <= 0.0);
             assert!(protection >= 0.0);
         }
@@ -1304,7 +1305,7 @@ fn test_thin_tranche_stability() {
         &schedule_params,
         finstack_quant_core::types::CurveId::from("USD-OIS"),
         finstack_quant_core::types::CurveId::from("CDX.NA.IG.42"),
-        TrancheSide::SellProtection,
+        PayReceive::Receive,
     )
     .expect("Valid tranche parameters");
 
@@ -1341,7 +1342,7 @@ fn test_super_senior_tranche() {
         &schedule_params,
         finstack_quant_core::types::CurveId::from("USD-OIS"),
         finstack_quant_core::types::CurveId::from("CDX.NA.IG.42"),
-        TrancheSide::SellProtection,
+        PayReceive::Receive,
     )
     .expect("Valid tranche parameters");
 
@@ -1539,7 +1540,7 @@ fn par_spread_ok_result_is_always_a_true_par() {
 
     // Exercise both protection sides and a range of strikes.
     let maturity = Date::from_calendar_date(2030, Month::January, 1).expect("date");
-    for side in [TrancheSide::BuyProtection, TrancheSide::SellProtection] {
+    for side in [PayReceive::Pay, PayReceive::Receive] {
         for &(attach, detach) in &[(0.0_f64, 3.0_f64), (3.0, 7.0), (10.0, 15.0)] {
             let params = CDSTrancheParams::new(
                 "CDX.NA.IG.42",
@@ -1748,7 +1749,7 @@ fn test_stochastic_recovery_impacts_equity_tranche() {
         &schedule_params,
         finstack_quant_core::types::CurveId::from("USD-OIS"),
         finstack_quant_core::types::CurveId::from("CDX.NA.IG.42"),
-        TrancheSide::SellProtection,
+        PayReceive::Receive,
     )
     .expect("Valid tranche parameters");
 
@@ -1915,7 +1916,7 @@ fn well_formed_base_correlation_prices_without_arbitrage_error() {
             &schedule_params,
             finstack_quant_core::types::CurveId::from("USD-OIS"),
             finstack_quant_core::types::CurveId::from("CDX.NA.IG.42"),
-            TrancheSide::SellProtection,
+            PayReceive::Receive,
         )
         .expect("Valid tranche parameters");
 
@@ -2384,7 +2385,7 @@ fn super_senior_tranche(attach: f64, detach: f64) -> CDSTranche {
         &schedule_params,
         finstack_quant_core::types::CurveId::from("USD-OIS"),
         finstack_quant_core::types::CurveId::from("CDX.NA.IG.42"),
-        TrancheSide::SellProtection,
+        PayReceive::Receive,
     )
     .expect("Valid tranche parameters")
 }

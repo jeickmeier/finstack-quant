@@ -22,7 +22,7 @@ use finstack_quant_valuations::instruments::fixed_income::fi_trs::FIIndexTotalRe
 use finstack_quant_valuations::instruments::EquityUnderlyingParams;
 use finstack_quant_valuations::instruments::FinancingLegSpec;
 use finstack_quant_valuations::instruments::IndexUnderlyingParams;
-use finstack_quant_valuations::instruments::{TrsScheduleSpec, TrsSide};
+use finstack_quant_valuations::instruments::{PayReceive, TrsScheduleSpec};
 use rust_decimal::Decimal;
 use time::Month;
 
@@ -142,7 +142,7 @@ pub struct TestEquityTrsBuilder {
     spread_bp: f64,
     start: Date,
     end: Date,
-    side: TrsSide,
+    side: PayReceive,
     initial_level: Option<f64>,
 }
 
@@ -161,7 +161,7 @@ impl Default for TestEquityTrsBuilder {
             // valuation date forward) doesn't cross the start date.
             start: as_of_date() + time::Duration::days(2),
             end: d(2026, 1, 2),
-            side: TrsSide::ReceiveTotalReturn,
+            side: PayReceive::Receive,
             initial_level: None,
         }
     }
@@ -197,7 +197,7 @@ impl TestEquityTrsBuilder {
         self
     }
 
-    pub fn side(mut self, side: TrsSide) -> Self {
+    pub fn side(mut self, side: PayReceive) -> Self {
         self.side = side;
         self
     }
@@ -256,7 +256,7 @@ pub struct TestFIIndexTrsBuilder {
     spread_bp: f64,
     start: Date,
     end: Date,
-    side: TrsSide,
+    side: PayReceive,
     initial_level: Option<f64>,
 }
 
@@ -275,7 +275,7 @@ impl Default for TestFIIndexTrsBuilder {
             // valuation date forward) doesn't cross the start date.
             start: as_of_date() + time::Duration::days(2),
             end: d(2026, 1, 2),
-            side: TrsSide::ReceiveTotalReturn,
+            side: PayReceive::Receive,
             initial_level: None,
         }
     }
@@ -306,7 +306,7 @@ impl TestFIIndexTrsBuilder {
         self
     }
 
-    pub fn side(mut self, side: TrsSide) -> Self {
+    pub fn side(mut self, side: PayReceive) -> Self {
         self.side = side;
         self
     }

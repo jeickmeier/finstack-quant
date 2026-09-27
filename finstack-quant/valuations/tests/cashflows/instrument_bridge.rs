@@ -182,7 +182,7 @@ fn xccy_swap_exposes_cashflow_provider_bridge() {
     let leg1 = finstack_quant_valuations::instruments::rates::xccy_swap::XccySwapLeg {
         currency: Currency::USD,
         notional: Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
-        side: finstack_quant_valuations::instruments::rates::xccy_swap::LegSide::Receive,
+        side: finstack_quant_valuations::instruments::PayReceive::Receive,
         forward_curve_id: CurveId::new("USD-SOFR-3M"),
         discount_curve_id: CurveId::new("USD-OIS"),
         start,
@@ -201,7 +201,7 @@ fn xccy_swap_exposes_cashflow_provider_bridge() {
     let leg2 = finstack_quant_valuations::instruments::rates::xccy_swap::XccySwapLeg {
         currency: Currency::EUR,
         notional: Money::new(900_000.0, Currency::EUR).expect("valid money fixture"),
-        side: finstack_quant_valuations::instruments::rates::xccy_swap::LegSide::Pay,
+        side: finstack_quant_valuations::instruments::PayReceive::Pay,
         forward_curve_id: CurveId::new("EUR-EURIBOR-3M"),
         discount_curve_id: CurveId::new("EUR-OIS"),
         start,

@@ -14,9 +14,8 @@ use finstack_quant_core::money::Money;
 use finstack_quant_valuations::instruments::credit_derivatives::cds_option::{
     CDSOptionParams, CDSOptionStrike,
 };
-use finstack_quant_valuations::instruments::credit_derivatives::cds_tranche::{
-    CDSTrancheParams, TrancheSide,
-};
+use finstack_quant_valuations::instruments::credit_derivatives::cds_tranche::CDSTrancheParams;
+use finstack_quant_valuations::instruments::PayReceive;
 use finstack_quant_valuations::instruments::{
     CDSOption, CDSTranche, CreditDefaultSwap, CreditParams, StructuredCredit,
 };
@@ -144,7 +143,7 @@ fn cds_tranche_new_carries_schedule_stub_and_roll_rule() {
         &schedule,
         "USD-OIS",
         "CDX.NA.IG.HAZARD",
-        TrancheSide::BuyProtection,
+        PayReceive::Pay,
     )
     .expect("tranche");
     assert_eq!(tranche.stub, StubKind::LongFront);
@@ -186,4 +185,26 @@ fn cds_option_accepts_zero_recovery_like_every_credit_instrument() {
         CDSOption::new("CDSO-FULL-R", &option_params, &one, "USD-OIS", "CDSO-VOL").is_err(),
         "full recovery leaves no protection and is rejected"
     );
+}
+
+#[test]
+fn cds_tranche_side_uses_pay_receive_like_cds() {
+    // A tranche buyer pays the running premium, exactly like a CDS/CDS-index
+    // `pay` side: `pay` buys protection, `receive` sells it.
+    let tranche = CDSTranche::example();
+    assert_eq!(tranche.side, PayReceive::Pay);
+    let json = serde_json::to_value(&tranche).expect("serialize");
+    assert_eq!(json["side"], "pay");
+
+    for retired in [
+        "buy_protection",  // schema-rejection-test: now `pay`
+        "sell_protection", // schema-rejection-test: now `receive`
+    ] {
+        let mut value = json.clone();
+        value["side"] = serde_json::json!(retired);
+        assert!(
+            serde_json::from_value::<CDSTranche>(value).is_err(),
+            "retired tranche side {retired} must be rejected"
+        );
+    }
 }

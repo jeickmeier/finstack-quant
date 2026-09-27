@@ -21,7 +21,7 @@
         "amount": "1000000",
         "currency": "USD"
       },
-      "option_type": "cap",
+      "rate_option_type": "cap",
       "start_date": "2024-01-15",
       "strike": "0.03",
       "stub": "short_front",

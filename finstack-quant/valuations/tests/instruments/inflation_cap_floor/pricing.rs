@@ -10,11 +10,10 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::scalars::InflationLag;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::CurveId;
-use finstack_quant_valuations::instruments::rates::inflation_cap_floor::{
-    InflationCapFloor, InflationCapFloorType,
-};
+use finstack_quant_valuations::instruments::rates::inflation_cap_floor::InflationCapFloor;
 use finstack_quant_valuations::instruments::Attributes;
 use finstack_quant_valuations::instruments::InstrumentPricingOverrides;
+use finstack_quant_valuations::instruments::RateOptionType;
 use finstack_quant_valuations::pricer::ModelKey;
 use rust_decimal::Decimal;
 use time::{Duration, Month};
@@ -45,7 +44,7 @@ fn test_caplet_intrinsic_after_fixing() {
 
     let caplet = InflationCapFloor::builder()
         .id("INF-CAPLET".into())
-        .option_type(InflationCapFloorType::Caplet)
+        .rate_option_type(RateOptionType::Caplet)
         .notional(notional)
         .strike(Decimal::try_from(0.02).expect("valid decimal"))
         .start_date(start)
@@ -108,7 +107,7 @@ fn test_floor_value_with_negative_forward_normal_model() {
 
     let floorlet = InflationCapFloor::builder()
         .id("INF-FLOOR".into())
-        .option_type(InflationCapFloorType::Floorlet)
+        .rate_option_type(RateOptionType::Floorlet)
         .notional(notional)
         .strike(Decimal::try_from(0.0).expect("valid decimal"))
         .start_date(start)
@@ -129,7 +128,7 @@ fn test_floor_value_with_negative_forward_normal_model() {
 
     let caplet = InflationCapFloor::builder()
         .id("INF-CAP".into())
-        .option_type(InflationCapFloorType::Caplet)
+        .rate_option_type(RateOptionType::Caplet)
         .notional(notional)
         .strike(Decimal::try_from(0.0).expect("valid decimal"))
         .start_date(start)
@@ -187,7 +186,7 @@ fn test_yoy_caplet_applies_convexity_adjustment() {
     let build_caplet = |vol_surface_id: &str| {
         InflationCapFloor::builder()
             .id("INF-CAP-CVX".into())
-            .option_type(InflationCapFloorType::Caplet)
+            .rate_option_type(RateOptionType::Caplet)
             .notional(notional)
             // Slightly OTM strike so the option carries time value and is
             // sensitive to the forward-raising convexity adjustment.
@@ -257,4 +256,17 @@ fn test_yoy_caplet_applies_convexity_adjustment() {
         "YoY caplet with vol must have positive value, got {}",
         pv_with_convexity.amount()
     );
+}
+
+#[test]
+fn inflation_cap_floor_uses_rate_option_type_key() {
+    let json = serde_json::to_value(InflationCapFloor::example()).expect("serialize");
+    assert_eq!(json["rate_option_type"], "cap");
+
+    let mut retired = json;
+    let object = retired.as_object_mut().expect("object");
+    object.remove("rate_option_type");
+    // schema-rejection-test: `option_type` is now `rate_option_type`
+    object.insert("option_type".to_string(), serde_json::json!("cap"));
+    assert!(serde_json::from_value::<InflationCapFloor>(retired).is_err());
 }

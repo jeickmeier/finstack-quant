@@ -1,7 +1,7 @@
 //! Duration-based DV01 calculator for fixed income index TRS.
 
-use crate::instruments::common_impl::parameters::trs_common::TrsSide;
 use crate::instruments::fixed_income::fi_trs::FIIndexTotalReturnSwap;
+use crate::instruments::PayReceive;
 use crate::metrics::{MetricCalculator, MetricContext};
 use finstack_quant_core::Result;
 
@@ -47,8 +47,8 @@ impl MetricCalculator for DurationDv01Calculator {
 
         // Long the reference bond (receive TR) loses when yields rise → negative.
         Ok(match trs.side {
-            TrsSide::ReceiveTotalReturn => -dv01,
-            TrsSide::PayTotalReturn => dv01,
+            PayReceive::Receive => -dv01,
+            PayReceive::Pay => dv01,
         })
     }
 }
