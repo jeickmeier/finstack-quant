@@ -20,7 +20,7 @@ jobs:
     env:
       CARGO_BUILD_JOBS: 4
       CARGO_INCREMENTAL: 0
-      CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUSTFLAGS: "-C debuginfo=0 -C strip=symbols -C linker=cc -C link-arg=-fuse-ld=bfd"
+      CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUSTFLAGS: "-C debuginfo=0 -C strip=symbols"
     steps:
       - uses: actions/checkout@v5
       - name: Set up swap space

@@ -7,7 +7,9 @@
 # Naming convention: <domain>-<action>  (domains: rust, python, wasm, ui, all)
 #   - `rust-*`, `python-*`, `wasm-*`, `ui-*`  — single-language tasks
 #   - `all-*`                          — aggregates that fan out to rust/python/wasm
-#   - `*-fmt`                          — reformats AND applies auto-fixes (mutating)
+#   - `*-fmt`                          — reformats (Rust) or reformats and auto-fixes (Python, WASM)
+#   - `rust-fix`                       — clippy --fix (mutating; separate from fmt so it does not
+#                                        invalidate the plain clippy cache)
 #   - `*-lint`                         — check-only (CI-safe, no mutation)
 
 [tools]
@@ -28,6 +30,7 @@ node = "24"
 "cargo:cargo-nextest" = "0.9.143"
 "cargo:cargo-llvm-cov" = "0.9.0"
 "cargo:cargo-deny" = "0.20.2"
+"github:obi1kenobi/cargo-semver-checks" = "0.50.0"
 "cargo:cargo-public-api" = "0.52.0"
 "cargo:flamegraph" = "latest"    # local profiling only, never gates CI
 "cargo:maturin" = "1.14.1"
@@ -95,7 +98,7 @@ description = "Check QuantLib attribution parity fixtures for generator drift"
 run = "uv run python -m scripts.golden.quantlib.generate --family attribution --product all --check"
 
 [tasks.all-fmt]
-description = "Format + auto-fix Rust, Python, and WASM code (mutating)"
+description = "Format Rust, Python, and WASM; auto-fix Python and WASM (mutating)"
 depends = ["rust-fmt", "python-fmt", "wasm-fmt"]
 
 [tasks.all-lint]
@@ -297,24 +300,29 @@ echo "HTML report: target/llvm-cov/html/index.html"
 """
 
 [tasks.rust-lint-crate]
-description = "Lint one crate: fmt check + clippy on lib/tests/bins/examples (preferred during iteration)"
+description = "Lint one crate: fmt check + clippy (preferred during iteration; --lib skips integration tests)"
 usage = '''
 arg "<package>" help="Cargo package (e.g. finstack-quant-valuations, finstack-quant-py)"
 flag "--all-features" help="Enable all crate features for clippy"
+flag "--lib" help="Clippy the library target only"
 '''
 run = '''
 set -e
 pkg="${usage_package?}"
 cargo fmt --all -- --check
+features=""
+targets="--lib --tests --bins --examples"
 if [ "${usage_all_features:-false}" = "true" ]; then
-  cargo clippy -p "$pkg" --lib --tests --bins --examples --all-features -- -D warnings
-else
-  cargo clippy -p "$pkg" --lib --tests --bins --examples -- -D warnings
+  features="--all-features"
 fi
+if [ "${usage_lib:-false}" = "true" ]; then
+  targets="--lib"
+fi
+cargo clippy -p "$pkg" $targets $features -- -D warnings
 '''
 
-[tasks.rust-fmt-crate]
-description = "Format + clippy --fix for one crate (mutating; skips workspace benches)"
+[tasks.rust-fix-crate]
+description = "Apply clippy --fix for one crate (mutating; skips workspace benches)"
 usage = '''
 arg "<package>" help="Cargo package (e.g. finstack-quant-scenarios)"
 flag "--all-features" help="Enable all crate features for clippy"
@@ -322,7 +330,6 @@ flag "--all-features" help="Enable all crate features for clippy"
 run = '''
 set -e
 pkg="${usage_package?}"
-cargo fmt --all
 if [ "${usage_all_features:-false}" = "true" ]; then
   cargo clippy -p "$pkg" --lib --tests --bins --examples --all-features --fix --allow-dirty -- -D warnings
 else
@@ -331,15 +338,17 @@ fi
 '''
 
 [tasks.rust-fmt]
-# `--workspace` keeps the mutating pass in step with `rust-lint`'s check-only pass;
-# without it, auto-fixes would skip the binding crates that rust-lint now gates on.
+description = "Format the full workspace with cargo fmt"
+run = "cargo fmt --all"
+
+[tasks.rust-fix]
+# `--workspace` keeps auto-fixes in step with `rust-lint`.
 # Clippy covers lib/bins/tests/examples only — Criterion benches are compiled by
-# `rust-bench`, not by fmt or lint.
-description = "Format + auto-fix full workspace (use rust-fmt-crate while iterating; skips benches)"
-run = [
-  "cargo fmt --all",
-  "cargo clippy --workspace --lib --bins --tests --examples --all-features --fix --allow-dirty -- -D warnings",
-]
+# `rust-bench`, not by fix or lint. `clippy --fix` rebuilds workspace crates
+# with a different fingerprint than plain clippy, so run it on demand rather
+# than on every format.
+description = "Apply clippy --fix across the workspace (mutating; skips benches)"
+run = "cargo clippy --workspace --lib --bins --tests --examples --all-features --fix --allow-dirty -- -D warnings"
 
 [tasks.rust-lint]
 # Full-workspace pass — matches CI pre-commit (.pre-commit-config.yaml).
@@ -578,10 +587,12 @@ run = "wasm-pack build finstack-quant-wasm --target web"
 
 [tasks.wasm-test]
 description = "Run WASM package tests (wasm-bindgen + Node facade)"
+# Facade builds use profile.wasm-test (opt-level 1, no LTO). Published packages
+# stay on wasm-build / wasm-pkg.
 run = [
   "npm --prefix finstack-quant-wasm run test",
-  "CARGO_INCREMENTAL=0 npm --prefix finstack-quant-wasm run build",
-  "CARGO_INCREMENTAL=0 npm --prefix finstack-quant-wasm run build:node",
+  "wasm-pack build finstack-quant-wasm --target web --profile wasm-test --no-opt --out-dir pkg",
+  "wasm-pack build finstack-quant-wasm --target nodejs --profile wasm-test --no-opt --out-dir pkg-node",
   "npm --prefix finstack-quant-wasm run test:facade",
 ]
 

@@ -85,8 +85,8 @@ Pass `--bench` explicitly. `cargo bench -p finstack-quant-features -- --sample-s
 also launches the lib test harness, which rejects Criterion flags.
 
 Benchmarks are measurement tasks, not gates: they are not run by `mise run rust-test`
-(nextest), not by `mise run all-test`, and not by PR CI. `mise run rust-fmt` and
-`mise run rust-lint` also skip Criterion targets. Workspace-wide measurement goes through `mise run rust-bench` (reduced
+(nextest), not by `mise run all-test`, and not by PR CI. `mise run rust-lint` and
+`mise run rust-fix` do not compile Criterion targets. Workspace-wide measurement goes through `mise run rust-bench` (reduced
 sampling, tunable via `FQ_BENCH_SAMPLE_SIZE`, `FQ_BENCH_WARM_UP_TIME`,
 `FQ_BENCH_MEASUREMENT_TIME`, `FQ_BENCH_NRESAMPLES`), with
 `mise run rust-bench-baseline` and `mise run rust-bench-compare` for regression gating

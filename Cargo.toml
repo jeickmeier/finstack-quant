@@ -105,6 +105,17 @@ lto = true              # Full link-time optimization
 codegen-units = 1       # Maximum optimization (slower compile, smaller output)
 strip = true            # Strip all symbols
 
+[profile.wasm-test]
+# Facade tests need a real wasm module, not the fat-LTO release profile.
+# `mise run wasm-pkg` and `wasm-build` stay on release / release-size.
+inherits = "release"
+opt-level = 1
+lto = false
+codegen-units = 256
+incremental = true
+debug = 0
+strip = "none"
+
 [profile.bench]
 # Optimized profile for benchmarking
 # Automatically used by `cargo bench`

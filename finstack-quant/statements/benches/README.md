@@ -30,7 +30,7 @@ cargo bench -p finstack-quant-statements -- --baseline my_baseline
 
 HTML reports land under `target/criterion/<group>/report/index.html`.
 
-`mise run rust-fmt` and `mise run rust-lint` skip Criterion targets.
+`mise run rust-lint` and `mise run rust-fix` do not compile Criterion targets.
 Workspace-wide runs and regression gating use `mise run rust-bench`,
 `mise run rust-bench-baseline`, and `mise run rust-bench-compare` (the last
 fails above a 10% median regression).

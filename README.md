@@ -373,7 +373,8 @@ rest are narrower (`goldens-*`, `wheel-*`, `pre-commit-*`, `materialization-*`,
 | `mise run all` | Run the complete test and lint gates without a separate preliminary build |
 | `mise run all-build` | Explicitly build Rust, Python, and WASM artifacts |
 | `mise run all-lint` | Lint Rust, Python, and WASM (check-only) |
-| `mise run all-fmt` | Format and auto-fix Rust, Python, and WASM (mutating) |
+| `mise run all-fmt` | Format Rust, Python, and WASM; auto-fix Python and WASM (mutating) |
+| `mise run rust-fix` | Apply clippy --fix across the Rust workspace (mutating) |
 | `mise run all-test` | Run Rust, Python, and WASM tests |
 | `mise run all-ci` | Regenerate derived artifacts, then reproduce the CI job set locally |
 | `mise run rust-build` | Build the Rust workspace excluding the binding crates |
@@ -425,7 +426,7 @@ so inherited shell settings do not override Cargo's release-profile default;
 dev and test builds remain incremental for repeat edits.
 
 Benchmarks are measurement tasks and stay outside `all-test`, nextest,
-`rust-fmt`, and `rust-lint`. PR CI compares four fixed cases; the full suite runs
+`rust-fix`, and `rust-lint`. `rust-fmt` still formats bench sources. PR CI compares four fixed cases; the full suite runs
 weekly. Run `mise run rust-bench` or `mise run rust-bench-crate` to measure locally.
 `mise run python-bench-portfolio` is the materialization-specific Python
 benchmark path; see

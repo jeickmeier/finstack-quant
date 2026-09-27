@@ -56,9 +56,11 @@ jobs:
 
     env:
       # ubuntu-latest is 4 vCPUs; keep parallelism matched (was 2 for OOM caution).
+      # Rust 1.90+ links x86_64-unknown-linux-gnu with rust-lld. Do not force ld.bfd.
+      # Incremental is off because Swatinem/rust-cache does not restore target/incremental.
       CARGO_BUILD_JOBS: 4
-      CARGO_INCREMENTAL: 1
-      CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUSTFLAGS: "-C debuginfo=0 -C strip=symbols -C linker=cc -C link-arg=-fuse-ld=bfd"
+      CARGO_INCREMENTAL: 0
+      CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUSTFLAGS: "-C debuginfo=0 -C strip=symbols"
 
     steps:
       - name: Checkout repository
@@ -129,8 +131,8 @@ jobs:
 
     env:
       CARGO_BUILD_JOBS: 4
-      CARGO_INCREMENTAL: 1
-      CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUSTFLAGS: "-C debuginfo=0 -C strip=symbols -C linker=cc -C link-arg=-fuse-ld=bfd"
+      CARGO_INCREMENTAL: 0
+      CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUSTFLAGS: "-C debuginfo=0 -C strip=symbols"
 
     steps:
       - name: Checkout repository
@@ -168,7 +170,7 @@ jobs:
     env:
       CARGO_BUILD_JOBS: 4
       CARGO_INCREMENTAL: 0
-      CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUSTFLAGS: "-C debuginfo=0 -C strip=symbols -C linker=cc -C link-arg=-fuse-ld=bfd"
+      CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUSTFLAGS: "-C debuginfo=0 -C strip=symbols"
 
     steps:
       - name: Checkout repository
@@ -205,8 +207,8 @@ jobs:
 
     env:
       CARGO_BUILD_JOBS: 4
-      CARGO_INCREMENTAL: 1
-      CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUSTFLAGS: "-C debuginfo=0 -C strip=symbols -C linker=cc -C link-arg=-fuse-ld=bfd"
+      CARGO_INCREMENTAL: 0
+      CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUSTFLAGS: "-C debuginfo=0 -C strip=symbols"
       PYO3_PYTHON: python3
 
     steps:
@@ -255,8 +257,8 @@ jobs:
       # Four parallel rust-lld links of the wasm-bindgen test graph SIGBUS on
       # ubuntu-latest (~7 GiB). Keep this below the native-job default of 4.
       CARGO_BUILD_JOBS: 2
-      CARGO_INCREMENTAL: 1
-      CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUSTFLAGS: "-C debuginfo=0 -C strip=symbols -C linker=cc -C link-arg=-fuse-ld=bfd"
+      CARGO_INCREMENTAL: 0
+      CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUSTFLAGS: "-C debuginfo=0 -C strip=symbols"
       # Must include the getrandom cfg: this env replaces crate `.cargo/config.toml`
       # rustflags rather than appending. `debuginfo=0` avoids the rust-lld
       # SIGBUS on huge wasm-bindgen describe-export lists (LLVM #195482).
@@ -311,7 +313,7 @@ jobs:
 
     env:
       CARGO_BUILD_JOBS: 4
-      CARGO_INCREMENTAL: 1
+      CARGO_INCREMENTAL: 0
       RUSTUP_TOOLCHAIN: "1.97.1"
       FQ_BENCH_SAMPLE_SIZE: "10"
       FQ_BENCH_WARM_UP_TIME: "1"
@@ -500,9 +502,7 @@ jobs:
           cache: true
           cache_save: false
 
-      - name: Install cargo-semver-checks
-        run: cargo install cargo-semver-checks --locked
-
+      # cargo-semver-checks is provisioned by mise from a GitHub release binary.
       # Semver-check the stable public-API crates.
       - name: Run semver checks against master
         run: |

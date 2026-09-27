@@ -182,7 +182,7 @@ Determines the correct version bump (patch / minor / major).
 
 ```bash
 # Compare current branch against the last release tag
-cargo install cargo-semver-checks --locked 2>/dev/null
+mise install
 cargo semver-checks check-release -p finstack-quant-core --baseline-rev <last-release-tag>
 ```
 
