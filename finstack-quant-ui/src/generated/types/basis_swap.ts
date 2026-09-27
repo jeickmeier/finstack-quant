@@ -275,6 +275,10 @@ export type DB556Bbeb1Ecf96C44C5A =
 export type BusinessDayConvention =
   "unadjusted" | "following" | "modified_following" | "preceding" | "modified_preceding" | "nearest";
 /**
+ * Opaque string identifier.
+ */
+export type Id1 = string;
+/**
  * Day count convention for accrual calculations
  */
 export type DayCount =
@@ -292,17 +296,17 @@ export type DayCount =
   | "act_act_afb"
   | "bus_252";
 /**
- * Discount curve identifier for present value calculations
+ * Opaque string identifier.
  */
-export type Id1 = string;
+export type Id2 = string;
 /**
  * End date of the leg
  */
 export type Date = string;
 /**
- * Forward curve identifier for this leg
+ * Opaque string identifier.
  */
-export type Id2 = string;
+export type Id3 = string;
 /**
  * Spread added to the floating rate, in **basis points**.
  *
@@ -1527,7 +1531,7 @@ export interface DDedcef72344Af3F828Eb {
   /**
    * Optional calendar identifier for business day adjustments
    */
-  calendar_id?: string | null;
+  calendar_id?: Id1 | null;
   /**
    * Overnight vs term compounding for this floating leg.
    *
@@ -1571,9 +1575,9 @@ export interface DDedcef72344Af3F828Eb {
         };
       };
   day_count: DayCount;
-  discount_curve_id: Id1;
+  discount_curve_id: Id2;
   end: Date;
-  forward_curve_id: Id2;
+  forward_curve_id: Id3;
   frequency: Tenor;
   /**
    * Payment lag in business days after period end (default: 0).
@@ -1620,7 +1624,7 @@ export interface DDedcef72344Af3F828Eb1 {
   /**
    * Optional calendar identifier for business day adjustments
    */
-  calendar_id?: string | null;
+  calendar_id?: Id1 | null;
   /**
    * Overnight vs term compounding for this floating leg.
    *
@@ -1664,9 +1668,9 @@ export interface DDedcef72344Af3F828Eb1 {
         };
       };
   day_count: DayCount;
-  discount_curve_id: Id1;
+  discount_curve_id: Id2;
   end: Date;
-  forward_curve_id: Id2;
+  forward_curve_id: Id3;
   frequency: Tenor;
   /**
    * Payment lag in business days after period end (default: 0).

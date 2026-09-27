@@ -1361,7 +1361,7 @@
       "type": "discounted_cash_flow",
       "instrumentSource": {
         "path": "finstack-quant/valuations/tests/instruments/json_examples/discounted_cash_flow.json",
-        "sha256": "ec48d35a85219478d5464639ed8d272970704c6500f251dea0ff46a020e71b6b",
+        "sha256": "a6ebbe4d1ee5eef9051892d3959f13bc10c3a632abb96a54dc8f0d69af1673ac",
         "pointer": []
       },
       "instrumentPatches": [],

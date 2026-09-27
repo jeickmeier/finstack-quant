@@ -9,6 +9,7 @@ export default [
         "instrument": {
           "spec": {
             "attributes": {},
+            "calendar_id": "nyse",
             "closing_date": "2024-01-01",
             "deal_metadata": {
               "manager_id": null,
@@ -34,7 +35,6 @@ export default [
               "refi_rate": 0.04
             },
             "maturity": "2034-01-01",
-            "payment_calendar_id": "nyse",
             "pool": {
               "assets": [
                 {
@@ -47,26 +47,25 @@ export default [
                     "currency": "USD"
                   },
                   "contractual_payment": null,
-                  "credit_quality": null,
                   "day_count": "act_360",
                   "default_date": null,
+                  "defaulted": false,
+                  "forward_curve_id": null,
                   "id": "COLLATERAL-1",
-                  "index_id": null,
                   "industry": null,
-                  "is_defaulted": false,
                   "maturity": "2034-01-01",
                   "mdr_override": null,
                   "obligor_id": null,
                   "origination_date": null,
                   "purchase_price": null,
                   "rate": 0.07,
+                  "rating": null,
                   "recovery_amount": null,
                   "recovery_rate": null,
                   "smm_override": null,
                   "spread_bp": null
                 }
               ],
-              "base_currency": "USD",
               "collection_account": {
                 "amount": "0",
                 "currency": "USD"
@@ -87,6 +86,7 @@ export default [
                 "amount": "0",
                 "currency": "USD"
               },
+              "currency": "USD",
               "deal_type": "clo",
               "excess_spread_account": {
                 "amount": "0",

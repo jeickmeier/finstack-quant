@@ -10,9 +10,10 @@
           "correlation": 0.85,
           "day_count": "act_360",
           "discount_curve_id": "USD-OIS",
-          "expiry_date": "2027-03-29",
+          "expiry": "2027-03-29",
           "forward_curve_id": "USD-SOFR-3M",
           "id": "CMS-SPREAD-10Y2Y",
+          "index_id": "USD-SOFR-OIS",
           "long_cms_tenor": {
             "count": 10,
             "unit": "years"
@@ -29,8 +30,7 @@
             "unit": "years"
           },
           "short_vol_surface_id": "USD-SWAPTION-VOL-2Y",
-          "strike": 0.005,
-          "swap_convention": "usd_sofr"
+          "strike": "0.005"
         },
         "type": "cms_spread_option"
       },
@@ -345,6 +345,18 @@
         "model"
       ],
       "type": "object"
+    },
+    "d_18f3ba1ec18ab2be13b2": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "description": "Exact decimal encoded as a JSON string.",
+      "examples": [
+        "1000000",
+        "0.0425",
+        "-1234.56789"
+      ],
+      "pattern": "^-?\\d+(\\.\\d+)?([eE][+-]?\\d+)?$",
+      "title": "Decimal",
+      "type": "string"
     },
     "d_1b2ccb88c9229e7463e8": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -687,36 +699,6 @@
         "direction"
       ],
       "type": "object"
-    },
-    "d_45d82c6e6b472f5d9bca": {
-      "description": "Standard interest rate swap conventions by region.\n\n# Market Standards Reference (Post-IBOR Transition)\n\n| Convention | Index | Fixed DC | Float DC | Fixed Freq | Float Freq | Reset Lag |\n|------------|-------|----------|----------|------------|------------|-----------|\n| USD OIS | SOFR | 30/360 | ACT/360 | Semi-annual | Annual | T-2 |\n| EUR OIS | ESTR | 30/360 | ACT/360 | Annual | Annual | T-2 |\n| EUR IBOR | EURIBOR | 30/360 | ACT/360 | Annual | Semi-annual | T-2 |\n| GBP OIS | SONIA | ACT/365F | ACT/365F | Annual | Annual | T-0 |\n| JPY OIS | TONAR | ACT/365F | ACT/365F | Semi-annual | Annual | T-2 |\n\n# OIS Compounding\n\nNote: OIS swaps (SOFR, ESTR, SONIA, TONAR) use **daily compounded** rates\nwith observation shift (typically 2 days lookback). The float frequency\nindicates the payment/reset frequency, not the compounding frequency.\nSee compounding method guidance below for details.\n\n# Sources\n\n- ISDA 2021 IBOR Fallbacks Protocol\n- Bloomberg SWDF function\n- QuantLib OvernightIndexedSwap conventions",
-      "oneOf": [
-        {
-          "const": "usd_sofr",
-          "description": "USD SOFR OIS: Annual fixed, annual float, ACT/360\n\nStandard post-LIBOR USD swap convention using SOFR compounded in arrears.",
-          "type": "string"
-        },
-        {
-          "const": "eur_estr",
-          "description": "EUR ESTR OIS: Annual fixed, annual float, ACT/360\n\nStandard EUR OIS convention using ESTR compounded in arrears.\nFor EURIBOR swaps, use [`EurEuribor`](Self::EurEuribor).",
-          "type": "string"
-        },
-        {
-          "const": "eur_euribor",
-          "description": "EUR EURIBOR: Annual fixed, semi-annual float, ACT/360\n\nLegacy EUR swap convention using EURIBOR 6M as the floating index.\nThis is a term rate (not compounded daily).",
-          "type": "string"
-        },
-        {
-          "const": "gbp_sonia",
-          "description": "GBP SONIA OIS: Annual fixed, annual float, ACT/365F\n\nStandard GBP swap convention using SONIA compounded in arrears.",
-          "type": "string"
-        },
-        {
-          "const": "jpy_tonar",
-          "description": "JPY TONAR OIS: Annual fixed, annual float, ACT/365F\n\nStandard JPY swap convention using TONAR compounded in arrears.",
-          "type": "string"
-        }
-      ]
     },
     "d_46455be5cce6b8020e50": {
       "description": "Asset dynamics specification for the Merton model.\n\nControls the stochastic process assumed for the firm's asset value.",
@@ -3752,7 +3734,7 @@
           "$ref": "#/$defs/d_9c3fc047c6fea21344ad",
           "description": "Discount curve ID."
         },
-        "expiry_date": {
+        "expiry": {
           "$ref": "#/$defs/d_1b2ccb88c9229e7463e8",
           "description": "Option expiry date."
         },
@@ -3763,6 +3745,17 @@
         "id": {
           "$ref": "#/$defs/d_9c3fc047c6fea21344ad",
           "description": "Unique instrument identifier."
+        },
+        "index_id": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/d_9c3fc047c6fea21344ad"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Rate-index convention-registry key of the underlying CMS swaps (e.g. `EUR-ESTR-OIS`).\n\nWhen set, provides default values for the fixed/float frequency and\nday count. Individual fields still override the convention when set."
         },
         "instrument_pricing_overrides": {
           "$ref": "#/$defs/d_c08279a20372931820e0",
@@ -3805,22 +3798,10 @@
           "description": "Swaption volatility surface for short tenor."
         },
         "strike": {
-          "description": "Strike spread (in decimal, e.g., 0.005 = 50bp).",
-          "format": "double",
-          "type": "number"
+          "$ref": "#/$defs/d_18f3ba1ec18ab2be13b2",
+          "description": "Strike on the CMS spread as a decimal rate (0.005 = 50bp)."
         },
-        "swap_convention": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/d_45d82c6e6b472f5d9bca"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "IRS convention for the underlying CMS swaps (e.g. `EurEstr`).\n\nWhen set, provides default values for the fixed/float frequency and\nday count. Individual fields still override the convention when set."
-        },
-        "swap_day_count": {
+        "swap_fixed_day_count": {
           "anyOf": [
             {
               "$ref": "#/$defs/d_c0401254ec268b317b65"
@@ -3872,7 +3853,7 @@
         "strike",
         "option_type",
         "notional",
-        "expiry_date",
+        "expiry",
         "payment_date",
         "long_vol_surface_id",
         "short_vol_surface_id",

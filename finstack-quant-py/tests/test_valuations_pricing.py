@@ -62,7 +62,7 @@ def _structured_credit_json() -> str:
     pool = {
         "id": "POOL",
         "deal_type": "abs",
-        "base_currency": "USD",
+        "currency": "USD",
         "assets": [
             {
                 "id": "A1",

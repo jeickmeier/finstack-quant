@@ -7,6 +7,10 @@
 export type BusinessDayConvention =
   "unadjusted" | "following" | "modified_following" | "preceding" | "modified_preceding" | "nearest";
 /**
+ * Opaque string identifier.
+ */
+export type Id = string;
+/**
  * Day count convention for accrual and option time.
  */
 export type DayCount =
@@ -24,17 +28,17 @@ export type DayCount =
   | "act_act_afb"
   | "bus_252";
 /**
- * Discount curve identifier.
- */
-export type Id = string;
-/**
- * Unique instrument identifier.
+ * Opaque string identifier.
  */
 export type Id1 = string;
 /**
- * Inflation index/curve identifier (e.g., US-CPI-U).
+ * Opaque string identifier.
  */
 export type Id2 = string;
+/**
+ * Opaque string identifier.
+ */
+export type Id3 = string;
 /**
  * A phantom-typed identifier that prevents mixing different kinds of IDs.
  *
@@ -373,9 +377,9 @@ export type Date1 = string;
  */
 export type Decimal = string;
 /**
- * Volatility surface identifier.
+ * Opaque string identifier.
  */
-export type Id3 = string;
+export type Id4 = string;
 /**
  * Canonical schema marker for persisted instrument envelopes.
  */
@@ -401,12 +405,12 @@ export interface D_2572320F93343Dabe361 {
   /**
    * Optional holiday calendar identifier.
    */
-  calendar_id?: string | null;
+  calendar_id?: Id | null;
   day_count: DayCount;
-  discount_curve_id: Id;
+  discount_curve_id: Id1;
   frequency: Tenor;
-  id: Id1;
-  inflation_index_id: Id2;
+  id: Id2;
+  inflation_index_id: Id3;
   /**
    * Correlation between the inflation index and the nominal short rate,
    * used in the YoY convexity/timing adjustment. `None` ⇒ treated as 0
@@ -416,14 +420,15 @@ export interface D_2572320F93343Dabe361 {
   inflation_nominal_correlation?: number | null;
   instrument_pricing_overrides?: InstrumentPricingOverrides;
   /**
-   * Contractual monthly CPI interpolation, overriding index metadata.
+   * Contractual monthly CPI interpolation; takes precedence over index metadata.
    * Defaults to monthly step interpolation when neither source supplies it.
    */
-  interpolation_override?: D_248B18283Cf30A5Fa9Bc | null;
+  interpolation?: D_248B18283Cf30A5Fa9Bc | null;
   /**
-   * Optional contract-level lag override.
+   * Contractual CPI observation lag; when `None` the index lag, then the
+   * curve's indexation lag, applies.
    */
-  lag_override?: DC8D5A8Dc925586Cc9B9D | null;
+  lag?: DC8D5A8Dc925586Cc9B9D | null;
   maturity: Date;
   metric_pricing_overrides?: MetricPricingOverrides;
   /**
@@ -443,7 +448,7 @@ export interface D_2572320F93343Dabe361 {
    * Schedule stub convention.
    */
   stub?: "none" | "short_front" | "short_back" | "long_front" | "long_back";
-  vol_surface_id: Id3;
+  vol_surface_id: Id4;
 }
 /**
  * Attributes for scenario selection and tagging.

@@ -13,15 +13,14 @@ export default [
             "calendar_id": null,
             "day_count": "act_360",
             "discount_curve_id": "USD-OIS",
+            "fixed_rate": "0.045",
             "id": "DEP-USD-6M",
             "maturity": "2024-07-01",
             "notional": {
               "amount": "100000",
               "currency": "USD"
             },
-            "quote_rate": "0.045",
-            "settlement_days": 2,
-            "start_date": "2024-01-01"
+            "start_date": "2024-01-03"
           },
           "type": "deposit"
         },
@@ -1234,7 +1233,7 @@ export default [
   {
     "path": "#/$defs/d_8dbf50e93309e9ee85f5",
     "source": "https://finstack_quant.dev/schemas/instrument/1/rates/deposit.schema.json#/$defs/Deposit",
-    "description": "Simple deposit instrument with optional quoted rate.\n\nRepresents a single-period deposit where principal is exchanged\nat start and principal plus interest at maturity.\n\n# Market Convention Fields\n\nThe instrument supports optional settlement convention fields for proper\nbusiness-day adjusted cashflow generation:\n\n- `settlement_days`: T+N business days from trade date to spot (effective start) date (market convention: 2 for USD/EUR/JPY, 0 for GBP)\n- `business_day_convention`: Business day convention for date adjustment (default: ModifiedFollowing)\n- `calendar_id`: Holiday calendar identifier for business day logic (e.g., \"nyse\", \"target\")\n\nWhen these fields are set, the effective start date is computed as\n`start + settlement_days` adjusted by the business day convention. In this case,\n`start` is treated as the trade date; otherwise it is the accrual start date."
+    "description": "Simple deposit instrument with optional quoted rate.\n\nRepresents a single-period deposit where principal is exchanged\nat start and principal plus interest at maturity.\n\n# Market Convention Fields\n\nThe instrument supports optional settlement convention fields for proper\nbusiness-day adjusted cashflow generation:\n\n- `business_day_convention`: Business day convention for date adjustment (default: ModifiedFollowing)\n- `calendar_id`: Holiday calendar identifier for business day logic (e.g., \"nyse\", \"target\")\n\n`start_date` is always the accrual start (spot) date. Callers holding a\ntrade date compute the spot date before building (see\n[`Deposit::from_conventions`]). When `calendar_id` is set, `start_date` and\n`maturity` are adjusted by the business day convention."
   },
   {
     "path": "#/$defs/d_8dbf50e93309e9ee85f5/properties/attributes",
@@ -1281,6 +1280,22 @@ export default [
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/id.schema.json#"
   },
   {
+    "path": "#/$defs/d_8dbf50e93309e9ee85f5/properties/fixed_rate",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/rates/deposit.schema.json#/$defs/Deposit/properties/fixed_rate",
+    "default": null,
+    "description": "Optional contractual simple rate r (annualised decimal, 0.045 = 4.5%) for the deposit.\n\nNote: `cashflow_schedule()` requires `fixed_rate` to be set. Leaving it as `None`\nis only appropriate if the caller never requests cashflow generation/PV from\nthis instrument (e.g., constructing placeholders)."
+  },
+  {
+    "path": "#/$defs/d_8dbf50e93309e9ee85f5/properties/fixed_rate/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/rates/deposit.schema.json#/$defs/Deposit/properties/fixed_rate/anyOf/0",
+    "ref": "https://finstack_quant.dev/schemas/common/1/decimal.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/decimal.schema.json#"
+  },
+  {
+    "path": "#/$defs/d_8dbf50e93309e9ee85f5/properties/fixed_rate/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/rates/deposit.schema.json#/$defs/Deposit/properties/fixed_rate/anyOf/1"
+  },
+  {
     "path": "#/$defs/d_8dbf50e93309e9ee85f5/properties/id",
     "source": "https://finstack_quant.dev/schemas/instrument/1/rates/deposit.schema.json#/$defs/Deposit/properties/id",
     "description": "Unique identifier for the deposit.",
@@ -1316,34 +1331,11 @@ export default [
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/money.schema.json#"
   },
   {
-    "path": "#/$defs/d_8dbf50e93309e9ee85f5/properties/quote_rate",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/rates/deposit.schema.json#/$defs/Deposit/properties/quote_rate",
-    "default": null,
-    "description": "Optional quoted simple rate r (annualised) for the deposit.\n\nNote: `cashflow_schedule()` requires `quote_rate` to be set. Leaving it as `None`\nis only appropriate if the caller never requests cashflow generation/PV from\nthis instrument (e.g., constructing placeholders)."
-  },
-  {
-    "path": "#/$defs/d_8dbf50e93309e9ee85f5/properties/quote_rate/anyOf/0",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/rates/deposit.schema.json#/$defs/Deposit/properties/quote_rate/anyOf/0",
-    "ref": "https://finstack_quant.dev/schemas/common/1/decimal.schema.json",
-    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/decimal.schema.json#"
-  },
-  {
-    "path": "#/$defs/d_8dbf50e93309e9ee85f5/properties/quote_rate/anyOf/1",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/rates/deposit.schema.json#/$defs/Deposit/properties/quote_rate/anyOf/1"
-  },
-  {
     "path": "#/$defs/d_8dbf50e93309e9ee85f5/properties/scenario_pricing_overrides",
     "source": "https://finstack_quant.dev/schemas/instrument/1/rates/deposit.schema.json#/$defs/Deposit/properties/scenario_pricing_overrides",
     "description": "Scenario-only pricing adjustments.",
     "ref": "https://finstack_quant.dev/schemas/common/1/scenario_pricing_overrides.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/scenario_pricing_overrides.schema.json#"
-  },
-  {
-    "path": "#/$defs/d_8dbf50e93309e9ee85f5/properties/settlement_days",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/rates/deposit.schema.json#/$defs/Deposit/properties/settlement_days",
-    "description": "Optional T+N settlement (spot) lag in business days from trade date to effective start.\n\nMarket convention: T+2 for USD/EUR/JPY, T+0 for GBP.\nIf not set, the raw `start` date is used without adjustment.",
-    "format": "uint32",
-    "minimum": 0
   },
   {
     "path": "#/$defs/d_8dbf50e93309e9ee85f5/properties/start_date",

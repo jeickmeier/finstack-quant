@@ -23,13 +23,13 @@ export type DayCount =
  */
 export type Id = string;
 /**
- * ISO 8601 calendar date string.
- */
-export type Date = string;
-/**
  * Opaque string identifier.
  */
 export type Id1 = string;
+/**
+ * ISO 8601 calendar date string.
+ */
+export type Date = string;
 /**
  * Opaque string identifier.
  */
@@ -511,22 +511,22 @@ export interface DB2E822Dc7Fb5846C6Cd8 {
    * Required only when the contract currency has no registered standard
    * overnight calendar. Otherwise the currency standard is used.
    */
-  fixing_calendar_id?: string | null;
+  fixing_calendar_id?: Id1 | null;
   /**
    * Underlying rate fixing date.
    *
    * Defaults to `terms.last_trading_date` when omitted.
    */
   fixing_date?: Date | null;
+  forward_curve_id: Id2;
+  id: Id3;
   /**
-   * Optional fixing-index identifier.
+   * Optional rate-index identity keying the historical fixing series.
    *
    * When omitted, historical fixings use `forward_curve_id`. Fixing series
    * are looked up strictly as `FIXING:{id}` without alias fallback.
    */
-  fixing_index_id?: Id1 | null;
-  forward_curve_id: Id2;
-  id: Id3;
+  index_id?: Id1 | null;
   instrument_pricing_overrides?: InstrumentPricingOverrides;
   metric_pricing_overrides?: MetricPricingOverrides;
   /**

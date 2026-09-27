@@ -27,7 +27,11 @@ export type DayCount =
  */
 export type Id = string;
 /**
- * Floating rate index identifier.
+ * Fixed rate component as a decimal annual rate (0.05 = 5%).
+ */
+export type Decimal = string;
+/**
+ * Rates forward curve that projects the floating index (also the fixing-series key).
  */
 export type Id1 = string;
 /**
@@ -299,6 +303,10 @@ export type DB556Bbeb1Ecf96C44C5A =
   | "ZMW"
   | "ZWL";
 /**
+ * ISO 8601 calendar date string.
+ */
+export type Date1 = string;
+/**
  * Opaque string identifier.
  */
 export type Id3 = string;
@@ -336,7 +344,7 @@ export interface DE71A70936D11Bb04Ba43 {
  * # Variants
  *
  * - **Snowball**: Coupon depends on previous coupon (path-dependent)
- * - **Inverse Floater**: Coupon = fixed_rate - leverage * floating_rate
+ * - **Inverse Floater**: Coupon = fixed_rate - gearing * floating_rate
  *   (simpler, not path-dependent, but often combined with callability)
  *
  * # References
@@ -354,34 +362,34 @@ export interface D_34C7523897E1E79A3D8C {
    */
   coupon_cap?: number | null;
   /**
-   * Coupon payment dates (must be sorted ascending).
-   */
-  coupon_dates: Date[];
-  /**
    * Floor on each period coupon (typically 0.0).
    */
   coupon_floor: number;
   day_count: DayCount;
   discount_curve_id: Id;
+  fixed_rate: Decimal;
+  forward_curve_id: Id1;
   /**
-   * Fixed rate component.
+   * Multiplier on the floating fixing (1.0 for snowball, variable for inverse floater).
    */
-  fixed_rate: number;
-  floating_index_id: Id1;
-  floating_tenor: Tenor;
+  gearing: number;
   id: Id2;
+  index_tenor: Tenor;
   /**
    * Initial coupon for snowball (c_0); ignored for inverse floater.
    */
   initial_coupon: number;
   instrument_pricing_overrides?: InstrumentPricingOverrides;
-  /**
-   * Leverage multiplier on floating rate (1.0 for snowball, variable for inverse floater).
-   */
-  leverage: number;
   metric_pricing_overrides?: MetricPricingOverrides;
   notional: Money;
+  /**
+   * Coupon payment dates, one per period, strictly ascending and after
+   * `start_date`. Period `i` accrues from the previous payment date (or
+   * `start_date`) to `payment_dates[i]` and fixes in advance at its start.
+   */
+  payment_dates: Date[];
   scenario_pricing_overrides?: ScenarioPricingOverrides;
+  start_date: Date1;
   /**
    * Snowball or inverse floater variant.
    */
@@ -419,8 +427,9 @@ export interface Attributes {
  * - `call_dates`: Sorted ascending dates on which the issuer may call.
  * - `price_pct_of_par`: Redemption price in percent of par (`100.0` = par,
  *   `102.0` = callable at 102).
- * - `lockout_periods`: Number of initial coupon periods during which
- *   the call right cannot be exercised.
+ * - `lockout_end`: Optional end of the no-call period; call dates on or
+ *   before it are not exercisable (exclusive bound, matching
+ *   `BermudanSchedule.lockout_end` on Bermudan swaptions).
  */
 export interface D_97331C606D553B2E79D9 {
   /**
@@ -428,9 +437,10 @@ export interface D_97331C606D553B2E79D9 {
    */
   call_dates: Date[];
   /**
-   * Lockout period in number of coupon periods before first call.
+   * End of the no-call (lockout) period. Call dates on or before this
+   * date are dropped (exclusive bound); `None` means no lockout.
    */
-  lockout_periods: number;
+  lockout_end?: Date | null;
   /**
    * Redemption price in percent of par (`100.0` = par). The pricer pays
    * `notional * price_pct_of_par / 100` at exercise.
@@ -438,7 +448,7 @@ export interface D_97331C606D553B2E79D9 {
   price_pct_of_par: number;
 }
 /**
- * Floating rate tenor.
+ * Contractual tenor of the observed floating index (must match the forward curve tenor).
  */
 export interface Tenor {
   /**

@@ -13,8 +13,8 @@
       "commodity_type": "Energy",
       "currency": "USD",
       "discount_curve_id": "USD-OIS",
-      "fixed_price": "3.5",
-      "floating_index_id": "NG-SPOT-AVG",
+      "fixed_price": 3.5,
+      "forward_curve_id": "NG-SPOT-AVG",
       "frequency": {
         "count": 1,
         "unit": "months"
@@ -25,7 +25,7 @@
       "quantity": 10000.0,
       "side": "pay",
       "start_date": "2025-01-01",
-      "ticker": "NG",
+      "underlying_ticker": "NG",
       "unit": "MMBTU"
     },
     "type": "commodity_swap"

@@ -7,9 +7,9 @@
       "discrete_dividends": [],
       "div_yield_id": "AAPL-DIV",
       "id": "EQUITY-AAPL",
-      "price_id": "AAPL-SPOT",
-      "price_quote": null,
-      "shares": 100.0,
+      "quantity": 100.0,
+      "quoted_spot": null,
+      "spot_id": "AAPL-SPOT",
       "ticker": "AAPL"
     },
     "type": "equity"

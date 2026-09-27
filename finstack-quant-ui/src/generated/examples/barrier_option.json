@@ -4,6 +4,7 @@
       "attributes": {},
       "barrier": 5000.0,
       "barrier_type": "up_and_out",
+      "currency": "USD",
       "day_count": "act_365f",
       "discount_curve_id": "USD-OIS",
       "div_yield_id": "SPX-DIV",
@@ -12,11 +13,8 @@
       "monitoring": {
         "type": "continuous"
       },
-      "notional": {
-        "amount": "100000",
-        "currency": "USD"
-      },
       "option_type": "call",
+      "quantity": 100000.0,
       "rebate": {
         "amount": "50",
         "currency": "USD"

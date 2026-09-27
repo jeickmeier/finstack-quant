@@ -116,8 +116,8 @@ it("adds and edits a native tuple array and distinguishes nullable omission", as
     screen.getByRole("textbox", { name: "Discrete dividends 1 2" }),
     { target: { value: "1.23456789" } },
   );
-  await user.click(screen.getByRole("button", { name: "Add price quote" }));
-  fireEvent.change(screen.getByRole("textbox", { name: "Price quote" }), {
+  await user.click(screen.getByRole("button", { name: "Add quoted spot" }));
+  fireEvent.change(screen.getByRole("textbox", { name: "Quoted spot" }), {
     target: { value: "123.456789" },
   });
   const first = await apply(submit);
@@ -125,20 +125,20 @@ it("adds and edits a native tuple array and distinguishes nullable omission", as
     ["2025-06-01", 1.23456789],
   ]);
   expect(first.instrument.spec.quoted_spot).toBe(123.456789);
-  await user.click(screen.getByRole("button", { name: "Price quote options" }));
+  await user.click(screen.getByRole("button", { name: "Quoted spot options" }));
   await user.click(
-    await screen.findByRole("button", { name: "Clear price quote" }),
+    await screen.findByRole("button", { name: "Clear quoted spot" }),
   );
   const cleared = await apply(submit);
   expect(cleared.instrument.spec.quoted_spot).toBeNull();
-  await user.click(screen.getByRole("button", { name: "Omit price quote" }));
+  await user.click(screen.getByRole("button", { name: "Omit quoted spot" }));
   await apply(submit);
   expect(
     JSON.parse(validate.mock.calls.at(-1)![0]).instrument.spec,
   ).not.toHaveProperty("quoted_spot");
   await user.click(
     screen.getByRole("button", {
-      name: "Set price quote to null",
+      name: "Set quoted spot to null",
     }),
   );
   const nulled = await apply(submit);

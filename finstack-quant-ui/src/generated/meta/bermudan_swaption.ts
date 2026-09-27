@@ -9,7 +9,8 @@ export default [
         "instrument": {
           "spec": {
             "attributes": {},
-            "bermudan_schedule": {
+            "bermudan_type": "co_terminal",
+            "exercise_schedule": {
               "exercise_dates": [
                 "2029-01-17",
                 "2029-07-17",
@@ -31,7 +32,6 @@ export default [
               "lockout_end": null,
               "notice_days": 0
             },
-            "bermudan_type": "co_terminal",
             "id": "BERM-10NC2-USD",
             "notional": {
               "amount": "10000000",
@@ -1270,6 +1270,16 @@ export default [
     "description": "Optional calendar for business day adjustments"
   },
   {
+    "path": "#/$defs/d_732a5eeede1f58d40372/properties/calendar_id/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/rates/bermudan_swaption.schema.json#/$defs/FloatLegSpec/properties/calendar_id/anyOf/0",
+    "ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/id.schema.json#"
+  },
+  {
+    "path": "#/$defs/d_732a5eeede1f58d40372/properties/calendar_id/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/rates/bermudan_swaption.schema.json#/$defs/FloatLegSpec/properties/calendar_id/anyOf/1"
+  },
+  {
     "path": "#/$defs/d_732a5eeede1f58d40372/properties/compounding",
     "source": "https://finstack_quant.dev/schemas/instrument/1/rates/bermudan_swaption.schema.json#/$defs/FloatLegSpec/properties/compounding",
     "default": "simple",
@@ -1309,6 +1319,16 @@ export default [
     "source": "https://finstack_quant.dev/schemas/instrument/1/rates/bermudan_swaption.schema.json#/$defs/FloatLegSpec/properties/fixing_calendar_id",
     "default": null,
     "description": "Optional calendar for rate fixing (reset lag)"
+  },
+  {
+    "path": "#/$defs/d_732a5eeede1f58d40372/properties/fixing_calendar_id/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/rates/bermudan_swaption.schema.json#/$defs/FloatLegSpec/properties/fixing_calendar_id/anyOf/0",
+    "ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/id.schema.json#"
+  },
+  {
+    "path": "#/$defs/d_732a5eeede1f58d40372/properties/fixing_calendar_id/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/rates/bermudan_swaption.schema.json#/$defs/FloatLegSpec/properties/fixing_calendar_id/anyOf/1"
   },
   {
     "path": "#/$defs/d_732a5eeede1f58d40372/properties/forward_curve_id",
@@ -2702,6 +2722,16 @@ export default [
     "description": "Optional calendar for business day adjustments"
   },
   {
+    "path": "#/$defs/d_b2304c53f63497441bfc/properties/calendar_id/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/rates/bermudan_swaption.schema.json#/$defs/FixedLegSpec/properties/calendar_id/anyOf/0",
+    "ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/id.schema.json#"
+  },
+  {
+    "path": "#/$defs/d_b2304c53f63497441bfc/properties/calendar_id/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/rates/bermudan_swaption.schema.json#/$defs/FixedLegSpec/properties/calendar_id/anyOf/1"
+  },
+  {
     "path": "#/$defs/d_b2304c53f63497441bfc/properties/compounding_simple",
     "source": "https://finstack_quant.dev/schemas/instrument/1/rates/bermudan_swaption.schema.json#/$defs/FixedLegSpec/properties/compounding_simple",
     "description": "If true, use simple interest on accrual fraction"
@@ -2797,18 +2827,18 @@ export default [
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/attributes.schema.json#"
   },
   {
-    "path": "#/$defs/d_b532a9f21fa25370d47c/properties/bermudan_schedule",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/rates/bermudan_swaption.schema.json#/$defs/BermudanSwaption/properties/bermudan_schedule",
-    "description": "Bermudan exercise schedule",
-    "ref": "#/$defs/BermudanSchedule",
-    "resolvedRef": "https://finstack_quant.dev/schemas/instrument/1/rates/bermudan_swaption.schema.json#/$defs/BermudanSchedule"
-  },
-  {
     "path": "#/$defs/d_b532a9f21fa25370d47c/properties/bermudan_type",
     "source": "https://finstack_quant.dev/schemas/instrument/1/rates/bermudan_swaption.schema.json#/$defs/BermudanSwaption/properties/bermudan_type",
     "description": "Co-terminal or non-co-terminal exercise",
     "ref": "#/$defs/BermudanType",
     "resolvedRef": "https://finstack_quant.dev/schemas/instrument/1/rates/bermudan_swaption.schema.json#/$defs/BermudanType"
+  },
+  {
+    "path": "#/$defs/d_b532a9f21fa25370d47c/properties/exercise_schedule",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/rates/bermudan_swaption.schema.json#/$defs/BermudanSwaption/properties/exercise_schedule",
+    "description": "Bermudan exercise schedule",
+    "ref": "#/$defs/BermudanSchedule",
+    "resolvedRef": "https://finstack_quant.dev/schemas/instrument/1/rates/bermudan_swaption.schema.json#/$defs/BermudanSchedule"
   },
   {
     "path": "#/$defs/d_b532a9f21fa25370d47c/properties/id",

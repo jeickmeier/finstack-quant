@@ -23,15 +23,15 @@
                     "discrete_dividends": [],
                     "div_yield_id": null,
                     "id": "COMPOSITE-LONG",
-                    "price_id": null,
-                    "price_quote": 100,
-                    "shares": 1,
+                    "quantity": 1,
+                    "quoted_spot": 100,
+                    "spot_id": null,
                     "ticker": "LONG"
                   },
                   "type": "equity"
                 },
                 "instrument_id": "COMPOSITE-LONG",
-                "weight": 1
+                "score": 1
               },
               {
                 "instrument": {
@@ -42,15 +42,15 @@
                     "discrete_dividends": [],
                     "div_yield_id": null,
                     "id": "COMPOSITE-SHORT",
-                    "price_id": null,
-                    "price_quote": 90,
-                    "shares": 1,
+                    "quantity": 1,
+                    "quoted_spot": 90,
+                    "spot_id": null,
                     "ticker": "SHORT"
                   },
                   "type": "equity"
                 },
                 "instrument_id": "COMPOSITE-SHORT",
-                "weight": -1
+                "score": -1
               }
             ],
             "rebalance_rule": {

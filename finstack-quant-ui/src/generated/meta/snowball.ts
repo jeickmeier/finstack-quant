@@ -11,30 +11,30 @@ export default [
             "attributes": {},
             "call_provision": null,
             "coupon_cap": null,
-            "coupon_dates": [
-              "2026-06-30",
+            "coupon_floor": 0,
+            "day_count": "act_360",
+            "discount_curve_id": "USD-OIS",
+            "fixed_rate": "0.05",
+            "forward_curve_id": "USD-SOFR-6M",
+            "gearing": 1,
+            "id": "SNOWBALL-USD-3Y",
+            "index_tenor": {
+              "count": 6,
+              "unit": "months"
+            },
+            "initial_coupon": 0.03,
+            "notional": {
+              "amount": "1000000",
+              "currency": "USD"
+            },
+            "payment_dates": [
               "2026-12-31",
               "2027-06-30",
               "2027-12-31",
               "2028-06-30",
               "2028-12-31"
             ],
-            "coupon_floor": 0,
-            "day_count": "act_360",
-            "discount_curve_id": "USD-OIS",
-            "fixed_rate": 0.05,
-            "floating_index_id": "USD-SOFR-6M",
-            "floating_tenor": {
-              "count": 6,
-              "unit": "months"
-            },
-            "id": "SNOWBALL-USD-3Y",
-            "initial_coupon": 0.03,
-            "leverage": 1,
-            "notional": {
-              "amount": "1000000",
-              "currency": "USD"
-            },
+            "start_date": "2026-06-30",
             "variant": "snowball",
             "vol_surface_id": "USD-SOFR-HW-VOL"
           },
@@ -354,6 +354,18 @@ export default [
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/RecoveryModel"
   },
   {
+    "path": "#/$defs/d_18f3ba1ec18ab2be13b2",
+    "source": "https://finstack_quant.dev/schemas/common/1/decimal.schema.json#",
+    "description": "Exact decimal encoded as a JSON string.",
+    "examples": [
+      "1000000",
+      "0.0425",
+      "-1234.56789"
+    ],
+    "pattern": "^-?\\d+(\\.\\d+)?([eE][+-]?\\d+)?$",
+    "title": "Decimal"
+  },
+  {
     "path": "#/$defs/d_1b2ccb88c9229e7463e8",
     "source": "https://finstack_quant.dev/schemas/common/1/date.schema.json#",
     "description": "ISO 8601 calendar date string.",
@@ -641,7 +653,7 @@ export default [
   {
     "path": "#/$defs/d_34c7523897e1e79a3d8c",
     "source": "https://finstack_quant.dev/schemas/instrument/1/exotics/snowball.schema.json#/$defs/Snowball",
-    "description": "Snowball structured note.\n\nThe coupon in each period depends on the previous period's coupon,\ncreating a path-dependent \"snowball\" accumulation:\n\n```text\nc_i = max(c_{i-1} + fixed_rate - L_i, 0)\n```\n\nwhere L_i is the floating rate and c_0 = initial_coupon.\n\nIf the floating rate stays low, coupons ratchet up over time.\nIf rates spike, the coupon floors at zero and must rebuild.\n\n# Variants\n\n- **Snowball**: Coupon depends on previous coupon (path-dependent)\n- **Inverse Floater**: Coupon = fixed_rate - leverage * floating_rate\n  (simpler, not path-dependent, but often combined with callability)\n\n# References\n\n- Brigo, D., & Mercurio, F. (2006). *Interest Rate Models*. Chapter 14. `docs/REFERENCES.md#brigo-mercurio-2006-interest-rate-models`"
+    "description": "Snowball structured note.\n\nThe coupon in each period depends on the previous period's coupon,\ncreating a path-dependent \"snowball\" accumulation:\n\n```text\nc_i = max(c_{i-1} + fixed_rate - L_i, 0)\n```\n\nwhere L_i is the floating rate and c_0 = initial_coupon.\n\nIf the floating rate stays low, coupons ratchet up over time.\nIf rates spike, the coupon floors at zero and must rebuild.\n\n# Variants\n\n- **Snowball**: Coupon depends on previous coupon (path-dependent)\n- **Inverse Floater**: Coupon = fixed_rate - gearing * floating_rate\n  (simpler, not path-dependent, but often combined with callability)\n\n# References\n\n- Brigo, D., & Mercurio, F. (2006). *Interest Rate Models*. Chapter 14. `docs/REFERENCES.md#brigo-mercurio-2006-interest-rate-models`"
   },
   {
     "path": "#/$defs/d_34c7523897e1e79a3d8c/properties/attributes",
@@ -672,17 +684,6 @@ export default [
     "format": "double"
   },
   {
-    "path": "#/$defs/d_34c7523897e1e79a3d8c/properties/coupon_dates",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/exotics/snowball.schema.json#/$defs/Snowball/properties/coupon_dates",
-    "description": "Coupon payment dates (must be sorted ascending)."
-  },
-  {
-    "path": "#/$defs/d_34c7523897e1e79a3d8c/properties/coupon_dates/items",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/exotics/snowball.schema.json#/$defs/Snowball/properties/coupon_dates/items",
-    "ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
-    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/date.schema.json#"
-  },
-  {
     "path": "#/$defs/d_34c7523897e1e79a3d8c/properties/coupon_floor",
     "source": "https://finstack_quant.dev/schemas/instrument/1/exotics/snowball.schema.json#/$defs/Snowball/properties/coupon_floor",
     "description": "Floor on each period coupon (typically 0.0).",
@@ -705,22 +706,22 @@ export default [
   {
     "path": "#/$defs/d_34c7523897e1e79a3d8c/properties/fixed_rate",
     "source": "https://finstack_quant.dev/schemas/instrument/1/exotics/snowball.schema.json#/$defs/Snowball/properties/fixed_rate",
-    "description": "Fixed rate component.",
-    "format": "double"
+    "description": "Fixed rate component as a decimal annual rate (0.05 = 5%).",
+    "ref": "https://finstack_quant.dev/schemas/common/1/decimal.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/decimal.schema.json#"
   },
   {
-    "path": "#/$defs/d_34c7523897e1e79a3d8c/properties/floating_index_id",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/exotics/snowball.schema.json#/$defs/Snowball/properties/floating_index_id",
-    "description": "Floating rate index identifier.",
+    "path": "#/$defs/d_34c7523897e1e79a3d8c/properties/forward_curve_id",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/exotics/snowball.schema.json#/$defs/Snowball/properties/forward_curve_id",
+    "description": "Rates forward curve that projects the floating index (also the fixing-series key).",
     "ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/id.schema.json#"
   },
   {
-    "path": "#/$defs/d_34c7523897e1e79a3d8c/properties/floating_tenor",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/exotics/snowball.schema.json#/$defs/Snowball/properties/floating_tenor",
-    "description": "Floating rate tenor.",
-    "ref": "https://finstack_quant.dev/schemas/common/1/tenor.schema.json",
-    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/tenor.schema.json#"
+    "path": "#/$defs/d_34c7523897e1e79a3d8c/properties/gearing",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/exotics/snowball.schema.json#/$defs/Snowball/properties/gearing",
+    "description": "Multiplier on the floating fixing (1.0 for snowball, variable for inverse floater).",
+    "format": "double"
   },
   {
     "path": "#/$defs/d_34c7523897e1e79a3d8c/properties/id",
@@ -728,6 +729,13 @@ export default [
     "description": "Unique instrument identifier.",
     "ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/id.schema.json#"
+  },
+  {
+    "path": "#/$defs/d_34c7523897e1e79a3d8c/properties/index_tenor",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/exotics/snowball.schema.json#/$defs/Snowball/properties/index_tenor",
+    "description": "Contractual tenor of the observed floating index (must match the forward curve tenor).",
+    "ref": "https://finstack_quant.dev/schemas/common/1/tenor.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/tenor.schema.json#"
   },
   {
     "path": "#/$defs/d_34c7523897e1e79a3d8c/properties/initial_coupon",
@@ -741,12 +749,6 @@ export default [
     "description": "Instrument-owned pricing inputs.",
     "ref": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#"
-  },
-  {
-    "path": "#/$defs/d_34c7523897e1e79a3d8c/properties/leverage",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/exotics/snowball.schema.json#/$defs/Snowball/properties/leverage",
-    "description": "Leverage multiplier on floating rate (1.0 for snowball, variable for inverse floater).",
-    "format": "double"
   },
   {
     "path": "#/$defs/d_34c7523897e1e79a3d8c/properties/metric_pricing_overrides",
@@ -763,11 +765,29 @@ export default [
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/money.schema.json#"
   },
   {
+    "path": "#/$defs/d_34c7523897e1e79a3d8c/properties/payment_dates",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/exotics/snowball.schema.json#/$defs/Snowball/properties/payment_dates",
+    "description": "Coupon payment dates, one per period, strictly ascending and after\n`start_date`. Period `i` accrues from the previous payment date (or\n`start_date`) to `payment_dates[i]` and fixes in advance at its start."
+  },
+  {
+    "path": "#/$defs/d_34c7523897e1e79a3d8c/properties/payment_dates/items",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/exotics/snowball.schema.json#/$defs/Snowball/properties/payment_dates/items",
+    "ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/date.schema.json#"
+  },
+  {
     "path": "#/$defs/d_34c7523897e1e79a3d8c/properties/scenario_pricing_overrides",
     "source": "https://finstack_quant.dev/schemas/instrument/1/exotics/snowball.schema.json#/$defs/Snowball/properties/scenario_pricing_overrides",
     "description": "Scenario-only pricing adjustments.",
     "ref": "https://finstack_quant.dev/schemas/common/1/scenario_pricing_overrides.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/scenario_pricing_overrides.schema.json#"
+  },
+  {
+    "path": "#/$defs/d_34c7523897e1e79a3d8c/properties/start_date",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/exotics/snowball.schema.json#/$defs/Snowball/properties/start_date",
+    "description": "Accrual start of the first coupon period; also the first in-advance\nfixing date.",
+    "ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/date.schema.json#"
   },
   {
     "path": "#/$defs/d_34c7523897e1e79a3d8c/properties/variant",
@@ -1411,12 +1431,12 @@ export default [
     "path": "#/$defs/d_971469fce183f1aebfac/oneOf/1",
     "source": "https://finstack_quant.dev/schemas/instrument/1/exotics/snowball.schema.json#/$defs/SnowballVariant/oneOf/1",
     "const": "inverse_floater",
-    "description": "Inverse floater: c_i = max(fixed - leverage * floating, 0)."
+    "description": "Inverse floater: c_i = max(fixed - gearing * floating, 0)."
   },
   {
     "path": "#/$defs/d_97331c606d553b2e79d9",
     "source": "https://finstack_quant.dev/schemas/instrument/1/exotics/snowball.schema.json#/$defs/BermudanCallProvision",
-    "description": "Bermudan call provision for callable exotics.\n\nAllows the issuer to terminate the note on specified call dates\nat a specified call price (typically par). Currently consumed by the\nCallable Range Accrual note (PRDC is not implemented, and the Snowball\npricer rejects callable provisions).\n\n# Fields\n\n- `call_dates`: Sorted ascending dates on which the issuer may call.\n- `price_pct_of_par`: Redemption price in percent of par (`100.0` = par,\n  `102.0` = callable at 102).\n- `lockout_periods`: Number of initial coupon periods during which\n  the call right cannot be exercised."
+    "description": "Bermudan call provision for callable exotics.\n\nAllows the issuer to terminate the note on specified call dates\nat a specified call price (typically par). Currently consumed by the\nCallable Range Accrual note (PRDC is not implemented, and the Snowball\npricer rejects callable provisions).\n\n# Fields\n\n- `call_dates`: Sorted ascending dates on which the issuer may call.\n- `price_pct_of_par`: Redemption price in percent of par (`100.0` = par,\n  `102.0` = callable at 102).\n- `lockout_end`: Optional end of the no-call period; call dates on or\n  before it are not exercisable (exclusive bound, matching\n  `BermudanSchedule.lockout_end` on Bermudan swaptions)."
   },
   {
     "path": "#/$defs/d_97331c606d553b2e79d9/properties/call_dates",
@@ -1430,11 +1450,19 @@ export default [
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/date.schema.json#"
   },
   {
-    "path": "#/$defs/d_97331c606d553b2e79d9/properties/lockout_periods",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/exotics/snowball.schema.json#/$defs/BermudanCallProvision/properties/lockout_periods",
-    "description": "Lockout period in number of coupon periods before first call.",
-    "format": "uint",
-    "minimum": 0
+    "path": "#/$defs/d_97331c606d553b2e79d9/properties/lockout_end",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/exotics/snowball.schema.json#/$defs/BermudanCallProvision/properties/lockout_end",
+    "description": "End of the no-call (lockout) period. Call dates on or before this\ndate are dropped (exclusive bound); `None` means no lockout."
+  },
+  {
+    "path": "#/$defs/d_97331c606d553b2e79d9/properties/lockout_end/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/exotics/snowball.schema.json#/$defs/BermudanCallProvision/properties/lockout_end/anyOf/0",
+    "ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/date.schema.json#"
+  },
+  {
+    "path": "#/$defs/d_97331c606d553b2e79d9/properties/lockout_end/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/exotics/snowball.schema.json#/$defs/BermudanCallProvision/properties/lockout_end/anyOf/1"
   },
   {
     "path": "#/$defs/d_97331c606d553b2e79d9/properties/price_pct_of_par",

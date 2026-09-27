@@ -2,19 +2,29 @@
 // JSON wire shape only; runtime constraints remain in the schema.
 
 /**
- * Exact decimal encoded as a JSON string.
+ * Business-day convention applied to payment dates (interest, fees and
+ * principal) and to the fixing-date roll. Accrual boundaries stay
+ * unadjusted. Defaults to `ModifiedFollowing`.
  */
-export type Decimal = string;
+export type BusinessDayConvention =
+  "unadjusted" | "following" | "modified_following" | "preceding" | "modified_preceding" | "nearest";
 /**
- * Exact decimal encoded as a JSON string.
- */
-export type Decimal1 = string;
-/**
- * Forward curve identifier (e.g., "USD-SOFR-3M", "EUR-EURIBOR-6M").
+ * Opaque string identifier.
  */
 export type Id = string;
 /**
- * Day-count convention.
+ * Date the new commitment takes effect (strictly after the commitment
+ * date, on or before maturity).
+ */
+export type Date = string;
+/**
+ * One-off reduction or cancellation fee, in basis points of the reduced
+ * amount (not per annum), paid by the borrower on `date` when the
+ * commitment steps down. Ignored on a step up. Defaults to zero.
+ */
+export type Decimal = string;
+/**
+ * Day count convention for interest accrual.
  */
 export type DayCount =
   | "one_one"
@@ -31,124 +41,33 @@ export type DayCount =
   | "act_act_afb"
   | "bus_252";
 /**
- * Compounding method for overnight rate indices (SOFR, ESTR, SONIA).
- *
- * Controls how daily overnight fixings are aggregated into a period rate
- * for floating rate coupons. The choice of compounding method affects both
- * the accrued amount and the payment timing/certainty.
- *
- * # Market Conventions
- *
- * | Index | Standard Method | Lookback | Reference |
- * |-------|----------------|----------|-----------|
- * | USD SOFR | CompoundedInArrears | 2 BD | ISDA 2021 |
- * | EUR €STR | CompoundedWithObservationShift | 2 BD | ECB |
- * | GBP SONIA | CompoundedWithObservationShift | 5 BD | BoE |
- * | JPY TONA | CompoundedInArrears | 2 BD | BoJ |
- *
- * # Reference
- *
- * - ISDA (2021). "IBOR Fallbacks Supplement." Section 7.
- * - ARRC (2020). "SOFR: A User's Guide." Federal Reserve Bank of New York. `docs/REFERENCES.md#arrc-sofr-users-guide`
- * - `docs/REFERENCES.md#andersen-piterbarg-interest-rate-modeling`
- * - `docs/REFERENCES.md#isda-2006-definitions`
+ * Opaque string identifier.
  */
-export type DE93F91B2Bfca5B034Bc7 =
-  | "simple_average"
-  | "compounded_in_arrears"
-  | {
-      compounded_with_lookback: {
-        /**
-         * Number of business days to look back for rate observations.
-         */
-        lookback_days: number;
-      };
-    }
-  | {
-      compounded_with_lockout: {
-        /**
-         * Number of business days before period end to freeze the rate.
-         */
-        lockout_days: number;
-      };
-    }
-  | {
-      compounded_with_observation_shift: {
-        /**
-         * Number of business days to shift observations.
-         */
-        shift_days: number;
-      };
-    };
+export type Id1 = string;
 /**
- * Exact decimal encoded as a JSON string.
- */
-export type Decimal2 = string;
-/**
- * Business-day convention applied to payment dates (interest, fees and
- * principal) and to the fixing-date roll. Accrual boundaries stay
- * unadjusted. Defaults to `ModifiedFollowing`.
- */
-export type BusinessDayConvention =
-  "unadjusted" | "following" | "modified_following" | "preceding" | "modified_preceding" | "nearest";
-/**
- * Date when the facility becomes available.
- */
-export type Date = string;
-/**
- * Date the new commitment takes effect (strictly after the commitment
- * date, on or before maturity).
+ * Date of the draw or repayment.
  */
 export type Date1 = string;
 /**
  * Opaque string identifier.
  */
-export type Id1 = string;
-/**
- * Day-count convention.
- */
-export type DayCount1 =
-  | "one_one"
-  | "act_360"
-  | "act_365f"
-  | "act_365l"
-  | "30_360"
-  | "30e_360"
-  | "30e_360_isda"
-  | "30_360_it"
-  | "nl_365"
-  | "act_act"
-  | "act_act_isma"
-  | "act_act_afb"
-  | "bus_252";
-/**
- * Opaque string identifier.
- */
 export type Id2 = string;
 /**
- * Date of the draw or repayment.
+ * Fee rate in basis points for this tier.
  */
-export type Date2 = string;
+export type Decimal1 = string;
 /**
- * Opaque string identifier.
+ * Utilization threshold (0.0 to 1.0). Fee applies when utilization >= this threshold.
  */
-export type Id3 = string;
-/**
- * Exact decimal encoded as a JSON string.
- */
-export type Decimal3 = string;
-/**
- * Exact decimal encoded as a JSON string.
- */
-export type Decimal4 = string;
+export type Decimal2 = string;
 /**
  * Date the deltas take effect (strictly inside the facility life).
  */
-export type Date3 = string;
+export type Date2 = string;
 /**
  * Upfront (arrangement or original-issue-discount) fee of a facility.
  *
- * Paid by the borrower to the lender on the commitment date. Enters the
+ * Paid by the borrower to the lender on the issue date. Enters the
  * present value only while the commitment date lies after the valuation
  * date, and the effective-interest-rate metrics always.
  */
@@ -162,7 +81,7 @@ export type DC338B2B6A7Bb9038A413 =
 /**
  * Opaque string identifier.
  */
-export type Id4 = string;
+export type Id3 = string;
 /**
  * A phantom-typed identifier that prevents mixing different kinds of IDs.
  *
@@ -254,6 +173,10 @@ export type D_02A11B30Ee627630F221 = "per_name" | "large_homogeneous";
  */
 export type DEc89Adc17436F33De839 = "black" | "normal";
 /**
+ * Date when the facility becomes available.
+ */
+export type Date3 = string;
+/**
  * Date the letter of credit is issued or expires (strictly after the
  * simulation anchor, on or before maturity).
  */
@@ -262,6 +185,10 @@ export type Date4 = string;
  * Effective-from date of the margin change.
  */
 export type Date5 = string;
+/**
+ * Change in margin, in basis points (`100` = 1%); negative steps down.
+ */
+export type Decimal3 = string;
 /**
  * Date when the facility expires.
  */
@@ -441,6 +368,89 @@ export type DB556Bbeb1Ecf96C44C5A =
   | "ZMW"
   | "ZWL";
 /**
+ * Exact decimal encoded as a JSON string.
+ */
+export type Decimal4 = string;
+/**
+ * Opaque string identifier.
+ */
+export type Id4 = string;
+/**
+ * Exact decimal encoded as a JSON string.
+ */
+export type Decimal5 = string;
+/**
+ * Day-count convention.
+ */
+export type DayCount1 =
+  | "one_one"
+  | "act_360"
+  | "act_365f"
+  | "act_365l"
+  | "30_360"
+  | "30e_360"
+  | "30e_360_isda"
+  | "30_360_it"
+  | "nl_365"
+  | "act_act"
+  | "act_act_isma"
+  | "act_act_afb"
+  | "bus_252";
+/**
+ * Compounding method for overnight rate indices (SOFR, ESTR, SONIA).
+ *
+ * Controls how daily overnight fixings are aggregated into a period rate
+ * for floating rate coupons. The choice of compounding method affects both
+ * the accrued amount and the payment timing/certainty.
+ *
+ * # Market Conventions
+ *
+ * | Index | Standard Method | Lookback | Reference |
+ * |-------|----------------|----------|-----------|
+ * | USD SOFR | CompoundedInArrears | 2 BD | ISDA 2021 |
+ * | EUR €STR | CompoundedWithObservationShift | 2 BD | ECB |
+ * | GBP SONIA | CompoundedWithObservationShift | 5 BD | BoE |
+ * | JPY TONA | CompoundedInArrears | 2 BD | BoJ |
+ *
+ * # Reference
+ *
+ * - ISDA (2021). "IBOR Fallbacks Supplement." Section 7.
+ * - ARRC (2020). "SOFR: A User's Guide." Federal Reserve Bank of New York. `docs/REFERENCES.md#arrc-sofr-users-guide`
+ * - `docs/REFERENCES.md#andersen-piterbarg-interest-rate-modeling`
+ * - `docs/REFERENCES.md#isda-2006-definitions`
+ */
+export type DE93F91B2Bfca5B034Bc7 =
+  | "simple_average"
+  | "compounded_in_arrears"
+  | {
+      compounded_with_lookback: {
+        /**
+         * Number of business days to look back for rate observations.
+         */
+        lookback_days: number;
+      };
+    }
+  | {
+      compounded_with_lockout: {
+        /**
+         * Number of business days before period end to freeze the rate.
+         */
+        lockout_days: number;
+      };
+    }
+  | {
+      compounded_with_observation_shift: {
+        /**
+         * Number of business days to shift observations.
+         */
+        shift_days: number;
+      };
+    };
+/**
+ * Exact decimal encoded as a JSON string.
+ */
+export type Decimal6 = string;
+/**
  * Payment date (strictly after the commitment date, on or before
  * maturity).
  */
@@ -472,22 +482,6 @@ export interface D_922D100Aa65E8Babbacd {
  */
 export interface D_2D9B65Cc4D957Fd6344E {
   attributes: Attributes;
-  /**
-   * Base rate specification (fixed or floating).
-   */
-  base_rate_spec:
-    | {
-        fixed: {
-          /**
-           * Annual interest rate (e.g., 0.05 for 5%).
-           */
-          rate: number;
-          [k: string]: unknown;
-        };
-      }
-    | {
-        floating: D_879C942D15Cfcad2445B;
-      };
   business_day_convention?: BusinessDayConvention;
   /**
    * Holiday calendar identifier (for example `"usny"`) used to adjust
@@ -496,13 +490,12 @@ export interface D_2D9B65Cc4D957Fd6344E {
    * `FloatingRateSpec::fixing_calendar_id` overrides it for the fixing
    * date alone.
    */
-  calendar_id?: string | null;
-  commitment_amount: Money;
-  commitment_date: Date;
+  calendar_id?: Id | null;
+  commitment: Money;
   /**
    * Scheduled commitment changes (amortizing commitments, availability
    * expiries, accordions), each in force from its date until the next.
-   * Dates must be strictly increasing, after `commitment_date` and on or
+   * Dates must be strictly increasing, after `issue_date` and on or
    * before `maturity`; the drawn balance plus outstanding letters of
    * credit must never exceed the commitment in force. A step down pays its
    * `fee_bp` on the reduced amount. Empty by default.
@@ -514,9 +507,9 @@ export interface D_2D9B65Cc4D957Fd6344E {
    * When provided, survival probabilities from the hazard curve are applied
    * to discount cashflows, adjusting for default risk.
    */
-  credit_curve_id?: Id1 | null;
-  day_count: DayCount1;
-  discount_curve_id: Id2;
+  credit_curve_id?: Id | null;
+  day_count: DayCount;
+  discount_curve_id: Id1;
   /**
    * Draw and repayment schedule (deterministic or stochastic).
    */
@@ -527,11 +520,12 @@ export interface D_2D9B65Cc4D957Fd6344E {
     | {
         stochastic: D_818D7C74805F8D3A4Bee;
       };
-  drawn_amount: Money3;
+  drawn: Money3;
   fees: D_21E99Cfd351458495Cc5;
-  frequency: Tenor2;
-  id: Id4;
+  frequency: Tenor;
+  id: Id3;
   instrument_pricing_overrides?: InstrumentPricingOverrides;
+  issue_date: Date3;
   /**
    * Letter-of-credit sub-facility. Outstanding letters of credit reduce
    * availability and the commitment-fee base, count as usage for fee
@@ -573,6 +567,21 @@ export interface D_2D9B65Cc4D957Fd6344E {
    * `calendar_id`. `0` (the default) pays on the adjusted accrual end.
    */
   payment_lag_days?: number;
+  /**
+   * Base rate specification (fixed or floating).
+   */
+  rate:
+    | {
+        fixed: {
+          /**
+           * Annual rate as a decimal (`0.06` = 6%).
+           */
+          rate: number;
+        };
+      }
+    | {
+        floating: D_879C942D15Cfcad2445B;
+      };
   /**
    * Recovery rate on default (used when credit_curve_id is present).
    *
@@ -625,222 +634,7 @@ export interface Attributes {
   tags?: string[];
 }
 /**
- * Canonical floating rate specification for all instruments.
- *
- * Used by bonds, swaps, credit facilities, and structured products.
- * All instruments should compose this type rather than defining their own
- * floating rate specifications.
- *
- * # Rate Calculation
- *
- * The all-in rate is computed as:
- * 1. Look up forward rate from `index_id` curve for the accrual period
- * 2. Apply `index_floor_bp` to index rate (if specified) - applied BEFORE adding spread
- * 3. Add `spread_bp` to get base rate
- * 4. Multiply by `gearing` (typically 1.0)
- * 5. Apply `all_in_cap_bp` to final rate (if specified) - applied AFTER spread and gearing
- *
- * Formula: `cap(gearing * (floor(index) + spread))`
- *
- * # Negative Rate Handling
- *
- * Negative index rates are supported and will flow through calculations
- * unless constrained by floors. For markets with negative rates (EUR, JPY, CHF):
- *
- * - Set `index_floor_bp: Some(0.0)` to floor the index at zero
- * - Set `all_in_floor_bp: Some(0.0)` to floor the total coupon at zero
- * - Omit floors to allow negative coupons (rare but valid in some structures)
- *
- * The implementation does not reject negative rates; the policy is controlled
- * by the floor configuration.
- *
- * # Seasoned Instruments (Historical Fixings)
- *
- * Historical fixings **are supported** via the `MarketContext`: store a
- * `ScalarTimeSeries` under the canonical id `FIXING:{index_id}` (see
- * `finstack_quant_core::market_data::fixings`) containing realized index
- * observations. Observation dates strictly before the forward curve base
- * date then resolve from that series instead of the curve:
- *
- * - **Overnight observations** (compounded/averaged paths) use LOCF lookup
- *   (last observation carried forward), matching RFR publication
- *   conventions where a fixing carries over non-publication days
- *   (ARRC 2020 SOFR conventions; ISDA 2021 Supp. 70 §7.1(g)). A partially
- *   seasoned compounding window seamlessly mixes realized fixings and
- *   curve-projected forwards with identical `(rate, days)` weighting.
- * - **Term-rate resets** use exact-date lookup on the (business-day
- *   adjusted) reset date — a term rate fixes on a specific published date.
- *   The fixing is the index rate only; gearing/spread/floors/caps apply on
- *   top exactly as for projected rates.
- *
- * An observation exactly on the curve base date prefers a published
- * same-day fixing when the series has one, otherwise projects from `t = 0`.
- *
- * The [`FloatingRateFallback`] policy applies only when **no** fixing
- * series is provided: `Error` (the default) fails the build with a
- * descriptive message naming the date, index, and expected series id;
- * `FixedRate(r)` uses `r` as the index rate for the affected coupon;
- * `SpreadOnly` projects spread-only.
- *
- * # Example
- *
- * ```rust
- * use finstack_quant_core::dates::Tenor;
- * use finstack_quant_cashflows::builder::{FloatingRateSpec, OvernightIndexConstraintApplication};
- * use rust_decimal_macros::dec;
- *
- * // 3M SOFR + 200bps with 0% floor
- * let spec = FloatingRateSpec {
- *     index_id: "USD-SOFR-3M".into(),
- *     spread_bp: dec!(200.0),
- *     gearing: dec!(1.0),
- *     gearing_includes_spread: true,
- *     index_floor_bp: Some(dec!(0.0)),
- *     all_in_floor_bp: None,
- *     all_in_cap_bp: None,
- *     index_cap_bp: None,
- *     overnight_index_constraints: OvernightIndexConstraintApplication::Daily,
- *     reset_frequency: Tenor::quarterly(),
- *     index_tenor: None,
- *     reset_lag_days: 2,
- *     fixing_calendar_id: None,
- *     overnight_compounding: None,
- *     overnight_basis: None,
- *     fallback: Default::default(),
- * };
- * ```
- */
-export interface D_879C942D15Cfcad2445B {
-  /**
-   * Cap on all-in rate in basis points (applied after spread and gearing).
-   *
-   * Example: all_in_cap_bp = Some(1000.0) ensures all-in rate <= 10%.
-   */
-  all_in_cap_bp?: Decimal | null;
-  /**
-   * Floor on all-in rate in basis points (Min Coupon).
-   *
-   * Applied to the final calculated rate after gearing and spread.
-   */
-  all_in_floor_bp?: Decimal | null;
-  /**
-   * Policy when forward curve lookup fails during emission.
-   *
-   * Defaults to `Error`, which surfaces curve lookup failures.
-   * Set to `SpreadOnly` for spread-only projection, or `FixedRate(r)`
-   * to use a fixed index rate.
-   */
-  fallback?:
-    | "error"
-    | "spread_only"
-    | {
-        fixed_rate: Decimal;
-      };
-  /**
-   * Optional calendar for rate fixing (reset lag).
-   *
-   * If not provided, defaults to the coupon schedule calendar.
-   */
-  fixing_calendar_id?: string | null;
-  gearing?: Decimal1;
-  /**
-   * Whether gearing includes the spread (default: true).
-   *
-   * - `true`: `rate = (index + spread) * gearing`
-   * - `false`: `rate = (index * gearing) + spread` (Affine model)
-   */
-  gearing_includes_spread?: boolean;
-  /**
-   * Cap on index rate in basis points (applied to index component).
-   */
-  index_cap_bp?: Decimal | null;
-  /**
-   * Floor on index rate in basis points (applied to index component).
-   *
-   * Example: index_floor_bp = Some(0.0) ensures index rate >= 0%.
-   */
-  index_floor_bp?: Decimal | null;
-  index_id: Id;
-  /**
-   * Diagnostic tenor for term-index projection error context.
-   *
-   * The named forward curve is already the term index (for example a 3M
-   * EURIBOR curve). Projection is `fwd.rate(reset_date)`, not a FRA-style
-   * average over `[reset, reset + tenor]`. This field (or
-   * [`Self::reset_frequency`] when `None`) is used only to compute
-   * `index_maturity` for error messages. Ignored for overnight-compounded
-   * legs. When set, the builder warns at build time if it disagrees with
-   * the resolved curve's tenor by more than 10% — the curve remains
-   * authoritative.
-   */
-  index_tenor?: Tenor | null;
-  /**
-   * Day-count basis for the overnight compounding denominator.
-   *
-   * This controls the annualization factor used when compounding daily
-   * overnight fixings (e.g., 360 for SOFR/€STR/TONA, 365 for SONIA).
-   * It is independent of the leg's accrual day count when set explicitly.
-   *
-   * When `None` and `overnight_compounding` is set, the coupon
-   * `schedule.day_count` is used if it is `Act360` or `Act365F`. Other
-   * coupon day counts (for example `Thirty360`) error unless an explicit
-   * `Act360` or `Act365F` basis is supplied. Ignored when
-   * `overnight_compounding` is `None`.
-   */
-  overnight_basis?: DayCount | null;
-  /**
-   * Overnight compounding method for overnight rate indices (SOFR, ESTR, SONIA).
-   *
-   * When set to `Some(method)`, the rate for each accrual period is computed
-   * by compounding daily overnight fixings according to the specified method,
-   * rather than looking up a single forward rate for the period.
-   *
-   * Leave as `None` for term rates (e.g., 3M EURIBOR, 6M LIBOR).
-   */
-  overnight_compounding?: DE93F91B2Bfca5B034Bc7 | null;
-  /**
-   * Index floor/cap application policy for overnight-compounded coupons.
-   */
-  overnight_index_constraints?: "daily" | "period";
-  reset_frequency: Tenor1;
-  /**
-   * Reset lag in business days (e.g., 2 for T-2 SOFR convention).
-   */
-  reset_lag_days?: number;
-  spread_bp: Decimal2;
-}
-/**
- * Parsed financial tenor.
- */
-export interface Tenor {
-  /**
-   * Number of `unit` periods in the tenor. Must be at least 1; `0` is
-   * rejected because a zero-length period makes schedule generation loop.
-   */
-  count: number;
-  /**
-   * Calendar unit the count is expressed in, such as days, weeks, months,
-   * or years.
-   */
-  unit: "days" | "weeks" | "months" | "years";
-}
-/**
- * Parsed financial tenor.
- */
-export interface Tenor1 {
-  /**
-   * Number of `unit` periods in the tenor. Must be at least 1; `0` is
-   * rejected because a zero-length period makes schedule generation loop.
-   */
-  count: number;
-  /**
-   * Calendar unit the count is expressed in, such as days, weeks, months,
-   * or years.
-   */
-  unit: "days" | "weeks" | "months" | "years";
-}
-/**
- * Opening commitment of the facility, in force from `commitment_date`
+ * Opening commitment of the facility, in force from `issue_date`
  * until the first entry of `commitment_steps`.
  */
 export interface Money {
@@ -1026,17 +820,12 @@ export interface Money {
  *
  * A delayed-draw term loan (`DdtlSpec::commitment_steps`) accepts only
  * non-increasing steps inside its availability window and no reduction fee
- * (`fee_bp` must be `0.0`).
+ * (`reduction_fee_bp` must be zero).
  */
 export interface DBa391D15759D4194C067 {
   amount: Money1;
-  date: Date1;
-  /**
-   * Reduction or cancellation fee, in basis points of the reduced amount,
-   * paid by the borrower on `date` when the commitment steps down. Ignored
-   * on a step up. Defaults to `0.0`.
-   */
-  fee_bp?: number;
+  date: Date;
+  reduction_fee_bp?: Decimal;
 }
 /**
  * Commitment in force from `date`, in the facility currency (zero ends
@@ -1220,7 +1009,7 @@ export interface Money1 {
  */
 export interface D_2A6Ae68744Ec1Bd77C7E {
   amount: Money2;
-  date: Date2;
+  date: Date1;
   /**
    * True if this is a draw, false if it's a repayment.
    */
@@ -1475,7 +1264,7 @@ export interface D_672E934A739B8903870E {
       }
     | {
         market_anchored: {
-          credit_curve_id: Id3;
+          credit_curve_id: Id2;
           /**
            * Annualized CDS (index) option implied volatility for spreads.
            */
@@ -1542,16 +1331,20 @@ export interface DFaa74Dec9955D51938F4 {
 export interface D_21790C5Ea4F40586693A {
   mean_reverting: {
     /**
-     * Mean reversion speed (annualized).
+     * Mean-reversion speed κ, per year.
      */
-    speed: number;
+    kappa: number;
+    /**
+     * Utilization volatility σ, annualized (absolute utilization units).
+     */
+    sigma: number;
     /**
      * Sensitivity of the utilization target to the simulated credit
      * spread (adverse selection), as a decimal per unit of relative
      * spread change.
      *
      * The target used by the OU step becomes
-     * `θ(t) = clamp(target_rate + spread_sensitivity · (s(t) / s(0) − 1), 0, 1)`
+     * `θ(t) = clamp(theta + spread_sensitivity · (s(t) / s(0) − 1), 0, 1)`
      * where `s(t)` is the simulated spread and `s(0)` its initial level,
      * so a spread that doubles raises the target by `spread_sensitivity`.
      * Defaults to `0.0` (no link); the utilization/credit shock
@@ -1560,18 +1353,13 @@ export interface D_21790C5Ea4F40586693A {
      */
     spread_sensitivity?: number;
     /**
-     * Target utilization rate (0.0 to 1.0).
+     * Long-run utilization level θ, as a fraction in `[0, 1]`.
      */
-    target_rate: number;
-    /**
-     * Volatility of utilization changes (annualized).
-     */
-    volatility: number;
-    [k: string]: unknown;
+    theta: number;
   };
 }
 /**
- * Drawn balance at the simulation anchor, the later of `commitment_date`
+ * Drawn balance at the simulation anchor, the later of `issue_date`
  * and the valuation date, in both deterministic and stochastic mode.
  *
  * For a new facility this is the balance funded at commitment; for a
@@ -1797,8 +1585,8 @@ export interface D_21E99Cfd351458495Cc5 {
  * rejects unordered tiers.
  */
 export interface DE10F396F3Ee032Fe0173 {
-  bp: Decimal3;
-  threshold: Decimal4;
+  bp: Decimal1;
+  threshold: Decimal2;
 }
 /**
  * A dated change of a revolving facility's running fees.
@@ -1813,7 +1601,7 @@ export interface DDf0Dd4Da9C34768B6500 {
    * points per annum. Defaults to `0.0`.
    */
   commitment_delta_bp?: number;
-  date: Date3;
+  date: Date2;
   /**
    * Change to the facility fee on the total commitment, in basis points
    * per annum. Defaults to `0.0`.
@@ -2001,9 +1789,9 @@ export interface Money4 {
     | "ZWL";
 }
 /**
- * Parsed financial tenor.
+ * Payment frequency for interest and fees.
  */
-export interface Tenor2 {
+export interface Tenor {
   /**
    * Number of `unit` periods in the tenor. Must be at least 1; `0` is
    * rejected because a zero-length period makes schedule generation loop.
@@ -3336,10 +3124,7 @@ export interface Money7 {
  */
 export interface D_8F71Ae7Cac6991C71D8C {
   date: Date5;
-  /**
-   * Change in margin, in basis points (100 = 1%); negative steps down.
-   */
-  delta_bp: number;
+  delta_bp: Decimal3;
 }
 /**
  * Metric-time pricing configuration.
@@ -3511,6 +3296,221 @@ export interface D_2E0Bc1103181D92528Ce {
    * Defaults to true because these fees are typically part of the effective yield.
    */
   include_fees?: boolean;
+}
+/**
+ * Canonical floating rate specification for all instruments.
+ *
+ * Used by bonds, swaps, credit facilities, and structured products.
+ * All instruments should compose this type rather than defining their own
+ * floating rate specifications.
+ *
+ * # Rate Calculation
+ *
+ * The all-in rate is computed as:
+ * 1. Look up forward rate from `forward_curve_id` curve for the accrual period
+ * 2. Apply `index_floor_bp` to index rate (if specified) - applied BEFORE adding spread
+ * 3. Add `spread_bp` to get base rate
+ * 4. Multiply by `gearing` (typically 1.0)
+ * 5. Apply `all_in_cap_bp` to final rate (if specified) - applied AFTER spread and gearing
+ *
+ * Formula: `cap(gearing * (floor(index) + spread))`
+ *
+ * # Negative Rate Handling
+ *
+ * Negative index rates are supported and will flow through calculations
+ * unless constrained by floors. For markets with negative rates (EUR, JPY, CHF):
+ *
+ * - Set `index_floor_bp: Some(0.0)` to floor the index at zero
+ * - Set `all_in_floor_bp: Some(0.0)` to floor the total coupon at zero
+ * - Omit floors to allow negative coupons (rare but valid in some structures)
+ *
+ * The implementation does not reject negative rates; the policy is controlled
+ * by the floor configuration.
+ *
+ * # Seasoned Instruments (Historical Fixings)
+ *
+ * Historical fixings **are supported** via the `MarketContext`: store a
+ * `ScalarTimeSeries` under the canonical id `FIXING:{forward_curve_id}` (see
+ * `finstack_quant_core::market_data::fixings`) containing realized index
+ * observations. Observation dates strictly before the forward curve base
+ * date then resolve from that series instead of the curve:
+ *
+ * - **Overnight observations** (compounded/averaged paths) use LOCF lookup
+ *   (last observation carried forward), matching RFR publication
+ *   conventions where a fixing carries over non-publication days
+ *   (ARRC 2020 SOFR conventions; ISDA 2021 Supp. 70 §7.1(g)). A partially
+ *   seasoned compounding window seamlessly mixes realized fixings and
+ *   curve-projected forwards with identical `(rate, days)` weighting.
+ * - **Term-rate resets** use exact-date lookup on the (business-day
+ *   adjusted) reset date — a term rate fixes on a specific published date.
+ *   The fixing is the index rate only; gearing/spread/floors/caps apply on
+ *   top exactly as for projected rates.
+ *
+ * An observation exactly on the curve base date prefers a published
+ * same-day fixing when the series has one, otherwise projects from `t = 0`.
+ *
+ * The [`FloatingRateFallback`] policy applies only when **no** fixing
+ * series is provided: `Error` (the default) fails the build with a
+ * descriptive message naming the date, index, and expected series id;
+ * `FixedRate(r)` uses `r` as the index rate for the affected coupon;
+ * `SpreadOnly` projects spread-only.
+ *
+ * # Example
+ *
+ * ```rust
+ * use finstack_quant_core::dates::Tenor;
+ * use finstack_quant_cashflows::builder::{FloatingRateSpec, OvernightIndexConstraintApplication};
+ * use rust_decimal_macros::dec;
+ *
+ * // 3M SOFR + 200bps with 0% floor
+ * let spec = FloatingRateSpec {
+ *     forward_curve_id: "USD-SOFR-3M".into(),
+ *     spread_bp: dec!(200.0),
+ *     gearing: dec!(1.0),
+ *     gearing_includes_spread: true,
+ *     index_floor_bp: Some(dec!(0.0)),
+ *     all_in_floor_bp: None,
+ *     all_in_cap_bp: None,
+ *     index_cap_bp: None,
+ *     overnight_index_constraints: OvernightIndexConstraintApplication::Daily,
+ *     reset_frequency: Tenor::quarterly(),
+ *     index_tenor: None,
+ *     reset_lag_days: 2,
+ *     fixing_calendar_id: None,
+ *     overnight_compounding: None,
+ *     overnight_basis: None,
+ *     fallback: Default::default(),
+ * };
+ * ```
+ */
+export interface D_879C942D15Cfcad2445B {
+  /**
+   * Cap on all-in rate in basis points (applied after spread and gearing).
+   *
+   * Example: all_in_cap_bp = Some(1000.0) ensures all-in rate <= 10%.
+   */
+  all_in_cap_bp?: Decimal4 | null;
+  /**
+   * Floor on all-in rate in basis points (Min Coupon).
+   *
+   * Applied to the final calculated rate after gearing and spread.
+   */
+  all_in_floor_bp?: Decimal4 | null;
+  /**
+   * Policy when forward curve lookup fails during emission.
+   *
+   * Defaults to `Error`, which surfaces curve lookup failures.
+   * Set to `SpreadOnly` for spread-only projection, or `FixedRate(r)`
+   * to use a fixed index rate.
+   */
+  fallback?:
+    | "error"
+    | "spread_only"
+    | {
+        fixed_rate: Decimal4;
+      };
+  /**
+   * Optional calendar for rate fixing (reset lag).
+   *
+   * If not provided, defaults to the coupon schedule calendar.
+   */
+  fixing_calendar_id?: Id | null;
+  forward_curve_id: Id4;
+  gearing?: Decimal5;
+  /**
+   * Whether gearing includes the spread (default: true).
+   *
+   * - `true`: `rate = (index + spread) * gearing`
+   * - `false`: `rate = (index * gearing) + spread` (Affine model)
+   */
+  gearing_includes_spread?: boolean;
+  /**
+   * Cap on index rate in basis points (applied to index component).
+   */
+  index_cap_bp?: Decimal4 | null;
+  /**
+   * Floor on index rate in basis points (applied to index component).
+   *
+   * Example: index_floor_bp = Some(0.0) ensures index rate >= 0%.
+   */
+  index_floor_bp?: Decimal4 | null;
+  /**
+   * Diagnostic tenor for term-index projection error context.
+   *
+   * The named forward curve is already the term index (for example a 3M
+   * EURIBOR curve). Projection is `fwd.rate(reset_date)`, not a FRA-style
+   * average over `[reset, reset + tenor]`. This field (or
+   * [`Self::reset_frequency`] when `None`) is used only to compute
+   * `index_maturity` for error messages. Ignored for overnight-compounded
+   * legs. When set, the builder warns at build time if it disagrees with
+   * the resolved curve's tenor by more than 10% — the curve remains
+   * authoritative.
+   */
+  index_tenor?: Tenor1 | null;
+  /**
+   * Day-count basis for the overnight compounding denominator.
+   *
+   * This controls the annualization factor used when compounding daily
+   * overnight fixings (e.g., 360 for SOFR/€STR/TONA, 365 for SONIA).
+   * It is independent of the leg's accrual day count when set explicitly.
+   *
+   * When `None` and `overnight_compounding` is set, the coupon
+   * `schedule.day_count` is used if it is `Act360` or `Act365F`. Other
+   * coupon day counts (for example `Thirty360`) error unless an explicit
+   * `Act360` or `Act365F` basis is supplied. Ignored when
+   * `overnight_compounding` is `None`.
+   */
+  overnight_basis?: DayCount1 | null;
+  /**
+   * Overnight compounding method for overnight rate indices (SOFR, ESTR, SONIA).
+   *
+   * When set to `Some(method)`, the rate for each accrual period is computed
+   * by compounding daily overnight fixings according to the specified method,
+   * rather than looking up a single forward rate for the period.
+   *
+   * Leave as `None` for term rates (e.g., 3M EURIBOR, 6M LIBOR).
+   */
+  overnight_compounding?: DE93F91B2Bfca5B034Bc7 | null;
+  /**
+   * Index floor/cap application policy for overnight-compounded coupons.
+   */
+  overnight_index_constraints?: "daily" | "period";
+  reset_frequency: Tenor2;
+  /**
+   * Reset lag in business days (e.g., 2 for T-2 SOFR convention).
+   */
+  reset_lag_days?: number;
+  spread_bp: Decimal6;
+}
+/**
+ * Parsed financial tenor.
+ */
+export interface Tenor1 {
+  /**
+   * Number of `unit` periods in the tenor. Must be at least 1; `0` is
+   * rejected because a zero-length period makes schedule generation loop.
+   */
+  count: number;
+  /**
+   * Calendar unit the count is expressed in, such as days, weeks, months,
+   * or years.
+   */
+  unit: "days" | "weeks" | "months" | "years";
+}
+/**
+ * Parsed financial tenor.
+ */
+export interface Tenor2 {
+  /**
+   * Number of `unit` periods in the tenor. Must be at least 1; `0` is
+   * rejected because a zero-length period makes schedule generation loop.
+   */
+  count: number;
+  /**
+   * Calendar unit the count is expressed in, such as days, weeks, months,
+   * or years.
+   */
+  unit: "days" | "weeks" | "months" | "years";
 }
 /**
  * Scenario-only pricing adjustments.

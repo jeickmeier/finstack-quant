@@ -5,6 +5,7 @@
       "close_series_id": null,
       "day_count": "act_365f",
       "discount_curve_id": "USD-OIS",
+      "div_yield_id": "SPX-DIVYIELD",
       "high_series_id": null,
       "id": "VARSPX-1Y",
       "low_series_id": null,
@@ -25,10 +26,12 @@
       "realized_var_method": "close_to_close",
       "settlement_date": null,
       "side": "receive",
+      "spot_id": "SPX",
       "start_date": "2024-01-01",
       "strike_variance": 0.04,
       "trading_days_per_year": 252.0,
-      "underlying_ticker": "SPX"
+      "underlying_ticker": "SPX",
+      "vol_surface_id": "SPX-VOL"
     },
     "type": "variance_swap"
   },

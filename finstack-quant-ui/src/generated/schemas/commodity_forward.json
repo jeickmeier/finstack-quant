@@ -27,7 +27,7 @@
           "position": "long",
           "quantity": 1000,
           "settlement": "cash",
-          "ticker": "CL",
+          "underlying_ticker": "CL",
           "unit": "BBL"
         },
         "type": "commodity_forward"
@@ -3429,11 +3429,15 @@
           "description": "Business day convention for settlement date adjustment.\n\nDefaults to `Following` for energy commodities, `ModifiedFollowing`\nfor precious metals."
         },
         "settlement_calendar_id": {
-          "description": "Calendar ID for settlement date adjustments.\n\nUsed for business day adjustment of the settlement date. If `convention`\nis set, uses the convention's calendar unless explicitly overridden.",
-          "type": [
-            "string",
-            "null"
-          ]
+          "anyOf": [
+            {
+              "$ref": "#/$defs/d_9c3fc047c6fea21344ad"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Calendar ID for settlement date adjustments.\n\nUsed for business day adjustment of the settlement date. If `convention`\nis set, uses the convention's calendar unless explicitly overridden."
         },
         "settlement_days": {
           "description": "Settlement lag in business days (T+N).\n\nDefaults to 2 for most commodity markets (T+2). If `convention` is set,\nuses the convention's default unless explicitly overridden here.\n\n# Market Standards\n\n| Market | Settlement |\n|--------|------------|\n| Energy (WTI, Brent, NG) | T+2 |\n| Precious metals | T+2 |\n| Base metals (LME) | T+2 |\n| Power | T+1 |",
@@ -3445,14 +3449,18 @@
           ]
         },
         "spot_id": {
-          "description": "Optional spot price ID (for delta calculations).",
-          "type": [
-            "string",
-            "null"
-          ]
+          "anyOf": [
+            {
+              "$ref": "#/$defs/d_9c3fc047c6fea21344ad"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Optional spot price ID (for delta calculations)."
         },
-        "ticker": {
-          "description": "Ticker/identifier for market data lookup (e.g., \"CL\", \"GC\", \"NG\")",
+        "underlying_ticker": {
+          "description": "Commodity symbol label (e.g., \"CL\", \"GC\", \"NG\"); never a market-data key.",
           "type": "string"
         },
         "unit": {
@@ -3463,7 +3471,7 @@
       "required": [
         "id",
         "commodity_type",
-        "ticker",
+        "underlying_ticker",
         "unit",
         "currency",
         "quantity",

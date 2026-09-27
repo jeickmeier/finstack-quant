@@ -8,7 +8,6 @@ export default [
       {
         "instrument": {
           "spec": {
-            "accrual_start_date": "2023-12-31",
             "attributes": {},
             "bounds_type": "relative_to_initial_spot",
             "coupon_rate": 0.08,
@@ -38,6 +37,7 @@ export default [
             "past_observations_in_range": null,
             "payment_date": null,
             "spot_id": "SPX-SPOT",
+            "start_date": "2023-12-31",
             "total_past_observations": null,
             "underlying_ticker": "SPX",
             "upper_bound": 1.05,
@@ -4540,14 +4540,7 @@ export default [
   {
     "path": "#/$defs/d_c3cfabdd5d36e6a2dfa1",
     "source": "https://finstack_quant.dev/schemas/instrument/1/exotics/range_accrual.schema.json#/$defs/RangeAccrual",
-    "description": "Range accrual instrument.\n\nRange accrual notes pay coupons that accrue only when a reference rate or asset\nstays within a specified range. The accrual is proportional to the number of\nobservation dates where the underlying is within [lower_bound, upper_bound].\n\n# Bounds Interpretation\n\nThe `bounds_type` field controls how `lower_bound` and `upper_bound` are interpreted:\n- `Absolute`: Bounds are absolute price levels (e.g., 4500.0 for SPX at 4700)\n- `RelativeToInitialSpot`: Bounds are multipliers of the initial spot (e.g., 0.95 = 95%)\n\n# Historical Fixings\n\nFor mid-life valuations, use `past_observations_in_range` to specify how many past\nobservations were in range. The pricer will add this to expected future fixings.\n\n# Rate-Linked Underlyings: Pricing Routing\n\nThe rate-linked fields (`rate_index_id`, `projection_curve_id`,\n`reference_tenor`) describe the contract but are **not priceable by the\nstandalone `RangeAccrual` pricers**, which support equity/FX (GBM)\nunderlyings only and return a validation error when these fields are set.\nPrice rate-linked range accrual notes through\n[`CallableRangeAccrual`](crate::instruments::exotics::callable_range_accrual)\n(whose `range_accrual` field carries these [`RangeAccrualTerms`]), which\nmodels the reference rate under HW1F and reconstructs the term rate per\nobservation."
-  },
-  {
-    "path": "#/$defs/d_c3cfabdd5d36e6a2dfa1/properties/accrual_start_date",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/exotics/range_accrual.schema.json#/$defs/RangeAccrual/properties/accrual_start_date",
-    "description": "Contractual accrual-period start date.",
-    "ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
-    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/date.schema.json#"
+    "description": "Range accrual instrument.\n\nRange accrual notes pay coupons that accrue only when a reference rate or asset\nstays within a specified range. The accrual is proportional to the number of\nobservation dates where the underlying is within [lower_bound, upper_bound].\n\n# Bounds Interpretation\n\nThe `bounds_type` field controls how `lower_bound` and `upper_bound` are interpreted:\n- `Absolute`: Bounds are absolute price levels (e.g., 4500.0 for SPX at 4700)\n- `RelativeToInitialSpot`: Bounds are multipliers of the initial spot (e.g., 0.95 = 95%)\n\n# Historical Fixings\n\nFor mid-life valuations, use `past_observations_in_range` to specify how many past\nobservations were in range. The pricer will add this to expected future fixings.\n\n# Rate-Linked Underlyings: Pricing Routing\n\nThe rate-linked fields (`index_id`, `forward_curve_id`,\n`index_tenor`) describe the contract but are **not priceable by the\nstandalone `RangeAccrual` pricers**, which support equity/FX (GBM)\nunderlyings only and return a validation error when these fields are set.\nPrice rate-linked range accrual notes through\n[`CallableRangeAccrual`](crate::instruments::exotics::callable_range_accrual)\n(whose `range_accrual` field carries these [`RangeAccrualTerms`]), which\nmodels the reference rate under HW1F and reconstructs the term rate per\nobservation."
   },
   {
     "path": "#/$defs/d_c3cfabdd5d36e6a2dfa1/properties/attributes",
@@ -4600,11 +4593,56 @@ export default [
     "source": "https://finstack_quant.dev/schemas/instrument/1/exotics/range_accrual.schema.json#/$defs/RangeAccrual/properties/div_yield_id/anyOf/1"
   },
   {
+    "path": "#/$defs/d_c3cfabdd5d36e6a2dfa1/properties/forward_curve_id",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/exotics/range_accrual.schema.json#/$defs/RangeAccrual/properties/forward_curve_id",
+    "description": "Rates forward curve that projects the observed index of a rate-linked range accrual."
+  },
+  {
+    "path": "#/$defs/d_c3cfabdd5d36e6a2dfa1/properties/forward_curve_id/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/exotics/range_accrual.schema.json#/$defs/RangeAccrual/properties/forward_curve_id/anyOf/0",
+    "ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/id.schema.json#"
+  },
+  {
+    "path": "#/$defs/d_c3cfabdd5d36e6a2dfa1/properties/forward_curve_id/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/exotics/range_accrual.schema.json#/$defs/RangeAccrual/properties/forward_curve_id/anyOf/1"
+  },
+  {
     "path": "#/$defs/d_c3cfabdd5d36e6a2dfa1/properties/id",
     "source": "https://finstack_quant.dev/schemas/instrument/1/exotics/range_accrual.schema.json#/$defs/RangeAccrual/properties/id",
     "description": "Unique instrument identifier",
     "ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/id.schema.json#"
+  },
+  {
+    "path": "#/$defs/d_c3cfabdd5d36e6a2dfa1/properties/index_id",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/exotics/range_accrual.schema.json#/$defs/RangeAccrual/properties/index_id",
+    "description": "Rate-index identity (e.g. `USD-SOFR`) of a rate-linked range accrual."
+  },
+  {
+    "path": "#/$defs/d_c3cfabdd5d36e6a2dfa1/properties/index_id/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/exotics/range_accrual.schema.json#/$defs/RangeAccrual/properties/index_id/anyOf/0",
+    "ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/id.schema.json#"
+  },
+  {
+    "path": "#/$defs/d_c3cfabdd5d36e6a2dfa1/properties/index_id/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/exotics/range_accrual.schema.json#/$defs/RangeAccrual/properties/index_id/anyOf/1"
+  },
+  {
+    "path": "#/$defs/d_c3cfabdd5d36e6a2dfa1/properties/index_tenor",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/exotics/range_accrual.schema.json#/$defs/RangeAccrual/properties/index_tenor",
+    "description": "Contractual tenor of the observed rate index."
+  },
+  {
+    "path": "#/$defs/d_c3cfabdd5d36e6a2dfa1/properties/index_tenor/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/exotics/range_accrual.schema.json#/$defs/RangeAccrual/properties/index_tenor/anyOf/0",
+    "ref": "https://finstack_quant.dev/schemas/common/1/tenor.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/tenor.schema.json#"
+  },
+  {
+    "path": "#/$defs/d_c3cfabdd5d36e6a2dfa1/properties/index_tenor/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/exotics/range_accrual.schema.json#/$defs/RangeAccrual/properties/index_tenor/anyOf/1"
   },
   {
     "path": "#/$defs/d_c3cfabdd5d36e6a2dfa1/properties/instrument_pricing_overrides",
@@ -4668,21 +4706,6 @@ export default [
     "source": "https://finstack_quant.dev/schemas/instrument/1/exotics/range_accrual.schema.json#/$defs/RangeAccrual/properties/payment_date/anyOf/1"
   },
   {
-    "path": "#/$defs/d_c3cfabdd5d36e6a2dfa1/properties/projection_curve_id",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/exotics/range_accrual.schema.json#/$defs/RangeAccrual/properties/projection_curve_id",
-    "description": "Projection curve for a rate-linked range accrual."
-  },
-  {
-    "path": "#/$defs/d_c3cfabdd5d36e6a2dfa1/properties/projection_curve_id/anyOf/0",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/exotics/range_accrual.schema.json#/$defs/RangeAccrual/properties/projection_curve_id/anyOf/0",
-    "ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
-    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/id.schema.json#"
-  },
-  {
-    "path": "#/$defs/d_c3cfabdd5d36e6a2dfa1/properties/projection_curve_id/anyOf/1",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/exotics/range_accrual.schema.json#/$defs/RangeAccrual/properties/projection_curve_id/anyOf/1"
-  },
-  {
     "path": "#/$defs/d_c3cfabdd5d36e6a2dfa1/properties/quanto",
     "source": "https://finstack_quant.dev/schemas/instrument/1/exotics/range_accrual.schema.json#/$defs/RangeAccrual/properties/quanto",
     "description": "Optional quanto adjustment parameters. When provided, applies a drift\ncorrection for instruments whose payoff currency differs from the\nunderlying asset currency."
@@ -4698,36 +4721,6 @@ export default [
     "source": "https://finstack_quant.dev/schemas/instrument/1/exotics/range_accrual.schema.json#/$defs/RangeAccrual/properties/quanto/anyOf/1"
   },
   {
-    "path": "#/$defs/d_c3cfabdd5d36e6a2dfa1/properties/rate_index_id",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/exotics/range_accrual.schema.json#/$defs/RangeAccrual/properties/rate_index_id",
-    "description": "Explicit rate index for rate-linked range accruals."
-  },
-  {
-    "path": "#/$defs/d_c3cfabdd5d36e6a2dfa1/properties/rate_index_id/anyOf/0",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/exotics/range_accrual.schema.json#/$defs/RangeAccrual/properties/rate_index_id/anyOf/0",
-    "ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
-    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/id.schema.json#"
-  },
-  {
-    "path": "#/$defs/d_c3cfabdd5d36e6a2dfa1/properties/rate_index_id/anyOf/1",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/exotics/range_accrual.schema.json#/$defs/RangeAccrual/properties/rate_index_id/anyOf/1"
-  },
-  {
-    "path": "#/$defs/d_c3cfabdd5d36e6a2dfa1/properties/reference_tenor",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/exotics/range_accrual.schema.json#/$defs/RangeAccrual/properties/reference_tenor",
-    "description": "Contractual tenor of the observed reference rate."
-  },
-  {
-    "path": "#/$defs/d_c3cfabdd5d36e6a2dfa1/properties/reference_tenor/anyOf/0",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/exotics/range_accrual.schema.json#/$defs/RangeAccrual/properties/reference_tenor/anyOf/0",
-    "ref": "https://finstack_quant.dev/schemas/common/1/tenor.schema.json",
-    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/tenor.schema.json#"
-  },
-  {
-    "path": "#/$defs/d_c3cfabdd5d36e6a2dfa1/properties/reference_tenor/anyOf/1",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/exotics/range_accrual.schema.json#/$defs/RangeAccrual/properties/reference_tenor/anyOf/1"
-  },
-  {
     "path": "#/$defs/d_c3cfabdd5d36e6a2dfa1/properties/scenario_pricing_overrides",
     "source": "https://finstack_quant.dev/schemas/instrument/1/exotics/range_accrual.schema.json#/$defs/RangeAccrual/properties/scenario_pricing_overrides",
     "description": "Scenario-only pricing adjustments.",
@@ -4740,6 +4733,13 @@ export default [
     "description": "Spot price identifier",
     "ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/id.schema.json#"
+  },
+  {
+    "path": "#/$defs/d_c3cfabdd5d36e6a2dfa1/properties/start_date",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/exotics/range_accrual.schema.json#/$defs/RangeAccrual/properties/start_date",
+    "description": "Contractual accrual-period start date.",
+    "ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/date.schema.json#"
   },
   {
     "path": "#/$defs/d_c3cfabdd5d36e6a2dfa1/properties/total_past_observations",

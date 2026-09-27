@@ -2,10 +2,6 @@
 // JSON wire shape only; runtime constraints remain in the schema.
 
 /**
- * Underlying CDS maturity date
- */
-export type Date = string;
-/**
  * Exact decimal encoded as a JSON string.
  */
 export type Decimal = string;
@@ -20,11 +16,11 @@ export type Id1 = string;
 /**
  * ISO 8601 calendar date string.
  */
-export type Date1 = string;
+export type Date = string;
 /**
  * ISO 8601 calendar date string.
  */
-export type Date2 = string;
+export type Date1 = string;
 /**
  * Unique instrument identifier
  */
@@ -294,6 +290,10 @@ export type DB556Bbeb1Ecf96C44C5A =
   | "ZMW"
   | "ZWL";
 /**
+ * ISO 8601 calendar date string.
+ */
+export type Date2 = string;
+/**
  * Volatility surface identifier
  */
 export type Id3 = string;
@@ -330,7 +330,6 @@ export interface D_0688739575C4B1492597 {
  */
 export interface DDc0C483409E01928615C {
   attributes?: Attributes;
-  cds_maturity: Date;
   /**
    * Contractual running coupon `c` of the underlying CDS, in basis points
    * (e.g., `100` for the standard CDX.NA.IG coupon, `500` for the
@@ -349,12 +348,12 @@ export interface DDc0C483409E01928615C {
    * Must be on or after expiry and before CDS maturity. Discounting uses
    * this date; spread variance ends at legal expiry.
    */
-  exercise_settlement_date?: Date1 | null;
+  exercise_settlement_date?: Date | null;
   /**
    * Exercise style
    */
   exercise_style: "european" | "american" | "bermudan";
-  expiry: Date2;
+  expiry: Date1;
   id: Id2;
   /**
    * Current index factor `f` at valuation: the surviving fraction of the
@@ -382,10 +381,10 @@ export interface DDc0C483409E01928615C {
    * accessor. This does not change variance time or front-end protection;
    * the option value excludes the separately agreed trade premium.
    */
-  premium_settlement_date?: Date1 | null;
+  premium_settlement_date?: Date | null;
   /**
    * Convention used to select the synthetic underlying CDS accrual start
-   * when `underlying_effective_date` is not explicitly supplied.
+   * when `underlying_start_date` is not explicitly supplied.
    */
   protection_start_convention?: "spot" | "forward";
   /**
@@ -441,13 +440,6 @@ export interface DDc0C483409E01928615C {
    */
   underlying_convention?: "isda_na" | "isda_eu" | "isda_as" | "custom";
   /**
-   * Underlying CDS accrual-effective date used for forward spread and risky
-   * annuity. Bloomberg CDSO can quote a standard CDS effective date before
-   * option expiry; in that case premium accrues from this date while
-   * protection starts at expiry.
-   */
-  underlying_effective_date?: Date1 | null;
-  /**
    * If true, the underlying is a CDS index; else single-name CDS.
    *
    * The Bloomberg CDSO model treats the two cases differently in the
@@ -457,6 +449,14 @@ export interface DDc0C483409E01928615C {
    * knock out on default and skip it.
    */
   underlying_is_index?: boolean;
+  underlying_maturity: Date2;
+  /**
+   * Underlying CDS accrual-effective date used for forward spread and risky
+   * annuity. Bloomberg CDSO can quote a standard CDS effective date before
+   * option expiry; in that case premium accrues from this date while
+   * protection starts at expiry.
+   */
+  underlying_start_date?: Date | null;
   vol_surface_id: Id3;
 }
 /**

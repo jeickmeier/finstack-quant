@@ -551,9 +551,9 @@ export interface D_630Fb6613F366870C6Aa {
    */
   strike: number;
   /**
-   * Ticker/identifier for market data lookup (e.g., "CL", "GC", "NG")
+   * Commodity symbol label (e.g., "CL", "GC", "NG"); never a market-data key.
    */
-  ticker: string;
+  underlying_ticker: string;
   /**
    * Unit of measurement (e.g., "BBL", "OZ", "MT", "MMBTU")
    */

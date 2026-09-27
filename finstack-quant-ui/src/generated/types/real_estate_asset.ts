@@ -459,10 +459,6 @@ export type DB556Bbeb1Ecf96C44C5A =
 export type DAffc3D9F712C31A5E8D0 =
   "office" | "multifamily" | "retail" | "industrial" | "hospitality" | "mixed_use" | "other";
 /**
- * ISO 8601 calendar date string.
- */
-export type Date1 = string;
-/**
  * Canonical schema marker for persisted instrument envelopes.
  */
 export type D_1D76806E856302A4A006 = "finstack_quant.instrument/1";
@@ -485,13 +481,8 @@ export interface D_8Cd4Cd18F2Cd76E30405 {
  */
 export interface DF056A252F953016E9606 {
   /**
-   * Optional one-time acquisition cost deducted at `as_of` in DCF valuation.
-   *
-   * This is intended for closing costs, fees, and other transaction costs.
-   */
-  acquisition_cost?: number | null;
-  /**
-   * Optional detailed acquisition cost line items (positive outflows) deducted at `as_of`.
+   * Acquisition (closing) cost line items in instrument currency, as
+   * positive outflow magnitudes deducted at `as_of` in DCF valuation.
    */
   acquisition_costs?: Money[];
   /**
@@ -570,7 +561,6 @@ export interface DF056A252F953016E9606 {
    * Validation range is \([-100\%, 20\%]\) to guard against configuration errors.
    */
   terminal_growth_rate?: number | null;
-  valuation_date: Date1;
   /**
    * Valuation method (DCF or DirectCap).
    */

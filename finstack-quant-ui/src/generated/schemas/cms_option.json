@@ -13,7 +13,10 @@
             0.25
           ],
           "attributes": {},
-          "cms_tenor": 10,
+          "cms_tenor": {
+            "count": 10,
+            "unit": "years"
+          },
           "day_count": "act_365f",
           "discount_curve_id": "USD-OIS",
           "fixing_dates": [
@@ -24,6 +27,7 @@
           ],
           "forward_curve_id": "USD-LIBOR-3M",
           "id": "CMSOPT-10Y-USD",
+          "index_id": "USD-SOFR-OIS",
           "notional": {
             "amount": "10000000",
             "currency": "USD"
@@ -36,7 +40,6 @@
             "2026-03-20"
           ],
           "strike": "0.025",
-          "swap_convention": "usd_sofr",
           "swap_float_day_count": "act_360",
           "vol_surface_id": "USD-CMS10Y-VOL"
         },
@@ -1369,9 +1372,8 @@
           "description": "Attributes for scenario selection and grouping"
         },
         "cms_tenor": {
-          "description": "Tenor of the CMS swap in years (e.g., 10.0 for 10Y)",
-          "format": "double",
-          "type": "number"
+          "$ref": "#/$defs/d_47e5e74524615b78a19f",
+          "description": "Tenor of the CMS reference swap (e.g. 10Y); must be month- or year-based."
         },
         "day_count": {
           "$ref": "#/$defs/d_c0401254ec268b317b65",
@@ -1395,6 +1397,17 @@
         "id": {
           "$ref": "#/$defs/d_9c3fc047c6fea21344ad",
           "description": "Unique instrument identifier"
+        },
+        "index_id": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/d_9c3fc047c6fea21344ad"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Rate-index convention-registry key of the underlying swap (e.g. `USD-SOFR-OIS`).\n\nWhen set, provides default values for `swap_fixed_frequency`, `swap_float_frequency`,\n`swap_fixed_day_count`, and `swap_float_day_count`. Individual fields still\noverride the convention when explicitly set."
         },
         "instrument_pricing_overrides": {
           "$ref": "#/$defs/d_c08279a20372931820e0",
@@ -1427,18 +1440,7 @@
           "$ref": "#/$defs/d_18f3ba1ec18ab2be13b2",
           "description": "Strike (fixed rate for CMS option)"
         },
-        "swap_convention": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/d_d5fd5808479e42cdcfff"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "IRS convention for the underlying swap (e.g., `UsdSofr`).\n\nWhen set, provides default values for `swap_fixed_frequency`, `swap_float_frequency`,\n`swap_day_count`, and `swap_float_day_count`. Individual fields still\noverride the convention when explicitly set."
-        },
-        "swap_day_count": {
+        "swap_fixed_day_count": {
           "anyOf": [
             {
               "$ref": "#/$defs/d_c0401254ec268b317b65"
@@ -3537,36 +3539,6 @@
         {
           "const": "brownian_bridge",
           "description": "Brownian-bridge correction for continuous monitoring between steps.",
-          "type": "string"
-        }
-      ]
-    },
-    "d_d5fd5808479e42cdcfff": {
-      "description": "Standard interest rate swap conventions by region.\n\n# Market Standards Reference (Post-IBOR Transition)\n\n| Convention | Index | Fixed DC | Float DC | Fixed Freq | Float Freq | Reset Lag |\n|------------|-------|----------|----------|------------|------------|-----------|\n| USD OIS | SOFR | 30/360 | ACT/360 | Semi-annual | Annual | T-2 |\n| EUR OIS | ESTR | 30/360 | ACT/360 | Annual | Annual | T-2 |\n| EUR IBOR | EURIBOR | 30/360 | ACT/360 | Annual | Semi-annual | T-2 |\n| GBP OIS | SONIA | ACT/365F | ACT/365F | Annual | Annual | T-0 |\n| JPY OIS | TONAR | ACT/365F | ACT/365F | Semi-annual | Annual | T-2 |\n\n# OIS Compounding\n\nNote: OIS swaps (SOFR, ESTR, SONIA, TONAR) use **daily compounded** rates\nwith observation shift (typically 2 days lookback). The float frequency\nindicates the payment/reset frequency, not the compounding frequency.\nSee compounding method guidance below for details.\n\n# Sources\n\n- ISDA 2021 IBOR Fallbacks Protocol\n- Bloomberg SWDF function\n- QuantLib OvernightIndexedSwap conventions",
-      "oneOf": [
-        {
-          "const": "usd_sofr",
-          "description": "USD SOFR OIS: Annual fixed, annual float, ACT/360\n\nStandard post-LIBOR USD swap convention using SOFR compounded in arrears.",
-          "type": "string"
-        },
-        {
-          "const": "eur_estr",
-          "description": "EUR ESTR OIS: Annual fixed, annual float, ACT/360\n\nStandard EUR OIS convention using ESTR compounded in arrears.\nFor EURIBOR swaps, use [`EurEuribor`](Self::EurEuribor).",
-          "type": "string"
-        },
-        {
-          "const": "eur_euribor",
-          "description": "EUR EURIBOR: Annual fixed, semi-annual float, ACT/360\n\nLegacy EUR swap convention using EURIBOR 6M as the floating index.\nThis is a term rate (not compounded daily).",
-          "type": "string"
-        },
-        {
-          "const": "gbp_sonia",
-          "description": "GBP SONIA OIS: Annual fixed, annual float, ACT/365F\n\nStandard GBP swap convention using SONIA compounded in arrears.",
-          "type": "string"
-        },
-        {
-          "const": "jpy_tonar",
-          "description": "JPY TONAR OIS: Annual fixed, annual float, ACT/365F\n\nStandard JPY swap convention using TONAR compounded in arrears.",
           "type": "string"
         }
       ]

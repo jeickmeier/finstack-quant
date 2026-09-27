@@ -13,17 +13,22 @@
               "2026-09-30",
               "2026-12-31"
             ],
-            "lockout_periods": 1,
+            "lockout_end": "2026-01-31",
             "price_pct_of_par": 100
           },
           "id": "CALLABLE-RA-SOFR-1Y",
           "range_accrual": {
-            "accrual_start_date": "2025-12-31",
             "bounds_type": "absolute",
             "coupon_rate": 0.065,
             "day_count": "act_360",
             "discount_curve_id": "USD-OIS",
             "div_yield_id": null,
+            "forward_curve_id": "USD-OIS",
+            "index_id": "SOFR",
+            "index_tenor": {
+              "count": 3,
+              "unit": "months"
+            },
             "lower_bound": 0.04,
             "notional": {
               "amount": "1000000",
@@ -45,13 +50,8 @@
             ],
             "past_observations_in_range": null,
             "payment_date": null,
-            "projection_curve_id": "USD-OIS",
-            "rate_index_id": "SOFR",
-            "reference_tenor": {
-              "count": 3,
-              "unit": "months"
-            },
             "spot_id": "SOFR-RATE",
+            "start_date": "2025-12-31",
             "total_past_observations": null,
             "underlying_ticker": "SOFR",
             "upper_bound": 0.06,
@@ -4389,7 +4389,7 @@
     },
     "d_db20612dc309c7165418": {
       "additionalProperties": false,
-      "description": "Bermudan call provision for callable exotics.\n\nAllows the issuer to terminate the note on specified call dates\nat a specified call price (typically par). Currently consumed by the\nCallable Range Accrual note (PRDC is not implemented, and the Snowball\npricer rejects callable provisions).\n\n# Fields\n\n- `call_dates`: Sorted ascending dates on which the issuer may call.\n- `price_pct_of_par`: Redemption price in percent of par (`100.0` = par,\n  `102.0` = callable at 102).\n- `lockout_periods`: Number of initial coupon periods during which\n  the call right cannot be exercised.",
+      "description": "Bermudan call provision for callable exotics.\n\nAllows the issuer to terminate the note on specified call dates\nat a specified call price (typically par). Currently consumed by the\nCallable Range Accrual note (PRDC is not implemented, and the Snowball\npricer rejects callable provisions).\n\n# Fields\n\n- `call_dates`: Sorted ascending dates on which the issuer may call.\n- `price_pct_of_par`: Redemption price in percent of par (`100.0` = par,\n  `102.0` = callable at 102).\n- `lockout_end`: Optional end of the no-call period; call dates on or\n  before it are not exercisable (exclusive bound, matching\n  `BermudanSchedule.lockout_end` on Bermudan swaptions).",
       "properties": {
         "call_dates": {
           "description": "Dates on which the issuer can call (must be sorted ascending).",
@@ -4398,11 +4398,16 @@
           },
           "type": "array"
         },
-        "lockout_periods": {
-          "description": "Lockout period in number of coupon periods before first call.",
-          "format": "uint",
-          "minimum": 0,
-          "type": "integer"
+        "lockout_end": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/d_1b2ccb88c9229e7463e8"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "End of the no-call (lockout) period. Call dates on or before this\ndate are dropped (exclusive bound); `None` means no lockout."
         },
         "price_pct_of_par": {
           "description": "Redemption price in percent of par (`100.0` = par). The pricer pays\n`notional * price_pct_of_par / 100` at exercise.",
@@ -4412,8 +4417,7 @@
       },
       "required": [
         "call_dates",
-        "price_pct_of_par",
-        "lockout_periods"
+        "price_pct_of_par"
       ],
       "type": "object"
     },
@@ -4421,10 +4425,6 @@
       "additionalProperties": false,
       "description": "Contract terms of a range accrual note, without identity or pricing overrides.\n\n[`RangeAccrual`] flattens these terms into its own payload, and\n[`CallableRangeAccrual`](crate::instruments::exotics::callable_range_accrual::CallableRangeAccrual)\nnests them under `range_accrual`, so the callable note has exactly one\n`id`, one `attributes` map and one set of pricing overrides.",
       "properties": {
-        "accrual_start_date": {
-          "$ref": "#/$defs/d_1b2ccb88c9229e7463e8",
-          "description": "Contractual accrual-period start date."
-        },
         "bounds_type": {
           "$ref": "#/$defs/d_f30e208982840b66d83c",
           "default": "absolute",
@@ -4453,6 +4453,39 @@
             }
           ],
           "description": "Optional dividend-yield scalar ID"
+        },
+        "forward_curve_id": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/d_9c3fc047c6fea21344ad"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Rates forward curve that projects the observed index of a rate-linked range accrual."
+        },
+        "index_id": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/d_9c3fc047c6fea21344ad"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Rate-index identity (e.g. `USD-SOFR`) of a rate-linked range accrual."
+        },
+        "index_tenor": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/d_47e5e74524615b78a19f"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Contractual tenor of the observed rate index."
         },
         "lower_bound": {
           "description": "Lower bound of accrual range (interpretation depends on bounds_type)",
@@ -4491,17 +4524,6 @@
           "default": null,
           "description": "Optional payment date (defaults to last observation date)"
         },
-        "projection_curve_id": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/d_9c3fc047c6fea21344ad"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "Projection curve for a rate-linked range accrual."
-        },
         "quanto": {
           "anyOf": [
             {
@@ -4513,31 +4535,13 @@
           ],
           "description": "Optional quanto adjustment parameters. When provided, applies a drift\ncorrection for instruments whose payoff currency differs from the\nunderlying asset currency."
         },
-        "rate_index_id": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/d_9c3fc047c6fea21344ad"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "Explicit rate index for rate-linked range accruals."
-        },
-        "reference_tenor": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/d_47e5e74524615b78a19f"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "Contractual tenor of the observed reference rate."
-        },
         "spot_id": {
           "$ref": "#/$defs/d_9c3fc047c6fea21344ad",
           "description": "Spot price identifier"
+        },
+        "start_date": {
+          "$ref": "#/$defs/d_1b2ccb88c9229e7463e8",
+          "description": "Contractual accrual-period start date."
         },
         "total_past_observations": {
           "description": "Total number of past observations (for mid-life valuations).\nMust be provided if `past_observations_in_range` is set.",
@@ -4570,7 +4574,7 @@
         "coupon_rate",
         "notional",
         "day_count",
-        "accrual_start_date",
+        "start_date",
         "discount_curve_id",
         "spot_id",
         "vol_surface_id"

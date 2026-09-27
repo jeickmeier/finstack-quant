@@ -15,17 +15,22 @@ export default [
                 "2026-09-30",
                 "2026-12-31"
               ],
-              "lockout_periods": 1,
+              "lockout_end": "2026-01-31",
               "price_pct_of_par": 100
             },
             "id": "CALLABLE-RA-SOFR-1Y",
             "range_accrual": {
-              "accrual_start_date": "2025-12-31",
               "bounds_type": "absolute",
               "coupon_rate": 0.065,
               "day_count": "act_360",
               "discount_curve_id": "USD-OIS",
               "div_yield_id": null,
+              "forward_curve_id": "USD-OIS",
+              "index_id": "SOFR",
+              "index_tenor": {
+                "count": 3,
+                "unit": "months"
+              },
               "lower_bound": 0.04,
               "notional": {
                 "amount": "1000000",
@@ -47,13 +52,8 @@ export default [
               ],
               "past_observations_in_range": null,
               "payment_date": null,
-              "projection_curve_id": "USD-OIS",
-              "rate_index_id": "SOFR",
-              "reference_tenor": {
-                "count": 3,
-                "unit": "months"
-              },
               "spot_id": "SOFR-RATE",
+              "start_date": "2025-12-31",
               "total_past_observations": null,
               "underlying_ticker": "SOFR",
               "upper_bound": 0.06,
@@ -4780,7 +4780,7 @@ export default [
   {
     "path": "#/$defs/d_db20612dc309c7165418",
     "source": "https://finstack_quant.dev/schemas/instrument/1/exotics/callable_range_accrual.schema.json#/$defs/BermudanCallProvision",
-    "description": "Bermudan call provision for callable exotics.\n\nAllows the issuer to terminate the note on specified call dates\nat a specified call price (typically par). Currently consumed by the\nCallable Range Accrual note (PRDC is not implemented, and the Snowball\npricer rejects callable provisions).\n\n# Fields\n\n- `call_dates`: Sorted ascending dates on which the issuer may call.\n- `price_pct_of_par`: Redemption price in percent of par (`100.0` = par,\n  `102.0` = callable at 102).\n- `lockout_periods`: Number of initial coupon periods during which\n  the call right cannot be exercised."
+    "description": "Bermudan call provision for callable exotics.\n\nAllows the issuer to terminate the note on specified call dates\nat a specified call price (typically par). Currently consumed by the\nCallable Range Accrual note (PRDC is not implemented, and the Snowball\npricer rejects callable provisions).\n\n# Fields\n\n- `call_dates`: Sorted ascending dates on which the issuer may call.\n- `price_pct_of_par`: Redemption price in percent of par (`100.0` = par,\n  `102.0` = callable at 102).\n- `lockout_end`: Optional end of the no-call period; call dates on or\n  before it are not exercisable (exclusive bound, matching\n  `BermudanSchedule.lockout_end` on Bermudan swaptions)."
   },
   {
     "path": "#/$defs/d_db20612dc309c7165418/properties/call_dates",
@@ -4794,11 +4794,19 @@ export default [
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/date.schema.json#"
   },
   {
-    "path": "#/$defs/d_db20612dc309c7165418/properties/lockout_periods",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/exotics/callable_range_accrual.schema.json#/$defs/BermudanCallProvision/properties/lockout_periods",
-    "description": "Lockout period in number of coupon periods before first call.",
-    "format": "uint",
-    "minimum": 0
+    "path": "#/$defs/d_db20612dc309c7165418/properties/lockout_end",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/exotics/callable_range_accrual.schema.json#/$defs/BermudanCallProvision/properties/lockout_end",
+    "description": "End of the no-call (lockout) period. Call dates on or before this\ndate are dropped (exclusive bound); `None` means no lockout."
+  },
+  {
+    "path": "#/$defs/d_db20612dc309c7165418/properties/lockout_end/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/exotics/callable_range_accrual.schema.json#/$defs/BermudanCallProvision/properties/lockout_end/anyOf/0",
+    "ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/date.schema.json#"
+  },
+  {
+    "path": "#/$defs/d_db20612dc309c7165418/properties/lockout_end/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/exotics/callable_range_accrual.schema.json#/$defs/BermudanCallProvision/properties/lockout_end/anyOf/1"
   },
   {
     "path": "#/$defs/d_db20612dc309c7165418/properties/price_pct_of_par",
@@ -4810,13 +4818,6 @@ export default [
     "path": "#/$defs/d_de9dcde9d5fad54ea251",
     "source": "https://finstack_quant.dev/schemas/instrument/1/exotics/callable_range_accrual.schema.json#/$defs/RangeAccrualTerms",
     "description": "Contract terms of a range accrual note, without identity or pricing overrides.\n\n[`RangeAccrual`] flattens these terms into its own payload, and\n[`CallableRangeAccrual`](crate::instruments::exotics::callable_range_accrual::CallableRangeAccrual)\nnests them under `range_accrual`, so the callable note has exactly one\n`id`, one `attributes` map and one set of pricing overrides."
-  },
-  {
-    "path": "#/$defs/d_de9dcde9d5fad54ea251/properties/accrual_start_date",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/exotics/callable_range_accrual.schema.json#/$defs/RangeAccrualTerms/properties/accrual_start_date",
-    "description": "Contractual accrual-period start date.",
-    "ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
-    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/date.schema.json#"
   },
   {
     "path": "#/$defs/d_de9dcde9d5fad54ea251/properties/bounds_type",
@@ -4860,6 +4861,51 @@ export default [
   {
     "path": "#/$defs/d_de9dcde9d5fad54ea251/properties/div_yield_id/anyOf/1",
     "source": "https://finstack_quant.dev/schemas/instrument/1/exotics/callable_range_accrual.schema.json#/$defs/RangeAccrualTerms/properties/div_yield_id/anyOf/1"
+  },
+  {
+    "path": "#/$defs/d_de9dcde9d5fad54ea251/properties/forward_curve_id",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/exotics/callable_range_accrual.schema.json#/$defs/RangeAccrualTerms/properties/forward_curve_id",
+    "description": "Rates forward curve that projects the observed index of a rate-linked range accrual."
+  },
+  {
+    "path": "#/$defs/d_de9dcde9d5fad54ea251/properties/forward_curve_id/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/exotics/callable_range_accrual.schema.json#/$defs/RangeAccrualTerms/properties/forward_curve_id/anyOf/0",
+    "ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/id.schema.json#"
+  },
+  {
+    "path": "#/$defs/d_de9dcde9d5fad54ea251/properties/forward_curve_id/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/exotics/callable_range_accrual.schema.json#/$defs/RangeAccrualTerms/properties/forward_curve_id/anyOf/1"
+  },
+  {
+    "path": "#/$defs/d_de9dcde9d5fad54ea251/properties/index_id",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/exotics/callable_range_accrual.schema.json#/$defs/RangeAccrualTerms/properties/index_id",
+    "description": "Rate-index identity (e.g. `USD-SOFR`) of a rate-linked range accrual."
+  },
+  {
+    "path": "#/$defs/d_de9dcde9d5fad54ea251/properties/index_id/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/exotics/callable_range_accrual.schema.json#/$defs/RangeAccrualTerms/properties/index_id/anyOf/0",
+    "ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/id.schema.json#"
+  },
+  {
+    "path": "#/$defs/d_de9dcde9d5fad54ea251/properties/index_id/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/exotics/callable_range_accrual.schema.json#/$defs/RangeAccrualTerms/properties/index_id/anyOf/1"
+  },
+  {
+    "path": "#/$defs/d_de9dcde9d5fad54ea251/properties/index_tenor",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/exotics/callable_range_accrual.schema.json#/$defs/RangeAccrualTerms/properties/index_tenor",
+    "description": "Contractual tenor of the observed rate index."
+  },
+  {
+    "path": "#/$defs/d_de9dcde9d5fad54ea251/properties/index_tenor/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/exotics/callable_range_accrual.schema.json#/$defs/RangeAccrualTerms/properties/index_tenor/anyOf/0",
+    "ref": "https://finstack_quant.dev/schemas/common/1/tenor.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/tenor.schema.json#"
+  },
+  {
+    "path": "#/$defs/d_de9dcde9d5fad54ea251/properties/index_tenor/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/exotics/callable_range_accrual.schema.json#/$defs/RangeAccrualTerms/properties/index_tenor/anyOf/1"
   },
   {
     "path": "#/$defs/d_de9dcde9d5fad54ea251/properties/lower_bound",
@@ -4909,21 +4955,6 @@ export default [
     "source": "https://finstack_quant.dev/schemas/instrument/1/exotics/callable_range_accrual.schema.json#/$defs/RangeAccrualTerms/properties/payment_date/anyOf/1"
   },
   {
-    "path": "#/$defs/d_de9dcde9d5fad54ea251/properties/projection_curve_id",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/exotics/callable_range_accrual.schema.json#/$defs/RangeAccrualTerms/properties/projection_curve_id",
-    "description": "Projection curve for a rate-linked range accrual."
-  },
-  {
-    "path": "#/$defs/d_de9dcde9d5fad54ea251/properties/projection_curve_id/anyOf/0",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/exotics/callable_range_accrual.schema.json#/$defs/RangeAccrualTerms/properties/projection_curve_id/anyOf/0",
-    "ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
-    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/id.schema.json#"
-  },
-  {
-    "path": "#/$defs/d_de9dcde9d5fad54ea251/properties/projection_curve_id/anyOf/1",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/exotics/callable_range_accrual.schema.json#/$defs/RangeAccrualTerms/properties/projection_curve_id/anyOf/1"
-  },
-  {
     "path": "#/$defs/d_de9dcde9d5fad54ea251/properties/quanto",
     "source": "https://finstack_quant.dev/schemas/instrument/1/exotics/callable_range_accrual.schema.json#/$defs/RangeAccrualTerms/properties/quanto",
     "description": "Optional quanto adjustment parameters. When provided, applies a drift\ncorrection for instruments whose payoff currency differs from the\nunderlying asset currency."
@@ -4939,41 +4970,18 @@ export default [
     "source": "https://finstack_quant.dev/schemas/instrument/1/exotics/callable_range_accrual.schema.json#/$defs/RangeAccrualTerms/properties/quanto/anyOf/1"
   },
   {
-    "path": "#/$defs/d_de9dcde9d5fad54ea251/properties/rate_index_id",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/exotics/callable_range_accrual.schema.json#/$defs/RangeAccrualTerms/properties/rate_index_id",
-    "description": "Explicit rate index for rate-linked range accruals."
-  },
-  {
-    "path": "#/$defs/d_de9dcde9d5fad54ea251/properties/rate_index_id/anyOf/0",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/exotics/callable_range_accrual.schema.json#/$defs/RangeAccrualTerms/properties/rate_index_id/anyOf/0",
-    "ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
-    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/id.schema.json#"
-  },
-  {
-    "path": "#/$defs/d_de9dcde9d5fad54ea251/properties/rate_index_id/anyOf/1",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/exotics/callable_range_accrual.schema.json#/$defs/RangeAccrualTerms/properties/rate_index_id/anyOf/1"
-  },
-  {
-    "path": "#/$defs/d_de9dcde9d5fad54ea251/properties/reference_tenor",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/exotics/callable_range_accrual.schema.json#/$defs/RangeAccrualTerms/properties/reference_tenor",
-    "description": "Contractual tenor of the observed reference rate."
-  },
-  {
-    "path": "#/$defs/d_de9dcde9d5fad54ea251/properties/reference_tenor/anyOf/0",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/exotics/callable_range_accrual.schema.json#/$defs/RangeAccrualTerms/properties/reference_tenor/anyOf/0",
-    "ref": "https://finstack_quant.dev/schemas/common/1/tenor.schema.json",
-    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/tenor.schema.json#"
-  },
-  {
-    "path": "#/$defs/d_de9dcde9d5fad54ea251/properties/reference_tenor/anyOf/1",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/exotics/callable_range_accrual.schema.json#/$defs/RangeAccrualTerms/properties/reference_tenor/anyOf/1"
-  },
-  {
     "path": "#/$defs/d_de9dcde9d5fad54ea251/properties/spot_id",
     "source": "https://finstack_quant.dev/schemas/instrument/1/exotics/callable_range_accrual.schema.json#/$defs/RangeAccrualTerms/properties/spot_id",
     "description": "Spot price identifier",
     "ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/id.schema.json#"
+  },
+  {
+    "path": "#/$defs/d_de9dcde9d5fad54ea251/properties/start_date",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/exotics/callable_range_accrual.schema.json#/$defs/RangeAccrualTerms/properties/start_date",
+    "description": "Contractual accrual-period start date.",
+    "ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/date.schema.json#"
   },
   {
     "path": "#/$defs/d_de9dcde9d5fad54ea251/properties/total_past_observations",

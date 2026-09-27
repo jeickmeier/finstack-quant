@@ -10,7 +10,6 @@
       "day_count": "act_360",
       "detach_pct": 3.0,
       "discount_curve_id": "USD-OIS",
-      "effective_date": null,
       "frequency": {
         "count": 3,
         "unit": "months"
@@ -26,6 +25,7 @@
       "roll_rule": "cds_imm",
       "series": 42,
       "side": "buy_protection",
+      "start_date": null,
       "stub": "short_front",
       "upfront": null
     },

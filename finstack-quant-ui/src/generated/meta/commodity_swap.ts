@@ -20,8 +20,8 @@ export default [
             "commodity_type": "Energy",
             "currency": "USD",
             "discount_curve_id": "USD-OIS",
-            "fixed_price": "3.5",
-            "floating_index_id": "NG-SPOT-AVG",
+            "fixed_price": 3.5,
+            "forward_curve_id": "NG-SPOT-AVG",
             "frequency": {
               "count": 1,
               "unit": "months"
@@ -32,7 +32,7 @@ export default [
             "quantity": 10000,
             "side": "pay",
             "start_date": "2025-01-01",
-            "ticker": "NG",
+            "underlying_ticker": "NG",
             "unit": "MMBTU"
           },
           "type": "commodity_swap"
@@ -395,18 +395,6 @@ export default [
     "description": "Recovery model governing the notional-to-recovery mapping.",
     "ref": "#/$defs/RecoveryModel",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/RecoveryModel"
-  },
-  {
-    "path": "#/$defs/d_18f3ba1ec18ab2be13b2",
-    "source": "https://finstack_quant.dev/schemas/common/1/decimal.schema.json#",
-    "description": "Exact decimal encoded as a JSON string.",
-    "examples": [
-      "1000000",
-      "0.0425",
-      "-1234.56789"
-    ],
-    "pattern": "^-?\\d+(\\.\\d+)?([eE][+-]?\\d+)?$",
-    "title": "Decimal"
   },
   {
     "path": "#/$defs/d_1b2ccb88c9229e7463e8",
@@ -1059,7 +1047,7 @@ export default [
   {
     "path": "#/$defs/d_6a0b21d7e4dfcb5ae18c",
     "source": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_swap.schema.json#/$defs/CommoditySwap",
-    "description": "Commodity swap (fixed-for-floating commodity price exchange).\n\nOne party pays a fixed price per unit, the other pays a floating price\ndetermined by an index or average of spot prices over the period.\n\n# Pricing\n\nFixed leg: ∑ Q × P_fixed × DF(t_i)\nFloating leg: ∑ Q × E[P_float(t_i)] × DF(t_i)\n\nFor a payer of fixed:\nNPV = Floating leg PV - Fixed leg PV\n\n# Examples\n\n```rust\nuse finstack_quant_valuations::instruments::commodity::commodity_swap::CommoditySwap;\nuse finstack_quant_valuations::instruments::CommodityUnderlyingParams;\nuse finstack_quant_valuations::instruments::PayReceive;\nuse finstack_quant_core::currency::Currency;\nuse finstack_quant_core::dates::{Date, BusinessDayConvention, Tenor, TenorUnit};\nuse finstack_quant_core::types::{CurveId, InstrumentId};\nuse time::Month;\n\nlet swap = CommoditySwap::builder()\n    .id(InstrumentId::new(\"NG-SWAP-2025\"))\n    .underlying(CommodityUnderlyingParams::new(\"Energy\", \"NG\", \"MMBTU\", Currency::USD))\n    .quantity(10000.0)\n    .fixed_price(rust_decimal::Decimal::try_from(3.50).expect(\"valid decimal\"))\n    .floating_index_id(CurveId::new(\"NG-SPOT-AVG\"))\n    .side(PayReceive::Pay)\n    .start_date(Date::from_calendar_date(2025, Month::January, 1).unwrap())\n    .maturity(Date::from_calendar_date(2025, Month::December, 31).unwrap())\n    .frequency(Tenor::new(1, TenorUnit::Months).expect(\"valid tenor fixture\"))\n    .discount_curve_id(CurveId::new(\"USD-OIS\"))\n    .build()\n    .expect(\"Valid swap\");\n```"
+    "description": "Commodity swap (fixed-for-floating commodity price exchange).\n\nOne party pays a fixed price per unit, the other pays a floating price\ndetermined by an index or average of spot prices over the period.\n\n# Pricing\n\nFixed leg: ∑ Q × P_fixed × DF(t_i)\nFloating leg: ∑ Q × E[P_float(t_i)] × DF(t_i)\n\nFor a payer of fixed:\nNPV = Floating leg PV - Fixed leg PV\n\n# Examples\n\n```rust\nuse finstack_quant_valuations::instruments::commodity::commodity_swap::CommoditySwap;\nuse finstack_quant_valuations::instruments::CommodityUnderlyingParams;\nuse finstack_quant_valuations::instruments::PayReceive;\nuse finstack_quant_core::currency::Currency;\nuse finstack_quant_core::dates::{Date, BusinessDayConvention, Tenor, TenorUnit};\nuse finstack_quant_core::types::{CurveId, InstrumentId};\nuse time::Month;\n\nlet swap = CommoditySwap::builder()\n    .id(InstrumentId::new(\"NG-SWAP-2025\"))\n    .underlying(CommodityUnderlyingParams::new(\"Energy\", \"NG\", \"MMBTU\", Currency::USD))\n    .quantity(10000.0)\n    .fixed_price(3.50)\n    .forward_curve_id(CurveId::new(\"NG-SPOT-AVG\"))\n    .side(PayReceive::Pay)\n    .start_date(Date::from_calendar_date(2025, Month::January, 1).unwrap())\n    .maturity(Date::from_calendar_date(2025, Month::December, 31).unwrap())\n    .frequency(Tenor::new(1, TenorUnit::Months).expect(\"valid tenor fixture\"))\n    .discount_curve_id(CurveId::new(\"USD-OIS\"))\n    .build()\n    .expect(\"Valid swap\");\n```"
   },
   {
     "path": "#/$defs/d_6a0b21d7e4dfcb5ae18c/properties/attributes",
@@ -1114,14 +1102,13 @@ export default [
   {
     "path": "#/$defs/d_6a0b21d7e4dfcb5ae18c/properties/fixed_price",
     "source": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_swap.schema.json#/$defs/CommoditySwap/properties/fixed_price",
-    "description": "Fixed price per unit.",
-    "ref": "https://finstack_quant.dev/schemas/common/1/decimal.schema.json",
-    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/decimal.schema.json#"
+    "description": "Fixed price per commodity unit, in the notional currency (finite).",
+    "format": "double"
   },
   {
-    "path": "#/$defs/d_6a0b21d7e4dfcb5ae18c/properties/floating_index_id",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_swap.schema.json#/$defs/CommoditySwap/properties/floating_index_id",
-    "description": "Floating index ID for price lookups.",
+    "path": "#/$defs/d_6a0b21d7e4dfcb5ae18c/properties/forward_curve_id",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_swap.schema.json#/$defs/CommoditySwap/properties/forward_curve_id",
+    "description": "Commodity forward `PriceCurve` that projects the floating-leg price observations.",
     "ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/id.schema.json#"
   },
@@ -1217,9 +1204,9 @@ export default [
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/date.schema.json#"
   },
   {
-    "path": "#/$defs/d_6a0b21d7e4dfcb5ae18c/properties/ticker",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_swap.schema.json#/$defs/CommoditySwap/properties/ticker",
-    "description": "Ticker/identifier for market data lookup (e.g., \"CL\", \"GC\", \"NG\")"
+    "path": "#/$defs/d_6a0b21d7e4dfcb5ae18c/properties/underlying_ticker",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_swap.schema.json#/$defs/CommoditySwap/properties/underlying_ticker",
+    "description": "Commodity symbol label (e.g., \"CL\", \"GC\", \"NG\"); never a market-data key."
   },
   {
     "path": "#/$defs/d_6a0b21d7e4dfcb5ae18c/properties/unit",

@@ -2,7 +2,6 @@
   "instrument": {
     "spec": {
       "attributes": {},
-      "cds_maturity": "2030-06-20",
       "coupon_bp": null,
       "credit_curve_id": "CORP-HAZARD",
       "discount_curve_id": "USD-OIS",
@@ -25,6 +24,7 @@
       },
       "underlying_convention": "isda_na",
       "underlying_is_index": false,
+      "underlying_maturity": "2030-06-20",
       "vol_surface_id": "CDSOPT-VOL"
     },
     "type": "cds_option"

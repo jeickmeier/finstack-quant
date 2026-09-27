@@ -454,17 +454,17 @@ export default [
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json#"
   },
   {
+    "path": "#/$defs/d_1e2be4aea8d96cea2462/properties/quoted_spot",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/fx/fx_future.schema.json#/$defs/FxFuture/properties/quoted_spot",
+    "description": "Optional spot override in quote currency per base currency.",
+    "format": "double"
+  },
+  {
     "path": "#/$defs/d_1e2be4aea8d96cea2462/properties/scenario_pricing_overrides",
     "source": "https://finstack_quant.dev/schemas/instrument/1/fx/fx_future.schema.json#/$defs/FxFuture/properties/scenario_pricing_overrides",
     "description": "Scenario-only pricing adjustments.",
     "ref": "https://finstack_quant.dev/schemas/common/1/scenario_pricing_overrides.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/scenario_pricing_overrides.schema.json#"
-  },
-  {
-    "path": "#/$defs/d_1e2be4aea8d96cea2462/properties/spot_rate_override",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/fx/fx_future.schema.json#/$defs/FxFuture/properties/spot_rate_override",
-    "description": "Optional spot override in quote currency per base currency.",
-    "format": "double"
   },
   {
     "path": "#/$defs/d_1e2be4aea8d96cea2462/properties/terms",

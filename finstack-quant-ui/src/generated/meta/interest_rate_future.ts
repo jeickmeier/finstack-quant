@@ -1596,6 +1596,16 @@ export default [
     "description": "Optional overnight fixing calendar identifier.\n\nRequired only when the contract currency has no registered standard\novernight calendar. Otherwise the currency standard is used."
   },
   {
+    "path": "#/$defs/d_b2e822dc7fb5846c6cd8/properties/fixing_calendar_id/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/rates/interest_rate_future.schema.json#/$defs/InterestRateFuture/properties/fixing_calendar_id/anyOf/0",
+    "ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/id.schema.json#"
+  },
+  {
+    "path": "#/$defs/d_b2e822dc7fb5846c6cd8/properties/fixing_calendar_id/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/rates/interest_rate_future.schema.json#/$defs/InterestRateFuture/properties/fixing_calendar_id/anyOf/1"
+  },
+  {
     "path": "#/$defs/d_b2e822dc7fb5846c6cd8/properties/fixing_date",
     "source": "https://finstack_quant.dev/schemas/instrument/1/rates/interest_rate_future.schema.json#/$defs/InterestRateFuture/properties/fixing_date",
     "description": "Underlying rate fixing date.\n\nDefaults to `terms.last_trading_date` when omitted."
@@ -1611,21 +1621,6 @@ export default [
     "source": "https://finstack_quant.dev/schemas/instrument/1/rates/interest_rate_future.schema.json#/$defs/InterestRateFuture/properties/fixing_date/anyOf/1"
   },
   {
-    "path": "#/$defs/d_b2e822dc7fb5846c6cd8/properties/fixing_index_id",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/rates/interest_rate_future.schema.json#/$defs/InterestRateFuture/properties/fixing_index_id",
-    "description": "Optional fixing-index identifier.\n\nWhen omitted, historical fixings use `forward_curve_id`. Fixing series\nare looked up strictly as `FIXING:{id}` without alias fallback."
-  },
-  {
-    "path": "#/$defs/d_b2e822dc7fb5846c6cd8/properties/fixing_index_id/anyOf/0",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/rates/interest_rate_future.schema.json#/$defs/InterestRateFuture/properties/fixing_index_id/anyOf/0",
-    "ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
-    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/id.schema.json#"
-  },
-  {
-    "path": "#/$defs/d_b2e822dc7fb5846c6cd8/properties/fixing_index_id/anyOf/1",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/rates/interest_rate_future.schema.json#/$defs/InterestRateFuture/properties/fixing_index_id/anyOf/1"
-  },
-  {
     "path": "#/$defs/d_b2e822dc7fb5846c6cd8/properties/forward_curve_id",
     "source": "https://finstack_quant.dev/schemas/instrument/1/rates/interest_rate_future.schema.json#/$defs/InterestRateFuture/properties/forward_curve_id",
     "description": "Forward curve identifier",
@@ -1638,6 +1633,21 @@ export default [
     "description": "Unique identifier",
     "ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/id.schema.json#"
+  },
+  {
+    "path": "#/$defs/d_b2e822dc7fb5846c6cd8/properties/index_id",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/rates/interest_rate_future.schema.json#/$defs/InterestRateFuture/properties/index_id",
+    "description": "Optional rate-index identity keying the historical fixing series.\n\nWhen omitted, historical fixings use `forward_curve_id`. Fixing series\nare looked up strictly as `FIXING:{id}` without alias fallback."
+  },
+  {
+    "path": "#/$defs/d_b2e822dc7fb5846c6cd8/properties/index_id/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/rates/interest_rate_future.schema.json#/$defs/InterestRateFuture/properties/index_id/anyOf/0",
+    "ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/id.schema.json#"
+  },
+  {
+    "path": "#/$defs/d_b2e822dc7fb5846c6cd8/properties/index_id/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/rates/interest_rate_future.schema.json#/$defs/InterestRateFuture/properties/index_id/anyOf/1"
   },
   {
     "path": "#/$defs/d_b2e822dc7fb5846c6cd8/properties/instrument_pricing_overrides",

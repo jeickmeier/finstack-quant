@@ -942,7 +942,7 @@ export default [
   {
     "path": "#/$defs/d_5f15f4bd684bc813ff88",
     "source": "https://finstack_quant.dev/schemas/instrument/1/fx/fx_forward.schema.json#/$defs/FxForward",
-    "description": "FX forward (outright forward) instrument.\n\nRepresents a commitment to exchange one currency for another at a specified\nfuture date at a predetermined rate. The position is long base currency\n(foreign) and short quote currency (domestic).\n\n# Pricing\n\nForward value is calculated using covered interest rate parity:\n```text\nF_market = S × DF_foreign(T) / DF_domestic(T)\nPV = notional × (F_market - F_contract) × DF_domestic(T)\n```\nwhere:\n- S = spot FX rate (from FxMatrix or spot_rate_override)\n- DF_foreign(T) = discount factor in base currency to maturity\n- DF_domestic(T) = discount factor in quote currency to maturity\n- F_contract = contract_rate (if provided, else F_market for at-market forward)\n\n# Examples\n\n```rust\nuse finstack_quant_valuations::instruments::fx::fx_forward::FxForward;\nuse finstack_quant_core::currency::Currency;\nuse finstack_quant_core::dates::Date;\nuse finstack_quant_core::money::Money;\nuse finstack_quant_core::types::{CurveId, InstrumentId};\nuse time::Month;\n\nlet forward = FxForward::builder()\n    .id(InstrumentId::new(\"EURUSD-FWD-6M\"))\n    .base_currency(Currency::EUR)\n    .quote_currency(Currency::USD)\n    .maturity(Date::from_calendar_date(2025, Month::June, 15).unwrap())\n    .notional(Money::from((1_000_000_i64, Currency::EUR)))\n    .domestic_discount_curve_id(CurveId::new(\"USD-OIS\"))\n    .foreign_discount_curve_id(CurveId::new(\"EUR-OIS\"))\n    .build()\n    .expect(\"Valid forward\");\n```"
+    "description": "FX forward (outright forward) instrument.\n\nRepresents a commitment to exchange one currency for another at a specified\nfuture date at a predetermined rate. The position is long base currency\n(foreign) and short quote currency (domestic).\n\n# Pricing\n\nForward value is calculated using covered interest rate parity:\n```text\nF_market = S × DF_foreign(T) / DF_domestic(T)\nPV = notional × (F_market - F_contract) × DF_domestic(T)\n```\nwhere:\n- S = spot FX rate (from FxMatrix or quoted_spot)\n- DF_foreign(T) = discount factor in base currency to maturity\n- DF_domestic(T) = discount factor in quote currency to maturity\n- F_contract = contract_rate (if provided, else F_market for at-market forward)\n\n# Examples\n\n```rust\nuse finstack_quant_valuations::instruments::fx::fx_forward::FxForward;\nuse finstack_quant_core::currency::Currency;\nuse finstack_quant_core::dates::Date;\nuse finstack_quant_core::money::Money;\nuse finstack_quant_core::types::{CurveId, InstrumentId};\nuse time::Month;\n\nlet forward = FxForward::builder()\n    .id(InstrumentId::new(\"EURUSD-FWD-6M\"))\n    .base_currency(Currency::EUR)\n    .quote_currency(Currency::USD)\n    .maturity(Date::from_calendar_date(2025, Month::June, 15).unwrap())\n    .notional(Money::from((1_000_000_i64, Currency::EUR)))\n    .domestic_discount_curve_id(CurveId::new(\"USD-OIS\"))\n    .foreign_discount_curve_id(CurveId::new(\"EUR-OIS\"))\n    .build()\n    .expect(\"Valid forward\");\n```"
   },
   {
     "path": "#/$defs/d_5f15f4bd684bc813ff88/properties/attributes",
@@ -1038,19 +1038,19 @@ export default [
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/currency.schema.json#"
   },
   {
+    "path": "#/$defs/d_5f15f4bd684bc813ff88/properties/quoted_spot",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/fx/fx_forward.schema.json#/$defs/FxForward/properties/quoted_spot",
+    "default": null,
+    "description": "Optional spot rate override (quote per base). If None, source from FxMatrix.",
+    "format": "double"
+  },
+  {
     "path": "#/$defs/d_5f15f4bd684bc813ff88/properties/scenario_pricing_overrides",
     "source": "https://finstack_quant.dev/schemas/instrument/1/fx/fx_forward.schema.json#/$defs/FxForward/properties/scenario_pricing_overrides",
     "default": {},
     "description": "Scenario-only pricing adjustments.",
     "ref": "https://finstack_quant.dev/schemas/common/1/scenario_pricing_overrides.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/scenario_pricing_overrides.schema.json#"
-  },
-  {
-    "path": "#/$defs/d_5f15f4bd684bc813ff88/properties/spot_rate_override",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/fx/fx_forward.schema.json#/$defs/FxForward/properties/spot_rate_override",
-    "default": null,
-    "description": "Optional spot rate override (quote per base). If None, source from FxMatrix.",
-    "format": "double"
   },
   {
     "path": "#/$defs/d_605c3b0b209df681efb9",

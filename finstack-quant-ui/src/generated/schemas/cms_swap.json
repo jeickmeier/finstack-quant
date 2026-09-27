@@ -6,29 +6,26 @@
     {
       "instrument": {
         "spec": {
-          "attributes": {},
-          "cms_accrual_fractions": [
+          "accrual_fractions": [
             0.25,
             0.25,
             0.25,
             0.25
           ],
-          "cms_day_count": "act_365f",
-          "cms_fixing_dates": [
+          "attributes": {},
+          "cms_spread_bp": "0",
+          "cms_tenor": {
+            "count": 10,
+            "unit": "years"
+          },
+          "day_count": "act_365f",
+          "discount_curve_id": "USD-OIS",
+          "fixing_dates": [
             "2025-03-20",
             "2025-06-20",
             "2025-09-22",
             "2025-12-22"
           ],
-          "cms_payment_dates": [
-            "2025-06-20",
-            "2025-09-22",
-            "2025-12-22",
-            "2026-03-20"
-          ],
-          "cms_spread": 0,
-          "cms_tenor": 10,
-          "discount_curve_id": "USD-OIS",
           "forward_curve_id": "USD-LIBOR-3M",
           "funding_leg": {
             "accrual_fractions": [
@@ -44,16 +41,22 @@
               "2025-12-22",
               "2026-03-20"
             ],
-            "rate": 0.03,
+            "rate": "0.03",
             "type": "fixed"
           },
           "id": "CMSSWAP-10Y-USD",
+          "index_id": "USD-SOFR-OIS",
           "notional": {
             "amount": "10000000",
             "currency": "USD"
           },
+          "payment_dates": [
+            "2025-06-20",
+            "2025-09-22",
+            "2025-12-22",
+            "2026-03-20"
+          ],
           "side": "pay",
-          "swap_convention": "usd_sofr",
           "swap_float_day_count": "act_360",
           "vol_surface_id": "USD-CMS10Y-VOL"
         },
@@ -357,6 +360,18 @@
     "d_179dbc55e68b65b7ecfc": {
       "const": "finstack_quant.instrument/1",
       "description": "Canonical schema marker for persisted instrument envelopes.",
+      "type": "string"
+    },
+    "d_18f3ba1ec18ab2be13b2": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "description": "Exact decimal encoded as a JSON string.",
+      "examples": [
+        "1000000",
+        "0.0425",
+        "-1234.56789"
+      ],
+      "pattern": "^-?\\d+(\\.\\d+)?([eE][+-]?\\d+)?$",
+      "title": "Decimal",
       "type": "string"
     },
     "d_1b2ccb88c9229e7463e8": {
@@ -705,18 +720,18 @@
       "additionalProperties": false,
       "description": "CMS (Constant Maturity Swap) swap instrument.\n\nOne leg pays a CMS rate (the par swap rate for a reference tenor, e.g., 10Y)\nobserved on each fixing date, and the other leg pays a fixed or floating rate.\n\nThe CMS rate requires a convexity adjustment because the CMS rate is not a\nmartingale under the payment measure. The adjustment depends on the correlation\nbetween the CMS rate and the numeraire (annuity).\n\n# Reference\n\nHagan, P. S. (2003). \"Convexity Conundrums: Pricing CMS Swaps, Caps, and Floors.\"\n*Wilmott Magazine*, March, 38-44. `docs/REFERENCES.md#hagan-2003-cms-convexity`",
       "properties": {
-        "attributes": {
-          "$ref": "#/$defs/d_2c88e4d1e2e4f7c22e02",
-          "default": {},
-          "description": "Attributes for scenario selection and grouping."
-        },
-        "cms_accrual_fractions": {
+        "accrual_fractions": {
           "description": "Accrual fractions for each CMS period.",
           "items": {
             "format": "double",
             "type": "number"
           },
           "type": "array"
+        },
+        "attributes": {
+          "$ref": "#/$defs/d_2c88e4d1e2e4f7c22e02",
+          "default": {},
+          "description": "Attributes for scenario selection and grouping."
         },
         "cms_cap": {
           "description": "Optional cap on the CMS rate (decimal).",
@@ -726,17 +741,6 @@
             "null"
           ]
         },
-        "cms_day_count": {
-          "$ref": "#/$defs/d_c0401254ec268b317b65",
-          "description": "Day count convention for CMS leg accrual."
-        },
-        "cms_fixing_dates": {
-          "description": "Fixing dates for CMS rate observations.",
-          "items": {
-            "$ref": "#/$defs/d_1b2ccb88c9229e7463e8"
-          },
-          "type": "array"
-        },
         "cms_floor": {
           "description": "Optional floor on the CMS rate (decimal).",
           "format": "double",
@@ -745,27 +749,29 @@
             "null"
           ]
         },
-        "cms_payment_dates": {
-          "description": "Payment dates for the CMS leg.",
-          "items": {
-            "$ref": "#/$defs/d_1b2ccb88c9229e7463e8"
-          },
-          "type": "array"
-        },
-        "cms_spread": {
-          "default": 0,
-          "description": "Spread over the CMS rate (decimal, e.g., 0.001 = 10bp).",
-          "format": "double",
-          "type": "number"
+        "cms_spread_bp": {
+          "$ref": "#/$defs/d_18f3ba1ec18ab2be13b2",
+          "default": "0",
+          "description": "Additive spread over the CMS rate in basis points (10 = 10bp)."
         },
         "cms_tenor": {
-          "description": "CMS tenor in years (e.g., 10.0 for 10Y swap rate).",
-          "format": "double",
-          "type": "number"
+          "$ref": "#/$defs/d_47e5e74524615b78a19f",
+          "description": "Tenor of the CMS reference swap (e.g. 10Y); must be month- or year-based."
+        },
+        "day_count": {
+          "$ref": "#/$defs/d_c0401254ec268b317b65",
+          "description": "Day count convention for CMS leg accrual."
         },
         "discount_curve_id": {
           "$ref": "#/$defs/d_9c3fc047c6fea21344ad",
           "description": "Discount curve ID for present value calculations."
+        },
+        "fixing_dates": {
+          "description": "Fixing dates for CMS rate observations.",
+          "items": {
+            "$ref": "#/$defs/d_1b2ccb88c9229e7463e8"
+          },
+          "type": "array"
         },
         "forward_curve_id": {
           "$ref": "#/$defs/d_9c3fc047c6fea21344ad",
@@ -779,6 +785,17 @@
           "$ref": "#/$defs/d_9c3fc047c6fea21344ad",
           "description": "Unique instrument identifier."
         },
+        "index_id": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/d_9c3fc047c6fea21344ad"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Rate-index convention-registry key of the underlying swap (e.g. `USD-SOFR-OIS`)."
+        },
         "instrument_pricing_overrides": {
           "$ref": "#/$defs/d_c08279a20372931820e0",
           "description": "Instrument-owned pricing inputs."
@@ -791,6 +808,13 @@
           "$ref": "#/$defs/d_4ba43030fede59fe5993",
           "description": "Notional amount."
         },
+        "payment_dates": {
+          "description": "Payment dates for the CMS leg.",
+          "items": {
+            "$ref": "#/$defs/d_1b2ccb88c9229e7463e8"
+          },
+          "type": "array"
+        },
         "scenario_pricing_overrides": {
           "$ref": "#/$defs/d_f80c8a31d359e1cb5dd4",
           "description": "Scenario-only pricing adjustments."
@@ -799,18 +823,7 @@
           "$ref": "#/$defs/d_a0fcfc511edf327c4e62",
           "description": "Pay direction: `Pay` means pay CMS leg, receive funding leg."
         },
-        "swap_convention": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/d_8a3160f076020928d015"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "IRS convention for the underlying swap (e.g., `UsdSofr`)."
-        },
-        "swap_day_count": {
+        "swap_fixed_day_count": {
           "anyOf": [
             {
               "$ref": "#/$defs/d_c0401254ec268b317b65"
@@ -864,10 +877,10 @@
         "notional",
         "side",
         "cms_tenor",
-        "cms_fixing_dates",
-        "cms_payment_dates",
-        "cms_accrual_fractions",
-        "cms_day_count",
+        "fixing_dates",
+        "payment_dates",
+        "accrual_fractions",
+        "day_count",
         "funding_leg",
         "discount_curve_id",
         "forward_curve_id",
@@ -1054,6 +1067,7 @@
       "description": "Funding leg specification for a CMS swap.",
       "oneOf": [
         {
+          "additionalProperties": false,
           "description": "Fixed rate funding leg.",
           "properties": {
             "accrual_fractions": {
@@ -1076,9 +1090,8 @@
               "type": "array"
             },
             "rate": {
-              "description": "Fixed coupon rate (decimal, e.g., 0.03 = 3%).",
-              "format": "double",
-              "type": "number"
+              "$ref": "#/$defs/d_18f3ba1ec18ab2be13b2",
+              "description": "Fixed coupon rate as a decimal annual rate (0.03 = 3%)."
             },
             "type": {
               "const": "fixed",
@@ -1095,6 +1108,7 @@
           "type": "object"
         },
         {
+          "additionalProperties": false,
           "description": "Floating rate funding leg.\n\n# Convention: no payment lag\n\nThis leg models each period by its `payment_dates` only and assumes the\n**accrual end equals the payment date** (no payment lag, no\naccrual-vs-pay adjustment). The pricer projects the floating forward over\n`[previous payment date, payment date]` and discounts to the payment\ndate. For funding with a genuine payment lag or accrual end ≠ payment\ndate, model the floating side as a full IRS float leg (which carries\nexplicit accrual start/end and payment dates) instead of this simplified\nfunding leg.",
           "properties": {
             "accrual_fractions": {
@@ -1120,10 +1134,9 @@
               },
               "type": "array"
             },
-            "spread": {
-              "description": "Spread over the floating index (decimal, e.g., 0.001 = 10bp).",
-              "format": "double",
-              "type": "number"
+            "spread_bp": {
+              "$ref": "#/$defs/d_18f3ba1ec18ab2be13b2",
+              "description": "Additive spread over the floating index in basis points (10 = 10bp)."
             },
             "type": {
               "const": "floating",
@@ -1132,7 +1145,7 @@
           },
           "required": [
             "type",
-            "spread",
+            "spread_bp",
             "payment_dates",
             "accrual_fractions",
             "day_count",
@@ -1577,36 +1590,6 @@
         {
           "const": "toggle",
           "description": "Deferred to the [`ToggleExerciseModel`] on the config.\nFalls back to `Cash` if no toggle model is set.",
-          "type": "string"
-        }
-      ]
-    },
-    "d_8a3160f076020928d015": {
-      "description": "Standard interest rate swap conventions by region.\n\n# Market Standards Reference (Post-IBOR Transition)\n\n| Convention | Index | Fixed DC | Float DC | Fixed Freq | Float Freq | Reset Lag |\n|------------|-------|----------|----------|------------|------------|-----------|\n| USD OIS | SOFR | 30/360 | ACT/360 | Semi-annual | Annual | T-2 |\n| EUR OIS | ESTR | 30/360 | ACT/360 | Annual | Annual | T-2 |\n| EUR IBOR | EURIBOR | 30/360 | ACT/360 | Annual | Semi-annual | T-2 |\n| GBP OIS | SONIA | ACT/365F | ACT/365F | Annual | Annual | T-0 |\n| JPY OIS | TONAR | ACT/365F | ACT/365F | Semi-annual | Annual | T-2 |\n\n# OIS Compounding\n\nNote: OIS swaps (SOFR, ESTR, SONIA, TONAR) use **daily compounded** rates\nwith observation shift (typically 2 days lookback). The float frequency\nindicates the payment/reset frequency, not the compounding frequency.\nSee compounding method guidance below for details.\n\n# Sources\n\n- ISDA 2021 IBOR Fallbacks Protocol\n- Bloomberg SWDF function\n- QuantLib OvernightIndexedSwap conventions",
-      "oneOf": [
-        {
-          "const": "usd_sofr",
-          "description": "USD SOFR OIS: Annual fixed, annual float, ACT/360\n\nStandard post-LIBOR USD swap convention using SOFR compounded in arrears.",
-          "type": "string"
-        },
-        {
-          "const": "eur_estr",
-          "description": "EUR ESTR OIS: Annual fixed, annual float, ACT/360\n\nStandard EUR OIS convention using ESTR compounded in arrears.\nFor EURIBOR swaps, use [`EurEuribor`](Self::EurEuribor).",
-          "type": "string"
-        },
-        {
-          "const": "eur_euribor",
-          "description": "EUR EURIBOR: Annual fixed, semi-annual float, ACT/360\n\nLegacy EUR swap convention using EURIBOR 6M as the floating index.\nThis is a term rate (not compounded daily).",
-          "type": "string"
-        },
-        {
-          "const": "gbp_sonia",
-          "description": "GBP SONIA OIS: Annual fixed, annual float, ACT/365F\n\nStandard GBP swap convention using SONIA compounded in arrears.",
-          "type": "string"
-        },
-        {
-          "const": "jpy_tonar",
-          "description": "JPY TONAR OIS: Annual fixed, annual float, ACT/365F\n\nStandard JPY swap convention using TONAR compounded in arrears.",
           "type": "string"
         }
       ]

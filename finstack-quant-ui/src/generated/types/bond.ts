@@ -4,7 +4,7 @@
 /**
  * Last date when the option can be exercised, inclusive.
  *
- * Use the same value as `start_date` for one-day/discrete exercise.
+ * Use the same value as `start` for one-day/discrete exercise.
  */
 export type Date = string;
 /**
@@ -26,6 +26,12 @@ export type Date1 = string;
  */
 export type BusinessDayConvention =
   "unadjusted" | "following" | "modified_following" | "preceding" | "modified_preceding" | "nearest";
+/**
+ * Holiday calendar identifier used together with `business_day_convention`.
+ *
+ * Use `"weekends_only"` when only Saturday/Sunday adjustment is needed.
+ */
+export type Id1 = string;
 /**
  * Fraction of the coupon paid in cash, expressed as a decimal share in
  * `[0, 1]`.
@@ -70,6 +76,12 @@ export type Decimal2 = string;
 export type BusinessDayConvention1 =
   "unadjusted" | "following" | "modified_following" | "preceding" | "modified_preceding" | "nearest";
 /**
+ * Holiday calendar identifier used together with `business_day_convention`.
+ *
+ * Use `"weekends_only"` when only Saturday/Sunday adjustment is needed.
+ */
+export type Id2 = string;
+/**
  * Fraction of the coupon paid in cash, expressed as a decimal share in
  * `[0, 1]`.
  */
@@ -102,13 +114,17 @@ export type DayCount1 =
  */
 export type Decimal5 = string;
 /**
+ * Opaque string identifier.
+ */
+export type Id3 = string;
+/**
+ * Opaque string identifier.
+ */
+export type Id4 = string;
+/**
  * Exact decimal encoded as a JSON string.
  */
 export type Decimal6 = string;
-/**
- * Forward curve identifier (e.g., "USD-SOFR-3M", "EUR-EURIBOR-6M").
- */
-export type Id1 = string;
 /**
  * Day-count convention.
  */
@@ -192,6 +208,10 @@ export type Decimal7 = string;
 export type BusinessDayConvention2 =
   "unadjusted" | "following" | "modified_following" | "preceding" | "modified_preceding" | "nearest";
 /**
+ * Opaque string identifier.
+ */
+export type Id5 = string;
+/**
  * Day-count convention.
  */
 export type DayCount3 =
@@ -259,6 +279,21 @@ export type D_3422Fc770732B0Ea327C =
               };
             }
           | {
+              percent_of_remaining_per_period: {
+                /**
+                 * Fraction of the outstanding principal paid per period (e.g.,
+                 * 0.025 = 2.5%), in `[0, 1]`.
+                 */
+                pct: number;
+              };
+            }
+          | {
+              linear_between: {
+                end: Date3;
+                start: Date4;
+              };
+            }
+          | {
               custom_principal: {
                 /**
                  * List of `(date, principal_amount)` exchanges; amounts are absolute cashflows.
@@ -270,9 +305,13 @@ export type D_3422Fc770732B0Ea327C =
       };
     };
 /**
- * Opaque string identifier.
+ * ISO 8601 calendar date string.
  */
-export type Id2 = string;
+export type Date3 = string;
+/**
+ * ISO 8601 calendar date string.
+ */
+export type Date4 = string;
 /**
  * Day-count convention.
  */
@@ -310,27 +349,27 @@ export type DayCount5 =
 /**
  * ISO 8601 calendar date string.
  */
-export type Date3 = string;
-/**
- * ISO 8601 calendar date string.
- */
-export type Date4 = string;
-/**
- * ISO 8601 calendar date string.
- */
 export type Date5 = string;
 /**
  * ISO 8601 calendar date string.
  */
 export type Date6 = string;
 /**
- * Opaque string identifier.
+ * ISO 8601 calendar date string.
  */
-export type Id3 = string;
+export type Date7 = string;
+/**
+ * ISO 8601 calendar date string.
+ */
+export type Date8 = string;
 /**
  * Opaque string identifier.
  */
-export type Id4 = string;
+export type Id6 = string;
+/**
+ * Opaque string identifier.
+ */
+export type Id7 = string;
 /**
  * A phantom-typed identifier that prevents mixing different kinds of IDs.
  *
@@ -424,11 +463,11 @@ export type DEc89Adc17436F33De839 = "black" | "normal";
 /**
  * ISO 8601 calendar date string.
  */
-export type Date7 = string;
+export type Date9 = string;
 /**
  * ISO 8601 calendar date string.
  */
-export type Date8 = string;
+export type Date10 = string;
 /**
  * Basis used for bond duration, convexity, and DV01-style risk metrics.
  */
@@ -606,11 +645,11 @@ export type DB556Bbeb1Ecf96C44C5A =
 /**
  * ISO 8601 calendar date string.
  */
-export type Date9 = string;
+export type Date11 = string;
 /**
  * ISO 8601 calendar date string.
  */
-export type Date10 = string;
+export type Date12 = string;
 /**
  * Canonical schema marker for persisted instrument envelopes.
  */
@@ -705,6 +744,21 @@ export interface D_67C3F0Fee95F47938Ab4 {
                 };
               }
             | {
+                percent_of_remaining_per_period: {
+                  /**
+                   * Fraction of the outstanding principal paid per period (e.g.,
+                   * 0.025 = 2.5%), in `[0, 1]`.
+                   */
+                  pct: number;
+                };
+              }
+            | {
+                linear_between: {
+                  end: Date3;
+                  start: Date4;
+                };
+              }
+            | {
                 custom_principal: {
                   /**
                    * List of `(date, principal_amount)` exchanges; amounts are absolute cashflows.
@@ -719,31 +773,31 @@ export interface D_67C3F0Fee95F47938Ab4 {
    * Optional credit curve identifier (default intensity). When present,
    * credit-rate pricing is enabled.
    */
-  credit_curve_id?: Id2 | null;
+  credit_curve_id?: Id3 | null;
   /**
    * Optional pre-built cashflow schedule. If provided, this will be used instead of
    * generating cashflows from the cashflow_spec.
    */
   custom_cashflows?: D_7C4149870A1F77E1F644 | null;
-  discount_curve_id: Id3;
+  discount_curve_id: Id6;
   /**
    * Calendar identifier for ex-coupon day counting.
    */
-  ex_coupon_calendar_id?: string | null;
+  ex_coupon_calendar_id?: Id3 | null;
   /**
    * Number of ex-coupon days before coupon date.
    */
   ex_coupon_days?: number;
-  /**
-   * Optional funding/repo curve for carry cost computation.
-   */
-  funding_curve_id?: Id2 | null;
-  id: Id4;
+  id: Id7;
   instrument_pricing_overrides?: InstrumentPricingOverrides;
-  issue_date: Date7;
-  maturity: Date8;
+  issue_date: Date9;
+  maturity: Date10;
   metric_pricing_overrides?: MetricPricingOverrides;
   notional: Money4;
+  /**
+   * Optional repo (financing) discount curve for carry cost computation.
+   */
+  repo_curve_id?: Id3 | null;
   /**
    * Optional guaranteed minimum-return ("return floor") call protection.
    *
@@ -790,8 +844,8 @@ export interface Attributes {
  *
  * let mut schedule = CallPutSchedule::default();
  * schedule.calls.push(CallPut {
- *     start_date: Date::from_calendar_date(2027, Month::January, 1).unwrap(),
- *     end_date: Date::from_calendar_date(2027, Month::January, 1).unwrap(),
+ *     start: Date::from_calendar_date(2027, Month::January, 1).unwrap(),
+ *     end: Date::from_calendar_date(2027, Month::January, 1).unwrap(),
  *     price_pct_of_par: 102.0,
  *     make_whole: None,
  * });
@@ -822,15 +876,15 @@ export interface D_5Ac99974B71A6572Dd47 {
  *
  * // Discrete call option: issuer can redeem at 102% of par on Jan 1, 2027
  * let call = CallPut {
- *     start_date: Date::from_calendar_date(2027, Month::January, 1).unwrap(),
- *     end_date: Date::from_calendar_date(2027, Month::January, 1).unwrap(),
+ *     start: Date::from_calendar_date(2027, Month::January, 1).unwrap(),
+ *     end: Date::from_calendar_date(2027, Month::January, 1).unwrap(),
  *     price_pct_of_par: 102.0,
  *     make_whole: None,
  * };
  * ```
  */
 export interface D_672Fabbbba5B6Aab56Ef {
-  end_date: Date;
+  end: Date;
   /**
    * Optional make-whole call specification.
    *
@@ -850,7 +904,7 @@ export interface D_672Fabbbba5B6Aab56Ef {
    * Accrued coupon interest at exercise is added to determine the cash payment.
    */
   price_pct_of_par: number;
-  start_date: Date1;
+  start: Date1;
 }
 /**
  * Make-whole call specification.
@@ -893,12 +947,7 @@ export interface FixedCouponSpec {
    */
   adjust_accrual_dates?: boolean;
   business_day_convention?: BusinessDayConvention;
-  /**
-   * Holiday calendar identifier used together with `business_day_convention`.
-   *
-   * Use `"weekends_only"` when only Saturday/Sunday adjustment is needed.
-   */
-  calendar_id: string;
+  calendar_id: Id1;
   /**
    * Coupon settlement behavior: cash, PIK, or an explicit split of the
    * coupon amount.
@@ -980,12 +1029,7 @@ export interface DBf3D60B7Aa736F436254 {
    */
   adjust_accrual_dates?: boolean;
   business_day_convention?: BusinessDayConvention1;
-  /**
-   * Holiday calendar identifier used together with `business_day_convention`.
-   *
-   * Use `"weekends_only"` when only Saturday/Sunday adjustment is needed.
-   */
-  calendar_id: string;
+  calendar_id: Id2;
   /**
    * Coupon type (Cash/PIK/Split).
    */
@@ -1075,7 +1119,8 @@ export interface DAfaff9B4B34177Ac633E {
    *
    * If not provided, defaults to the coupon schedule calendar.
    */
-  fixing_calendar_id?: string | null;
+  fixing_calendar_id?: Id3 | null;
+  forward_curve_id: Id4;
   gearing?: Decimal6;
   /**
    * Whether gearing includes the spread (default: true).
@@ -1094,7 +1139,6 @@ export interface DAfaff9B4B34177Ac633E {
    * Example: index_floor_bp = Some(0.0) ensures index rate >= 0%.
    */
   index_floor_bp?: Decimal5 | null;
-  index_id: Id1;
   /**
    * Diagnostic tenor for term-index projection error context.
    *
@@ -1202,7 +1246,7 @@ export interface Tenor3 {
  *         frequency: Tenor::semi_annual(),
  *         day_count: DayCount::Thirty360,
  *         business_day_convention: BusinessDayConvention::Following,
- *         calendar_id: "weekends_only".to_string(),
+ *         calendar_id: "weekends_only".into(),
  *         stub: StubKind::None,
  *         end_of_month: false,
  *         payment_lag_days: 0,
@@ -1230,12 +1274,7 @@ export interface D_336250C98Cf023A4B5E2 {
    */
   adjust_accrual_dates?: boolean;
   business_day_convention?: BusinessDayConvention2;
-  /**
-   * Holiday calendar identifier used together with `business_day_convention`.
-   *
-   * Use `"weekends_only"` when only Saturday/Sunday adjustment is needed.
-   */
-  calendar_id: string;
+  calendar_id: Id5;
   /**
    * Coupon type (Cash/PIK/Split).
    */
@@ -1684,7 +1723,7 @@ export interface D_5Fdd6C8Cd626De8799Fe {
    */
   accrual_factor: number;
   amount: Money2;
-  date: Date5;
+  date: Date7;
   /**
    * Category/kind of cash-flow.
    */
@@ -1762,7 +1801,7 @@ export interface D_931Ca4Fd1B880C77B04D {
    */
   coupon_period?: [Date2, Date2] | null;
   day_count: DayCount5;
-  end: Date3;
+  end: Date5;
   /**
    * Whether `end` is the instrument termination date, for the 30E/360 ISDA
    * February exception. Intermediate coupon and rate-step ends are false.
@@ -1772,7 +1811,7 @@ export interface D_931Ca4Fd1B880C77B04D {
    * Projected index rate before spread, gearing, caps, or floors.
    */
   projected_index_rate?: number | null;
-  start: Date4;
+  start: Date6;
 }
 /**
  * Currency-tagged monetary amount.
@@ -1958,9 +1997,10 @@ export interface DFf91F56De5Ec0B73D330 {
    */
   calendar_ids: string[];
   /**
-   * Optional facility limit/commitment for instruments like RCFs.
+   * Total facility commitment for revolving and delayed-draw facilities;
+   * `None` for instruments without one.
    */
-  facility_limit?: Money1 | null;
+  commitment?: Money1 | null;
   /**
    * Issue date of the instrument, when known.
    *
@@ -1972,7 +2012,7 @@ export interface DFf91F56De5Ec0B73D330 {
   /**
    * Contractual maturity date, distinct from an adjusted final payment date.
    */
-  maturity_date?: Date2 | null;
+  maturity?: Date2 | null;
   /**
    * Raw index observations used by projected floating coupons, before spread,
    * gearing, caps and floors; retained for deterministic time-roll fixings.
@@ -1987,7 +2027,7 @@ export interface DFf91F56De5Ec0B73D330 {
  * One raw index observation needed by a projected floating coupon.
  */
 export interface DC4190F1F5Bda84C722E6 {
-  date: Date6;
+  date: Date8;
   /**
    * Canonical market-series identifier, including the `FIXING:` prefix.
    */
@@ -2030,6 +2070,21 @@ export interface DF3215Ce633904F48B76E {
            * Fraction of original notional paid per period (e.g., 0.05 = 5%).
            */
           pct: number;
+        };
+      }
+    | {
+        percent_of_remaining_per_period: {
+          /**
+           * Fraction of the outstanding principal paid per period (e.g.,
+           * 0.025 = 2.5%), in `[0, 1]`.
+           */
+          pct: number;
+        };
+      }
+    | {
+        linear_between: {
+          end: Date3;
+          start: Date4;
         };
       }
     | {
@@ -3459,8 +3514,8 @@ export interface DE19Dd3057Abfdc658580 {
       }
     | {
         between: {
-          end: Date9;
-          start: Date10;
+          end: Date11;
+          start: Date12;
           [k: string]: unknown;
         };
       };

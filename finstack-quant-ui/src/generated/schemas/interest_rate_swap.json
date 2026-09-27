@@ -211,11 +211,15 @@
           "description": "Business day convention for payment dates"
         },
         "calendar_id": {
-          "description": "Optional calendar for business day adjustments",
-          "type": [
-            "string",
-            "null"
-          ]
+          "anyOf": [
+            {
+              "$ref": "#/$defs/d_9c3fc047c6fea21344ad"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Optional calendar for business day adjustments"
         },
         "compounding": {
           "$ref": "#/$defs/d_1fea90e06b9931379b0f",
@@ -240,12 +244,16 @@
           "type": "boolean"
         },
         "fixing_calendar_id": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/d_9c3fc047c6fea21344ad"
+            },
+            {
+              "type": "null"
+            }
+          ],
           "default": null,
-          "description": "Optional calendar for rate fixing (reset lag)",
-          "type": [
-            "string",
-            "null"
-          ]
+          "description": "Optional calendar for rate fixing (reset lag)"
         },
         "forward_curve_id": {
           "$ref": "#/$defs/d_9c3fc047c6fea21344ad",
@@ -5144,11 +5152,15 @@
           "description": "Business day convention for payment dates"
         },
         "calendar_id": {
-          "description": "Optional calendar for business day adjustments",
-          "type": [
-            "string",
-            "null"
-          ]
+          "anyOf": [
+            {
+              "$ref": "#/$defs/d_9c3fc047c6fea21344ad"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Optional calendar for business day adjustments"
         },
         "compounding_simple": {
           "description": "If true, use simple interest on accrual fraction",

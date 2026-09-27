@@ -8,7 +8,10 @@
         0.25
       ],
       "attributes": {},
-      "cms_tenor": 10.0,
+      "cms_tenor": {
+        "count": 10,
+        "unit": "years"
+      },
       "day_count": "act_365f",
       "discount_curve_id": "USD-OIS",
       "fixing_dates": [
@@ -19,6 +22,7 @@
       ],
       "forward_curve_id": "USD-LIBOR-3M",
       "id": "CMSOPT-10Y-USD",
+      "index_id": "USD-SOFR-OIS",
       "notional": {
         "amount": "10000000",
         "currency": "USD"
@@ -31,7 +35,6 @@
         "2026-03-20"
       ],
       "strike": "0.025",
-      "swap_convention": "usd_sofr",
       "swap_float_day_count": "act_360",
       "vol_surface_id": "USD-CMS10Y-VOL"
     },

@@ -29,7 +29,7 @@ export default [
             "position": "long",
             "quantity": 1000,
             "settlement": "cash",
-            "ticker": "CL",
+            "underlying_ticker": "CL",
             "unit": "BBL"
           },
           "type": "commodity_forward"
@@ -3693,6 +3693,16 @@ export default [
     "description": "Calendar ID for settlement date adjustments.\n\nUsed for business day adjustment of the settlement date. If `convention`\nis set, uses the convention's calendar unless explicitly overridden."
   },
   {
+    "path": "#/$defs/d_d34fe8d294aafaa3e650/properties/settlement_calendar_id/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_forward.schema.json#/$defs/CommodityForward/properties/settlement_calendar_id/anyOf/0",
+    "ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/id.schema.json#"
+  },
+  {
+    "path": "#/$defs/d_d34fe8d294aafaa3e650/properties/settlement_calendar_id/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_forward.schema.json#/$defs/CommodityForward/properties/settlement_calendar_id/anyOf/1"
+  },
+  {
     "path": "#/$defs/d_d34fe8d294aafaa3e650/properties/settlement_days",
     "source": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_forward.schema.json#/$defs/CommodityForward/properties/settlement_days",
     "description": "Settlement lag in business days (T+N).\n\nDefaults to 2 for most commodity markets (T+2). If `convention` is set,\nuses the convention's default unless explicitly overridden here.\n\n# Market Standards\n\n| Market | Settlement |\n|--------|------------|\n| Energy (WTI, Brent, NG) | T+2 |\n| Precious metals | T+2 |\n| Base metals (LME) | T+2 |\n| Power | T+1 |",
@@ -3705,9 +3715,19 @@ export default [
     "description": "Optional spot price ID (for delta calculations)."
   },
   {
-    "path": "#/$defs/d_d34fe8d294aafaa3e650/properties/ticker",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_forward.schema.json#/$defs/CommodityForward/properties/ticker",
-    "description": "Ticker/identifier for market data lookup (e.g., \"CL\", \"GC\", \"NG\")"
+    "path": "#/$defs/d_d34fe8d294aafaa3e650/properties/spot_id/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_forward.schema.json#/$defs/CommodityForward/properties/spot_id/anyOf/0",
+    "ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/id.schema.json#"
+  },
+  {
+    "path": "#/$defs/d_d34fe8d294aafaa3e650/properties/spot_id/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_forward.schema.json#/$defs/CommodityForward/properties/spot_id/anyOf/1"
+  },
+  {
+    "path": "#/$defs/d_d34fe8d294aafaa3e650/properties/underlying_ticker",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_forward.schema.json#/$defs/CommodityForward/properties/underlying_ticker",
+    "description": "Commodity symbol label (e.g., \"CL\", \"GC\", \"NG\"); never a market-data key."
   },
   {
     "path": "#/$defs/d_d34fe8d294aafaa3e650/properties/unit",

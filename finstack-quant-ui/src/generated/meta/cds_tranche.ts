@@ -17,7 +17,6 @@ export default [
             "day_count": "act_360",
             "detach_pct": 3,
             "discount_curve_id": "USD-OIS",
-            "effective_date": null,
             "frequency": {
               "count": 3,
               "unit": "months"
@@ -33,6 +32,7 @@ export default [
             "roll_rule": "cds_imm",
             "series": 42,
             "side": "buy_protection",
+            "start_date": null,
             "stub": "short_front",
             "upfront": null
           },
@@ -428,6 +428,16 @@ export default [
     "description": "Optional holiday calendar id"
   },
   {
+    "path": "#/$defs/d_1376bb75255ac32c8b77/properties/calendar_id/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_tranche.schema.json#/$defs/CDSTranche/properties/calendar_id/anyOf/0",
+    "ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/id.schema.json#"
+  },
+  {
+    "path": "#/$defs/d_1376bb75255ac32c8b77/properties/calendar_id/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_tranche.schema.json#/$defs/CDSTranche/properties/calendar_id/anyOf/1"
+  },
+  {
     "path": "#/$defs/d_1376bb75255ac32c8b77/properties/coupon_bp",
     "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_tranche.schema.json#/$defs/CDSTranche/properties/coupon_bp",
     "description": "Running coupon in basis points (e.g., 100 = 1.00%)",
@@ -459,22 +469,6 @@ export default [
     "description": "Discount curve identifier (by quote currency)",
     "ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/id.schema.json#"
-  },
-  {
-    "path": "#/$defs/d_1376bb75255ac32c8b77/properties/effective_date",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_tranche.schema.json#/$defs/CDSTranche/properties/effective_date",
-    "default": null,
-    "description": "Optional effective date for schedule anchoring (if None, uses as_of date)"
-  },
-  {
-    "path": "#/$defs/d_1376bb75255ac32c8b77/properties/effective_date/anyOf/0",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_tranche.schema.json#/$defs/CDSTranche/properties/effective_date/anyOf/0",
-    "ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
-    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/date.schema.json#"
-  },
-  {
-    "path": "#/$defs/d_1376bb75255ac32c8b77/properties/effective_date/anyOf/1",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_tranche.schema.json#/$defs/CDSTranche/properties/effective_date/anyOf/1"
   },
   {
     "path": "#/$defs/d_1376bb75255ac32c8b77/properties/frequency",
@@ -558,6 +552,22 @@ export default [
     "description": "Tranche side (buy/sell protection)",
     "ref": "#/$defs/TrancheSide",
     "resolvedRef": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_tranche.schema.json#/$defs/TrancheSide"
+  },
+  {
+    "path": "#/$defs/d_1376bb75255ac32c8b77/properties/start_date",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_tranche.schema.json#/$defs/CDSTranche/properties/start_date",
+    "default": null,
+    "description": "Optional effective date for schedule anchoring (if None, uses as_of date)"
+  },
+  {
+    "path": "#/$defs/d_1376bb75255ac32c8b77/properties/start_date/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_tranche.schema.json#/$defs/CDSTranche/properties/start_date/anyOf/0",
+    "ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/date.schema.json#"
+  },
+  {
+    "path": "#/$defs/d_1376bb75255ac32c8b77/properties/start_date/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_tranche.schema.json#/$defs/CDSTranche/properties/start_date/anyOf/1"
   },
   {
     "path": "#/$defs/d_1376bb75255ac32c8b77/properties/stub",

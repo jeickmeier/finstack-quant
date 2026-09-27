@@ -165,7 +165,7 @@ export type Currency =
   | "ZMW"
   | "ZWL";
 /**
- * Day count convention.
+ * Day count convention (defaults to ACT/365F).
  */
 export type DayCount =
   | "one_one"
@@ -665,27 +665,26 @@ export interface DE896827D9Ebec6B04130 {
    * Correlation between equity price and FX rate.
    */
   correlation: number;
-  day_count: DayCount;
+  day_count?: DayCount;
   /**
    * Optional dividend-yield scalar ID.
    */
   div_yield_id?: Id | null;
   domestic_discount_curve_id: Id1;
-  equity_strike: Money;
   expiry: Date;
   foreign_discount_curve_id: Id2;
   /**
    * Optional FX rate identifier.
    */
-  fx_rate_id?: string | null;
+  fx_spot_id?: Id | null;
   /**
    * Optional FX volatility surface ID.
    */
-  fx_vol_id?: Id | null;
+  fx_vol_surface_id?: Id | null;
   id: Id3;
   instrument_pricing_overrides?: InstrumentPricingOverrides;
   metric_pricing_overrides?: MetricPricingOverrides;
-  notional: Money1;
+  notional: Money;
   /**
    * Option type (call or put).
    */
@@ -694,13 +693,17 @@ export interface DE896827D9Ebec6B04130 {
    * Fixed payoff FX conversion rate from base-currency payoff into quote currency.
    */
   payoff_fx_rate?: number | null;
+  /**
+   * Number of underlying units covered by the option payoff.
+   */
+  quantity?: number | null;
   quote_currency: Currency1;
   scenario_pricing_overrides?: ScenarioPricingOverrides;
   spot_id: Id4;
   /**
-   * Number of underlying units covered by the option payoff.
+   * Per-unit strike of the equity underlying, in `base_currency` price units.
    */
-  underlying_quantity?: number | null;
+  strike: number;
   /**
    * Underlying equity ticker symbol.
    */
@@ -721,181 +724,6 @@ export interface Attributes {
    * User-defined tags for categorization.
    */
   tags?: string[];
-}
-/**
- * Strike price for equity option.
- */
-export interface Money {
-  /**
-   * Monetary amount, carried on the wire as an exact decimal string rather
-   * than a JSON number so no precision is lost in transit. Construction with
-   * configuration applies the selected ingest scale; raw construction does not.
-   */
-  amount: string;
-  /**
-   * ISO 4217 currency of `amount`. Arithmetic between two `Money` values
-   * requires this to match; there is no implicit conversion.
-   */
-  currency:
-    | "AED"
-    | "AFN"
-    | "ALL"
-    | "AMD"
-    | "ANG"
-    | "AOA"
-    | "ARS"
-    | "AUD"
-    | "AWG"
-    | "AZN"
-    | "BAM"
-    | "BBD"
-    | "BDT"
-    | "BGN"
-    | "BHD"
-    | "BIF"
-    | "BMD"
-    | "BND"
-    | "BOB"
-    | "BRL"
-    | "BSD"
-    | "BTN"
-    | "BWP"
-    | "BYN"
-    | "BZD"
-    | "CAD"
-    | "CDF"
-    | "CHF"
-    | "CLF"
-    | "CLP"
-    | "CNY"
-    | "COP"
-    | "CRC"
-    | "CUC"
-    | "CUP"
-    | "CVE"
-    | "CZK"
-    | "DJF"
-    | "DKK"
-    | "DOP"
-    | "DZD"
-    | "EGP"
-    | "ERN"
-    | "ETB"
-    | "EUR"
-    | "FJD"
-    | "FKP"
-    | "GBP"
-    | "GEL"
-    | "GHS"
-    | "GIP"
-    | "GMD"
-    | "GNF"
-    | "GTQ"
-    | "GYD"
-    | "HKD"
-    | "HNL"
-    | "HRK"
-    | "HTG"
-    | "HUF"
-    | "IDR"
-    | "ILS"
-    | "INR"
-    | "IQD"
-    | "IRR"
-    | "ISK"
-    | "JMD"
-    | "JOD"
-    | "JPY"
-    | "KES"
-    | "KGS"
-    | "KHR"
-    | "KMF"
-    | "KPW"
-    | "KRW"
-    | "KWD"
-    | "KYD"
-    | "KZT"
-    | "LAK"
-    | "LBP"
-    | "LKR"
-    | "LRD"
-    | "LSL"
-    | "LYD"
-    | "MAD"
-    | "MDL"
-    | "MGA"
-    | "MKD"
-    | "MMK"
-    | "MNT"
-    | "MOP"
-    | "MRU"
-    | "MUR"
-    | "MVR"
-    | "MWK"
-    | "MXN"
-    | "MYR"
-    | "MZN"
-    | "NAD"
-    | "NGN"
-    | "NIO"
-    | "NOK"
-    | "NPR"
-    | "NZD"
-    | "OMR"
-    | "PAB"
-    | "PEN"
-    | "PGK"
-    | "PHP"
-    | "PKR"
-    | "PLN"
-    | "PYG"
-    | "QAR"
-    | "RON"
-    | "RSD"
-    | "RUB"
-    | "RWF"
-    | "SAR"
-    | "SBD"
-    | "SCR"
-    | "SDG"
-    | "SEK"
-    | "SGD"
-    | "SHP"
-    | "SLE"
-    | "SLL"
-    | "SOS"
-    | "SRD"
-    | "SSP"
-    | "STN"
-    | "SYP"
-    | "SZL"
-    | "THB"
-    | "TJS"
-    | "TMT"
-    | "TND"
-    | "TOP"
-    | "TRY"
-    | "TTD"
-    | "TWD"
-    | "TZS"
-    | "UAH"
-    | "UGX"
-    | "USD"
-    | "UYU"
-    | "UZS"
-    | "VED"
-    | "VES"
-    | "VND"
-    | "VUV"
-    | "WST"
-    | "XAF"
-    | "XCD"
-    | "XOF"
-    | "XPF"
-    | "YER"
-    | "ZAR"
-    | "ZMW"
-    | "ZWL";
 }
 /**
  * Instrument-owned pricing inputs.
@@ -1798,7 +1626,7 @@ export interface DE49387F97C0F9D510642 {
 /**
  * Strike-equivalent domestic reference notional.
  */
-export interface Money1 {
+export interface Money {
   /**
    * Monetary amount, carried on the wire as an exact decimal string rather
    * than a JSON number so no precision is lost in transit. Construction with

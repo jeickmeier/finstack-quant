@@ -14,14 +14,10 @@ export default [
             "day_count": "act_365f",
             "div_yield_id": "NKY-DIV",
             "domestic_discount_curve_id": "USD-OIS",
-            "equity_strike": {
-              "amount": "35000",
-              "currency": "JPY"
-            },
             "expiry": "2030-06-21",
             "foreign_discount_curve_id": "JPY-OIS",
-            "fx_rate_id": "JPYUSD-SPOT",
-            "fx_vol_id": "JPYUSD-VOL",
+            "fx_spot_id": "JPYUSD-SPOT",
+            "fx_vol_surface_id": "JPYUSD-VOL",
             "id": "QUANTO-NKY-USD-CALL",
             "notional": {
               "amount": "1000000",
@@ -29,9 +25,10 @@ export default [
             },
             "option_type": "call",
             "payoff_fx_rate": 0.007142857142857143,
+            "quantity": 4000,
             "quote_currency": "USD",
             "spot_id": "NKY-SPOT",
-            "underlying_quantity": 4000,
+            "strike": 35000,
             "underlying_ticker": "NKY",
             "vol_surface_id": "NKY-VOL"
           },
@@ -4690,7 +4687,8 @@ export default [
   {
     "path": "#/$defs/d_e896827d9ebec6b04130/properties/day_count",
     "source": "https://finstack_quant.dev/schemas/instrument/1/fx/quanto_option.schema.json#/$defs/QuantoOption/properties/day_count",
-    "description": "Day count convention.",
+    "default": "act_365f",
+    "description": "Day count convention (defaults to ACT/365F).",
     "ref": "https://finstack_quant.dev/schemas/common/1/day_count.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/day_count.schema.json#"
   },
@@ -4718,13 +4716,6 @@ export default [
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/id.schema.json#"
   },
   {
-    "path": "#/$defs/d_e896827d9ebec6b04130/properties/equity_strike",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/fx/quanto_option.schema.json#/$defs/QuantoOption/properties/equity_strike",
-    "description": "Strike price for equity option.",
-    "ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
-    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/money.schema.json#"
-  },
-  {
     "path": "#/$defs/d_e896827d9ebec6b04130/properties/expiry",
     "source": "https://finstack_quant.dev/schemas/instrument/1/fx/quanto_option.schema.json#/$defs/QuantoOption/properties/expiry",
     "description": "Option expiry date.",
@@ -4739,26 +4730,36 @@ export default [
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/id.schema.json#"
   },
   {
-    "path": "#/$defs/d_e896827d9ebec6b04130/properties/fx_rate_id",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/fx/quanto_option.schema.json#/$defs/QuantoOption/properties/fx_rate_id",
+    "path": "#/$defs/d_e896827d9ebec6b04130/properties/fx_spot_id",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/fx/quanto_option.schema.json#/$defs/QuantoOption/properties/fx_spot_id",
     "default": null,
     "description": "Optional FX rate identifier."
   },
   {
-    "path": "#/$defs/d_e896827d9ebec6b04130/properties/fx_vol_id",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/fx/quanto_option.schema.json#/$defs/QuantoOption/properties/fx_vol_id",
-    "default": null,
-    "description": "Optional FX volatility surface ID."
-  },
-  {
-    "path": "#/$defs/d_e896827d9ebec6b04130/properties/fx_vol_id/anyOf/0",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/fx/quanto_option.schema.json#/$defs/QuantoOption/properties/fx_vol_id/anyOf/0",
+    "path": "#/$defs/d_e896827d9ebec6b04130/properties/fx_spot_id/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/fx/quanto_option.schema.json#/$defs/QuantoOption/properties/fx_spot_id/anyOf/0",
     "ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/id.schema.json#"
   },
   {
-    "path": "#/$defs/d_e896827d9ebec6b04130/properties/fx_vol_id/anyOf/1",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/fx/quanto_option.schema.json#/$defs/QuantoOption/properties/fx_vol_id/anyOf/1"
+    "path": "#/$defs/d_e896827d9ebec6b04130/properties/fx_spot_id/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/fx/quanto_option.schema.json#/$defs/QuantoOption/properties/fx_spot_id/anyOf/1"
+  },
+  {
+    "path": "#/$defs/d_e896827d9ebec6b04130/properties/fx_vol_surface_id",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/fx/quanto_option.schema.json#/$defs/QuantoOption/properties/fx_vol_surface_id",
+    "default": null,
+    "description": "Optional FX volatility surface ID."
+  },
+  {
+    "path": "#/$defs/d_e896827d9ebec6b04130/properties/fx_vol_surface_id/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/fx/quanto_option.schema.json#/$defs/QuantoOption/properties/fx_vol_surface_id/anyOf/0",
+    "ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/id.schema.json#"
+  },
+  {
+    "path": "#/$defs/d_e896827d9ebec6b04130/properties/fx_vol_surface_id/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/fx/quanto_option.schema.json#/$defs/QuantoOption/properties/fx_vol_surface_id/anyOf/1"
   },
   {
     "path": "#/$defs/d_e896827d9ebec6b04130/properties/id",
@@ -4807,6 +4808,13 @@ export default [
     "format": "double"
   },
   {
+    "path": "#/$defs/d_e896827d9ebec6b04130/properties/quantity",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/fx/quanto_option.schema.json#/$defs/QuantoOption/properties/quantity",
+    "default": null,
+    "description": "Number of underlying units covered by the option payoff.",
+    "format": "double"
+  },
+  {
     "path": "#/$defs/d_e896827d9ebec6b04130/properties/quote_currency",
     "source": "https://finstack_quant.dev/schemas/instrument/1/fx/quanto_option.schema.json#/$defs/QuantoOption/properties/quote_currency",
     "description": "Quote currency (payment/settlement currency).",
@@ -4829,10 +4837,9 @@ export default [
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/id.schema.json#"
   },
   {
-    "path": "#/$defs/d_e896827d9ebec6b04130/properties/underlying_quantity",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/fx/quanto_option.schema.json#/$defs/QuantoOption/properties/underlying_quantity",
-    "default": null,
-    "description": "Number of underlying units covered by the option payoff.",
+    "path": "#/$defs/d_e896827d9ebec6b04130/properties/strike",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/fx/quanto_option.schema.json#/$defs/QuantoOption/properties/strike",
+    "description": "Per-unit strike of the equity underlying, in `base_currency` price units.",
     "format": "double"
   },
   {

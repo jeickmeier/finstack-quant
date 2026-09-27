@@ -3669,11 +3669,15 @@
           "description": "Business day convention for date adjustments"
         },
         "calendar_id": {
-          "description": "Optional calendar identifier for business day adjustments",
-          "type": [
-            "string",
-            "null"
-          ]
+          "anyOf": [
+            {
+              "$ref": "#/$defs/d_9c3fc047c6fea21344ad"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Optional calendar identifier for business day adjustments"
         },
         "compounding": {
           "$ref": "#/$defs/d_bc70851d62fecbbe51c0",

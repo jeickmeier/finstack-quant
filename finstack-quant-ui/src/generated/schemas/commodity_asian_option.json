@@ -27,7 +27,7 @@
           "past_fixings": [],
           "quantity": 1000,
           "strike": 75,
-          "ticker": "CL",
+          "underlying_ticker": "CL",
           "unit": "BBL",
           "vol_surface_id": "CL-VOL"
         },
@@ -1065,8 +1065,8 @@
           "$ref": "#/$defs/d_cfd19b90f35924bacebd",
           "description": "Strike price per unit."
         },
-        "ticker": {
-          "description": "Ticker/identifier for market data lookup (e.g., \"CL\", \"GC\", \"NG\")",
+        "underlying_ticker": {
+          "description": "Commodity symbol label (e.g., \"CL\", \"GC\", \"NG\"); never a market-data key.",
           "type": "string"
         },
         "unit": {
@@ -1081,7 +1081,7 @@
       "required": [
         "id",
         "commodity_type",
-        "ticker",
+        "underlying_ticker",
         "unit",
         "currency",
         "strike",

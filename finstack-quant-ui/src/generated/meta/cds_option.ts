@@ -9,7 +9,6 @@ export default [
         "instrument": {
           "spec": {
             "attributes": {},
-            "cds_maturity": "2030-06-20",
             "coupon_bp": null,
             "credit_curve_id": "CORP-HAZARD",
             "discount_curve_id": "USD-OIS",
@@ -32,6 +31,7 @@ export default [
             },
             "underlying_convention": "isda_na",
             "underlying_is_index": false,
+            "underlying_maturity": "2030-06-20",
             "vol_surface_id": "CDSOPT-VOL"
           },
           "type": "cds_option"
@@ -3642,13 +3642,6 @@ export default [
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/attributes.schema.json#"
   },
   {
-    "path": "#/$defs/d_dc0c483409e01928615c/properties/cds_maturity",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_option.schema.json#/$defs/CDSOption/properties/cds_maturity",
-    "description": "Underlying CDS maturity date",
-    "ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
-    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/date.schema.json#"
-  },
-  {
     "path": "#/$defs/d_dc0c483409e01928615c/properties/coupon_bp",
     "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_option.schema.json#/$defs/CDSOption/properties/coupon_bp",
     "default": null,
@@ -3774,7 +3767,7 @@ export default [
     "path": "#/$defs/d_dc0c483409e01928615c/properties/protection_start_convention",
     "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_option.schema.json#/$defs/CDSOption/properties/protection_start_convention",
     "default": "spot",
-    "description": "Convention used to select the synthetic underlying CDS accrual start\nwhen `underlying_effective_date` is not explicitly supplied.",
+    "description": "Convention used to select the synthetic underlying CDS accrual start\nwhen `underlying_start_date` is not explicitly supplied.",
     "ref": "#/$defs/ProtectionStartConvention",
     "resolvedRef": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_option.schema.json#/$defs/ProtectionStartConvention"
   },
@@ -3827,25 +3820,32 @@ export default [
     "resolvedRef": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_option.schema.json#/$defs/CdsConvention"
   },
   {
-    "path": "#/$defs/d_dc0c483409e01928615c/properties/underlying_effective_date",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_option.schema.json#/$defs/CDSOption/properties/underlying_effective_date",
-    "description": "Underlying CDS accrual-effective date used for forward spread and risky\nannuity. Bloomberg CDSO can quote a standard CDS effective date before\noption expiry; in that case premium accrues from this date while\nprotection starts at expiry."
-  },
-  {
-    "path": "#/$defs/d_dc0c483409e01928615c/properties/underlying_effective_date/anyOf/0",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_option.schema.json#/$defs/CDSOption/properties/underlying_effective_date/anyOf/0",
-    "ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
-    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/date.schema.json#"
-  },
-  {
-    "path": "#/$defs/d_dc0c483409e01928615c/properties/underlying_effective_date/anyOf/1",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_option.schema.json#/$defs/CDSOption/properties/underlying_effective_date/anyOf/1"
-  },
-  {
     "path": "#/$defs/d_dc0c483409e01928615c/properties/underlying_is_index",
     "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_option.schema.json#/$defs/CDSOption/properties/underlying_is_index",
     "default": false,
     "description": "If true, the underlying is a CDS index; else single-name CDS.\n\nThe Bloomberg CDSO model treats the two cases differently in the\nno-knockout calibration `F_0 = E[V_te]` (DOCS 2055833 §1.2): index\noptions trade no-knockout and the calibration target includes the\n`(1−R)·(1−q_te)` FEP-equivalent contribution; single-name options\nknock out on default and skip it."
+  },
+  {
+    "path": "#/$defs/d_dc0c483409e01928615c/properties/underlying_maturity",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_option.schema.json#/$defs/CDSOption/properties/underlying_maturity",
+    "description": "Underlying CDS maturity date",
+    "ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/date.schema.json#"
+  },
+  {
+    "path": "#/$defs/d_dc0c483409e01928615c/properties/underlying_start_date",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_option.schema.json#/$defs/CDSOption/properties/underlying_start_date",
+    "description": "Underlying CDS accrual-effective date used for forward spread and risky\nannuity. Bloomberg CDSO can quote a standard CDS effective date before\noption expiry; in that case premium accrues from this date while\nprotection starts at expiry."
+  },
+  {
+    "path": "#/$defs/d_dc0c483409e01928615c/properties/underlying_start_date/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_option.schema.json#/$defs/CDSOption/properties/underlying_start_date/anyOf/0",
+    "ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/date.schema.json#"
+  },
+  {
+    "path": "#/$defs/d_dc0c483409e01928615c/properties/underlying_start_date/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_option.schema.json#/$defs/CDSOption/properties/underlying_start_date/anyOf/1"
   },
   {
     "path": "#/$defs/d_dc0c483409e01928615c/properties/vol_surface_id",

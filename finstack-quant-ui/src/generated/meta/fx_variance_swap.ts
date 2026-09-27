@@ -1163,7 +1163,9 @@ export default [
   {
     "path": "#/$defs/d_6e351f851936941d91a0/properties/base_calendar_id",
     "source": "https://finstack_quant.dev/schemas/instrument/1/fx/fx_variance_swap.schema.json#/$defs/FxVarianceSwap/properties/base_calendar_id",
-    "description": "Base-currency calendar used in the joint observation calendar."
+    "description": "Base-currency calendar used in the joint observation calendar.",
+    "ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/id.schema.json#"
   },
   {
     "path": "#/$defs/d_6e351f851936941d91a0/properties/base_currency",
@@ -1181,7 +1183,8 @@ export default [
   {
     "path": "#/$defs/d_6e351f851936941d91a0/properties/day_count",
     "source": "https://finstack_quant.dev/schemas/instrument/1/fx/fx_variance_swap.schema.json#/$defs/FxVarianceSwap/properties/day_count",
-    "description": "Day count convention for time calculations",
+    "default": "act_365f",
+    "description": "Day count convention for time calculations (defaults to ACT/365F).",
     "ref": "https://finstack_quant.dev/schemas/common/1/day_count.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/day_count.schema.json#"
   },
@@ -1276,7 +1279,9 @@ export default [
   {
     "path": "#/$defs/d_6e351f851936941d91a0/properties/quote_calendar_id",
     "source": "https://finstack_quant.dev/schemas/instrument/1/fx/fx_variance_swap.schema.json#/$defs/FxVarianceSwap/properties/quote_calendar_id",
-    "description": "Quote-currency calendar used in the joint observation calendar."
+    "description": "Quote-currency calendar used in the joint observation calendar.",
+    "ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/id.schema.json#"
   },
   {
     "path": "#/$defs/d_6e351f851936941d91a0/properties/quote_currency",
@@ -1327,6 +1332,16 @@ export default [
     "path": "#/$defs/d_6e351f851936941d91a0/properties/spot_id",
     "source": "https://finstack_quant.dev/schemas/instrument/1/fx/fx_variance_swap.schema.json#/$defs/FxVarianceSwap/properties/spot_id",
     "description": "Optional spot identifier used to look up historical series."
+  },
+  {
+    "path": "#/$defs/d_6e351f851936941d91a0/properties/spot_id/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/fx/fx_variance_swap.schema.json#/$defs/FxVarianceSwap/properties/spot_id/anyOf/0",
+    "ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/id.schema.json#"
+  },
+  {
+    "path": "#/$defs/d_6e351f851936941d91a0/properties/spot_id/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/fx/fx_variance_swap.schema.json#/$defs/FxVarianceSwap/properties/spot_id/anyOf/1"
   },
   {
     "path": "#/$defs/d_6e351f851936941d91a0/properties/start_date",

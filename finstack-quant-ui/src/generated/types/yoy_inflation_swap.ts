@@ -417,14 +417,15 @@ export interface D_6C7Cf0810B445D318Ec1 {
   inflation_index_id: Id3;
   instrument_pricing_overrides?: InstrumentPricingOverrides;
   /**
-   * Contractual monthly reference-index interpolation. Overrides index metadata;
+   * Contractual monthly reference-index interpolation; takes precedence over index metadata;
    * without either source the default is monthly step interpolation.
    */
-  interpolation_override?: D_3F9F853D11E3E642Afa6 | null;
+  interpolation?: D_3F9F853D11E3E642Afa6 | null;
   /**
-   * Optional contract-level lag override (if set, overrides index lag)
+   * Contractual CPI observation lag; when `None` the index lag, then the
+   * curve's indexation lag, applies.
    */
-  lag_override?: DAf2460F03219A318A4C9 | null;
+  lag?: DAf2460F03219A318A4C9 | null;
   maturity: Date;
   metric_pricing_overrides?: MetricPricingOverrides;
   notional: Money;

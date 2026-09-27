@@ -497,6 +497,10 @@ export type DB556Bbeb1Ecf96C44C5A =
 export type BusinessDayConvention =
   "unadjusted" | "following" | "modified_following" | "preceding" | "modified_preceding" | "nearest";
 /**
+ * Opaque string identifier.
+ */
+export type Id2 = string;
+/**
  * Contractual running coupon in basis points (e.g., `100` = 1% per
  * annum, the standard CDX.NA.IG coupon; `500` for high yield).
  */
@@ -519,9 +523,9 @@ export type DayCount =
   | "act_act_afb"
   | "bus_252";
 /**
- * Discount curve identifier
+ * Opaque string identifier.
  */
-export type Id2 = string;
+export type Id3 = string;
 /**
  * End date of protection
  */
@@ -531,9 +535,9 @@ export type Date = string;
  */
 export type Date1 = string;
 /**
- * Hazard curve identifier for default probabilities
+ * Opaque string identifier.
  */
-export type Id3 = string;
+export type Id4 = string;
 /**
  * ISO 8601 calendar date string.
  */
@@ -3115,10 +3119,10 @@ export interface DAa1B03A4B2041456F32B {
   /**
    * Holiday calendar identifier
    */
-  calendar_id?: string | null;
+  calendar_id?: Id2 | null;
   coupon_bp: Decimal;
   day_count: DayCount;
-  discount_curve_id: Id2;
+  discount_curve_id: Id3;
   end: Date;
   frequency: Tenor;
   /**
@@ -3154,7 +3158,7 @@ export interface Tenor {
  * Protection leg specification
  */
 export interface D_80D76E0F51C533A80Ab8 {
-  credit_curve_id: Id3;
+  credit_curve_id: Id4;
   /**
    * Recovery rate as a decimal fraction in `[0.0, 1.0)`
    */

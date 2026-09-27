@@ -1096,7 +1096,8 @@ export default [
   {
     "path": "#/$defs/d_7acc8ad9e320efcfa909/properties/day_count",
     "source": "https://finstack_quant.dev/schemas/instrument/1/fx/fx_digital_option.schema.json#/$defs/FxDigitalOption/properties/day_count",
-    "description": "Day count convention",
+    "default": "act_365f",
+    "description": "Day count convention (defaults to ACT/365F).",
     "ref": "https://finstack_quant.dev/schemas/common/1/day_count.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/day_count.schema.json#"
   },

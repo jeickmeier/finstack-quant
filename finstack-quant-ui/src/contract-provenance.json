@@ -12,21 +12,21 @@
           "uri": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_asian_option.schema.json",
           "pointer": "#",
           "source": "finstack-quant/valuations/schemas/instruments/1/commodity/commodity_asian_option.schema.json",
-          "sha256": "0cd0dbddac106c78f4b60cb017f8cc9045aa41129c9cbdca11f139f122c8a92a",
+          "sha256": "d5d7a2003fcf1f43817c46ea024ca956292ce5f3d558e093644b687a3926612a",
           "description": "Canonical single-instrument v1 envelope generated from its serde type."
         },
         {
           "uri": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_forward.schema.json",
           "pointer": "#",
           "source": "finstack-quant/valuations/schemas/instruments/1/commodity/commodity_forward.schema.json",
-          "sha256": "3cad3fd58732dfb832db0d66c42e5299d3669dafedd8780bb3bb381417406344",
+          "sha256": "2fe9f93487c66f4d357dc229d11168dffe34a9e70ac1f2f1b7a1c13a78baa103",
           "description": "Canonical single-instrument v1 envelope generated from its serde type."
         },
         {
           "uri": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_future.schema.json",
           "pointer": "#",
           "source": "finstack-quant/valuations/schemas/instruments/1/commodity/commodity_future.schema.json",
-          "sha256": "6a565f701efd7b5916c739aefa71ebf5b70d8d7ebd46b326da5c81ed15f1fcf4",
+          "sha256": "862526737bf91d53e9bae9beea64d2a41892a42540973a491ab29d44648e7811",
           "description": "Canonical single-instrument v1 envelope generated from its serde type."
         },
         {
@@ -40,63 +40,63 @@
           "uri": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_option.schema.json",
           "pointer": "#",
           "source": "finstack-quant/valuations/schemas/instruments/1/commodity/commodity_option.schema.json",
-          "sha256": "40a897204e7eabb04270b4bbf4902d6f5ebcc48e819ad0bd088bec46582b22e5",
+          "sha256": "71b88acab86a77f31204a83641507e1fc47128bd13c6070e91991768cdc3b012",
           "description": "Canonical single-instrument v1 envelope generated from its serde type."
         },
         {
           "uri": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_spread_option.schema.json",
           "pointer": "#",
           "source": "finstack-quant/valuations/schemas/instruments/1/commodity/commodity_spread_option.schema.json",
-          "sha256": "455578874caaf5c6e4da84162171e888e0e296b6c20d94c49ef2f66688f08a18",
+          "sha256": "04b55d0015387499c51009a3dffc2b1586efd92bd79cf02d5a0a255e28a36a89",
           "description": "Canonical single-instrument v1 envelope generated from its serde type."
         },
         {
           "uri": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_swap.schema.json",
           "pointer": "#",
           "source": "finstack-quant/valuations/schemas/instruments/1/commodity/commodity_swap.schema.json",
-          "sha256": "6abe4a84c9d99f318c255b802d150d2ef12799bacfa9c73770c028add355f129",
+          "sha256": "f62dc87989c195b27e12c5a2ca0b5af3c5473b14ae2bb60411d104c56e6ea080",
           "description": "Canonical single-instrument v1 envelope generated from its serde type."
         },
         {
           "uri": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_swaption.schema.json",
           "pointer": "#",
           "source": "finstack-quant/valuations/schemas/instruments/1/commodity/commodity_swaption.schema.json",
-          "sha256": "ca7c067dec80f9b1eec5d75ab05a3eb5c3799be574eca410028893314602bdc3",
+          "sha256": "aafe970745883b337241df2482c66a3e339bb9369bcf4316854a9a2ea8422013",
           "description": "Canonical single-instrument v1 envelope generated from its serde type."
         },
         {
           "uri": "https://finstack_quant.dev/schemas/instrument/1/composite/composite.schema.json",
           "pointer": "#",
           "source": "finstack-quant/valuations/schemas/instruments/1/composite/composite.schema.json",
-          "sha256": "dacbfef57670837c5af8b82440185fd526fee86290c6f52479bc4865afa3955f",
+          "sha256": "48c94e03b3cd047764b197aa51361138b65da33a7468764a31143815c60fcfc5",
           "description": "Canonical single-instrument v1 envelope generated from its serde type."
         },
         {
           "uri": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_index.schema.json",
           "pointer": "#",
           "source": "finstack-quant/valuations/schemas/instruments/1/credit_derivatives/cds_index.schema.json",
-          "sha256": "0a578cbb320317d718357ced5d180039ca01c93c3a2f1c0157ec9c9806427102",
+          "sha256": "6a6498c587f6d5fdc6c450f726dbee7c7266f9c62fd50c72a3ae00ca506afb77",
           "description": "Canonical single-instrument v1 envelope generated from its serde type."
         },
         {
           "uri": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_option.schema.json",
           "pointer": "#",
           "source": "finstack-quant/valuations/schemas/instruments/1/credit_derivatives/cds_option.schema.json",
-          "sha256": "2f21ee4fc8e856f512002371a8186a9aa295538fadf4a5b2c462bb1a75ae2182",
+          "sha256": "6e2adc06f3913175c69dedf740cd8e215d2d7a2f0df0daf0f55956097a65b752",
           "description": "Canonical single-instrument v1 envelope generated from its serde type."
         },
         {
           "uri": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_tranche.schema.json",
           "pointer": "#",
           "source": "finstack-quant/valuations/schemas/instruments/1/credit_derivatives/cds_tranche.schema.json",
-          "sha256": "b7e126bf54ab35a6f858950065aab0bba8ee482b25a3062ae6e7e5220d2eba39",
+          "sha256": "31c079ae0a89fd66cfb0d934d938289aca29f8727edcddda8e1c8704df806c6c",
           "description": "Canonical single-instrument v1 envelope generated from its serde type."
         },
         {
           "uri": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/credit_default_swap.schema.json",
           "pointer": "#",
           "source": "finstack-quant/valuations/schemas/instruments/1/credit_derivatives/credit_default_swap.schema.json",
-          "sha256": "3c644f8d91430e0b274bcd6e02b55862dc6a77423f10f3498b731f7768be2826",
+          "sha256": "da1b6625a14364d0d7775afbb82b99ee54c3911a366b44fe60854b235a13b894",
           "description": "Canonical single-instrument v1 envelope generated from its serde type."
         },
         {
@@ -117,21 +117,21 @@
           "uri": "https://finstack_quant.dev/schemas/instrument/1/equity/discounted_cash_flow.schema.json",
           "pointer": "#",
           "source": "finstack-quant/valuations/schemas/instruments/1/equity/discounted_cash_flow.schema.json",
-          "sha256": "1fb8a61a47ccedca6824f2688b39f9570feb161a2e3134cdbda9146ccb3410e7",
+          "sha256": "b4fa4f082da42f7287c5ad68a93e990eb84744152c5b2db4668bf083eea0dc9e",
           "description": "Canonical single-instrument v1 envelope generated from its serde type."
         },
         {
           "uri": "https://finstack_quant.dev/schemas/instrument/1/equity/equity.schema.json",
           "pointer": "#",
           "source": "finstack-quant/valuations/schemas/instruments/1/equity/equity.schema.json",
-          "sha256": "077025b7ff9f3d22e102dfcca06ed873ee9d4ee26a864c28b0a9c6f2506beab8",
+          "sha256": "7d8da218dcf00bd9ac82bce0be80239146731b074af8a973715ec9e71c5b5a22",
           "description": "Canonical single-instrument v1 envelope generated from its serde type."
         },
         {
           "uri": "https://finstack_quant.dev/schemas/instrument/1/equity/equity_future.schema.json",
           "pointer": "#",
           "source": "finstack-quant/valuations/schemas/instruments/1/equity/equity_future.schema.json",
-          "sha256": "5916a64336a5cb65a7c800b5435e216004edb6d37b3e91883e3a55977e981d98",
+          "sha256": "70d3d5ea0102ef5ee2d5596e7d68c5649a548a7d15404fd108ccf29109012254",
           "description": "Canonical single-instrument v1 envelope generated from its serde type."
         },
         {
@@ -145,7 +145,7 @@
           "uri": "https://finstack_quant.dev/schemas/instrument/1/equity/equity_option.schema.json",
           "pointer": "#",
           "source": "finstack-quant/valuations/schemas/instruments/1/equity/equity_option.schema.json",
-          "sha256": "f06129dde5875a300d56099a41abd83bffe3c369ba2e9f1f0ee5c55fbb4f2c17",
+          "sha256": "5bf97cdb2ce7581f7c0148d4e4235a4ae7a0e2eced5c161c8146e08dac4ff34e",
           "description": "Canonical single-instrument v1 envelope generated from its serde type."
         },
         {
@@ -159,35 +159,35 @@
           "uri": "https://finstack_quant.dev/schemas/instrument/1/equity/levered_real_estate_equity.schema.json",
           "pointer": "#",
           "source": "finstack-quant/valuations/schemas/instruments/1/equity/levered_real_estate_equity.schema.json",
-          "sha256": "7cb24d113e1db4cd539970f5b3c2646a445a53ae0a514d8de845bbf4e41a4d10",
+          "sha256": "cee338e90c4797a0751e337eaafbae1516ed1a1424ec726e727ab75e6d6de34c",
           "description": "Canonical single-instrument v1 envelope generated from its serde type."
         },
         {
           "uri": "https://finstack_quant.dev/schemas/instrument/1/equity/private_markets_fund.schema.json",
           "pointer": "#",
           "source": "finstack-quant/valuations/schemas/instruments/1/equity/private_markets_fund.schema.json",
-          "sha256": "afda6bd11f3a51b9557c888393555bef1db34a1f4c71ac484dd8941e4dfadd04",
+          "sha256": "3498eb5114da5b930497bce2a852538d952a201ea8a7ee711a3161269d66431e",
           "description": "Canonical single-instrument v1 envelope generated from its serde type."
         },
         {
           "uri": "https://finstack_quant.dev/schemas/instrument/1/equity/real_estate_asset.schema.json",
           "pointer": "#",
           "source": "finstack-quant/valuations/schemas/instruments/1/equity/real_estate_asset.schema.json",
-          "sha256": "d43fd9ce2cddee9b4be14b39428c6a8b871a982b96f760953c21dbceccaa3d54",
+          "sha256": "096ef8b656aa940af38ce5a49bf0d0befcee1fee1f990db5f7413f58df97b91d",
           "description": "Canonical single-instrument v1 envelope generated from its serde type."
         },
         {
           "uri": "https://finstack_quant.dev/schemas/instrument/1/equity/trs_equity.schema.json",
           "pointer": "#",
           "source": "finstack-quant/valuations/schemas/instruments/1/equity/trs_equity.schema.json",
-          "sha256": "639ecaa6c00f31c3c73b32d31091a2feb0cd942d3c24ab0f44bf2f35e5014a78",
+          "sha256": "565779dba24222f55847833775d8cdceb175fc2ddf769692aa35521e6555b844",
           "description": "Canonical single-instrument v1 envelope generated from its serde type."
         },
         {
           "uri": "https://finstack_quant.dev/schemas/instrument/1/equity/variance_swap.schema.json",
           "pointer": "#",
           "source": "finstack-quant/valuations/schemas/instruments/1/equity/variance_swap.schema.json",
-          "sha256": "c510498eb58230788ed4433671658d77c7a03b400059c13499fe41999fbdc9d5",
+          "sha256": "a2ae528b41c8a6d3544a7556304915db9a2f66f707a4ab473c801fefb3f6e6f3",
           "description": "Canonical single-instrument v1 envelope generated from its serde type."
         },
         {
@@ -208,56 +208,56 @@
           "uri": "https://finstack_quant.dev/schemas/instrument/1/exotics/asian_option.schema.json",
           "pointer": "#",
           "source": "finstack-quant/valuations/schemas/instruments/1/exotics/asian_option.schema.json",
-          "sha256": "7d379f4af1330ba0e1d52d0dce83716d4c8c8033a9cb2aefef4ebd0a032517e8",
+          "sha256": "679a234aae8228bf3f4a251797088f06fd53db19ed0c32af80445d61297bc848",
           "description": "Canonical single-instrument v1 envelope generated from its serde type."
         },
         {
           "uri": "https://finstack_quant.dev/schemas/instrument/1/exotics/barrier_option.schema.json",
           "pointer": "#",
           "source": "finstack-quant/valuations/schemas/instruments/1/exotics/barrier_option.schema.json",
-          "sha256": "b0898d8bd3db520431b2ceb015f929ebbbe4d46c2dcfc7f7b4dc26f564ec3eae",
+          "sha256": "3649c770ba3714ca7b1453a4ed6bfd03c2eecb6e3f8131e3aeb782f29c3d71ae",
           "description": "Canonical single-instrument v1 envelope generated from its serde type."
         },
         {
           "uri": "https://finstack_quant.dev/schemas/instrument/1/exotics/basket.schema.json",
           "pointer": "#",
           "source": "finstack-quant/valuations/schemas/instruments/1/exotics/basket.schema.json",
-          "sha256": "8dd26409ad5b452e4427240019c66214accc025434ddad9ba542bf82e35dd86c",
+          "sha256": "d813656ce523beda7a719e2781cff4fe8c1295900571bcb7cc7df6654fe48c1f",
           "description": "Canonical single-instrument v1 envelope generated from its serde type."
         },
         {
           "uri": "https://finstack_quant.dev/schemas/instrument/1/exotics/callable_range_accrual.schema.json",
           "pointer": "#",
           "source": "finstack-quant/valuations/schemas/instruments/1/exotics/callable_range_accrual.schema.json",
-          "sha256": "4b8ff0222da4349393de39c81be51cbacdf2fb1e1970e3b505995871505c49cd",
+          "sha256": "8ebecabcbb03d1b0294f0d0c3d42f3ae37c0dc90e673ff33e06b5a9fe64eb700",
           "description": "Canonical single-instrument v1 envelope generated from its serde type."
         },
         {
           "uri": "https://finstack_quant.dev/schemas/instrument/1/exotics/lookback_option.schema.json",
           "pointer": "#",
           "source": "finstack-quant/valuations/schemas/instruments/1/exotics/lookback_option.schema.json",
-          "sha256": "4eb5def0df1182bbdf44c582d045b748717a78b15be22c07e0d4a3f6418939e7",
+          "sha256": "3e8923fe565a72529e3da900cc611d524e44ce221e7fcb8448710e87f3a334da",
           "description": "Canonical single-instrument v1 envelope generated from its serde type."
         },
         {
           "uri": "https://finstack_quant.dev/schemas/instrument/1/exotics/range_accrual.schema.json",
           "pointer": "#",
           "source": "finstack-quant/valuations/schemas/instruments/1/exotics/range_accrual.schema.json",
-          "sha256": "5adcfdcc67ae24dd3130b8e457396156709b9322fdf1f7629bde1899abdeb80d",
+          "sha256": "97e23c45b8e34f6ffd6b74363ca2587f70ee0b4d968ba13d9f2bf4faa22af143",
           "description": "Canonical single-instrument v1 envelope generated from its serde type."
         },
         {
           "uri": "https://finstack_quant.dev/schemas/instrument/1/exotics/snowball.schema.json",
           "pointer": "#",
           "source": "finstack-quant/valuations/schemas/instruments/1/exotics/snowball.schema.json",
-          "sha256": "730fb3309ec4a1a07ba204187ab20eee7ad79c81db061661b2d3346d5c7eaaa3",
+          "sha256": "714ff2bcd39916d85de94f6bfe27518901bca27051ef618f2e74436a8409e7f3",
           "description": "Canonical single-instrument v1 envelope generated from its serde type."
         },
         {
           "uri": "https://finstack_quant.dev/schemas/instrument/1/exotics/tarn.schema.json",
           "pointer": "#",
           "source": "finstack-quant/valuations/schemas/instruments/1/exotics/tarn.schema.json",
-          "sha256": "8c921304975d37e3b562a6d6699f68b73fc5c6bd532a77b0b184e4e118821206",
+          "sha256": "8c88500aa7076e159f4956aa1878350f67c65871f59358da75b3db5317e92fa6",
           "description": "Canonical single-instrument v1 envelope generated from its serde type."
         },
         {
@@ -285,70 +285,70 @@
           "uri": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/asset_backed_facility.schema.json",
           "pointer": "#",
           "source": "finstack-quant/valuations/schemas/instruments/1/fixed_income/asset_backed_facility.schema.json",
-          "sha256": "9b6efec88b5eae2c73fd32adb75acc6810fbd30574b6744cff31a9e64204c1ff",
+          "sha256": "1dbaee76f795145fa8c9906825d7270687ddf7454a39264f5d94cd05a2e6b332",
           "description": "Canonical single-instrument v1 envelope generated from its serde type."
         },
         {
           "uri": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/bond.schema.json",
           "pointer": "#",
           "source": "finstack-quant/valuations/schemas/instruments/1/fixed_income/bond.schema.json",
-          "sha256": "44f8fc74ddc297d859678e75ff080010e64c8ded7d4179cdbec4384669c9c169",
+          "sha256": "e9ca759356078c05dd0c7e5d23459c3d4401a70400b74bfebb2b36a0c7ec1007",
           "description": "Canonical single-instrument v1 envelope generated from its serde type."
         },
         {
           "uri": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/bond_future.schema.json",
           "pointer": "#",
           "source": "finstack-quant/valuations/schemas/instruments/1/fixed_income/bond_future.schema.json",
-          "sha256": "131219db104f07a2f68d6408a6f13691bb6511f3d68167a8bb1e85563e897097",
+          "sha256": "730bb990be1f902e67eabf7272b2a14ff4a4ceec69d9fa8d740aa4dab637c8cc",
           "description": "Canonical single-instrument v1 envelope generated from its serde type."
         },
         {
           "uri": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/convertible_bond.schema.json",
           "pointer": "#",
           "source": "finstack-quant/valuations/schemas/instruments/1/fixed_income/convertible_bond.schema.json",
-          "sha256": "b005c4a4aec35deb1021113e9dd41224ff58c7590400e844d2b2478a0882f46c",
+          "sha256": "1fa6a39b9624ec1d23798a28aaa3d31fd8d2d17f5e73d93564a71480708c97f9",
           "description": "Canonical single-instrument v1 envelope generated from its serde type."
         },
         {
           "uri": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/dollar_roll.schema.json",
           "pointer": "#",
           "source": "finstack-quant/valuations/schemas/instruments/1/fixed_income/dollar_roll.schema.json",
-          "sha256": "fcc944185b479b870be957d593a80b0586072b3c293738e63118c5deaee43b17",
+          "sha256": "5b5d9c71b73d926cc76a44549a814c591475a2a0f2b301f99660f174cf5238c5",
           "description": "Canonical single-instrument v1 envelope generated from its serde type."
         },
         {
           "uri": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/inflation_linked_bond.schema.json",
           "pointer": "#",
           "source": "finstack-quant/valuations/schemas/instruments/1/fixed_income/inflation_linked_bond.schema.json",
-          "sha256": "b2fe9e05219e370b0c4a1e38b952d120f7ee174e582c56169022f6df1e7c4bf3",
+          "sha256": "44f89b8293fe60bceb8faa123d2307088670035352d36323f5276b918543b262",
           "description": "Canonical single-instrument v1 envelope generated from its serde type."
         },
         {
           "uri": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/revolving_credit.schema.json",
           "pointer": "#",
           "source": "finstack-quant/valuations/schemas/instruments/1/fixed_income/revolving_credit.schema.json",
-          "sha256": "d74582244dca7d9bc9c3f408f2a27f5e522ccf6652b8bcf1072f21fa3acd45ef",
+          "sha256": "cc0596a2a4badb5b89fc4735fc4e51d178ae77710a99205430a5609a3d16bb13",
           "description": "Canonical single-instrument v1 envelope generated from its serde type."
         },
         {
           "uri": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/structured_credit.schema.json",
           "pointer": "#",
           "source": "finstack-quant/valuations/schemas/instruments/1/fixed_income/structured_credit.schema.json",
-          "sha256": "72b2649cf490dfe0dc451f2e78c354b94641260836fdf73487007c381021a4e9",
+          "sha256": "b36a061f54cc73fcdf07b02109415c03efb9e2de27025691808c71bcfc4311ec",
           "description": "Canonical single-instrument v1 envelope generated from its serde type."
         },
         {
           "uri": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/term_loan.schema.json",
           "pointer": "#",
           "source": "finstack-quant/valuations/schemas/instruments/1/fixed_income/term_loan.schema.json",
-          "sha256": "469cd489dd69b07a36d07964ffecfdc0aad245388e484cc087591c1bcd54a4f3",
+          "sha256": "ceccfff390533f7fab50d0c62c06b308f7b462d8f6337edbbdb05ceab3a52a3a",
           "description": "Canonical single-instrument v1 envelope generated from its serde type."
         },
         {
           "uri": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/trs_fixed_income_index.schema.json",
           "pointer": "#",
           "source": "finstack-quant/valuations/schemas/instruments/1/fixed_income/trs_fixed_income_index.schema.json",
-          "sha256": "6beaf3a0654e18b12692b62345781aa0864c05d071daccaf999efc0b63de3c42",
+          "sha256": "a2a8407897812ab2b16bd61be4b40d29e33f8604e87eb55605a8a415097f40db",
           "description": "Canonical single-instrument v1 envelope generated from its serde type."
         },
         {
@@ -362,21 +362,21 @@
           "uri": "https://finstack_quant.dev/schemas/instrument/1/fx/fx_digital_option.schema.json",
           "pointer": "#",
           "source": "finstack-quant/valuations/schemas/instruments/1/fx/fx_digital_option.schema.json",
-          "sha256": "51f6f985106d15ae266f7c9debf2d85306b087d20214fbff7d66cfcaef8a39e7",
+          "sha256": "8d5f81b36f5ed0c3f7365d719763f7554df57e9253de98d6fbc29c05d40a06f0",
           "description": "Canonical single-instrument v1 envelope generated from its serde type."
         },
         {
           "uri": "https://finstack_quant.dev/schemas/instrument/1/fx/fx_forward.schema.json",
           "pointer": "#",
           "source": "finstack-quant/valuations/schemas/instruments/1/fx/fx_forward.schema.json",
-          "sha256": "e08b8226d9b1252a9869e80547818461fea7cc95f9967837f5f44d1b2bb865c1",
+          "sha256": "1ca56d3ae09db19d6e22ff521521104857deb1cb6b2481d84f3e586d7f693666",
           "description": "Canonical single-instrument v1 envelope generated from its serde type."
         },
         {
           "uri": "https://finstack_quant.dev/schemas/instrument/1/fx/fx_future.schema.json",
           "pointer": "#",
           "source": "finstack-quant/valuations/schemas/instruments/1/fx/fx_future.schema.json",
-          "sha256": "7a9ef5c9f5d37831c402f4da2808877e9bd112e8a19b0ea21d6b37c66a75e67a",
+          "sha256": "728538d3d0221ec06f8b9964b8a145f675445464a92f842fbefac8c5dce8267f",
           "description": "Canonical single-instrument v1 envelope generated from its serde type."
         },
         {
@@ -397,119 +397,119 @@
           "uri": "https://finstack_quant.dev/schemas/instrument/1/fx/fx_spot.schema.json",
           "pointer": "#",
           "source": "finstack-quant/valuations/schemas/instruments/1/fx/fx_spot.schema.json",
-          "sha256": "c2d82657371855cb21a5f41c5fe4f37fa7672f101159da941c849cb72d48a48d",
+          "sha256": "cbdc7d176b01ddc19709cdd209bb2befe380241c3d0c360b2d3b62895980a758",
           "description": "Canonical single-instrument v1 envelope generated from its serde type."
         },
         {
           "uri": "https://finstack_quant.dev/schemas/instrument/1/fx/fx_swap.schema.json",
           "pointer": "#",
           "source": "finstack-quant/valuations/schemas/instruments/1/fx/fx_swap.schema.json",
-          "sha256": "829c2631db427f55952d35ac6199f980dc66ed9bb4b9b10052adbed487d650a7",
+          "sha256": "16c70b7b51684b9f4feae51ac4de5aa030c64c54fceb71a957f16b20e3de6999",
           "description": "Canonical single-instrument v1 envelope generated from its serde type."
         },
         {
           "uri": "https://finstack_quant.dev/schemas/instrument/1/fx/fx_touch_option.schema.json",
           "pointer": "#",
           "source": "finstack-quant/valuations/schemas/instruments/1/fx/fx_touch_option.schema.json",
-          "sha256": "823e3f9d629a1d4f64daefec82efff90f92f2e70cec3e4b2ef6f6b22ac1720a1",
+          "sha256": "7e7b0241b8371a255ac739b121bf01a3fa771b348cdd307ace6ac0d16f71d13b",
           "description": "Canonical single-instrument v1 envelope generated from its serde type."
         },
         {
           "uri": "https://finstack_quant.dev/schemas/instrument/1/fx/fx_variance_swap.schema.json",
           "pointer": "#",
           "source": "finstack-quant/valuations/schemas/instruments/1/fx/fx_variance_swap.schema.json",
-          "sha256": "1d6d107c78d1499a61fa30f71f220053a063474aab9611979809b083f36e0739",
+          "sha256": "5ff644fdc5ad78fa929b4e2cfa445724efdbeee9da9e1a9c29c7ae16ab79c074",
           "description": "Canonical single-instrument v1 envelope generated from its serde type."
         },
         {
           "uri": "https://finstack_quant.dev/schemas/instrument/1/fx/ndf.schema.json",
           "pointer": "#",
           "source": "finstack-quant/valuations/schemas/instruments/1/fx/ndf.schema.json",
-          "sha256": "915486094cc8b854a9756eb91cce322ec9aaaf18e38853ae9596b614700255ea",
+          "sha256": "b08afdda480ca724c59664e9e9b231a3d86d6f00da46edc4bcc2cf8f466acd1b",
           "description": "Canonical single-instrument v1 envelope generated from its serde type."
         },
         {
           "uri": "https://finstack_quant.dev/schemas/instrument/1/fx/quanto_option.schema.json",
           "pointer": "#",
           "source": "finstack-quant/valuations/schemas/instruments/1/fx/quanto_option.schema.json",
-          "sha256": "c6f2542a833737e4b1c0339c103658978fc8accbe1c80643bc37313171f6121d",
+          "sha256": "3ee7e3b95775c6b06ad5dfdbfcfb9b4580a892089545f7caee7cd466090b7244",
           "description": "Canonical single-instrument v1 envelope generated from its serde type."
         },
         {
           "uri": "https://finstack_quant.dev/schemas/instrument/1/rates/basis_swap.schema.json",
           "pointer": "#",
           "source": "finstack-quant/valuations/schemas/instruments/1/rates/basis_swap.schema.json",
-          "sha256": "a8ae3c7e61972c53e6028b031868978c68c45333047a99236113c215c86b0ce8",
+          "sha256": "dd3b732f5ca8cbf671b8934d20c36de8cc7627bdcc5913fdd8988f7d9715f66c",
           "description": "Canonical single-instrument v1 envelope generated from its serde type."
         },
         {
           "uri": "https://finstack_quant.dev/schemas/instrument/1/rates/bermudan_swaption.schema.json",
           "pointer": "#",
           "source": "finstack-quant/valuations/schemas/instruments/1/rates/bermudan_swaption.schema.json",
-          "sha256": "3e40a024c1f0e8e39c757396e45c1e414fc8d73b704af593cbf3f2b7fa7024fc",
+          "sha256": "8664e4b7f39b86536b846da4231a09724fc9a060009d67e76f2aa0de05653244",
           "description": "Canonical single-instrument v1 envelope generated from its serde type."
         },
         {
           "uri": "https://finstack_quant.dev/schemas/instrument/1/rates/cap_floor.schema.json",
           "pointer": "#",
           "source": "finstack-quant/valuations/schemas/instruments/1/rates/cap_floor.schema.json",
-          "sha256": "6525fe61ceaa846d06a57bffea54862562ee32c7b82b36a65f8fd3a46c2aef2f",
+          "sha256": "ef7beed51f1e9bcff8ce9a9293874cd45526fc18aa50845515ae41cdc4c00920",
           "description": "Canonical single-instrument v1 envelope generated from its serde type."
         },
         {
           "uri": "https://finstack_quant.dev/schemas/instrument/1/rates/cms_option.schema.json",
           "pointer": "#",
           "source": "finstack-quant/valuations/schemas/instruments/1/rates/cms_option.schema.json",
-          "sha256": "bcf48042d5e3f2e5e377b6b5dbaa6d3b549bcf034a5b21a797926252a8c56154",
+          "sha256": "a9fdf77e56e51778312873edfa04ba43116884bbae4a07d13157f2065e01e37b",
           "description": "Canonical single-instrument v1 envelope generated from its serde type."
         },
         {
           "uri": "https://finstack_quant.dev/schemas/instrument/1/rates/cms_spread_option.schema.json",
           "pointer": "#",
           "source": "finstack-quant/valuations/schemas/instruments/1/rates/cms_spread_option.schema.json",
-          "sha256": "05f1c11e432ee50563c6dc4fc9babcfa752dd56ceeafe2f922779bd42f31194d",
+          "sha256": "81f0408de58ebded4ac27ac9edd062d24a957c870991464ffd90cfee7709a168",
           "description": "Canonical single-instrument v1 envelope generated from its serde type."
         },
         {
           "uri": "https://finstack_quant.dev/schemas/instrument/1/rates/cms_swap.schema.json",
           "pointer": "#",
           "source": "finstack-quant/valuations/schemas/instruments/1/rates/cms_swap.schema.json",
-          "sha256": "1415e1ed328c4beeb92a4d9cabefb01a8091f43a80a0b498796b1428b65f700d",
+          "sha256": "d0180bceaedd780aae709c38cf87d4f793c409079767b0c67dfd3057e5e41e75",
           "description": "Canonical single-instrument v1 envelope generated from its serde type."
         },
         {
           "uri": "https://finstack_quant.dev/schemas/instrument/1/rates/deposit.schema.json",
           "pointer": "#",
           "source": "finstack-quant/valuations/schemas/instruments/1/rates/deposit.schema.json",
-          "sha256": "fe21dc637286bcb2513383d9a24c5fbfe94a2b272649bb0b6e5f60a823d5e43d",
+          "sha256": "0de44497344f13d520c3565568d40df8d4861ba8bc9335a2bc9e99e39b8cbe86",
           "description": "Canonical single-instrument v1 envelope generated from its serde type."
         },
         {
           "uri": "https://finstack_quant.dev/schemas/instrument/1/rates/forward_rate_agreement.schema.json",
           "pointer": "#",
           "source": "finstack-quant/valuations/schemas/instruments/1/rates/forward_rate_agreement.schema.json",
-          "sha256": "27b969d761798712bc2332dab3e1aee466acfbf4168d461d3a891eb57a96e876",
+          "sha256": "34d48d1285a0956cda2011f6a595095d2c6866f613964440a2c45c122764d111",
           "description": "Canonical single-instrument v1 envelope generated from its serde type."
         },
         {
           "uri": "https://finstack_quant.dev/schemas/instrument/1/rates/inflation_cap_floor.schema.json",
           "pointer": "#",
           "source": "finstack-quant/valuations/schemas/instruments/1/rates/inflation_cap_floor.schema.json",
-          "sha256": "89173c514ce27dafb955f3fe8e1cffb5894d4e2537dc841bfca7892c918201e4",
+          "sha256": "a48ffa12cb58522827c160150e6edaf45167444824a10bc6dc079037b52e9fa4",
           "description": "Canonical single-instrument v1 envelope generated from its serde type."
         },
         {
           "uri": "https://finstack_quant.dev/schemas/instrument/1/rates/inflation_swap.schema.json",
           "pointer": "#",
           "source": "finstack-quant/valuations/schemas/instruments/1/rates/inflation_swap.schema.json",
-          "sha256": "20af20962d6bb3304ea272bc3b0b039f662492071ea54edb9a97d1b129e2836b",
+          "sha256": "c5c4ed8cadebe5954879b67674660fbee189216b054494a0147cc356965846ec",
           "description": "Canonical single-instrument v1 envelope generated from its serde type."
         },
         {
           "uri": "https://finstack_quant.dev/schemas/instrument/1/rates/interest_rate_future.schema.json",
           "pointer": "#",
           "source": "finstack-quant/valuations/schemas/instruments/1/rates/interest_rate_future.schema.json",
-          "sha256": "fb9abcb926e2dc3b1bf370ac5763a0fb001416b161f473379912ea17cdf3fa90",
+          "sha256": "356b165baad1e91508617f8795e3ffc74a146bc74b4c0f5de6cbc343d7c1d175",
           "description": "Canonical single-instrument v1 envelope generated from its serde type."
         },
         {
@@ -523,35 +523,35 @@
           "uri": "https://finstack_quant.dev/schemas/instrument/1/rates/interest_rate_swap.schema.json",
           "pointer": "#",
           "source": "finstack-quant/valuations/schemas/instruments/1/rates/interest_rate_swap.schema.json",
-          "sha256": "221bbf63848999e1fc1f55f1b0ee7fb0d5ad8de53a264fa69c191c5e253d6d9f",
+          "sha256": "f47ac1a88b687bd20d15c89191e9a4b456cda68ec44cebcbca6e758b92a2eb60",
           "description": "Canonical single-instrument v1 envelope generated from its serde type."
         },
         {
           "uri": "https://finstack_quant.dev/schemas/instrument/1/rates/repo.schema.json",
           "pointer": "#",
           "source": "finstack-quant/valuations/schemas/instruments/1/rates/repo.schema.json",
-          "sha256": "954bbc8b5c6602e0ae44351b8e210a19e95db8408670bd8b38f0f96a75ada6a4",
+          "sha256": "ff949ea317c57cef5ca86aae00e27b8970f9b2a31dcf1cf5629d0cf09273fce7",
           "description": "Canonical single-instrument v1 envelope generated from its serde type."
         },
         {
           "uri": "https://finstack_quant.dev/schemas/instrument/1/rates/swaption.schema.json",
           "pointer": "#",
           "source": "finstack-quant/valuations/schemas/instruments/1/rates/swaption.schema.json",
-          "sha256": "ede7285d8273d6212c285e5147d3f3777519c6c5e8662f2c056b9cca09bfa984",
+          "sha256": "8ec6c7a554d6fb1a3656e346510a5c765dfee4fb34ebbdd0e2eb4b66a7f19665",
           "description": "Canonical single-instrument v1 envelope generated from its serde type."
         },
         {
           "uri": "https://finstack_quant.dev/schemas/instrument/1/rates/xccy_swap.schema.json",
           "pointer": "#",
           "source": "finstack-quant/valuations/schemas/instruments/1/rates/xccy_swap.schema.json",
-          "sha256": "afc5ed3c2ae76bfc3bf4503f81829e9de4a5a31209015796fb9e1888ca5ddda7",
+          "sha256": "04a177efdc2ce9e50f64f9f82c25a4ec4d67eed5144cac43c32c97240c1624e8",
           "description": "Canonical single-instrument v1 envelope generated from its serde type."
         },
         {
           "uri": "https://finstack_quant.dev/schemas/instrument/1/rates/yoy_inflation_swap.schema.json",
           "pointer": "#",
           "source": "finstack-quant/valuations/schemas/instruments/1/rates/yoy_inflation_swap.schema.json",
-          "sha256": "5bb50fd1ed8245da56f0aaa237d90b1f0109d9448cde42e50d25608604123658",
+          "sha256": "2d6c1f187c89f76483cbaf04a3990d6bf4c46d4f60ffa45bbea2bc71613d8884",
           "description": "Canonical single-instrument v1 envelope generated from its serde type."
         }
       ]
@@ -631,8 +631,8 @@
           }
         ],
         "returns": "ValuationResult",
-        "declaration": "/**\n   * Price an instrument from its canonical envelope and return a `ValuationResult` object.\n   *\n   * Pass `model = \"default\"` to use the instrument-native default model.\n   * Fields are readable directly (`result.value.amount`,\n   * `result.measures.dv01`). Monte Carlo results carry a lossless `bigint`\n   * seed; use a BigInt-aware replacer when stringifying them.\n   * For bonds, `\"discounting\"` is non-callable rates-only PV,\n   * `\"hazard_rate\"` is non-callable fractional recovery of par, `\"tree\"`\n   * values rates-only exercise rights, and `\"rates_credit\"` values joint\n   * rates-credit bonds including call, put, and return floors. Stochastic `\"rates_credit\"` runs add\n   * `type: \"monte_carlo\"` diagnostics to `result.details`.\n   * @param instrumentJson - Required `finstack_quant.instrument/1` envelope.\n   * @param marketJson - Canonical market-context JSON supplying curves, quotes, and FX data.\n   * @param asOf - ISO-8601 valuation date used to resolve date-dependent market data.\n   * @param model - Optional pricing-model identifier; omit for the instrument-native model.\n   * @param metrics - Optional canonical metric IDs such as `\"ytm\"`, `\"dv01\"`, `\"hvar\"`, or `\"expected_shortfall\"`. Omit, `null`, or `undefined` for a valuation-only result. Mortgage OAS and CMO Z-spread consume clean prices per 100 current face and include settlement accrued interest. MBS DV01, bucketed DV01 and duration share rate-dependent prepayment assumptions. FI TRS duration DV01 requires `duration_id` and a finite signed scalar in years. Roll specialness is in basis points versus `repo_curve_id` (a forward curve), or the discount curve when omitted; implied financing is an ACT/360 decimal.\n   * @param metricPricingOverrides - Optional JSON metric-pricing overrides merged into the envelope before validation. Omit, `null`, or `undefined` to use the envelope as-is.\n   * @param marketHistory - Optional serialized market-history JSON required by historical risk metrics such as historical VaR.\n   * @returns Plain JavaScript `ValuationResult` (`instrument_id`, `as_of`, `value`, `measures`, `meta`, …).\n   * @throws Error - Throws a JavaScript exception if an instrument, market, metric-pricing-override, or market-history payload is invalid; `metrics` is not a string array; `asOf`, `model`, or a metric identifier is invalid; required market data is missing; pricing or a metric calculation fails; or the valuation cannot be converted to a JavaScript value.\n   */\n  priceInstrument(\n    instrumentJson: string,\n    marketJson: string,\n    asOf: string,\n    model?: string | null,\n    metrics?: string[] | null,\n    metricPricingOverrides?: string | null,\n    marketHistory?: string | null\n  ): ValuationResult;",
-        "sha256": "6de0df14a767f0e6b0e5234bf6eef6517c5db7d6b4d069acb859cd5b1ccc367f"
+        "declaration": "/**\n   * Price an instrument from its canonical envelope and return a `ValuationResult` object.\n   *\n   * Pass `model = \"default\"` to use the instrument-native default model.\n   * Fields are readable directly (`result.value.amount`,\n   * `result.measures.dv01`). Monte Carlo results carry a lossless `bigint`\n   * seed; use a BigInt-aware replacer when stringifying them.\n   * For bonds, `\"discounting\"` is non-callable rates-only PV,\n   * `\"hazard_rate\"` is non-callable fractional recovery of par, `\"tree\"`\n   * values rates-only exercise rights, and `\"rates_credit\"` values joint\n   * rates-credit bonds including call, put, and return floors. Stochastic `\"rates_credit\"` runs add\n   * `type: \"monte_carlo\"` diagnostics to `result.details`.\n   * @param instrumentJson - Required `finstack_quant.instrument/1` envelope.\n   * @param marketJson - Canonical market-context JSON supplying curves, quotes, and FX data.\n   * @param asOf - ISO-8601 valuation date used to resolve date-dependent market data.\n   * @param model - Optional pricing-model identifier; omit for the instrument-native model.\n   * @param metrics - Optional canonical metric IDs such as `\"ytm\"`, `\"dv01\"`, `\"hvar\"`, or `\"expected_shortfall\"`. Omit, `null`, or `undefined` for a valuation-only result. Mortgage OAS and CMO Z-spread consume clean prices per 100 current face and include settlement accrued interest. MBS DV01, bucketed DV01 and duration share rate-dependent prepayment assumptions. FI TRS duration DV01 requires `duration_id` and a finite signed scalar in years. Roll specialness is in basis points versus `repo_curve_id` (a discount curve), or the discount curve when omitted; implied financing is an ACT/360 decimal.\n   * @param metricPricingOverrides - Optional JSON metric-pricing overrides merged into the envelope before validation. Omit, `null`, or `undefined` to use the envelope as-is.\n   * @param marketHistory - Optional serialized market-history JSON required by historical risk metrics such as historical VaR.\n   * @returns Plain JavaScript `ValuationResult` (`instrument_id`, `as_of`, `value`, `measures`, `meta`, …).\n   * @throws Error - Throws a JavaScript exception if an instrument, market, metric-pricing-override, or market-history payload is invalid; `metrics` is not a string array; `asOf`, `model`, or a metric identifier is invalid; required market data is missing; pricing or a metric calculation fails; or the valuation cannot be converted to a JavaScript value.\n   */\n  priceInstrument(\n    instrumentJson: string,\n    marketJson: string,\n    asOf: string,\n    model?: string | null,\n    metrics?: string[] | null,\n    metricPricingOverrides?: string | null,\n    marketHistory?: string | null\n  ): ValuationResult;",
+        "sha256": "b03553fa58583278c69d02b8316659ebfd0e96eaa985684c02a2c68ae4475ed6"
       },
       "schemas": [
         {
@@ -691,8 +691,8 @@
           }
         ],
         "returns": "ValuationResult",
-        "declaration": "/**\n   * Price an instrument from its canonical envelope and return a `ValuationResult` object.\n   *\n   * Pass `model = \"default\"` to use the instrument-native default model.\n   * Fields are readable directly (`result.value.amount`,\n   * `result.measures.dv01`). Monte Carlo results carry a lossless `bigint`\n   * seed; use a BigInt-aware replacer when stringifying them.\n   * For bonds, `\"discounting\"` is non-callable rates-only PV,\n   * `\"hazard_rate\"` is non-callable fractional recovery of par, `\"tree\"`\n   * values rates-only exercise rights, and `\"rates_credit\"` values joint\n   * rates-credit bonds including call, put, and return floors. Stochastic `\"rates_credit\"` runs add\n   * `type: \"monte_carlo\"` diagnostics to `result.details`.\n   * @param instrumentJson - Required `finstack_quant.instrument/1` envelope.\n   * @param marketJson - Canonical market-context JSON supplying curves, quotes, and FX data.\n   * @param asOf - ISO-8601 valuation date used to resolve date-dependent market data.\n   * @param model - Optional pricing-model identifier; omit for the instrument-native model.\n   * @param metrics - Optional canonical metric IDs such as `\"ytm\"`, `\"dv01\"`, `\"hvar\"`, or `\"expected_shortfall\"`. Omit, `null`, or `undefined` for a valuation-only result. Mortgage OAS and CMO Z-spread consume clean prices per 100 current face and include settlement accrued interest. MBS DV01, bucketed DV01 and duration share rate-dependent prepayment assumptions. FI TRS duration DV01 requires `duration_id` and a finite signed scalar in years. Roll specialness is in basis points versus `repo_curve_id` (a forward curve), or the discount curve when omitted; implied financing is an ACT/360 decimal.\n   * @param metricPricingOverrides - Optional JSON metric-pricing overrides merged into the envelope before validation. Omit, `null`, or `undefined` to use the envelope as-is.\n   * @param marketHistory - Optional serialized market-history JSON required by historical risk metrics such as historical VaR.\n   * @returns Plain JavaScript `ValuationResult` (`instrument_id`, `as_of`, `value`, `measures`, `meta`, …).\n   * @throws Error - Throws a JavaScript exception if an instrument, market, metric-pricing-override, or market-history payload is invalid; `metrics` is not a string array; `asOf`, `model`, or a metric identifier is invalid; required market data is missing; pricing or a metric calculation fails; or the valuation cannot be converted to a JavaScript value.\n   */\n  priceInstrument(\n    instrumentJson: string,\n    marketJson: string,\n    asOf: string,\n    model?: string | null,\n    metrics?: string[] | null,\n    metricPricingOverrides?: string | null,\n    marketHistory?: string | null\n  ): ValuationResult;",
-        "sha256": "6de0df14a767f0e6b0e5234bf6eef6517c5db7d6b4d069acb859cd5b1ccc367f"
+        "declaration": "/**\n   * Price an instrument from its canonical envelope and return a `ValuationResult` object.\n   *\n   * Pass `model = \"default\"` to use the instrument-native default model.\n   * Fields are readable directly (`result.value.amount`,\n   * `result.measures.dv01`). Monte Carlo results carry a lossless `bigint`\n   * seed; use a BigInt-aware replacer when stringifying them.\n   * For bonds, `\"discounting\"` is non-callable rates-only PV,\n   * `\"hazard_rate\"` is non-callable fractional recovery of par, `\"tree\"`\n   * values rates-only exercise rights, and `\"rates_credit\"` values joint\n   * rates-credit bonds including call, put, and return floors. Stochastic `\"rates_credit\"` runs add\n   * `type: \"monte_carlo\"` diagnostics to `result.details`.\n   * @param instrumentJson - Required `finstack_quant.instrument/1` envelope.\n   * @param marketJson - Canonical market-context JSON supplying curves, quotes, and FX data.\n   * @param asOf - ISO-8601 valuation date used to resolve date-dependent market data.\n   * @param model - Optional pricing-model identifier; omit for the instrument-native model.\n   * @param metrics - Optional canonical metric IDs such as `\"ytm\"`, `\"dv01\"`, `\"hvar\"`, or `\"expected_shortfall\"`. Omit, `null`, or `undefined` for a valuation-only result. Mortgage OAS and CMO Z-spread consume clean prices per 100 current face and include settlement accrued interest. MBS DV01, bucketed DV01 and duration share rate-dependent prepayment assumptions. FI TRS duration DV01 requires `duration_id` and a finite signed scalar in years. Roll specialness is in basis points versus `repo_curve_id` (a discount curve), or the discount curve when omitted; implied financing is an ACT/360 decimal.\n   * @param metricPricingOverrides - Optional JSON metric-pricing overrides merged into the envelope before validation. Omit, `null`, or `undefined` to use the envelope as-is.\n   * @param marketHistory - Optional serialized market-history JSON required by historical risk metrics such as historical VaR.\n   * @returns Plain JavaScript `ValuationResult` (`instrument_id`, `as_of`, `value`, `measures`, `meta`, …).\n   * @throws Error - Throws a JavaScript exception if an instrument, market, metric-pricing-override, or market-history payload is invalid; `metrics` is not a string array; `asOf`, `model`, or a metric identifier is invalid; required market data is missing; pricing or a metric calculation fails; or the valuation cannot be converted to a JavaScript value.\n   */\n  priceInstrument(\n    instrumentJson: string,\n    marketJson: string,\n    asOf: string,\n    model?: string | null,\n    metrics?: string[] | null,\n    metricPricingOverrides?: string | null,\n    marketHistory?: string | null\n  ): ValuationResult;",
+        "sha256": "b03553fa58583278c69d02b8316659ebfd0e96eaa985684c02a2c68ae4475ed6"
       },
       "schemas": [
         {
@@ -781,8 +781,8 @@
           }
         ],
         "returns": "ValuationResult",
-        "declaration": "/**\n   * Price an instrument from its canonical envelope and return a `ValuationResult` object.\n   *\n   * Pass `model = \"default\"` to use the instrument-native default model.\n   * Fields are readable directly (`result.value.amount`,\n   * `result.measures.dv01`). Monte Carlo results carry a lossless `bigint`\n   * seed; use a BigInt-aware replacer when stringifying them.\n   * For bonds, `\"discounting\"` is non-callable rates-only PV,\n   * `\"hazard_rate\"` is non-callable fractional recovery of par, `\"tree\"`\n   * values rates-only exercise rights, and `\"rates_credit\"` values joint\n   * rates-credit bonds including call, put, and return floors. Stochastic `\"rates_credit\"` runs add\n   * `type: \"monte_carlo\"` diagnostics to `result.details`.\n   * @param instrumentJson - Required `finstack_quant.instrument/1` envelope.\n   * @param marketJson - Canonical market-context JSON supplying curves, quotes, and FX data.\n   * @param asOf - ISO-8601 valuation date used to resolve date-dependent market data.\n   * @param model - Optional pricing-model identifier; omit for the instrument-native model.\n   * @param metrics - Optional canonical metric IDs such as `\"ytm\"`, `\"dv01\"`, `\"hvar\"`, or `\"expected_shortfall\"`. Omit, `null`, or `undefined` for a valuation-only result. Mortgage OAS and CMO Z-spread consume clean prices per 100 current face and include settlement accrued interest. MBS DV01, bucketed DV01 and duration share rate-dependent prepayment assumptions. FI TRS duration DV01 requires `duration_id` and a finite signed scalar in years. Roll specialness is in basis points versus `repo_curve_id` (a forward curve), or the discount curve when omitted; implied financing is an ACT/360 decimal.\n   * @param metricPricingOverrides - Optional JSON metric-pricing overrides merged into the envelope before validation. Omit, `null`, or `undefined` to use the envelope as-is.\n   * @param marketHistory - Optional serialized market-history JSON required by historical risk metrics such as historical VaR.\n   * @returns Plain JavaScript `ValuationResult` (`instrument_id`, `as_of`, `value`, `measures`, `meta`, …).\n   * @throws Error - Throws a JavaScript exception if an instrument, market, metric-pricing-override, or market-history payload is invalid; `metrics` is not a string array; `asOf`, `model`, or a metric identifier is invalid; required market data is missing; pricing or a metric calculation fails; or the valuation cannot be converted to a JavaScript value.\n   */\n  priceInstrument(\n    instrumentJson: string,\n    marketJson: string,\n    asOf: string,\n    model?: string | null,\n    metrics?: string[] | null,\n    metricPricingOverrides?: string | null,\n    marketHistory?: string | null\n  ): ValuationResult;",
-        "sha256": "6de0df14a767f0e6b0e5234bf6eef6517c5db7d6b4d069acb859cd5b1ccc367f"
+        "declaration": "/**\n   * Price an instrument from its canonical envelope and return a `ValuationResult` object.\n   *\n   * Pass `model = \"default\"` to use the instrument-native default model.\n   * Fields are readable directly (`result.value.amount`,\n   * `result.measures.dv01`). Monte Carlo results carry a lossless `bigint`\n   * seed; use a BigInt-aware replacer when stringifying them.\n   * For bonds, `\"discounting\"` is non-callable rates-only PV,\n   * `\"hazard_rate\"` is non-callable fractional recovery of par, `\"tree\"`\n   * values rates-only exercise rights, and `\"rates_credit\"` values joint\n   * rates-credit bonds including call, put, and return floors. Stochastic `\"rates_credit\"` runs add\n   * `type: \"monte_carlo\"` diagnostics to `result.details`.\n   * @param instrumentJson - Required `finstack_quant.instrument/1` envelope.\n   * @param marketJson - Canonical market-context JSON supplying curves, quotes, and FX data.\n   * @param asOf - ISO-8601 valuation date used to resolve date-dependent market data.\n   * @param model - Optional pricing-model identifier; omit for the instrument-native model.\n   * @param metrics - Optional canonical metric IDs such as `\"ytm\"`, `\"dv01\"`, `\"hvar\"`, or `\"expected_shortfall\"`. Omit, `null`, or `undefined` for a valuation-only result. Mortgage OAS and CMO Z-spread consume clean prices per 100 current face and include settlement accrued interest. MBS DV01, bucketed DV01 and duration share rate-dependent prepayment assumptions. FI TRS duration DV01 requires `duration_id` and a finite signed scalar in years. Roll specialness is in basis points versus `repo_curve_id` (a discount curve), or the discount curve when omitted; implied financing is an ACT/360 decimal.\n   * @param metricPricingOverrides - Optional JSON metric-pricing overrides merged into the envelope before validation. Omit, `null`, or `undefined` to use the envelope as-is.\n   * @param marketHistory - Optional serialized market-history JSON required by historical risk metrics such as historical VaR.\n   * @returns Plain JavaScript `ValuationResult` (`instrument_id`, `as_of`, `value`, `measures`, `meta`, …).\n   * @throws Error - Throws a JavaScript exception if an instrument, market, metric-pricing-override, or market-history payload is invalid; `metrics` is not a string array; `asOf`, `model`, or a metric identifier is invalid; required market data is missing; pricing or a metric calculation fails; or the valuation cannot be converted to a JavaScript value.\n   */\n  priceInstrument(\n    instrumentJson: string,\n    marketJson: string,\n    asOf: string,\n    model?: string | null,\n    metrics?: string[] | null,\n    metricPricingOverrides?: string | null,\n    marketHistory?: string | null\n  ): ValuationResult;",
+        "sha256": "b03553fa58583278c69d02b8316659ebfd0e96eaa985684c02a2c68ae4475ed6"
       },
       "schemas": [
         {
@@ -841,8 +841,8 @@
           }
         ],
         "returns": "ValuationResult",
-        "declaration": "/**\n   * Price an instrument from its canonical envelope and return a `ValuationResult` object.\n   *\n   * Pass `model = \"default\"` to use the instrument-native default model.\n   * Fields are readable directly (`result.value.amount`,\n   * `result.measures.dv01`). Monte Carlo results carry a lossless `bigint`\n   * seed; use a BigInt-aware replacer when stringifying them.\n   * For bonds, `\"discounting\"` is non-callable rates-only PV,\n   * `\"hazard_rate\"` is non-callable fractional recovery of par, `\"tree\"`\n   * values rates-only exercise rights, and `\"rates_credit\"` values joint\n   * rates-credit bonds including call, put, and return floors. Stochastic `\"rates_credit\"` runs add\n   * `type: \"monte_carlo\"` diagnostics to `result.details`.\n   * @param instrumentJson - Required `finstack_quant.instrument/1` envelope.\n   * @param marketJson - Canonical market-context JSON supplying curves, quotes, and FX data.\n   * @param asOf - ISO-8601 valuation date used to resolve date-dependent market data.\n   * @param model - Optional pricing-model identifier; omit for the instrument-native model.\n   * @param metrics - Optional canonical metric IDs such as `\"ytm\"`, `\"dv01\"`, `\"hvar\"`, or `\"expected_shortfall\"`. Omit, `null`, or `undefined` for a valuation-only result. Mortgage OAS and CMO Z-spread consume clean prices per 100 current face and include settlement accrued interest. MBS DV01, bucketed DV01 and duration share rate-dependent prepayment assumptions. FI TRS duration DV01 requires `duration_id` and a finite signed scalar in years. Roll specialness is in basis points versus `repo_curve_id` (a forward curve), or the discount curve when omitted; implied financing is an ACT/360 decimal.\n   * @param metricPricingOverrides - Optional JSON metric-pricing overrides merged into the envelope before validation. Omit, `null`, or `undefined` to use the envelope as-is.\n   * @param marketHistory - Optional serialized market-history JSON required by historical risk metrics such as historical VaR.\n   * @returns Plain JavaScript `ValuationResult` (`instrument_id`, `as_of`, `value`, `measures`, `meta`, …).\n   * @throws Error - Throws a JavaScript exception if an instrument, market, metric-pricing-override, or market-history payload is invalid; `metrics` is not a string array; `asOf`, `model`, or a metric identifier is invalid; required market data is missing; pricing or a metric calculation fails; or the valuation cannot be converted to a JavaScript value.\n   */\n  priceInstrument(\n    instrumentJson: string,\n    marketJson: string,\n    asOf: string,\n    model?: string | null,\n    metrics?: string[] | null,\n    metricPricingOverrides?: string | null,\n    marketHistory?: string | null\n  ): ValuationResult;",
-        "sha256": "6de0df14a767f0e6b0e5234bf6eef6517c5db7d6b4d069acb859cd5b1ccc367f"
+        "declaration": "/**\n   * Price an instrument from its canonical envelope and return a `ValuationResult` object.\n   *\n   * Pass `model = \"default\"` to use the instrument-native default model.\n   * Fields are readable directly (`result.value.amount`,\n   * `result.measures.dv01`). Monte Carlo results carry a lossless `bigint`\n   * seed; use a BigInt-aware replacer when stringifying them.\n   * For bonds, `\"discounting\"` is non-callable rates-only PV,\n   * `\"hazard_rate\"` is non-callable fractional recovery of par, `\"tree\"`\n   * values rates-only exercise rights, and `\"rates_credit\"` values joint\n   * rates-credit bonds including call, put, and return floors. Stochastic `\"rates_credit\"` runs add\n   * `type: \"monte_carlo\"` diagnostics to `result.details`.\n   * @param instrumentJson - Required `finstack_quant.instrument/1` envelope.\n   * @param marketJson - Canonical market-context JSON supplying curves, quotes, and FX data.\n   * @param asOf - ISO-8601 valuation date used to resolve date-dependent market data.\n   * @param model - Optional pricing-model identifier; omit for the instrument-native model.\n   * @param metrics - Optional canonical metric IDs such as `\"ytm\"`, `\"dv01\"`, `\"hvar\"`, or `\"expected_shortfall\"`. Omit, `null`, or `undefined` for a valuation-only result. Mortgage OAS and CMO Z-spread consume clean prices per 100 current face and include settlement accrued interest. MBS DV01, bucketed DV01 and duration share rate-dependent prepayment assumptions. FI TRS duration DV01 requires `duration_id` and a finite signed scalar in years. Roll specialness is in basis points versus `repo_curve_id` (a discount curve), or the discount curve when omitted; implied financing is an ACT/360 decimal.\n   * @param metricPricingOverrides - Optional JSON metric-pricing overrides merged into the envelope before validation. Omit, `null`, or `undefined` to use the envelope as-is.\n   * @param marketHistory - Optional serialized market-history JSON required by historical risk metrics such as historical VaR.\n   * @returns Plain JavaScript `ValuationResult` (`instrument_id`, `as_of`, `value`, `measures`, `meta`, …).\n   * @throws Error - Throws a JavaScript exception if an instrument, market, metric-pricing-override, or market-history payload is invalid; `metrics` is not a string array; `asOf`, `model`, or a metric identifier is invalid; required market data is missing; pricing or a metric calculation fails; or the valuation cannot be converted to a JavaScript value.\n   */\n  priceInstrument(\n    instrumentJson: string,\n    marketJson: string,\n    asOf: string,\n    model?: string | null,\n    metrics?: string[] | null,\n    metricPricingOverrides?: string | null,\n    marketHistory?: string | null\n  ): ValuationResult;",
+        "sha256": "b03553fa58583278c69d02b8316659ebfd0e96eaa985684c02a2c68ae4475ed6"
       },
       "schemas": [
         {
@@ -901,8 +901,8 @@
           }
         ],
         "returns": "ValuationResult",
-        "declaration": "/**\n   * Price an instrument from its canonical envelope and return a `ValuationResult` object.\n   *\n   * Pass `model = \"default\"` to use the instrument-native default model.\n   * Fields are readable directly (`result.value.amount`,\n   * `result.measures.dv01`). Monte Carlo results carry a lossless `bigint`\n   * seed; use a BigInt-aware replacer when stringifying them.\n   * For bonds, `\"discounting\"` is non-callable rates-only PV,\n   * `\"hazard_rate\"` is non-callable fractional recovery of par, `\"tree\"`\n   * values rates-only exercise rights, and `\"rates_credit\"` values joint\n   * rates-credit bonds including call, put, and return floors. Stochastic `\"rates_credit\"` runs add\n   * `type: \"monte_carlo\"` diagnostics to `result.details`.\n   * @param instrumentJson - Required `finstack_quant.instrument/1` envelope.\n   * @param marketJson - Canonical market-context JSON supplying curves, quotes, and FX data.\n   * @param asOf - ISO-8601 valuation date used to resolve date-dependent market data.\n   * @param model - Optional pricing-model identifier; omit for the instrument-native model.\n   * @param metrics - Optional canonical metric IDs such as `\"ytm\"`, `\"dv01\"`, `\"hvar\"`, or `\"expected_shortfall\"`. Omit, `null`, or `undefined` for a valuation-only result. Mortgage OAS and CMO Z-spread consume clean prices per 100 current face and include settlement accrued interest. MBS DV01, bucketed DV01 and duration share rate-dependent prepayment assumptions. FI TRS duration DV01 requires `duration_id` and a finite signed scalar in years. Roll specialness is in basis points versus `repo_curve_id` (a forward curve), or the discount curve when omitted; implied financing is an ACT/360 decimal.\n   * @param metricPricingOverrides - Optional JSON metric-pricing overrides merged into the envelope before validation. Omit, `null`, or `undefined` to use the envelope as-is.\n   * @param marketHistory - Optional serialized market-history JSON required by historical risk metrics such as historical VaR.\n   * @returns Plain JavaScript `ValuationResult` (`instrument_id`, `as_of`, `value`, `measures`, `meta`, …).\n   * @throws Error - Throws a JavaScript exception if an instrument, market, metric-pricing-override, or market-history payload is invalid; `metrics` is not a string array; `asOf`, `model`, or a metric identifier is invalid; required market data is missing; pricing or a metric calculation fails; or the valuation cannot be converted to a JavaScript value.\n   */\n  priceInstrument(\n    instrumentJson: string,\n    marketJson: string,\n    asOf: string,\n    model?: string | null,\n    metrics?: string[] | null,\n    metricPricingOverrides?: string | null,\n    marketHistory?: string | null\n  ): ValuationResult;",
-        "sha256": "6de0df14a767f0e6b0e5234bf6eef6517c5db7d6b4d069acb859cd5b1ccc367f"
+        "declaration": "/**\n   * Price an instrument from its canonical envelope and return a `ValuationResult` object.\n   *\n   * Pass `model = \"default\"` to use the instrument-native default model.\n   * Fields are readable directly (`result.value.amount`,\n   * `result.measures.dv01`). Monte Carlo results carry a lossless `bigint`\n   * seed; use a BigInt-aware replacer when stringifying them.\n   * For bonds, `\"discounting\"` is non-callable rates-only PV,\n   * `\"hazard_rate\"` is non-callable fractional recovery of par, `\"tree\"`\n   * values rates-only exercise rights, and `\"rates_credit\"` values joint\n   * rates-credit bonds including call, put, and return floors. Stochastic `\"rates_credit\"` runs add\n   * `type: \"monte_carlo\"` diagnostics to `result.details`.\n   * @param instrumentJson - Required `finstack_quant.instrument/1` envelope.\n   * @param marketJson - Canonical market-context JSON supplying curves, quotes, and FX data.\n   * @param asOf - ISO-8601 valuation date used to resolve date-dependent market data.\n   * @param model - Optional pricing-model identifier; omit for the instrument-native model.\n   * @param metrics - Optional canonical metric IDs such as `\"ytm\"`, `\"dv01\"`, `\"hvar\"`, or `\"expected_shortfall\"`. Omit, `null`, or `undefined` for a valuation-only result. Mortgage OAS and CMO Z-spread consume clean prices per 100 current face and include settlement accrued interest. MBS DV01, bucketed DV01 and duration share rate-dependent prepayment assumptions. FI TRS duration DV01 requires `duration_id` and a finite signed scalar in years. Roll specialness is in basis points versus `repo_curve_id` (a discount curve), or the discount curve when omitted; implied financing is an ACT/360 decimal.\n   * @param metricPricingOverrides - Optional JSON metric-pricing overrides merged into the envelope before validation. Omit, `null`, or `undefined` to use the envelope as-is.\n   * @param marketHistory - Optional serialized market-history JSON required by historical risk metrics such as historical VaR.\n   * @returns Plain JavaScript `ValuationResult` (`instrument_id`, `as_of`, `value`, `measures`, `meta`, …).\n   * @throws Error - Throws a JavaScript exception if an instrument, market, metric-pricing-override, or market-history payload is invalid; `metrics` is not a string array; `asOf`, `model`, or a metric identifier is invalid; required market data is missing; pricing or a metric calculation fails; or the valuation cannot be converted to a JavaScript value.\n   */\n  priceInstrument(\n    instrumentJson: string,\n    marketJson: string,\n    asOf: string,\n    model?: string | null,\n    metrics?: string[] | null,\n    metricPricingOverrides?: string | null,\n    marketHistory?: string | null\n  ): ValuationResult;",
+        "sha256": "b03553fa58583278c69d02b8316659ebfd0e96eaa985684c02a2c68ae4475ed6"
       },
       "schemas": [
         {
@@ -1300,7 +1300,7 @@
   ],
   "hostContract": {
     "source": "finstack-quant-wasm/schemas/host/1/valuation_result.schema.json",
-    "sha256": "bb2a1c2110e2bfc3c2cb383e90f8aeb68882ea447cd33da38819ffb3ea7c3bea"
+    "sha256": "b8f72c6197a5aaa4ee5f5408dcf472b6307843183dbc55d7262ba4542f2744a3"
   },
   "details": [
     {
@@ -1326,7 +1326,7 @@
   ],
   "scenarioAuthority": {
     "source": "finstack-quant/valuations/src/instruments/fixed_income/structured_credit/metrics/scenario.rs",
-    "sha256": "d607e88189231e464f747c05c14cc6b0f06fecb0ef4d0785a8a8d24136a94123"
+    "sha256": "de810d80c35d80782a45b82e93651f44f80bd925ca39f2298666de3cbf85228d"
   },
   "deferred": {
     "machine-readable-units": "Generic values stay raw; do not infer units from names or decimal refs.",

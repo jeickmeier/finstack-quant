@@ -6,7 +6,6 @@
     {
       "instrument": {
         "spec": {
-          "accrual_start_date": "2023-12-31",
           "attributes": {},
           "bounds_type": "relative_to_initial_spot",
           "coupon_rate": 0.08,
@@ -36,6 +35,7 @@
           "past_observations_in_range": null,
           "payment_date": null,
           "spot_id": "SPX-SPOT",
+          "start_date": "2023-12-31",
           "total_past_observations": null,
           "underlying_ticker": "SPX",
           "upper_bound": 1.05,
@@ -4158,12 +4158,8 @@
     },
     "d_c3cfabdd5d36e6a2dfa1": {
       "additionalProperties": false,
-      "description": "Range accrual instrument.\n\nRange accrual notes pay coupons that accrue only when a reference rate or asset\nstays within a specified range. The accrual is proportional to the number of\nobservation dates where the underlying is within [lower_bound, upper_bound].\n\n# Bounds Interpretation\n\nThe `bounds_type` field controls how `lower_bound` and `upper_bound` are interpreted:\n- `Absolute`: Bounds are absolute price levels (e.g., 4500.0 for SPX at 4700)\n- `RelativeToInitialSpot`: Bounds are multipliers of the initial spot (e.g., 0.95 = 95%)\n\n# Historical Fixings\n\nFor mid-life valuations, use `past_observations_in_range` to specify how many past\nobservations were in range. The pricer will add this to expected future fixings.\n\n# Rate-Linked Underlyings: Pricing Routing\n\nThe rate-linked fields (`rate_index_id`, `projection_curve_id`,\n`reference_tenor`) describe the contract but are **not priceable by the\nstandalone `RangeAccrual` pricers**, which support equity/FX (GBM)\nunderlyings only and return a validation error when these fields are set.\nPrice rate-linked range accrual notes through\n[`CallableRangeAccrual`](crate::instruments::exotics::callable_range_accrual)\n(whose `range_accrual` field carries these [`RangeAccrualTerms`]), which\nmodels the reference rate under HW1F and reconstructs the term rate per\nobservation.",
+      "description": "Range accrual instrument.\n\nRange accrual notes pay coupons that accrue only when a reference rate or asset\nstays within a specified range. The accrual is proportional to the number of\nobservation dates where the underlying is within [lower_bound, upper_bound].\n\n# Bounds Interpretation\n\nThe `bounds_type` field controls how `lower_bound` and `upper_bound` are interpreted:\n- `Absolute`: Bounds are absolute price levels (e.g., 4500.0 for SPX at 4700)\n- `RelativeToInitialSpot`: Bounds are multipliers of the initial spot (e.g., 0.95 = 95%)\n\n# Historical Fixings\n\nFor mid-life valuations, use `past_observations_in_range` to specify how many past\nobservations were in range. The pricer will add this to expected future fixings.\n\n# Rate-Linked Underlyings: Pricing Routing\n\nThe rate-linked fields (`index_id`, `forward_curve_id`,\n`index_tenor`) describe the contract but are **not priceable by the\nstandalone `RangeAccrual` pricers**, which support equity/FX (GBM)\nunderlyings only and return a validation error when these fields are set.\nPrice rate-linked range accrual notes through\n[`CallableRangeAccrual`](crate::instruments::exotics::callable_range_accrual)\n(whose `range_accrual` field carries these [`RangeAccrualTerms`]), which\nmodels the reference rate under HW1F and reconstructs the term rate per\nobservation.",
       "properties": {
-        "accrual_start_date": {
-          "$ref": "#/$defs/d_1b2ccb88c9229e7463e8",
-          "description": "Contractual accrual-period start date."
-        },
         "attributes": {
           "$ref": "#/$defs/d_2c88e4d1e2e4f7c22e02",
           "description": "Attributes for scenario selection and grouping"
@@ -4197,9 +4193,42 @@
           ],
           "description": "Optional dividend-yield scalar ID"
         },
+        "forward_curve_id": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/d_9c3fc047c6fea21344ad"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Rates forward curve that projects the observed index of a rate-linked range accrual."
+        },
         "id": {
           "$ref": "#/$defs/d_9c3fc047c6fea21344ad",
           "description": "Unique instrument identifier"
+        },
+        "index_id": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/d_9c3fc047c6fea21344ad"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Rate-index identity (e.g. `USD-SOFR`) of a rate-linked range accrual."
+        },
+        "index_tenor": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/d_47e5e74524615b78a19f"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Contractual tenor of the observed rate index."
         },
         "instrument_pricing_overrides": {
           "$ref": "#/$defs/d_c08279a20372931820e0",
@@ -4246,17 +4275,6 @@
           "default": null,
           "description": "Optional payment date (defaults to last observation date)"
         },
-        "projection_curve_id": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/d_9c3fc047c6fea21344ad"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "Projection curve for a rate-linked range accrual."
-        },
         "quanto": {
           "anyOf": [
             {
@@ -4268,28 +4286,6 @@
           ],
           "description": "Optional quanto adjustment parameters. When provided, applies a drift\ncorrection for instruments whose payoff currency differs from the\nunderlying asset currency."
         },
-        "rate_index_id": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/d_9c3fc047c6fea21344ad"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "Explicit rate index for rate-linked range accruals."
-        },
-        "reference_tenor": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/d_47e5e74524615b78a19f"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "Contractual tenor of the observed reference rate."
-        },
         "scenario_pricing_overrides": {
           "$ref": "#/$defs/d_f80c8a31d359e1cb5dd4",
           "description": "Scenario-only pricing adjustments."
@@ -4297,6 +4293,10 @@
         "spot_id": {
           "$ref": "#/$defs/d_9c3fc047c6fea21344ad",
           "description": "Spot price identifier"
+        },
+        "start_date": {
+          "$ref": "#/$defs/d_1b2ccb88c9229e7463e8",
+          "description": "Contractual accrual-period start date."
         },
         "total_past_observations": {
           "description": "Total number of past observations (for mid-life valuations).\nMust be provided if `past_observations_in_range` is set.",
@@ -4330,7 +4330,7 @@
         "coupon_rate",
         "notional",
         "day_count",
-        "accrual_start_date",
+        "start_date",
         "discount_curve_id",
         "spot_id",
         "vol_surface_id",

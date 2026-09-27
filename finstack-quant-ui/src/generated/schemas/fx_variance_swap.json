@@ -1215,8 +1215,8 @@
           "description": "Attributes for scenario selection and tagging"
         },
         "base_calendar_id": {
-          "description": "Base-currency calendar used in the joint observation calendar.",
-          "type": "string"
+          "$ref": "#/$defs/d_9c3fc047c6fea21344ad",
+          "description": "Base-currency calendar used in the joint observation calendar."
         },
         "base_currency": {
           "$ref": "#/$defs/d_be98333e68c25ab5ae57",
@@ -1232,7 +1232,8 @@
         },
         "day_count": {
           "$ref": "#/$defs/d_c0401254ec268b317b65",
-          "description": "Day count convention for time calculations"
+          "default": "act_365f",
+          "description": "Day count convention for time calculations (defaults to ACT/365F)."
         },
         "domestic_discount_curve_id": {
           "$ref": "#/$defs/d_9c3fc047c6fea21344ad",
@@ -1301,8 +1302,8 @@
           ]
         },
         "quote_calendar_id": {
-          "description": "Quote-currency calendar used in the joint observation calendar.",
-          "type": "string"
+          "$ref": "#/$defs/d_9c3fc047c6fea21344ad",
+          "description": "Quote-currency calendar used in the joint observation calendar."
         },
         "quote_currency": {
           "$ref": "#/$defs/d_be98333e68c25ab5ae57",
@@ -1334,11 +1335,15 @@
           "description": "Pay/receive variance"
         },
         "spot_id": {
-          "description": "Optional spot identifier used to look up historical series.",
-          "type": [
-            "string",
-            "null"
-          ]
+          "anyOf": [
+            {
+              "$ref": "#/$defs/d_9c3fc047c6fea21344ad"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Optional spot identifier used to look up historical series."
         },
         "start_date": {
           "$ref": "#/$defs/d_1b2ccb88c9229e7463e8",
@@ -1375,7 +1380,6 @@
         "domestic_discount_curve_id",
         "foreign_discount_curve_id",
         "vol_surface_id",
-        "day_count",
         "attributes"
       ],
       "type": "object"

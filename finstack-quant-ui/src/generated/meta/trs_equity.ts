@@ -440,7 +440,7 @@ export default [
   {
     "path": "#/$defs/d_14a97e9c761228d7d7fa",
     "source": "https://finstack_quant.dev/schemas/instrument/1/equity/trs_equity.schema.json#/$defs/TrsScheduleSpec",
-    "description": "Schedule specification for TRS payment periods.\n\nDefines the payment schedule and frequency for both legs of the TRS.\nThis is shared between equity and fixed income TRS instruments.\n\n# Examples\n\n```\nuse finstack_quant_valuations::instruments::TrsScheduleSpec;\nuse finstack_quant_cashflows::builder::ScheduleParams;\nuse finstack_quant_core::dates::{Date, Tenor, DayCount, BusinessDayConvention, StubKind};\n\nlet schedule = TrsScheduleSpec::from_params(\n    Date::from_calendar_date(2024, time::Month::January, 1).unwrap(),\n    Date::from_calendar_date(2025, time::Month::January, 1).unwrap(),\n    ScheduleParams {\n        frequency: Tenor::quarterly(),\n        day_count: DayCount::Act360,\n        business_day_convention: BusinessDayConvention::Following,\n        calendar_id: \"weekends_only\".to_string(),\n        stub: StubKind::None,\n        end_of_month: false,\n        payment_lag_days: 0,\n        adjust_accrual_dates: false,\n        roll_rule: finstack_quant_cashflows::builder::specs::RollRule::None,\n    },\n);\n```"
+    "description": "Schedule specification for TRS payment periods.\n\nDefines the payment schedule and frequency for both legs of the TRS.\nThis is shared between equity and fixed income TRS instruments.\n\n# Examples\n\n```\nuse finstack_quant_valuations::instruments::TrsScheduleSpec;\nuse finstack_quant_cashflows::builder::ScheduleParams;\nuse finstack_quant_core::dates::{Date, Tenor, DayCount, BusinessDayConvention, StubKind};\n\nlet schedule = TrsScheduleSpec::from_params(\n    Date::from_calendar_date(2024, time::Month::January, 1).unwrap(),\n    Date::from_calendar_date(2025, time::Month::January, 1).unwrap(),\n    ScheduleParams {\n        frequency: Tenor::quarterly(),\n        day_count: DayCount::Act360,\n        business_day_convention: BusinessDayConvention::Following,\n        calendar_id: \"weekends_only\".into(),\n        stub: StubKind::None,\n        end_of_month: false,\n        payment_lag_days: 0,\n        adjust_accrual_dates: false,\n        roll_rule: finstack_quant_cashflows::builder::specs::RollRule::None,\n    },\n);\n```"
   },
   {
     "path": "#/$defs/d_14a97e9c761228d7d7fa/properties/end",
@@ -523,7 +523,9 @@ export default [
   {
     "path": "#/$defs/d_176cce21985eadf0161c/properties/calendar_id",
     "source": "https://finstack_quant.dev/schemas/cashflow/1/schedule_params.schema.json#/properties/calendar_id",
-    "description": "Holiday calendar identifier used together with `business_day_convention`.\n\nUse `\"weekends_only\"` when only Saturday/Sunday adjustment is needed."
+    "description": "Holiday calendar identifier used together with `business_day_convention`.\n\nUse `\"weekends_only\"` when only Saturday/Sunday adjustment is needed.",
+    "ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/id.schema.json#"
   },
   {
     "path": "#/$defs/d_176cce21985eadf0161c/properties/day_count",

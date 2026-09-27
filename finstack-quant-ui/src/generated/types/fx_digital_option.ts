@@ -165,7 +165,7 @@ export type Currency =
   | "ZMW"
   | "ZWL";
 /**
- * Day count convention
+ * Day count convention (defaults to ACT/365F).
  */
 export type DayCount =
   | "one_one"
@@ -670,7 +670,7 @@ export interface D_8815113Da8F358631817 {
 export interface D_7Acc8Ad9E320Efcfa909 {
   attributes: Attributes;
   base_currency: Currency;
-  day_count: DayCount;
+  day_count?: DayCount;
   domestic_discount_curve_id: Id;
   expiry: Date;
   foreign_discount_curve_id: Id1;

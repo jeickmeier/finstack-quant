@@ -35,6 +35,10 @@ export type Id1 = string;
  */
 export type Id2 = string;
 /**
+ * Opaque string identifier.
+ */
+export type Id3 = string;
+/**
  * A phantom-typed identifier that prevents mixing different kinds of IDs.
  *
  * This type wraps a string identifier with a phantom type parameter to ensure
@@ -125,9 +129,9 @@ export type D_02A11B30Ee627630F221 = "per_name" | "large_homogeneous";
  */
 export type DEc89Adc17436F33De839 = "black" | "normal";
 /**
- * Swaption volatility surface for long tenor.
+ * Opaque string identifier.
  */
-export type Id3 = string;
+export type Id4 = string;
 /**
  * Basis used for bond duration, convexity, and DV01-style risk metrics.
  */
@@ -307,36 +311,13 @@ export type DB556Bbeb1Ecf96C44C5A =
  */
 export type Date1 = string;
 /**
- * Swaption volatility surface for short tenor.
+ * Opaque string identifier.
  */
-export type Id4 = string;
+export type Id5 = string;
 /**
- * Standard interest rate swap conventions by region.
- *
- * # Market Standards Reference (Post-IBOR Transition)
- *
- * | Convention | Index | Fixed DC | Float DC | Fixed Freq | Float Freq | Reset Lag |
- * |------------|-------|----------|----------|------------|------------|-----------|
- * | USD OIS | SOFR | 30/360 | ACT/360 | Semi-annual | Annual | T-2 |
- * | EUR OIS | ESTR | 30/360 | ACT/360 | Annual | Annual | T-2 |
- * | EUR IBOR | EURIBOR | 30/360 | ACT/360 | Annual | Semi-annual | T-2 |
- * | GBP OIS | SONIA | ACT/365F | ACT/365F | Annual | Annual | T-0 |
- * | JPY OIS | TONAR | ACT/365F | ACT/365F | Semi-annual | Annual | T-2 |
- *
- * # OIS Compounding
- *
- * Note: OIS swaps (SOFR, ESTR, SONIA, TONAR) use **daily compounded** rates
- * with observation shift (typically 2 days lookback). The float frequency
- * indicates the payment/reset frequency, not the compounding frequency.
- * See compounding method guidance below for details.
- *
- * # Sources
- *
- * - ISDA 2021 IBOR Fallbacks Protocol
- * - Bloomberg SWDF function
- * - QuantLib OvernightIndexedSwap conventions
+ * Strike on the CMS spread as a decimal rate (0.005 = 50bp).
  */
-export type D_45D82C6E6B472F5D9Bca = "usd_sofr" | "eur_estr" | "eur_euribor" | "gbp_sonia" | "jpy_tonar";
+export type Decimal = string;
 /**
  * Day-count convention.
  */
@@ -401,12 +382,19 @@ export interface DFf58Eb1D8C0Cb6416B15 {
   correlation: number;
   day_count: DayCount;
   discount_curve_id: Id;
-  expiry_date: Date;
+  expiry: Date;
   forward_curve_id: Id1;
   id: Id2;
+  /**
+   * Rate-index convention-registry key of the underlying CMS swaps (e.g. `EUR-ESTR-OIS`).
+   *
+   * When set, provides default values for the fixed/float frequency and
+   * day count. Individual fields still override the convention when set.
+   */
+  index_id?: Id3 | null;
   instrument_pricing_overrides?: InstrumentPricingOverrides;
   long_cms_tenor: Tenor;
-  long_vol_surface_id: Id3;
+  long_vol_surface_id: Id4;
   metric_pricing_overrides?: MetricPricingOverrides;
   notional: Money;
   /**
@@ -416,22 +404,12 @@ export interface DFf58Eb1D8C0Cb6416B15 {
   payment_date: Date1;
   scenario_pricing_overrides?: ScenarioPricingOverrides;
   short_cms_tenor: Tenor1;
-  short_vol_surface_id: Id4;
-  /**
-   * Strike spread (in decimal, e.g., 0.005 = 50bp).
-   */
-  strike: number;
-  /**
-   * IRS convention for the underlying CMS swaps (e.g. `EurEstr`).
-   *
-   * When set, provides default values for the fixed/float frequency and
-   * day count. Individual fields still override the convention when set.
-   */
-  swap_convention?: D_45D82C6E6B472F5D9Bca | null;
+  short_vol_surface_id: Id5;
+  strike: Decimal;
   /**
    * Fixed leg day count of the underlying CMS swaps (overrides convention).
    */
-  swap_day_count?: DayCount1 | null;
+  swap_fixed_day_count?: DayCount1 | null;
   /**
    * Fixed leg frequency of the underlying CMS swaps (overrides convention).
    */

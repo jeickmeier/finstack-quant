@@ -12,14 +12,10 @@
           "day_count": "act_365f",
           "div_yield_id": "NKY-DIV",
           "domestic_discount_curve_id": "USD-OIS",
-          "equity_strike": {
-            "amount": "35000",
-            "currency": "JPY"
-          },
           "expiry": "2030-06-21",
           "foreign_discount_curve_id": "JPY-OIS",
-          "fx_rate_id": "JPYUSD-SPOT",
-          "fx_vol_id": "JPYUSD-VOL",
+          "fx_spot_id": "JPYUSD-SPOT",
+          "fx_vol_surface_id": "JPYUSD-VOL",
           "id": "QUANTO-NKY-USD-CALL",
           "notional": {
             "amount": "1000000",
@@ -27,9 +23,10 @@
           },
           "option_type": "call",
           "payoff_fx_rate": 0.007142857142857143,
+          "quantity": 4000,
           "quote_currency": "USD",
           "spot_id": "NKY-SPOT",
-          "underlying_quantity": 4000,
+          "strike": 35000,
           "underlying_ticker": "NKY",
           "vol_surface_id": "NKY-VOL"
         },
@@ -4300,7 +4297,8 @@
         },
         "day_count": {
           "$ref": "#/$defs/d_c0401254ec268b317b65",
-          "description": "Day count convention."
+          "default": "act_365f",
+          "description": "Day count convention (defaults to ACT/365F)."
         },
         "div_yield_id": {
           "anyOf": [
@@ -4318,10 +4316,6 @@
           "$ref": "#/$defs/d_9c3fc047c6fea21344ad",
           "description": "Discount curve ID (domestic currency)."
         },
-        "equity_strike": {
-          "$ref": "#/$defs/d_4ba43030fede59fe5993",
-          "description": "Strike price for equity option."
-        },
         "expiry": {
           "$ref": "#/$defs/d_1b2ccb88c9229e7463e8",
           "description": "Option expiry date."
@@ -4330,15 +4324,19 @@
           "$ref": "#/$defs/d_9c3fc047c6fea21344ad",
           "description": "Discount curve ID (foreign currency)."
         },
-        "fx_rate_id": {
+        "fx_spot_id": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/d_9c3fc047c6fea21344ad"
+            },
+            {
+              "type": "null"
+            }
+          ],
           "default": null,
-          "description": "Optional FX rate identifier.",
-          "type": [
-            "string",
-            "null"
-          ]
+          "description": "Optional FX rate identifier."
         },
-        "fx_vol_id": {
+        "fx_vol_surface_id": {
           "anyOf": [
             {
               "$ref": "#/$defs/d_9c3fc047c6fea21344ad"
@@ -4383,6 +4381,15 @@
             "null"
           ]
         },
+        "quantity": {
+          "default": null,
+          "description": "Number of underlying units covered by the option payoff.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
         "quote_currency": {
           "$ref": "#/$defs/d_be98333e68c25ab5ae57",
           "description": "Quote currency (payment/settlement currency)."
@@ -4396,14 +4403,10 @@
           "$ref": "#/$defs/d_9c3fc047c6fea21344ad",
           "description": "Equity spot price identifier."
         },
-        "underlying_quantity": {
-          "default": null,
-          "description": "Number of underlying units covered by the option payoff.",
+        "strike": {
+          "description": "Per-unit strike of the equity underlying, in `base_currency` price units.",
           "format": "double",
-          "type": [
-            "number",
-            "null"
-          ]
+          "type": "number"
         },
         "underlying_ticker": {
           "description": "Underlying equity ticker symbol.",
@@ -4417,14 +4420,13 @@
       "required": [
         "id",
         "underlying_ticker",
-        "equity_strike",
+        "strike",
         "option_type",
         "expiry",
         "notional",
         "base_currency",
         "quote_currency",
         "correlation",
-        "day_count",
         "domestic_discount_curve_id",
         "foreign_discount_curve_id",
         "spot_id",

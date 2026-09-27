@@ -228,7 +228,7 @@ def test_cds_tranche_builder_setters_accept_keyword_value() -> None:
         .discount_curve_id(value="USD-OIS")
         .credit_index_id(value="CDX-IG-42-CURVE")
         .side(value="buy_protection")
-        .effective_date(value=datetime.date(2024, 6, 20))
+        .start_date(value=datetime.date(2024, 6, 20))
         .realized_loss(value=0.01)
         .roll_rule(value=RollRule.NONE)
         .build()
@@ -255,6 +255,7 @@ def test_convertible_bond_builder_setters_accept_keyword_value() -> None:
         .discount_curve_id(value="USD-OIS")
         .credit_curve_id(value="USD-CREDIT-BBB")
         .conversion(value=conversion)
+        .cashflow_spec(value=ConvertibleBond.example().cashflow_spec)
         .spot_id(value="ACME")
         .vol_surface_id(value="ACME-VOL")
         .settlement_days(value=2)
@@ -305,7 +306,7 @@ def test_rep_line_accepts_keyword_arguments() -> None:
 
 
 def test_asset_pool_accepts_keyword_arguments() -> None:
-    pool = AssetPool(id="POOL-KW", deal_type="abs", base_currency=Currency("USD"))
+    pool = AssetPool(id="POOL-KW", deal_type="abs", currency=Currency("USD"))
     assert "POOL-KW" in repr(pool)
     with_lines = pool.with_rep_lines(rep_lines=[_single_rep_line()])
     assert "POOL-KW" in repr(with_lines)

@@ -58,7 +58,7 @@ POOL_SETTERS = {
     "excess_spread_account": "with_accounts",
     "original_balance": "with_accounts",
 }
-POOL_CONSTRUCTOR_FIELDS = {"id", "deal_type", "base_currency"}
+POOL_CONSTRUCTOR_FIELDS = {"id", "deal_type", "currency"}
 
 
 def _fields(definition: str, document_name: str = "structured_credit.schema.json") -> set[str]:

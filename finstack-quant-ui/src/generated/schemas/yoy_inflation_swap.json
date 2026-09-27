@@ -19,8 +19,8 @@
           },
           "id": "YOYSWAP-USD-5Y",
           "inflation_index_id": "US-CPI",
-          "interpolation_override": null,
-          "lag_override": {
+          "interpolation": null,
+          "lag": {
             "months": 3
           },
           "maturity": "2029-01-15",
@@ -1307,7 +1307,7 @@
           "$ref": "#/$defs/d_c08279a20372931820e0",
           "description": "Instrument-owned pricing inputs."
         },
-        "interpolation_override": {
+        "interpolation": {
           "anyOf": [
             {
               "$ref": "#/$defs/d_3f9f853d11e3e642afa6"
@@ -1316,9 +1316,9 @@
               "type": "null"
             }
           ],
-          "description": "Contractual monthly reference-index interpolation. Overrides index metadata;\nwithout either source the default is monthly step interpolation."
+          "description": "Contractual monthly reference-index interpolation; takes precedence over index metadata;\nwithout either source the default is monthly step interpolation."
         },
-        "lag_override": {
+        "lag": {
           "anyOf": [
             {
               "$ref": "#/$defs/d_af2460f03219a318a4c9"
@@ -1327,7 +1327,7 @@
               "type": "null"
             }
           ],
-          "description": "Optional contract-level lag override (if set, overrides index lag)"
+          "description": "Contractual CPI observation lag; when `None` the index lag, then the\ncurve's indexation lag, applies."
         },
         "maturity": {
           "$ref": "#/$defs/d_1b2ccb88c9229e7463e8",

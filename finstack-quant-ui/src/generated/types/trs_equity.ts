@@ -523,6 +523,12 @@ export type Date1 = string;
 export type BusinessDayConvention =
   "unadjusted" | "following" | "modified_following" | "preceding" | "modified_preceding" | "nearest";
 /**
+ * Holiday calendar identifier used together with `business_day_convention`.
+ *
+ * Use `"weekends_only"` when only Saturday/Sunday adjustment is needed.
+ */
+export type Id4 = string;
+/**
  * Day-count convention used to convert each generated accrual period into a
  * year fraction.
  */
@@ -710,11 +716,11 @@ export type Currency1 =
 /**
  * Opaque string identifier.
  */
-export type Id4 = string;
+export type Id5 = string;
 /**
  * Opaque string identifier.
  */
-export type Id5 = string;
+export type Id6 = string;
 /**
  * Canonical schema marker for persisted instrument envelopes.
  */
@@ -3360,12 +3366,7 @@ export interface ScheduleParams {
    */
   adjust_accrual_dates?: boolean;
   business_day_convention?: BusinessDayConvention;
-  /**
-   * Holiday calendar identifier used together with `business_day_convention`.
-   *
-   * Use `"weekends_only"` when only Saturday/Sunday adjustment is needed.
-   */
-  calendar_id: string;
+  calendar_id: Id4;
   day_count: DayCount1;
   /**
    * Whether end-of-month rolling should be preserved when generating the
@@ -3420,8 +3421,8 @@ export interface D_3907A55Cf33393B0F707 {
   /**
    * Optional dividend yield identifier
    */
-  div_yield_id?: Id4 | null;
-  spot_id: Id5;
+  div_yield_id?: Id5 | null;
+  spot_id: Id6;
   /**
    * Underlying ticker/identifier
    */

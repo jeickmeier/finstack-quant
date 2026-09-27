@@ -19,8 +19,8 @@ export default [
             "leg1_vol_surface_id": "RBOB-VOL",
             "leg2_forward_curve_id": "WTI-FORWARD",
             "leg2_vol_surface_id": "WTI-VOL",
-            "notional": 10000,
             "option_type": "call",
+            "quantity": 10000,
             "strike": 5
           },
           "type": "commodity_spread_option"
@@ -729,7 +729,7 @@ export default [
   {
     "path": "#/$defs/d_4ddd0cf1e26b0b417f39",
     "source": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_spread_option.schema.json#/$defs/CommoditySpreadOption",
-    "description": "Commodity spread option: option on the price difference between two commodities.\n\nPays max(S1 - S2 - K, 0) for calls, max(K - (S1 - S2), 0) for puts.\n\n# Kirk's Approximation\n\nThe spread option is priced using Kirk's approximation, which maps the\ntwo-asset problem into a single-asset Black-76 framework:\n\n1. Forward prices F1, F2 from respective price curves\n2. Adjusted strike: K_adj = F2 + K\n3. Kirk's volatility:\n   sigma_kirk = sqrt(sigma1^2 - 2*rho*sigma1*sigma2*F2/(F2+K) + (sigma2*F2/(F2+K))^2)\n4. Price via Black-76 on F1 vs K_adj with sigma_kirk\n\nFor puts, put-call parity is used: P = C - DF * (F1 - F2 - K)\n\n# Correlation\n\nThe `correlation` parameter captures the co-movement between the two\ncommodity prices. Higher correlation reduces the effective spread volatility\nand hence the option price. The correlation must be in [-1, 1].\n\n# Example\n\n```\nuse finstack_quant_valuations::instruments::commodity::CommoditySpreadOption;\nuse finstack_quant_valuations::instruments::OptionType;\nuse finstack_quant_core::types::{CurveId, InstrumentId};\nuse time::macros::date;\n\nlet spread_opt = CommoditySpreadOption::builder()\n    .id(InstrumentId::new(\"WTI-RBOB-CRACK-SPREAD\"))\n    .currency(finstack_quant_core::currency::Currency::USD)\n    .option_type(OptionType::Call)\n    .expiry(date!(2025-06-15))\n    .strike(10.0)           // $10/bbl crack spread strike\n    .notional(1000.0)\n    .leg1_forward_curve_id(CurveId::new(\"RBOB-FORWARD\"))\n    .leg2_forward_curve_id(CurveId::new(\"WTI-FORWARD\"))\n    .leg1_vol_surface_id(CurveId::new(\"RBOB-VOL\"))\n    .leg2_vol_surface_id(CurveId::new(\"WTI-VOL\"))\n    .discount_curve_id(CurveId::new(\"USD-OIS\"))\n    .correlation(0.85)\n    .build()\n    .expect(\"Valid spread option\");\n```"
+    "description": "Commodity spread option: option on the price difference between two commodities.\n\nPays max(S1 - S2 - K, 0) for calls, max(K - (S1 - S2), 0) for puts.\n\n# Kirk's Approximation\n\nThe spread option is priced using Kirk's approximation, which maps the\ntwo-asset problem into a single-asset Black-76 framework:\n\n1. Forward prices F1, F2 from respective price curves\n2. Adjusted strike: K_adj = F2 + K\n3. Kirk's volatility:\n   sigma_kirk = sqrt(sigma1^2 - 2*rho*sigma1*sigma2*F2/(F2+K) + (sigma2*F2/(F2+K))^2)\n4. Price via Black-76 on F1 vs K_adj with sigma_kirk\n\nFor puts, put-call parity is used: P = C - DF * (F1 - F2 - K)\n\n# Correlation\n\nThe `correlation` parameter captures the co-movement between the two\ncommodity prices. Higher correlation reduces the effective spread volatility\nand hence the option price. The correlation must be in [-1, 1].\n\n# Example\n\n```\nuse finstack_quant_valuations::instruments::commodity::CommoditySpreadOption;\nuse finstack_quant_valuations::instruments::OptionType;\nuse finstack_quant_core::types::{CurveId, InstrumentId};\nuse time::macros::date;\n\nlet spread_opt = CommoditySpreadOption::builder()\n    .id(InstrumentId::new(\"WTI-RBOB-CRACK-SPREAD\"))\n    .currency(finstack_quant_core::currency::Currency::USD)\n    .option_type(OptionType::Call)\n    .expiry(date!(2025-06-15))\n    .strike(10.0)           // $10/bbl crack spread strike\n    .quantity(1000.0)\n    .leg1_forward_curve_id(CurveId::new(\"RBOB-FORWARD\"))\n    .leg2_forward_curve_id(CurveId::new(\"WTI-FORWARD\"))\n    .leg1_vol_surface_id(CurveId::new(\"RBOB-VOL\"))\n    .leg2_vol_surface_id(CurveId::new(\"WTI-VOL\"))\n    .discount_curve_id(CurveId::new(\"USD-OIS\"))\n    .correlation(0.85)\n    .build()\n    .expect(\"Valid spread option\");\n```"
   },
   {
     "path": "#/$defs/d_4ddd0cf1e26b0b417f39/properties/attributes",
@@ -825,18 +825,18 @@ export default [
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json#"
   },
   {
-    "path": "#/$defs/d_4ddd0cf1e26b0b417f39/properties/notional",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_spread_option.schema.json#/$defs/CommoditySpreadOption/properties/notional",
-    "description": "Notional quantity (number of units).",
-    "ref": "#/$defs/PositiveF64Wire",
-    "resolvedRef": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_spread_option.schema.json#/$defs/PositiveF64Wire"
-  },
-  {
     "path": "#/$defs/d_4ddd0cf1e26b0b417f39/properties/option_type",
     "source": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_spread_option.schema.json#/$defs/CommoditySpreadOption/properties/option_type",
     "description": "Option type (call or put on the spread S1 - S2).",
     "ref": "#/$defs/OptionType",
     "resolvedRef": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_spread_option.schema.json#/$defs/OptionType"
+  },
+  {
+    "path": "#/$defs/d_4ddd0cf1e26b0b417f39/properties/quantity",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_spread_option.schema.json#/$defs/CommoditySpreadOption/properties/quantity",
+    "description": "Notional quantity (number of units).",
+    "ref": "#/$defs/PositiveF64Wire",
+    "resolvedRef": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_spread_option.schema.json#/$defs/PositiveF64Wire"
   },
   {
     "path": "#/$defs/d_4ddd0cf1e26b0b417f39/properties/scenario_pricing_overrides",

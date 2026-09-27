@@ -197,6 +197,7 @@ class TestConvertibleBondTyped:
             .discount_curve_id("USD-OIS")
             .credit_curve_id("USD-CREDIT-BBB")
             .conversion(conversion)
+            .cashflow_spec(ConvertibleBond.example().cashflow_spec)
             .spot_id("ACME")
             .vol_surface_id("ACME-VOL")
             .settlement_days(2)

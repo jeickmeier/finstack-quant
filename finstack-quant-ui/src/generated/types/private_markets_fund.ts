@@ -441,7 +441,8 @@ export type DB556Bbeb1Ecf96C44C5A =
   | "ZMW"
   | "ZWL";
 /**
- * Day count basis for IRR calculations
+ * Day count for LP/fund IRR year fractions and hurdle compounding
+ * `(1 + hurdle_irr)^years` (default Act/365F)
  */
 export type DayCount =
   | "one_one"
@@ -465,10 +466,10 @@ export type D_40C29976C86Ef72069C6 =
   | {
       preferred_irr: {
         /**
-         * Irr.
+         * LP preferred-return hurdle as an annual decimal IRR (`0.08` = 8%),
+         * compounded on the spec's `day_count`.
          */
-        irr: number;
-        [k: string]: unknown;
+        hurdle_irr: number;
       };
     }
   | {
@@ -481,7 +482,6 @@ export type D_40C29976C86Ef72069C6 =
          * follows.
          */
         gp_share: number;
-        [k: string]: unknown;
       };
     }
   | {
@@ -491,13 +491,16 @@ export type D_40C29976C86Ef72069C6 =
          * `lp_share`.
          */
         gp_share: number;
-        hurdle: DBddf5Dccfbc7D1810795;
+        /**
+         * Annual decimal IRR hurdle (`0.12` = 12%) the LP must reach (at
+         * 100% payout) before this tier's split activates.
+         */
+        hurdle_irr: number;
         /**
          * LP share of each split dollar, in `[0, 1]`; must sum to 1 with
          * `gp_share`.
          */
         lp_share: number;
-        [k: string]: unknown;
       };
     };
 /**
@@ -1875,12 +1878,12 @@ export interface DB615D613Cb81Bc46Fa6E {
   /**
    * Catch-up mode
    */
-  catchup_mode?: "full" | "partial";
+  catch_up_mode?: "full" | "partial";
   /**
-   * Optional clawback specification
+   * Clawback specification; `None` means no clawback (presence is the switch)
    */
   clawback?: DEfbdfcaec74Cc53Cfacb | null;
-  irr_basis?: DayCount;
+  day_count?: DayCount;
   /**
    * Allocation style (European vs American)
    */
@@ -1895,10 +1898,6 @@ export interface DB615D613Cb81Bc46Fa6E {
  */
 export interface DEfbdfcaec74Cc53Cfacb {
   /**
-   * Whether clawback is enabled
-   */
-  enable: boolean;
-  /**
    * Optional share of GP carry held back until settlement, as a decimal
    * fraction in `[0, 1]` (`0.2` = 20%)
    */
@@ -1907,17 +1906,4 @@ export interface DEfbdfcaec74Cc53Cfacb {
    * When to settle clawback
    */
   settle_on: "fund_end" | "periodic";
-}
-/**
- * IRR hurdle the LP must reach (at 100% payout) before this tier's
- * split activates.
- */
-export interface DBddf5Dccfbc7D1810795 {
-  irr: {
-    /**
-     * Rate.
-     */
-    rate: number;
-    [k: string]: unknown;
-  };
 }

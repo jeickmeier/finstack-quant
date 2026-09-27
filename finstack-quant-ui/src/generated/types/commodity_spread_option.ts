@@ -527,7 +527,7 @@ export interface D_3B27D43E9174707C7567 {
  *     .option_type(OptionType::Call)
  *     .expiry(date!(2025-06-15))
  *     .strike(10.0)           // $10/bbl crack spread strike
- *     .notional(1000.0)
+ *     .quantity(1000.0)
  *     .leg1_forward_curve_id(CurveId::new("RBOB-FORWARD"))
  *     .leg2_forward_curve_id(CurveId::new("WTI-FORWARD"))
  *     .leg1_vol_surface_id(CurveId::new("RBOB-VOL"))
@@ -556,13 +556,13 @@ export interface D_4Ddd0Cf1E26B0B417F39 {
   leg2_vol_surface_id: Id5;
   metric_pricing_overrides?: MetricPricingOverrides;
   /**
-   * Notional quantity (number of units).
-   */
-  notional: number;
-  /**
    * Option type (call or put on the spread S1 - S2).
    */
   option_type: "call" | "put";
+  /**
+   * Notional quantity (number of units).
+   */
+  quantity: number;
   scenario_pricing_overrides?: ScenarioPricingOverrides;
   /**
    * Spread strike price K in the payoff max(S1 - S2 - K, 0).

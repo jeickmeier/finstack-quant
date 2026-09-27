@@ -6,6 +6,47 @@
  */
 export type DB375E274438Ab847F1Fc = string;
 /**
+ * A phantom-typed identifier that prevents mixing different kinds of IDs.
+ *
+ * This type wraps a string identifier with a phantom type parameter to ensure
+ * type safety at compile time. Different `Id<T>` types with different `T`
+ * cannot be compared or mixed accidentally, preventing entire classes of bugs.
+ *
+ * # Type Parameters
+ *
+ * * `T` - Phantom type tag that distinguishes this ID from IDs with different tags
+ *
+ * # Invariants
+ *
+ * - Storage uses `Arc<str>` for efficient cloning
+ * - The phantom marker has zero size and runtime cost
+ * - Two `Id<T>` values are equal if their string values are equal
+ * - IDs with different type tags (`Id<A>` vs `Id<B>`) cannot be compared
+ *
+ * # Examples
+ *
+ * ```rust
+ * use finstack_quant_core::types::{CurveId, InstrumentId};
+ *
+ * // Create IDs with different type tags
+ * let curve = CurveId::from("USD-SOFR");
+ * let bond = InstrumentId::from("ISIN:US912828XG60");
+ *
+ * // Can compare IDs of the same type
+ * assert_eq!(curve, CurveId::from("USD-SOFR"));
+ * assert_ne!(curve, CurveId::from("EUR-ESTR"));
+ *
+ * // Cannot compare IDs of different types (compile error):
+ * // let _ = curve == bond;  // Error: mismatched types
+ * ```
+ *
+ * # Thread Safety
+ *
+ * `Id<T>` is `Send + Sync` as it wraps an `Arc<str>`. Multiple threads can
+ * safely share and clone IDs with minimal synchronization overhead.
+ */
+export type D_557De6D70142Abc041E8 = string;
+/**
  * Supported day-count conventions with industry-standard definitions.
  *
  * Each variant implements a specific day count convention as defined by
@@ -148,6 +189,27 @@ export type D_8D25A1938646339Aff0F =
               };
             }
           | {
+              percent_of_remaining_per_period: {
+                /**
+                 * Fraction of the outstanding principal paid per period (e.g.,
+                 * 0.025 = 2.5%), in `[0, 1]`.
+                 */
+                pct: number;
+              };
+            }
+          | {
+              linear_between: {
+                /**
+                 * ISO 8601 calendar date encoded as a `YYYY-MM-DD` JSON string.
+                 */
+                end: string;
+                /**
+                 * ISO 8601 calendar date encoded as a `YYYY-MM-DD` JSON string.
+                 */
+                start: string;
+              };
+            }
+          | {
               custom_principal: {
                 /**
                  * List of `(date, principal_amount)` exchanges; amounts are absolute cashflows.
@@ -158,47 +220,6 @@ export type D_8D25A1938646339Aff0F =
         [k: string]: unknown;
       };
     };
-/**
- * A phantom-typed identifier that prevents mixing different kinds of IDs.
- *
- * This type wraps a string identifier with a phantom type parameter to ensure
- * type safety at compile time. Different `Id<T>` types with different `T`
- * cannot be compared or mixed accidentally, preventing entire classes of bugs.
- *
- * # Type Parameters
- *
- * * `T` - Phantom type tag that distinguishes this ID from IDs with different tags
- *
- * # Invariants
- *
- * - Storage uses `Arc<str>` for efficient cloning
- * - The phantom marker has zero size and runtime cost
- * - Two `Id<T>` values are equal if their string values are equal
- * - IDs with different type tags (`Id<A>` vs `Id<B>`) cannot be compared
- *
- * # Examples
- *
- * ```rust
- * use finstack_quant_core::types::{CurveId, InstrumentId};
- *
- * // Create IDs with different type tags
- * let curve = CurveId::from("USD-SOFR");
- * let bond = InstrumentId::from("ISIN:US912828XG60");
- *
- * // Can compare IDs of the same type
- * assert_eq!(curve, CurveId::from("USD-SOFR"));
- * assert_ne!(curve, CurveId::from("EUR-ESTR"));
- *
- * // Cannot compare IDs of different types (compile error):
- * // let _ = curve == bond;  // Error: mismatched types
- * ```
- *
- * # Thread Safety
- *
- * `Id<T>` is `Send + Sync` as it wraps an `Arc<str>`. Multiple threads can
- * safely share and clone IDs with minimal synchronization overhead.
- */
-export type D_557De6D70142Abc041E8 = string;
 /**
  * Per-coupon PIK behavior for the MC engine.
  *
@@ -429,22 +450,12 @@ export type DAf0B56C7Ddbd670Dfe63 =
   | "qualified_ipo"
   | "change_of_control"
   | {
-      price_trigger: {
-        /**
-         * Lookback days.
-         */
-        lookback_days: number;
-        /**
-         * Threshold.
-         */
-        threshold: number;
-        [k: string]: unknown;
-      };
+      price_trigger: D_2Bf34Fd81F4504C2B2B7;
     };
 /**
  * Upfront (arrangement or original-issue-discount) fee of a facility.
  *
- * Paid by the borrower to the lender on the commitment date. Enters the
+ * Paid by the borrower to the lender on the issue date. Enters the
  * present value only while the commitment date lies after the valuation
  * date, and the effective-interest-rate metrics always.
  */
@@ -497,7 +508,7 @@ export type D_085E3Ec82Eb8695Eaf89 =
  * use finstack_quant_core::currency::Currency;
  *
  * // 2% OID withheld from proceeds
- * let oid = OidPolicy::WithheldBp(200);  // 200 bp = 2%
+ * let oid = OidPolicy::WithheldBp(dec!(200));  // 200 bp = 2%
  *
  * // $50,000 fixed OID
  * let oid_fixed = OidPolicy::WithheldAmount(Money::from((50_000_i64, Currency::USD)));
@@ -505,13 +516,13 @@ export type D_085E3Ec82Eb8695Eaf89 =
  */
 export type D_369F1A09E65Be1364D06 =
   | {
-      withheld_bp: number;
+      withheld_bp: DB375E274438Ab847F1Fc;
     }
   | {
       withheld_amount: DD5Bd42D8B6Ec6C31D7861;
     }
   | {
-      separate_bp: number;
+      separate_bp: DB375E274438Ab847F1Fc;
     }
   | {
       separate_amount: DD5Bd42D8B6Ec6C31D7861;
@@ -946,6 +957,27 @@ export interface D_0C72F5Cb09B10476Ecb7 {
                 };
               }
             | {
+                percent_of_remaining_per_period: {
+                  /**
+                   * Fraction of the outstanding principal paid per period (e.g.,
+                   * 0.025 = 2.5%), in `[0, 1]`.
+                   */
+                  pct: number;
+                };
+              }
+            | {
+                linear_between: {
+                  /**
+                   * ISO 8601 calendar date encoded as a `YYYY-MM-DD` JSON string.
+                   */
+                  end: string;
+                  /**
+                   * ISO 8601 calendar date encoded as a `YYYY-MM-DD` JSON string.
+                   */
+                  start: string;
+                };
+              }
+            | {
                 custom_principal: {
                   /**
                    * List of `(date, principal_amount)` exchanges; amounts are absolute cashflows.
@@ -1010,15 +1042,11 @@ export interface D_0C72F5Cb09B10476Ecb7 {
   /**
    * Calendar identifier for ex-coupon day counting.
    */
-  ex_coupon_calendar_id?: string | null;
+  ex_coupon_calendar_id?: D_557De6D70142Abc041E8 | null;
   /**
    * Number of ex-coupon days before coupon date.
    */
   ex_coupon_days?: number;
-  /**
-   * Optional funding/repo curve for carry cost computation.
-   */
-  funding_curve_id?: D_557De6D70142Abc041E8 | null;
   /**
    * A phantom-typed identifier that prevents mixing different kinds of IDs.
    *
@@ -1072,6 +1100,10 @@ export interface D_0C72F5Cb09B10476Ecb7 {
   metric_pricing_overrides?: D_3883C45B3701884Ad50B;
   notional: DD5Bd42D8B6Ec6C31D7864;
   /**
+   * Optional repo (financing) discount curve for carry cost computation.
+   */
+  repo_curve_id?: D_557De6D70142Abc041E8 | null;
+  /**
    * Optional guaranteed minimum-return ("return floor") call protection.
    *
    * When present, the bond is treated as prepayable across the protection
@@ -1117,8 +1149,8 @@ export interface D_87642A02554Ab08B56E3 {
  *
  * let mut schedule = CallPutSchedule::default();
  * schedule.calls.push(CallPut {
- *     start_date: Date::from_calendar_date(2027, Month::January, 1).unwrap(),
- *     end_date: Date::from_calendar_date(2027, Month::January, 1).unwrap(),
+ *     start: Date::from_calendar_date(2027, Month::January, 1).unwrap(),
+ *     end: Date::from_calendar_date(2027, Month::January, 1).unwrap(),
  *     price_pct_of_par: 102.0,
  *     make_whole: None,
  * });
@@ -1149,8 +1181,8 @@ export interface DFb11B05Db6Ea44C39740 {
  *
  * // Discrete call option: issuer can redeem at 102% of par on Jan 1, 2027
  * let call = CallPut {
- *     start_date: Date::from_calendar_date(2027, Month::January, 1).unwrap(),
- *     end_date: Date::from_calendar_date(2027, Month::January, 1).unwrap(),
+ *     start: Date::from_calendar_date(2027, Month::January, 1).unwrap(),
+ *     end: Date::from_calendar_date(2027, Month::January, 1).unwrap(),
  *     price_pct_of_par: 102.0,
  *     make_whole: None,
  * };
@@ -1160,9 +1192,9 @@ export interface D_7912F75930D3Ff1647D0 {
   /**
    * Last date when the option can be exercised, inclusive.
    *
-   * Use the same value as `start_date` for one-day/discrete exercise.
+   * Use the same value as `start` for one-day/discrete exercise.
    */
-  end_date: string;
+  end: string;
   /**
    * Optional make-whole call specification.
    *
@@ -1185,7 +1217,7 @@ export interface D_7912F75930D3Ff1647D0 {
   /**
    * First date when the option can be exercised.
    */
-  start_date: string;
+  start: string;
 }
 /**
  * Make-whole call specification.
@@ -1489,7 +1521,48 @@ export interface D_7Af15F20A258D1Def9Dd {
    *
    * If not provided, defaults to the coupon schedule calendar.
    */
-  fixing_calendar_id?: string | null;
+  fixing_calendar_id?: D_557De6D70142Abc041E8 | null;
+  /**
+   * A phantom-typed identifier that prevents mixing different kinds of IDs.
+   *
+   * This type wraps a string identifier with a phantom type parameter to ensure
+   * type safety at compile time. Different `Id<T>` types with different `T`
+   * cannot be compared or mixed accidentally, preventing entire classes of bugs.
+   *
+   * # Type Parameters
+   *
+   * * `T` - Phantom type tag that distinguishes this ID from IDs with different tags
+   *
+   * # Invariants
+   *
+   * - Storage uses `Arc<str>` for efficient cloning
+   * - The phantom marker has zero size and runtime cost
+   * - Two `Id<T>` values are equal if their string values are equal
+   * - IDs with different type tags (`Id<A>` vs `Id<B>`) cannot be compared
+   *
+   * # Examples
+   *
+   * ```rust
+   * use finstack_quant_core::types::{CurveId, InstrumentId};
+   *
+   * // Create IDs with different type tags
+   * let curve = CurveId::from("USD-SOFR");
+   * let bond = InstrumentId::from("ISIN:US912828XG60");
+   *
+   * // Can compare IDs of the same type
+   * assert_eq!(curve, CurveId::from("USD-SOFR"));
+   * assert_ne!(curve, CurveId::from("EUR-ESTR"));
+   *
+   * // Cannot compare IDs of different types (compile error):
+   * // let _ = curve == bond;  // Error: mismatched types
+   * ```
+   *
+   * # Thread Safety
+   *
+   * `Id<T>` is `Send + Sync` as it wraps an `Arc<str>`. Multiple threads can
+   * safely share and clone IDs with minimal synchronization overhead.
+   */
+  forward_curve_id: string;
   /**
    * Exact decimal encoded only as a JSON string.
    */
@@ -1511,10 +1584,6 @@ export interface D_7Af15F20A258D1Def9Dd {
    * Example: index_floor_bp = Some(0.0) ensures index rate >= 0%.
    */
   index_floor_bp?: DB375E274438Ab847F1Fc | null;
-  /**
-   * Forward curve identifier (e.g., "USD-SOFR-3M", "EUR-EURIBOR-6M").
-   */
-  index_id: string;
   /**
    * Diagnostic tenor for term-index projection error context.
    *
@@ -1667,7 +1736,7 @@ export interface DCc937Fbaa12E32D4187E3 {
  *         frequency: Tenor::semi_annual(),
  *         day_count: DayCount::Thirty360,
  *         business_day_convention: BusinessDayConvention::Following,
- *         calendar_id: "weekends_only".to_string(),
+ *         calendar_id: "weekends_only".into(),
  *         stub: StubKind::None,
  *         end_of_month: false,
  *         payment_lag_days: 0,
@@ -1706,9 +1775,44 @@ export interface D_78D4B16242Febe84F62B {
   business_day_convention?:
     "unadjusted" | "following" | "modified_following" | "preceding" | "modified_preceding" | "nearest";
   /**
-   * Holiday calendar identifier used together with `business_day_convention`.
+   * A phantom-typed identifier that prevents mixing different kinds of IDs.
    *
-   * Use `"weekends_only"` when only Saturday/Sunday adjustment is needed.
+   * This type wraps a string identifier with a phantom type parameter to ensure
+   * type safety at compile time. Different `Id<T>` types with different `T`
+   * cannot be compared or mixed accidentally, preventing entire classes of bugs.
+   *
+   * # Type Parameters
+   *
+   * * `T` - Phantom type tag that distinguishes this ID from IDs with different tags
+   *
+   * # Invariants
+   *
+   * - Storage uses `Arc<str>` for efficient cloning
+   * - The phantom marker has zero size and runtime cost
+   * - Two `Id<T>` values are equal if their string values are equal
+   * - IDs with different type tags (`Id<A>` vs `Id<B>`) cannot be compared
+   *
+   * # Examples
+   *
+   * ```rust
+   * use finstack_quant_core::types::{CurveId, InstrumentId};
+   *
+   * // Create IDs with different type tags
+   * let curve = CurveId::from("USD-SOFR");
+   * let bond = InstrumentId::from("ISIN:US912828XG60");
+   *
+   * // Can compare IDs of the same type
+   * assert_eq!(curve, CurveId::from("USD-SOFR"));
+   * assert_ne!(curve, CurveId::from("EUR-ESTR"));
+   *
+   * // Cannot compare IDs of different types (compile error):
+   * // let _ = curve == bond;  // Error: mismatched types
+   * ```
+   *
+   * # Thread Safety
+   *
+   * `Id<T>` is `Send + Sync` as it wraps an `Arc<str>`. Multiple threads can
+   * safely share and clone IDs with minimal synchronization overhead.
    */
   calendar_id: string;
   /**
@@ -2633,9 +2737,10 @@ export interface DBba0Ef481F913F00873A {
    */
   calendar_ids: string[];
   /**
-   * Optional facility limit/commitment for instruments like RCFs.
+   * Total facility commitment for revolving and delayed-draw facilities;
+   * `None` for instruments without one.
    */
-  facility_limit?: DD5Bd42D8B6Ec6C31D7861 | null;
+  commitment?: DD5Bd42D8B6Ec6C31D7861 | null;
   /**
    * Issue date of the instrument, when known.
    *
@@ -2647,7 +2752,7 @@ export interface DBba0Ef481F913F00873A {
   /**
    * Contractual maturity date, distinct from an adjusted final payment date.
    */
-  maturity_date?: D_2331411247Fb4Fdd46Dd | null;
+  maturity?: D_2331411247Fb4Fdd46Dd | null;
   /**
    * Raw index observations used by projected floating coupons, before spread,
    * gearing, caps and floors; retained for deterministic time-roll fixings.
@@ -2708,6 +2813,27 @@ export interface D_6602Ee07128Cdbd914Fe {
            * Fraction of original notional paid per period (e.g., 0.05 = 5%).
            */
           pct: number;
+        };
+      }
+    | {
+        percent_of_remaining_per_period: {
+          /**
+           * Fraction of the outstanding principal paid per period (e.g.,
+           * 0.025 = 2.5%), in `[0, 1]`.
+           */
+          pct: number;
+        };
+      }
+    | {
+        linear_between: {
+          /**
+           * ISO 8601 calendar date encoded as a `YYYY-MM-DD` JSON string.
+           */
+          end: string;
+          /**
+           * ISO 8601 calendar date encoded as a `YYYY-MM-DD` JSON string.
+           */
+          start: string;
         };
       }
     | {
@@ -4180,6 +4306,82 @@ export interface D_174Ce9631272C7D7F4F7 {
    * Optional call/put schedule (issuer/holder redemption before maturity).
    */
   call_put?: DFb11B05Db6Ea44C39740 | null;
+  /**
+   * Coupon leg (fixed, floating, step-up or amortizing), the same type as
+   * `Bond.cashflow_spec`. A zero-coupon convertible is a fixed spec with
+   * rate `0`.
+   */
+  cashflow_spec:
+    | {
+        fixed: DCdca3F67B974113083De;
+      }
+    | {
+        floating: D_210Ab4B44Ffb533F1266;
+      }
+    | {
+        step_up: D_78D4B16242Febe84F62B;
+      }
+    | {
+        amortizing: {
+          base: D_8D25A1938646339Aff0F;
+          /**
+           * Amortization schedule.
+           */
+          schedule:
+            | "none"
+            | {
+                linear_to: {
+                  final_notional: DD5Bd42D8B6Ec6C31D786;
+                };
+              }
+            | {
+                step_remaining: {
+                  /**
+                   * Ordered list of `(date, remaining_principal_after_date)`.
+                   */
+                  schedule: [D_2331411247Fb4Fdd46Dd, DD5Bd42D8B6Ec6C31D7861][];
+                };
+              }
+            | {
+                percent_of_original_per_period: {
+                  /**
+                   * Fraction of original notional paid per period (e.g., 0.05 = 5%).
+                   */
+                  pct: number;
+                };
+              }
+            | {
+                percent_of_remaining_per_period: {
+                  /**
+                   * Fraction of the outstanding principal paid per period (e.g.,
+                   * 0.025 = 2.5%), in `[0, 1]`.
+                   */
+                  pct: number;
+                };
+              }
+            | {
+                linear_between: {
+                  /**
+                   * ISO 8601 calendar date encoded as a `YYYY-MM-DD` JSON string.
+                   */
+                  end: string;
+                  /**
+                   * ISO 8601 calendar date encoded as a `YYYY-MM-DD` JSON string.
+                   */
+                  start: string;
+                };
+              }
+            | {
+                custom_principal: {
+                  /**
+                   * List of `(date, principal_amount)` exchanges; amounts are absolute cashflows.
+                   */
+                  items: [D_2331411247Fb4Fdd46Dd, DD5Bd42D8B6Ec6C31D7861][];
+                };
+              };
+          [k: string]: unknown;
+        };
+      };
   conversion: DCda814224Ddf8B157Fc6;
   /**
    * Issuer hazard curve identifier (a `HazardCurve`, as on every credit
@@ -4235,13 +4437,11 @@ export interface D_174Ce9631272C7D7F4F7 {
    */
   discount_curve_id: string;
   /**
-   * Fixed coupon specification (if applicable).
+   * Optional unitless continuous dividend-yield scalar id (decimal,
+   * 0.02 = 2%). `None` means a zero dividend yield; a configured id must
+   * resolve.
    */
-  fixed_coupon?: DCdca3F67B974113083De | null;
-  /**
-   * Floating coupon specification (if applicable).
-   */
-  floating_coupon?: D_210Ab4B44Ffb533F1266 | null;
+  div_yield_id?: D_557De6D70142Abc041E8 | null;
   /**
    * A phantom-typed identifier that prevents mixing different kinds of IDs.
    *
@@ -4336,11 +4536,89 @@ export interface D_174Ce9631272C7D7F4F7 {
    * Broadie-Glasserman-Kou-style barrier adjustment approximating the
    * k-of-n-days observation window; the realized path is not tracked.
    */
-  soft_call_trigger?: DA40C0605B39704Ac2379 | null;
+  soft_call_trigger?: D_2Bf34Fd81F4504C2B2B7 | null;
   /**
-   * Optional underlying equity identifier (ticker or instrument id).
+   * A phantom-typed identifier that prevents mixing different kinds of IDs.
+   *
+   * This type wraps a string identifier with a phantom type parameter to ensure
+   * type safety at compile time. Different `Id<T>` types with different `T`
+   * cannot be compared or mixed accidentally, preventing entire classes of bugs.
+   *
+   * # Type Parameters
+   *
+   * * `T` - Phantom type tag that distinguishes this ID from IDs with different tags
+   *
+   * # Invariants
+   *
+   * - Storage uses `Arc<str>` for efficient cloning
+   * - The phantom marker has zero size and runtime cost
+   * - Two `Id<T>` values are equal if their string values are equal
+   * - IDs with different type tags (`Id<A>` vs `Id<B>`) cannot be compared
+   *
+   * # Examples
+   *
+   * ```rust
+   * use finstack_quant_core::types::{CurveId, InstrumentId};
+   *
+   * // Create IDs with different type tags
+   * let curve = CurveId::from("USD-SOFR");
+   * let bond = InstrumentId::from("ISIN:US912828XG60");
+   *
+   * // Can compare IDs of the same type
+   * assert_eq!(curve, CurveId::from("USD-SOFR"));
+   * assert_ne!(curve, CurveId::from("EUR-ESTR"));
+   *
+   * // Cannot compare IDs of different types (compile error):
+   * // let _ = curve == bond;  // Error: mismatched types
+   * ```
+   *
+   * # Thread Safety
+   *
+   * `Id<T>` is `Send + Sync` as it wraps an `Arc<str>`. Multiple threads can
+   * safely share and clone IDs with minimal synchronization overhead.
    */
-  underlying_equity_id?: string | null;
+  spot_id: string;
+  /**
+   * A phantom-typed identifier that prevents mixing different kinds of IDs.
+   *
+   * This type wraps a string identifier with a phantom type parameter to ensure
+   * type safety at compile time. Different `Id<T>` types with different `T`
+   * cannot be compared or mixed accidentally, preventing entire classes of bugs.
+   *
+   * # Type Parameters
+   *
+   * * `T` - Phantom type tag that distinguishes this ID from IDs with different tags
+   *
+   * # Invariants
+   *
+   * - Storage uses `Arc<str>` for efficient cloning
+   * - The phantom marker has zero size and runtime cost
+   * - Two `Id<T>` values are equal if their string values are equal
+   * - IDs with different type tags (`Id<A>` vs `Id<B>`) cannot be compared
+   *
+   * # Examples
+   *
+   * ```rust
+   * use finstack_quant_core::types::{CurveId, InstrumentId};
+   *
+   * // Create IDs with different type tags
+   * let curve = CurveId::from("USD-SOFR");
+   * let bond = InstrumentId::from("ISIN:US912828XG60");
+   *
+   * // Can compare IDs of the same type
+   * assert_eq!(curve, CurveId::from("USD-SOFR"));
+   * assert_ne!(curve, CurveId::from("EUR-ESTR"));
+   *
+   * // Cannot compare IDs of different types (compile error):
+   * // let _ = curve == bond;  // Error: mismatched types
+   * ```
+   *
+   * # Thread Safety
+   *
+   * `Id<T>` is `Send + Sync` as it wraps an `Arc<str>`. Multiple threads can
+   * safely share and clone IDs with minimal synchronization overhead.
+   */
+  vol_surface_id: string;
 }
 /**
  * Attributes for scenario selection and tagging
@@ -4448,6 +4726,44 @@ export interface D_9C78Ba93C3Eb6E36De08 {
    * Number of shares outstanding before the event.
    */
   shares_outstanding_before: number;
+}
+/**
+ * Share-price trigger of a convertible bond: the last sale price must be at
+ * least `threshold_pct` of the conversion price on `required_days_above` of
+ * `observation_days` consecutive trading days.
+ *
+ * Used for the issuer's soft call (`ConvertibleBond::soft_call_trigger`) and
+ * the holder's contingent conversion
+ * (`ConversionPolicy::UponEvent(ConversionEvent::PriceTrigger(..))`).
+ *
+ * # Industry Practice
+ *
+ * The standard trigger is 130% of the conversion price on 20 of 30
+ * consecutive trading days; some issues use 120% or 150%.
+ *
+ * # Modeling scope
+ *
+ * The tree evaluates the trigger on the instantaneous node spot. The soft
+ * call applies a Broadie-Glasserman-Kou-style barrier shift scaled by
+ * `required_days_above / observation_days`; contingent conversion compares
+ * the node spot with the nominal level and does not model the observation
+ * window.
+ */
+export interface D_2Bf34Fd81F4504C2B2B7 {
+  /**
+   * Number of trading days in the observation window (e.g., 30).
+   */
+  observation_days: number;
+  /**
+   * Minimum number of days within the window on which the share price
+   * must be at or above the level (e.g., 20 of 30).
+   */
+  required_days_above: number;
+  /**
+   * Trigger level as a percent of the conversion price (`130.0` = 130%);
+   * must exceed 100.
+   */
+  threshold_pct: number;
 }
 /**
  * Instrument-owned pricing inputs.
@@ -4703,40 +5019,6 @@ export interface DB559Ae4814037C7E11Ce1 {
   scenario_spread_shock_bp?: number | null;
 }
 /**
- * Soft-call trigger condition for convertible bonds.
- *
- * A soft call allows the issuer to call the bond only if the underlying stock
- * price has been trading above a threshold (typically 130% of the conversion
- * price) for a sustained period. This protects holders from having their
- * conversion option terminated when the stock is only marginally above parity.
- *
- * # Industry Practice
- *
- * The standard soft-call trigger is:
- * - **Threshold**: 130% of conversion price (most common)
- * - **Observation period**: 20 of 30 consecutive trading days
- *
- * Some issuances use 120% or 150% thresholds.
- */
-export interface DA40C0605B39704Ac2379 {
-  /**
-   * Number of trading days in the observation window (e.g., 30).
-   */
-  observation_days: number;
-  /**
-   * Minimum number of days within the window that the stock must exceed
-   * the threshold (e.g., 20 out of 30 days).
-   */
-  required_days_above: number;
-  /**
-   * Threshold as a percentage of conversion price (e.g., 130.0 = 130%).
-   *
-   * The issuer can only exercise the call if the stock price exceeds
-   * `threshold_pct / 100 * conversion_price` for the required number of days.
-   */
-  threshold_pct: number;
-}
-/**
  * Revolving credit facility instrument.
  *
  * Models a credit facility with draws/repayments, interest payments on drawn
@@ -4747,22 +5029,6 @@ export interface DA40C0605B39704Ac2379 {
  */
 export interface D_756Aabf913F51B821A96 {
   attributes: D_87642A02554Ab08B56E32;
-  /**
-   * Base rate specification (fixed or floating).
-   */
-  base_rate_spec:
-    | {
-        fixed: {
-          /**
-           * Annual interest rate (e.g., 0.05 for 5%).
-           */
-          rate: number;
-          [k: string]: unknown;
-        };
-      }
-    | {
-        floating: D_7Af15F20A258D1Def9Dd1;
-      };
   /**
    * Business-day convention applied to payment dates (interest, fees and
    * principal) and to the fixing-date roll. Accrual boundaries stay
@@ -4777,16 +5043,12 @@ export interface D_756Aabf913F51B821A96 {
    * `FloatingRateSpec::fixing_calendar_id` overrides it for the fixing
    * date alone.
    */
-  calendar_id?: string | null;
-  commitment_amount: DD5Bd42D8B6Ec6C31D7866;
-  /**
-   * ISO 8601 calendar date encoded as a `YYYY-MM-DD` JSON string.
-   */
-  commitment_date: string;
+  calendar_id?: D_557De6D70142Abc041E8 | null;
+  commitment: DD5Bd42D8B6Ec6C31D7866;
   /**
    * Scheduled commitment changes (amortizing commitments, availability
    * expiries, accordions), each in force from its date until the next.
-   * Dates must be strictly increasing, after `commitment_date` and on or
+   * Dates must be strictly increasing, after `issue_date` and on or
    * before `maturity`; the drawn balance plus outstanding letters of
    * credit must never exceed the commitment in force. A step down pays its
    * `fee_bp` on the reduced amount. Empty by default.
@@ -4896,7 +5158,7 @@ export interface D_756Aabf913F51B821A96 {
     | {
         stochastic: DD3Bbe1A355Ec94307B4C;
       };
-  drawn_amount: DD5Bd42D8B6Ec6C31D7869;
+  drawn: DD5Bd42D8B6Ec6C31D7869;
   fees: D_12Fd8E2C005F5987500B;
   frequency: DCc937Fbaa12E32D4187E5;
   /**
@@ -4942,6 +5204,10 @@ export interface D_756Aabf913F51B821A96 {
   id: string;
   instrument_pricing_overrides?: D_230003E250762A70Be532;
   /**
+   * ISO 8601 calendar date encoded as a `YYYY-MM-DD` JSON string.
+   */
+  issue_date: string;
+  /**
    * Letter-of-credit sub-facility. Outstanding letters of credit reduce
    * availability and the commitment-fee base, count as usage for fee
    * tiers, accrue the LC fee (the floating margin unless `fee_bp` is set)
@@ -4985,6 +5251,21 @@ export interface D_756Aabf913F51B821A96 {
    * `calendar_id`. `0` (the default) pays on the adjusted accrual end.
    */
   payment_lag_days?: number;
+  /**
+   * Base rate specification (fixed or floating).
+   */
+  rate:
+    | {
+        fixed: {
+          /**
+           * Annual rate as a decimal (`0.06` = 6%).
+           */
+          rate: number;
+        };
+      }
+    | {
+        floating: D_7Af15F20A258D1Def9Dd1;
+      };
   /**
    * Recovery rate on default (used when credit_curve_id is present).
    *
@@ -5035,200 +5316,6 @@ export interface D_87642A02554Ab08B56E32 {
    * User-defined tags for categorization.
    */
   tags?: string[];
-}
-/**
- * Canonical floating rate specification for all instruments.
- *
- * Used by bonds, swaps, credit facilities, and structured products.
- * All instruments should compose this type rather than defining their own
- * floating rate specifications.
- *
- * # Rate Calculation
- *
- * The all-in rate is computed as:
- * 1. Look up forward rate from `index_id` curve for the accrual period
- * 2. Apply `index_floor_bp` to index rate (if specified) - applied BEFORE adding spread
- * 3. Add `spread_bp` to get base rate
- * 4. Multiply by `gearing` (typically 1.0)
- * 5. Apply `all_in_cap_bp` to final rate (if specified) - applied AFTER spread and gearing
- *
- * Formula: `cap(gearing * (floor(index) + spread))`
- *
- * # Negative Rate Handling
- *
- * Negative index rates are supported and will flow through calculations
- * unless constrained by floors. For markets with negative rates (EUR, JPY, CHF):
- *
- * - Set `index_floor_bp: Some(0.0)` to floor the index at zero
- * - Set `all_in_floor_bp: Some(0.0)` to floor the total coupon at zero
- * - Omit floors to allow negative coupons (rare but valid in some structures)
- *
- * The implementation does not reject negative rates; the policy is controlled
- * by the floor configuration.
- *
- * # Seasoned Instruments (Historical Fixings)
- *
- * Historical fixings **are supported** via the `MarketContext`: store a
- * `ScalarTimeSeries` under the canonical id `FIXING:{index_id}` (see
- * `finstack_quant_core::market_data::fixings`) containing realized index
- * observations. Observation dates strictly before the forward curve base
- * date then resolve from that series instead of the curve:
- *
- * - **Overnight observations** (compounded/averaged paths) use LOCF lookup
- *   (last observation carried forward), matching RFR publication
- *   conventions where a fixing carries over non-publication days
- *   (ARRC 2020 SOFR conventions; ISDA 2021 Supp. 70 §7.1(g)). A partially
- *   seasoned compounding window seamlessly mixes realized fixings and
- *   curve-projected forwards with identical `(rate, days)` weighting.
- * - **Term-rate resets** use exact-date lookup on the (business-day
- *   adjusted) reset date — a term rate fixes on a specific published date.
- *   The fixing is the index rate only; gearing/spread/floors/caps apply on
- *   top exactly as for projected rates.
- *
- * An observation exactly on the curve base date prefers a published
- * same-day fixing when the series has one, otherwise projects from `t = 0`.
- *
- * The [`FloatingRateFallback`] policy applies only when **no** fixing
- * series is provided: `Error` (the default) fails the build with a
- * descriptive message naming the date, index, and expected series id;
- * `FixedRate(r)` uses `r` as the index rate for the affected coupon;
- * `SpreadOnly` projects spread-only.
- *
- * # Example
- *
- * ```rust
- * use finstack_quant_core::dates::Tenor;
- * use finstack_quant_cashflows::builder::{FloatingRateSpec, OvernightIndexConstraintApplication};
- * use rust_decimal_macros::dec;
- *
- * // 3M SOFR + 200bps with 0% floor
- * let spec = FloatingRateSpec {
- *     index_id: "USD-SOFR-3M".into(),
- *     spread_bp: dec!(200.0),
- *     gearing: dec!(1.0),
- *     gearing_includes_spread: true,
- *     index_floor_bp: Some(dec!(0.0)),
- *     all_in_floor_bp: None,
- *     all_in_cap_bp: None,
- *     index_cap_bp: None,
- *     overnight_index_constraints: OvernightIndexConstraintApplication::Daily,
- *     reset_frequency: Tenor::quarterly(),
- *     index_tenor: None,
- *     reset_lag_days: 2,
- *     fixing_calendar_id: None,
- *     overnight_compounding: None,
- *     overnight_basis: None,
- *     fallback: Default::default(),
- * };
- * ```
- */
-export interface D_7Af15F20A258D1Def9Dd1 {
-  /**
-   * Cap on all-in rate in basis points (applied after spread and gearing).
-   *
-   * Example: all_in_cap_bp = Some(1000.0) ensures all-in rate <= 10%.
-   */
-  all_in_cap_bp?: DB375E274438Ab847F1Fc | null;
-  /**
-   * Floor on all-in rate in basis points (Min Coupon).
-   *
-   * Applied to the final calculated rate after gearing and spread.
-   */
-  all_in_floor_bp?: DB375E274438Ab847F1Fc | null;
-  /**
-   * Policy when forward curve lookup fails during emission.
-   *
-   * Defaults to `Error`, which surfaces curve lookup failures.
-   * Set to `SpreadOnly` for spread-only projection, or `FixedRate(r)`
-   * to use a fixed index rate.
-   */
-  fallback?:
-    | "error"
-    | "spread_only"
-    | {
-        fixed_rate: DB375E274438Ab847F1Fc;
-      };
-  /**
-   * Optional calendar for rate fixing (reset lag).
-   *
-   * If not provided, defaults to the coupon schedule calendar.
-   */
-  fixing_calendar_id?: string | null;
-  /**
-   * Exact decimal encoded only as a JSON string.
-   */
-  gearing?: string;
-  /**
-   * Whether gearing includes the spread (default: true).
-   *
-   * - `true`: `rate = (index + spread) * gearing`
-   * - `false`: `rate = (index * gearing) + spread` (Affine model)
-   */
-  gearing_includes_spread?: boolean;
-  /**
-   * Cap on index rate in basis points (applied to index component).
-   */
-  index_cap_bp?: DB375E274438Ab847F1Fc | null;
-  /**
-   * Floor on index rate in basis points (applied to index component).
-   *
-   * Example: index_floor_bp = Some(0.0) ensures index rate >= 0%.
-   */
-  index_floor_bp?: DB375E274438Ab847F1Fc | null;
-  /**
-   * Forward curve identifier (e.g., "USD-SOFR-3M", "EUR-EURIBOR-6M").
-   */
-  index_id: string;
-  /**
-   * Diagnostic tenor for term-index projection error context.
-   *
-   * The named forward curve is already the term index (for example a 3M
-   * EURIBOR curve). Projection is `fwd.rate(reset_date)`, not a FRA-style
-   * average over `[reset, reset + tenor]`. This field (or
-   * [`Self::reset_frequency`] when `None`) is used only to compute
-   * `index_maturity` for error messages. Ignored for overnight-compounded
-   * legs. When set, the builder warns at build time if it disagrees with
-   * the resolved curve's tenor by more than 10% — the curve remains
-   * authoritative.
-   */
-  index_tenor?: DCc937Fbaa12E32D4187E2 | null;
-  /**
-   * Day-count basis for the overnight compounding denominator.
-   *
-   * This controls the annualization factor used when compounding daily
-   * overnight fixings (e.g., 360 for SOFR/€STR/TONA, 365 for SONIA).
-   * It is independent of the leg's accrual day count when set explicitly.
-   *
-   * When `None` and `overnight_compounding` is set, the coupon
-   * `schedule.day_count` is used if it is `Act360` or `Act365F`. Other
-   * coupon day counts (for example `Thirty360`) error unless an explicit
-   * `Act360` or `Act365F` basis is supplied. Ignored when
-   * `overnight_compounding` is `None`.
-   */
-  overnight_basis?: D_686A28Cd91Db32D9583D | null;
-  /**
-   * Overnight compounding method for overnight rate indices (SOFR, ESTR, SONIA).
-   *
-   * When set to `Some(method)`, the rate for each accrual period is computed
-   * by compounding daily overnight fixings according to the specified method,
-   * rather than looking up a single forward rate for the period.
-   *
-   * Leave as `None` for term rates (e.g., 3M EURIBOR, 6M LIBOR).
-   */
-  overnight_compounding?: DA94367Ac9983B39C6A69 | null;
-  /**
-   * Index floor/cap application policy for overnight-compounded coupons.
-   */
-  overnight_index_constraints?: "daily" | "period";
-  reset_frequency: DCc937Fbaa12E32D4187E3;
-  /**
-   * Reset lag in business days (e.g., 2 for T-2 SOFR convention).
-   */
-  reset_lag_days?: number;
-  /**
-   * Exact decimal encoded only as a JSON string.
-   */
-  spread_bp: string;
 }
 /**
  * Currency-tagged monetary amount with safe arithmetic.
@@ -5429,7 +5516,7 @@ export interface DD5Bd42D8B6Ec6C31D7866 {
  *
  * A delayed-draw term loan (`DdtlSpec::commitment_steps`) accepts only
  * non-increasing steps inside its availability window and no reduction fee
- * (`fee_bp` must be `0.0`).
+ * (`reduction_fee_bp` must be zero).
  */
 export interface DCdcefb52Fec44Ed9Ad4D {
   amount: DD5Bd42D8B6Ec6C31D7867;
@@ -5438,11 +5525,9 @@ export interface DCdcefb52Fec44Ed9Ad4D {
    */
   date: string;
   /**
-   * Reduction or cancellation fee, in basis points of the reduced amount,
-   * paid by the borrower on `date` when the commitment steps down. Ignored
-   * on a step up. Defaults to `0.0`.
+   * Exact decimal encoded only as a JSON string.
    */
-  fee_bp?: number;
+  reduction_fee_bp?: string;
 }
 /**
  * Currency-tagged monetary amount with safe arithmetic.
@@ -6015,16 +6100,20 @@ export interface D_293347Ee63C6Edf32368 {
 export interface D_0Db717D28554658Ae7C4 {
   mean_reverting: {
     /**
-     * Mean reversion speed (annualized).
+     * Mean-reversion speed κ, per year.
      */
-    speed: number;
+    kappa: number;
+    /**
+     * Utilization volatility σ, annualized (absolute utilization units).
+     */
+    sigma: number;
     /**
      * Sensitivity of the utilization target to the simulated credit
      * spread (adverse selection), as a decimal per unit of relative
      * spread change.
      *
      * The target used by the OU step becomes
-     * `θ(t) = clamp(target_rate + spread_sensitivity · (s(t) / s(0) − 1), 0, 1)`
+     * `θ(t) = clamp(theta + spread_sensitivity · (s(t) / s(0) − 1), 0, 1)`
      * where `s(t)` is the simulated spread and `s(0)` its initial level,
      * so a spread that doubles raises the target by `spread_sensitivity`.
      * Defaults to `0.0` (no link); the utilization/credit shock
@@ -6033,14 +6122,9 @@ export interface D_0Db717D28554658Ae7C4 {
      */
     spread_sensitivity?: number;
     /**
-     * Target utilization rate (0.0 to 1.0).
+     * Long-run utilization level θ, as a fraction in `[0, 1]`.
      */
-    target_rate: number;
-    /**
-     * Volatility of utilization changes (annualized).
-     */
-    volatility: number;
-    [k: string]: unknown;
+    theta: number;
   };
 }
 /**
@@ -6980,9 +7064,9 @@ export interface D_540B029Baeeb4469863B {
    */
   date: string;
   /**
-   * Change in margin, in basis points (100 = 1%); negative steps down.
+   * Exact decimal encoded only as a JSON string.
    */
-  delta_bp: number;
+  delta_bp: string;
 }
 /**
  * Metric-time pricing configuration.
@@ -7027,6 +7111,237 @@ export interface D_3B1170Fe3280Aa725Fb4 {
    * Defaults to true because these fees are typically part of the effective yield.
    */
   include_fees?: boolean;
+}
+/**
+ * Canonical floating rate specification for all instruments.
+ *
+ * Used by bonds, swaps, credit facilities, and structured products.
+ * All instruments should compose this type rather than defining their own
+ * floating rate specifications.
+ *
+ * # Rate Calculation
+ *
+ * The all-in rate is computed as:
+ * 1. Look up forward rate from `forward_curve_id` curve for the accrual period
+ * 2. Apply `index_floor_bp` to index rate (if specified) - applied BEFORE adding spread
+ * 3. Add `spread_bp` to get base rate
+ * 4. Multiply by `gearing` (typically 1.0)
+ * 5. Apply `all_in_cap_bp` to final rate (if specified) - applied AFTER spread and gearing
+ *
+ * Formula: `cap(gearing * (floor(index) + spread))`
+ *
+ * # Negative Rate Handling
+ *
+ * Negative index rates are supported and will flow through calculations
+ * unless constrained by floors. For markets with negative rates (EUR, JPY, CHF):
+ *
+ * - Set `index_floor_bp: Some(0.0)` to floor the index at zero
+ * - Set `all_in_floor_bp: Some(0.0)` to floor the total coupon at zero
+ * - Omit floors to allow negative coupons (rare but valid in some structures)
+ *
+ * The implementation does not reject negative rates; the policy is controlled
+ * by the floor configuration.
+ *
+ * # Seasoned Instruments (Historical Fixings)
+ *
+ * Historical fixings **are supported** via the `MarketContext`: store a
+ * `ScalarTimeSeries` under the canonical id `FIXING:{forward_curve_id}` (see
+ * `finstack_quant_core::market_data::fixings`) containing realized index
+ * observations. Observation dates strictly before the forward curve base
+ * date then resolve from that series instead of the curve:
+ *
+ * - **Overnight observations** (compounded/averaged paths) use LOCF lookup
+ *   (last observation carried forward), matching RFR publication
+ *   conventions where a fixing carries over non-publication days
+ *   (ARRC 2020 SOFR conventions; ISDA 2021 Supp. 70 §7.1(g)). A partially
+ *   seasoned compounding window seamlessly mixes realized fixings and
+ *   curve-projected forwards with identical `(rate, days)` weighting.
+ * - **Term-rate resets** use exact-date lookup on the (business-day
+ *   adjusted) reset date — a term rate fixes on a specific published date.
+ *   The fixing is the index rate only; gearing/spread/floors/caps apply on
+ *   top exactly as for projected rates.
+ *
+ * An observation exactly on the curve base date prefers a published
+ * same-day fixing when the series has one, otherwise projects from `t = 0`.
+ *
+ * The [`FloatingRateFallback`] policy applies only when **no** fixing
+ * series is provided: `Error` (the default) fails the build with a
+ * descriptive message naming the date, index, and expected series id;
+ * `FixedRate(r)` uses `r` as the index rate for the affected coupon;
+ * `SpreadOnly` projects spread-only.
+ *
+ * # Example
+ *
+ * ```rust
+ * use finstack_quant_core::dates::Tenor;
+ * use finstack_quant_cashflows::builder::{FloatingRateSpec, OvernightIndexConstraintApplication};
+ * use rust_decimal_macros::dec;
+ *
+ * // 3M SOFR + 200bps with 0% floor
+ * let spec = FloatingRateSpec {
+ *     forward_curve_id: "USD-SOFR-3M".into(),
+ *     spread_bp: dec!(200.0),
+ *     gearing: dec!(1.0),
+ *     gearing_includes_spread: true,
+ *     index_floor_bp: Some(dec!(0.0)),
+ *     all_in_floor_bp: None,
+ *     all_in_cap_bp: None,
+ *     index_cap_bp: None,
+ *     overnight_index_constraints: OvernightIndexConstraintApplication::Daily,
+ *     reset_frequency: Tenor::quarterly(),
+ *     index_tenor: None,
+ *     reset_lag_days: 2,
+ *     fixing_calendar_id: None,
+ *     overnight_compounding: None,
+ *     overnight_basis: None,
+ *     fallback: Default::default(),
+ * };
+ * ```
+ */
+export interface D_7Af15F20A258D1Def9Dd1 {
+  /**
+   * Cap on all-in rate in basis points (applied after spread and gearing).
+   *
+   * Example: all_in_cap_bp = Some(1000.0) ensures all-in rate <= 10%.
+   */
+  all_in_cap_bp?: DB375E274438Ab847F1Fc | null;
+  /**
+   * Floor on all-in rate in basis points (Min Coupon).
+   *
+   * Applied to the final calculated rate after gearing and spread.
+   */
+  all_in_floor_bp?: DB375E274438Ab847F1Fc | null;
+  /**
+   * Policy when forward curve lookup fails during emission.
+   *
+   * Defaults to `Error`, which surfaces curve lookup failures.
+   * Set to `SpreadOnly` for spread-only projection, or `FixedRate(r)`
+   * to use a fixed index rate.
+   */
+  fallback?:
+    | "error"
+    | "spread_only"
+    | {
+        fixed_rate: DB375E274438Ab847F1Fc;
+      };
+  /**
+   * Optional calendar for rate fixing (reset lag).
+   *
+   * If not provided, defaults to the coupon schedule calendar.
+   */
+  fixing_calendar_id?: D_557De6D70142Abc041E8 | null;
+  /**
+   * A phantom-typed identifier that prevents mixing different kinds of IDs.
+   *
+   * This type wraps a string identifier with a phantom type parameter to ensure
+   * type safety at compile time. Different `Id<T>` types with different `T`
+   * cannot be compared or mixed accidentally, preventing entire classes of bugs.
+   *
+   * # Type Parameters
+   *
+   * * `T` - Phantom type tag that distinguishes this ID from IDs with different tags
+   *
+   * # Invariants
+   *
+   * - Storage uses `Arc<str>` for efficient cloning
+   * - The phantom marker has zero size and runtime cost
+   * - Two `Id<T>` values are equal if their string values are equal
+   * - IDs with different type tags (`Id<A>` vs `Id<B>`) cannot be compared
+   *
+   * # Examples
+   *
+   * ```rust
+   * use finstack_quant_core::types::{CurveId, InstrumentId};
+   *
+   * // Create IDs with different type tags
+   * let curve = CurveId::from("USD-SOFR");
+   * let bond = InstrumentId::from("ISIN:US912828XG60");
+   *
+   * // Can compare IDs of the same type
+   * assert_eq!(curve, CurveId::from("USD-SOFR"));
+   * assert_ne!(curve, CurveId::from("EUR-ESTR"));
+   *
+   * // Cannot compare IDs of different types (compile error):
+   * // let _ = curve == bond;  // Error: mismatched types
+   * ```
+   *
+   * # Thread Safety
+   *
+   * `Id<T>` is `Send + Sync` as it wraps an `Arc<str>`. Multiple threads can
+   * safely share and clone IDs with minimal synchronization overhead.
+   */
+  forward_curve_id: string;
+  /**
+   * Exact decimal encoded only as a JSON string.
+   */
+  gearing?: string;
+  /**
+   * Whether gearing includes the spread (default: true).
+   *
+   * - `true`: `rate = (index + spread) * gearing`
+   * - `false`: `rate = (index * gearing) + spread` (Affine model)
+   */
+  gearing_includes_spread?: boolean;
+  /**
+   * Cap on index rate in basis points (applied to index component).
+   */
+  index_cap_bp?: DB375E274438Ab847F1Fc | null;
+  /**
+   * Floor on index rate in basis points (applied to index component).
+   *
+   * Example: index_floor_bp = Some(0.0) ensures index rate >= 0%.
+   */
+  index_floor_bp?: DB375E274438Ab847F1Fc | null;
+  /**
+   * Diagnostic tenor for term-index projection error context.
+   *
+   * The named forward curve is already the term index (for example a 3M
+   * EURIBOR curve). Projection is `fwd.rate(reset_date)`, not a FRA-style
+   * average over `[reset, reset + tenor]`. This field (or
+   * [`Self::reset_frequency`] when `None`) is used only to compute
+   * `index_maturity` for error messages. Ignored for overnight-compounded
+   * legs. When set, the builder warns at build time if it disagrees with
+   * the resolved curve's tenor by more than 10% — the curve remains
+   * authoritative.
+   */
+  index_tenor?: DCc937Fbaa12E32D4187E2 | null;
+  /**
+   * Day-count basis for the overnight compounding denominator.
+   *
+   * This controls the annualization factor used when compounding daily
+   * overnight fixings (e.g., 360 for SOFR/€STR/TONA, 365 for SONIA).
+   * It is independent of the leg's accrual day count when set explicitly.
+   *
+   * When `None` and `overnight_compounding` is set, the coupon
+   * `schedule.day_count` is used if it is `Act360` or `Act365F`. Other
+   * coupon day counts (for example `Thirty360`) error unless an explicit
+   * `Act360` or `Act365F` basis is supplied. Ignored when
+   * `overnight_compounding` is `None`.
+   */
+  overnight_basis?: D_686A28Cd91Db32D9583D | null;
+  /**
+   * Overnight compounding method for overnight rate indices (SOFR, ESTR, SONIA).
+   *
+   * When set to `Some(method)`, the rate for each accrual period is computed
+   * by compounding daily overnight fixings according to the specified method,
+   * rather than looking up a single forward rate for the period.
+   *
+   * Leave as `None` for term rates (e.g., 3M EURIBOR, 6M LIBOR).
+   */
+  overnight_compounding?: DA94367Ac9983B39C6A69 | null;
+  /**
+   * Index floor/cap application policy for overnight-compounded coupons.
+   */
+  overnight_index_constraints?: "daily" | "period";
+  reset_frequency: DCc937Fbaa12E32D4187E3;
+  /**
+   * Reset lag in business days (e.g., 2 for T-2 SOFR convention).
+   */
+  reset_lag_days?: number;
+  /**
+   * Exact decimal encoded only as a JSON string.
+   */
+  spread_bp: string;
 }
 /**
  * Scenario-only pricing adjustments.
@@ -7305,12 +7620,44 @@ export interface DD5Bd42D8B6Ec6C31D78613 {
  */
 export interface D_8Dd62D29564577Ef6F97 {
   /**
-   * Amortization specification
+   * Scheduled principal amortization (the shared cashflows
+   * `AmortizationSpec`). `LinearTo` and `StepRemaining` are rejected;
+   * `PercentOfOriginalPerPeriod` and `LinearBetween` apply per funded draw.
    */
   amortization:
     | "none"
     | {
-        linear: {
+        linear_to: {
+          final_notional: DD5Bd42D8B6Ec6C31D786;
+        };
+      }
+    | {
+        step_remaining: {
+          /**
+           * Ordered list of `(date, remaining_principal_after_date)`.
+           */
+          schedule: [D_2331411247Fb4Fdd46Dd, DD5Bd42D8B6Ec6C31D7861][];
+        };
+      }
+    | {
+        percent_of_original_per_period: {
+          /**
+           * Fraction of original notional paid per period (e.g., 0.05 = 5%).
+           */
+          pct: number;
+        };
+      }
+    | {
+        percent_of_remaining_per_period: {
+          /**
+           * Fraction of the outstanding principal paid per period (e.g.,
+           * 0.025 = 2.5%), in `[0, 1]`.
+           */
+          pct: number;
+        };
+      }
+    | {
+        linear_between: {
           /**
            * ISO 8601 calendar date encoded as a `YYYY-MM-DD` JSON string.
            */
@@ -7322,23 +7669,12 @@ export interface D_8Dd62D29564577Ef6F97 {
         };
       }
     | {
-        percent_per_period: {
+        custom_principal: {
           /**
-           * Percentage in basis points per payment period (applied to current outstanding)
+           * List of `(date, principal_amount)` exchanges; amounts are absolute cashflows.
            */
-          bp: number;
+          items: [D_2331411247Fb4Fdd46Dd, DD5Bd42D8B6Ec6C31D7861][];
         };
-      }
-    | {
-        percent_of_original_notional: {
-          /**
-           * Percentage in basis points per payment period (applied to original notional)
-           */
-          bp: number;
-        };
-      }
-    | {
-        custom: [D_2331411247Fb4Fdd46Dd, DD5Bd42D8B6Ec6C31D7861][];
       };
   attributes: D_87642A02554Ab08B56E33;
   /**
@@ -7349,7 +7685,7 @@ export interface D_8Dd62D29564577Ef6F97 {
   /**
    * Optional calendar id for adjustments
    */
-  calendar_id?: string | null;
+  calendar_id?: D_557De6D70142Abc041E8 | null;
   /**
    * Optional call schedule (borrower callability)
    */
@@ -7700,10 +8036,9 @@ export interface D_8Dd62D29564577Ef6F97 {
     | {
         fixed: {
           /**
-           * Fixed rate in basis points (e.g., 600 = 6%)
+           * Annual rate as a decimal (`0.06` = 6%).
            */
-          rate_bp: number;
-          [k: string]: unknown;
+          rate: number;
         };
       }
     | {
@@ -7725,9 +8060,11 @@ export interface D_8Dd62D29564577Ef6F97 {
    */
   stub?: "none" | "short_front" | "short_back" | "long_front" | "long_back";
   /**
-   * Upfront fee at issue (if any)
+   * Upfront (arrangement or OID) fee paid on `issue_date`, as an amount or
+   * a fraction of the commitment (the DDTL `commitment`, else
+   * `notional_limit`).
    */
-  upfront_fee?: DD5Bd42D8B6Ec6C31D7861 | null;
+  upfront_fee?: D_085E3Ec82Eb8695Eaf89 | null;
 }
 /**
  * Attributes for tagging and scenarios
@@ -7796,7 +8133,7 @@ export interface D_36Aea06C7Cd7Bddb5D52 {
  * The `call_type` field determines how the call is exercised:
  * - `Hard`: Standard call at `price_pct_of_par` on or after `date`
  * - `Soft`: Premium call during protection period
- * - `MakeWhole`: PV-based redemption at Treasury + spread
+ * - `MakeWhole`: PV-based redemption at the reference curve plus spread
  *
  * For `MakeWhole` calls, `price_pct_of_par` serves as the minimum
  * (floor) redemption price. The actual price is the greater of
@@ -7810,12 +8147,7 @@ export interface D_8E71Fbc1A6Ed7Fb84C9E {
     | "hard"
     | "soft"
     | {
-        make_whole: {
-          /**
-           * Spread over the reference rate in basis points (e.g., 50 = T+50bps).
-           */
-          treasury_spread_bp: number;
-        };
+        make_whole: D_97Dd811122Ea3D1453E9;
       };
   /**
    * ISO 8601 calendar date encoded as a `YYYY-MM-DD` JSON string.
@@ -8106,13 +8438,13 @@ export interface D_4A1A06Fac651C71Ef236 {
  *
  * # fn example() -> Result<(), Box<dyn std::error::Error>> {
  * let ddtl = DdtlSpec {
- *     commitment_limit: Money::from((10_000_000_i64, Currency::USD)),
+ *     commitment: Money::from((10_000_000_i64, Currency::USD)),
  *     availability_start: create_date(2025, Month::January, 1)?,
  *     availability_end: create_date(2026, Month::January, 1)?,
  *     draws: vec![],
  *     commitment_steps: vec![],
- *     usage_fee_bp: 50.0,        // 50 bp usage fee
- *     commitment_fee_bp: 25.0,   // 25 bp commitment fee
+ *     usage_fee_bp: dec!(50),        // 50 bp usage fee
+ *     commitment_fee_bp: dec!(25),   // 25 bp commitment fee
  *     fee_base: CommitmentFeeBase::Undrawn,
  *     oid_policy: None,
  * };
@@ -8129,16 +8461,16 @@ export interface D_2477996Edc1959Af8D37 {
    * ISO 8601 calendar date encoded as a `YYYY-MM-DD` JSON string.
    */
   availability_start: string;
+  commitment: DD5Bd42D8B6Ec6C31D78615;
   /**
-   * Commitment fee on the undrawn commitment, in basis points per annum
-   * (non-negative, finite; `50.0` = 0.50%).
+   * Exact decimal encoded only as a JSON string.
    */
-  commitment_fee_bp: number;
-  commitment_limit: DD5Bd42D8B6Ec6C31D78615;
+  commitment_fee_bp: string;
   /**
    * Commitment steps, each effective from its date: strictly increasing
    * dates inside the availability window, non-increasing `amount`s in the
-   * loan currency, and `fee_bp == 0.0` (term loans carry no reduction fee).
+   * loan currency, and a zero `reduction_fee_bp` (term loans carry no
+   * reduction fee).
    */
   commitment_steps: DCdcefb52Fec44Ed9Ad4D[];
   /**
@@ -8154,10 +8486,9 @@ export interface D_2477996Edc1959Af8D37 {
    */
   oid_policy?: D_369F1A09E65Be1364D06 | null;
   /**
-   * Usage fee on drawn amounts, in basis points per annum (non-negative,
-   * finite; `25.0` = 0.25%).
+   * Exact decimal encoded only as a JSON string.
    */
-  usage_fee_bp: number;
+  usage_fee_bp: string;
 }
 /**
  * Currency-tagged monetary amount with safe arithmetic.
@@ -8348,10 +8679,11 @@ export interface DD5Bd42D8B6Ec6C31D78615 {
     | "ZWL";
 }
 /**
- * Draw event for delayed-draw term loans (DDTL).
+ * A scheduled draw `{date, amount}` on a committed facility.
  *
- * Represents a scheduled or actual draw against the commitment, reducing
- * available capacity and increasing outstanding principal.
+ * A delayed-draw term loan funds on `date` (inside its availability
+ * window); an asset-backed facility funds on the first payment date on or
+ * after `date`.
  */
 export interface D_15E0A0E0C92Dbbdf6D8D {
   amount: DD5Bd42D8B6Ec6C31D78616;
@@ -8975,7 +9307,7 @@ export interface DF6Da7F7Ae3129Fc74F07 {
   /**
    * Optional calendar for business day adjustments
    */
-  calendar_id?: string | null;
+  calendar_id?: D_557De6D70142Abc041E8 | null;
   /**
    * If true, use simple interest on accrual fraction
    */
@@ -9159,7 +9491,7 @@ export interface D_450829Dac3A74A5C8761 {
   /**
    * Optional calendar for business day adjustments
    */
-  calendar_id?: string | null;
+  calendar_id?: D_557De6D70142Abc041E8 | null;
   /**
    * Compounding method for floating coupons.
    *
@@ -9317,7 +9649,7 @@ export interface D_450829Dac3A74A5C8761 {
   /**
    * Optional calendar for rate fixing (reset lag)
    */
-  fixing_calendar_id?: string | null;
+  fixing_calendar_id?: D_557De6D70142Abc041E8 | null;
   /**
    * A phantom-typed identifier that prevents mixing different kinds of IDs.
    *
@@ -11532,7 +11864,7 @@ export interface DB925Ced0Cbd67041A76F {
   /**
    * Exact decimal encoded only as a JSON string.
    */
-  spread?: string;
+  spread_bp?: string;
   /**
    * ISO 8601 calendar date encoded as a `YYYY-MM-DD` JSON string.
    */
@@ -12423,7 +12755,7 @@ export interface DF6Da7F7Ae3129Fc74F071 {
   /**
    * Optional calendar for business day adjustments
    */
-  calendar_id?: string | null;
+  calendar_id?: D_557De6D70142Abc041E8 | null;
   /**
    * If true, use simple interest on accrual fraction
    */
@@ -12571,7 +12903,7 @@ export interface D_450829Dac3A74A5C87611 {
   /**
    * Optional calendar for business day adjustments
    */
-  calendar_id?: string | null;
+  calendar_id?: D_557De6D70142Abc041E8 | null;
   /**
    * Compounding method for floating coupons.
    *
@@ -12729,7 +13061,7 @@ export interface D_450829Dac3A74A5C87611 {
   /**
    * Optional calendar for rate fixing (reset lag)
    */
-  fixing_calendar_id?: string | null;
+  fixing_calendar_id?: D_557De6D70142Abc041E8 | null;
   /**
    * A phantom-typed identifier that prevents mixing different kinds of IDs.
    *

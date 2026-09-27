@@ -31,7 +31,6 @@
         ],
         "property_type": "office",
         "terminal_cap_rate": 0.055,
-        "valuation_date": "2025-01-01",
         "valuation_method": "dcf"
       },
       "attributes": {},

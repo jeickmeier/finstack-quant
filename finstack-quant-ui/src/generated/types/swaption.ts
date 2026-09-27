@@ -286,6 +286,10 @@ export type D_73B92F56Cdc5Ce046018 = number;
 export type BusinessDayConvention =
   "unadjusted" | "following" | "modified_following" | "preceding" | "modified_preceding" | "nearest";
 /**
+ * Opaque string identifier.
+ */
+export type Id1 = string;
+/**
  * Day count convention for accrual
  */
 export type DayCount =
@@ -303,9 +307,9 @@ export type DayCount =
   | "act_act_afb"
   | "bus_252";
 /**
- * Discount curve identifier for pricing
+ * Opaque string identifier.
  */
-export type Id1 = string;
+export type Id2 = string;
 /**
  * End date of the fixed leg
  */
@@ -345,17 +349,17 @@ export type DayCount1 =
   | "act_act_afb"
   | "bus_252";
 /**
- * Discount curve identifier for pricing
+ * Opaque string identifier.
  */
-export type Id2 = string;
+export type Id3 = string;
 /**
  * End date of the floating leg
  */
 export type Date3 = string;
 /**
- * Forward curve identifier for rate projections
+ * Opaque string identifier.
  */
-export type Id3 = string;
+export type Id4 = string;
 /**
  * Spread in basis points added to the forward rate
  */
@@ -365,9 +369,9 @@ export type Decimal1 = string;
  */
 export type Date4 = string;
 /**
- * Volatility surface ID for option pricing
+ * Opaque string identifier.
  */
-export type Id4 = string;
+export type Id5 = string;
 /**
  * Canonical schema marker for persisted instrument envelopes.
  */
@@ -435,7 +439,7 @@ export interface D_818134538Ec82F6D27C9 {
    * Volatility model (Black or Normal)
    */
   vol_model: "black" | "normal";
-  vol_surface_id: Id4;
+  vol_surface_id: Id5;
 }
 /**
  * Attributes for scenario selection and grouping
@@ -1586,13 +1590,13 @@ export interface DD76Aba90A93F590Ce184 {
   /**
    * Optional calendar for business day adjustments
    */
-  calendar_id?: string | null;
+  calendar_id?: Id1 | null;
   /**
    * If true, use simple interest on accrual fraction
    */
   compounding_simple: boolean;
   day_count: DayCount;
-  discount_curve_id: Id1;
+  discount_curve_id: Id2;
   end: Date1;
   /**
    * End-of-month roll convention (default: false).
@@ -1651,7 +1655,7 @@ export interface D_173Bb13D95B6E8Cec0D7 {
   /**
    * Optional calendar for business day adjustments
    */
-  calendar_id?: string | null;
+  calendar_id?: Id1 | null;
   /**
    * Compounding method for floating coupons.
    *
@@ -1702,7 +1706,7 @@ export interface D_173Bb13D95B6E8Cec0D7 {
         };
       };
   day_count: DayCount1;
-  discount_curve_id: Id2;
+  discount_curve_id: Id3;
   end: Date3;
   /**
    * End-of-month roll convention (default: false).
@@ -1721,8 +1725,8 @@ export interface D_173Bb13D95B6E8Cec0D7 {
   /**
    * Optional calendar for rate fixing (reset lag)
    */
-  fixing_calendar_id?: string | null;
-  forward_curve_id: Id3;
+  fixing_calendar_id?: Id1 | null;
+  forward_curve_id: Id4;
   frequency: Tenor1;
   /**
    * Payment lag in business days after period end (default: 0).

@@ -480,6 +480,10 @@ export type DB556Bbeb1Ecf96C44C5A =
 export type BusinessDayConvention =
   "unadjusted" | "following" | "modified_following" | "preceding" | "modified_preceding" | "nearest";
 /**
+ * Opaque string identifier.
+ */
+export type Id3 = string;
+/**
  * Canonical schema marker for persisted instrument envelopes.
  */
 export type D_1513B9A1F6Ad9F857Fe3 = "finstack_quant.instrument/1";
@@ -640,7 +644,7 @@ export interface DD34Fe8D294Aafaa3E650 {
    * Used for business day adjustment of the settlement date. If `convention`
    * is set, uses the convention's calendar unless explicitly overridden.
    */
-  settlement_calendar_id?: string | null;
+  settlement_calendar_id?: Id3 | null;
   /**
    * Settlement lag in business days (T+N).
    *
@@ -660,11 +664,11 @@ export interface DD34Fe8D294Aafaa3E650 {
   /**
    * Optional spot price ID (for delta calculations).
    */
-  spot_id?: string | null;
+  spot_id?: Id3 | null;
   /**
-   * Ticker/identifier for market data lookup (e.g., "CL", "GC", "NG")
+   * Commodity symbol label (e.g., "CL", "GC", "NG"); never a market-data key.
    */
-  ticker: string;
+  underlying_ticker: string;
   /**
    * Unit of measurement (e.g., "BBL", "OZ", "MT", "MMBTU")
    */

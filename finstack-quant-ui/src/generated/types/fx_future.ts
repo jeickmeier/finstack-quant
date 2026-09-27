@@ -648,11 +648,11 @@ export interface D_1E2Be4Aea8D96Cea2462 {
   id: Id2;
   instrument_pricing_overrides?: InstrumentPricingOverrides;
   metric_pricing_overrides?: MetricPricingOverrides;
-  scenario_pricing_overrides?: ScenarioPricingOverrides;
   /**
    * Optional spot override in quote currency per base currency.
    */
-  spot_rate_override?: number | null;
+  quoted_spot?: number | null;
+  scenario_pricing_overrides?: ScenarioPricingOverrides;
   terms: DFcc8C2157Eaad908B66C;
 }
 /**

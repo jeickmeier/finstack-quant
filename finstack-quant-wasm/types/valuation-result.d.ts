@@ -775,7 +775,7 @@ export interface ToleranceConfig {
  * via the `definition` "CompositeValuationDetails".
  */
 export interface CompositeValuationDetails {
-  exposure_report: CompositeExposureReport;
+  exposures: CompositeExposureReport;
   /**
    * Native and reporting-currency results for every top-level leg.
    */
@@ -2694,7 +2694,7 @@ export interface FxValuationDetails {
    * rather than a direct quote. Mirrors
    * [`FxRateResult.triangulated`](finstack_quant_core::money::fx::FxRateResult).
    * `None` when the instrument resolved spot from an explicit market
-   * scalar (`fx_rate_id`) rather than the matrix.
+   * scalar (`fx_spot_id`) rather than the matrix.
    */
   fx_triangulated?: boolean | null;
   [k: string]: unknown;

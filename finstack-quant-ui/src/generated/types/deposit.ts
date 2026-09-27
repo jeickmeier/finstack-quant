@@ -35,6 +35,10 @@ export type DayCount =
  */
 export type Id1 = string;
 /**
+ * Exact decimal encoded as a JSON string.
+ */
+export type Decimal = string;
+/**
  * Opaque string identifier.
  */
 export type Id2 = string;
@@ -307,10 +311,6 @@ export type DB556Bbeb1Ecf96C44C5A =
   | "ZMW"
   | "ZWL";
 /**
- * Exact decimal encoded as a JSON string.
- */
-export type Decimal = string;
-/**
  * Start date of the deposit period.
  */
 export type Date1 = string;
@@ -341,13 +341,13 @@ export interface D_1C927C69467A281351A3 {
  * The instrument supports optional settlement convention fields for proper
  * business-day adjusted cashflow generation:
  *
- * - `settlement_days`: T+N business days from trade date to spot (effective start) date (market convention: 2 for USD/EUR/JPY, 0 for GBP)
  * - `business_day_convention`: Business day convention for date adjustment (default: ModifiedFollowing)
  * - `calendar_id`: Holiday calendar identifier for business day logic (e.g., "nyse", "target")
  *
- * When these fields are set, the effective start date is computed as
- * `start + settlement_days` adjusted by the business day convention. In this case,
- * `start` is treated as the trade date; otherwise it is the accrual start date.
+ * `start_date` is always the accrual start (spot) date. Callers holding a
+ * trade date compute the spot date before building (see
+ * [`Deposit::from_conventions`]). When `calendar_id` is set, `start_date` and
+ * `maturity` are adjusted by the business day convention.
  */
 export interface D_8Dbf50E93309E9Ee85F5 {
   attributes: Attributes;
@@ -361,27 +361,20 @@ export interface D_8Dbf50E93309E9Ee85F5 {
   calendar_id?: Id | null;
   day_count: DayCount;
   discount_curve_id: Id1;
+  /**
+   * Optional contractual simple rate r (annualised decimal, 0.045 = 4.5%) for the deposit.
+   *
+   * Note: `cashflow_schedule()` requires `fixed_rate` to be set. Leaving it as `None`
+   * is only appropriate if the caller never requests cashflow generation/PV from
+   * this instrument (e.g., constructing placeholders).
+   */
+  fixed_rate?: Decimal | null;
   id: Id2;
   instrument_pricing_overrides?: InstrumentPricingOverrides;
   maturity: Date;
   metric_pricing_overrides?: MetricPricingOverrides;
   notional: Money;
-  /**
-   * Optional quoted simple rate r (annualised) for the deposit.
-   *
-   * Note: `cashflow_schedule()` requires `quote_rate` to be set. Leaving it as `None`
-   * is only appropriate if the caller never requests cashflow generation/PV from
-   * this instrument (e.g., constructing placeholders).
-   */
-  quote_rate?: Decimal | null;
   scenario_pricing_overrides?: ScenarioPricingOverrides;
-  /**
-   * Optional T+N settlement (spot) lag in business days from trade date to effective start.
-   *
-   * Market convention: T+2 for USD/EUR/JPY, T+0 for GBP.
-   * If not set, the raw `start` date is used without adjustment.
-   */
-  settlement_days?: number | null;
   start_date: Date1;
 }
 /**

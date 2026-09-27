@@ -10,6 +10,7 @@
           "close_series_id": null,
           "day_count": "act_365f",
           "discount_curve_id": "USD-OIS",
+          "div_yield_id": "SPX-DIVYIELD",
           "high_series_id": null,
           "id": "VARSPX-1Y",
           "low_series_id": null,
@@ -30,10 +31,12 @@
           "realized_var_method": "close_to_close",
           "settlement_date": null,
           "side": "receive",
+          "spot_id": "SPX",
           "start_date": "2024-01-01",
           "strike_variance": 0.04,
           "trading_days_per_year": 252,
-          "underlying_ticker": "SPX"
+          "underlying_ticker": "SPX",
+          "vol_surface_id": "SPX-VOL"
         },
         "type": "variance_swap"
       },
@@ -1389,7 +1392,7 @@
         },
         "close_series_id": {
           "default": null,
-          "description": "Series ID for close prices. Defaults to `underlying_ticker` when absent.",
+          "description": "Series ID for close prices. Defaults to `spot_id` when absent.",
           "type": [
             "string",
             "null"
@@ -1403,9 +1406,21 @@
           "$ref": "#/$defs/d_9c3fc047c6fea21344ad",
           "description": "Discount curve identifier"
         },
+        "div_yield_id": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/d_9c3fc047c6fea21344ad"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Optional unitless continuous dividend-yield scalar id (decimal,\n0.02 = 2%). `None` means a zero dividend yield."
+        },
         "high_series_id": {
           "default": null,
-          "description": "Series ID for high prices (required for Parkinson, GarmanKlass, RogersSatchell, YangZhang).\nDefaults to `underlying_ticker` when absent.",
+          "description": "Series ID for high prices (required for Parkinson, GarmanKlass, RogersSatchell, YangZhang).",
           "type": [
             "string",
             "null"
@@ -1421,7 +1436,7 @@
         },
         "low_series_id": {
           "default": null,
-          "description": "Series ID for low prices (required for Parkinson, GarmanKlass, RogersSatchell, YangZhang).\nDefaults to `underlying_ticker` when absent.",
+          "description": "Series ID for low prices (required for Parkinson, GarmanKlass, RogersSatchell, YangZhang).",
           "type": [
             "string",
             "null"
@@ -1445,8 +1460,8 @@
           "description": "Business-day convention applied to observation dates."
         },
         "observation_calendar_id": {
-          "description": "Exchange/fixing calendar used for every realized-variance observation.",
-          "type": "string"
+          "$ref": "#/$defs/d_9c3fc047c6fea21344ad",
+          "description": "Exchange/fixing calendar used for every realized-variance observation."
         },
         "observation_end_of_month": {
           "default": false,
@@ -1459,7 +1474,7 @@
         },
         "open_series_id": {
           "default": null,
-          "description": "Series ID for open prices (required for Parkinson, GarmanKlass, RogersSatchell, YangZhang).\nDefaults to `underlying_ticker` when absent.",
+          "description": "Series ID for open prices (required for Parkinson, GarmanKlass, RogersSatchell, YangZhang).",
           "type": [
             "string",
             "null"
@@ -1494,6 +1509,10 @@
           "$ref": "#/$defs/d_741fed613b4c198e57be",
           "description": "Pay/receive variance"
         },
+        "spot_id": {
+          "$ref": "#/$defs/d_9c3fc047c6fea21344ad",
+          "description": "Market-scalar id (`MarketContext::get_price`) of the underlying spot\nlevel. It is also the default close-price series id."
+        },
         "start_date": {
           "$ref": "#/$defs/d_1b2ccb88c9229e7463e8",
           "description": "Start date of observation period"
@@ -1510,13 +1529,19 @@
           "type": "number"
         },
         "underlying_ticker": {
-          "description": "Underlying identifier (equity/index)",
+          "description": "Underlying symbol (equity/index). A label only; market data is read\nthrough `spot_id`, `vol_surface_id` and `div_yield_id`.",
           "type": "string"
+        },
+        "vol_surface_id": {
+          "$ref": "#/$defs/d_9c3fc047c6fea21344ad",
+          "description": "Volatility surface used to replicate the unobserved variance."
         }
       },
       "required": [
         "id",
         "underlying_ticker",
+        "spot_id",
+        "vol_surface_id",
         "notional",
         "strike_variance",
         "start_date",

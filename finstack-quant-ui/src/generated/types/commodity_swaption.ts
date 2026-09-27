@@ -527,11 +527,11 @@ export interface D_630447734299C7A44378 {
  *     .underlying(CommodityUnderlyingParams::new("Energy", "NG", "MMBTU", Currency::USD))
  *     .option_type(OptionType::Call)
  *     .expiry(Date::from_calendar_date(2025, Month::June, 15).unwrap())
- *     .swap_start(Date::from_calendar_date(2025, Month::July, 1).unwrap())
- *     .swap_end(Date::from_calendar_date(2026, Month::June, 30).unwrap())
+ *     .underlying_start_date(Date::from_calendar_date(2025, Month::July, 1).unwrap())
+ *     .underlying_maturity(Date::from_calendar_date(2026, Month::June, 30).unwrap())
  *     .swap_frequency(Tenor::new(1, TenorUnit::Months).expect("valid tenor fixture"))
  *     .fixed_price(3.50)
- *     .notional(10000.0)
+ *     .quantity(10000.0)
  *     .forward_curve_id(CurveId::new("NG-FORWARD"))
  *     .discount_curve_id(CurveId::new("USD-OIS"))
  *     .vol_surface_id(CurveId::new("NG-VOL"))
@@ -563,21 +563,21 @@ export interface DEf370C084100082046D2 {
   instrument_pricing_overrides?: InstrumentPricingOverrides;
   metric_pricing_overrides?: MetricPricingOverrides;
   /**
-   * Notional quantity per period.
-   */
-  notional: number;
-  /**
    * Option type (call = right to enter pay-fixed swap, put = right to enter receive-fixed swap).
    */
   option_type: "call" | "put";
-  scenario_pricing_overrides?: ScenarioPricingOverrides;
-  swap_end: Date1;
-  swap_frequency: Tenor;
-  swap_start: Date2;
   /**
-   * Ticker/identifier for market data lookup (e.g., "CL", "GC", "NG")
+   * Notional quantity per period.
    */
-  ticker: string;
+  quantity: number;
+  scenario_pricing_overrides?: ScenarioPricingOverrides;
+  swap_frequency: Tenor;
+  underlying_maturity: Date1;
+  underlying_start_date: Date2;
+  /**
+   * Commodity symbol label (e.g., "CL", "GC", "NG"); never a market-data key.
+   */
+  underlying_ticker: string;
   /**
    * Unit of measurement (e.g., "BBL", "OZ", "MT", "MMBTU")
    */

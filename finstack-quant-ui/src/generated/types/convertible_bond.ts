@@ -4,7 +4,7 @@
 /**
  * Last date when the option can be exercised, inclusive.
  *
- * Use the same value as `start_date` for one-day/discrete exercise.
+ * Use the same value as `start` for one-day/discrete exercise.
  */
 export type Date = string;
 /**
@@ -16,53 +16,6 @@ export type Id = string;
  */
 export type Date1 = string;
 /**
- * Date of the dilutive event.
- */
-export type Date2 = string;
-/**
- * ISO 8601 calendar date string.
- */
-export type Date3 = string;
-/**
- * ISO 8601 calendar date string.
- */
-export type Date4 = string;
-/**
- * ISO 8601 calendar date string.
- */
-export type Date5 = string;
-/**
- * Events that may trigger conversion.
- */
-export type DD77F713D18Ae6C94Da1A =
-  | "qualified_ipo"
-  | "change_of_control"
-  | {
-      price_trigger: {
-        /**
-         * Lookback days.
-         */
-        lookback_days: number;
-        /**
-         * Threshold.
-         */
-        threshold: number;
-        [k: string]: unknown;
-      };
-    };
-/**
- * ISO 8601 calendar date string.
- */
-export type Date6 = string;
-/**
- * Opaque string identifier.
- */
-export type Id1 = string;
-/**
- * Opaque string identifier.
- */
-export type Id2 = string;
-/**
  * Business-day convention applied when rolling **payment dates** onto
  * valid business days.
  *
@@ -73,6 +26,12 @@ export type Id2 = string;
  */
 export type BusinessDayConvention =
   "unadjusted" | "following" | "modified_following" | "preceding" | "modified_preceding" | "nearest";
+/**
+ * Holiday calendar identifier used together with `business_day_convention`.
+ *
+ * Use `"weekends_only"` when only Saturday/Sunday adjustment is needed.
+ */
+export type Id1 = string;
 /**
  * Fraction of the coupon paid in cash, expressed as a decimal share in
  * `[0, 1]`.
@@ -117,6 +76,12 @@ export type Decimal2 = string;
 export type BusinessDayConvention1 =
   "unadjusted" | "following" | "modified_following" | "preceding" | "modified_preceding" | "nearest";
 /**
+ * Holiday calendar identifier used together with `business_day_convention`.
+ *
+ * Use `"weekends_only"` when only Saturday/Sunday adjustment is needed.
+ */
+export type Id2 = string;
+/**
  * Fraction of the coupon paid in cash, expressed as a decimal share in
  * `[0, 1]`.
  */
@@ -149,13 +114,17 @@ export type DayCount1 =
  */
 export type Decimal5 = string;
 /**
- * Exact decimal encoded as a JSON string.
- */
-export type Decimal6 = string;
-/**
  * Opaque string identifier.
  */
 export type Id3 = string;
+/**
+ * Opaque string identifier.
+ */
+export type Id4 = string;
+/**
+ * Exact decimal encoded as a JSON string.
+ */
+export type Decimal6 = string;
 /**
  * Day-count convention.
  */
@@ -228,9 +197,154 @@ export type DF09Cdd0D77475E3293B8 =
  */
 export type Decimal7 = string;
 /**
+ * Business-day convention applied when rolling **payment dates** onto
+ * valid business days.
+ *
+ * Accrual boundaries are left unadjusted (bond/ICMA convention) unless
+ * [`Self::adjust_accrual_dates`] is `true`, in which case the same
+ * convention also rolls both accrual-period boundaries (swap/ISDA 2006
+ * §4.10 convention).
+ */
+export type BusinessDayConvention2 =
+  "unadjusted" | "following" | "modified_following" | "preceding" | "modified_preceding" | "nearest";
+/**
  * Opaque string identifier.
  */
-export type Id4 = string;
+export type Id5 = string;
+/**
+ * Day-count convention.
+ */
+export type DayCount3 =
+  | "one_one"
+  | "act_360"
+  | "act_365f"
+  | "act_365l"
+  | "30_360"
+  | "30e_360"
+  | "30e_360_isda"
+  | "30_360_it"
+  | "nl_365"
+  | "act_act"
+  | "act_act_isma"
+  | "act_act_afb"
+  | "bus_252";
+/**
+ * Exact decimal encoded as a JSON string.
+ */
+export type Decimal8 = string;
+/**
+ * ISO 8601 calendar date string.
+ */
+export type Date2 = string;
+/**
+ * Base cashflow specification (fixed or floating).
+ */
+export type D_4Dbcb82Ab8C03D1C8C9C =
+  | {
+      fixed: FixedCouponSpec;
+    }
+  | {
+      floating: D_355963A7Acbc2C62Fdf5;
+    }
+  | {
+      step_up: DAb47B22B96D81A7D172A;
+    }
+  | {
+      amortizing: {
+        base: D_4Dbcb82Ab8C03D1C8C9C;
+        /**
+         * Amortization schedule.
+         */
+        schedule:
+          | "none"
+          | {
+              linear_to: {
+                final_notional: Money;
+              };
+            }
+          | {
+              step_remaining: {
+                /**
+                 * Ordered list of `(date, remaining_principal_after_date)`.
+                 */
+                schedule: [Date2, Money1][];
+              };
+            }
+          | {
+              percent_of_original_per_period: {
+                /**
+                 * Fraction of original notional paid per period (e.g., 0.05 = 5%).
+                 */
+                pct: number;
+              };
+            }
+          | {
+              percent_of_remaining_per_period: {
+                /**
+                 * Fraction of the outstanding principal paid per period (e.g.,
+                 * 0.025 = 2.5%), in `[0, 1]`.
+                 */
+                pct: number;
+              };
+            }
+          | {
+              linear_between: {
+                end: Date3;
+                start: Date4;
+              };
+            }
+          | {
+              custom_principal: {
+                /**
+                 * List of `(date, principal_amount)` exchanges; amounts are absolute cashflows.
+                 */
+                items: [Date2, Money1][];
+              };
+            };
+        [k: string]: unknown;
+      };
+    };
+/**
+ * ISO 8601 calendar date string.
+ */
+export type Date3 = string;
+/**
+ * ISO 8601 calendar date string.
+ */
+export type Date4 = string;
+/**
+ * ISO 8601 calendar date string.
+ */
+export type Date5 = string;
+/**
+ * ISO 8601 calendar date string.
+ */
+export type Date6 = string;
+/**
+ * ISO 8601 calendar date string.
+ */
+export type Date7 = string;
+/**
+ * Events that may trigger conversion.
+ */
+export type DD77F713D18Ae6C94Da1A =
+  | "qualified_ipo"
+  | "change_of_control"
+  | {
+      price_trigger: D_51885E17C080D760Db74;
+    };
+/**
+ * ISO 8601 calendar date string.
+ */
+export type Date8 = string;
+/**
+ * Opaque string identifier.
+ */
+export type Id6 = string;
+/**
+ * Opaque string identifier.
+ */
+export type Id7 = string;
 /**
  * A phantom-typed identifier that prevents mixing different kinds of IDs.
  *
@@ -324,11 +438,11 @@ export type DEc89Adc17436F33De839 = "black" | "normal";
 /**
  * ISO 8601 calendar date string.
  */
-export type Date7 = string;
+export type Date9 = string;
 /**
  * ISO 8601 calendar date string.
  */
-export type Date8 = string;
+export type Date10 = string;
 /**
  * Basis used for bond duration, convexity, and DV01-style risk metrics.
  */
@@ -504,6 +618,14 @@ export type DB556Bbeb1Ecf96C44C5A =
   | "ZMW"
   | "ZWL";
 /**
+ * Opaque string identifier.
+ */
+export type Id8 = string;
+/**
+ * Opaque string identifier.
+ */
+export type Id9 = string;
+/**
  * Canonical schema marker for persisted instrument envelopes.
  */
 export type D_646268D13067Bb9F9Cb8 = "finstack_quant.instrument/1";
@@ -532,6 +654,76 @@ export interface D_5D5C46A56F1A2114A2Ed {
    * Optional call/put schedule (issuer/holder redemption before maturity).
    */
   call_put?: DE61Aca20D5275E83942B | null;
+  /**
+   * Coupon leg (fixed, floating, step-up or amortizing), the same type as
+   * `Bond.cashflow_spec`. A zero-coupon convertible is a fixed spec with
+   * rate `0`.
+   */
+  cashflow_spec:
+    | {
+        fixed: FixedCouponSpec;
+      }
+    | {
+        floating: D_355963A7Acbc2C62Fdf5;
+      }
+    | {
+        step_up: DAb47B22B96D81A7D172A;
+      }
+    | {
+        amortizing: {
+          base: D_4Dbcb82Ab8C03D1C8C9C;
+          /**
+           * Amortization schedule.
+           */
+          schedule:
+            | "none"
+            | {
+                linear_to: {
+                  final_notional: Money;
+                };
+              }
+            | {
+                step_remaining: {
+                  /**
+                   * Ordered list of `(date, remaining_principal_after_date)`.
+                   */
+                  schedule: [Date2, Money1][];
+                };
+              }
+            | {
+                percent_of_original_per_period: {
+                  /**
+                   * Fraction of original notional paid per period (e.g., 0.05 = 5%).
+                   */
+                  pct: number;
+                };
+              }
+            | {
+                percent_of_remaining_per_period: {
+                  /**
+                   * Fraction of the outstanding principal paid per period (e.g.,
+                   * 0.025 = 2.5%), in `[0, 1]`.
+                   */
+                  pct: number;
+                };
+              }
+            | {
+                linear_between: {
+                  end: Date3;
+                  start: Date4;
+                };
+              }
+            | {
+                custom_principal: {
+                  /**
+                   * List of `(date, principal_amount)` exchanges; amounts are absolute cashflows.
+                   */
+                  items: [Date2, Money1][];
+                };
+              };
+          [k: string]: unknown;
+        };
+      };
   conversion: D_8D9E4Ad211395Ba91969;
   /**
    * Issuer hazard curve identifier (a `HazardCurve`, as on every credit
@@ -544,22 +736,20 @@ export interface D_5D5C46A56F1A2114A2Ed {
    * using [`Self::recovery_rate`]. The hazard curve's own recovery rate is
    * used only to convert spread bumps into hazard shifts for CS01.
    */
-  credit_curve_id?: Id1 | null;
-  discount_curve_id: Id2;
+  credit_curve_id?: Id3 | null;
+  discount_curve_id: Id6;
   /**
-   * Fixed coupon specification (if applicable).
+   * Optional unitless continuous dividend-yield scalar id (decimal,
+   * 0.02 = 2%). `None` means a zero dividend yield; a configured id must
+   * resolve.
    */
-  fixed_coupon?: FixedCouponSpec | null;
-  /**
-   * Floating coupon specification (if applicable).
-   */
-  floating_coupon?: D_355963A7Acbc2C62Fdf5 | null;
-  id: Id4;
+  div_yield_id?: Id3 | null;
+  id: Id7;
   instrument_pricing_overrides?: InstrumentPricingOverrides;
-  issue_date: Date7;
-  maturity: Date8;
+  issue_date: Date9;
+  maturity: Date10;
   metric_pricing_overrides?: MetricPricingOverrides;
-  notional: Money;
+  notional: Money2;
   /**
    * Assumed recovery rate on default, as a fraction (e.g., 0.40 = 40%).
    *
@@ -602,11 +792,9 @@ export interface D_5D5C46A56F1A2114A2Ed {
    * Broadie-Glasserman-Kou-style barrier adjustment approximating the
    * k-of-n-days observation window; the realized path is not tracked.
    */
-  soft_call_trigger?: DD4A0870426C46698B6D9 | null;
-  /**
-   * Optional underlying equity identifier (ticker or instrument id).
-   */
-  underlying_equity_id?: string | null;
+  soft_call_trigger?: D_51885E17C080D760Db74 | null;
+  spot_id: Id8;
+  vol_surface_id: Id9;
 }
 /**
  * Attributes for scenario selection and tagging
@@ -638,8 +826,8 @@ export interface Attributes {
  *
  * let mut schedule = CallPutSchedule::default();
  * schedule.calls.push(CallPut {
- *     start_date: Date::from_calendar_date(2027, Month::January, 1).unwrap(),
- *     end_date: Date::from_calendar_date(2027, Month::January, 1).unwrap(),
+ *     start: Date::from_calendar_date(2027, Month::January, 1).unwrap(),
+ *     end: Date::from_calendar_date(2027, Month::January, 1).unwrap(),
  *     price_pct_of_par: 102.0,
  *     make_whole: None,
  * });
@@ -670,15 +858,15 @@ export interface DE61Aca20D5275E83942B {
  *
  * // Discrete call option: issuer can redeem at 102% of par on Jan 1, 2027
  * let call = CallPut {
- *     start_date: Date::from_calendar_date(2027, Month::January, 1).unwrap(),
- *     end_date: Date::from_calendar_date(2027, Month::January, 1).unwrap(),
+ *     start: Date::from_calendar_date(2027, Month::January, 1).unwrap(),
+ *     end: Date::from_calendar_date(2027, Month::January, 1).unwrap(),
  *     price_pct_of_par: 102.0,
  *     make_whole: None,
  * };
  * ```
  */
 export interface D_8B07D188Ef24F2B5A810 {
-  end_date: Date;
+  end: Date;
   /**
    * Optional make-whole call specification.
    *
@@ -698,7 +886,7 @@ export interface D_8B07D188Ef24F2B5A810 {
    * Accrued coupon interest at exercise is added to determine the cash payment.
    */
   price_pct_of_par: number;
-  start_date: Date1;
+  start: Date1;
 }
 /**
  * Make-whole call specification.
@@ -721,86 +909,6 @@ export interface DF949Ae850Ed7798D02Bd {
   spread_bp: number;
 }
 /**
- * Conversion terms for equity conversion.
- */
-export interface D_8D9E4Ad211395Ba91969 {
-  /**
-   * Anti-dilution protection policy.
-   */
-  anti_dilution: "none" | "full_ratchet" | "weighted_average";
-  /**
-   * Historical dilution events that affect the conversion ratio, recorded
-   * in chronological (non-decreasing date) order and applied in that
-   * order. Validation rejects out-of-order events.
-   */
-  dilution_events?: D_333679A3A80Ab492C1C2[];
-  /**
-   * Dividend adjustment mechanism.
-   */
-  dividend_adjustment: "none" | "adjust_price" | "adjust_ratio";
-  /**
-   * Policy governing conversion timing/conditions.
-   */
-  policy:
-    | "voluntary"
-    | {
-        mandatory_on: Date3;
-      }
-    | {
-        window: {
-          end: Date4;
-          start: Date5;
-          [k: string]: unknown;
-        };
-      }
-    | {
-        upon_event: DD77F713D18Ae6C94Da1A;
-      }
-    | {
-        mandatory_variable: {
-          conversion_date: Date6;
-          /**
-           * Lower conversion price (below this, holder receives max shares).
-           */
-          lower_conversion_price: number;
-          /**
-           * Upper conversion price (above this, holder receives min shares).
-           */
-          upper_conversion_price: number;
-          [k: string]: unknown;
-        };
-      };
-  /**
-   * Conversion price (price per share). If not provided, derive from ratio.
-   */
-  price?: number | null;
-  /**
-   * Conversion ratio (shares per bond). If not provided, derive from price.
-   */
-  ratio?: number | null;
-}
-/**
- * A dilutive event that triggers anti-dilution adjustment.
- *
- * Records details of an equity issuance or corporate action that may
- * affect the conversion ratio under the bond's anti-dilution provisions.
- */
-export interface D_333679A3A80Ab492C1C2 {
-  date: Date2;
-  /**
-   * New issue price per share (for below-market issuances).
-   */
-  new_issue_price: number;
-  /**
-   * Number of new shares issued.
-   */
-  new_shares_issued: number;
-  /**
-   * Number of shares outstanding before the event.
-   */
-  shares_outstanding_before: number;
-}
-/**
  * Fixed and floating coupon specification.
  */
 export interface FixedCouponSpec {
@@ -821,12 +929,7 @@ export interface FixedCouponSpec {
    */
   adjust_accrual_dates?: boolean;
   business_day_convention?: BusinessDayConvention;
-  /**
-   * Holiday calendar identifier used together with `business_day_convention`.
-   *
-   * Use `"weekends_only"` when only Saturday/Sunday adjustment is needed.
-   */
-  calendar_id: string;
+  calendar_id: Id1;
   /**
    * Coupon settlement behavior: cash, PIK, or an explicit split of the
    * coupon amount.
@@ -908,12 +1011,7 @@ export interface D_355963A7Acbc2C62Fdf5 {
    */
   adjust_accrual_dates?: boolean;
   business_day_convention?: BusinessDayConvention1;
-  /**
-   * Holiday calendar identifier used together with `business_day_convention`.
-   *
-   * Use `"weekends_only"` when only Saturday/Sunday adjustment is needed.
-   */
-  calendar_id: string;
+  calendar_id: Id2;
   /**
    * Coupon type (Cash/PIK/Split).
    */
@@ -1003,7 +1101,8 @@ export interface D_14E8725A09F7B41C7021 {
    *
    * If not provided, defaults to the coupon schedule calendar.
    */
-  fixing_calendar_id?: string | null;
+  fixing_calendar_id?: Id3 | null;
+  forward_curve_id: Id4;
   gearing?: Decimal6;
   /**
    * Whether gearing includes the spread (default: true).
@@ -1022,7 +1121,6 @@ export interface D_14E8725A09F7B41C7021 {
    * Example: index_floor_bp = Some(0.0) ensures index rate >= 0%.
    */
   index_floor_bp?: Decimal5 | null;
-  index_id: Id3;
   /**
    * Diagnostic tenor for term-index projection error context.
    *
@@ -1100,6 +1198,599 @@ export interface Tenor3 {
    * or years.
    */
   unit: "days" | "weeks" | "months" | "years";
+}
+/**
+ * Step-up/step-down coupon specification.
+ *
+ * Defines a coupon that changes rate at specified dates, commonly used
+ * in bank capital instruments (AT1/Tier 2) and some agency bonds.
+ *
+ * The rate for each coupon period is determined by the last step date
+ * that falls on or before the period start date. If no step has occurred,
+ * the initial rate is used.
+ *
+ * # Examples
+ *
+ * ```rust
+ * use finstack_quant_core::dates::{Date, DayCount, Tenor, BusinessDayConvention, StubKind};
+ * use finstack_quant_cashflows::builder::{CouponType, ScheduleParams, StepUpCouponSpec};
+ * use rust_decimal_macros::dec;
+ * use time::Month;
+ *
+ * let spec = StepUpCouponSpec {
+ *     coupon_type: CouponType::Cash,
+ *     initial_rate: dec!(0.03),
+ *     step_schedule: vec![
+ *         (Date::from_calendar_date(2027, Month::January, 1).unwrap(), dec!(0.04)),
+ *         (Date::from_calendar_date(2029, Month::January, 1).unwrap(), dec!(0.05)),
+ *     ],
+ *     schedule: ScheduleParams {
+ *         frequency: Tenor::semi_annual(),
+ *         day_count: DayCount::Thirty360,
+ *         business_day_convention: BusinessDayConvention::Following,
+ *         calendar_id: "weekends_only".into(),
+ *         stub: StubKind::None,
+ *         end_of_month: false,
+ *         payment_lag_days: 0,
+ *         adjust_accrual_dates: false,
+ *         roll_rule: finstack_quant_cashflows::builder::specs::RollRule::None,
+ *     },
+ * };
+ * ```
+ */
+export interface DAb47B22B96D81A7D172A {
+  /**
+   * Whether accrual-period boundaries are business-day adjusted with
+   * `business_day_convention`.
+   *
+   * - `false` (default, bond convention): accrual periods run between the
+   *   unadjusted schedule anchors; only payment dates roll.
+   * - `true` (swap convention, ISDA 2006 §4.10 / ARRC SOFR conventions):
+   *   both accrual-period boundaries are rolled with `business_day_convention` before year
+   *   fractions and overnight observation windows are computed. The swap
+   *   presets ([`Self::usd_sofr_swap`], [`Self::eur_estr_swap`],
+   *   [`Self::gbp_sonia_swap`], [`Self::jpy_tona_swap`]) set this to
+   *   `true`.
+   *
+   * Serialized only when `true`, so existing wire payloads are unchanged.
+   */
+  adjust_accrual_dates?: boolean;
+  business_day_convention?: BusinessDayConvention2;
+  calendar_id: Id5;
+  /**
+   * Coupon type (Cash/PIK/Split).
+   */
+  coupon_type?:
+    | "cash"
+    | "pik"
+    | {
+        split: {
+          cash_fraction: Decimal3;
+          pik_fraction: Decimal4;
+        };
+      };
+  day_count: DayCount3;
+  /**
+   * Whether end-of-month rolling should be preserved when generating the
+   * schedule.
+   */
+  end_of_month?: boolean;
+  frequency: Tenor4;
+  initial_rate: Decimal8;
+  /**
+   * Payment lag in business days after the adjusted accrual end date.
+   */
+  payment_lag_days?: number;
+  /**
+   * Roll-date rule for schedule anchors (standard IMM or CDS IMM grids).
+   *
+   * [`RollRule::None`] (default) keeps plain tenor stepping. The IMM modes
+   * override `frequency`/`stub` with quarterly / short-back; see [`RollRule`].
+   *
+   * Serialized only when not `None`, so existing wire payloads are
+   * unchanged.
+   */
+  roll_rule?: "none" | "imm" | "cds_imm";
+  /**
+   * Step schedule: (effective_date, new_rate). Must be sorted by date.
+   * Each entry sets the rate from that date forward until the next step.
+   *
+   * **Date convention:** `effective_date` is compared against each
+   * accrual period's *unadjusted* `accrual_start`. Specify dates as
+   * unadjusted accrual-period boundaries (typically the issue date plus
+   * integer multiples of `frequency`); business-day adjustment is not
+   * applied here. The rate is set at accrual start (per market
+   * convention for step-up bonds).
+   */
+  step_schedule: [Date2, Decimal5][];
+  /**
+   * Stub-handling rule used when the start/end dates do not fit an exact
+   * whole number of periods.
+   */
+  stub?: "none" | "short_front" | "short_back" | "long_front" | "long_back";
+}
+/**
+ * Parsed financial tenor.
+ */
+export interface Tenor4 {
+  /**
+   * Number of `unit` periods in the tenor. Must be at least 1; `0` is
+   * rejected because a zero-length period makes schedule generation loop.
+   */
+  count: number;
+  /**
+   * Calendar unit the count is expressed in, such as days, weeks, months,
+   * or years.
+   */
+  unit: "days" | "weeks" | "months" | "years";
+}
+/**
+ * Target remaining principal at the end of the amortization schedule.
+ */
+export interface Money {
+  /**
+   * Monetary amount, carried on the wire as an exact decimal string rather
+   * than a JSON number so no precision is lost in transit. Construction with
+   * configuration applies the selected ingest scale; raw construction does not.
+   */
+  amount: string;
+  /**
+   * ISO 4217 currency of `amount`. Arithmetic between two `Money` values
+   * requires this to match; there is no implicit conversion.
+   */
+  currency:
+    | "AED"
+    | "AFN"
+    | "ALL"
+    | "AMD"
+    | "ANG"
+    | "AOA"
+    | "ARS"
+    | "AUD"
+    | "AWG"
+    | "AZN"
+    | "BAM"
+    | "BBD"
+    | "BDT"
+    | "BGN"
+    | "BHD"
+    | "BIF"
+    | "BMD"
+    | "BND"
+    | "BOB"
+    | "BRL"
+    | "BSD"
+    | "BTN"
+    | "BWP"
+    | "BYN"
+    | "BZD"
+    | "CAD"
+    | "CDF"
+    | "CHF"
+    | "CLF"
+    | "CLP"
+    | "CNY"
+    | "COP"
+    | "CRC"
+    | "CUC"
+    | "CUP"
+    | "CVE"
+    | "CZK"
+    | "DJF"
+    | "DKK"
+    | "DOP"
+    | "DZD"
+    | "EGP"
+    | "ERN"
+    | "ETB"
+    | "EUR"
+    | "FJD"
+    | "FKP"
+    | "GBP"
+    | "GEL"
+    | "GHS"
+    | "GIP"
+    | "GMD"
+    | "GNF"
+    | "GTQ"
+    | "GYD"
+    | "HKD"
+    | "HNL"
+    | "HRK"
+    | "HTG"
+    | "HUF"
+    | "IDR"
+    | "ILS"
+    | "INR"
+    | "IQD"
+    | "IRR"
+    | "ISK"
+    | "JMD"
+    | "JOD"
+    | "JPY"
+    | "KES"
+    | "KGS"
+    | "KHR"
+    | "KMF"
+    | "KPW"
+    | "KRW"
+    | "KWD"
+    | "KYD"
+    | "KZT"
+    | "LAK"
+    | "LBP"
+    | "LKR"
+    | "LRD"
+    | "LSL"
+    | "LYD"
+    | "MAD"
+    | "MDL"
+    | "MGA"
+    | "MKD"
+    | "MMK"
+    | "MNT"
+    | "MOP"
+    | "MRU"
+    | "MUR"
+    | "MVR"
+    | "MWK"
+    | "MXN"
+    | "MYR"
+    | "MZN"
+    | "NAD"
+    | "NGN"
+    | "NIO"
+    | "NOK"
+    | "NPR"
+    | "NZD"
+    | "OMR"
+    | "PAB"
+    | "PEN"
+    | "PGK"
+    | "PHP"
+    | "PKR"
+    | "PLN"
+    | "PYG"
+    | "QAR"
+    | "RON"
+    | "RSD"
+    | "RUB"
+    | "RWF"
+    | "SAR"
+    | "SBD"
+    | "SCR"
+    | "SDG"
+    | "SEK"
+    | "SGD"
+    | "SHP"
+    | "SLE"
+    | "SLL"
+    | "SOS"
+    | "SRD"
+    | "SSP"
+    | "STN"
+    | "SYP"
+    | "SZL"
+    | "THB"
+    | "TJS"
+    | "TMT"
+    | "TND"
+    | "TOP"
+    | "TRY"
+    | "TTD"
+    | "TWD"
+    | "TZS"
+    | "UAH"
+    | "UGX"
+    | "USD"
+    | "UYU"
+    | "UZS"
+    | "VED"
+    | "VES"
+    | "VND"
+    | "VUV"
+    | "WST"
+    | "XAF"
+    | "XCD"
+    | "XOF"
+    | "XPF"
+    | "YER"
+    | "ZAR"
+    | "ZMW"
+    | "ZWL";
+}
+/**
+ * Currency-tagged monetary amount.
+ */
+export interface Money1 {
+  /**
+   * Monetary amount, carried on the wire as an exact decimal string rather
+   * than a JSON number so no precision is lost in transit. Construction with
+   * configuration applies the selected ingest scale; raw construction does not.
+   */
+  amount: string;
+  /**
+   * ISO 4217 currency of `amount`. Arithmetic between two `Money` values
+   * requires this to match; there is no implicit conversion.
+   */
+  currency:
+    | "AED"
+    | "AFN"
+    | "ALL"
+    | "AMD"
+    | "ANG"
+    | "AOA"
+    | "ARS"
+    | "AUD"
+    | "AWG"
+    | "AZN"
+    | "BAM"
+    | "BBD"
+    | "BDT"
+    | "BGN"
+    | "BHD"
+    | "BIF"
+    | "BMD"
+    | "BND"
+    | "BOB"
+    | "BRL"
+    | "BSD"
+    | "BTN"
+    | "BWP"
+    | "BYN"
+    | "BZD"
+    | "CAD"
+    | "CDF"
+    | "CHF"
+    | "CLF"
+    | "CLP"
+    | "CNY"
+    | "COP"
+    | "CRC"
+    | "CUC"
+    | "CUP"
+    | "CVE"
+    | "CZK"
+    | "DJF"
+    | "DKK"
+    | "DOP"
+    | "DZD"
+    | "EGP"
+    | "ERN"
+    | "ETB"
+    | "EUR"
+    | "FJD"
+    | "FKP"
+    | "GBP"
+    | "GEL"
+    | "GHS"
+    | "GIP"
+    | "GMD"
+    | "GNF"
+    | "GTQ"
+    | "GYD"
+    | "HKD"
+    | "HNL"
+    | "HRK"
+    | "HTG"
+    | "HUF"
+    | "IDR"
+    | "ILS"
+    | "INR"
+    | "IQD"
+    | "IRR"
+    | "ISK"
+    | "JMD"
+    | "JOD"
+    | "JPY"
+    | "KES"
+    | "KGS"
+    | "KHR"
+    | "KMF"
+    | "KPW"
+    | "KRW"
+    | "KWD"
+    | "KYD"
+    | "KZT"
+    | "LAK"
+    | "LBP"
+    | "LKR"
+    | "LRD"
+    | "LSL"
+    | "LYD"
+    | "MAD"
+    | "MDL"
+    | "MGA"
+    | "MKD"
+    | "MMK"
+    | "MNT"
+    | "MOP"
+    | "MRU"
+    | "MUR"
+    | "MVR"
+    | "MWK"
+    | "MXN"
+    | "MYR"
+    | "MZN"
+    | "NAD"
+    | "NGN"
+    | "NIO"
+    | "NOK"
+    | "NPR"
+    | "NZD"
+    | "OMR"
+    | "PAB"
+    | "PEN"
+    | "PGK"
+    | "PHP"
+    | "PKR"
+    | "PLN"
+    | "PYG"
+    | "QAR"
+    | "RON"
+    | "RSD"
+    | "RUB"
+    | "RWF"
+    | "SAR"
+    | "SBD"
+    | "SCR"
+    | "SDG"
+    | "SEK"
+    | "SGD"
+    | "SHP"
+    | "SLE"
+    | "SLL"
+    | "SOS"
+    | "SRD"
+    | "SSP"
+    | "STN"
+    | "SYP"
+    | "SZL"
+    | "THB"
+    | "TJS"
+    | "TMT"
+    | "TND"
+    | "TOP"
+    | "TRY"
+    | "TTD"
+    | "TWD"
+    | "TZS"
+    | "UAH"
+    | "UGX"
+    | "USD"
+    | "UYU"
+    | "UZS"
+    | "VED"
+    | "VES"
+    | "VND"
+    | "VUV"
+    | "WST"
+    | "XAF"
+    | "XCD"
+    | "XOF"
+    | "XPF"
+    | "YER"
+    | "ZAR"
+    | "ZMW"
+    | "ZWL";
+}
+/**
+ * Conversion terms for equity conversion.
+ */
+export interface D_8D9E4Ad211395Ba91969 {
+  /**
+   * Anti-dilution protection policy.
+   */
+  anti_dilution: "none" | "full_ratchet" | "weighted_average";
+  /**
+   * Historical dilution events that affect the conversion ratio, recorded
+   * in chronological (non-decreasing date) order and applied in that
+   * order. Validation rejects out-of-order events.
+   */
+  dilution_events?: D_333679A3A80Ab492C1C2[];
+  /**
+   * Dividend adjustment mechanism.
+   */
+  dividend_adjustment: "none" | "adjust_price" | "adjust_ratio";
+  /**
+   * Policy governing conversion timing/conditions.
+   */
+  policy:
+    | "voluntary"
+    | {
+        mandatory_on: Date2;
+      }
+    | {
+        window: {
+          end: Date6;
+          start: Date7;
+          [k: string]: unknown;
+        };
+      }
+    | {
+        upon_event: DD77F713D18Ae6C94Da1A;
+      }
+    | {
+        mandatory_variable: {
+          conversion_date: Date8;
+          /**
+           * Lower conversion price (below this, holder receives max shares).
+           */
+          lower_conversion_price: number;
+          /**
+           * Upper conversion price (above this, holder receives min shares).
+           */
+          upper_conversion_price: number;
+          [k: string]: unknown;
+        };
+      };
+  /**
+   * Conversion price (price per share). If not provided, derive from ratio.
+   */
+  price?: number | null;
+  /**
+   * Conversion ratio (shares per bond). If not provided, derive from price.
+   */
+  ratio?: number | null;
+}
+/**
+ * A dilutive event that triggers anti-dilution adjustment.
+ *
+ * Records details of an equity issuance or corporate action that may
+ * affect the conversion ratio under the bond's anti-dilution provisions.
+ */
+export interface D_333679A3A80Ab492C1C2 {
+  date: Date5;
+  /**
+   * New issue price per share (for below-market issuances).
+   */
+  new_issue_price: number;
+  /**
+   * Number of new shares issued.
+   */
+  new_shares_issued: number;
+  /**
+   * Number of shares outstanding before the event.
+   */
+  shares_outstanding_before: number;
+}
+/**
+ * Share-price trigger of a convertible bond: the last sale price must be at
+ * least `threshold_pct` of the conversion price on `required_days_above` of
+ * `observation_days` consecutive trading days.
+ *
+ * Used for the issuer's soft call (`ConvertibleBond::soft_call_trigger`) and
+ * the holder's contingent conversion
+ * (`ConversionPolicy::UponEvent(ConversionEvent::PriceTrigger(..))`).
+ *
+ * # Industry Practice
+ *
+ * The standard trigger is 130% of the conversion price on 20 of 30
+ * consecutive trading days; some issues use 120% or 150%.
+ *
+ * # Modeling scope
+ *
+ * The tree evaluates the trigger on the instantaneous node spot. The soft
+ * call applies a Broadie-Glasserman-Kou-style barrier shift scaled by
+ * `required_days_above / observation_days`; contingent conversion compares
+ * the node spot with the nominal level and does not model the observation
+ * window.
+ */
+export interface D_51885E17C080D760Db74 {
+  /**
+   * Number of trading days in the observation window (e.g., 30).
+   */
+  observation_days: number;
+  /**
+   * Minimum number of days within the window on which the share price
+   * must be at or above the level (e.g., 20 of 30).
+   */
+  required_days_above: number;
+  /**
+   * Trigger level as a percent of the conversion price (`130.0` = 130%);
+   * must exceed 100.
+   */
+  threshold_pct: number;
 }
 /**
  * Instrument-owned pricing inputs.
@@ -2000,9 +2691,9 @@ export interface DE49387F97C0F9D510642 {
   reporting_currency?: DB556Bbeb1Ecf96C44C5A | null;
 }
 /**
- * Principal amount.
+ * Currency-tagged monetary amount.
  */
-export interface Money {
+export interface Money2 {
   /**
    * Monetary amount, carried on the wire as an exact decimal string rather
    * than a JSON number so no precision is lost in transit. Construction with
@@ -2201,38 +2892,4 @@ export interface ScenarioPricingOverrides {
    * curve) bonds, shock the hazard curve instead (e.g. a par-CDS curve bump).
    */
   scenario_spread_shock_bp?: number | null;
-}
-/**
- * Soft-call trigger condition for convertible bonds.
- *
- * A soft call allows the issuer to call the bond only if the underlying stock
- * price has been trading above a threshold (typically 130% of the conversion
- * price) for a sustained period. This protects holders from having their
- * conversion option terminated when the stock is only marginally above parity.
- *
- * # Industry Practice
- *
- * The standard soft-call trigger is:
- * - **Threshold**: 130% of conversion price (most common)
- * - **Observation period**: 20 of 30 consecutive trading days
- *
- * Some issuances use 120% or 150% thresholds.
- */
-export interface DD4A0870426C46698B6D9 {
-  /**
-   * Number of trading days in the observation window (e.g., 30).
-   */
-  observation_days: number;
-  /**
-   * Minimum number of days within the window that the stock must exceed
-   * the threshold (e.g., 20 out of 30 days).
-   */
-  required_days_above: number;
-  /**
-   * Threshold as a percentage of conversion price (e.g., 130.0 = 130%).
-   *
-   * The issuer can only exercise the call if the stock price exceeds
-   * `threshold_pct / 100 * conversion_price` for the required number of days.
-   */
-  threshold_pct: number;
 }

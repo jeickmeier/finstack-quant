@@ -35,7 +35,6 @@
           ],
           "property_type": "office",
           "terminal_cap_rate": 0.055,
-          "valuation_date": "2025-01-01",
           "valuation_method": "dcf"
         },
         "type": "real_estate_asset"
@@ -4418,18 +4417,9 @@
       "additionalProperties": false,
       "description": "Real estate asset valuation instrument.\n\nSupports DCF (explicit NOI schedule) and direct capitalization valuation.",
       "properties": {
-        "acquisition_cost": {
-          "default": null,
-          "description": "Optional one-time acquisition cost deducted at `as_of` in DCF valuation.\n\nThis is intended for closing costs, fees, and other transaction costs.",
-          "format": "double",
-          "type": [
-            "number",
-            "null"
-          ]
-        },
         "acquisition_costs": {
           "default": [],
-          "description": "Optional detailed acquisition cost line items (positive outflows) deducted at `as_of`.",
+          "description": "Acquisition (closing) cost line items in instrument currency, as\npositive outflow magnitudes deducted at `as_of` in DCF valuation.",
           "items": {
             "$ref": "#/$defs/d_4ba43030fede59fe5993"
           },
@@ -4631,10 +4621,6 @@
             "null"
           ]
         },
-        "valuation_date": {
-          "$ref": "#/$defs/d_1b2ccb88c9229e7463e8",
-          "description": "Valuation date (base date for discounting)."
-        },
         "valuation_method": {
           "$ref": "#/$defs/d_f5d4f1c6ec8d8bcbded6",
           "description": "Valuation method (DCF or DirectCap)."
@@ -4643,7 +4629,6 @@
       "required": [
         "id",
         "currency",
-        "valuation_date",
         "valuation_method",
         "noi_schedule",
         "day_count"

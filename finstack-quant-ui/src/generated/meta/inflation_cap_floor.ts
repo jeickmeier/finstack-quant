@@ -19,8 +19,8 @@ export default [
             },
             "id": "INFLCAP-USD-5Y",
             "inflation_index_id": "US-CPI",
-            "interpolation_override": null,
-            "lag_override": {
+            "interpolation": null,
+            "lag": {
               "months": 3
             },
             "maturity": "2029-01-15",
@@ -536,6 +536,16 @@ export default [
     "description": "Optional holiday calendar identifier."
   },
   {
+    "path": "#/$defs/d_2572320f93343dabe361/properties/calendar_id/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/rates/inflation_cap_floor.schema.json#/$defs/InflationCapFloor/properties/calendar_id/anyOf/0",
+    "ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/id.schema.json#"
+  },
+  {
+    "path": "#/$defs/d_2572320f93343dabe361/properties/calendar_id/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/rates/inflation_cap_floor.schema.json#/$defs/InflationCapFloor/properties/calendar_id/anyOf/1"
+  },
+  {
     "path": "#/$defs/d_2572320f93343dabe361/properties/day_count",
     "source": "https://finstack_quant.dev/schemas/instrument/1/rates/inflation_cap_floor.schema.json#/$defs/InflationCapFloor/properties/day_count",
     "description": "Day count convention for accrual and option time.",
@@ -584,34 +594,34 @@ export default [
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#"
   },
   {
-    "path": "#/$defs/d_2572320f93343dabe361/properties/interpolation_override",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/rates/inflation_cap_floor.schema.json#/$defs/InflationCapFloor/properties/interpolation_override",
-    "description": "Contractual monthly CPI interpolation, overriding index metadata.\nDefaults to monthly step interpolation when neither source supplies it."
+    "path": "#/$defs/d_2572320f93343dabe361/properties/interpolation",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/rates/inflation_cap_floor.schema.json#/$defs/InflationCapFloor/properties/interpolation",
+    "description": "Contractual monthly CPI interpolation; takes precedence over index metadata.\nDefaults to monthly step interpolation when neither source supplies it."
   },
   {
-    "path": "#/$defs/d_2572320f93343dabe361/properties/interpolation_override/anyOf/0",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/rates/inflation_cap_floor.schema.json#/$defs/InflationCapFloor/properties/interpolation_override/anyOf/0",
+    "path": "#/$defs/d_2572320f93343dabe361/properties/interpolation/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/rates/inflation_cap_floor.schema.json#/$defs/InflationCapFloor/properties/interpolation/anyOf/0",
     "ref": "#/$defs/InflationInterpolation",
     "resolvedRef": "https://finstack_quant.dev/schemas/instrument/1/rates/inflation_cap_floor.schema.json#/$defs/InflationInterpolation"
   },
   {
-    "path": "#/$defs/d_2572320f93343dabe361/properties/interpolation_override/anyOf/1",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/rates/inflation_cap_floor.schema.json#/$defs/InflationCapFloor/properties/interpolation_override/anyOf/1"
+    "path": "#/$defs/d_2572320f93343dabe361/properties/interpolation/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/rates/inflation_cap_floor.schema.json#/$defs/InflationCapFloor/properties/interpolation/anyOf/1"
   },
   {
-    "path": "#/$defs/d_2572320f93343dabe361/properties/lag_override",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/rates/inflation_cap_floor.schema.json#/$defs/InflationCapFloor/properties/lag_override",
-    "description": "Optional contract-level lag override."
+    "path": "#/$defs/d_2572320f93343dabe361/properties/lag",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/rates/inflation_cap_floor.schema.json#/$defs/InflationCapFloor/properties/lag",
+    "description": "Contractual CPI observation lag; when `None` the index lag, then the\ncurve's indexation lag, applies."
   },
   {
-    "path": "#/$defs/d_2572320f93343dabe361/properties/lag_override/anyOf/0",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/rates/inflation_cap_floor.schema.json#/$defs/InflationCapFloor/properties/lag_override/anyOf/0",
+    "path": "#/$defs/d_2572320f93343dabe361/properties/lag/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/rates/inflation_cap_floor.schema.json#/$defs/InflationCapFloor/properties/lag/anyOf/0",
     "ref": "#/$defs/InflationLag",
     "resolvedRef": "https://finstack_quant.dev/schemas/instrument/1/rates/inflation_cap_floor.schema.json#/$defs/InflationLag"
   },
   {
-    "path": "#/$defs/d_2572320f93343dabe361/properties/lag_override/anyOf/1",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/rates/inflation_cap_floor.schema.json#/$defs/InflationCapFloor/properties/lag_override/anyOf/1"
+    "path": "#/$defs/d_2572320f93343dabe361/properties/lag/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/rates/inflation_cap_floor.schema.json#/$defs/InflationCapFloor/properties/lag/anyOf/1"
   },
   {
     "path": "#/$defs/d_2572320f93343dabe361/properties/maturity",

@@ -638,7 +638,7 @@ export interface D_644Fac7163A2Fe78B985 {
  * PV = notional × (F_market - F_contract) × DF_domestic(T)
  * ```
  * where:
- * - S = spot FX rate (from FxMatrix or spot_rate_override)
+ * - S = spot FX rate (from FxMatrix or quoted_spot)
  * - DF_foreign(T) = discount factor in base currency to maturity
  * - DF_domestic(T) = discount factor in quote currency to maturity
  * - F_contract = contract_rate (if provided, else F_market for at-market forward)
@@ -688,11 +688,11 @@ export interface D_5F15F4Bd684Bc813Ff88 {
    */
   quote_calendar_id?: string | null;
   quote_currency: Currency1;
-  scenario_pricing_overrides?: ScenarioPricingOverrides;
   /**
    * Optional spot rate override (quote per base). If None, source from FxMatrix.
    */
-  spot_rate_override?: number | null;
+  quoted_spot?: number | null;
+  scenario_pricing_overrides?: ScenarioPricingOverrides;
 }
 /**
  * Attributes for scenario selection and tagging.

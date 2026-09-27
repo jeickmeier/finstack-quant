@@ -2,15 +2,15 @@
   "instrument": {
     "spec": {
       "attributes": {},
-      "discount_curve_id": "EUR-OIS",
+      "discount_curve_id": "USD-OIS",
       "div_yield_id": "SX5E-DIV",
       "id": "EUREX-FESQ-DEC26",
       "quanto": {
+        "asset_currency": "EUR",
+        "asset_discount_curve_id": "EUR-OIS",
         "correlation": -0.25,
-        "equity_vol_surface_id": "SX5E-VOL",
         "fx_spot_id": "EURUSD-SPOT",
-        "fx_vol_surface_id": "EURUSD-VOL",
-        "settlement_discount_curve_id": "USD-OIS"
+        "fx_vol_surface_id": "EURUSD-VOL"
       },
       "spot_id": "SX5E-SPOT",
       "terms": {
@@ -26,7 +26,8 @@
         "settlement_date": "2026-12-21"
       },
       "underlying_currency": "EUR",
-      "underlying_ticker": "SX5E"
+      "underlying_ticker": "SX5E",
+      "vol_surface_id": "SX5E-VOL"
     },
     "type": "equity_future"
   },

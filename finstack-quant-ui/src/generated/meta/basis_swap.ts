@@ -3877,6 +3877,16 @@ export default [
     "description": "Optional calendar identifier for business day adjustments"
   },
   {
+    "path": "#/$defs/d_dedcef72344af3f828eb/properties/calendar_id/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/rates/basis_swap.schema.json#/$defs/BasisSwapLeg/properties/calendar_id/anyOf/0",
+    "ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/id.schema.json#"
+  },
+  {
+    "path": "#/$defs/d_dedcef72344af3f828eb/properties/calendar_id/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/rates/basis_swap.schema.json#/$defs/BasisSwapLeg/properties/calendar_id/anyOf/1"
+  },
+  {
     "path": "#/$defs/d_dedcef72344af3f828eb/properties/compounding",
     "source": "https://finstack_quant.dev/schemas/instrument/1/rates/basis_swap.schema.json#/$defs/BasisSwapLeg/properties/compounding",
     "default": "simple",

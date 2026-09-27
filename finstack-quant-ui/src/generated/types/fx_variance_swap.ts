@@ -2,6 +2,10 @@
 // JSON wire shape only; runtime constraints remain in the schema.
 
 /**
+ * Base-currency calendar used in the joint observation calendar.
+ */
+export type Id = string;
+/**
  * Base currency (foreign)
  */
 export type Currency =
@@ -165,7 +169,7 @@ export type Currency =
   | "ZMW"
   | "ZWL";
 /**
- * Day count convention for time calculations
+ * Day count convention for time calculations (defaults to ACT/365F).
  */
 export type DayCount =
   | "one_one"
@@ -184,15 +188,15 @@ export type DayCount =
 /**
  * Domestic currency discount curve ID
  */
-export type Id = string;
+export type Id1 = string;
 /**
  * Foreign currency discount curve ID
  */
-export type Id1 = string;
+export type Id2 = string;
 /**
  * Unique instrument identifier
  */
-export type Id2 = string;
+export type Id3 = string;
 /**
  * A phantom-typed identifier that prevents mixing different kinds of IDs.
  *
@@ -467,6 +471,10 @@ export type DB556Bbeb1Ecf96C44C5A =
 export type BusinessDayConvention =
   "unadjusted" | "following" | "modified_following" | "preceding" | "modified_preceding" | "nearest";
 /**
+ * Quote-currency calendar used in the joint observation calendar.
+ */
+export type Id4 = string;
+/**
  * Quote currency (domestic)
  */
 export type Currency1 =
@@ -634,13 +642,17 @@ export type Currency1 =
  */
 export type Date1 = string;
 /**
+ * Opaque string identifier.
+ */
+export type Id5 = string;
+/**
  * ISO 8601 calendar date string.
  */
 export type Date2 = string;
 /**
- * FX volatility surface ID
+ * Opaque string identifier.
  */
-export type Id3 = string;
+export type Id6 = string;
 /**
  * Canonical schema marker for persisted instrument envelopes.
  */
@@ -664,24 +676,21 @@ export interface D_9098E54Fc41F56Cb1Edb {
  */
 export interface D_6E351F851936941D91A0 {
   attributes: Attributes;
-  /**
-   * Base-currency calendar used in the joint observation calendar.
-   */
-  base_calendar_id: string;
+  base_calendar_id: Id;
   base_currency: Currency;
   /**
    * Series ID for close prices. Defaults to `spot_id` (or currency-pair string) when absent.
    */
   close_series_id?: string | null;
-  day_count: DayCount;
-  domestic_discount_curve_id: Id;
-  foreign_discount_curve_id: Id1;
+  day_count?: DayCount;
+  domestic_discount_curve_id: Id1;
+  foreign_discount_curve_id: Id2;
   /**
    * Series ID for high prices (required for Parkinson, GarmanKlass, RogersSatchell, YangZhang).
    * Defaults to `spot_id` (or currency-pair string) when absent.
    */
   high_series_id?: string | null;
-  id: Id2;
+  id: Id3;
   instrument_pricing_overrides?: InstrumentPricingOverrides;
   /**
    * Series ID for low prices (required for Parkinson, GarmanKlass, RogersSatchell, YangZhang).
@@ -702,10 +711,7 @@ export interface D_6E351F851936941D91A0 {
    * Defaults to `spot_id` (or currency-pair string) when absent.
    */
   open_series_id?: string | null;
-  /**
-   * Quote-currency calendar used in the joint observation calendar.
-   */
-  quote_calendar_id: string;
+  quote_calendar_id: Id4;
   quote_currency: Currency1;
   /**
    * Method for calculating realized variance (defaults to CloseToClose)
@@ -723,7 +729,7 @@ export interface D_6E351F851936941D91A0 {
   /**
    * Optional spot identifier used to look up historical series.
    */
-  spot_id?: string | null;
+  spot_id?: Id5 | null;
   start_date: Date2;
   /**
    * Strike variance (annualized)
@@ -738,7 +744,7 @@ export interface D_6E351F851936941D91A0 {
    * [`crate::constants::TRADING_DAYS_PER_YEAR`] (252).
    */
   trading_days_per_year?: number;
-  vol_surface_id: Id3;
+  vol_surface_id: Id6;
 }
 /**
  * Attributes for scenario selection and tagging

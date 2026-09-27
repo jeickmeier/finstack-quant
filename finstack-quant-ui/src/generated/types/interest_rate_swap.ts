@@ -7,6 +7,10 @@
 export type BusinessDayConvention =
   "unadjusted" | "following" | "modified_following" | "preceding" | "modified_preceding" | "nearest";
 /**
+ * Opaque string identifier.
+ */
+export type Id = string;
+/**
  * Day count convention for accrual
  */
 export type DayCount =
@@ -24,9 +28,9 @@ export type DayCount =
   | "act_act_afb"
   | "bus_252";
 /**
- * Discount curve identifier for pricing
+ * Opaque string identifier.
  */
-export type Id = string;
+export type Id1 = string;
 /**
  * End date of the fixed leg
  */
@@ -66,17 +70,17 @@ export type DayCount1 =
   | "act_act_afb"
   | "bus_252";
 /**
- * Discount curve identifier for pricing
+ * Opaque string identifier.
  */
-export type Id1 = string;
+export type Id2 = string;
 /**
  * End date of the floating leg
  */
 export type Date2 = string;
 /**
- * Forward curve identifier for rate projections
+ * Opaque string identifier.
  */
-export type Id2 = string;
+export type Id3 = string;
 /**
  * Spread in basis points added to the forward rate
  */
@@ -86,9 +90,9 @@ export type Decimal1 = string;
  */
 export type Date3 = string;
 /**
- * Unique identifier for the swap.
+ * Opaque string identifier.
  */
-export type Id3 = string;
+export type Id4 = string;
 /**
  * A phantom-typed identifier that prevents mixing different kinds of IDs.
  *
@@ -346,12 +350,9 @@ export type Currency =
   | "ZMW"
   | "ZWL";
 /**
- * Discount curve ID for collateral valuation.
- *
- * Cash collateral is typically discounted at OIS/RFR rates.
- * This curve should match the CSA's collateral interest rate.
+ * Opaque string identifier.
  */
-export type Id4 = string;
+export type Id5 = string;
 /**
  * Explicit ISDA SIMM credit risk-class and bucket assignment.
  *
@@ -627,7 +628,7 @@ export interface DBbf36E9Ad6Eb27Fdf758 {
   attributes: Attributes;
   fixed: DDccff34D4D8A7A8Ae68B;
   float: D_02A84814797C76E9A7Fc;
-  id: Id3;
+  id: Id4;
   instrument_pricing_overrides?: InstrumentPricingOverrides;
   /**
    * Optional OTC margin specification for VM/IM.
@@ -668,13 +669,13 @@ export interface DDccff34D4D8A7A8Ae68B {
   /**
    * Optional calendar for business day adjustments
    */
-  calendar_id?: string | null;
+  calendar_id?: Id | null;
   /**
    * If true, use simple interest on accrual fraction
    */
   compounding_simple: boolean;
   day_count: DayCount;
-  discount_curve_id: Id;
+  discount_curve_id: Id1;
   end: Date;
   /**
    * End-of-month roll convention (default: false).
@@ -733,7 +734,7 @@ export interface D_02A84814797C76E9A7Fc {
   /**
    * Optional calendar for business day adjustments
    */
-  calendar_id?: string | null;
+  calendar_id?: Id | null;
   /**
    * Compounding method for floating coupons.
    *
@@ -784,7 +785,7 @@ export interface D_02A84814797C76E9A7Fc {
         };
       };
   day_count: DayCount1;
-  discount_curve_id: Id1;
+  discount_curve_id: Id2;
   end: Date2;
   /**
    * End-of-month roll convention (default: false).
@@ -803,8 +804,8 @@ export interface D_02A84814797C76E9A7Fc {
   /**
    * Optional calendar for rate fixing (reset lag)
    */
-  fixing_calendar_id?: string | null;
-  forward_curve_id: Id2;
+  fixing_calendar_id?: Id | null;
+  forward_curve_id: Id3;
   frequency: Tenor1;
   /**
    * Payment lag in business days after period end (default: 0).
@@ -1679,7 +1680,7 @@ export interface D_3033Bb5742989B033D53 {
    */
   calendar_id: string;
   call_timing: D_7E8Bc23E1C90F0E6Cc3A;
-  collateral_curve_id: Id4;
+  collateral_curve_id: Id5;
   eligible_collateral: D_2918C129Fb87F8E8Ee6C;
   /**
    * CSA identifier (e.g., "USD-CSA-STANDARD", "COUNTERPARTY-XYZ-CSA")

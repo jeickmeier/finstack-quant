@@ -1515,12 +1515,16 @@ export default [
   {
     "path": "#/$defs/d_994972192aa7987f8a64/properties/instrument_id",
     "source": "https://finstack_quant.dev/schemas/instrument/1/rates/repo.schema.json#/$defs/CollateralSpec/properties/instrument_id",
-    "description": "Identifier for the collateral instrument"
+    "description": "Identifier of the collateral security (for special collateral, the\nspecial security itself).",
+    "ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/id.schema.json#"
   },
   {
     "path": "#/$defs/d_994972192aa7987f8a64/properties/market_value_id",
     "source": "https://finstack_quant.dev/schemas/instrument/1/rates/repo.schema.json#/$defs/CollateralSpec/properties/market_value_id",
-    "description": "Market value identifier in MarketContext (e.g., \"BOND_ABC_PRICE\")"
+    "description": "Market value identifier in MarketContext (e.g., \"BOND_ABC_PRICE\")",
+    "ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/id.schema.json#"
   },
   {
     "path": "#/$defs/d_994972192aa7987f8a64/properties/quantity",
@@ -2575,7 +2579,7 @@ export default [
   {
     "path": "#/$defs/d_a90790311257fe58cf68/oneOf/1",
     "source": "https://finstack_quant.dev/schemas/instrument/1/rates/repo.schema.json#/$defs/CollateralType/oneOf/1",
-    "description": "Special collateral (specific securities in high demand, may trade at lower rates)"
+    "description": "Special collateral (specific securities in high demand, may trade at lower rates)\n\nThe special security is identified by [`CollateralSpec::instrument_id`]."
   },
   {
     "path": "#/$defs/d_a90790311257fe58cf68/oneOf/1/properties/special",
@@ -2586,11 +2590,6 @@ export default [
     "source": "https://finstack_quant.dev/schemas/instrument/1/rates/repo.schema.json#/$defs/CollateralType/oneOf/1/properties/special/properties/rate_adjustment_bp",
     "description": "Optional special rate adjustment in basis points (negative = lower rate)",
     "format": "double"
-  },
-  {
-    "path": "#/$defs/d_a90790311257fe58cf68/oneOf/1/properties/special/properties/security_id",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/rates/repo.schema.json#/$defs/CollateralType/oneOf/1/properties/special/properties/security_id",
-    "description": "Identifier of the specific security"
   },
   {
     "path": "#/$defs/d_ae5d75ed4e313ae3bc25",

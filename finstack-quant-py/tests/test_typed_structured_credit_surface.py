@@ -613,7 +613,7 @@ def _typed_deal_from_golden(spec: dict) -> StructuredCredit:
         for row in pool_spec["assets"]
     ]
     pool = (
-        AssetPool(pool_spec["id"], pool_spec["deal_type"], Currency(pool_spec["base_currency"]))
+        AssetPool(pool_spec["id"], pool_spec["deal_type"], Currency(pool_spec["currency"]))
         .with_assets(assets)
         .with_accounts(
             cumulative_defaults=_money(pool_spec["cumulative_defaults"]),

@@ -312,7 +312,7 @@ export type DB556Bbeb1Ecf96C44C5A =
  */
 export type Date1 = string;
 /**
- * Contractual spread added to the referenced rate, in decimal rate units.
+ * Contractual margin added to the referenced rate, in basis points (10 = 10bp).
  *
  * Term-index coupons add this spread after projecting the index. For
  * overnight coupons, [`OvernightSpreadCompounding`] determines whether it
@@ -406,7 +406,7 @@ export interface D_0F0Bc7Eb50B67F9D73D0 {
    * Settlement type (defaults to Cash; caps/floors are virtually always cash-settled)
    */
   settlement?: "physical" | "cash";
-  spread?: Decimal;
+  spread_bp?: Decimal;
   start_date: Date2;
   strike: Decimal1;
   /**

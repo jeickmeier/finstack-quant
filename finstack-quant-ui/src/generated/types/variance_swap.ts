@@ -23,9 +23,13 @@ export type DayCount =
  */
 export type Id = string;
 /**
- * Unique instrument identifier
+ * Opaque string identifier.
  */
 export type Id1 = string;
+/**
+ * Opaque string identifier.
+ */
+export type Id2 = string;
 /**
  * A phantom-typed identifier that prevents mixing different kinds of IDs.
  *
@@ -300,13 +304,25 @@ export type DB556Bbeb1Ecf96C44C5A =
 export type BusinessDayConvention =
   "unadjusted" | "following" | "modified_following" | "preceding" | "modified_preceding" | "nearest";
 /**
+ * Opaque string identifier.
+ */
+export type Id3 = string;
+/**
  * ISO 8601 calendar date string.
  */
 export type Date1 = string;
 /**
+ * Opaque string identifier.
+ */
+export type Id4 = string;
+/**
  * ISO 8601 calendar date string.
  */
 export type Date2 = string;
+/**
+ * Opaque string identifier.
+ */
+export type Id5 = string;
 /**
  * Canonical schema marker for persisted instrument envelopes.
  */
@@ -371,31 +387,31 @@ export interface D_23D4F276163Dab11B0Db {
 export interface D_85Bc3Ccea16Ecaa23151 {
   attributes: Attributes;
   /**
-   * Series ID for close prices. Defaults to `underlying_ticker` when absent.
+   * Series ID for close prices. Defaults to `spot_id` when absent.
    */
   close_series_id?: string | null;
   day_count: DayCount;
   discount_curve_id: Id;
   /**
+   * Optional unitless continuous dividend-yield scalar id (decimal,
+   * 0.02 = 2%). `None` means a zero dividend yield.
+   */
+  div_yield_id?: Id1 | null;
+  /**
    * Series ID for high prices (required for Parkinson, GarmanKlass, RogersSatchell, YangZhang).
-   * Defaults to `underlying_ticker` when absent.
    */
   high_series_id?: string | null;
-  id: Id1;
+  id: Id2;
   instrument_pricing_overrides?: InstrumentPricingOverrides;
   /**
    * Series ID for low prices (required for Parkinson, GarmanKlass, RogersSatchell, YangZhang).
-   * Defaults to `underlying_ticker` when absent.
    */
   low_series_id?: string | null;
   maturity: Date;
   metric_pricing_overrides?: MetricPricingOverrides;
   notional: Money;
   observation_business_day_convention?: BusinessDayConvention;
-  /**
-   * Exchange/fixing calendar used for every realized-variance observation.
-   */
-  observation_calendar_id: string;
+  observation_calendar_id: Id3;
   /**
    * Preserve month-end rolls for month/year observation frequencies.
    */
@@ -403,7 +419,6 @@ export interface D_85Bc3Ccea16Ecaa23151 {
   observation_frequency: Tenor;
   /**
    * Series ID for open prices (required for Parkinson, GarmanKlass, RogersSatchell, YangZhang).
-   * Defaults to `underlying_ticker` when absent.
    */
   open_series_id?: string | null;
   /**
@@ -428,6 +443,7 @@ export interface D_85Bc3Ccea16Ecaa23151 {
    * Pay/receive variance
    */
   side: "pay" | "receive";
+  spot_id: Id4;
   start_date: Date2;
   /**
    * Strike variance (annualized)
@@ -443,9 +459,11 @@ export interface D_85Bc3Ccea16Ecaa23151 {
    */
   trading_days_per_year?: number;
   /**
-   * Underlying identifier (equity/index)
+   * Underlying symbol (equity/index). A label only; market data is read
+   * through `spot_id`, `vol_surface_id` and `div_yield_id`.
    */
   underlying_ticker: string;
+  vol_surface_id: Id5;
 }
 /**
  * Attributes for scenario selection and tagging

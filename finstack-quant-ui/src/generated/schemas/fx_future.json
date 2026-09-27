@@ -422,17 +422,17 @@
           "$ref": "#/$defs/d_00292b2cd9779815232f",
           "description": "Metric-time pricing configuration."
         },
-        "scenario_pricing_overrides": {
-          "$ref": "#/$defs/d_f80c8a31d359e1cb5dd4",
-          "description": "Scenario-only pricing adjustments."
-        },
-        "spot_rate_override": {
+        "quoted_spot": {
           "description": "Optional spot override in quote currency per base currency.",
           "format": "double",
           "type": [
             "number",
             "null"
           ]
+        },
+        "scenario_pricing_overrides": {
+          "$ref": "#/$defs/d_f80c8a31d359e1cb5dd4",
+          "description": "Scenario-only pricing adjustments."
         },
         "terms": {
           "$ref": "#/$defs/d_fcc8c2157eaad908b66c",

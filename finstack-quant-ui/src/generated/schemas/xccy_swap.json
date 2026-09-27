@@ -1532,11 +1532,15 @@
           "description": "Business day convention for schedule dates."
         },
         "calendar_id": {
-          "description": "Calendar identifier for schedule generation and lags.",
-          "type": [
-            "string",
-            "null"
-          ]
+          "anyOf": [
+            {
+              "$ref": "#/$defs/d_9c3fc047c6fea21344ad"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Calendar identifier for schedule generation and lags."
         },
         "compounding": {
           "$ref": "#/$defs/d_245867acdd20ef6e60fd",

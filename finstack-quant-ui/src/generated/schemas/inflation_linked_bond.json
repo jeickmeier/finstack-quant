@@ -7,8 +7,8 @@
       "instrument": {
         "spec": {
           "attributes": {},
+          "base_cpi": 100,
           "base_date": "2024-01-15",
-          "base_index": 100,
           "business_day_convention": "unadjusted",
           "calendar_id": null,
           "day_count": "act_act_isma",
@@ -3508,14 +3508,14 @@
           "$ref": "#/$defs/d_2c88e4d1e2e4f7c22e02",
           "description": "Attributes for scenario selection and tagging"
         },
-        "base_date": {
-          "$ref": "#/$defs/d_1b2ccb88c9229e7463e8",
-          "description": "Base date for index (may differ from issue date)"
-        },
-        "base_index": {
+        "base_cpi": {
           "description": "Base CPI/index value at issue",
           "format": "double",
           "type": "number"
+        },
+        "base_date": {
+          "$ref": "#/$defs/d_1b2ccb88c9229e7463e8",
+          "description": "Base date for index (may differ from issue date)"
         },
         "business_day_convention": {
           "$ref": "#/$defs/d_01cd6b2e4ad257352fdb",
@@ -3607,7 +3607,7 @@
         "day_count",
         "issue_date",
         "maturity",
-        "base_index",
+        "base_cpi",
         "base_date",
         "indexation_method",
         "lag",

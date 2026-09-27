@@ -374,9 +374,9 @@ export default [
     "resolvedRef": "https://finstack_quant.dev/schemas/instrument/1/rates/cap_floor.schema.json#/$defs/SettlementType"
   },
   {
-    "path": "#/$defs/d_0f0bc7eb50b67f9d73d0/properties/spread",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/rates/cap_floor.schema.json#/$defs/CapFloor/properties/spread",
-    "description": "Contractual spread added to the referenced rate, in decimal rate units.\n\nTerm-index coupons add this spread after projecting the index. For\novernight coupons, [`OvernightSpreadCompounding`] determines whether it\nis added after compounding or included in every daily factor.",
+    "path": "#/$defs/d_0f0bc7eb50b67f9d73d0/properties/spread_bp",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/rates/cap_floor.schema.json#/$defs/CapFloor/properties/spread_bp",
+    "description": "Contractual margin added to the referenced rate, in basis points (10 = 10bp).\n\nTerm-index coupons add this spread after projecting the index. For\novernight coupons, [`OvernightSpreadCompounding`] determines whether it\nis added after compounding or included in every daily factor.",
     "ref": "https://finstack_quant.dev/schemas/common/1/decimal.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/decimal.schema.json#"
   },

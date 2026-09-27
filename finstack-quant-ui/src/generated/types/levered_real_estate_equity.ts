@@ -459,10 +459,6 @@ export type DB556Bbeb1Ecf96C44C5A =
 export type DA003B3D722522D2349A4 =
   "office" | "multifamily" | "retail" | "industrial" | "hospitality" | "mixed_use" | "other";
 /**
- * ISO 8601 calendar date string.
- */
-export type Date1 = string;
-/**
  * Currency (must match asset currency; financing PV is validated at valuation time).
  */
 export type Currency1 =
@@ -648,7 +644,7 @@ export type DB428938E56E618C85C20 =
 /**
  * ISO 8601 calendar date string.
  */
-export type Date2 = string;
+export type Date1 = string;
 /**
  * Reference curve identifier (e.g., "USD-TREASURY").
  */
@@ -656,7 +652,7 @@ export type Id1 = string;
 /**
  * ISO 8601 calendar date string.
  */
-export type Date3 = string;
+export type Date2 = string;
 /**
  * Business-day convention applied when rolling **payment dates** onto
  * valid business days.
@@ -668,6 +664,12 @@ export type Date3 = string;
  */
 export type BusinessDayConvention =
   "unadjusted" | "following" | "modified_following" | "preceding" | "modified_preceding" | "nearest";
+/**
+ * Holiday calendar identifier used together with `business_day_convention`.
+ *
+ * Use `"weekends_only"` when only Saturday/Sunday adjustment is needed.
+ */
+export type Id2 = string;
 /**
  * Fraction of the coupon paid in cash, expressed as a decimal share in
  * `[0, 1]`.
@@ -712,6 +714,12 @@ export type Decimal2 = string;
 export type BusinessDayConvention1 =
   "unadjusted" | "following" | "modified_following" | "preceding" | "modified_preceding" | "nearest";
 /**
+ * Holiday calendar identifier used together with `business_day_convention`.
+ *
+ * Use `"weekends_only"` when only Saturday/Sunday adjustment is needed.
+ */
+export type Id3 = string;
+/**
  * Fraction of the coupon paid in cash, expressed as a decimal share in
  * `[0, 1]`.
  */
@@ -744,13 +752,17 @@ export type DayCount2 =
  */
 export type Decimal5 = string;
 /**
+ * Opaque string identifier.
+ */
+export type Id4 = string;
+/**
+ * Opaque string identifier.
+ */
+export type Id5 = string;
+/**
  * Exact decimal encoded as a JSON string.
  */
 export type Decimal6 = string;
-/**
- * Forward curve identifier (e.g., "USD-SOFR-3M", "EUR-EURIBOR-6M").
- */
-export type Id2 = string;
 /**
  * Day-count convention.
  */
@@ -834,6 +846,10 @@ export type Decimal7 = string;
 export type BusinessDayConvention2 =
   "unadjusted" | "following" | "modified_following" | "preceding" | "modified_preceding" | "nearest";
 /**
+ * Opaque string identifier.
+ */
+export type Id6 = string;
+/**
  * Day-count convention.
  */
 export type DayCount4 =
@@ -897,6 +913,21 @@ export type DFf2Ca165Ec8247C5B9Bf =
               };
             }
           | {
+              percent_of_remaining_per_period: {
+                /**
+                 * Fraction of the outstanding principal paid per period (e.g.,
+                 * 0.025 = 2.5%), in `[0, 1]`.
+                 */
+                pct: number;
+              };
+            }
+          | {
+              linear_between: {
+                end: Date3;
+                start: Date4;
+              };
+            }
+          | {
               custom_principal: {
                 /**
                  * List of `(date, principal_amount)` exchanges; amounts are absolute cashflows.
@@ -908,9 +939,13 @@ export type DFf2Ca165Ec8247C5B9Bf =
       };
     };
 /**
- * Opaque string identifier.
+ * ISO 8601 calendar date string.
  */
-export type Id3 = string;
+export type Date3 = string;
+/**
+ * ISO 8601 calendar date string.
+ */
+export type Date4 = string;
 /**
  * Day-count convention.
  */
@@ -948,10 +983,6 @@ export type DayCount6 =
 /**
  * ISO 8601 calendar date string.
  */
-export type Date4 = string;
-/**
- * ISO 8601 calendar date string.
- */
 export type Date5 = string;
 /**
  * ISO 8601 calendar date string.
@@ -962,17 +993,17 @@ export type Date6 = string;
  */
 export type Date7 = string;
 /**
- * Opaque string identifier.
- */
-export type Id4 = string;
-/**
- * Opaque string identifier.
- */
-export type Id5 = string;
-/**
  * ISO 8601 calendar date string.
  */
 export type Date8 = string;
+/**
+ * Opaque string identifier.
+ */
+export type Id7 = string;
+/**
+ * Opaque string identifier.
+ */
+export type Id8 = string;
 /**
  * ISO 8601 calendar date string.
  */
@@ -990,14 +1021,14 @@ export type Date11 = string;
  */
 export type Date12 = string;
 /**
- * ISO 8601 calendar date string.
- */
-export type Date13 = string;
-/**
  * Business day convention
  */
 export type BusinessDayConvention3 =
   "unadjusted" | "following" | "modified_following" | "preceding" | "modified_preceding" | "nearest";
+/**
+ * ISO 8601 calendar date string.
+ */
+export type Date13 = string;
 /**
  * ISO 8601 calendar date string.
  */
@@ -1007,13 +1038,13 @@ export type Date14 = string;
  */
 export type Date15 = string;
 /**
- * ISO 8601 calendar date string.
+ * Exact decimal encoded as a JSON string.
  */
-export type Date16 = string;
+export type Decimal9 = string;
 /**
  * ISO 8601 calendar date string.
  */
-export type Date17 = string;
+export type Date16 = string;
 /**
  * Currency for all cashflows
  */
@@ -1197,19 +1228,27 @@ export type DayCount7 =
 /**
  * ISO 8601 calendar date string.
  */
+export type Date17 = string;
+/**
+ * ISO 8601 calendar date string.
+ */
 export type Date18 = string;
+/**
+ * Exact decimal encoded as a JSON string.
+ */
+export type Decimal10 = string;
 /**
  * ISO 8601 calendar date string.
  */
 export type Date19 = string;
 /**
- * ISO 8601 calendar date string.
+ * Exact decimal encoded as a JSON string.
  */
-export type Date20 = string;
+export type Decimal11 = string;
 /**
  * ISO 8601 calendar date string.
  */
-export type Date21 = string;
+export type Date20 = string;
 /**
  * Original Issue Discount (OID) policy for term loan origination.
  *
@@ -1252,7 +1291,7 @@ export type Date21 = string;
  * use finstack_quant_core::currency::Currency;
  *
  * // 2% OID withheld from proceeds
- * let oid = OidPolicy::WithheldBp(200);  // 200 bp = 2%
+ * let oid = OidPolicy::WithheldBp(dec!(200));  // 200 bp = 2%
  *
  * // $50,000 fixed OID
  * let oid_fixed = OidPolicy::WithheldAmount(Money::from((50_000_i64, Currency::USD)));
@@ -1260,33 +1299,51 @@ export type Date21 = string;
  */
 export type D_282Cc71E3B5B312F79C9 =
   | {
-      withheld_bp: number;
+      withheld_bp: Decimal5;
     }
   | {
       withheld_amount: Money;
     }
   | {
-      separate_bp: number;
+      separate_bp: Decimal5;
     }
   | {
       separate_amount: Money;
     };
 /**
- * Opaque string identifier.
+ * Exact decimal encoded as a JSON string.
  */
-export type Id6 = string;
+export type Decimal12 = string;
 /**
  * Opaque string identifier.
  */
-export type Id7 = string;
+export type Id9 = string;
+/**
+ * Opaque string identifier.
+ */
+export type Id10 = string;
+/**
+ * ISO 8601 calendar date string.
+ */
+export type Date21 = string;
 /**
  * ISO 8601 calendar date string.
  */
 export type Date22 = string;
 /**
- * ISO 8601 calendar date string.
+ * Upfront (arrangement or original-issue-discount) fee of a facility.
+ *
+ * Paid by the borrower to the lender on the issue date. Enters the
+ * present value only while the commitment date lies after the valuation
+ * date, and the effective-interest-rate metrics always.
  */
-export type Date23 = string;
+export type DF8Cc3E84589384Dc0202 =
+  | {
+      amount: Money;
+    }
+  | {
+      fraction_of_commitment: number;
+    };
 /**
  * Business-day convention applied to payment dates (interest, fees and
  * principal) and to the fixing-date roll. Accrual boundaries stay
@@ -1294,10 +1351,6 @@ export type Date23 = string;
  */
 export type BusinessDayConvention4 =
   "unadjusted" | "following" | "modified_following" | "preceding" | "modified_preceding" | "nearest";
-/**
- * ISO 8601 calendar date string.
- */
-export type Date24 = string;
 /**
  * Day-count convention.
  */
@@ -1318,45 +1371,39 @@ export type DayCount8 =
 /**
  * Opaque string identifier.
  */
-export type Id8 = string;
+export type Id11 = string;
+/**
+ * ISO 8601 calendar date string.
+ */
+export type Date23 = string;
+/**
+ * Opaque string identifier.
+ */
+export type Id12 = string;
+/**
+ * Exact decimal encoded as a JSON string.
+ */
+export type Decimal13 = string;
+/**
+ * Exact decimal encoded as a JSON string.
+ */
+export type Decimal14 = string;
+/**
+ * ISO 8601 calendar date string.
+ */
+export type Date24 = string;
+/**
+ * Opaque string identifier.
+ */
+export type Id13 = string;
 /**
  * ISO 8601 calendar date string.
  */
 export type Date25 = string;
 /**
- * Opaque string identifier.
- */
-export type Id9 = string;
-/**
- * Exact decimal encoded as a JSON string.
- */
-export type Decimal9 = string;
-/**
- * Exact decimal encoded as a JSON string.
- */
-export type Decimal10 = string;
-/**
  * ISO 8601 calendar date string.
  */
 export type Date26 = string;
-/**
- * Upfront (arrangement or original-issue-discount) fee of a facility.
- *
- * Paid by the borrower to the lender on the commitment date. Enters the
- * present value only while the commitment date lies after the valuation
- * date, and the effective-interest-rate metrics always.
- */
-export type DF8Cc3E84589384Dc0202 =
-  | {
-      amount: Money;
-    }
-  | {
-      fraction_of_commitment: number;
-    };
-/**
- * Opaque string identifier.
- */
-export type Id10 = string;
 /**
  * ISO 8601 calendar date string.
  */
@@ -1366,14 +1413,18 @@ export type Date27 = string;
  */
 export type Date28 = string;
 /**
- * ISO 8601 calendar date string.
- */
-export type Date29 = string;
-/**
  * Business day convention
  */
 export type BusinessDayConvention5 =
   "unadjusted" | "following" | "modified_following" | "preceding" | "modified_preceding" | "nearest";
+/**
+ * Opaque string identifier.
+ */
+export type Id14 = string;
+/**
+ * Opaque string identifier.
+ */
+export type Id15 = string;
 /**
  * Day-count convention.
  */
@@ -1394,27 +1445,27 @@ export type DayCount9 =
 /**
  * Opaque string identifier.
  */
-export type Id11 = string;
+export type Id16 = string;
 /**
  * Opaque string identifier.
  */
-export type Id12 = string;
+export type Id17 = string;
+/**
+ * ISO 8601 calendar date string.
+ */
+export type Date29 = string;
+/**
+ * Exact decimal encoded as a JSON string.
+ */
+export type Decimal15 = string;
 /**
  * ISO 8601 calendar date string.
  */
 export type Date30 = string;
 /**
- * Exact decimal encoded as a JSON string.
- */
-export type Decimal11 = string;
-/**
- * ISO 8601 calendar date string.
- */
-export type Date31 = string;
-/**
  * Opaque string identifier.
  */
-export type Id13 = string;
+export type Id18 = string;
 /**
  * Canonical schema marker for persisted instrument envelopes.
  */
@@ -1438,26 +1489,21 @@ export interface D_09A286D667Ad39D754Bd {
  * - `PV_equity = PV_asset - PV_financing` (financing valued from lender perspective).
  *
  * Return/coverage metrics are computed from a simplified equity cashflow schedule:
- * - Initial outflow: `-(purchase_price + acquisition_cost)` at `as_of`
+ * - Initial outflow: `-(purchase_price + Σ acquisition_costs)` at `as_of`
  * - Financing funding legs on/after `as_of` are included as equity inflows
  * - Interim equity CFs: `(NOI - CapEx) - debt_service_cash`
- * - Exit: `(sale_proceeds - financing_payoff)` at `exit_date`
+ * - Exit: `(sale_proceeds - financing_payoff)` at the asset horizon (`asset.sale_date`, else the last NOI date)
  */
 export interface D_67Ac7Ae7Fa3C625D34Ff {
   asset: D_42Ef997031425D58Ca65;
   attributes: Attributes1;
   currency: Currency1;
   /**
-   * Optional explicit exit/sale date. Defaults to the asset's valuation
-   * horizon: `asset.sale_date` when set, else the last NOI date on/after `as_of`.
-   */
-  exit_date?: Date | null;
-  /**
    * Supported borrower liabilities, valued from the lender perspective and
    * netted from asset PV.
    */
   financing?: DB428938E56E618C85C20[];
-  id: Id13;
+  id: Id18;
   instrument_pricing_overrides?: InstrumentPricingOverrides5;
   metric_pricing_overrides?: MetricPricingOverrides5;
   scenario_pricing_overrides?: ScenarioPricingOverrides5;
@@ -1467,13 +1513,8 @@ export interface D_67Ac7Ae7Fa3C625D34Ff {
  */
 export interface D_42Ef997031425D58Ca65 {
   /**
-   * Optional one-time acquisition cost deducted at `as_of` in DCF valuation.
-   *
-   * This is intended for closing costs, fees, and other transaction costs.
-   */
-  acquisition_cost?: number | null;
-  /**
-   * Optional detailed acquisition cost line items (positive outflows) deducted at `as_of`.
+   * Acquisition (closing) cost line items in instrument currency, as
+   * positive outflow magnitudes deducted at `as_of` in DCF valuation.
    */
   acquisition_costs?: Money[];
   /**
@@ -1552,7 +1593,6 @@ export interface D_42Ef997031425D58Ca65 {
    * Validation range is \([-100\%, 20\%]\) to guard against configuration errors.
    */
   terminal_growth_rate?: number | null;
-  valuation_date: Date1;
   /**
    * Valuation method (DCF or DirectCap).
    */
@@ -2768,6 +2808,21 @@ export interface DBead93058Da9E6B7D476 {
                 };
               }
             | {
+                percent_of_remaining_per_period: {
+                  /**
+                   * Fraction of the outstanding principal paid per period (e.g.,
+                   * 0.025 = 2.5%), in `[0, 1]`.
+                   */
+                  pct: number;
+                };
+              }
+            | {
+                linear_between: {
+                  end: Date3;
+                  start: Date4;
+                };
+              }
+            | {
                 custom_principal: {
                   /**
                    * List of `(date, principal_amount)` exchanges; amounts are absolute cashflows.
@@ -2782,31 +2837,31 @@ export interface DBead93058Da9E6B7D476 {
    * Optional credit curve identifier (default intensity). When present,
    * credit-rate pricing is enabled.
    */
-  credit_curve_id?: Id3 | null;
+  credit_curve_id?: Id4 | null;
   /**
    * Optional pre-built cashflow schedule. If provided, this will be used instead of
    * generating cashflows from the cashflow_spec.
    */
   custom_cashflows?: D_8Dac854926C6F4Ca503B | null;
-  discount_curve_id: Id4;
+  discount_curve_id: Id7;
   /**
    * Calendar identifier for ex-coupon day counting.
    */
-  ex_coupon_calendar_id?: string | null;
+  ex_coupon_calendar_id?: Id4 | null;
   /**
    * Number of ex-coupon days before coupon date.
    */
   ex_coupon_days?: number;
-  /**
-   * Optional funding/repo curve for carry cost computation.
-   */
-  funding_curve_id?: Id3 | null;
-  id: Id5;
+  id: Id8;
   instrument_pricing_overrides?: InstrumentPricingOverrides1;
-  issue_date: Date8;
-  maturity: Date9;
+  issue_date: Date9;
+  maturity: Date10;
   metric_pricing_overrides?: MetricPricingOverrides1;
   notional: Money4;
+  /**
+   * Optional repo (financing) discount curve for carry cost computation.
+   */
+  repo_curve_id?: Id4 | null;
   /**
    * Optional guaranteed minimum-return ("return floor") call protection.
    *
@@ -2853,8 +2908,8 @@ export interface Attributes2 {
  *
  * let mut schedule = CallPutSchedule::default();
  * schedule.calls.push(CallPut {
- *     start_date: Date::from_calendar_date(2027, Month::January, 1).unwrap(),
- *     end_date: Date::from_calendar_date(2027, Month::January, 1).unwrap(),
+ *     start: Date::from_calendar_date(2027, Month::January, 1).unwrap(),
+ *     end: Date::from_calendar_date(2027, Month::January, 1).unwrap(),
  *     price_pct_of_par: 102.0,
  *     make_whole: None,
  * });
@@ -2885,15 +2940,15 @@ export interface D_46C47C411F014A63Af5D {
  *
  * // Discrete call option: issuer can redeem at 102% of par on Jan 1, 2027
  * let call = CallPut {
- *     start_date: Date::from_calendar_date(2027, Month::January, 1).unwrap(),
- *     end_date: Date::from_calendar_date(2027, Month::January, 1).unwrap(),
+ *     start: Date::from_calendar_date(2027, Month::January, 1).unwrap(),
+ *     end: Date::from_calendar_date(2027, Month::January, 1).unwrap(),
  *     price_pct_of_par: 102.0,
  *     make_whole: None,
  * };
  * ```
  */
 export interface D_63252262B353F04Ca110 {
-  end_date: Date2;
+  end: Date1;
   /**
    * Optional make-whole call specification.
    *
@@ -2913,7 +2968,7 @@ export interface D_63252262B353F04Ca110 {
    * Accrued coupon interest at exercise is added to determine the cash payment.
    */
   price_pct_of_par: number;
-  start_date: Date3;
+  start: Date2;
 }
 /**
  * Make-whole call specification.
@@ -2956,12 +3011,7 @@ export interface FixedCouponSpec {
    */
   adjust_accrual_dates?: boolean;
   business_day_convention?: BusinessDayConvention;
-  /**
-   * Holiday calendar identifier used together with `business_day_convention`.
-   *
-   * Use `"weekends_only"` when only Saturday/Sunday adjustment is needed.
-   */
-  calendar_id: string;
+  calendar_id: Id2;
   /**
    * Coupon settlement behavior: cash, PIK, or an explicit split of the
    * coupon amount.
@@ -3043,12 +3093,7 @@ export interface DCab7645E7A298529F6Dc {
    */
   adjust_accrual_dates?: boolean;
   business_day_convention?: BusinessDayConvention1;
-  /**
-   * Holiday calendar identifier used together with `business_day_convention`.
-   *
-   * Use `"weekends_only"` when only Saturday/Sunday adjustment is needed.
-   */
-  calendar_id: string;
+  calendar_id: Id3;
   /**
    * Coupon type (Cash/PIK/Split).
    */
@@ -3138,7 +3183,8 @@ export interface D_11E2Bbdddad8Dbf2F7F3 {
    *
    * If not provided, defaults to the coupon schedule calendar.
    */
-  fixing_calendar_id?: string | null;
+  fixing_calendar_id?: Id4 | null;
+  forward_curve_id: Id5;
   gearing?: Decimal6;
   /**
    * Whether gearing includes the spread (default: true).
@@ -3157,7 +3203,6 @@ export interface D_11E2Bbdddad8Dbf2F7F3 {
    * Example: index_floor_bp = Some(0.0) ensures index rate >= 0%.
    */
   index_floor_bp?: Decimal5 | null;
-  index_id: Id2;
   /**
    * Diagnostic tenor for term-index projection error context.
    *
@@ -3265,7 +3310,7 @@ export interface Tenor3 {
  *         frequency: Tenor::semi_annual(),
  *         day_count: DayCount::Thirty360,
  *         business_day_convention: BusinessDayConvention::Following,
- *         calendar_id: "weekends_only".to_string(),
+ *         calendar_id: "weekends_only".into(),
  *         stub: StubKind::None,
  *         end_of_month: false,
  *         payment_lag_days: 0,
@@ -3293,12 +3338,7 @@ export interface DC40E1D7B8B06C6A5365D {
    */
   adjust_accrual_dates?: boolean;
   business_day_convention?: BusinessDayConvention2;
-  /**
-   * Holiday calendar identifier used together with `business_day_convention`.
-   *
-   * Use `"weekends_only"` when only Saturday/Sunday adjustment is needed.
-   */
-  calendar_id: string;
+  calendar_id: Id6;
   /**
    * Coupon type (Cash/PIK/Split).
    */
@@ -3572,7 +3612,7 @@ export interface D_561C56F793Cc06Bf015E {
    */
   accrual_factor: number;
   amount: Money2;
-  date: Date6;
+  date: Date7;
   /**
    * Category/kind of cash-flow.
    */
@@ -3650,7 +3690,7 @@ export interface D_380D6451B5A9B6D4B9Ca {
    */
   coupon_period?: [Date, Date] | null;
   day_count: DayCount6;
-  end: Date4;
+  end: Date5;
   /**
    * Whether `end` is the instrument termination date, for the 30E/360 ISDA
    * February exception. Intermediate coupon and rate-step ends are false.
@@ -3660,7 +3700,7 @@ export interface D_380D6451B5A9B6D4B9Ca {
    * Projected index rate before spread, gearing, caps, or floors.
    */
   projected_index_rate?: number | null;
-  start: Date5;
+  start: Date6;
 }
 /**
  * Currency-tagged monetary amount.
@@ -3846,9 +3886,10 @@ export interface DCf2B490Be81Aa851E8Fe {
    */
   calendar_ids: string[];
   /**
-   * Optional facility limit/commitment for instruments like RCFs.
+   * Total facility commitment for revolving and delayed-draw facilities;
+   * `None` for instruments without one.
    */
-  facility_limit?: Money | null;
+  commitment?: Money | null;
   /**
    * Issue date of the instrument, when known.
    *
@@ -3860,7 +3901,7 @@ export interface DCf2B490Be81Aa851E8Fe {
   /**
    * Contractual maturity date, distinct from an adjusted final payment date.
    */
-  maturity_date?: Date | null;
+  maturity?: Date | null;
   /**
    * Raw index observations used by projected floating coupons, before spread,
    * gearing, caps and floors; retained for deterministic time-roll fixings.
@@ -3875,7 +3916,7 @@ export interface DCf2B490Be81Aa851E8Fe {
  * One raw index observation needed by a projected floating coupon.
  */
 export interface D_2681Df442Acb51A38B4E {
-  date: Date7;
+  date: Date8;
   /**
    * Canonical market-series identifier, including the `FIXING:` prefix.
    */
@@ -3918,6 +3959,21 @@ export interface DC4Af4662Fb83082E864A {
            * Fraction of original notional paid per period (e.g., 0.05 = 5%).
            */
           pct: number;
+        };
+      }
+    | {
+        percent_of_remaining_per_period: {
+          /**
+           * Fraction of the outstanding principal paid per period (e.g.,
+           * 0.025 = 2.5%), in `[0, 1]`.
+           */
+          pct: number;
+        };
+      }
+    | {
+        linear_between: {
+          end: Date3;
+          start: Date4;
         };
       }
     | {
@@ -4486,8 +4542,8 @@ export interface DF6867Bdc53B436C37092 {
       }
     | {
         between: {
-          end: Date10;
-          start: Date11;
+          end: Date11;
+          start: Date12;
           [k: string]: unknown;
         };
       };
@@ -4570,41 +4626,62 @@ export interface ScenarioPricingOverrides1 {
  */
 export interface DB0A7458B7623F012Eb4B {
   /**
-   * Amortization specification
+   * Scheduled principal amortization (the shared cashflows
+   * `AmortizationSpec`). `LinearTo` and `StepRemaining` are rejected;
+   * `PercentOfOriginalPerPeriod` and `LinearBetween` apply per funded draw.
    */
   amortization:
     | "none"
     | {
-        linear: {
-          end: Date12;
-          start: Date13;
+        linear_to: {
+          final_notional: Money1;
         };
       }
     | {
-        percent_per_period: {
+        step_remaining: {
           /**
-           * Percentage in basis points per payment period (applied to current outstanding)
+           * Ordered list of `(date, remaining_principal_after_date)`.
            */
-          bp: number;
+          schedule: [Date, Money][];
         };
       }
     | {
-        percent_of_original_notional: {
+        percent_of_original_per_period: {
           /**
-           * Percentage in basis points per payment period (applied to original notional)
+           * Fraction of original notional paid per period (e.g., 0.05 = 5%).
            */
-          bp: number;
+          pct: number;
         };
       }
     | {
-        custom: [Date, Money][];
+        percent_of_remaining_per_period: {
+          /**
+           * Fraction of the outstanding principal paid per period (e.g.,
+           * 0.025 = 2.5%), in `[0, 1]`.
+           */
+          pct: number;
+        };
+      }
+    | {
+        linear_between: {
+          end: Date3;
+          start: Date4;
+        };
+      }
+    | {
+        custom_principal: {
+          /**
+           * List of `(date, principal_amount)` exchanges; amounts are absolute cashflows.
+           */
+          items: [Date, Money][];
+        };
       };
   attributes: Attributes3;
   business_day_convention?: BusinessDayConvention3;
   /**
    * Optional calendar id for adjustments
    */
-  calendar_id?: string | null;
+  calendar_id?: Id4 | null;
   /**
    * Optional call schedule (borrower callability)
    */
@@ -4628,19 +4705,19 @@ export interface DB0A7458B7623F012Eb4B {
   /**
    * Optional credit curve identifier (defaults to discount_curve_id if None)
    */
-  credit_curve_id?: Id3 | null;
+  credit_curve_id?: Id4 | null;
   currency: Currency2;
   day_count: DayCount7;
   /**
    * Optional DDTL parameters; None => plain term loan
    */
   ddtl?: D_567A05766E75C7A74F60 | null;
-  discount_curve_id: Id6;
+  discount_curve_id: Id9;
   frequency: Tenor5;
-  id: Id7;
+  id: Id10;
   instrument_pricing_overrides?: InstrumentPricingOverrides2;
-  issue_date: Date22;
-  maturity: Date23;
+  issue_date: Date21;
+  maturity: Date22;
   metric_pricing_overrides?: MetricPricingOverrides2;
   notional_limit: Money9;
   /**
@@ -4654,10 +4731,9 @@ export interface DB0A7458B7623F012Eb4B {
     | {
         fixed: {
           /**
-           * Fixed rate in basis points (e.g., 600 = 6%)
+           * Annual rate as a decimal (`0.06` = 6%).
            */
-          rate_bp: number;
-          [k: string]: unknown;
+          rate: number;
         };
       }
     | {
@@ -4679,9 +4755,11 @@ export interface DB0A7458B7623F012Eb4B {
    */
   stub?: "none" | "short_front" | "short_back" | "long_front" | "long_back";
   /**
-   * Upfront fee at issue (if any)
+   * Upfront (arrangement or OID) fee paid on `issue_date`, as an amount or
+   * a fraction of the commitment (the DDTL `commitment`, else
+   * `notional_limit`).
    */
-  upfront_fee?: Money | null;
+  upfront_fee?: DF8Cc3E84589384Dc0202 | null;
 }
 /**
  * Attributes for tagging and scenarios
@@ -4750,7 +4828,7 @@ export interface DB004E136Abde209D90De {
  * The `call_type` field determines how the call is exercised:
  * - `Hard`: Standard call at `price_pct_of_par` on or after `date`
  * - `Soft`: Premium call during protection period
- * - `MakeWhole`: PV-based redemption at Treasury + spread
+ * - `MakeWhole`: PV-based redemption at the reference curve plus spread
  *
  * For `MakeWhole` calls, `price_pct_of_par` serves as the minimum
  * (floor) redemption price. The actual price is the greater of
@@ -4764,14 +4842,9 @@ export interface D_267D8577Ac642991B18B {
     | "hard"
     | "soft"
     | {
-        make_whole: {
-          /**
-           * Spread over the reference rate in basis points (e.g., 50 = T+50bps).
-           */
-          treasury_spread_bp: number;
-        };
+        make_whole: DF9D84Ae6512A483B59Dd;
       };
-  date: Date14;
+  date: Date13;
   /**
    * Redemption price as percentage of par (e.g., 102.0 = 102% of par).
    * For make-whole calls, this is the minimum (floor) price.
@@ -4812,7 +4885,7 @@ export interface D_86A72099B58D92668Ef1 {
  */
 export interface D_6Cce9Bce78984Cc5Fa4B {
   amount: Money5;
-  date: Date15;
+  date: Date14;
 }
 /**
  * Currency-tagged monetary amount.
@@ -4997,11 +5070,8 @@ export interface Money5 {
  * leverage-grid improvement); term loans accept only non-negative steps.
  */
 export interface D_422736A194Bc02F6A66F {
-  date: Date16;
-  /**
-   * Change in margin, in basis points (100 = 1%); negative steps down.
-   */
-  delta_bp: number;
+  date: Date15;
+  delta_bp: Decimal9;
 }
 /**
  * Payment-in-kind (PIK) toggle event.
@@ -5010,7 +5080,7 @@ export interface D_422736A194Bc02F6A66F {
  * a portion of interest may be capitalized rather than paid in cash.
  */
 export interface D_587D159069C2143E3Ae8 {
-  date: Date17;
+  date: Date16;
   /**
    * True to enable PIK, false to disable
    */
@@ -5052,13 +5122,13 @@ export interface D_587D159069C2143E3Ae8 {
  *
  * # fn example() -> Result<(), Box<dyn std::error::Error>> {
  * let ddtl = DdtlSpec {
- *     commitment_limit: Money::from((10_000_000_i64, Currency::USD)),
+ *     commitment: Money::from((10_000_000_i64, Currency::USD)),
  *     availability_start: create_date(2025, Month::January, 1)?,
  *     availability_end: create_date(2026, Month::January, 1)?,
  *     draws: vec![],
  *     commitment_steps: vec![],
- *     usage_fee_bp: 50.0,        // 50 bp usage fee
- *     commitment_fee_bp: 25.0,   // 25 bp commitment fee
+ *     usage_fee_bp: dec!(50),        // 50 bp usage fee
+ *     commitment_fee_bp: dec!(25),   // 25 bp commitment fee
  *     fee_base: CommitmentFeeBase::Undrawn,
  *     oid_policy: None,
  * };
@@ -5067,18 +5137,15 @@ export interface D_587D159069C2143E3Ae8 {
  * ```
  */
 export interface D_567A05766E75C7A74F60 {
-  availability_end: Date18;
-  availability_start: Date19;
-  /**
-   * Commitment fee on the undrawn commitment, in basis points per annum
-   * (non-negative, finite; `50.0` = 0.50%).
-   */
-  commitment_fee_bp: number;
-  commitment_limit: Money6;
+  availability_end: Date17;
+  availability_start: Date18;
+  commitment: Money6;
+  commitment_fee_bp: Decimal10;
   /**
    * Commitment steps, each effective from its date: strictly increasing
    * dates inside the availability window, non-increasing `amount`s in the
-   * loan currency, and `fee_bp == 0.0` (term loans carry no reduction fee).
+   * loan currency, and a zero `reduction_fee_bp` (term loans carry no
+   * reduction fee).
    */
   commitment_steps: D_488D578B2Ebcb4B2Fc06[];
   /**
@@ -5093,11 +5160,7 @@ export interface D_567A05766E75C7A74F60 {
    * Original issue discount policy, if applicable
    */
   oid_policy?: D_282Cc71E3B5B312F79C9 | null;
-  /**
-   * Usage fee on drawn amounts, in basis points per annum (non-negative,
-   * finite; `25.0` = 0.25%).
-   */
-  usage_fee_bp: number;
+  usage_fee_bp: Decimal12;
 }
 /**
  * Currency-tagged monetary amount.
@@ -5285,17 +5348,12 @@ export interface Money6 {
  *
  * A delayed-draw term loan (`DdtlSpec::commitment_steps`) accepts only
  * non-increasing steps inside its availability window and no reduction fee
- * (`fee_bp` must be `0.0`).
+ * (`reduction_fee_bp` must be zero).
  */
 export interface D_488D578B2Ebcb4B2Fc06 {
   amount: Money7;
-  date: Date20;
-  /**
-   * Reduction or cancellation fee, in basis points of the reduced amount,
-   * paid by the borrower on `date` when the commitment steps down. Ignored
-   * on a step up. Defaults to `0.0`.
-   */
-  fee_bp?: number;
+  date: Date19;
+  reduction_fee_bp?: Decimal11;
 }
 /**
  * Currency-tagged monetary amount.
@@ -5473,14 +5531,15 @@ export interface Money7 {
     | "ZWL";
 }
 /**
- * Draw event for delayed-draw term loans (DDTL).
+ * A scheduled draw `{date, amount}` on a committed facility.
  *
- * Represents a scheduled or actual draw against the commitment, reducing
- * available capacity and increasing outstanding principal.
+ * A delayed-draw term loan funds on `date` (inside its availability
+ * window); an asset-backed facility funds on the first payment date on or
+ * after `date`.
  */
 export interface DF47392Cbceb10C9A41D6 {
   amount: Money8;
-  date: Date21;
+  date: Date20;
 }
 /**
  * Currency-tagged monetary amount.
@@ -5908,7 +5967,7 @@ export interface DBa65527Bb807631Cd58F {
  * # Rate Calculation
  *
  * The all-in rate is computed as:
- * 1. Look up forward rate from `index_id` curve for the accrual period
+ * 1. Look up forward rate from `forward_curve_id` curve for the accrual period
  * 2. Apply `index_floor_bp` to index rate (if specified) - applied BEFORE adding spread
  * 3. Add `spread_bp` to get base rate
  * 4. Multiply by `gearing` (typically 1.0)
@@ -5931,7 +5990,7 @@ export interface DBa65527Bb807631Cd58F {
  * # Seasoned Instruments (Historical Fixings)
  *
  * Historical fixings **are supported** via the `MarketContext`: store a
- * `ScalarTimeSeries` under the canonical id `FIXING:{index_id}` (see
+ * `ScalarTimeSeries` under the canonical id `FIXING:{forward_curve_id}` (see
  * `finstack_quant_core::market_data::fixings`) containing realized index
  * observations. Observation dates strictly before the forward curve base
  * date then resolve from that series instead of the curve:
@@ -5965,7 +6024,7 @@ export interface DBa65527Bb807631Cd58F {
  *
  * // 3M SOFR + 200bps with 0% floor
  * let spec = FloatingRateSpec {
- *     index_id: "USD-SOFR-3M".into(),
+ *     forward_curve_id: "USD-SOFR-3M".into(),
  *     spread_bp: dec!(200.0),
  *     gearing: dec!(1.0),
  *     gearing_includes_spread: true,
@@ -6015,7 +6074,8 @@ export interface D_11E2Bbdddad8Dbf2F7F31 {
    *
    * If not provided, defaults to the coupon schedule calendar.
    */
-  fixing_calendar_id?: string | null;
+  fixing_calendar_id?: Id4 | null;
+  forward_curve_id: Id5;
   gearing?: Decimal6;
   /**
    * Whether gearing includes the spread (default: true).
@@ -6034,7 +6094,6 @@ export interface D_11E2Bbdddad8Dbf2F7F31 {
    * Example: index_floor_bp = Some(0.0) ensures index rate >= 0%.
    */
   index_floor_bp?: Decimal5 | null;
-  index_id: Id2;
   /**
    * Diagnostic tenor for term-index projection error context.
    *
@@ -6122,22 +6181,6 @@ export interface ScenarioPricingOverrides2 {
  */
 export interface DBef55Fa450B231D7B330 {
   attributes: Attributes4;
-  /**
-   * Base rate specification (fixed or floating).
-   */
-  base_rate_spec:
-    | {
-        fixed: {
-          /**
-           * Annual interest rate (e.g., 0.05 for 5%).
-           */
-          rate: number;
-          [k: string]: unknown;
-        };
-      }
-    | {
-        floating: D_11E2Bbdddad8Dbf2F7F31;
-      };
   business_day_convention?: BusinessDayConvention4;
   /**
    * Holiday calendar identifier (for example `"usny"`) used to adjust
@@ -6146,13 +6189,12 @@ export interface DBef55Fa450B231D7B330 {
    * `FloatingRateSpec::fixing_calendar_id` overrides it for the fixing
    * date alone.
    */
-  calendar_id?: string | null;
-  commitment_amount: Money10;
-  commitment_date: Date24;
+  calendar_id?: Id4 | null;
+  commitment: Money10;
   /**
    * Scheduled commitment changes (amortizing commitments, availability
    * expiries, accordions), each in force from its date until the next.
-   * Dates must be strictly increasing, after `commitment_date` and on or
+   * Dates must be strictly increasing, after `issue_date` and on or
    * before `maturity`; the drawn balance plus outstanding letters of
    * credit must never exceed the commitment in force. A step down pays its
    * `fee_bp` on the reduced amount. Empty by default.
@@ -6164,9 +6206,9 @@ export interface DBef55Fa450B231D7B330 {
    * When provided, survival probabilities from the hazard curve are applied
    * to discount cashflows, adjusting for default risk.
    */
-  credit_curve_id?: Id3 | null;
+  credit_curve_id?: Id4 | null;
   day_count: DayCount8;
-  discount_curve_id: Id8;
+  discount_curve_id: Id11;
   /**
    * Draw and repayment schedule (deterministic or stochastic).
    */
@@ -6177,11 +6219,12 @@ export interface DBef55Fa450B231D7B330 {
     | {
         stochastic: DDb361Df79C3Ba201A17A;
       };
-  drawn_amount: Money12;
+  drawn: Money12;
   fees: DE3Ab2140A3C980De74A0;
   frequency: Tenor6;
-  id: Id10;
+  id: Id13;
   instrument_pricing_overrides?: InstrumentPricingOverrides3;
+  issue_date: Date25;
   /**
    * Letter-of-credit sub-facility. Outstanding letters of credit reduce
    * availability and the commitment-fee base, count as usage for fee
@@ -6210,7 +6253,7 @@ export interface DBef55Fa450B231D7B330 {
    * facility life. Empty by default.
    */
   margin_steps?: D_422736A194Bc02F6A66F[];
-  maturity: Date28;
+  maturity: Date27;
   metric_pricing_overrides?: MetricPricingOverrides3;
   /**
    * Effective-interest-rate reporting switch for the
@@ -6223,6 +6266,21 @@ export interface DBef55Fa450B231D7B330 {
    * `calendar_id`. `0` (the default) pays on the adjusted accrual end.
    */
   payment_lag_days?: number;
+  /**
+   * Base rate specification (fixed or floating).
+   */
+  rate:
+    | {
+        fixed: {
+          /**
+           * Annual rate as a decimal (`0.06` = 6%).
+           */
+          rate: number;
+        };
+      }
+    | {
+        floating: D_11E2Bbdddad8Dbf2F7F31;
+      };
   /**
    * Recovery rate on default (used when credit_curve_id is present).
    *
@@ -6454,7 +6512,7 @@ export interface Money10 {
  */
 export interface DC17277Fa7467F08B53F1 {
   amount: Money11;
-  date: Date25;
+  date: Date23;
   /**
    * True if this is a draw, false if it's a repayment.
    */
@@ -6709,7 +6767,7 @@ export interface D_7Ab5Bac7015D046B3Dfb {
       }
     | {
         market_anchored: {
-          credit_curve_id: Id9;
+          credit_curve_id: Id12;
           /**
            * Annualized CDS (index) option implied volatility for spreads.
            */
@@ -6776,16 +6834,20 @@ export interface D_22A38114F81489D9874E {
 export interface D_85A377Cd9542Ce372249 {
   mean_reverting: {
     /**
-     * Mean reversion speed (annualized).
+     * Mean-reversion speed κ, per year.
      */
-    speed: number;
+    kappa: number;
+    /**
+     * Utilization volatility σ, annualized (absolute utilization units).
+     */
+    sigma: number;
     /**
      * Sensitivity of the utilization target to the simulated credit
      * spread (adverse selection), as a decimal per unit of relative
      * spread change.
      *
      * The target used by the OU step becomes
-     * `θ(t) = clamp(target_rate + spread_sensitivity · (s(t) / s(0) − 1), 0, 1)`
+     * `θ(t) = clamp(theta + spread_sensitivity · (s(t) / s(0) − 1), 0, 1)`
      * where `s(t)` is the simulated spread and `s(0)` its initial level,
      * so a spread that doubles raises the target by `spread_sensitivity`.
      * Defaults to `0.0` (no link); the utilization/credit shock
@@ -6794,14 +6856,9 @@ export interface D_85A377Cd9542Ce372249 {
      */
     spread_sensitivity?: number;
     /**
-     * Target utilization rate (0.0 to 1.0).
+     * Long-run utilization level θ, as a fraction in `[0, 1]`.
      */
-    target_rate: number;
-    /**
-     * Volatility of utilization changes (annualized).
-     */
-    volatility: number;
-    [k: string]: unknown;
+    theta: number;
   };
 }
 /**
@@ -7022,8 +7079,8 @@ export interface DE3Ab2140A3C980De74A0 {
  * rejects unordered tiers.
  */
 export interface D_9Ba274E7Bf0C25Adcffd {
-  bp: Decimal9;
-  threshold: Decimal10;
+  bp: Decimal13;
+  threshold: Decimal14;
 }
 /**
  * A dated change of a revolving facility's running fees.
@@ -7038,7 +7095,7 @@ export interface DFc3A3C7C042399741012 {
    * points per annum. Defaults to `0.0`.
    */
   commitment_delta_bp?: number;
-  date: Date26;
+  date: Date24;
   /**
    * Change to the facility fee on the total commitment, in basis points
    * per annum. Defaults to `0.0`.
@@ -7111,7 +7168,7 @@ export interface DAe3Fba4759C9Affaf77D {
  */
 export interface D_80755C3C677Debee42Bd {
   amount: Money13;
-  date: Date27;
+  date: Date26;
   /**
    * `true` for an issuance (LC outstanding rises), `false` for an expiry
    * or cancellation.
@@ -7707,7 +7764,7 @@ export interface ScenarioPricingOverrides3 {
  */
 export interface DFf1205B888Cf8Fba865E {
   amount: Money16;
-  date: Date29;
+  date: Date28;
 }
 /**
  * Currency-tagged monetary amount.
@@ -7893,16 +7950,16 @@ export interface D_5D63D91B43268508D01D {
   /**
    * Optional calendar for business day adjustments
    */
-  calendar_id?: Id3 | null;
+  calendar_id?: Id4 | null;
   cash_amount: Money17;
   collateral: D_0462C3A38Cc828Eadadf;
   day_count: DayCount9;
-  discount_curve_id: Id11;
+  discount_curve_id: Id16;
   /**
    * Haircut percentage (as decimal, e.g., 0.02 = 2%)
    */
   haircut: number;
-  id: Id12;
+  id: Id17;
   instrument_pricing_overrides?: InstrumentPricingOverrides4;
   /**
    * Optional margin specification for mark-to-market margining.
@@ -7911,15 +7968,15 @@ export interface D_5D63D91B43268508D01D {
    * and margin interest calculations. See [`RepoMarginSpec`] for details.
    */
   margin_spec?: D_2A56C8E7799710Ddfef1 | null;
-  maturity: Date30;
+  maturity: Date29;
   metric_pricing_overrides?: MetricPricingOverrides4;
-  repo_rate: Decimal11;
+  repo_rate: Decimal15;
   /**
    * Type of repo
    */
   repo_type: "term" | "open" | "overnight";
   scenario_pricing_overrides?: ScenarioPricingOverrides4;
-  start_date: Date31;
+  start_date: Date30;
   /**
    * Whether this is a tri-party repo
    */
@@ -8130,21 +8187,10 @@ export interface D_0462C3A38Cc828Eadadf {
            * Optional special rate adjustment in basis points (negative = lower rate)
            */
           rate_adjustment_bp?: number | null;
-          /**
-           * Identifier of the specific security
-           */
-          security_id: string;
-          [k: string]: unknown;
         };
       };
-  /**
-   * Identifier for the collateral instrument
-   */
-  instrument_id: string;
-  /**
-   * Market value identifier in MarketContext (e.g., "BOND_ABC_PRICE")
-   */
-  market_value_id: string;
+  instrument_id: Id14;
+  market_value_id: Id15;
   /**
    * Quantity/face value of collateral
    */

@@ -20,8 +20,7 @@ export default [
             "contract_rate": 7.25,
             "domestic_discount_curve_id": "USD-OIS",
             "fixing_date": "2025-03-13",
-            "fixing_source_enum": "PBOC",
-            "forward_rate_override": 7.25,
+            "fixing_source": "PBOC",
             "id": "USDCNY-NDF-3M",
             "maturity": "2025-03-15",
             "notional": {
@@ -29,6 +28,7 @@ export default [
               "currency": "CNY"
             },
             "quote_convention": "base_per_settlement",
+            "quoted_forward": 7.25,
             "settlement_currency": "USD"
           },
           "type": "ndf"
@@ -406,7 +406,7 @@ export default [
   {
     "path": "#/$defs/d_1f0bf95e27d8096e424e",
     "source": "https://finstack_quant.dev/schemas/instrument/1/fx/ndf.schema.json#/$defs/NdfFixingSource",
-    "description": "Official NDF fixing source/benchmark.\n\nNDF settlements reference official fixing rates published by central banks\nor designated fixing bodies. Using the correct fixing source is critical\nfor proper settlement calculations.\n\n# Market Standards\n\n| Currency | Fixing Source | Publisher | Settlement |\n|----------|---------------|-----------|------------|\n| CNY | PBOC | People's Bank of China | USD T+2 |\n| CNH | CNHFIX | Treasury Markets Association (HK) | USD T+2 |\n| INR | RBI | Reserve Bank of India | USD T+2 |\n| KRW | KFTC | Korea Financial Telecommunications | USD T+1 |\n| BRL | PTAX | Banco Central do Brasil | USD T+2 |\n| TWD | TAIFX | Taipei Forex Inc. | USD T+2 |\n| PHP | PHP BVAL | Bankers Association of the Philippines | USD T+1 |\n| IDR | JISDOR | Bank Indonesia | USD T+2 |\n| MYR | BNM | Bank Negara Malaysia | USD T+2 |\n\n# Example\n\n```rust\nuse finstack_quant_valuations::instruments::fx::ndf::{Ndf, NdfFixingSource, NdfQuoteConvention};\nuse finstack_quant_core::currency::Currency;\nuse finstack_quant_core::dates::Date;\nuse finstack_quant_core::money::Money;\nuse finstack_quant_core::types::{CurveId, InstrumentId};\nuse time::Month;\n\nlet ndf = Ndf::builder()\n    .id(InstrumentId::new(\"USDCNY-NDF\"))\n    .base_currency(Currency::CNY)\n    .settlement_currency(Currency::USD)\n    .fixing_date(Date::from_calendar_date(2025, Month::March, 13).unwrap())\n    .maturity(Date::from_calendar_date(2025, Month::March, 15).unwrap())\n    .notional(Money::from((10_000_000_i64, Currency::CNY)))\n    .contract_rate(7.25)\n    .domestic_discount_curve_id(CurveId::new(\"USD-OIS\"))\n    .quote_convention(NdfQuoteConvention::BasePerSettlement)\n    .fixing_source_enum_opt(Some(NdfFixingSource::Pboc))\n    .build()\n    .expect(\"Valid NDF\");\n```"
+    "description": "Official NDF fixing source/benchmark.\n\nNDF settlements reference official fixing rates published by central banks\nor designated fixing bodies. Using the correct fixing source is critical\nfor proper settlement calculations.\n\n# Market Standards\n\n| Currency | Fixing Source | Publisher | Settlement |\n|----------|---------------|-----------|------------|\n| CNY | PBOC | People's Bank of China | USD T+2 |\n| CNH | CNHFIX | Treasury Markets Association (HK) | USD T+2 |\n| INR | RBI | Reserve Bank of India | USD T+2 |\n| KRW | KFTC | Korea Financial Telecommunications | USD T+1 |\n| BRL | PTAX | Banco Central do Brasil | USD T+2 |\n| TWD | TAIFX | Taipei Forex Inc. | USD T+2 |\n| PHP | PHP BVAL | Bankers Association of the Philippines | USD T+1 |\n| IDR | JISDOR | Bank Indonesia | USD T+2 |\n| MYR | BNM | Bank Negara Malaysia | USD T+2 |\n\n# Example\n\n```rust\nuse finstack_quant_valuations::instruments::fx::ndf::{Ndf, NdfFixingSource, NdfQuoteConvention};\nuse finstack_quant_core::currency::Currency;\nuse finstack_quant_core::dates::Date;\nuse finstack_quant_core::money::Money;\nuse finstack_quant_core::types::{CurveId, InstrumentId};\nuse time::Month;\n\nlet ndf = Ndf::builder()\n    .id(InstrumentId::new(\"USDCNY-NDF\"))\n    .base_currency(Currency::CNY)\n    .settlement_currency(Currency::USD)\n    .fixing_date(Date::from_calendar_date(2025, Month::March, 13).unwrap())\n    .maturity(Date::from_calendar_date(2025, Month::March, 15).unwrap())\n    .notional(Money::from((10_000_000_i64, Currency::CNY)))\n    .contract_rate(7.25)\n    .domestic_discount_curve_id(CurveId::new(\"USD-OIS\"))\n    .quote_convention(NdfQuoteConvention::BasePerSettlement)\n    .fixing_source_opt(Some(NdfFixingSource::Pboc))\n    .build()\n    .expect(\"Valid NDF\");\n```"
   },
   {
     "path": "#/$defs/d_1f0bf95e27d8096e424e/oneOf/0",
@@ -1058,7 +1058,8 @@ export default [
   {
     "path": "#/$defs/d_6737e7813812de86cf9b/properties/contract_rate",
     "source": "https://finstack_quant.dev/schemas/instrument/1/fx/ndf.schema.json#/$defs/Ndf/properties/contract_rate",
-    "description": "Contract forward rate. Interpretation depends on `quote_convention`.",
+    "default": null,
+    "description": "Contract forward rate. Interpretation depends on `quote_convention`.\n`None` values the NDF at-market.",
     "format": "double"
   },
   {
@@ -1076,20 +1077,20 @@ export default [
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/date.schema.json#"
   },
   {
-    "path": "#/$defs/d_6737e7813812de86cf9b/properties/fixing_source_enum",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/fx/ndf.schema.json#/$defs/Ndf/properties/fixing_source_enum",
+    "path": "#/$defs/d_6737e7813812de86cf9b/properties/fixing_source",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/fx/ndf.schema.json#/$defs/Ndf/properties/fixing_source",
     "default": null,
     "description": "Official fixing source/benchmark enum for type-safe specification."
   },
   {
-    "path": "#/$defs/d_6737e7813812de86cf9b/properties/fixing_source_enum/anyOf/0",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/fx/ndf.schema.json#/$defs/Ndf/properties/fixing_source_enum/anyOf/0",
+    "path": "#/$defs/d_6737e7813812de86cf9b/properties/fixing_source/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/fx/ndf.schema.json#/$defs/Ndf/properties/fixing_source/anyOf/0",
     "ref": "#/$defs/NdfFixingSource",
     "resolvedRef": "https://finstack_quant.dev/schemas/instrument/1/fx/ndf.schema.json#/$defs/NdfFixingSource"
   },
   {
-    "path": "#/$defs/d_6737e7813812de86cf9b/properties/fixing_source_enum/anyOf/1",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/fx/ndf.schema.json#/$defs/Ndf/properties/fixing_source_enum/anyOf/1"
+    "path": "#/$defs/d_6737e7813812de86cf9b/properties/fixing_source/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/fx/ndf.schema.json#/$defs/Ndf/properties/fixing_source/anyOf/1"
   },
   {
     "path": "#/$defs/d_6737e7813812de86cf9b/properties/foreign_discount_curve_id",
@@ -1106,13 +1107,6 @@ export default [
   {
     "path": "#/$defs/d_6737e7813812de86cf9b/properties/foreign_discount_curve_id/anyOf/1",
     "source": "https://finstack_quant.dev/schemas/instrument/1/fx/ndf.schema.json#/$defs/Ndf/properties/foreign_discount_curve_id/anyOf/1"
-  },
-  {
-    "path": "#/$defs/d_6737e7813812de86cf9b/properties/forward_rate_override",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/fx/ndf.schema.json#/$defs/Ndf/properties/forward_rate_override",
-    "default": null,
-    "description": "Explicit pre-fixing forward rate in `quote_convention` units.",
-    "format": "double"
   },
   {
     "path": "#/$defs/d_6737e7813812de86cf9b/properties/id",
@@ -1161,17 +1155,25 @@ export default [
     "format": "double"
   },
   {
-    "path": "#/$defs/d_6737e7813812de86cf9b/properties/quote_calendar_id",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/fx/ndf.schema.json#/$defs/Ndf/properties/quote_calendar_id",
-    "default": null,
-    "description": "Optional settlement currency calendar."
-  },
-  {
     "path": "#/$defs/d_6737e7813812de86cf9b/properties/quote_convention",
     "source": "https://finstack_quant.dev/schemas/instrument/1/fx/ndf.schema.json#/$defs/Ndf/properties/quote_convention",
     "description": "Quote convention for contract_rate and observed_fixing.",
     "ref": "#/$defs/NdfQuoteConvention",
     "resolvedRef": "https://finstack_quant.dev/schemas/instrument/1/fx/ndf.schema.json#/$defs/NdfQuoteConvention"
+  },
+  {
+    "path": "#/$defs/d_6737e7813812de86cf9b/properties/quoted_forward",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/fx/ndf.schema.json#/$defs/Ndf/properties/quoted_forward",
+    "default": null,
+    "description": "Explicit pre-fixing forward rate in `quote_convention` units.",
+    "format": "double"
+  },
+  {
+    "path": "#/$defs/d_6737e7813812de86cf9b/properties/quoted_spot",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/fx/ndf.schema.json#/$defs/Ndf/properties/quoted_spot",
+    "default": null,
+    "description": "Optional spot rate override for forward rate calculation.",
+    "format": "double"
   },
   {
     "path": "#/$defs/d_6737e7813812de86cf9b/properties/scenario_pricing_overrides",
@@ -1182,18 +1184,17 @@ export default [
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/scenario_pricing_overrides.schema.json#"
   },
   {
+    "path": "#/$defs/d_6737e7813812de86cf9b/properties/settlement_calendar_id",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/fx/ndf.schema.json#/$defs/Ndf/properties/settlement_calendar_id",
+    "default": null,
+    "description": "Optional settlement currency calendar."
+  },
+  {
     "path": "#/$defs/d_6737e7813812de86cf9b/properties/settlement_currency",
     "source": "https://finstack_quant.dev/schemas/instrument/1/fx/ndf.schema.json#/$defs/Ndf/properties/settlement_currency",
     "description": "Settlement currency (freely convertible, typically USD, denominator and PV currency).",
     "ref": "https://finstack_quant.dev/schemas/common/1/currency.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/currency.schema.json#"
-  },
-  {
-    "path": "#/$defs/d_6737e7813812de86cf9b/properties/spot_rate_override",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/fx/ndf.schema.json#/$defs/Ndf/properties/spot_rate_override",
-    "default": null,
-    "description": "Optional spot rate override for forward rate calculation.",
-    "format": "double"
   },
   {
     "path": "#/$defs/d_6ad9d1d29a70c131b17a",

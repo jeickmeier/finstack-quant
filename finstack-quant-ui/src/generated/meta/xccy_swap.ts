@@ -1472,6 +1472,16 @@ export default [
     "description": "Calendar identifier for schedule generation and lags."
   },
   {
+    "path": "#/$defs/d_8426ebf5dcce24ed2cdf/properties/calendar_id/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/rates/xccy_swap.schema.json#/$defs/XccySwapLeg/properties/calendar_id/anyOf/0",
+    "ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/id.schema.json#"
+  },
+  {
+    "path": "#/$defs/d_8426ebf5dcce24ed2cdf/properties/calendar_id/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/rates/xccy_swap.schema.json#/$defs/XccySwapLeg/properties/calendar_id/anyOf/1"
+  },
+  {
     "path": "#/$defs/d_8426ebf5dcce24ed2cdf/properties/compounding",
     "source": "https://finstack_quant.dev/schemas/instrument/1/rates/xccy_swap.schema.json#/$defs/XccySwapLeg/properties/compounding",
     "default": "simple",

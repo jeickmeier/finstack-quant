@@ -9,8 +9,8 @@ export default [
         "instrument": {
           "spec": {
             "attributes": {},
+            "base_cpi": 100,
             "base_date": "2024-01-15",
-            "base_index": 100,
             "business_day_convention": "unadjusted",
             "calendar_id": null,
             "day_count": "act_act_isma",
@@ -3738,17 +3738,17 @@ export default [
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/attributes.schema.json#"
   },
   {
+    "path": "#/$defs/d_cf0ae253da617678cc3e/properties/base_cpi",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/inflation_linked_bond.schema.json#/$defs/InflationLinkedBond/properties/base_cpi",
+    "description": "Base CPI/index value at issue",
+    "format": "double"
+  },
+  {
     "path": "#/$defs/d_cf0ae253da617678cc3e/properties/base_date",
     "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/inflation_linked_bond.schema.json#/$defs/InflationLinkedBond/properties/base_date",
     "description": "Base date for index (may differ from issue date)",
     "ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/date.schema.json#"
-  },
-  {
-    "path": "#/$defs/d_cf0ae253da617678cc3e/properties/base_index",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/inflation_linked_bond.schema.json#/$defs/InflationLinkedBond/properties/base_index",
-    "description": "Base CPI/index value at issue",
-    "format": "double"
   },
   {
     "path": "#/$defs/d_cf0ae253da617678cc3e/properties/business_day_convention",

@@ -9,31 +9,12 @@ export default [
         "instrument": {
           "spec": {
             "attributes": {},
-            "base_rate_spec": {
-              "floating": {
-                "all_in_cap_bp": null,
-                "all_in_floor_bp": null,
-                "fixing_calendar_id": null,
-                "gearing": "1",
-                "gearing_includes_spread": true,
-                "index_cap_bp": null,
-                "index_floor_bp": "0",
-                "index_id": "USD-SOFR-3M",
-                "reset_frequency": {
-                  "count": 3,
-                  "unit": "months"
-                },
-                "reset_lag_days": 2,
-                "spread_bp": "250"
-              }
-            },
             "business_day_convention": "modified_following",
             "calendar_id": "usny",
-            "commitment_amount": {
+            "commitment": {
               "amount": "50000000",
               "currency": "USD"
             },
-            "commitment_date": "2024-01-01",
             "commitment_steps": [],
             "credit_curve_id": null,
             "day_count": "act_360",
@@ -58,7 +39,7 @@ export default [
                 }
               ]
             },
-            "drawn_amount": {
+            "drawn": {
               "amount": "10000000",
               "currency": "USD"
             },
@@ -84,12 +65,31 @@ export default [
               "unit": "months"
             },
             "id": "RCF-USD-3Y",
+            "issue_date": "2024-01-01",
             "lc": null,
             "leq": 0,
             "margin_steps": [],
             "maturity": "2027-01-01",
             "oid_eir": null,
             "payment_lag_days": 0,
+            "rate": {
+              "floating": {
+                "all_in_cap_bp": null,
+                "all_in_floor_bp": null,
+                "fixing_calendar_id": null,
+                "forward_curve_id": "USD-SOFR-3M",
+                "gearing": "1",
+                "gearing_includes_spread": true,
+                "index_cap_bp": null,
+                "index_floor_bp": "0",
+                "reset_frequency": {
+                  "count": 3,
+                  "unit": "months"
+                },
+                "reset_lag_days": 2,
+                "spread_bp": "250"
+              }
+            },
             "recovery_rate": 0,
             "scheduled_fees": [],
             "settlement_days": 0,
@@ -729,28 +729,28 @@ export default [
     "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/revolving_credit.schema.json#/$defs/UtilizationProcess/properties/mean_reverting"
   },
   {
-    "path": "#/$defs/d_21790c5ea4f40586693a/properties/mean_reverting/properties/speed",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/revolving_credit.schema.json#/$defs/UtilizationProcess/properties/mean_reverting/properties/speed",
-    "description": "Mean reversion speed (annualized).",
+    "path": "#/$defs/d_21790c5ea4f40586693a/properties/mean_reverting/properties/kappa",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/revolving_credit.schema.json#/$defs/UtilizationProcess/properties/mean_reverting/properties/kappa",
+    "description": "Mean-reversion speed κ, per year.",
+    "format": "double"
+  },
+  {
+    "path": "#/$defs/d_21790c5ea4f40586693a/properties/mean_reverting/properties/sigma",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/revolving_credit.schema.json#/$defs/UtilizationProcess/properties/mean_reverting/properties/sigma",
+    "description": "Utilization volatility σ, annualized (absolute utilization units).",
     "format": "double"
   },
   {
     "path": "#/$defs/d_21790c5ea4f40586693a/properties/mean_reverting/properties/spread_sensitivity",
     "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/revolving_credit.schema.json#/$defs/UtilizationProcess/properties/mean_reverting/properties/spread_sensitivity",
     "default": 0,
-    "description": "Sensitivity of the utilization target to the simulated credit\nspread (adverse selection), as a decimal per unit of relative\nspread change.\n\nThe target used by the OU step becomes\n`θ(t) = clamp(target_rate + spread_sensitivity · (s(t) / s(0) − 1), 0, 1)`\nwhere `s(t)` is the simulated spread and `s(0)` its initial level,\nso a spread that doubles raises the target by `spread_sensitivity`.\nDefaults to `0.0` (no link); the utilization/credit shock\ncorrelation in `McConfig` applies on top of it. Ignored when the\nfacility has no credit-spread process.",
+    "description": "Sensitivity of the utilization target to the simulated credit\nspread (adverse selection), as a decimal per unit of relative\nspread change.\n\nThe target used by the OU step becomes\n`θ(t) = clamp(theta + spread_sensitivity · (s(t) / s(0) − 1), 0, 1)`\nwhere `s(t)` is the simulated spread and `s(0)` its initial level,\nso a spread that doubles raises the target by `spread_sensitivity`.\nDefaults to `0.0` (no link); the utilization/credit shock\ncorrelation in `McConfig` applies on top of it. Ignored when the\nfacility has no credit-spread process.",
     "format": "double"
   },
   {
-    "path": "#/$defs/d_21790c5ea4f40586693a/properties/mean_reverting/properties/target_rate",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/revolving_credit.schema.json#/$defs/UtilizationProcess/properties/mean_reverting/properties/target_rate",
-    "description": "Target utilization rate (0.0 to 1.0).",
-    "format": "double"
-  },
-  {
-    "path": "#/$defs/d_21790c5ea4f40586693a/properties/mean_reverting/properties/volatility",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/revolving_credit.schema.json#/$defs/UtilizationProcess/properties/mean_reverting/properties/volatility",
-    "description": "Volatility of utilization changes (annualized).",
+    "path": "#/$defs/d_21790c5ea4f40586693a/properties/mean_reverting/properties/theta",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/revolving_credit.schema.json#/$defs/UtilizationProcess/properties/mean_reverting/properties/theta",
+    "description": "Long-run utilization level θ, as a fraction in `[0, 1]`.",
     "format": "double"
   },
   {
@@ -951,13 +951,6 @@ export default [
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/attributes.schema.json#"
   },
   {
-    "path": "#/$defs/d_2d9b65cc4d957fd6344e/properties/base_rate_spec",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/revolving_credit.schema.json#/$defs/RevolvingCredit/properties/base_rate_spec",
-    "description": "Base rate specification (fixed or floating).",
-    "ref": "#/$defs/BaseRateSpec",
-    "resolvedRef": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/revolving_credit.schema.json#/$defs/BaseRateSpec"
-  },
-  {
     "path": "#/$defs/d_2d9b65cc4d957fd6344e/properties/business_day_convention",
     "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/revolving_credit.schema.json#/$defs/RevolvingCredit/properties/business_day_convention",
     "default": "modified_following",
@@ -972,24 +965,27 @@ export default [
     "description": "Holiday calendar identifier (for example `\"usny\"`) used to adjust\npayment dates, roll fixing dates and count settlement days. `None`\nadjusts for weekends only. Validation rejects an unknown identifier.\n`FloatingRateSpec::fixing_calendar_id` overrides it for the fixing\ndate alone."
   },
   {
-    "path": "#/$defs/d_2d9b65cc4d957fd6344e/properties/commitment_amount",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/revolving_credit.schema.json#/$defs/RevolvingCredit/properties/commitment_amount",
-    "description": "Opening commitment of the facility, in force from `commitment_date`\nuntil the first entry of `commitment_steps`.",
-    "ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
-    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/money.schema.json#"
+    "path": "#/$defs/d_2d9b65cc4d957fd6344e/properties/calendar_id/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/revolving_credit.schema.json#/$defs/RevolvingCredit/properties/calendar_id/anyOf/0",
+    "ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/id.schema.json#"
   },
   {
-    "path": "#/$defs/d_2d9b65cc4d957fd6344e/properties/commitment_date",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/revolving_credit.schema.json#/$defs/RevolvingCredit/properties/commitment_date",
-    "description": "Date when the facility becomes available.",
-    "ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
-    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/date.schema.json#"
+    "path": "#/$defs/d_2d9b65cc4d957fd6344e/properties/calendar_id/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/revolving_credit.schema.json#/$defs/RevolvingCredit/properties/calendar_id/anyOf/1"
+  },
+  {
+    "path": "#/$defs/d_2d9b65cc4d957fd6344e/properties/commitment",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/revolving_credit.schema.json#/$defs/RevolvingCredit/properties/commitment",
+    "description": "Opening commitment of the facility, in force from `issue_date`\nuntil the first entry of `commitment_steps`.",
+    "ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/money.schema.json#"
   },
   {
     "path": "#/$defs/d_2d9b65cc4d957fd6344e/properties/commitment_steps",
     "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/revolving_credit.schema.json#/$defs/RevolvingCredit/properties/commitment_steps",
     "default": [],
-    "description": "Scheduled commitment changes (amortizing commitments, availability\nexpiries, accordions), each in force from its date until the next.\nDates must be strictly increasing, after `commitment_date` and on or\nbefore `maturity`; the drawn balance plus outstanding letters of\ncredit must never exceed the commitment in force. A step down pays its\n`fee_bp` on the reduced amount. Empty by default."
+    "description": "Scheduled commitment changes (amortizing commitments, availability\nexpiries, accordions), each in force from its date until the next.\nDates must be strictly increasing, after `issue_date` and on or\nbefore `maturity`; the drawn balance plus outstanding letters of\ncredit must never exceed the commitment in force. A step down pays its\n`fee_bp` on the reduced amount. Empty by default."
   },
   {
     "path": "#/$defs/d_2d9b65cc4d957fd6344e/properties/commitment_steps/items",
@@ -1035,9 +1031,9 @@ export default [
     "resolvedRef": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/revolving_credit.schema.json#/$defs/DrawRepaySpec"
   },
   {
-    "path": "#/$defs/d_2d9b65cc4d957fd6344e/properties/drawn_amount",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/revolving_credit.schema.json#/$defs/RevolvingCredit/properties/drawn_amount",
-    "description": "Drawn balance at the simulation anchor, the later of `commitment_date`\nand the valuation date, in both deterministic and stochastic mode.\n\nFor a new facility this is the balance funded at commitment; for a\nseasoned facility it is the balance observed on the valuation date.\nDeterministic draw/repay events describe the future only: an event\ndated on or before the valuation date is rejected by the cashflow\nengine, because the position at the anchor is defined by this field\nalone. The accrual period containing the valuation date accrues on\nthis balance from its accrual start.",
+    "path": "#/$defs/d_2d9b65cc4d957fd6344e/properties/drawn",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/revolving_credit.schema.json#/$defs/RevolvingCredit/properties/drawn",
+    "description": "Drawn balance at the simulation anchor, the later of `issue_date`\nand the valuation date, in both deterministic and stochastic mode.\n\nFor a new facility this is the balance funded at commitment; for a\nseasoned facility it is the balance observed on the valuation date.\nDeterministic draw/repay events describe the future only: an event\ndated on or before the valuation date is rejected by the cashflow\nengine, because the position at the anchor is defined by this field\nalone. The accrual period containing the valuation date accrues on\nthis balance from its accrual start.",
     "ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/money.schema.json#"
   },
@@ -1068,6 +1064,13 @@ export default [
     "description": "Instrument-owned pricing inputs.",
     "ref": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#"
+  },
+  {
+    "path": "#/$defs/d_2d9b65cc4d957fd6344e/properties/issue_date",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/revolving_credit.schema.json#/$defs/RevolvingCredit/properties/issue_date",
+    "description": "Date when the facility becomes available.",
+    "ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/date.schema.json#"
   },
   {
     "path": "#/$defs/d_2d9b65cc4d957fd6344e/properties/lc",
@@ -1141,6 +1144,13 @@ export default [
     "description": "Business days between an accrual end and its payment date, on\n`calendar_id`. `0` (the default) pays on the adjusted accrual end.",
     "format": "uint32",
     "minimum": 0
+  },
+  {
+    "path": "#/$defs/d_2d9b65cc4d957fd6344e/properties/rate",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/revolving_credit.schema.json#/$defs/RevolvingCredit/properties/rate",
+    "description": "Base rate specification (fixed or floating).",
+    "ref": "#/$defs/RateSpec",
+    "resolvedRef": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/revolving_credit.schema.json#/$defs/RateSpec"
   },
   {
     "path": "#/$defs/d_2d9b65cc4d957fd6344e/properties/recovery_rate",
@@ -1325,33 +1335,33 @@ export default [
     "format": "double"
   },
   {
-    "path": "#/$defs/d_44a783489fd714980a9b",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/revolving_credit.schema.json#/$defs/BaseRateSpec",
-    "description": "Base rate specification for revolving credit interest.\n\nDefines whether the facility pays a fixed rate or a floating rate\ntied to a market index plus margin."
+    "path": "#/$defs/d_3c319da7190ff52c5100",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/revolving_credit.schema.json#/$defs/RateSpec",
+    "description": "Contractual coupon of a loan facility or note: a fixed all-in rate or a\nfloating index plus spread.\n\nShared by `TermLoan.rate`, `RevolvingCredit.rate`, `AssetBackedFacility.rate`\nand structured-credit `Tranche.coupon`.\n\n# Examples\n\n```rust\nuse finstack_quant_valuations::instruments::fixed_income::loan_terms::RateSpec;\n\nlet fixed = RateSpec::Fixed { rate: 0.06 }; // 6% all-in\nassert!(matches!(fixed, RateSpec::Fixed { .. }));\n```"
   },
   {
-    "path": "#/$defs/d_44a783489fd714980a9b/oneOf/0",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/revolving_credit.schema.json#/$defs/BaseRateSpec/oneOf/0",
-    "description": "Fixed rate (annualized)."
+    "path": "#/$defs/d_3c319da7190ff52c5100/oneOf/0",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/revolving_credit.schema.json#/$defs/RateSpec/oneOf/0",
+    "description": "Fixed all-in annual rate."
   },
   {
-    "path": "#/$defs/d_44a783489fd714980a9b/oneOf/0/properties/fixed",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/revolving_credit.schema.json#/$defs/BaseRateSpec/oneOf/0/properties/fixed"
+    "path": "#/$defs/d_3c319da7190ff52c5100/oneOf/0/properties/fixed",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/revolving_credit.schema.json#/$defs/RateSpec/oneOf/0/properties/fixed"
   },
   {
-    "path": "#/$defs/d_44a783489fd714980a9b/oneOf/0/properties/fixed/properties/rate",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/revolving_credit.schema.json#/$defs/BaseRateSpec/oneOf/0/properties/fixed/properties/rate",
-    "description": "Annual interest rate (e.g., 0.05 for 5%).",
+    "path": "#/$defs/d_3c319da7190ff52c5100/oneOf/0/properties/fixed/properties/rate",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/revolving_credit.schema.json#/$defs/RateSpec/oneOf/0/properties/fixed/properties/rate",
+    "description": "Annual rate as a decimal (`0.06` = 6%).",
     "format": "double"
   },
   {
-    "path": "#/$defs/d_44a783489fd714980a9b/oneOf/1",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/revolving_credit.schema.json#/$defs/BaseRateSpec/oneOf/1",
-    "description": "Floating rate using canonical FloatingRateSpec.\n\nComposes the standard floating rate specification with full support\nfor floors, caps, and gearing."
+    "path": "#/$defs/d_3c319da7190ff52c5100/oneOf/1",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/revolving_credit.schema.json#/$defs/RateSpec/oneOf/1",
+    "description": "Floating index plus spread, with the canonical floor, cap, gearing and\nreset conventions of [`FloatingRateSpec`]."
   },
   {
-    "path": "#/$defs/d_44a783489fd714980a9b/oneOf/1/properties/floating",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/revolving_credit.schema.json#/$defs/BaseRateSpec/oneOf/1/properties/floating",
+    "path": "#/$defs/d_3c319da7190ff52c5100/oneOf/1/properties/floating",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/revolving_credit.schema.json#/$defs/RateSpec/oneOf/1/properties/floating",
     "ref": "#/$defs/FloatingRateSpec",
     "resolvedRef": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/revolving_credit.schema.json#/$defs/FloatingRateSpec"
   },
@@ -2022,7 +2032,7 @@ export default [
   {
     "path": "#/$defs/d_879c942d15cfcad2445b",
     "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/revolving_credit.schema.json#/$defs/FloatingRateSpec",
-    "description": "Canonical floating rate specification for all instruments.\n\nUsed by bonds, swaps, credit facilities, and structured products.\nAll instruments should compose this type rather than defining their own\nfloating rate specifications.\n\n# Rate Calculation\n\nThe all-in rate is computed as:\n1. Look up forward rate from `index_id` curve for the accrual period\n2. Apply `index_floor_bp` to index rate (if specified) - applied BEFORE adding spread\n3. Add `spread_bp` to get base rate\n4. Multiply by `gearing` (typically 1.0)\n5. Apply `all_in_cap_bp` to final rate (if specified) - applied AFTER spread and gearing\n\nFormula: `cap(gearing * (floor(index) + spread))`\n\n# Negative Rate Handling\n\nNegative index rates are supported and will flow through calculations\nunless constrained by floors. For markets with negative rates (EUR, JPY, CHF):\n\n- Set `index_floor_bp: Some(0.0)` to floor the index at zero\n- Set `all_in_floor_bp: Some(0.0)` to floor the total coupon at zero\n- Omit floors to allow negative coupons (rare but valid in some structures)\n\nThe implementation does not reject negative rates; the policy is controlled\nby the floor configuration.\n\n# Seasoned Instruments (Historical Fixings)\n\nHistorical fixings **are supported** via the `MarketContext`: store a\n`ScalarTimeSeries` under the canonical id `FIXING:{index_id}` (see\n`finstack_quant_core::market_data::fixings`) containing realized index\nobservations. Observation dates strictly before the forward curve base\ndate then resolve from that series instead of the curve:\n\n- **Overnight observations** (compounded/averaged paths) use LOCF lookup\n  (last observation carried forward), matching RFR publication\n  conventions where a fixing carries over non-publication days\n  (ARRC 2020 SOFR conventions; ISDA 2021 Supp. 70 §7.1(g)). A partially\n  seasoned compounding window seamlessly mixes realized fixings and\n  curve-projected forwards with identical `(rate, days)` weighting.\n- **Term-rate resets** use exact-date lookup on the (business-day\n  adjusted) reset date — a term rate fixes on a specific published date.\n  The fixing is the index rate only; gearing/spread/floors/caps apply on\n  top exactly as for projected rates.\n\nAn observation exactly on the curve base date prefers a published\nsame-day fixing when the series has one, otherwise projects from `t = 0`.\n\nThe [`FloatingRateFallback`] policy applies only when **no** fixing\nseries is provided: `Error` (the default) fails the build with a\ndescriptive message naming the date, index, and expected series id;\n`FixedRate(r)` uses `r` as the index rate for the affected coupon;\n`SpreadOnly` projects spread-only.\n\n# Example\n\n```rust\nuse finstack_quant_core::dates::Tenor;\nuse finstack_quant_cashflows::builder::{FloatingRateSpec, OvernightIndexConstraintApplication};\nuse rust_decimal_macros::dec;\n\n// 3M SOFR + 200bps with 0% floor\nlet spec = FloatingRateSpec {\n    index_id: \"USD-SOFR-3M\".into(),\n    spread_bp: dec!(200.0),\n    gearing: dec!(1.0),\n    gearing_includes_spread: true,\n    index_floor_bp: Some(dec!(0.0)),\n    all_in_floor_bp: None,\n    all_in_cap_bp: None,\n    index_cap_bp: None,\n    overnight_index_constraints: OvernightIndexConstraintApplication::Daily,\n    reset_frequency: Tenor::quarterly(),\n    index_tenor: None,\n    reset_lag_days: 2,\n    fixing_calendar_id: None,\n    overnight_compounding: None,\n    overnight_basis: None,\n    fallback: Default::default(),\n};\n```"
+    "description": "Canonical floating rate specification for all instruments.\n\nUsed by bonds, swaps, credit facilities, and structured products.\nAll instruments should compose this type rather than defining their own\nfloating rate specifications.\n\n# Rate Calculation\n\nThe all-in rate is computed as:\n1. Look up forward rate from `forward_curve_id` curve for the accrual period\n2. Apply `index_floor_bp` to index rate (if specified) - applied BEFORE adding spread\n3. Add `spread_bp` to get base rate\n4. Multiply by `gearing` (typically 1.0)\n5. Apply `all_in_cap_bp` to final rate (if specified) - applied AFTER spread and gearing\n\nFormula: `cap(gearing * (floor(index) + spread))`\n\n# Negative Rate Handling\n\nNegative index rates are supported and will flow through calculations\nunless constrained by floors. For markets with negative rates (EUR, JPY, CHF):\n\n- Set `index_floor_bp: Some(0.0)` to floor the index at zero\n- Set `all_in_floor_bp: Some(0.0)` to floor the total coupon at zero\n- Omit floors to allow negative coupons (rare but valid in some structures)\n\nThe implementation does not reject negative rates; the policy is controlled\nby the floor configuration.\n\n# Seasoned Instruments (Historical Fixings)\n\nHistorical fixings **are supported** via the `MarketContext`: store a\n`ScalarTimeSeries` under the canonical id `FIXING:{forward_curve_id}` (see\n`finstack_quant_core::market_data::fixings`) containing realized index\nobservations. Observation dates strictly before the forward curve base\ndate then resolve from that series instead of the curve:\n\n- **Overnight observations** (compounded/averaged paths) use LOCF lookup\n  (last observation carried forward), matching RFR publication\n  conventions where a fixing carries over non-publication days\n  (ARRC 2020 SOFR conventions; ISDA 2021 Supp. 70 §7.1(g)). A partially\n  seasoned compounding window seamlessly mixes realized fixings and\n  curve-projected forwards with identical `(rate, days)` weighting.\n- **Term-rate resets** use exact-date lookup on the (business-day\n  adjusted) reset date — a term rate fixes on a specific published date.\n  The fixing is the index rate only; gearing/spread/floors/caps apply on\n  top exactly as for projected rates.\n\nAn observation exactly on the curve base date prefers a published\nsame-day fixing when the series has one, otherwise projects from `t = 0`.\n\nThe [`FloatingRateFallback`] policy applies only when **no** fixing\nseries is provided: `Error` (the default) fails the build with a\ndescriptive message naming the date, index, and expected series id;\n`FixedRate(r)` uses `r` as the index rate for the affected coupon;\n`SpreadOnly` projects spread-only.\n\n# Example\n\n```rust\nuse finstack_quant_core::dates::Tenor;\nuse finstack_quant_cashflows::builder::{FloatingRateSpec, OvernightIndexConstraintApplication};\nuse rust_decimal_macros::dec;\n\n// 3M SOFR + 200bps with 0% floor\nlet spec = FloatingRateSpec {\n    forward_curve_id: \"USD-SOFR-3M\".into(),\n    spread_bp: dec!(200.0),\n    gearing: dec!(1.0),\n    gearing_includes_spread: true,\n    index_floor_bp: Some(dec!(0.0)),\n    all_in_floor_bp: None,\n    all_in_cap_bp: None,\n    index_cap_bp: None,\n    overnight_index_constraints: OvernightIndexConstraintApplication::Daily,\n    reset_frequency: Tenor::quarterly(),\n    index_tenor: None,\n    reset_lag_days: 2,\n    fixing_calendar_id: None,\n    overnight_compounding: None,\n    overnight_basis: None,\n    fallback: Default::default(),\n};\n```"
   },
   {
     "path": "#/$defs/d_879c942d15cfcad2445b/properties/all_in_cap_bp",
@@ -2070,6 +2080,23 @@ export default [
     "description": "Optional calendar for rate fixing (reset lag).\n\nIf not provided, defaults to the coupon schedule calendar."
   },
   {
+    "path": "#/$defs/d_879c942d15cfcad2445b/properties/fixing_calendar_id/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/revolving_credit.schema.json#/$defs/FloatingRateSpec/properties/fixing_calendar_id/anyOf/0",
+    "ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/id.schema.json#"
+  },
+  {
+    "path": "#/$defs/d_879c942d15cfcad2445b/properties/fixing_calendar_id/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/revolving_credit.schema.json#/$defs/FloatingRateSpec/properties/fixing_calendar_id/anyOf/1"
+  },
+  {
+    "path": "#/$defs/d_879c942d15cfcad2445b/properties/forward_curve_id",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/revolving_credit.schema.json#/$defs/FloatingRateSpec/properties/forward_curve_id",
+    "description": "Forward curve identifier (e.g., \"USD-SOFR-3M\", \"EUR-EURIBOR-6M\").",
+    "ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/id.schema.json#"
+  },
+  {
     "path": "#/$defs/d_879c942d15cfcad2445b/properties/gearing",
     "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/revolving_credit.schema.json#/$defs/FloatingRateSpec/properties/gearing",
     "default": "1",
@@ -2114,13 +2141,6 @@ export default [
   {
     "path": "#/$defs/d_879c942d15cfcad2445b/properties/index_floor_bp/anyOf/1",
     "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/revolving_credit.schema.json#/$defs/FloatingRateSpec/properties/index_floor_bp/anyOf/1"
-  },
-  {
-    "path": "#/$defs/d_879c942d15cfcad2445b/properties/index_id",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/revolving_credit.schema.json#/$defs/FloatingRateSpec/properties/index_id",
-    "description": "Forward curve identifier (e.g., \"USD-SOFR-3M\", \"EUR-EURIBOR-6M\").",
-    "ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
-    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/id.schema.json#"
   },
   {
     "path": "#/$defs/d_879c942d15cfcad2445b/properties/index_tenor",
@@ -2274,8 +2294,9 @@ export default [
   {
     "path": "#/$defs/d_8f71ae7cac6991c71d8c/properties/delta_bp",
     "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/revolving_credit.schema.json#/$defs/MarginStep/properties/delta_bp",
-    "description": "Change in margin, in basis points (100 = 1%); negative steps down.",
-    "format": "int32"
+    "description": "Change in margin, in basis points (`100` = 1%); negative steps down.",
+    "ref": "https://finstack_quant.dev/schemas/common/1/decimal.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/decimal.schema.json#"
   },
   {
     "path": "#/$defs/d_922d100aa65e8babbacd",
@@ -4427,7 +4448,7 @@ export default [
   {
     "path": "#/$defs/d_ba391d15759d4194c067",
     "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/revolving_credit.schema.json#/$defs/CommitmentStep",
-    "description": "A scheduled change of a facility's commitment.\n\nThe commitment equals `amount` from `date` forward until the next step.\nSteps down are amortizing commitments, availability expiries and voluntary\nreductions; steps up are accordion exercises. Utilization is always drawn\nbalance over the commitment in force, so a stochastic revolving facility\nbooks the implied principal change at the step.\n\nA delayed-draw term loan (`DdtlSpec::commitment_steps`) accepts only\nnon-increasing steps inside its availability window and no reduction fee\n(`fee_bp` must be `0.0`)."
+    "description": "A scheduled change of a facility's commitment.\n\nThe commitment equals `amount` from `date` forward until the next step.\nSteps down are amortizing commitments, availability expiries and voluntary\nreductions; steps up are accordion exercises. Utilization is always drawn\nbalance over the commitment in force, so a stochastic revolving facility\nbooks the implied principal change at the step.\n\nA delayed-draw term loan (`DdtlSpec::commitment_steps`) accepts only\nnon-increasing steps inside its availability window and no reduction fee\n(`reduction_fee_bp` must be zero)."
   },
   {
     "path": "#/$defs/d_ba391d15759d4194c067/properties/amount",
@@ -4444,11 +4465,12 @@ export default [
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/date.schema.json#"
   },
   {
-    "path": "#/$defs/d_ba391d15759d4194c067/properties/fee_bp",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/revolving_credit.schema.json#/$defs/CommitmentStep/properties/fee_bp",
-    "default": 0,
-    "description": "Reduction or cancellation fee, in basis points of the reduced amount,\npaid by the borrower on `date` when the commitment steps down. Ignored\non a step up. Defaults to `0.0`.",
-    "format": "double"
+    "path": "#/$defs/d_ba391d15759d4194c067/properties/reduction_fee_bp",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/revolving_credit.schema.json#/$defs/CommitmentStep/properties/reduction_fee_bp",
+    "default": "0",
+    "description": "One-off reduction or cancellation fee, in basis points of the reduced\namount (not per annum), paid by the borrower on `date` when the\ncommitment steps down. Ignored on a step up. Defaults to zero.",
+    "ref": "https://finstack_quant.dev/schemas/common/1/decimal.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/decimal.schema.json#"
   },
   {
     "path": "#/$defs/d_bdf84b73c34f6ec51af5",
@@ -4578,7 +4600,7 @@ export default [
   {
     "path": "#/$defs/d_c338b2b6a7bb9038a413",
     "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/revolving_credit.schema.json#/$defs/UpfrontFee",
-    "description": "Upfront (arrangement or original-issue-discount) fee of a facility.\n\nPaid by the borrower to the lender on the commitment date. Enters the\npresent value only while the commitment date lies after the valuation\ndate, and the effective-interest-rate metrics always."
+    "description": "Upfront (arrangement or original-issue-discount) fee of a facility.\n\nPaid by the borrower to the lender on the issue date. Enters the\npresent value only while the commitment date lies after the valuation\ndate, and the effective-interest-rate metrics always."
   },
   {
     "path": "#/$defs/d_c338b2b6a7bb9038a413/oneOf/0",

@@ -22,7 +22,7 @@ export default [
             "quantity": 1000,
             "settlement": "cash",
             "strike": 75,
-            "ticker": "CL",
+            "underlying_ticker": "CL",
             "unit": "BBL",
             "vol_surface_id": "WTI-VOL"
           },
@@ -461,13 +461,13 @@ export default [
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/id.schema.json#"
   },
   {
-    "path": "#/$defs/d_1e0fa57668926accf1a2/properties/exercise_schedule",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_option.schema.json#/$defs/CommodityOption/properties/exercise_schedule",
+    "path": "#/$defs/d_1e0fa57668926accf1a2/properties/exercise_dates",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_option.schema.json#/$defs/CommodityOption/properties/exercise_dates",
     "description": "Optional Bermudan exercise schedule.\n\nRequired when `exercise_style == ExerciseStyle::Bermudan`."
   },
   {
-    "path": "#/$defs/d_1e0fa57668926accf1a2/properties/exercise_schedule/items",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_option.schema.json#/$defs/CommodityOption/properties/exercise_schedule/items",
+    "path": "#/$defs/d_1e0fa57668926accf1a2/properties/exercise_dates/items",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_option.schema.json#/$defs/CommodityOption/properties/exercise_dates/items",
     "ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/date.schema.json#"
   },
@@ -569,6 +569,16 @@ export default [
     "description": "Optional spot price ID (for spot-based pricing and American options)."
   },
   {
+    "path": "#/$defs/d_1e0fa57668926accf1a2/properties/spot_id/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_option.schema.json#/$defs/CommodityOption/properties/spot_id/anyOf/0",
+    "ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/id.schema.json#"
+  },
+  {
+    "path": "#/$defs/d_1e0fa57668926accf1a2/properties/spot_id/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_option.schema.json#/$defs/CommodityOption/properties/spot_id/anyOf/1"
+  },
+  {
     "path": "#/$defs/d_1e0fa57668926accf1a2/properties/strike",
     "source": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_option.schema.json#/$defs/CommodityOption/properties/strike",
     "description": "Strike price per unit.",
@@ -576,9 +586,9 @@ export default [
     "resolvedRef": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_option.schema.json#/$defs/PositiveF64Wire"
   },
   {
-    "path": "#/$defs/d_1e0fa57668926accf1a2/properties/ticker",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_option.schema.json#/$defs/CommodityOption/properties/ticker",
-    "description": "Ticker/identifier for market data lookup (e.g., \"CL\", \"GC\", \"NG\")"
+    "path": "#/$defs/d_1e0fa57668926accf1a2/properties/underlying_ticker",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_option.schema.json#/$defs/CommodityOption/properties/underlying_ticker",
+    "description": "Commodity symbol label (e.g., \"CL\", \"GC\", \"NG\"); never a market-data key."
   },
   {
     "path": "#/$defs/d_1e0fa57668926accf1a2/properties/unit",

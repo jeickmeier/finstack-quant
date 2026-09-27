@@ -1285,7 +1285,8 @@
         },
         "day_count": {
           "$ref": "#/$defs/d_c0401254ec268b317b65",
-          "description": "Day count convention"
+          "default": "act_365f",
+          "description": "Day count convention (defaults to ACT/365F)."
         },
         "domestic_discount_curve_id": {
           "$ref": "#/$defs/d_9c3fc047c6fea21344ad",
@@ -1364,7 +1365,6 @@
         "payout_amount",
         "payout_timing",
         "expiry",
-        "day_count",
         "domestic_discount_curve_id",
         "foreign_discount_curve_id",
         "vol_surface_id",

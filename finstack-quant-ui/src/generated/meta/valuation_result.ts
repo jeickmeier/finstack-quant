@@ -23,7 +23,7 @@ export default [
             },
             "version": 1
           },
-          "version": "0.8.0"
+          "version": "0.9.0"
         },
         "schema_version": 1,
         "value": {
@@ -137,8 +137,8 @@ export default [
     "description": "Rich structured details attached to composite valuation results."
   },
   {
-    "path": "#/$defs/d_11c88c8641cb7ae81898/properties/exposure_report",
-    "source": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/CompositeValuationDetails/properties/exposure_report",
+    "path": "#/$defs/d_11c88c8641cb7ae81898/properties/exposures",
+    "source": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/CompositeValuationDetails/properties/exposures",
     "description": "Recursive path-level and net/gross primitive exposures.",
     "ref": "#/$defs/CompositeExposureReport",
     "resolvedRef": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/CompositeExposureReport"
@@ -274,7 +274,7 @@ export default [
         },
         "version": 1
       },
-      "version": "0.8.0"
+      "version": "0.9.0"
     },
     "description": "Audit stamp: numeric mode, rounding context, and FX policy in force.",
     "ref": "#/$defs/ResultsMeta",
@@ -2975,7 +2975,7 @@ export default [
   {
     "path": "#/$defs/d_ccd53ca701e8c5bb4008/properties/fx_triangulated",
     "source": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/FxValuationDetails/properties/fx_triangulated",
-    "description": "`true` when the FX spot was obtained via triangulation through the\n[`FxMatrix`](finstack_quant_core::money::fx::FxMatrix) pivot currency\nrather than a direct quote. Mirrors\n[`FxRateResult.triangulated`](finstack_quant_core::money::fx::FxRateResult).\n`None` when the instrument resolved spot from an explicit market\nscalar (`fx_rate_id`) rather than the matrix."
+    "description": "`true` when the FX spot was obtained via triangulation through the\n[`FxMatrix`](finstack_quant_core::money::fx::FxMatrix) pivot currency\nrather than a direct quote. Mirrors\n[`FxRateResult.triangulated`](finstack_quant_core::money::fx::FxRateResult).\n`None` when the instrument resolved spot from an explicit market\nscalar (`fx_spot_id`) rather than the matrix."
   },
   {
     "path": "#/$defs/d_d5837ae057e724b8713e",

@@ -2,6 +2,10 @@
 // JSON wire shape only; runtime constraints remain in the schema.
 
 /**
+ * Additive spread over the CMS rate in basis points (10 = 10bp).
+ */
+export type Decimal = string;
+/**
  * Day count convention for CMS leg accrual.
  */
 export type DayCount =
@@ -19,13 +23,13 @@ export type DayCount =
   | "act_act_afb"
   | "bus_252";
 /**
- * ISO 8601 calendar date string.
- */
-export type Date = string;
-/**
  * Discount curve ID for present value calculations.
  */
 export type Id = string;
+/**
+ * ISO 8601 calendar date string.
+ */
+export type Date = string;
 /**
  * Forward/projection curve ID for CMS rate projection.
  */
@@ -48,6 +52,10 @@ export type DayCount1 =
   | "act_act_afb"
   | "bus_252";
 /**
+ * Fixed coupon rate as a decimal annual rate (0.03 = 3%).
+ */
+export type Decimal1 = string;
+/**
  * Day count convention.
  */
 export type DayCount2 =
@@ -69,9 +77,17 @@ export type DayCount2 =
  */
 export type Id2 = string;
 /**
+ * Additive spread over the floating index in basis points (10 = 10bp).
+ */
+export type Decimal2 = string;
+/**
  * Unique instrument identifier.
  */
 export type Id3 = string;
+/**
+ * Opaque string identifier.
+ */
+export type Id4 = string;
 /**
  * A phantom-typed identifier that prevents mixing different kinds of IDs.
  *
@@ -337,33 +353,6 @@ export type DB556Bbeb1Ecf96C44C5A =
   | "ZMW"
   | "ZWL";
 /**
- * Standard interest rate swap conventions by region.
- *
- * # Market Standards Reference (Post-IBOR Transition)
- *
- * | Convention | Index | Fixed DC | Float DC | Fixed Freq | Float Freq | Reset Lag |
- * |------------|-------|----------|----------|------------|------------|-----------|
- * | USD OIS | SOFR | 30/360 | ACT/360 | Semi-annual | Annual | T-2 |
- * | EUR OIS | ESTR | 30/360 | ACT/360 | Annual | Annual | T-2 |
- * | EUR IBOR | EURIBOR | 30/360 | ACT/360 | Annual | Semi-annual | T-2 |
- * | GBP OIS | SONIA | ACT/365F | ACT/365F | Annual | Annual | T-0 |
- * | JPY OIS | TONAR | ACT/365F | ACT/365F | Semi-annual | Annual | T-2 |
- *
- * # OIS Compounding
- *
- * Note: OIS swaps (SOFR, ESTR, SONIA, TONAR) use **daily compounded** rates
- * with observation shift (typically 2 days lookback). The float frequency
- * indicates the payment/reset frequency, not the compounding frequency.
- * See compounding method guidance below for details.
- *
- * # Sources
- *
- * - ISDA 2021 IBOR Fallbacks Protocol
- * - Bloomberg SWDF function
- * - QuantLib OvernightIndexedSwap conventions
- */
-export type D_8A3160F076020928D015 = "usd_sofr" | "eur_estr" | "eur_euribor" | "gbp_sonia" | "jpy_tonar";
-/**
  * Day-count convention.
  */
 export type DayCount3 =
@@ -381,9 +370,9 @@ export type DayCount3 =
   | "act_act_afb"
   | "bus_252";
 /**
- * Volatility surface ID for CMS convexity adjustment.
+ * Opaque string identifier.
  */
-export type Id4 = string;
+export type Id5 = string;
 /**
  * Canonical schema marker for persisted instrument envelopes.
  */
@@ -416,37 +405,27 @@ export interface D_5598587674Cd85Bcb9Fb {
  * *Wilmott Magazine*, March, 38-44. `docs/REFERENCES.md#hagan-2003-cms-convexity`
  */
 export interface D_3Dbd4A1Aab74E98Eef06 {
-  attributes?: Attributes;
   /**
    * Accrual fractions for each CMS period.
    */
-  cms_accrual_fractions: number[];
+  accrual_fractions: number[];
+  attributes?: Attributes;
   /**
    * Optional cap on the CMS rate (decimal).
    */
   cms_cap?: number | null;
-  cms_day_count: DayCount;
-  /**
-   * Fixing dates for CMS rate observations.
-   */
-  cms_fixing_dates: Date[];
   /**
    * Optional floor on the CMS rate (decimal).
    */
   cms_floor?: number | null;
-  /**
-   * Payment dates for the CMS leg.
-   */
-  cms_payment_dates: Date[];
-  /**
-   * Spread over the CMS rate (decimal, e.g., 0.001 = 10bp).
-   */
-  cms_spread?: number;
-  /**
-   * CMS tenor in years (e.g., 10.0 for 10Y swap rate).
-   */
-  cms_tenor: number;
+  cms_spread_bp?: Decimal;
+  cms_tenor: Tenor;
+  day_count: DayCount;
   discount_curve_id: Id;
+  /**
+   * Fixing dates for CMS rate observations.
+   */
+  fixing_dates: Date[];
   forward_curve_id: Id1;
   /**
    * Funding leg definition (fixed or floating).
@@ -462,12 +441,8 @@ export interface D_3Dbd4A1Aab74E98Eef06 {
          * Payment dates for each period.
          */
         payment_dates: Date[];
-        /**
-         * Fixed coupon rate (decimal, e.g., 0.03 = 3%).
-         */
-        rate: number;
+        rate: Decimal1;
         type: "fixed";
-        [k: string]: unknown;
       }
     | {
         /**
@@ -481,34 +456,34 @@ export interface D_3Dbd4A1Aab74E98Eef06 {
          * accrual-end date (no payment lag — see the variant docs).
          */
         payment_dates: Date[];
-        /**
-         * Spread over the floating index (decimal, e.g., 0.001 = 10bp).
-         */
-        spread: number;
+        spread_bp: Decimal2;
         type: "floating";
-        [k: string]: unknown;
       };
   id: Id3;
+  /**
+   * Rate-index convention-registry key of the underlying swap (e.g. `USD-SOFR-OIS`).
+   */
+  index_id?: Id4 | null;
   instrument_pricing_overrides?: InstrumentPricingOverrides;
   metric_pricing_overrides?: MetricPricingOverrides;
   notional: Money;
+  /**
+   * Payment dates for the CMS leg.
+   */
+  payment_dates: Date[];
   scenario_pricing_overrides?: ScenarioPricingOverrides;
   /**
    * Pay direction: `Pay` means pay CMS leg, receive funding leg.
    */
   side: "pay" | "receive";
   /**
-   * IRS convention for the underlying swap (e.g., `UsdSofr`).
-   */
-  swap_convention?: D_8A3160F076020928D015 | null;
-  /**
    * Day count of the underlying swap fixed leg (overrides convention).
    */
-  swap_day_count?: DayCount3 | null;
+  swap_fixed_day_count?: DayCount3 | null;
   /**
    * Fixed leg frequency of the underlying swap (overrides convention).
    */
-  swap_fixed_frequency?: Tenor | null;
+  swap_fixed_frequency?: Tenor1 | null;
   /**
    * Day count of the underlying swap floating leg (overrides convention).
    */
@@ -516,8 +491,8 @@ export interface D_3Dbd4A1Aab74E98Eef06 {
   /**
    * Floating leg frequency of the underlying swap (overrides convention).
    */
-  swap_float_frequency?: Tenor | null;
-  vol_surface_id: Id4;
+  swap_float_frequency?: Tenor1 | null;
+  vol_surface_id: Id5;
 }
 /**
  * Attributes for scenario selection and grouping.
@@ -533,6 +508,21 @@ export interface Attributes {
    * User-defined tags for categorization.
    */
   tags?: string[];
+}
+/**
+ * Tenor of the CMS reference swap (e.g. 10Y); must be month- or year-based.
+ */
+export interface Tenor {
+  /**
+   * Number of `unit` periods in the tenor. Must be at least 1; `0` is
+   * rejected because a zero-length period makes schedule generation loop.
+   */
+  count: number;
+  /**
+   * Calendar unit the count is expressed in, such as days, weeks, months,
+   * or years.
+   */
+  unit: "days" | "weeks" | "months" | "years";
 }
 /**
  * Instrument-owned pricing inputs.
@@ -1638,7 +1628,7 @@ export interface ScenarioPricingOverrides {
 /**
  * Parsed financial tenor.
  */
-export interface Tenor {
+export interface Tenor1 {
   /**
    * Number of `unit` periods in the tenor. Must be at least 1; `0` is
    * rejected because a zero-length period makes schedule generation loop.

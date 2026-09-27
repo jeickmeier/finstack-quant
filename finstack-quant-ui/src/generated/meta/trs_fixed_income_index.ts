@@ -40,7 +40,7 @@ export default [
             },
             "side": "receive_total_return",
             "underlying": {
-              "base_currency": "USD",
+              "currency": "USD",
               "duration_id": "US-CORP-DURATION",
               "index_id": "US-CORP-INDEX",
               "yield_id": "US-CORP-YIELD"
@@ -541,7 +541,9 @@ export default [
   {
     "path": "#/$defs/d_176cce21985eadf0161c/properties/calendar_id",
     "source": "https://finstack_quant.dev/schemas/cashflow/1/schedule_params.schema.json#/properties/calendar_id",
-    "description": "Holiday calendar identifier used together with `business_day_convention`.\n\nUse `\"weekends_only\"` when only Saturday/Sunday adjustment is needed."
+    "description": "Holiday calendar identifier used together with `business_day_convention`.\n\nUse `\"weekends_only\"` when only Saturday/Sunday adjustment is needed.",
+    "ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/id.schema.json#"
   },
   {
     "path": "#/$defs/d_176cce21985eadf0161c/properties/day_count",
@@ -890,7 +892,7 @@ export default [
   {
     "path": "#/$defs/d_3013bfcc020829bbbbd5",
     "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/trs_fixed_income_index.schema.json#/$defs/TrsScheduleSpec",
-    "description": "Schedule specification for TRS payment periods.\n\nDefines the payment schedule and frequency for both legs of the TRS.\nThis is shared between equity and fixed income TRS instruments.\n\n# Examples\n\n```\nuse finstack_quant_valuations::instruments::TrsScheduleSpec;\nuse finstack_quant_cashflows::builder::ScheduleParams;\nuse finstack_quant_core::dates::{Date, Tenor, DayCount, BusinessDayConvention, StubKind};\n\nlet schedule = TrsScheduleSpec::from_params(\n    Date::from_calendar_date(2024, time::Month::January, 1).unwrap(),\n    Date::from_calendar_date(2025, time::Month::January, 1).unwrap(),\n    ScheduleParams {\n        frequency: Tenor::quarterly(),\n        day_count: DayCount::Act360,\n        business_day_convention: BusinessDayConvention::Following,\n        calendar_id: \"weekends_only\".to_string(),\n        stub: StubKind::None,\n        end_of_month: false,\n        payment_lag_days: 0,\n        adjust_accrual_dates: false,\n        roll_rule: finstack_quant_cashflows::builder::specs::RollRule::None,\n    },\n);\n```"
+    "description": "Schedule specification for TRS payment periods.\n\nDefines the payment schedule and frequency for both legs of the TRS.\nThis is shared between equity and fixed income TRS instruments.\n\n# Examples\n\n```\nuse finstack_quant_valuations::instruments::TrsScheduleSpec;\nuse finstack_quant_cashflows::builder::ScheduleParams;\nuse finstack_quant_core::dates::{Date, Tenor, DayCount, BusinessDayConvention, StubKind};\n\nlet schedule = TrsScheduleSpec::from_params(\n    Date::from_calendar_date(2024, time::Month::January, 1).unwrap(),\n    Date::from_calendar_date(2025, time::Month::January, 1).unwrap(),\n    ScheduleParams {\n        frequency: Tenor::quarterly(),\n        day_count: DayCount::Act360,\n        business_day_convention: BusinessDayConvention::Following,\n        calendar_id: \"weekends_only\".into(),\n        stub: StubKind::None,\n        end_of_month: false,\n        payment_lag_days: 0,\n        adjust_accrual_dates: false,\n        roll_rule: finstack_quant_cashflows::builder::specs::RollRule::None,\n    },\n);\n```"
   },
   {
     "path": "#/$defs/d_3013bfcc020829bbbbd5/properties/end",
@@ -919,9 +921,9 @@ export default [
     "description": "Index underlying parameters for total return swaps and index-linked instruments."
   },
   {
-    "path": "#/$defs/d_302f94ee7e57481d4351/properties/base_currency",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/trs_fixed_income_index.schema.json#/$defs/IndexUnderlyingParams/properties/base_currency",
-    "description": "Base currency of the index",
+    "path": "#/$defs/d_302f94ee7e57481d4351/properties/currency",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/trs_fixed_income_index.schema.json#/$defs/IndexUnderlyingParams/properties/currency",
+    "description": "Currency the index (and so the swap notional) is denominated in.",
     "ref": "https://finstack_quant.dev/schemas/common/1/currency.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/currency.schema.json#"
   },
@@ -929,6 +931,16 @@ export default [
     "path": "#/$defs/d_302f94ee7e57481d4351/properties/duration_id",
     "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/trs_fixed_income_index.schema.json#/$defs/IndexUnderlyingParams/properties/duration_id",
     "description": "Market scalar identifier for signed index duration in years. Required when\nrequesting FI TRS duration risk; the scalar must be unitless and finite. No duration is inferred from index name or maturity."
+  },
+  {
+    "path": "#/$defs/d_302f94ee7e57481d4351/properties/duration_id/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/trs_fixed_income_index.schema.json#/$defs/IndexUnderlyingParams/properties/duration_id/anyOf/0",
+    "ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/id.schema.json#"
+  },
+  {
+    "path": "#/$defs/d_302f94ee7e57481d4351/properties/duration_id/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/trs_fixed_income_index.schema.json#/$defs/IndexUnderlyingParams/properties/duration_id/anyOf/1"
   },
   {
     "path": "#/$defs/d_302f94ee7e57481d4351/properties/index_id",
@@ -941,6 +953,16 @@ export default [
     "path": "#/$defs/d_302f94ee7e57481d4351/properties/yield_id",
     "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/trs_fixed_income_index.schema.json#/$defs/IndexUnderlyingParams/properties/yield_id",
     "description": "Optional yield curve/scalar identifier for carry calculation"
+  },
+  {
+    "path": "#/$defs/d_302f94ee7e57481d4351/properties/yield_id/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/trs_fixed_income_index.schema.json#/$defs/IndexUnderlyingParams/properties/yield_id/anyOf/0",
+    "ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/id.schema.json#"
+  },
+  {
+    "path": "#/$defs/d_302f94ee7e57481d4351/properties/yield_id/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/trs_fixed_income_index.schema.json#/$defs/IndexUnderlyingParams/properties/yield_id/anyOf/1"
   },
   {
     "path": "#/$defs/d_305c1a38cfd98cc3ea44",

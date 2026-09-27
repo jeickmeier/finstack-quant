@@ -671,7 +671,7 @@ export interface D_719F3377340F012E0Eb2 {
  * Rich structured details attached to composite valuation results.
  */
 export interface D_11C88C8641Cb7Ae81898 {
-  exposure_report: D_0F7858A8A073798Bb651;
+  exposures: D_0F7858A8A073798Bb651;
   /**
    * Native and reporting-currency results for every top-level leg.
    */
@@ -4130,7 +4130,7 @@ export interface DCcd53Ca701E8C5Bb4008 {
    * rather than a direct quote. Mirrors
    * [`FxRateResult.triangulated`](finstack_quant_core::money::fx::FxRateResult).
    * `None` when the instrument resolved spot from an explicit market
-   * scalar (`fx_rate_id`) rather than the matrix.
+   * scalar (`fx_spot_id`) rather than the matrix.
    */
   fx_triangulated?: boolean | null;
   [k: string]: unknown;

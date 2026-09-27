@@ -3104,6 +3104,16 @@ export default [
     "description": "Holiday calendar identifier"
   },
   {
+    "path": "#/$defs/d_aa1b03a4b2041456f32b/properties/calendar_id/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/credit_default_swap.schema.json#/$defs/PremiumLegSpec/properties/calendar_id/anyOf/0",
+    "ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/id.schema.json#"
+  },
+  {
+    "path": "#/$defs/d_aa1b03a4b2041456f32b/properties/calendar_id/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/credit_default_swap.schema.json#/$defs/PremiumLegSpec/properties/calendar_id/anyOf/1"
+  },
+  {
     "path": "#/$defs/d_aa1b03a4b2041456f32b/properties/coupon_bp",
     "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/credit_default_swap.schema.json#/$defs/PremiumLegSpec/properties/coupon_bp",
     "description": "Contractual running coupon in basis points (e.g., `100` = 1% per\nannum, the standard CDX.NA.IG coupon; `500` for high yield).",

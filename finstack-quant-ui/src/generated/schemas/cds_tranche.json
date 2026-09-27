@@ -15,7 +15,6 @@
           "day_count": "act_360",
           "detach_pct": 3,
           "discount_curve_id": "USD-OIS",
-          "effective_date": null,
           "frequency": {
             "count": 3,
             "unit": "months"
@@ -31,6 +30,7 @@
           "roll_rule": "cds_imm",
           "series": 42,
           "side": "buy_protection",
+          "start_date": null,
           "stub": "short_front",
           "upfront": null
         },
@@ -385,11 +385,15 @@
           "description": "Business day convention"
         },
         "calendar_id": {
-          "description": "Optional holiday calendar id",
-          "type": [
-            "string",
-            "null"
-          ]
+          "anyOf": [
+            {
+              "$ref": "#/$defs/d_9c3fc047c6fea21344ad"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Optional holiday calendar id"
         },
         "coupon_bp": {
           "description": "Running coupon in basis points (e.g., 100 = 1.00%)",
@@ -412,18 +416,6 @@
         "discount_curve_id": {
           "$ref": "#/$defs/d_9c3fc047c6fea21344ad",
           "description": "Discount curve identifier (by quote currency)"
-        },
-        "effective_date": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/d_1b2ccb88c9229e7463e8"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "description": "Optional effective date for schedule anchoring (if None, uses as_of date)"
         },
         "frequency": {
           "$ref": "#/$defs/d_47e5e74524615b78a19f",
@@ -477,6 +469,18 @@
         "side": {
           "$ref": "#/$defs/d_85aa0c7c3653d6c1cc66",
           "description": "Tranche side (buy/sell protection)"
+        },
+        "start_date": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/d_1b2ccb88c9229e7463e8"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Optional effective date for schedule anchoring (if None, uses as_of date)"
         },
         "stub": {
           "$ref": "#/$defs/d_824f38e62e355eadf8d3",

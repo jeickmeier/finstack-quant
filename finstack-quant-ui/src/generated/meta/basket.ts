@@ -37,7 +37,6 @@ export default [
                 "weight": 0.4
               }
             ],
-            "currency": "USD",
             "discount_curve_id": "USD-OIS",
             "expense_ratio": 0.0025,
             "id": "BASKET-60-40",
@@ -48,7 +47,8 @@ export default [
             "pricing_config": {
               "days_in_year": 365.25,
               "fx_policy": "cashflow_date"
-            }
+            },
+            "reporting_currency": "USD"
           },
           "type": "basket"
         },

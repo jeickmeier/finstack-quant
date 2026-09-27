@@ -51,15 +51,15 @@ export default [
             ],
             "id": "PMF-EXAMPLE",
             "waterfall_spec": {
-              "catchup_mode": "full",
+              "catch_up_mode": "full",
               "clawback": null,
-              "irr_basis": "act_365f",
+              "day_count": "act_365f",
               "style": "european",
               "tranches": [
                 "return_of_capital",
                 {
                   "preferred_irr": {
-                    "irr": 0.08
+                    "hurdle_irr": 0.08
                   }
                 },
                 {
@@ -70,11 +70,7 @@ export default [
                 {
                   "promote_tier": {
                     "gp_share": 0.2,
-                    "hurdle": {
-                      "irr": {
-                        "rate": 0.12
-                      }
-                    },
+                    "hurdle_irr": 0.12,
                     "lp_share": 0.8
                   }
                 }
@@ -815,9 +811,9 @@ export default [
     "source": "https://finstack_quant.dev/schemas/instrument/1/equity/private_markets_fund.schema.json#/$defs/PeFundWaterfallTranche/oneOf/1/properties/preferred_irr"
   },
   {
-    "path": "#/$defs/d_40c29976c86ef72069c6/oneOf/1/properties/preferred_irr/properties/irr",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/equity/private_markets_fund.schema.json#/$defs/PeFundWaterfallTranche/oneOf/1/properties/preferred_irr/properties/irr",
-    "description": "Irr.",
+    "path": "#/$defs/d_40c29976c86ef72069c6/oneOf/1/properties/preferred_irr/properties/hurdle_irr",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/equity/private_markets_fund.schema.json#/$defs/PeFundWaterfallTranche/oneOf/1/properties/preferred_irr/properties/hurdle_irr",
+    "description": "LP preferred-return hurdle as an annual decimal IRR (`0.08` = 8%),\ncompounded on the spec's `day_count`.",
     "format": "double"
   },
   {
@@ -838,7 +834,7 @@ export default [
   {
     "path": "#/$defs/d_40c29976c86ef72069c6/oneOf/3",
     "source": "https://finstack_quant.dev/schemas/instrument/1/equity/private_markets_fund.schema.json#/$defs/PeFundWaterfallTranche/oneOf/3",
-    "description": "Promote tier with hurdle and LP/GP split.\n\n**Hard-hurdle gating semantics**: before the split activates, the LP\nis paid at 100% until the LP-net IRR reaches this tier's `hurdle`;\nonly cash above the hurdle is split `lp_share`/`gp_share` (cascading\nto the next tier once the next tier's hurdle is reached). If a\n[`Tranche::CatchUp`] precedes a promote tier whose hurdle sits above\nthe preferred return, the LP-100% infill between the catch-up and the\nhurdle dilutes the GP's realized share back below the catch-up\ntarget. LPAs where all post-catch-up dollars split continuously at\n`lp_share`/`gp_share` should set this tier's hurdle equal to the\npreceding preferred return (or `0.0` when there is no gap to fill),\nso the LP-100% infill is empty."
+    "description": "Promote tier with hurdle and LP/GP split.\n\n**Hard-hurdle gating semantics**: before the split activates, the LP\nis paid at 100% until the LP-net IRR reaches this tier's `hurdle_irr`;\nonly cash above the hurdle is split `lp_share`/`gp_share` (cascading\nto the next tier once the next tier's hurdle is reached). If a\n[`Tranche::CatchUp`] precedes a promote tier whose `hurdle_irr` sits above\nthe preferred return, the LP-100% infill between the catch-up and the\nhurdle dilutes the GP's realized share back below the catch-up\ntarget. LPAs where all post-catch-up dollars split continuously at\n`lp_share`/`gp_share` should set this tier's hurdle equal to the\npreceding preferred return (or `0.0` when there is no gap to fill),\nso the LP-100% infill is empty."
   },
   {
     "path": "#/$defs/d_40c29976c86ef72069c6/oneOf/3/properties/promote_tier",
@@ -851,11 +847,10 @@ export default [
     "format": "double"
   },
   {
-    "path": "#/$defs/d_40c29976c86ef72069c6/oneOf/3/properties/promote_tier/properties/hurdle",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/equity/private_markets_fund.schema.json#/$defs/PeFundWaterfallTranche/oneOf/3/properties/promote_tier/properties/hurdle",
-    "description": "IRR hurdle the LP must reach (at 100% payout) before this tier's\nsplit activates.",
-    "ref": "#/$defs/Hurdle",
-    "resolvedRef": "https://finstack_quant.dev/schemas/instrument/1/equity/private_markets_fund.schema.json#/$defs/Hurdle"
+    "path": "#/$defs/d_40c29976c86ef72069c6/oneOf/3/properties/promote_tier/properties/hurdle_irr",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/equity/private_markets_fund.schema.json#/$defs/PeFundWaterfallTranche/oneOf/3/properties/promote_tier/properties/hurdle_irr",
+    "description": "Annual decimal IRR hurdle (`0.12` = 12%) the LP must reach (at\n100% payout) before this tier's split activates.",
+    "format": "double"
   },
   {
     "path": "#/$defs/d_40c29976c86ef72069c6/oneOf/3/properties/promote_tier/properties/lp_share",
@@ -3593,8 +3588,8 @@ export default [
     "description": "Complete waterfall specification."
   },
   {
-    "path": "#/$defs/d_b615d613cb81bc46fa6e/properties/catchup_mode",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/equity/private_markets_fund.schema.json#/$defs/PeFundWaterfallSpec/properties/catchup_mode",
+    "path": "#/$defs/d_b615d613cb81bc46fa6e/properties/catch_up_mode",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/equity/private_markets_fund.schema.json#/$defs/PeFundWaterfallSpec/properties/catch_up_mode",
     "default": "full",
     "description": "Catch-up mode",
     "ref": "#/$defs/CatchUpMode",
@@ -3604,7 +3599,7 @@ export default [
     "path": "#/$defs/d_b615d613cb81bc46fa6e/properties/clawback",
     "source": "https://finstack_quant.dev/schemas/instrument/1/equity/private_markets_fund.schema.json#/$defs/PeFundWaterfallSpec/properties/clawback",
     "default": null,
-    "description": "Optional clawback specification"
+    "description": "Clawback specification; `None` means no clawback (presence is the switch)"
   },
   {
     "path": "#/$defs/d_b615d613cb81bc46fa6e/properties/clawback/anyOf/0",
@@ -3617,10 +3612,10 @@ export default [
     "source": "https://finstack_quant.dev/schemas/instrument/1/equity/private_markets_fund.schema.json#/$defs/PeFundWaterfallSpec/properties/clawback/anyOf/1"
   },
   {
-    "path": "#/$defs/d_b615d613cb81bc46fa6e/properties/irr_basis",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/equity/private_markets_fund.schema.json#/$defs/PeFundWaterfallSpec/properties/irr_basis",
+    "path": "#/$defs/d_b615d613cb81bc46fa6e/properties/day_count",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/equity/private_markets_fund.schema.json#/$defs/PeFundWaterfallSpec/properties/day_count",
     "default": "act_365f",
-    "description": "Day count basis for IRR calculations",
+    "description": "Day count for LP/fund IRR year fractions and hurdle compounding\n`(1 + hurdle_irr)^years` (default Act/365F)",
     "ref": "https://finstack_quant.dev/schemas/common/1/day_count.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/day_count.schema.json#"
   },
@@ -3672,21 +3667,6 @@ export default [
     "description": "Type of event",
     "ref": "#/$defs/FundEventKind",
     "resolvedRef": "https://finstack_quant.dev/schemas/instrument/1/equity/private_markets_fund.schema.json#/$defs/FundEventKind"
-  },
-  {
-    "path": "#/$defs/d_bddf5dccfbc7d1810795",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/equity/private_markets_fund.schema.json#/$defs/Hurdle",
-    "description": "Hurdle types for waterfall tiers."
-  },
-  {
-    "path": "#/$defs/d_bddf5dccfbc7d1810795/properties/irr",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/equity/private_markets_fund.schema.json#/$defs/Hurdle/properties/irr"
-  },
-  {
-    "path": "#/$defs/d_bddf5dccfbc7d1810795/properties/irr/properties/rate",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/equity/private_markets_fund.schema.json#/$defs/Hurdle/properties/irr/properties/rate",
-    "description": "Rate.",
-    "format": "double"
   },
   {
     "path": "#/$defs/d_bdf84b73c34f6ec51af5",
@@ -5126,11 +5106,6 @@ export default [
     "path": "#/$defs/d_efbdfcaec74cc53cfacb",
     "source": "https://finstack_quant.dev/schemas/instrument/1/equity/private_markets_fund.schema.json#/$defs/ClawbackSpec",
     "description": "Clawback specification for GP carry reconciliation."
-  },
-  {
-    "path": "#/$defs/d_efbdfcaec74cc53cfacb/properties/enable",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/equity/private_markets_fund.schema.json#/$defs/ClawbackSpec/properties/enable",
-    "description": "Whether clawback is enabled"
   },
   {
     "path": "#/$defs/d_efbdfcaec74cc53cfacb/properties/holdback_decimal",

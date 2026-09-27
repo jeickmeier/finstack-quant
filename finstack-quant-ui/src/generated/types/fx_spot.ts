@@ -637,7 +637,7 @@ export interface DC3A357E95F2E04D3518D {
  *
  * The rate is interpreted as: **1 unit of base = rate units of quote**
  *
- * For example, if `base = EUR`, `quote = USD`, and `spot_rate = 1.10`:
+ * For example, if `base = EUR`, `quote = USD`, and `quoted_spot = 1.10`:
  * - 1 EUR = 1.10 USD
  * - This is the "EUR/USD" rate
  *
@@ -665,7 +665,7 @@ export interface D_81828A2Fc42Ad3C4Ad70 {
    * cashflow. When absent the settlement amount is reported undiscounted
    * (a 1–2 day effect for standard spot lags).
    */
-  discount_curve_id?: Id | null;
+  domestic_discount_curve_id?: Id | null;
   id: Id1;
   instrument_pricing_overrides?: InstrumentPricingOverrides;
   metric_pricing_overrides?: MetricPricingOverrides;
@@ -678,6 +678,10 @@ export interface D_81828A2Fc42Ad3C4Ad70 {
    */
   quote_calendar_id?: string | null;
   quote_currency: Currency1;
+  /**
+   * Optional quoted FX spot rate (quote per base); `None` reads the FxMatrix.
+   */
+  quoted_spot?: number | null;
   scenario_pricing_overrides?: ScenarioPricingOverrides;
   /**
    * Optional explicit settlement (value) date
@@ -689,10 +693,6 @@ export interface D_81828A2Fc42Ad3C4Ad70 {
    * `None` uses the pair-aware default: T+1 for USD↔CAD and USD↔TRY, T+2 otherwise.
    */
   settlement_days?: number | null;
-  /**
-   * Optional spot rate (if not provided, will look up from market data)
-   */
-  spot_rate?: number | null;
 }
 /**
  * Attributes for scenario selection and tagging

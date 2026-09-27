@@ -806,7 +806,7 @@ def instrument_description(instrument_spec: dict) -> str:
         return f"SOFR Fut {exp} {pos} @{price:.2f}"
 
     if itype == "equity":
-        return f"{s['ticker']} {s['shares']:.0f}sh"
+        return f"{s['ticker']} {s['quantity']:.0f}sh"
 
     if itype == "variance_swap":
         tenor = int(s["maturity"][:4]) - ref_year

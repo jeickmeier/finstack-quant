@@ -62,7 +62,7 @@ test('convertible cross gamma follows scalar and override volatility', () => {
   );
   const spec = fixture.instrument.instrument.spec;
   spec.call_put = null;
-  spec.cashflow_spec.fixed.rate = "0";
+  spec.cashflow_spec.fixed.rate = '0';
   spec.conversion.ratio = 10;
   const price = (spot, vol, metrics = []) => {
     fixture.market.prices.AAPL.unitless = spot;
@@ -663,7 +663,7 @@ for (const [endDate, periodDays] of [
         maturity: endDate,
       });
       spec.pool.reinvestment_period = {
-        end_date: endDate,
+        end: endDate,
         is_active: true,
         criteria: {
           max_price_pct: maxPrice,

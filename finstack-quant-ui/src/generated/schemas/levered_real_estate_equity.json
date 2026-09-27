@@ -36,7 +36,6 @@
             ],
             "property_type": "office",
             "terminal_cap_rate": 0.055,
-            "valuation_date": "2025-01-01",
             "valuation_method": "dcf"
           },
           "attributes": {},
@@ -201,12 +200,12 @@
           "description": "Type of collateral (general vs special)"
         },
         "instrument_id": {
-          "description": "Identifier for the collateral instrument",
-          "type": "string"
+          "$ref": "#/$defs/d_9c3fc047c6fea21344ad",
+          "description": "Identifier of the collateral security (for special collateral, the\nspecial security itself)."
         },
         "market_value_id": {
-          "description": "Market value identifier in MarketContext (e.g., \"BOND_ABC_PRICE\")",
-          "type": "string"
+          "$ref": "#/$defs/d_9c3fc047c6fea21344ad",
+          "description": "Market value identifier in MarketContext (e.g., \"BOND_ABC_PRICE\")"
         },
         "quantity": {
           "description": "Quantity/face value of collateral",
@@ -424,7 +423,7 @@
     },
     "d_11e2bbdddad8dbf2f7f3": {
       "additionalProperties": false,
-      "description": "Canonical floating rate specification for all instruments.\n\nUsed by bonds, swaps, credit facilities, and structured products.\nAll instruments should compose this type rather than defining their own\nfloating rate specifications.\n\n# Rate Calculation\n\nThe all-in rate is computed as:\n1. Look up forward rate from `index_id` curve for the accrual period\n2. Apply `index_floor_bp` to index rate (if specified) - applied BEFORE adding spread\n3. Add `spread_bp` to get base rate\n4. Multiply by `gearing` (typically 1.0)\n5. Apply `all_in_cap_bp` to final rate (if specified) - applied AFTER spread and gearing\n\nFormula: `cap(gearing * (floor(index) + spread))`\n\n# Negative Rate Handling\n\nNegative index rates are supported and will flow through calculations\nunless constrained by floors. For markets with negative rates (EUR, JPY, CHF):\n\n- Set `index_floor_bp: Some(0.0)` to floor the index at zero\n- Set `all_in_floor_bp: Some(0.0)` to floor the total coupon at zero\n- Omit floors to allow negative coupons (rare but valid in some structures)\n\nThe implementation does not reject negative rates; the policy is controlled\nby the floor configuration.\n\n# Seasoned Instruments (Historical Fixings)\n\nHistorical fixings **are supported** via the `MarketContext`: store a\n`ScalarTimeSeries` under the canonical id `FIXING:{index_id}` (see\n`finstack_quant_core::market_data::fixings`) containing realized index\nobservations. Observation dates strictly before the forward curve base\ndate then resolve from that series instead of the curve:\n\n- **Overnight observations** (compounded/averaged paths) use LOCF lookup\n  (last observation carried forward), matching RFR publication\n  conventions where a fixing carries over non-publication days\n  (ARRC 2020 SOFR conventions; ISDA 2021 Supp. 70 §7.1(g)). A partially\n  seasoned compounding window seamlessly mixes realized fixings and\n  curve-projected forwards with identical `(rate, days)` weighting.\n- **Term-rate resets** use exact-date lookup on the (business-day\n  adjusted) reset date — a term rate fixes on a specific published date.\n  The fixing is the index rate only; gearing/spread/floors/caps apply on\n  top exactly as for projected rates.\n\nAn observation exactly on the curve base date prefers a published\nsame-day fixing when the series has one, otherwise projects from `t = 0`.\n\nThe [`FloatingRateFallback`] policy applies only when **no** fixing\nseries is provided: `Error` (the default) fails the build with a\ndescriptive message naming the date, index, and expected series id;\n`FixedRate(r)` uses `r` as the index rate for the affected coupon;\n`SpreadOnly` projects spread-only.\n\n# Example\n\n```rust\nuse finstack_quant_core::dates::Tenor;\nuse finstack_quant_cashflows::builder::{FloatingRateSpec, OvernightIndexConstraintApplication};\nuse rust_decimal_macros::dec;\n\n// 3M SOFR + 200bps with 0% floor\nlet spec = FloatingRateSpec {\n    index_id: \"USD-SOFR-3M\".into(),\n    spread_bp: dec!(200.0),\n    gearing: dec!(1.0),\n    gearing_includes_spread: true,\n    index_floor_bp: Some(dec!(0.0)),\n    all_in_floor_bp: None,\n    all_in_cap_bp: None,\n    index_cap_bp: None,\n    overnight_index_constraints: OvernightIndexConstraintApplication::Daily,\n    reset_frequency: Tenor::quarterly(),\n    index_tenor: None,\n    reset_lag_days: 2,\n    fixing_calendar_id: None,\n    overnight_compounding: None,\n    overnight_basis: None,\n    fallback: Default::default(),\n};\n```",
+      "description": "Canonical floating rate specification for all instruments.\n\nUsed by bonds, swaps, credit facilities, and structured products.\nAll instruments should compose this type rather than defining their own\nfloating rate specifications.\n\n# Rate Calculation\n\nThe all-in rate is computed as:\n1. Look up forward rate from `forward_curve_id` curve for the accrual period\n2. Apply `index_floor_bp` to index rate (if specified) - applied BEFORE adding spread\n3. Add `spread_bp` to get base rate\n4. Multiply by `gearing` (typically 1.0)\n5. Apply `all_in_cap_bp` to final rate (if specified) - applied AFTER spread and gearing\n\nFormula: `cap(gearing * (floor(index) + spread))`\n\n# Negative Rate Handling\n\nNegative index rates are supported and will flow through calculations\nunless constrained by floors. For markets with negative rates (EUR, JPY, CHF):\n\n- Set `index_floor_bp: Some(0.0)` to floor the index at zero\n- Set `all_in_floor_bp: Some(0.0)` to floor the total coupon at zero\n- Omit floors to allow negative coupons (rare but valid in some structures)\n\nThe implementation does not reject negative rates; the policy is controlled\nby the floor configuration.\n\n# Seasoned Instruments (Historical Fixings)\n\nHistorical fixings **are supported** via the `MarketContext`: store a\n`ScalarTimeSeries` under the canonical id `FIXING:{forward_curve_id}` (see\n`finstack_quant_core::market_data::fixings`) containing realized index\nobservations. Observation dates strictly before the forward curve base\ndate then resolve from that series instead of the curve:\n\n- **Overnight observations** (compounded/averaged paths) use LOCF lookup\n  (last observation carried forward), matching RFR publication\n  conventions where a fixing carries over non-publication days\n  (ARRC 2020 SOFR conventions; ISDA 2021 Supp. 70 §7.1(g)). A partially\n  seasoned compounding window seamlessly mixes realized fixings and\n  curve-projected forwards with identical `(rate, days)` weighting.\n- **Term-rate resets** use exact-date lookup on the (business-day\n  adjusted) reset date — a term rate fixes on a specific published date.\n  The fixing is the index rate only; gearing/spread/floors/caps apply on\n  top exactly as for projected rates.\n\nAn observation exactly on the curve base date prefers a published\nsame-day fixing when the series has one, otherwise projects from `t = 0`.\n\nThe [`FloatingRateFallback`] policy applies only when **no** fixing\nseries is provided: `Error` (the default) fails the build with a\ndescriptive message naming the date, index, and expected series id;\n`FixedRate(r)` uses `r` as the index rate for the affected coupon;\n`SpreadOnly` projects spread-only.\n\n# Example\n\n```rust\nuse finstack_quant_core::dates::Tenor;\nuse finstack_quant_cashflows::builder::{FloatingRateSpec, OvernightIndexConstraintApplication};\nuse rust_decimal_macros::dec;\n\n// 3M SOFR + 200bps with 0% floor\nlet spec = FloatingRateSpec {\n    forward_curve_id: \"USD-SOFR-3M\".into(),\n    spread_bp: dec!(200.0),\n    gearing: dec!(1.0),\n    gearing_includes_spread: true,\n    index_floor_bp: Some(dec!(0.0)),\n    all_in_floor_bp: None,\n    all_in_cap_bp: None,\n    index_cap_bp: None,\n    overnight_index_constraints: OvernightIndexConstraintApplication::Daily,\n    reset_frequency: Tenor::quarterly(),\n    index_tenor: None,\n    reset_lag_days: 2,\n    fixing_calendar_id: None,\n    overnight_compounding: None,\n    overnight_basis: None,\n    fallback: Default::default(),\n};\n```",
       "properties": {
         "all_in_cap_bp": {
           "anyOf": [
@@ -455,12 +454,20 @@
           "description": "Policy when forward curve lookup fails during emission.\n\nDefaults to `Error`, which surfaces curve lookup failures.\nSet to `SpreadOnly` for spread-only projection, or `FixedRate(r)`\nto use a fixed index rate."
         },
         "fixing_calendar_id": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/d_9c3fc047c6fea21344ad"
+            },
+            {
+              "type": "null"
+            }
+          ],
           "default": null,
-          "description": "Optional calendar for rate fixing (reset lag).\n\nIf not provided, defaults to the coupon schedule calendar.",
-          "type": [
-            "string",
-            "null"
-          ]
+          "description": "Optional calendar for rate fixing (reset lag).\n\nIf not provided, defaults to the coupon schedule calendar."
+        },
+        "forward_curve_id": {
+          "$ref": "#/$defs/d_9c3fc047c6fea21344ad",
+          "description": "Forward curve identifier (e.g., \"USD-SOFR-3M\", \"EUR-EURIBOR-6M\")."
         },
         "gearing": {
           "$ref": "#/$defs/d_18f3ba1ec18ab2be13b2",
@@ -495,10 +502,6 @@
           ],
           "default": null,
           "description": "Floor on index rate in basis points (applied to index component).\n\nExample: index_floor_bp = Some(0.0) ensures index rate >= 0%."
-        },
-        "index_id": {
-          "$ref": "#/$defs/d_9c3fc047c6fea21344ad",
-          "description": "Forward curve identifier (e.g., \"USD-SOFR-3M\", \"EUR-EURIBOR-6M\")."
         },
         "index_tenor": {
           "anyOf": [
@@ -553,7 +556,7 @@
         }
       },
       "required": [
-        "index_id",
+        "forward_curve_id",
         "spread_bp",
         "reset_frequency"
       ],
@@ -728,7 +731,7 @@
     },
     "d_267d8577ac642991b18b": {
       "additionalProperties": false,
-      "description": "Borrower call option on term loan.\n\nRepresents the borrower's right to prepay the loan at a specified\nredemption price (typically at premium to par for early calls,\napproaching par near maturity).\n\n# Call Types\n\nThe `call_type` field determines how the call is exercised:\n- `Hard`: Standard call at `price_pct_of_par` on or after `date`\n- `Soft`: Premium call during protection period\n- `MakeWhole`: PV-based redemption at Treasury + spread\n\nFor `MakeWhole` calls, `price_pct_of_par` serves as the minimum\n(floor) redemption price. The actual price is the greater of\n`price_pct_of_par` and the make-whole amount.",
+      "description": "Borrower call option on term loan.\n\nRepresents the borrower's right to prepay the loan at a specified\nredemption price (typically at premium to par for early calls,\napproaching par near maturity).\n\n# Call Types\n\nThe `call_type` field determines how the call is exercised:\n- `Hard`: Standard call at `price_pct_of_par` on or after `date`\n- `Soft`: Premium call during protection period\n- `MakeWhole`: PV-based redemption at the reference curve plus spread\n\nFor `MakeWhole` calls, `price_pct_of_par` serves as the minimum\n(floor) redemption price. The actual price is the greater of\n`price_pct_of_par` and the make-whole amount.",
       "properties": {
         "call_type": {
           "$ref": "#/$defs/d_e03f269a2f027f942f8f",
@@ -823,15 +826,14 @@
       ]
     },
     "d_282cc71e3b5b312f79c9": {
-      "description": "Original Issue Discount (OID) policy for term loan origination.\n\nOID represents the discount from par value at loan origination. The policy\ndetermines how the discount is handled: withheld from proceeds or tracked separately.\n\n# Industry Practice\n\nOID is common in institutional term loans and private credit, particularly for:\n- Leveraged buyout financing (LBO loans)\n- Distressed refinancings\n- High-yield institutional term loans\n\nTypical OID ranges from 1-5% (100-500 bp) of par value.\n\n# Accounting Treatment\n\nOID affects accounting under GAAP/IFRS:\n- **Withheld**: Reduces initial cash proceeds, increases effective yield\n- **Separate**: May be accounted as upfront fee or amortized discount\n\nFor effective interest rate (EIR) amortization schedules, see [`OidEirSpec`].\n\n# Variants\n\n- `WithheldBp`: Discount in basis points of each funded draw, withheld\n  from proceeds\n- `WithheldAmount`: Fixed facility-level amount withheld from funded\n  proceeds, pro-rated across draws by draw size\n- `SeparateBp`: Discount in basis points of each draw, tracked\n  separately and not withheld\n- `SeparateAmount`: Fixed facility-level amount tracked separately,\n  pro-rated across draws by draw size\n\n# Examples\n\n```text\nuse finstack_quant_valuations::instruments::fixed_income::term_loan::spec::OidPolicy;\nuse finstack_quant_core::money::Money;\nuse finstack_quant_core::currency::Currency;\n\n// 2% OID withheld from proceeds\nlet oid = OidPolicy::WithheldBp(200);  // 200 bp = 2%\n\n// $50,000 fixed OID\nlet oid_fixed = OidPolicy::WithheldAmount(Money::from((50_000_i64, Currency::USD)));\n```",
+      "description": "Original Issue Discount (OID) policy for term loan origination.\n\nOID represents the discount from par value at loan origination. The policy\ndetermines how the discount is handled: withheld from proceeds or tracked separately.\n\n# Industry Practice\n\nOID is common in institutional term loans and private credit, particularly for:\n- Leveraged buyout financing (LBO loans)\n- Distressed refinancings\n- High-yield institutional term loans\n\nTypical OID ranges from 1-5% (100-500 bp) of par value.\n\n# Accounting Treatment\n\nOID affects accounting under GAAP/IFRS:\n- **Withheld**: Reduces initial cash proceeds, increases effective yield\n- **Separate**: May be accounted as upfront fee or amortized discount\n\nFor effective interest rate (EIR) amortization schedules, see [`OidEirSpec`].\n\n# Variants\n\n- `WithheldBp`: Discount in basis points of each funded draw, withheld\n  from proceeds\n- `WithheldAmount`: Fixed facility-level amount withheld from funded\n  proceeds, pro-rated across draws by draw size\n- `SeparateBp`: Discount in basis points of each draw, tracked\n  separately and not withheld\n- `SeparateAmount`: Fixed facility-level amount tracked separately,\n  pro-rated across draws by draw size\n\n# Examples\n\n```text\nuse finstack_quant_valuations::instruments::fixed_income::term_loan::spec::OidPolicy;\nuse finstack_quant_core::money::Money;\nuse finstack_quant_core::currency::Currency;\n\n// 2% OID withheld from proceeds\nlet oid = OidPolicy::WithheldBp(dec!(200));  // 200 bp = 2%\n\n// $50,000 fixed OID\nlet oid_fixed = OidPolicy::WithheldAmount(Money::from((50_000_i64, Currency::USD)));\n```",
       "oneOf": [
         {
           "additionalProperties": false,
           "description": "Discount in basis points of each funded draw (`200` = 2%), withheld\nfrom proceeds",
           "properties": {
             "withheld_bp": {
-              "format": "int32",
-              "type": "integer"
+              "$ref": "#/$defs/d_18f3ba1ec18ab2be13b2"
             }
           },
           "required": [
@@ -857,8 +859,7 @@
           "description": "Discount in basis points of each draw (`200` = 2%), tracked\nseparately for amortization",
           "properties": {
             "separate_bp": {
-              "format": "int32",
-              "type": "integer"
+              "$ref": "#/$defs/d_18f3ba1ec18ab2be13b2"
             }
           },
           "required": [
@@ -1321,9 +1322,8 @@
           "description": "Effective-from date of the margin change."
         },
         "delta_bp": {
-          "description": "Change in margin, in basis points (100 = 1%); negative steps down.",
-          "format": "int32",
-          "type": "integer"
+          "$ref": "#/$defs/d_18f3ba1ec18ab2be13b2",
+          "description": "Change in margin, in basis points (`100` = 1%); negative steps down."
         }
       },
       "required": [
@@ -1368,18 +1368,9 @@
       "additionalProperties": false,
       "description": "Real estate asset valuation instrument.\n\nSupports DCF (explicit NOI schedule) and direct capitalization valuation.",
       "properties": {
-        "acquisition_cost": {
-          "default": null,
-          "description": "Optional one-time acquisition cost deducted at `as_of` in DCF valuation.\n\nThis is intended for closing costs, fees, and other transaction costs.",
-          "format": "double",
-          "type": [
-            "number",
-            "null"
-          ]
-        },
         "acquisition_costs": {
           "default": [],
-          "description": "Optional detailed acquisition cost line items (positive outflows) deducted at `as_of`.",
+          "description": "Acquisition (closing) cost line items in instrument currency, as\npositive outflow magnitudes deducted at `as_of` in DCF valuation.",
           "items": {
             "$ref": "#/$defs/d_4ba43030fede59fe5993"
           },
@@ -1581,10 +1572,6 @@
             "null"
           ]
         },
-        "valuation_date": {
-          "$ref": "#/$defs/d_1b2ccb88c9229e7463e8",
-          "description": "Valuation date (base date for discounting)."
-        },
         "valuation_method": {
           "$ref": "#/$defs/d_b55ee51b01327d37b498",
           "description": "Valuation method (DCF or DirectCap)."
@@ -1593,7 +1580,6 @@
       "required": [
         "id",
         "currency",
-        "valuation_date",
         "valuation_method",
         "noi_schedule",
         "day_count"
@@ -1676,7 +1662,7 @@
     },
     "d_46c47c411f014a63af5d": {
       "additionalProperties": false,
-      "description": "Schedule of call and put options for a bond.\n\nContains lists of call and put options that can be exercised during the bond's life.\nUsed for pricing callable/putable bonds and calculating yield-to-worst.\n\n# Examples\n\n```rust\nuse finstack_quant_valuations::instruments::fixed_income::bond::{CallPut, CallPutSchedule};\nuse finstack_quant_core::dates::Date;\nuse time::Month;\n\nlet mut schedule = CallPutSchedule::default();\nschedule.calls.push(CallPut {\n    start_date: Date::from_calendar_date(2027, Month::January, 1).unwrap(),\n    end_date: Date::from_calendar_date(2027, Month::January, 1).unwrap(),\n    price_pct_of_par: 102.0,\n    make_whole: None,\n});\n```",
+      "description": "Schedule of call and put options for a bond.\n\nContains lists of call and put options that can be exercised during the bond's life.\nUsed for pricing callable/putable bonds and calculating yield-to-worst.\n\n# Examples\n\n```rust\nuse finstack_quant_valuations::instruments::fixed_income::bond::{CallPut, CallPutSchedule};\nuse finstack_quant_core::dates::Date;\nuse time::Month;\n\nlet mut schedule = CallPutSchedule::default();\nschedule.calls.push(CallPut {\n    start: Date::from_calendar_date(2027, Month::January, 1).unwrap(),\n    end: Date::from_calendar_date(2027, Month::January, 1).unwrap(),\n    price_pct_of_par: 102.0,\n    make_whole: None,\n});\n```",
       "properties": {
         "calls": {
           "description": "Call options (issuer can redeem early).",
@@ -1734,7 +1720,7 @@
     },
     "d_488d578b2ebcb4b2fc06": {
       "additionalProperties": false,
-      "description": "A scheduled change of a facility's commitment.\n\nThe commitment equals `amount` from `date` forward until the next step.\nSteps down are amortizing commitments, availability expiries and voluntary\nreductions; steps up are accordion exercises. Utilization is always drawn\nbalance over the commitment in force, so a stochastic revolving facility\nbooks the implied principal change at the step.\n\nA delayed-draw term loan (`DdtlSpec::commitment_steps`) accepts only\nnon-increasing steps inside its availability window and no reduction fee\n(`fee_bp` must be `0.0`).",
+      "description": "A scheduled change of a facility's commitment.\n\nThe commitment equals `amount` from `date` forward until the next step.\nSteps down are amortizing commitments, availability expiries and voluntary\nreductions; steps up are accordion exercises. Utilization is always drawn\nbalance over the commitment in force, so a stochastic revolving facility\nbooks the implied principal change at the step.\n\nA delayed-draw term loan (`DdtlSpec::commitment_steps`) accepts only\nnon-increasing steps inside its availability window and no reduction fee\n(`reduction_fee_bp` must be zero).",
       "properties": {
         "amount": {
           "$ref": "#/$defs/d_4ba43030fede59fe5993",
@@ -1744,11 +1730,10 @@
           "$ref": "#/$defs/d_1b2ccb88c9229e7463e8",
           "description": "Date the new commitment takes effect (strictly after the commitment\ndate, on or before maturity)."
         },
-        "fee_bp": {
-          "default": 0,
-          "description": "Reduction or cancellation fee, in basis points of the reduced amount,\npaid by the borrower on `date` when the commitment steps down. Ignored\non a step up. Defaults to `0.0`.",
-          "format": "double",
-          "type": "number"
+        "reduction_fee_bp": {
+          "$ref": "#/$defs/d_18f3ba1ec18ab2be13b2",
+          "default": "0",
+          "description": "One-off reduction or cancellation fee, in basis points of the reduced\namount (not per annum), paid by the borrower on `date` when the\ncommitment steps down. Ignored on a step up. Defaults to zero."
         }
       },
       "required": [
@@ -1893,7 +1878,7 @@
     },
     "d_567a05766e75c7a74f60": {
       "additionalProperties": false,
-      "description": "Delayed-draw term loan (DDTL) specification.\n\nModels a term loan with commitment period during which borrower may draw\ndown funds, subject to availability dates, step-downs, and fees.\n\n# Industry Practice\n\nDDTLs are common in:\n- **Construction financing**: Funds released as construction milestones are met\n- **Acquisition financing**: Delayed funding for earn-outs or contingent payments\n- **Working capital facilities**: Drawn as needed within commitment period\n\nTypical features:\n- Commitment period: 6-24 months\n- Commitment fees: 25-50 bp on undrawn amounts\n- Usage fees: 0-25 bp on drawn amounts\n- Step-downs: Commitment reduces at milestones (e.g., construction completion)\n\n# Fee Conventions\n\n- **Commitment fee**: Paid on undrawn commitment (compensates lender for availability)\n- **Usage fee**: Paid on drawn amounts (additive to interest margin)\n- **OID**: May be withheld at each draw or tracked separately\n\n# Examples\n\n```text\nuse finstack_quant_valuations::instruments::fixed_income::term_loan::spec::*;\nuse finstack_quant_core::money::Money;\nuse finstack_quant_core::currency::Currency;\nuse finstack_quant_core::dates::create_date;\nuse time::Month;\n\n# fn example() -> Result<(), Box<dyn std::error::Error>> {\nlet ddtl = DdtlSpec {\n    commitment_limit: Money::from((10_000_000_i64, Currency::USD)),\n    availability_start: create_date(2025, Month::January, 1)?,\n    availability_end: create_date(2026, Month::January, 1)?,\n    draws: vec![],\n    commitment_steps: vec![],\n    usage_fee_bp: 50.0,        // 50 bp usage fee\n    commitment_fee_bp: 25.0,   // 25 bp commitment fee\n    fee_base: CommitmentFeeBase::Undrawn,\n    oid_policy: None,\n};\n# Ok(())\n# }\n```",
+      "description": "Delayed-draw term loan (DDTL) specification.\n\nModels a term loan with commitment period during which borrower may draw\ndown funds, subject to availability dates, step-downs, and fees.\n\n# Industry Practice\n\nDDTLs are common in:\n- **Construction financing**: Funds released as construction milestones are met\n- **Acquisition financing**: Delayed funding for earn-outs or contingent payments\n- **Working capital facilities**: Drawn as needed within commitment period\n\nTypical features:\n- Commitment period: 6-24 months\n- Commitment fees: 25-50 bp on undrawn amounts\n- Usage fees: 0-25 bp on drawn amounts\n- Step-downs: Commitment reduces at milestones (e.g., construction completion)\n\n# Fee Conventions\n\n- **Commitment fee**: Paid on undrawn commitment (compensates lender for availability)\n- **Usage fee**: Paid on drawn amounts (additive to interest margin)\n- **OID**: May be withheld at each draw or tracked separately\n\n# Examples\n\n```text\nuse finstack_quant_valuations::instruments::fixed_income::term_loan::spec::*;\nuse finstack_quant_core::money::Money;\nuse finstack_quant_core::currency::Currency;\nuse finstack_quant_core::dates::create_date;\nuse time::Month;\n\n# fn example() -> Result<(), Box<dyn std::error::Error>> {\nlet ddtl = DdtlSpec {\n    commitment: Money::from((10_000_000_i64, Currency::USD)),\n    availability_start: create_date(2025, Month::January, 1)?,\n    availability_end: create_date(2026, Month::January, 1)?,\n    draws: vec![],\n    commitment_steps: vec![],\n    usage_fee_bp: dec!(50),        // 50 bp usage fee\n    commitment_fee_bp: dec!(25),   // 25 bp commitment fee\n    fee_base: CommitmentFeeBase::Undrawn,\n    oid_policy: None,\n};\n# Ok(())\n# }\n```",
       "properties": {
         "availability_end": {
           "$ref": "#/$defs/d_1b2ccb88c9229e7463e8",
@@ -1903,17 +1888,16 @@
           "$ref": "#/$defs/d_1b2ccb88c9229e7463e8",
           "description": "First date draws are permitted"
         },
-        "commitment_fee_bp": {
-          "description": "Commitment fee on the undrawn commitment, in basis points per annum\n(non-negative, finite; `50.0` = 0.50%).",
-          "format": "double",
-          "type": "number"
-        },
-        "commitment_limit": {
+        "commitment": {
           "$ref": "#/$defs/d_4ba43030fede59fe5993",
-          "description": "Total commitment limit available for draws"
+          "description": "Total commitment available for draws, in the loan currency."
+        },
+        "commitment_fee_bp": {
+          "$ref": "#/$defs/d_18f3ba1ec18ab2be13b2",
+          "description": "Commitment fee on the undrawn commitment, in basis points per annum\n(non-negative; `50` = 0.50%)."
         },
         "commitment_steps": {
-          "description": "Commitment steps, each effective from its date: strictly increasing\ndates inside the availability window, non-increasing `amount`s in the\nloan currency, and `fee_bp == 0.0` (term loans carry no reduction fee).",
+          "description": "Commitment steps, each effective from its date: strictly increasing\ndates inside the availability window, non-increasing `amount`s in the\nloan currency, and a zero `reduction_fee_bp` (term loans carry no\nreduction fee).",
           "items": {
             "$ref": "#/$defs/d_488d578b2ebcb4b2fc06"
           },
@@ -1942,13 +1926,12 @@
           "description": "Original issue discount policy, if applicable"
         },
         "usage_fee_bp": {
-          "description": "Usage fee on drawn amounts, in basis points per annum (non-negative,\nfinite; `25.0` = 0.25%).",
-          "format": "double",
-          "type": "number"
+          "$ref": "#/$defs/d_18f3ba1ec18ab2be13b2",
+          "description": "Usage fee on drawn amounts, in basis points per annum (non-negative;\n`25` = 0.25%)."
         }
       },
       "required": [
-        "commitment_limit",
+        "commitment",
         "availability_start",
         "availability_end",
         "draws",
@@ -2418,11 +2401,11 @@
     },
     "d_63252262b353f04ca110": {
       "additionalProperties": false,
-      "description": "Call or put option on a bond.\n\nRepresents a single call or put option with an exercise period and redemption price.\nCall options allow the issuer to redeem early; put options allow the holder to redeem early.\n\n# Examples\n\n```rust\nuse finstack_quant_valuations::instruments::fixed_income::bond::CallPut;\nuse finstack_quant_core::dates::Date;\nuse time::Month;\n\n// Discrete call option: issuer can redeem at 102% of par on Jan 1, 2027\nlet call = CallPut {\n    start_date: Date::from_calendar_date(2027, Month::January, 1).unwrap(),\n    end_date: Date::from_calendar_date(2027, Month::January, 1).unwrap(),\n    price_pct_of_par: 102.0,\n    make_whole: None,\n};\n```",
+      "description": "Call or put option on a bond.\n\nRepresents a single call or put option with an exercise period and redemption price.\nCall options allow the issuer to redeem early; put options allow the holder to redeem early.\n\n# Examples\n\n```rust\nuse finstack_quant_valuations::instruments::fixed_income::bond::CallPut;\nuse finstack_quant_core::dates::Date;\nuse time::Month;\n\n// Discrete call option: issuer can redeem at 102% of par on Jan 1, 2027\nlet call = CallPut {\n    start: Date::from_calendar_date(2027, Month::January, 1).unwrap(),\n    end: Date::from_calendar_date(2027, Month::January, 1).unwrap(),\n    price_pct_of_par: 102.0,\n    make_whole: None,\n};\n```",
       "properties": {
-        "end_date": {
+        "end": {
           "$ref": "#/$defs/d_1b2ccb88c9229e7463e8",
-          "description": "Last date when the option can be exercised, inclusive.\n\nUse the same value as `start_date` for one-day/discrete exercise."
+          "description": "Last date when the option can be exercised, inclusive.\n\nUse the same value as `start` for one-day/discrete exercise."
         },
         "make_whole": {
           "anyOf": [
@@ -2440,14 +2423,14 @@
           "format": "double",
           "type": "number"
         },
-        "start_date": {
+        "start": {
           "$ref": "#/$defs/d_1b2ccb88c9229e7463e8",
           "description": "First date when the option can be exercised."
         }
       },
       "required": [
-        "start_date",
-        "end_date",
+        "start",
+        "end",
         "price_pct_of_par"
       ],
       "type": "object"
@@ -2503,8 +2486,8 @@
           "description": "Business-day convention applied when rolling **payment dates** onto\nvalid business days.\n\nAccrual boundaries are left unadjusted (bond/ICMA convention) unless\n[`Self::adjust_accrual_dates`] is `true`, in which case the same\nconvention also rolls both accrual-period boundaries (swap/ISDA 2006\n§4.10 convention)."
         },
         "calendar_id": {
-          "description": "Holiday calendar identifier used together with `business_day_convention`.\n\nUse `\"weekends_only\"` when only Saturday/Sunday adjustment is needed.",
-          "type": "string"
+          "$ref": "#/$defs/d_9c3fc047c6fea21344ad",
+          "description": "Holiday calendar identifier used together with `business_day_convention`.\n\nUse `\"weekends_only\"` when only Saturday/Sunday adjustment is needed."
         },
         "coupon_type": {
           "$ref": "#/$defs/d_a561434dff1275f40d83",
@@ -2555,7 +2538,7 @@
     },
     "d_67ac7ae7fa3c625d34ff": {
       "additionalProperties": false,
-      "description": "Levered real estate equity = unlevered asset + financing.\n\nValue convention:\n- `PV_equity = PV_asset - PV_financing` (financing valued from lender perspective).\n\nReturn/coverage metrics are computed from a simplified equity cashflow schedule:\n- Initial outflow: `-(purchase_price + acquisition_cost)` at `as_of`\n- Financing funding legs on/after `as_of` are included as equity inflows\n- Interim equity CFs: `(NOI - CapEx) - debt_service_cash`\n- Exit: `(sale_proceeds - financing_payoff)` at `exit_date`",
+      "description": "Levered real estate equity = unlevered asset + financing.\n\nValue convention:\n- `PV_equity = PV_asset - PV_financing` (financing valued from lender perspective).\n\nReturn/coverage metrics are computed from a simplified equity cashflow schedule:\n- Initial outflow: `-(purchase_price + Σ acquisition_costs)` at `as_of`\n- Financing funding legs on/after `as_of` are included as equity inflows\n- Interim equity CFs: `(NOI - CapEx) - debt_service_cash`\n- Exit: `(sale_proceeds - financing_payoff)` at the asset horizon (`asset.sale_date`, else the last NOI date)",
       "properties": {
         "asset": {
           "$ref": "#/$defs/d_42ef997031425d58ca65",
@@ -2568,17 +2551,6 @@
         "currency": {
           "$ref": "#/$defs/d_be98333e68c25ab5ae57",
           "description": "Currency (must match asset currency; financing PV is validated at valuation time)."
-        },
-        "exit_date": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/d_1b2ccb88c9229e7463e8"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "Optional explicit exit/sale date. Defaults to the asset's valuation\nhorizon: `asset.sale_date` when set, else the last NOI date on/after `as_of`."
         },
         "financing": {
           "description": "Supported borrower liabilities, valued from the lender perspective and\nnetted from asset PV.",
@@ -3172,33 +3144,34 @@
       "description": "Utilization process for stochastic draws/repayments.\n\nFor the 80/20 implementation, we support a single mean-reverting process.\nThis can be extended in the future to support other processes (jump-diffusion,\nregime-switching, etc.).",
       "properties": {
         "mean_reverting": {
+          "additionalProperties": false,
           "properties": {
-            "speed": {
-              "description": "Mean reversion speed (annualized).",
+            "kappa": {
+              "description": "Mean-reversion speed κ, per year.",
+              "format": "double",
+              "type": "number"
+            },
+            "sigma": {
+              "description": "Utilization volatility σ, annualized (absolute utilization units).",
               "format": "double",
               "type": "number"
             },
             "spread_sensitivity": {
               "default": 0,
-              "description": "Sensitivity of the utilization target to the simulated credit\nspread (adverse selection), as a decimal per unit of relative\nspread change.\n\nThe target used by the OU step becomes\n`θ(t) = clamp(target_rate + spread_sensitivity · (s(t) / s(0) − 1), 0, 1)`\nwhere `s(t)` is the simulated spread and `s(0)` its initial level,\nso a spread that doubles raises the target by `spread_sensitivity`.\nDefaults to `0.0` (no link); the utilization/credit shock\ncorrelation in `McConfig` applies on top of it. Ignored when the\nfacility has no credit-spread process.",
+              "description": "Sensitivity of the utilization target to the simulated credit\nspread (adverse selection), as a decimal per unit of relative\nspread change.\n\nThe target used by the OU step becomes\n`θ(t) = clamp(theta + spread_sensitivity · (s(t) / s(0) − 1), 0, 1)`\nwhere `s(t)` is the simulated spread and `s(0)` its initial level,\nso a spread that doubles raises the target by `spread_sensitivity`.\nDefaults to `0.0` (no link); the utilization/credit shock\ncorrelation in `McConfig` applies on top of it. Ignored when the\nfacility has no credit-spread process.",
               "format": "double",
               "type": "number"
             },
-            "target_rate": {
-              "description": "Target utilization rate (0.0 to 1.0).",
-              "format": "double",
-              "type": "number"
-            },
-            "volatility": {
-              "description": "Volatility of utilization changes (annualized).",
+            "theta": {
+              "description": "Long-run utilization level θ, as a fraction in `[0, 1]`.",
               "format": "double",
               "type": "number"
             }
           },
           "required": [
-            "target_rate",
-            "speed",
-            "volatility"
+            "theta",
+            "kappa",
+            "sigma"
           ],
           "type": "object"
         }
@@ -3351,22 +3324,23 @@
       ]
     },
     "d_9028c5ae285d759c7873": {
-      "description": "Rate specification for term loans.\n\n Defines whether the loan uses fixed or floating rate interest, with full\nsupport for floating rate features including floors, caps, and leverage.\n\n# Variants\n\n- [`Fixed`](RateSpec::Fixed): Constant rate specified in basis points\n- [`Floating`](RateSpec::Floating): Index-based rate with spread and optional limits\n\n# Examples\n\nFixed rate loan:\n```rust\nuse finstack_quant_valuations::instruments::fixed_income::term_loan::RateSpec;\n\nlet fixed_rate = RateSpec::Fixed { rate_bp: 600 };  // 6% fixed\n```\n\nFloating rate with floor:\n```rust\nuse finstack_quant_valuations::instruments::fixed_income::term_loan::RateSpec;\nuse finstack_quant_cashflows::builder::FloatingRateSpec;\nuse finstack_quant_core::dates::Tenor;\nuse finstack_quant_core::types::CurveId;\nuse rust_decimal_macros::dec;\n\nlet floating = RateSpec::Floating(FloatingRateSpec {\n    index_id: CurveId::new(\"USD-SOFR-3M\"),\n    spread_bp: dec!(300),     // +300 bp spread\n    gearing: dec!(1),\n    gearing_includes_spread: true,\n    index_floor_bp: Some(dec!(0)),  // 0% floor\n    all_in_floor_bp: None,\n    all_in_cap_bp: None,\n    index_cap_bp: None,\n    overnight_index_constraints: Default::default(),\n    reset_frequency: Tenor::quarterly(),\n    index_tenor: None,\n    reset_lag_days: 2,\n    fixing_calendar_id: None,\n    overnight_compounding: None,\n    overnight_basis: None,\n    fallback: Default::default(),\n});\n```",
+      "description": "Contractual coupon of a loan facility or note: a fixed all-in rate or a\nfloating index plus spread.\n\nShared by `TermLoan.rate`, `RevolvingCredit.rate`, `AssetBackedFacility.rate`\nand structured-credit `Tranche.coupon`.\n\n# Examples\n\n```rust\nuse finstack_quant_valuations::instruments::fixed_income::loan_terms::RateSpec;\n\nlet fixed = RateSpec::Fixed { rate: 0.06 }; // 6% all-in\nassert!(matches!(fixed, RateSpec::Fixed { .. }));\n```",
       "oneOf": [
         {
           "additionalProperties": false,
-          "description": "Fixed annual rate in basis points",
+          "description": "Fixed all-in annual rate.",
           "properties": {
             "fixed": {
+              "additionalProperties": false,
               "properties": {
-                "rate_bp": {
-                  "description": "Fixed rate in basis points (e.g., 600 = 6%)",
-                  "format": "int32",
-                  "type": "integer"
+                "rate": {
+                  "description": "Annual rate as a decimal (`0.06` = 6%).",
+                  "format": "double",
+                  "type": "number"
                 }
               },
               "required": [
-                "rate_bp"
+                "rate"
               ],
               "type": "object"
             }
@@ -3378,7 +3352,7 @@
         },
         {
           "additionalProperties": false,
-          "description": "Floating rate using canonical FloatingRateSpec.\n\nUses the standard floating rate specification with full support\nfor floors, caps, gearing, and reset conventions.\n\nEvery field of the spec is honored. The loan-level\n`TermLoan::calendar_id` drives the payment schedule and business-day\nadjustments; `fixing_calendar_id` (the loan calendar when unset) drives\nthe reset lag and overnight observations. Covenant and override margin\nstep-ups add to `spread_bp` from the next accrual period. Overnight\nindices compound per `overnight_compounding` and apply index floors and\ncaps per `overnight_index_constraints` (each daily fixing by default).",
+          "description": "Floating index plus spread, with the canonical floor, cap, gearing and\nreset conventions of [`FloatingRateSpec`].",
           "properties": {
             "floating": {
               "$ref": "#/$defs/d_11e2bbdddad8dbf2f7f3"
@@ -4753,8 +4727,8 @@
       "description": "Term loan instrument with covenant and DDTL support.\n\nRepresents a fully-validated institutional term loan with support for:\n- Fixed or floating interest rates\n- Delayed-draw term loan (DDTL) features\n- Payment-in-kind (PIK) interest\n- Flexible amortization schedules\n- Covenant-driven events (margin step-ups, cash sweeps, PIK toggles)\n- Original issue discount (OID) handling\n- Borrower call schedules\n\n# Construction\n\nBuild with [`TermLoan::builder()`]; `build()` validates the complete\ncontract (dates, currencies, DDTL draws against the commitment in force,\ncovenant and call schedules):\n\n```\nuse finstack_quant_valuations::instruments::fixed_income::term_loan::TermLoan;\n\nlet loan = TermLoan::example()?;\nloan.validate()?;\n# Ok::<(), finstack_quant_core::Error>(())\n```\n\n# Cashflow Generation\n\nUses the [`CashflowProvider`](crate::cashflow::traits::CashflowProvider) trait:\n- `dated_cashflows()` returns signed canonical schedule flows (coupons, amortization, redemptions)\n- `cashflow_schedule()` returns the signed canonical schedule with `CFKind` metadata\n\n# Pricing\n\nImplements [`Instrument::value()`](crate::instruments::common_impl::traits::Instrument::value)\nusing deterministic cashflow discounting. PIK interest is capitalized and excluded from PV.\n\n# Invariants\n\n- `issue < maturity`\n- `notional_limit.currency() == currency`\n- All monetary amounts are in the same currency\n- Amortization does not exceed outstanding principal\n\n# Thread Safety\n\nThis type is `Send + Sync` as all fields are thread-safe.",
       "properties": {
         "amortization": {
-          "$ref": "#/$defs/d_ba8365e12c57768c637c",
-          "description": "Amortization specification"
+          "$ref": "#/$defs/d_b68d80acd3bb73b369bf",
+          "description": "Scheduled principal amortization (the shared cashflows\n`AmortizationSpec`). `LinearTo` and `StepRemaining` are rejected;\n`PercentOfOriginalPerPeriod` and `LinearBetween` apply per funded draw."
         },
         "attributes": {
           "$ref": "#/$defs/d_2c88e4d1e2e4f7c22e02",
@@ -4766,11 +4740,15 @@
           "description": "Business day convention"
         },
         "calendar_id": {
-          "description": "Optional calendar id for adjustments",
-          "type": [
-            "string",
-            "null"
-          ]
+          "anyOf": [
+            {
+              "$ref": "#/$defs/d_9c3fc047c6fea21344ad"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Optional calendar id for adjustments"
         },
         "call_schedule": {
           "anyOf": [
@@ -4895,13 +4873,13 @@
         "upfront_fee": {
           "anyOf": [
             {
-              "$ref": "#/$defs/d_4ba43030fede59fe5993"
+              "$ref": "#/$defs/d_f8cc3e84589384dc0202"
             },
             {
               "type": "null"
             }
           ],
-          "description": "Upfront fee at issue (if any)"
+          "description": "Upfront (arrangement or OID) fee paid on `issue_date`, as an amount or\na fraction of the commitment (the DDTL `commitment`, else\n`notional_limit`)."
         }
       },
       "required": [
@@ -5972,6 +5950,58 @@
         },
         {
           "additionalProperties": false,
+          "description": "Fixed percentage of the **remaining** outstanding paid each period\n(declining balance): the payment is `outstanding * pct`, so it falls\ngeometrically from period to period.",
+          "properties": {
+            "percent_of_remaining_per_period": {
+              "additionalProperties": false,
+              "properties": {
+                "pct": {
+                  "description": "Fraction of the outstanding principal paid per period (e.g.,\n0.025 = 2.5%), in `[0, 1]`.",
+                  "format": "double",
+                  "type": "number"
+                }
+              },
+              "required": [
+                "pct"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "percent_of_remaining_per_period"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Equal principal installments on every payment date in `(start, end]`,\nrepaying the outstanding principal in full by `end`.",
+          "properties": {
+            "linear_between": {
+              "additionalProperties": false,
+              "properties": {
+                "end": {
+                  "$ref": "#/$defs/d_1b2ccb88c9229e7463e8",
+                  "description": "Amortization end (full repayment), on or before maturity."
+                },
+                "start": {
+                  "$ref": "#/$defs/d_1b2ccb88c9229e7463e8",
+                  "description": "Amortization start; installments fall on payment dates strictly\nafter it."
+                }
+              },
+              "required": [
+                "start",
+                "end"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "linear_between"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
           "description": "Custom principal exchanges on specific dates (absolute cash amounts).\nPositive amounts reduce outstanding (i.e., principal paid by issuer).",
           "properties": {
             "custom_principal": {
@@ -6019,118 +6049,6 @@
         }
       },
       "type": "object"
-    },
-    "d_ba8365e12c57768c637c": {
-      "description": "Principal amortization schedule specification.\n\nDefines how the loan principal is amortized over its life,\nfrom no amortization (bullet) to custom schedules.",
-      "oneOf": [
-        {
-          "const": "none",
-          "description": "Bullet loan with no scheduled amortization",
-          "type": "string"
-        },
-        {
-          "additionalProperties": false,
-          "description": "Linear amortization between start and end dates",
-          "properties": {
-            "linear": {
-              "additionalProperties": false,
-              "properties": {
-                "end": {
-                  "$ref": "#/$defs/d_1b2ccb88c9229e7463e8",
-                  "description": "Amortization end date (full repayment)"
-                },
-                "start": {
-                  "$ref": "#/$defs/d_1b2ccb88c9229e7463e8",
-                  "description": "Amortization start date"
-                }
-              },
-              "required": [
-                "start",
-                "end"
-              ],
-              "type": "object"
-            }
-          },
-          "required": [
-            "linear"
-          ],
-          "type": "object"
-        },
-        {
-          "additionalProperties": false,
-          "description": "Percentage of current outstanding principal per period (geometric decay).\n\nEach period, the amortization amount equals `bp / 10000 × current_outstanding`.\nBecause the percentage is applied to the declining balance, the dollar amount\ndecreases geometrically each period.\n\n**Note**: This is NOT the same as a flat percentage of original notional\n(which would produce equal dollar payments each period).  For example,\n250 bp (2.5%) per quarter applied to $10M produces:\n- Q1: $250,000 (2.5% × $10M)\n- Q2: $243,750 (2.5% × $9.75M)\n- Q3: $237,656 (2.5% × $9.506M)\n- etc.",
-          "properties": {
-            "percent_per_period": {
-              "additionalProperties": false,
-              "properties": {
-                "bp": {
-                  "description": "Percentage in basis points per payment period (applied to current outstanding)",
-                  "format": "int32",
-                  "type": "integer"
-                }
-              },
-              "required": [
-                "bp"
-              ],
-              "type": "object"
-            }
-          },
-          "required": [
-            "percent_per_period"
-          ],
-          "type": "object"
-        },
-        {
-          "additionalProperties": false,
-          "description": "Flat dollar amortization each period (percentage of original notional).\n\nEach period, the amortization amount equals `bp / 10000 × original_notional`.\nBecause the percentage is applied to the fixed original balance, the dollar\namount is identical every period (unlike `PercentPerPeriod` which decays).\n\nFor example, 250 bp (2.5%) per quarter applied to $10M produces:\n- Q1: $250,000 (2.5% × $10M)\n- Q2: $250,000 (2.5% × $10M)\n- Q3: $250,000 (2.5% × $10M)\n- etc.",
-          "properties": {
-            "percent_of_original_notional": {
-              "additionalProperties": false,
-              "properties": {
-                "bp": {
-                  "description": "Percentage in basis points per payment period (applied to original notional)",
-                  "format": "int32",
-                  "type": "integer"
-                }
-              },
-              "required": [
-                "bp"
-              ],
-              "type": "object"
-            }
-          },
-          "required": [
-            "percent_of_original_notional"
-          ],
-          "type": "object"
-        },
-        {
-          "additionalProperties": false,
-          "description": "Custom amortization schedule with explicit principal payments",
-          "properties": {
-            "custom": {
-              "items": {
-                "maxItems": 2,
-                "minItems": 2,
-                "prefixItems": [
-                  {
-                    "$ref": "#/$defs/d_1b2ccb88c9229e7463e8"
-                  },
-                  {
-                    "$ref": "#/$defs/d_4ba43030fede59fe5993"
-                  }
-                ],
-                "type": "array"
-              },
-              "type": "array"
-            }
-          },
-          "required": [
-            "custom"
-          ],
-          "type": "object"
-        }
-      ]
     },
     "d_bd95aa2706e04e0c4d79": {
       "description": "Collateral asset classes per BCBS-IOSCO standards.\n\nAsset classes determine baseline haircuts and eligibility criteria.\nThe BCBS-IOSCO framework specifies minimum haircuts by asset class.\n\n# Reference\n\nBCBS-IOSCO \"Margin requirements for non-centrally cleared derivatives\" (2020)\nAnnex A: Standardized haircut schedule `docs/REFERENCES.md#bcbs-iosco-uncleared-margin`",
@@ -7044,20 +6962,6 @@
           "description": "Discount curve identifier for pricing."
         },
         "ex_coupon_calendar_id": {
-          "description": "Calendar identifier for ex-coupon day counting.",
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "ex_coupon_days": {
-          "default": 0,
-          "description": "Number of ex-coupon days before coupon date.",
-          "format": "uint32",
-          "minimum": 0,
-          "type": "integer"
-        },
-        "funding_curve_id": {
           "anyOf": [
             {
               "$ref": "#/$defs/d_9c3fc047c6fea21344ad"
@@ -7066,7 +6970,14 @@
               "type": "null"
             }
           ],
-          "description": "Optional funding/repo curve for carry cost computation."
+          "description": "Calendar identifier for ex-coupon day counting."
+        },
+        "ex_coupon_days": {
+          "default": 0,
+          "description": "Number of ex-coupon days before coupon date.",
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
         },
         "id": {
           "$ref": "#/$defs/d_9c3fc047c6fea21344ad",
@@ -7091,6 +7002,17 @@
         "notional": {
           "$ref": "#/$defs/d_4ba43030fede59fe5993",
           "description": "Principal amount of the bond."
+        },
+        "repo_curve_id": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/d_9c3fc047c6fea21344ad"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Optional repo (financing) discount curve for carry cost computation."
         },
         "return_floor": {
           "anyOf": [
@@ -7134,34 +7056,30 @@
           "$ref": "#/$defs/d_2c88e4d1e2e4f7c22e02",
           "description": "Attributes for scenario selection and tagging"
         },
-        "base_rate_spec": {
-          "$ref": "#/$defs/d_de5554d85b2779d04efa",
-          "description": "Base rate specification (fixed or floating)."
-        },
         "business_day_convention": {
           "$ref": "#/$defs/d_01cd6b2e4ad257352fdb",
           "default": "modified_following",
           "description": "Business-day convention applied to payment dates (interest, fees and\nprincipal) and to the fixing-date roll. Accrual boundaries stay\nunadjusted. Defaults to `ModifiedFollowing`."
         },
         "calendar_id": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/d_9c3fc047c6fea21344ad"
+            },
+            {
+              "type": "null"
+            }
+          ],
           "default": null,
-          "description": "Holiday calendar identifier (for example `\"usny\"`) used to adjust\npayment dates, roll fixing dates and count settlement days. `None`\nadjusts for weekends only. Validation rejects an unknown identifier.\n`FloatingRateSpec::fixing_calendar_id` overrides it for the fixing\ndate alone.",
-          "type": [
-            "string",
-            "null"
-          ]
+          "description": "Holiday calendar identifier (for example `\"usny\"`) used to adjust\npayment dates, roll fixing dates and count settlement days. `None`\nadjusts for weekends only. Validation rejects an unknown identifier.\n`FloatingRateSpec::fixing_calendar_id` overrides it for the fixing\ndate alone."
         },
-        "commitment_amount": {
+        "commitment": {
           "$ref": "#/$defs/d_4ba43030fede59fe5993",
-          "description": "Opening commitment of the facility, in force from `commitment_date`\nuntil the first entry of `commitment_steps`."
-        },
-        "commitment_date": {
-          "$ref": "#/$defs/d_1b2ccb88c9229e7463e8",
-          "description": "Date when the facility becomes available."
+          "description": "Opening commitment of the facility, in force from `issue_date`\nuntil the first entry of `commitment_steps`."
         },
         "commitment_steps": {
           "default": [],
-          "description": "Scheduled commitment changes (amortizing commitments, availability\nexpiries, accordions), each in force from its date until the next.\nDates must be strictly increasing, after `commitment_date` and on or\nbefore `maturity`; the drawn balance plus outstanding letters of\ncredit must never exceed the commitment in force. A step down pays its\n`fee_bp` on the reduced amount. Empty by default.",
+          "description": "Scheduled commitment changes (amortizing commitments, availability\nexpiries, accordions), each in force from its date until the next.\nDates must be strictly increasing, after `issue_date` and on or\nbefore `maturity`; the drawn balance plus outstanding letters of\ncredit must never exceed the commitment in force. A step down pays its\n`fee_bp` on the reduced amount. Empty by default.",
           "items": {
             "$ref": "#/$defs/d_488d578b2ebcb4b2fc06"
           },
@@ -7191,9 +7109,9 @@
           "$ref": "#/$defs/d_99987bc20d52a7a117cb",
           "description": "Draw and repayment schedule (deterministic or stochastic)."
         },
-        "drawn_amount": {
+        "drawn": {
           "$ref": "#/$defs/d_4ba43030fede59fe5993",
-          "description": "Drawn balance at the simulation anchor, the later of `commitment_date`\nand the valuation date, in both deterministic and stochastic mode.\n\nFor a new facility this is the balance funded at commitment; for a\nseasoned facility it is the balance observed on the valuation date.\nDeterministic draw/repay events describe the future only: an event\ndated on or before the valuation date is rejected by the cashflow\nengine, because the position at the anchor is defined by this field\nalone. The accrual period containing the valuation date accrues on\nthis balance from its accrual start."
+          "description": "Drawn balance at the simulation anchor, the later of `issue_date`\nand the valuation date, in both deterministic and stochastic mode.\n\nFor a new facility this is the balance funded at commitment; for a\nseasoned facility it is the balance observed on the valuation date.\nDeterministic draw/repay events describe the future only: an event\ndated on or before the valuation date is rejected by the cashflow\nengine, because the position at the anchor is defined by this field\nalone. The accrual period containing the valuation date accrues on\nthis balance from its accrual start."
         },
         "fees": {
           "$ref": "#/$defs/d_e3ab2140a3c980de74a0",
@@ -7210,6 +7128,10 @@
         "instrument_pricing_overrides": {
           "$ref": "#/$defs/d_c08279a20372931820e0",
           "description": "Instrument-owned pricing inputs."
+        },
+        "issue_date": {
+          "$ref": "#/$defs/d_1b2ccb88c9229e7463e8",
+          "description": "Date when the facility becomes available."
         },
         "lc": {
           "anyOf": [
@@ -7264,6 +7186,10 @@
           "minimum": 0,
           "type": "integer"
         },
+        "rate": {
+          "$ref": "#/$defs/d_9028c5ae285d759c7873",
+          "description": "Base rate specification (fixed or floating)."
+        },
         "recovery_rate": {
           "description": "Recovery rate on default (used when credit_curve_id is present).\n\nRepresents the fraction of exposure recovered in the event of default.\nTypical values: 0.30-0.50 for senior secured facilities.\nCallers must provide the value explicitly; zero recovery remains valid.",
           "format": "double",
@@ -7296,11 +7222,11 @@
       },
       "required": [
         "id",
-        "commitment_amount",
-        "drawn_amount",
-        "commitment_date",
+        "commitment",
+        "drawn",
+        "issue_date",
         "maturity",
-        "base_rate_spec",
+        "rate",
         "day_count",
         "frequency",
         "fees",
@@ -7438,7 +7364,7 @@
     },
     "d_c40e1d7b8b06c6a5365d": {
       "additionalProperties": false,
-      "description": "Step-up/step-down coupon specification.\n\nDefines a coupon that changes rate at specified dates, commonly used\nin bank capital instruments (AT1/Tier 2) and some agency bonds.\n\nThe rate for each coupon period is determined by the last step date\nthat falls on or before the period start date. If no step has occurred,\nthe initial rate is used.\n\n# Examples\n\n```rust\nuse finstack_quant_core::dates::{Date, DayCount, Tenor, BusinessDayConvention, StubKind};\nuse finstack_quant_cashflows::builder::{CouponType, ScheduleParams, StepUpCouponSpec};\nuse rust_decimal_macros::dec;\nuse time::Month;\n\nlet spec = StepUpCouponSpec {\n    coupon_type: CouponType::Cash,\n    initial_rate: dec!(0.03),\n    step_schedule: vec![\n        (Date::from_calendar_date(2027, Month::January, 1).unwrap(), dec!(0.04)),\n        (Date::from_calendar_date(2029, Month::January, 1).unwrap(), dec!(0.05)),\n    ],\n    schedule: ScheduleParams {\n        frequency: Tenor::semi_annual(),\n        day_count: DayCount::Thirty360,\n        business_day_convention: BusinessDayConvention::Following,\n        calendar_id: \"weekends_only\".to_string(),\n        stub: StubKind::None,\n        end_of_month: false,\n        payment_lag_days: 0,\n        adjust_accrual_dates: false,\n        roll_rule: finstack_quant_cashflows::builder::specs::RollRule::None,\n    },\n};\n```",
+      "description": "Step-up/step-down coupon specification.\n\nDefines a coupon that changes rate at specified dates, commonly used\nin bank capital instruments (AT1/Tier 2) and some agency bonds.\n\nThe rate for each coupon period is determined by the last step date\nthat falls on or before the period start date. If no step has occurred,\nthe initial rate is used.\n\n# Examples\n\n```rust\nuse finstack_quant_core::dates::{Date, DayCount, Tenor, BusinessDayConvention, StubKind};\nuse finstack_quant_cashflows::builder::{CouponType, ScheduleParams, StepUpCouponSpec};\nuse rust_decimal_macros::dec;\nuse time::Month;\n\nlet spec = StepUpCouponSpec {\n    coupon_type: CouponType::Cash,\n    initial_rate: dec!(0.03),\n    step_schedule: vec![\n        (Date::from_calendar_date(2027, Month::January, 1).unwrap(), dec!(0.04)),\n        (Date::from_calendar_date(2029, Month::January, 1).unwrap(), dec!(0.05)),\n    ],\n    schedule: ScheduleParams {\n        frequency: Tenor::semi_annual(),\n        day_count: DayCount::Thirty360,\n        business_day_convention: BusinessDayConvention::Following,\n        calendar_id: \"weekends_only\".into(),\n        stub: StubKind::None,\n        end_of_month: false,\n        payment_lag_days: 0,\n        adjust_accrual_dates: false,\n        roll_rule: finstack_quant_cashflows::builder::specs::RollRule::None,\n    },\n};\n```",
       "properties": {
         "adjust_accrual_dates": {
           "description": "Whether accrual-period boundaries are business-day adjusted with\n`business_day_convention`.\n\n- `false` (default, bond convention): accrual periods run between the\n  unadjusted schedule anchors; only payment dates roll.\n- `true` (swap convention, ISDA 2006 §4.10 / ARRC SOFR conventions):\n  both accrual-period boundaries are rolled with `business_day_convention` before year\n  fractions and overnight observation windows are computed. The swap\n  presets ([`Self::usd_sofr_swap`], [`Self::eur_estr_swap`],\n  [`Self::gbp_sonia_swap`], [`Self::jpy_tona_swap`]) set this to\n  `true`.\n\nSerialized only when `true`, so existing wire payloads are unchanged.",
@@ -7450,8 +7376,8 @@
           "description": "Business-day convention applied when rolling **payment dates** onto\nvalid business days.\n\nAccrual boundaries are left unadjusted (bond/ICMA convention) unless\n[`Self::adjust_accrual_dates`] is `true`, in which case the same\nconvention also rolls both accrual-period boundaries (swap/ISDA 2006\n§4.10 convention)."
         },
         "calendar_id": {
-          "description": "Holiday calendar identifier used together with `business_day_convention`.\n\nUse `\"weekends_only\"` when only Saturday/Sunday adjustment is needed.",
-          "type": "string"
+          "$ref": "#/$defs/d_9c3fc047c6fea21344ad",
+          "description": "Holiday calendar identifier used together with `business_day_convention`.\n\nUse `\"weekends_only\"` when only Saturday/Sunday adjustment is needed."
         },
         "coupon_type": {
           "$ref": "#/$defs/d_b4be51a6ee34e35c9484",
@@ -7590,8 +7516,8 @@
           "description": "Business-day convention applied when rolling **payment dates** onto\nvalid business days.\n\nAccrual boundaries are left unadjusted (bond/ICMA convention) unless\n[`Self::adjust_accrual_dates`] is `true`, in which case the same\nconvention also rolls both accrual-period boundaries (swap/ISDA 2006\n§4.10 convention)."
         },
         "calendar_id": {
-          "description": "Holiday calendar identifier used together with `business_day_convention`.\n\nUse `\"weekends_only\"` when only Saturday/Sunday adjustment is needed.",
-          "type": "string"
+          "$ref": "#/$defs/d_9c3fc047c6fea21344ad",
+          "description": "Holiday calendar identifier used together with `business_day_convention`.\n\nUse `\"weekends_only\"` when only Saturday/Sunday adjustment is needed."
         },
         "coupon_type": {
           "$ref": "#/$defs/d_b4be51a6ee34e35c9484",
@@ -7758,7 +7684,7 @@
           },
           "type": "array"
         },
-        "facility_limit": {
+        "commitment": {
           "anyOf": [
             {
               "$ref": "#/$defs/d_4ba43030fede59fe5993"
@@ -7767,7 +7693,7 @@
               "type": "null"
             }
           ],
-          "description": "Optional facility limit/commitment for instruments like RCFs."
+          "description": "Total facility commitment for revolving and delayed-draw facilities;\n`None` for instruments without one."
         },
         "issue_date": {
           "anyOf": [
@@ -7780,7 +7706,7 @@
           ],
           "description": "Issue date of the instrument, when known.\n\nUsed by the accrual engine to establish the first coupon period start\ndate precisely, avoiding the inverse day count approximation that can\nbe off by 1-2 days."
         },
-        "maturity_date": {
+        "maturity": {
           "anyOf": [
             {
               "$ref": "#/$defs/d_1b2ccb88c9229e7463e8"
@@ -8035,47 +7961,6 @@
       ],
       "type": "object"
     },
-    "d_de5554d85b2779d04efa": {
-      "description": "Base rate specification for revolving credit interest.\n\nDefines whether the facility pays a fixed rate or a floating rate\ntied to a market index plus margin.",
-      "oneOf": [
-        {
-          "additionalProperties": false,
-          "description": "Fixed rate (annualized).",
-          "properties": {
-            "fixed": {
-              "properties": {
-                "rate": {
-                  "description": "Annual interest rate (e.g., 0.05 for 5%).",
-                  "format": "double",
-                  "type": "number"
-                }
-              },
-              "required": [
-                "rate"
-              ],
-              "type": "object"
-            }
-          },
-          "required": [
-            "fixed"
-          ],
-          "type": "object"
-        },
-        {
-          "additionalProperties": false,
-          "description": "Floating rate using canonical FloatingRateSpec.\n\nComposes the standard floating rate specification with full support\nfor floors, caps, and gearing.",
-          "properties": {
-            "floating": {
-              "$ref": "#/$defs/d_11e2bbdddad8dbf2f7f3"
-            }
-          },
-          "required": [
-            "floating"
-          ],
-          "type": "object"
-        }
-      ]
-    },
     "d_e03f269a2f027f942f8f": {
       "description": "Type of borrower call provision on a term loan.\n\nInstitutional term loans use several types of call provisions:\n- **Hard call**: Non-callable until the call date, then callable at the stated price.\n- **Soft call**: Callable at any time, but subject to a premium (call protection).\n  Typically applies for the first 6-24 months (\"non-call period\").\n- **Make-whole**: Borrower must pay the present value of remaining cashflows\n  discounted at a reference rate (typically a Treasury rate) plus a spread.\n  This ensures the lender receives full economic value upon early prepayment.\n\n# Industry Practice\n\nLeveraged term loans typically have 6-12 months of soft call protection\n(101% of par, sometimes called \"soft call 101\"), after which they become\ncallable at par. Make-whole provisions are more common in investment-grade\nterm loans and private placements.",
       "oneOf": [
@@ -8091,21 +7976,10 @@
         },
         {
           "additionalProperties": false,
-          "description": "Make-whole call: borrower pays PV of remaining cashflows at a reference\nrate plus the specified spread. Ensures lender receives full economic value.",
+          "description": "Make-whole call: borrower pays PV of remaining cashflows at the\nreference curve plus spread of the shared [`MakeWholeSpec`] (the same\ntype bonds use). The term-loan tree pricer and yield-to-call metrics\nnever exercise it: paying at least the make-whole amount leaves the\nlender indifferent, so the loan is not economically callable.",
           "properties": {
             "make_whole": {
-              "additionalProperties": false,
-              "properties": {
-                "treasury_spread_bp": {
-                  "description": "Spread over the reference rate in basis points (e.g., 50 = T+50bps).",
-                  "format": "int32",
-                  "type": "integer"
-                }
-              },
-              "required": [
-                "treasury_spread_bp"
-              ],
-              "type": "object"
+              "$ref": "#/$defs/d_f9d84ae6512a483b59dd"
             }
           },
           "required": [
@@ -8320,15 +8194,15 @@
     },
     "d_f47392cbceb10c9a41d6": {
       "additionalProperties": false,
-      "description": "Draw event for delayed-draw term loans (DDTL).\n\nRepresents a scheduled or actual draw against the commitment, reducing\navailable capacity and increasing outstanding principal.",
+      "description": "A scheduled draw `{date, amount}` on a committed facility.\n\nA delayed-draw term loan funds on `date` (inside its availability\nwindow); an asset-backed facility funds on the first payment date on or\nafter `date`.",
       "properties": {
         "amount": {
           "$ref": "#/$defs/d_4ba43030fede59fe5993",
-          "description": "Amount drawn from available commitment"
+          "description": "Amount drawn from the available commitment, in the facility currency\n(positive)."
         },
         "date": {
           "$ref": "#/$defs/d_1b2ccb88c9229e7463e8",
-          "description": "Date of the draw"
+          "description": "Date of the draw."
         }
       },
       "required": [
@@ -8382,9 +8256,10 @@
         },
         {
           "additionalProperties": false,
-          "description": "Special collateral (specific securities in high demand, may trade at lower rates)",
+          "description": "Special collateral (specific securities in high demand, may trade at lower rates)\n\nThe special security is identified by [`CollateralSpec::instrument_id`].",
           "properties": {
             "special": {
+              "additionalProperties": false,
               "properties": {
                 "rate_adjustment_bp": {
                   "description": "Optional special rate adjustment in basis points (negative = lower rate)",
@@ -8393,15 +8268,8 @@
                     "number",
                     "null"
                   ]
-                },
-                "security_id": {
-                  "description": "Identifier of the specific security",
-                  "type": "string"
                 }
               },
-              "required": [
-                "security_id"
-              ],
               "type": "object"
             }
           },
@@ -8459,7 +8327,7 @@
       ]
     },
     "d_f8cc3e84589384dc0202": {
-      "description": "Upfront (arrangement or original-issue-discount) fee of a facility.\n\nPaid by the borrower to the lender on the commitment date. Enters the\npresent value only while the commitment date lies after the valuation\ndate, and the effective-interest-rate metrics always.",
+      "description": "Upfront (arrangement or original-issue-discount) fee of a facility.\n\nPaid by the borrower to the lender on the issue date. Enters the\npresent value only while the commitment date lies after the valuation\ndate, and the effective-interest-rate metrics always.",
       "oneOf": [
         {
           "additionalProperties": false,

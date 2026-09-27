@@ -494,9 +494,13 @@ export type DB556Bbeb1Ecf96C44C5A =
   | "ZMW"
   | "ZWL";
 /**
- * Volatility surface ID for implied vol.
+ * Opaque string identifier.
  */
 export type Id3 = string;
+/**
+ * Opaque string identifier.
+ */
+export type Id4 = string;
 /**
  * Canonical schema marker for persisted instrument envelopes.
  */
@@ -560,7 +564,7 @@ export interface D_1E0Fa57668926Accf1A2 {
    *
    * Required when `exercise_style == ExerciseStyle::Bermudan`.
    */
-  exercise_schedule?: Date[] | null;
+  exercise_dates?: Date[] | null;
   /**
    * Exercise style (European or American).
    */
@@ -604,20 +608,20 @@ export interface D_1E0Fa57668926Accf1A2 {
   /**
    * Optional spot price ID (for spot-based pricing and American options).
    */
-  spot_id?: string | null;
+  spot_id?: Id3 | null;
   /**
    * Strike price per unit.
    */
   strike: number;
   /**
-   * Ticker/identifier for market data lookup (e.g., "CL", "GC", "NG")
+   * Commodity symbol label (e.g., "CL", "GC", "NG"); never a market-data key.
    */
-  ticker: string;
+  underlying_ticker: string;
   /**
    * Unit of measurement (e.g., "BBL", "OZ", "MT", "MMBTU")
    */
   unit: string;
-  vol_surface_id: Id3;
+  vol_surface_id: Id4;
 }
 /**
  * Attributes for tagging and selection.

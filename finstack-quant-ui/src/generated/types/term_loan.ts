@@ -2,11 +2,11 @@
 // JSON wire shape only; runtime constraints remain in the schema.
 
 /**
- * Amortization end date (full repayment)
+ * ISO 8601 calendar date string.
  */
 export type Date = string;
 /**
- * Amortization start date
+ * ISO 8601 calendar date string.
  */
 export type Date1 = string;
 /**
@@ -18,6 +18,14 @@ export type Date2 = string;
  */
 export type BusinessDayConvention =
   "unadjusted" | "following" | "modified_following" | "preceding" | "modified_preceding" | "nearest";
+/**
+ * Opaque string identifier.
+ */
+export type Id = string;
+/**
+ * Opaque string identifier.
+ */
+export type Id1 = string;
 /**
  * ISO 8601 calendar date string.
  */
@@ -41,13 +49,13 @@ export type Date4 = string;
  */
 export type Date5 = string;
 /**
+ * Change in margin, in basis points (`100` = 1%); negative steps down.
+ */
+export type Decimal2 = string;
+/**
  * ISO 8601 calendar date string.
  */
 export type Date6 = string;
-/**
- * Opaque string identifier.
- */
-export type Id = string;
 /**
  * Currency for all cashflows
  */
@@ -237,9 +245,20 @@ export type Date7 = string;
  */
 export type Date8 = string;
 /**
+ * Commitment fee on the undrawn commitment, in basis points per annum
+ * (non-negative; `50` = 0.50%).
+ */
+export type Decimal3 = string;
+/**
  * ISO 8601 calendar date string.
  */
 export type Date9 = string;
+/**
+ * One-off reduction or cancellation fee, in basis points of the reduced
+ * amount (not per annum), paid by the borrower on `date` when the
+ * commitment steps down. Ignored on a step up. Defaults to zero.
+ */
+export type Decimal4 = string;
 /**
  * ISO 8601 calendar date string.
  */
@@ -286,7 +305,7 @@ export type Date10 = string;
  * use finstack_quant_core::currency::Currency;
  *
  * // 2% OID withheld from proceeds
- * let oid = OidPolicy::WithheldBp(200);  // 200 bp = 2%
+ * let oid = OidPolicy::WithheldBp(dec!(200));  // 200 bp = 2%
  *
  * // $50,000 fixed OID
  * let oid_fixed = OidPolicy::WithheldAmount(Money::from((50_000_i64, Currency::USD)));
@@ -294,25 +313,33 @@ export type Date10 = string;
  */
 export type DAb52C59E8Dd68406Ea31 =
   | {
-      withheld_bp: number;
+      withheld_bp: Decimal5;
     }
   | {
-      withheld_amount: Money;
+      withheld_amount: Money1;
     }
   | {
-      separate_bp: number;
+      separate_bp: Decimal5;
     }
   | {
-      separate_amount: Money;
+      separate_amount: Money1;
     };
 /**
- * Opaque string identifier.
+ * Exact decimal encoded as a JSON string.
  */
-export type Id1 = string;
+export type Decimal5 = string;
+/**
+ * Exact decimal encoded as a JSON string.
+ */
+export type Decimal6 = string;
 /**
  * Opaque string identifier.
  */
 export type Id2 = string;
+/**
+ * Opaque string identifier.
+ */
+export type Id3 = string;
 /**
  * A phantom-typed identifier that prevents mixing different kinds of IDs.
  *
@@ -586,17 +613,13 @@ export type DB556Bbeb1Ecf96C44C5A =
   | "ZMW"
   | "ZWL";
 /**
- * Exact decimal encoded as a JSON string.
- */
-export type Decimal2 = string;
-/**
- * Exact decimal encoded as a JSON string.
- */
-export type Decimal3 = string;
-/**
  * Opaque string identifier.
  */
-export type Id3 = string;
+export type Id4 = string;
+/**
+ * Exact decimal encoded as a JSON string.
+ */
+export type Decimal7 = string;
 /**
  * Day-count convention.
  */
@@ -667,7 +690,21 @@ export type D_2036Bc0C5D6E651A35Ad =
 /**
  * Exact decimal encoded as a JSON string.
  */
-export type Decimal4 = string;
+export type Decimal8 = string;
+/**
+ * Upfront (arrangement or original-issue-discount) fee of a facility.
+ *
+ * Paid by the borrower to the lender on the issue date. Enters the
+ * present value only while the commitment date lies after the valuation
+ * date, and the effective-interest-rate metrics always.
+ */
+export type DA089Be1189A5Bdf5F0E1 =
+  | {
+      amount: Money1;
+    }
+  | {
+      fraction_of_commitment: number;
+    };
 /**
  * Canonical schema marker for persisted instrument envelopes.
  */
@@ -734,41 +771,62 @@ export interface D_937C784C4C0Df9557E1F {
  */
 export interface D_5F6Cd145395C86Ce73B6 {
   /**
-   * Amortization specification
+   * Scheduled principal amortization (the shared cashflows
+   * `AmortizationSpec`). `LinearTo` and `StepRemaining` are rejected;
+   * `PercentOfOriginalPerPeriod` and `LinearBetween` apply per funded draw.
    */
   amortization:
     | "none"
     | {
-        linear: {
-          end: Date;
-          start: Date1;
+        linear_to: {
+          final_notional: Money;
         };
       }
     | {
-        percent_per_period: {
+        step_remaining: {
           /**
-           * Percentage in basis points per payment period (applied to current outstanding)
+           * Ordered list of `(date, remaining_principal_after_date)`.
            */
-          bp: number;
+          schedule: [Date, Money1][];
         };
       }
     | {
-        percent_of_original_notional: {
+        percent_of_original_per_period: {
           /**
-           * Percentage in basis points per payment period (applied to original notional)
+           * Fraction of original notional paid per period (e.g., 0.05 = 5%).
            */
-          bp: number;
+          pct: number;
         };
       }
     | {
-        custom: [Date2, Money][];
+        percent_of_remaining_per_period: {
+          /**
+           * Fraction of the outstanding principal paid per period (e.g.,
+           * 0.025 = 2.5%), in `[0, 1]`.
+           */
+          pct: number;
+        };
+      }
+    | {
+        linear_between: {
+          end: Date1;
+          start: Date2;
+        };
+      }
+    | {
+        custom_principal: {
+          /**
+           * List of `(date, principal_amount)` exchanges; amounts are absolute cashflows.
+           */
+          items: [Date, Money1][];
+        };
       };
   attributes: Attributes;
   business_day_convention?: BusinessDayConvention;
   /**
    * Optional calendar id for adjustments
    */
-  calendar_id?: string | null;
+  calendar_id?: Id | null;
   /**
    * Optional call schedule (borrower callability)
    */
@@ -799,14 +857,14 @@ export interface D_5F6Cd145395C86Ce73B6 {
    * Optional DDTL parameters; None => plain term loan
    */
   ddtl?: D_9C32Ce6385C1F57509A4 | null;
-  discount_curve_id: Id1;
+  discount_curve_id: Id2;
   frequency: Tenor;
-  id: Id2;
+  id: Id3;
   instrument_pricing_overrides?: InstrumentPricingOverrides;
   issue_date: Date11;
   maturity: Date12;
   metric_pricing_overrides?: MetricPricingOverrides;
-  notional_limit: Money5;
+  notional_limit: Money6;
   /**
    * Optional EIR amortization settings for reporting schedules
    */
@@ -818,10 +876,9 @@ export interface D_5F6Cd145395C86Ce73B6 {
     | {
         fixed: {
           /**
-           * Fixed rate in basis points (e.g., 600 = 6%)
+           * Annual rate as a decimal (`0.06` = 6%).
            */
-          rate_bp: number;
-          [k: string]: unknown;
+          rate: number;
         };
       }
     | {
@@ -843,14 +900,191 @@ export interface D_5F6Cd145395C86Ce73B6 {
    */
   stub?: "none" | "short_front" | "short_back" | "long_front" | "long_back";
   /**
-   * Upfront fee at issue (if any)
+   * Upfront (arrangement or OID) fee paid on `issue_date`, as an amount or
+   * a fraction of the commitment (the DDTL `commitment`, else
+   * `notional_limit`).
    */
-  upfront_fee?: Money | null;
+  upfront_fee?: DA089Be1189A5Bdf5F0E1 | null;
+}
+/**
+ * Target remaining principal at the end of the amortization schedule.
+ */
+export interface Money {
+  /**
+   * Monetary amount, carried on the wire as an exact decimal string rather
+   * than a JSON number so no precision is lost in transit. Construction with
+   * configuration applies the selected ingest scale; raw construction does not.
+   */
+  amount: string;
+  /**
+   * ISO 4217 currency of `amount`. Arithmetic between two `Money` values
+   * requires this to match; there is no implicit conversion.
+   */
+  currency:
+    | "AED"
+    | "AFN"
+    | "ALL"
+    | "AMD"
+    | "ANG"
+    | "AOA"
+    | "ARS"
+    | "AUD"
+    | "AWG"
+    | "AZN"
+    | "BAM"
+    | "BBD"
+    | "BDT"
+    | "BGN"
+    | "BHD"
+    | "BIF"
+    | "BMD"
+    | "BND"
+    | "BOB"
+    | "BRL"
+    | "BSD"
+    | "BTN"
+    | "BWP"
+    | "BYN"
+    | "BZD"
+    | "CAD"
+    | "CDF"
+    | "CHF"
+    | "CLF"
+    | "CLP"
+    | "CNY"
+    | "COP"
+    | "CRC"
+    | "CUC"
+    | "CUP"
+    | "CVE"
+    | "CZK"
+    | "DJF"
+    | "DKK"
+    | "DOP"
+    | "DZD"
+    | "EGP"
+    | "ERN"
+    | "ETB"
+    | "EUR"
+    | "FJD"
+    | "FKP"
+    | "GBP"
+    | "GEL"
+    | "GHS"
+    | "GIP"
+    | "GMD"
+    | "GNF"
+    | "GTQ"
+    | "GYD"
+    | "HKD"
+    | "HNL"
+    | "HRK"
+    | "HTG"
+    | "HUF"
+    | "IDR"
+    | "ILS"
+    | "INR"
+    | "IQD"
+    | "IRR"
+    | "ISK"
+    | "JMD"
+    | "JOD"
+    | "JPY"
+    | "KES"
+    | "KGS"
+    | "KHR"
+    | "KMF"
+    | "KPW"
+    | "KRW"
+    | "KWD"
+    | "KYD"
+    | "KZT"
+    | "LAK"
+    | "LBP"
+    | "LKR"
+    | "LRD"
+    | "LSL"
+    | "LYD"
+    | "MAD"
+    | "MDL"
+    | "MGA"
+    | "MKD"
+    | "MMK"
+    | "MNT"
+    | "MOP"
+    | "MRU"
+    | "MUR"
+    | "MVR"
+    | "MWK"
+    | "MXN"
+    | "MYR"
+    | "MZN"
+    | "NAD"
+    | "NGN"
+    | "NIO"
+    | "NOK"
+    | "NPR"
+    | "NZD"
+    | "OMR"
+    | "PAB"
+    | "PEN"
+    | "PGK"
+    | "PHP"
+    | "PKR"
+    | "PLN"
+    | "PYG"
+    | "QAR"
+    | "RON"
+    | "RSD"
+    | "RUB"
+    | "RWF"
+    | "SAR"
+    | "SBD"
+    | "SCR"
+    | "SDG"
+    | "SEK"
+    | "SGD"
+    | "SHP"
+    | "SLE"
+    | "SLL"
+    | "SOS"
+    | "SRD"
+    | "SSP"
+    | "STN"
+    | "SYP"
+    | "SZL"
+    | "THB"
+    | "TJS"
+    | "TMT"
+    | "TND"
+    | "TOP"
+    | "TRY"
+    | "TTD"
+    | "TWD"
+    | "TZS"
+    | "UAH"
+    | "UGX"
+    | "USD"
+    | "UYU"
+    | "UZS"
+    | "VED"
+    | "VES"
+    | "VND"
+    | "VUV"
+    | "WST"
+    | "XAF"
+    | "XCD"
+    | "XOF"
+    | "XPF"
+    | "YER"
+    | "ZAR"
+    | "ZMW"
+    | "ZWL";
 }
 /**
  * Currency-tagged monetary amount.
  */
-export interface Money {
+export interface Money1 {
   /**
    * Monetary amount, carried on the wire as an exact decimal string rather
    * than a JSON number so no precision is lost in transit. Construction with
@@ -1089,7 +1323,7 @@ export interface D_00951D655C22374D04Bf {
  * The `call_type` field determines how the call is exercised:
  * - `Hard`: Standard call at `price_pct_of_par` on or after `date`
  * - `Soft`: Premium call during protection period
- * - `MakeWhole`: PV-based redemption at Treasury + spread
+ * - `MakeWhole`: PV-based redemption at the reference curve plus spread
  *
  * For `MakeWhole` calls, `price_pct_of_par` serves as the minimum
  * (floor) redemption price. The actual price is the greater of
@@ -1103,12 +1337,7 @@ export interface DB70805C3F548Ff75Edc3 {
     | "hard"
     | "soft"
     | {
-        make_whole: {
-          /**
-           * Spread over the reference rate in basis points (e.g., 50 = T+50bps).
-           */
-          treasury_spread_bp: number;
-        };
+        make_whole: DCcc2259Abca8287Fe0Da;
       };
   date: Date3;
   /**
@@ -1116,6 +1345,26 @@ export interface DB70805C3F548Ff75Edc3 {
    * For make-whole calls, this is the minimum (floor) price.
    */
   price_pct_of_par: number;
+}
+/**
+ * Make-whole call specification.
+ *
+ * Defines the reference curve and spread used to compute the make-whole redemption
+ * price. The issuer pays the holder the greater of par and the present value of
+ * remaining cashflows discounted at the reference rate plus a spread.
+ *
+ * # Industry Practice
+ *
+ * - Investment-grade corporates: typically Treasury + 25-50 bp
+ * - High-yield: typically Treasury + 50-100 bp
+ * - Convertibles: typically Treasury + 50 bp
+ */
+export interface DCcc2259Abca8287Fe0Da {
+  reference_curve_id: Id1;
+  /**
+   * Spread over the reference curve in basis points (e.g., 50.0 = T+50bps).
+   */
+  spread_bp: number;
 }
 /**
  * Covenant-driven events for term loans.
@@ -1132,7 +1381,7 @@ export interface D_3D04Dd3Ee2244B29C6F6 {
   /**
    * Dates on which draws are prohibited (covenant breach or scheduled)
    */
-  draw_stop_dates: Date2[];
+  draw_stop_dates: Date[];
   /**
    * Margin steps, each a non-negative cumulative bp change effective from
    * the start of the first interest period on or after its date.
@@ -1150,13 +1399,13 @@ export interface D_3D04Dd3Ee2244B29C6F6 {
  * excess cash flow, reducing outstanding principal.
  */
 export interface D_98C7061509589233B46E {
-  amount: Money1;
+  amount: Money2;
   date: Date4;
 }
 /**
  * Currency-tagged monetary amount.
  */
-export interface Money1 {
+export interface Money2 {
   /**
    * Monetary amount, carried on the wire as an exact decimal string rather
    * than a JSON number so no precision is lost in transit. Construction with
@@ -1337,10 +1586,7 @@ export interface Money1 {
  */
 export interface D_6B755832A11590976F52 {
   date: Date5;
-  /**
-   * Change in margin, in basis points (100 = 1%); negative steps down.
-   */
-  delta_bp: number;
+  delta_bp: Decimal2;
 }
 /**
  * Payment-in-kind (PIK) toggle event.
@@ -1391,13 +1637,13 @@ export interface D_6452Ed90Bbd41F2Ff746 {
  *
  * # fn example() -> Result<(), Box<dyn std::error::Error>> {
  * let ddtl = DdtlSpec {
- *     commitment_limit: Money::from((10_000_000_i64, Currency::USD)),
+ *     commitment: Money::from((10_000_000_i64, Currency::USD)),
  *     availability_start: create_date(2025, Month::January, 1)?,
  *     availability_end: create_date(2026, Month::January, 1)?,
  *     draws: vec![],
  *     commitment_steps: vec![],
- *     usage_fee_bp: 50.0,        // 50 bp usage fee
- *     commitment_fee_bp: 25.0,   // 25 bp commitment fee
+ *     usage_fee_bp: dec!(50),        // 50 bp usage fee
+ *     commitment_fee_bp: dec!(25),   // 25 bp commitment fee
  *     fee_base: CommitmentFeeBase::Undrawn,
  *     oid_policy: None,
  * };
@@ -1408,16 +1654,13 @@ export interface D_6452Ed90Bbd41F2Ff746 {
 export interface D_9C32Ce6385C1F57509A4 {
   availability_end: Date7;
   availability_start: Date8;
-  /**
-   * Commitment fee on the undrawn commitment, in basis points per annum
-   * (non-negative, finite; `50.0` = 0.50%).
-   */
-  commitment_fee_bp: number;
-  commitment_limit: Money2;
+  commitment: Money3;
+  commitment_fee_bp: Decimal3;
   /**
    * Commitment steps, each effective from its date: strictly increasing
    * dates inside the availability window, non-increasing `amount`s in the
-   * loan currency, and `fee_bp == 0.0` (term loans carry no reduction fee).
+   * loan currency, and a zero `reduction_fee_bp` (term loans carry no
+   * reduction fee).
    */
   commitment_steps: DB7E04Bfd47E833688482[];
   /**
@@ -1432,16 +1675,12 @@ export interface D_9C32Ce6385C1F57509A4 {
    * Original issue discount policy, if applicable
    */
   oid_policy?: DAb52C59E8Dd68406Ea31 | null;
-  /**
-   * Usage fee on drawn amounts, in basis points per annum (non-negative,
-   * finite; `25.0` = 0.25%).
-   */
-  usage_fee_bp: number;
+  usage_fee_bp: Decimal6;
 }
 /**
  * Currency-tagged monetary amount.
  */
-export interface Money2 {
+export interface Money3 {
   /**
    * Monetary amount, carried on the wire as an exact decimal string rather
    * than a JSON number so no precision is lost in transit. Construction with
@@ -1624,22 +1863,17 @@ export interface Money2 {
  *
  * A delayed-draw term loan (`DdtlSpec::commitment_steps`) accepts only
  * non-increasing steps inside its availability window and no reduction fee
- * (`fee_bp` must be `0.0`).
+ * (`reduction_fee_bp` must be zero).
  */
 export interface DB7E04Bfd47E833688482 {
-  amount: Money3;
+  amount: Money4;
   date: Date9;
-  /**
-   * Reduction or cancellation fee, in basis points of the reduced amount,
-   * paid by the borrower on `date` when the commitment steps down. Ignored
-   * on a step up. Defaults to `0.0`.
-   */
-  fee_bp?: number;
+  reduction_fee_bp?: Decimal4;
 }
 /**
  * Currency-tagged monetary amount.
  */
-export interface Money3 {
+export interface Money4 {
   /**
    * Monetary amount, carried on the wire as an exact decimal string rather
    * than a JSON number so no precision is lost in transit. Construction with
@@ -1812,19 +2046,20 @@ export interface Money3 {
     | "ZWL";
 }
 /**
- * Draw event for delayed-draw term loans (DDTL).
+ * A scheduled draw `{date, amount}` on a committed facility.
  *
- * Represents a scheduled or actual draw against the commitment, reducing
- * available capacity and increasing outstanding principal.
+ * A delayed-draw term loan funds on `date` (inside its availability
+ * window); an asset-backed facility funds on the first payment date on or
+ * after `date`.
  */
 export interface DFcbc2725E6418Df3F430 {
-  amount: Money4;
+  amount: Money5;
   date: Date10;
 }
 /**
  * Currency-tagged monetary amount.
  */
-export interface Money4 {
+export interface Money5 {
   /**
    * Monetary amount, carried on the wire as an exact decimal string rather
    * than a JSON number so no precision is lost in transit. Construction with
@@ -2912,7 +3147,7 @@ export interface DE49387F97C0F9D510642 {
 /**
  * Currency-tagged monetary amount.
  */
-export interface Money5 {
+export interface Money6 {
   /**
    * Monetary amount, carried on the wire as an exact decimal string rather
    * than a JSON number so no precision is lost in transit. Construction with
@@ -3108,7 +3343,7 @@ export interface DE805C3231C7C576C5303 {
  * # Rate Calculation
  *
  * The all-in rate is computed as:
- * 1. Look up forward rate from `index_id` curve for the accrual period
+ * 1. Look up forward rate from `forward_curve_id` curve for the accrual period
  * 2. Apply `index_floor_bp` to index rate (if specified) - applied BEFORE adding spread
  * 3. Add `spread_bp` to get base rate
  * 4. Multiply by `gearing` (typically 1.0)
@@ -3131,7 +3366,7 @@ export interface DE805C3231C7C576C5303 {
  * # Seasoned Instruments (Historical Fixings)
  *
  * Historical fixings **are supported** via the `MarketContext`: store a
- * `ScalarTimeSeries` under the canonical id `FIXING:{index_id}` (see
+ * `ScalarTimeSeries` under the canonical id `FIXING:{forward_curve_id}` (see
  * `finstack_quant_core::market_data::fixings`) containing realized index
  * observations. Observation dates strictly before the forward curve base
  * date then resolve from that series instead of the curve:
@@ -3165,7 +3400,7 @@ export interface DE805C3231C7C576C5303 {
  *
  * // 3M SOFR + 200bps with 0% floor
  * let spec = FloatingRateSpec {
- *     index_id: "USD-SOFR-3M".into(),
+ *     forward_curve_id: "USD-SOFR-3M".into(),
  *     spread_bp: dec!(200.0),
  *     gearing: dec!(1.0),
  *     gearing_includes_spread: true,
@@ -3190,13 +3425,13 @@ export interface D_082C9Df57E6F2F432594 {
    *
    * Example: all_in_cap_bp = Some(1000.0) ensures all-in rate <= 10%.
    */
-  all_in_cap_bp?: Decimal2 | null;
+  all_in_cap_bp?: Decimal5 | null;
   /**
    * Floor on all-in rate in basis points (Min Coupon).
    *
    * Applied to the final calculated rate after gearing and spread.
    */
-  all_in_floor_bp?: Decimal2 | null;
+  all_in_floor_bp?: Decimal5 | null;
   /**
    * Policy when forward curve lookup fails during emission.
    *
@@ -3208,15 +3443,16 @@ export interface D_082C9Df57E6F2F432594 {
     | "error"
     | "spread_only"
     | {
-        fixed_rate: Decimal2;
+        fixed_rate: Decimal5;
       };
   /**
    * Optional calendar for rate fixing (reset lag).
    *
    * If not provided, defaults to the coupon schedule calendar.
    */
-  fixing_calendar_id?: string | null;
-  gearing?: Decimal3;
+  fixing_calendar_id?: Id | null;
+  forward_curve_id: Id4;
+  gearing?: Decimal7;
   /**
    * Whether gearing includes the spread (default: true).
    *
@@ -3227,14 +3463,13 @@ export interface D_082C9Df57E6F2F432594 {
   /**
    * Cap on index rate in basis points (applied to index component).
    */
-  index_cap_bp?: Decimal2 | null;
+  index_cap_bp?: Decimal5 | null;
   /**
    * Floor on index rate in basis points (applied to index component).
    *
    * Example: index_floor_bp = Some(0.0) ensures index rate >= 0%.
    */
-  index_floor_bp?: Decimal2 | null;
-  index_id: Id3;
+  index_floor_bp?: Decimal5 | null;
   /**
    * Diagnostic tenor for term-index projection error context.
    *
@@ -3281,7 +3516,7 @@ export interface D_082C9Df57E6F2F432594 {
    * Reset lag in business days (e.g., 2 for T-2 SOFR convention).
    */
   reset_lag_days?: number;
-  spread_bp: Decimal4;
+  spread_bp: Decimal8;
 }
 /**
  * Parsed financial tenor.

@@ -10,6 +10,13 @@ export default [
           "spec": {
             "attributes": {},
             "currency": "USD",
+            "equity_bridge": {
+              "cash": 0,
+              "minority_interest": 0,
+              "non_operating_assets": 0,
+              "preferred_equity": 0,
+              "total_debt": 15000000
+            },
             "flows": [
               [
                 "2026-01-01",
@@ -34,10 +41,9 @@ export default [
             ],
             "id": "DCF-TECH-CO",
             "mid_year_convention": true,
-            "net_debt": 15000000,
             "shares_outstanding": 10000000,
             "terminal_value": {
-              "growth_rate": 0.02,
+              "stable_growth_rate": 0.02,
               "type": "gordon_growth"
             },
             "valuation_date": "2025-01-01",
@@ -179,7 +185,7 @@ export default [
   {
     "path": "#/$defs/d_05fc0451dee1e185f517",
     "source": "https://finstack_quant.dev/schemas/instrument/1/equity/discounted_cash_flow.schema.json#/$defs/DiscountedCashFlow",
-    "description": "Discounted Cash Flow instrument for corporate valuation.\n\nDCF values a company by discounting projected free cash flows and terminal value.\nThe equity value is calculated as: Enterprise Value - Net Debt (or structured bridge).\n\n# Equity Bridge\n\nWhen [`equity_bridge`](Self::equity_bridge) is `Some`, it takes precedence over\nthe flat [`net_debt`](Self::net_debt) field for the EV-to-equity conversion.\n\n# Mid-Year Convention\n\nWhen [`mid_year_convention`](Self::mid_year_convention) is `true`, cash flows are\ndiscounted at `t` minus half the average flow spacing instead of `t` years,\nreflecting the assumption that cash flows arrive mid-period (standard IB/PE\npractice). For annual grids this is the classic `(t - 0.5)`; for sub-annual\ngrids the shift is half a period. `ExitMultiple` terminal values always\ndiscount at the full horizon (a point-in-time sale price).\n\n# Valuation Discounts\n\nPrivate company valuations can apply DLOM, DLOC, and other discounts via\n[`valuation_discounts`](Self::valuation_discounts). These discounts apply\nafter the EV-to-equity bridge, so the reported enterprise value remains a\npre-discount enterprise value and does not equal discounted equity value\nplus net debt."
+    "description": "Discounted Cash Flow instrument for corporate valuation.\n\nDCF values a company by discounting projected free cash flows and terminal value.\nThe equity value is calculated as: Enterprise Value - Net Debt (or structured bridge).\n\n# Equity Bridge\n\n[`equity_bridge`](Self::equity_bridge) is the single EV-to-equity channel; a\nflat net-debt deduction sets only its `total_debt` and `cash`.\n\n# Mid-Year Convention\n\nWhen [`mid_year_convention`](Self::mid_year_convention) is `true`, cash flows are\ndiscounted at `t` minus half the average flow spacing instead of `t` years,\nreflecting the assumption that cash flows arrive mid-period (standard IB/PE\npractice). For annual grids this is the classic `(t - 0.5)`; for sub-annual\ngrids the shift is half a period. `ExitMultiple` terminal values always\ndiscount at the full horizon (a point-in-time sale price).\n\n# Valuation Discounts\n\nPrivate company valuations can apply DLOM, DLOC, and other discounts via\n[`valuation_discounts`](Self::valuation_discounts). These discounts apply\nafter the EV-to-equity bridge, so the reported enterprise value remains a\npre-discount enterprise value and does not equal discounted equity value\nplus net debt."
   },
   {
     "path": "#/$defs/d_05fc0451dee1e185f517/properties/attributes",
@@ -210,18 +216,9 @@ export default [
   {
     "path": "#/$defs/d_05fc0451dee1e185f517/properties/equity_bridge",
     "source": "https://finstack_quant.dev/schemas/instrument/1/equity/discounted_cash_flow.schema.json#/$defs/DiscountedCashFlow/properties/equity_bridge",
-    "default": null,
-    "description": "Structured equity bridge for EV-to-equity conversion.\n\nWhen present, takes precedence over the flat `net_debt` field."
-  },
-  {
-    "path": "#/$defs/d_05fc0451dee1e185f517/properties/equity_bridge/anyOf/0",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/equity/discounted_cash_flow.schema.json#/$defs/DiscountedCashFlow/properties/equity_bridge/anyOf/0",
+    "description": "Equity bridge from enterprise value to equity value (debt, cash,\npreferred equity, minority interest, non-operating assets and other\nadjustments), in instrument currency.",
     "ref": "#/$defs/EquityBridge",
     "resolvedRef": "https://finstack_quant.dev/schemas/instrument/1/equity/discounted_cash_flow.schema.json#/$defs/EquityBridge"
-  },
-  {
-    "path": "#/$defs/d_05fc0451dee1e185f517/properties/equity_bridge/anyOf/1",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/equity/discounted_cash_flow.schema.json#/$defs/DiscountedCashFlow/properties/equity_bridge/anyOf/1"
   },
   {
     "path": "#/$defs/d_05fc0451dee1e185f517/properties/flows",
@@ -273,12 +270,6 @@ export default [
     "source": "https://finstack_quant.dev/schemas/instrument/1/equity/discounted_cash_flow.schema.json#/$defs/DiscountedCashFlow/properties/mid_year_convention",
     "default": false,
     "description": "Discount curve identifier, used for risk attribution only.\n\nDiscounting always uses [`wacc`](Self::wacc) via `(1 + wacc)^{-t}`\nregardless of whether this curve is loaded (the\nprevious behavior silently switched risky flows to risk-free curve\ndiscounting). WACC sensitivity is exposed separately as `dcf::wacc01`.\nMid-year discounting convention (default: `false` = end-of-period).\n\nWhen `true`, each flow is discounted at `t` minus half the average\nflow spacing instead of `t` (the classic `t - 0.5` for annual\ngrids; half a period for sub-annual grids), reflecting the\nassumption that cash flows arrive mid-period. This is the standard\nconvention in IB/PE practice (Koller et al.). Exit-multiple\nterminal values are not shifted (point-in-time sale at the horizon)."
-  },
-  {
-    "path": "#/$defs/d_05fc0451dee1e185f517/properties/net_debt",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/equity/discounted_cash_flow.schema.json#/$defs/DiscountedCashFlow/properties/net_debt",
-    "description": "Net debt (debt - cash) to subtract from enterprise value.\n\nIgnored when [`equity_bridge`](Self::equity_bridge) is `Some`.",
-    "format": "double"
   },
   {
     "path": "#/$defs/d_05fc0451dee1e185f517/properties/scenario_pricing_overrides",
@@ -1451,9 +1442,9 @@ export default [
     "description": "Gordon Growth Model: TV = FCF_terminal × (1 + g) / (WACC - g)"
   },
   {
-    "path": "#/$defs/d_a4b741fb3a3ad1ae5f23/oneOf/0/properties/growth_rate",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/equity/discounted_cash_flow.schema.json#/$defs/TerminalValueSpec/oneOf/0/properties/growth_rate",
-    "description": "Perpetual growth rate (e.g., 0.02 for 2%)",
+    "path": "#/$defs/d_a4b741fb3a3ad1ae5f23/oneOf/0/properties/stable_growth_rate",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/equity/discounted_cash_flow.schema.json#/$defs/TerminalValueSpec/oneOf/0/properties/stable_growth_rate",
+    "description": "Perpetual stable growth rate as an annual decimal (e.g., 0.02 for\n2%). Must be < WACC.",
     "format": "double"
   },
   {
@@ -3796,7 +3787,7 @@ export default [
   {
     "path": "#/$defs/d_e3fba31e59ae8c9a690e",
     "source": "https://finstack_quant.dev/schemas/instrument/1/equity/discounted_cash_flow.schema.json#/$defs/EquityBridge",
-    "description": "Structured equity bridge for converting Enterprise Value to Equity Value.\n\nStandard professional bridge:\n```text\nEquity = EV - Total Debt + Cash - Preferred Equity - Minority Interest\n         + Non-Operating Assets + Σ(other adjustments)\n```\n\nWhen attached to a [`DiscountedCashFlow`], this takes precedence over the\nflat `net_debt` scalar."
+    "description": "Structured equity bridge for converting Enterprise Value to Equity Value.\n\nStandard professional bridge:\n```text\nEquity = EV - Total Debt + Cash - Preferred Equity - Minority Interest\n         + Non-Operating Assets + Σ(other adjustments)\n```\n\nEvery [`DiscountedCashFlow`] carries one; a flat net-debt deduction is\nwritten as `EquityBridge { total_debt, cash, ..Default::default() }`."
   },
   {
     "path": "#/$defs/d_e3fba31e59ae8c9a690e/properties/cash",

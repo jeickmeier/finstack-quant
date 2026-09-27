@@ -2,10 +2,6 @@
 // JSON wire shape only; runtime constraints remain in the schema.
 
 /**
- * ISO 8601 calendar date string.
- */
-export type Date = string;
-/**
  * Day count convention for coupon accrual.
  */
 export type DayCount =
@@ -27,7 +23,11 @@ export type DayCount =
  */
 export type Id = string;
 /**
- * Floating rate index identifier.
+ * Fixed coupon rate (the "strike" rate) as a decimal annual rate (0.05 = 5%).
+ */
+export type Decimal = string;
+/**
+ * Rates forward curve that projects the floating index (also the fixing-series key).
  */
 export type Id1 = string;
 /**
@@ -299,6 +299,14 @@ export type DB556Bbeb1Ecf96C44C5A =
   | "ZMW"
   | "ZWL";
 /**
+ * ISO 8601 calendar date string.
+ */
+export type Date = string;
+/**
+ * ISO 8601 calendar date string.
+ */
+export type Date1 = string;
+/**
  * Opaque string identifier.
  */
 export type Id3 = string;
@@ -349,26 +357,26 @@ export interface D_66F596B430C73F0A0656 {
 export interface D_8Af284Dde09995F0Ad8C {
   attributes: Attributes;
   /**
-   * Coupon payment dates (must be sorted ascending).
-   */
-  coupon_dates: Date[];
-  /**
    * Floor on each period's coupon (typically 0.0).
    */
   coupon_floor: number;
   day_count: DayCount;
   discount_curve_id: Id;
-  /**
-   * Fixed coupon rate (the "strike" rate).
-   */
-  fixed_rate: number;
-  floating_index_id: Id1;
-  floating_tenor: Tenor;
+  fixed_rate: Decimal;
+  forward_curve_id: Id1;
   id: Id2;
+  index_tenor: Tenor;
   instrument_pricing_overrides?: InstrumentPricingOverrides;
   metric_pricing_overrides?: MetricPricingOverrides;
   notional: Money;
+  /**
+   * Coupon payment dates, one per period, strictly ascending and after
+   * `start_date`. Period `i` accrues from the previous payment date (or
+   * `start_date`) to `payment_dates[i]` and fixes in advance at its start.
+   */
+  payment_dates: Date[];
   scenario_pricing_overrides?: ScenarioPricingOverrides;
+  start_date: Date1;
   /**
    * Target cumulative coupon level (triggers early redemption).
    *
@@ -397,7 +405,7 @@ export interface Attributes {
   tags?: string[];
 }
 /**
- * Floating rate tenor (e.g., "3M", "6M").
+ * Contractual tenor of the observed floating index (e.g. 3M, 6M); must match the forward curve tenor.
  */
 export interface Tenor {
   /**

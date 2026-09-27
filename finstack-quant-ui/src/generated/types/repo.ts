@@ -11,6 +11,14 @@ export type BusinessDayConvention =
  */
 export type Id = string;
 /**
+ * Opaque string identifier.
+ */
+export type Id1 = string;
+/**
+ * Opaque string identifier.
+ */
+export type Id2 = string;
+/**
  * Day count convention for interest calculations
  */
 export type DayCount =
@@ -30,11 +38,11 @@ export type DayCount =
 /**
  * Opaque string identifier.
  */
-export type Id1 = string;
+export type Id3 = string;
 /**
  * Opaque string identifier.
  */
-export type Id2 = string;
+export type Id4 = string;
 /**
  * A phantom-typed identifier that prevents mixing different kinds of IDs.
  *
@@ -340,12 +348,12 @@ export interface D_911098148B688Bb268Ba {
   cash_amount: Money;
   collateral: D_994972192Aa7987F8A64;
   day_count: DayCount;
-  discount_curve_id: Id1;
+  discount_curve_id: Id3;
   /**
    * Haircut percentage (as decimal, e.g., 0.02 = 2%)
    */
   haircut: number;
-  id: Id2;
+  id: Id4;
   instrument_pricing_overrides?: InstrumentPricingOverrides;
   /**
    * Optional margin specification for mark-to-market margining.
@@ -573,21 +581,10 @@ export interface D_994972192Aa7987F8A64 {
            * Optional special rate adjustment in basis points (negative = lower rate)
            */
           rate_adjustment_bp?: number | null;
-          /**
-           * Identifier of the specific security
-           */
-          security_id: string;
-          [k: string]: unknown;
         };
       };
-  /**
-   * Identifier for the collateral instrument
-   */
-  instrument_id: string;
-  /**
-   * Market value identifier in MarketContext (e.g., "BOND_ABC_PRICE")
-   */
-  market_value_id: string;
+  instrument_id: Id1;
+  market_value_id: Id2;
   /**
    * Quantity/face value of collateral
    */

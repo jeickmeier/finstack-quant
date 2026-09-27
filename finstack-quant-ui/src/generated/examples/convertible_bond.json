@@ -3,6 +3,22 @@
     "spec": {
       "attributes": {},
       "call_put": null,
+      "cashflow_spec": {
+        "fixed": {
+          "business_day_convention": "following",
+          "calendar_id": "weekends_only",
+          "coupon_type": "cash",
+          "day_count": "30_360",
+          "end_of_month": false,
+          "frequency": {
+            "count": 6,
+            "unit": "months"
+          },
+          "payment_lag_days": 0,
+          "rate": "0.02",
+          "stub": "none"
+        }
+      },
       "conversion": {
         "anti_dilution": "none",
         "dilution_events": [],
@@ -13,21 +29,7 @@
       },
       "credit_curve_id": "USD-CREDIT-BBB",
       "discount_curve_id": "USD-IG",
-      "fixed_coupon": {
-        "business_day_convention": "following",
-        "calendar_id": "weekends_only",
-        "coupon_type": "cash",
-        "day_count": "30_360",
-        "end_of_month": false,
-        "frequency": {
-          "count": 6,
-          "unit": "months"
-        },
-        "payment_lag_days": 0,
-        "rate": "0.02",
-        "stub": "none"
-      },
-      "floating_coupon": null,
+      "div_yield_id": null,
       "id": "CB-TECH-5Y",
       "issue_date": "2024-01-15",
       "maturity": "2029-01-15",
@@ -36,7 +38,8 @@
         "currency": "USD"
       },
       "recovery_rate": 0.0,
-      "underlying_equity_id": "TECH"
+      "spot_id": "TECH",
+      "vol_surface_id": "TECH-VOL"
     },
     "type": "convertible_bond"
   },

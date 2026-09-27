@@ -8,29 +8,26 @@ export default [
       {
         "instrument": {
           "spec": {
-            "attributes": {},
-            "cms_accrual_fractions": [
+            "accrual_fractions": [
               0.25,
               0.25,
               0.25,
               0.25
             ],
-            "cms_day_count": "act_365f",
-            "cms_fixing_dates": [
+            "attributes": {},
+            "cms_spread_bp": "0",
+            "cms_tenor": {
+              "count": 10,
+              "unit": "years"
+            },
+            "day_count": "act_365f",
+            "discount_curve_id": "USD-OIS",
+            "fixing_dates": [
               "2025-03-20",
               "2025-06-20",
               "2025-09-22",
               "2025-12-22"
             ],
-            "cms_payment_dates": [
-              "2025-06-20",
-              "2025-09-22",
-              "2025-12-22",
-              "2026-03-20"
-            ],
-            "cms_spread": 0,
-            "cms_tenor": 10,
-            "discount_curve_id": "USD-OIS",
             "forward_curve_id": "USD-LIBOR-3M",
             "funding_leg": {
               "accrual_fractions": [
@@ -46,16 +43,22 @@ export default [
                 "2025-12-22",
                 "2026-03-20"
               ],
-              "rate": 0.03,
+              "rate": "0.03",
               "type": "fixed"
             },
             "id": "CMSSWAP-10Y-USD",
+            "index_id": "USD-SOFR-OIS",
             "notional": {
               "amount": "10000000",
               "currency": "USD"
             },
+            "payment_dates": [
+              "2025-06-20",
+              "2025-09-22",
+              "2025-12-22",
+              "2026-03-20"
+            ],
             "side": "pay",
-            "swap_convention": "usd_sofr",
             "swap_float_day_count": "act_360",
             "vol_surface_id": "USD-CMS10Y-VOL"
           },
@@ -381,6 +384,18 @@ export default [
     "description": "Canonical schema marker for persisted instrument envelopes."
   },
   {
+    "path": "#/$defs/d_18f3ba1ec18ab2be13b2",
+    "source": "https://finstack_quant.dev/schemas/common/1/decimal.schema.json#",
+    "description": "Exact decimal encoded as a JSON string.",
+    "examples": [
+      "1000000",
+      "0.0425",
+      "-1234.56789"
+    ],
+    "pattern": "^-?\\d+(\\.\\d+)?([eE][+-]?\\d+)?$",
+    "title": "Decimal"
+  },
+  {
     "path": "#/$defs/d_1b2ccb88c9229e7463e8",
     "source": "https://finstack_quant.dev/schemas/common/1/date.schema.json#",
     "description": "ISO 8601 calendar date string.",
@@ -671,6 +686,16 @@ export default [
     "description": "CMS (Constant Maturity Swap) swap instrument.\n\nOne leg pays a CMS rate (the par swap rate for a reference tenor, e.g., 10Y)\nobserved on each fixing date, and the other leg pays a fixed or floating rate.\n\nThe CMS rate requires a convexity adjustment because the CMS rate is not a\nmartingale under the payment measure. The adjustment depends on the correlation\nbetween the CMS rate and the numeraire (annuity).\n\n# Reference\n\nHagan, P. S. (2003). \"Convexity Conundrums: Pricing CMS Swaps, Caps, and Floors.\"\n*Wilmott Magazine*, March, 38-44. `docs/REFERENCES.md#hagan-2003-cms-convexity`"
   },
   {
+    "path": "#/$defs/d_3dbd4a1aab74e98eef06/properties/accrual_fractions",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/rates/cms_swap.schema.json#/$defs/CmsSwap/properties/accrual_fractions",
+    "description": "Accrual fractions for each CMS period."
+  },
+  {
+    "path": "#/$defs/d_3dbd4a1aab74e98eef06/properties/accrual_fractions/items",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/rates/cms_swap.schema.json#/$defs/CmsSwap/properties/accrual_fractions/items",
+    "format": "double"
+  },
+  {
     "path": "#/$defs/d_3dbd4a1aab74e98eef06/properties/attributes",
     "source": "https://finstack_quant.dev/schemas/instrument/1/rates/cms_swap.schema.json#/$defs/CmsSwap/properties/attributes",
     "default": {},
@@ -679,38 +704,10 @@ export default [
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/attributes.schema.json#"
   },
   {
-    "path": "#/$defs/d_3dbd4a1aab74e98eef06/properties/cms_accrual_fractions",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/rates/cms_swap.schema.json#/$defs/CmsSwap/properties/cms_accrual_fractions",
-    "description": "Accrual fractions for each CMS period."
-  },
-  {
-    "path": "#/$defs/d_3dbd4a1aab74e98eef06/properties/cms_accrual_fractions/items",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/rates/cms_swap.schema.json#/$defs/CmsSwap/properties/cms_accrual_fractions/items",
-    "format": "double"
-  },
-  {
     "path": "#/$defs/d_3dbd4a1aab74e98eef06/properties/cms_cap",
     "source": "https://finstack_quant.dev/schemas/instrument/1/rates/cms_swap.schema.json#/$defs/CmsSwap/properties/cms_cap",
     "description": "Optional cap on the CMS rate (decimal).",
     "format": "double"
-  },
-  {
-    "path": "#/$defs/d_3dbd4a1aab74e98eef06/properties/cms_day_count",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/rates/cms_swap.schema.json#/$defs/CmsSwap/properties/cms_day_count",
-    "description": "Day count convention for CMS leg accrual.",
-    "ref": "https://finstack_quant.dev/schemas/common/1/day_count.schema.json",
-    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/day_count.schema.json#"
-  },
-  {
-    "path": "#/$defs/d_3dbd4a1aab74e98eef06/properties/cms_fixing_dates",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/rates/cms_swap.schema.json#/$defs/CmsSwap/properties/cms_fixing_dates",
-    "description": "Fixing dates for CMS rate observations."
-  },
-  {
-    "path": "#/$defs/d_3dbd4a1aab74e98eef06/properties/cms_fixing_dates/items",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/rates/cms_swap.schema.json#/$defs/CmsSwap/properties/cms_fixing_dates/items",
-    "ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
-    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/date.schema.json#"
   },
   {
     "path": "#/$defs/d_3dbd4a1aab74e98eef06/properties/cms_floor",
@@ -719,28 +716,26 @@ export default [
     "format": "double"
   },
   {
-    "path": "#/$defs/d_3dbd4a1aab74e98eef06/properties/cms_payment_dates",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/rates/cms_swap.schema.json#/$defs/CmsSwap/properties/cms_payment_dates",
-    "description": "Payment dates for the CMS leg."
-  },
-  {
-    "path": "#/$defs/d_3dbd4a1aab74e98eef06/properties/cms_payment_dates/items",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/rates/cms_swap.schema.json#/$defs/CmsSwap/properties/cms_payment_dates/items",
-    "ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
-    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/date.schema.json#"
-  },
-  {
-    "path": "#/$defs/d_3dbd4a1aab74e98eef06/properties/cms_spread",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/rates/cms_swap.schema.json#/$defs/CmsSwap/properties/cms_spread",
-    "default": 0,
-    "description": "Spread over the CMS rate (decimal, e.g., 0.001 = 10bp).",
-    "format": "double"
+    "path": "#/$defs/d_3dbd4a1aab74e98eef06/properties/cms_spread_bp",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/rates/cms_swap.schema.json#/$defs/CmsSwap/properties/cms_spread_bp",
+    "default": "0",
+    "description": "Additive spread over the CMS rate in basis points (10 = 10bp).",
+    "ref": "https://finstack_quant.dev/schemas/common/1/decimal.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/decimal.schema.json#"
   },
   {
     "path": "#/$defs/d_3dbd4a1aab74e98eef06/properties/cms_tenor",
     "source": "https://finstack_quant.dev/schemas/instrument/1/rates/cms_swap.schema.json#/$defs/CmsSwap/properties/cms_tenor",
-    "description": "CMS tenor in years (e.g., 10.0 for 10Y swap rate).",
-    "format": "double"
+    "description": "Tenor of the CMS reference swap (e.g. 10Y); must be month- or year-based.",
+    "ref": "https://finstack_quant.dev/schemas/common/1/tenor.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/tenor.schema.json#"
+  },
+  {
+    "path": "#/$defs/d_3dbd4a1aab74e98eef06/properties/day_count",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/rates/cms_swap.schema.json#/$defs/CmsSwap/properties/day_count",
+    "description": "Day count convention for CMS leg accrual.",
+    "ref": "https://finstack_quant.dev/schemas/common/1/day_count.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/day_count.schema.json#"
   },
   {
     "path": "#/$defs/d_3dbd4a1aab74e98eef06/properties/discount_curve_id",
@@ -748,6 +743,17 @@ export default [
     "description": "Discount curve ID for present value calculations.",
     "ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/id.schema.json#"
+  },
+  {
+    "path": "#/$defs/d_3dbd4a1aab74e98eef06/properties/fixing_dates",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/rates/cms_swap.schema.json#/$defs/CmsSwap/properties/fixing_dates",
+    "description": "Fixing dates for CMS rate observations."
+  },
+  {
+    "path": "#/$defs/d_3dbd4a1aab74e98eef06/properties/fixing_dates/items",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/rates/cms_swap.schema.json#/$defs/CmsSwap/properties/fixing_dates/items",
+    "ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/date.schema.json#"
   },
   {
     "path": "#/$defs/d_3dbd4a1aab74e98eef06/properties/forward_curve_id",
@@ -771,6 +777,21 @@ export default [
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/id.schema.json#"
   },
   {
+    "path": "#/$defs/d_3dbd4a1aab74e98eef06/properties/index_id",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/rates/cms_swap.schema.json#/$defs/CmsSwap/properties/index_id",
+    "description": "Rate-index convention-registry key of the underlying swap (e.g. `USD-SOFR-OIS`)."
+  },
+  {
+    "path": "#/$defs/d_3dbd4a1aab74e98eef06/properties/index_id/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/rates/cms_swap.schema.json#/$defs/CmsSwap/properties/index_id/anyOf/0",
+    "ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/id.schema.json#"
+  },
+  {
+    "path": "#/$defs/d_3dbd4a1aab74e98eef06/properties/index_id/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/rates/cms_swap.schema.json#/$defs/CmsSwap/properties/index_id/anyOf/1"
+  },
+  {
     "path": "#/$defs/d_3dbd4a1aab74e98eef06/properties/instrument_pricing_overrides",
     "source": "https://finstack_quant.dev/schemas/instrument/1/rates/cms_swap.schema.json#/$defs/CmsSwap/properties/instrument_pricing_overrides",
     "description": "Instrument-owned pricing inputs.",
@@ -792,6 +813,17 @@ export default [
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/money.schema.json#"
   },
   {
+    "path": "#/$defs/d_3dbd4a1aab74e98eef06/properties/payment_dates",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/rates/cms_swap.schema.json#/$defs/CmsSwap/properties/payment_dates",
+    "description": "Payment dates for the CMS leg."
+  },
+  {
+    "path": "#/$defs/d_3dbd4a1aab74e98eef06/properties/payment_dates/items",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/rates/cms_swap.schema.json#/$defs/CmsSwap/properties/payment_dates/items",
+    "ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/date.schema.json#"
+  },
+  {
     "path": "#/$defs/d_3dbd4a1aab74e98eef06/properties/scenario_pricing_overrides",
     "source": "https://finstack_quant.dev/schemas/instrument/1/rates/cms_swap.schema.json#/$defs/CmsSwap/properties/scenario_pricing_overrides",
     "description": "Scenario-only pricing adjustments.",
@@ -806,34 +838,19 @@ export default [
     "resolvedRef": "https://finstack_quant.dev/schemas/instrument/1/rates/cms_swap.schema.json#/$defs/PayReceive"
   },
   {
-    "path": "#/$defs/d_3dbd4a1aab74e98eef06/properties/swap_convention",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/rates/cms_swap.schema.json#/$defs/CmsSwap/properties/swap_convention",
-    "description": "IRS convention for the underlying swap (e.g., `UsdSofr`)."
-  },
-  {
-    "path": "#/$defs/d_3dbd4a1aab74e98eef06/properties/swap_convention/anyOf/0",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/rates/cms_swap.schema.json#/$defs/CmsSwap/properties/swap_convention/anyOf/0",
-    "ref": "#/$defs/IRSConvention",
-    "resolvedRef": "https://finstack_quant.dev/schemas/instrument/1/rates/cms_swap.schema.json#/$defs/IRSConvention"
-  },
-  {
-    "path": "#/$defs/d_3dbd4a1aab74e98eef06/properties/swap_convention/anyOf/1",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/rates/cms_swap.schema.json#/$defs/CmsSwap/properties/swap_convention/anyOf/1"
-  },
-  {
-    "path": "#/$defs/d_3dbd4a1aab74e98eef06/properties/swap_day_count",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/rates/cms_swap.schema.json#/$defs/CmsSwap/properties/swap_day_count",
+    "path": "#/$defs/d_3dbd4a1aab74e98eef06/properties/swap_fixed_day_count",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/rates/cms_swap.schema.json#/$defs/CmsSwap/properties/swap_fixed_day_count",
     "description": "Day count of the underlying swap fixed leg (overrides convention)."
   },
   {
-    "path": "#/$defs/d_3dbd4a1aab74e98eef06/properties/swap_day_count/anyOf/0",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/rates/cms_swap.schema.json#/$defs/CmsSwap/properties/swap_day_count/anyOf/0",
+    "path": "#/$defs/d_3dbd4a1aab74e98eef06/properties/swap_fixed_day_count/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/rates/cms_swap.schema.json#/$defs/CmsSwap/properties/swap_fixed_day_count/anyOf/0",
     "ref": "https://finstack_quant.dev/schemas/common/1/day_count.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/day_count.schema.json#"
   },
   {
-    "path": "#/$defs/d_3dbd4a1aab74e98eef06/properties/swap_day_count/anyOf/1",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/rates/cms_swap.schema.json#/$defs/CmsSwap/properties/swap_day_count/anyOf/1"
+    "path": "#/$defs/d_3dbd4a1aab74e98eef06/properties/swap_fixed_day_count/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/rates/cms_swap.schema.json#/$defs/CmsSwap/properties/swap_fixed_day_count/anyOf/1"
   },
   {
     "path": "#/$defs/d_3dbd4a1aab74e98eef06/properties/swap_fixed_frequency",
@@ -1085,8 +1102,9 @@ export default [
   {
     "path": "#/$defs/d_55de605ffd705a3d4f33/oneOf/0/properties/rate",
     "source": "https://finstack_quant.dev/schemas/instrument/1/rates/cms_swap.schema.json#/$defs/FundingLeg/oneOf/0/properties/rate",
-    "description": "Fixed coupon rate (decimal, e.g., 0.03 = 3%).",
-    "format": "double"
+    "description": "Fixed coupon rate as a decimal annual rate (0.03 = 3%).",
+    "ref": "https://finstack_quant.dev/schemas/common/1/decimal.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/decimal.schema.json#"
   },
   {
     "path": "#/$defs/d_55de605ffd705a3d4f33/oneOf/0/properties/type",
@@ -1134,10 +1152,11 @@ export default [
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/date.schema.json#"
   },
   {
-    "path": "#/$defs/d_55de605ffd705a3d4f33/oneOf/1/properties/spread",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/rates/cms_swap.schema.json#/$defs/FundingLeg/oneOf/1/properties/spread",
-    "description": "Spread over the floating index (decimal, e.g., 0.001 = 10bp).",
-    "format": "double"
+    "path": "#/$defs/d_55de605ffd705a3d4f33/oneOf/1/properties/spread_bp",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/rates/cms_swap.schema.json#/$defs/FundingLeg/oneOf/1/properties/spread_bp",
+    "description": "Additive spread over the floating index in basis points (10 = 10bp).",
+    "ref": "https://finstack_quant.dev/schemas/common/1/decimal.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/decimal.schema.json#"
   },
   {
     "path": "#/$defs/d_55de605ffd705a3d4f33/oneOf/1/properties/type",
@@ -1559,41 +1578,6 @@ export default [
     "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/PikMode/oneOf/3",
     "const": "toggle",
     "description": "Deferred to the [`ToggleExerciseModel`] on the config.\nFalls back to `Cash` if no toggle model is set."
-  },
-  {
-    "path": "#/$defs/d_8a3160f076020928d015",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/rates/cms_swap.schema.json#/$defs/IRSConvention",
-    "description": "Standard interest rate swap conventions by region.\n\n# Market Standards Reference (Post-IBOR Transition)\n\n| Convention | Index | Fixed DC | Float DC | Fixed Freq | Float Freq | Reset Lag |\n|------------|-------|----------|----------|------------|------------|-----------|\n| USD OIS | SOFR | 30/360 | ACT/360 | Semi-annual | Annual | T-2 |\n| EUR OIS | ESTR | 30/360 | ACT/360 | Annual | Annual | T-2 |\n| EUR IBOR | EURIBOR | 30/360 | ACT/360 | Annual | Semi-annual | T-2 |\n| GBP OIS | SONIA | ACT/365F | ACT/365F | Annual | Annual | T-0 |\n| JPY OIS | TONAR | ACT/365F | ACT/365F | Semi-annual | Annual | T-2 |\n\n# OIS Compounding\n\nNote: OIS swaps (SOFR, ESTR, SONIA, TONAR) use **daily compounded** rates\nwith observation shift (typically 2 days lookback). The float frequency\nindicates the payment/reset frequency, not the compounding frequency.\nSee compounding method guidance below for details.\n\n# Sources\n\n- ISDA 2021 IBOR Fallbacks Protocol\n- Bloomberg SWDF function\n- QuantLib OvernightIndexedSwap conventions"
-  },
-  {
-    "path": "#/$defs/d_8a3160f076020928d015/oneOf/0",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/rates/cms_swap.schema.json#/$defs/IRSConvention/oneOf/0",
-    "const": "usd_sofr",
-    "description": "USD SOFR OIS: Annual fixed, annual float, ACT/360\n\nStandard post-LIBOR USD swap convention using SOFR compounded in arrears."
-  },
-  {
-    "path": "#/$defs/d_8a3160f076020928d015/oneOf/1",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/rates/cms_swap.schema.json#/$defs/IRSConvention/oneOf/1",
-    "const": "eur_estr",
-    "description": "EUR ESTR OIS: Annual fixed, annual float, ACT/360\n\nStandard EUR OIS convention using ESTR compounded in arrears.\nFor EURIBOR swaps, use [`EurEuribor`](Self::EurEuribor)."
-  },
-  {
-    "path": "#/$defs/d_8a3160f076020928d015/oneOf/2",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/rates/cms_swap.schema.json#/$defs/IRSConvention/oneOf/2",
-    "const": "eur_euribor",
-    "description": "EUR EURIBOR: Annual fixed, semi-annual float, ACT/360\n\nLegacy EUR swap convention using EURIBOR 6M as the floating index.\nThis is a term rate (not compounded daily)."
-  },
-  {
-    "path": "#/$defs/d_8a3160f076020928d015/oneOf/3",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/rates/cms_swap.schema.json#/$defs/IRSConvention/oneOf/3",
-    "const": "gbp_sonia",
-    "description": "GBP SONIA OIS: Annual fixed, annual float, ACT/365F\n\nStandard GBP swap convention using SONIA compounded in arrears."
-  },
-  {
-    "path": "#/$defs/d_8a3160f076020928d015/oneOf/4",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/rates/cms_swap.schema.json#/$defs/IRSConvention/oneOf/4",
-    "const": "jpy_tonar",
-    "description": "JPY TONAR OIS: Annual fixed, annual float, ACT/365F\n\nStandard JPY swap convention using TONAR compounded in arrears."
   },
   {
     "path": "#/$defs/d_8a837e6f142b34e8cfd4",

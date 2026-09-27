@@ -10,10 +10,6 @@ export default [
           "spec": {
             "attributes": {},
             "base_currency": "EUR",
-            "base_notional": {
-              "amount": "1000000",
-              "currency": "EUR"
-            },
             "domestic_discount_curve_id": "USD-OIS",
             "far_date": "2024-07-05",
             "far_rate": 1.12,
@@ -21,6 +17,10 @@ export default [
             "id": "FXSWAP-EURUSD-6M",
             "near_date": "2024-01-05",
             "near_rate": 1.1,
+            "notional": {
+              "amount": "1000000",
+              "currency": "EUR"
+            },
             "quote_currency": "USD"
           },
           "type": "fx_swap"
@@ -364,13 +364,6 @@ export default [
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/currency.schema.json#"
   },
   {
-    "path": "#/$defs/d_17ebaf6bae7cbde5673d/properties/base_notional",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/fx/fx_swap.schema.json#/$defs/FxSwap/properties/base_notional",
-    "description": "Notional amount in base currency (exchanged on near, reversed on far).",
-    "ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
-    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/money.schema.json#"
-  },
-  {
     "path": "#/$defs/d_17ebaf6bae7cbde5673d/properties/domestic_discount_curve_id",
     "source": "https://finstack_quant.dev/schemas/instrument/1/fx/fx_swap.schema.json#/$defs/FxSwap/properties/domestic_discount_curve_id",
     "description": "Domestic discount curve id (quote currency).",
@@ -436,6 +429,13 @@ export default [
     "default": null,
     "description": "Optional near leg FX rate (quote per base). If None, source from market.",
     "format": "double"
+  },
+  {
+    "path": "#/$defs/d_17ebaf6bae7cbde5673d/properties/notional",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/fx/fx_swap.schema.json#/$defs/FxSwap/properties/notional",
+    "description": "Notional amount in base currency (exchanged on near, reversed on far).",
+    "ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/money.schema.json#"
   },
   {
     "path": "#/$defs/d_17ebaf6bae7cbde5673d/properties/quote_calendar_id",

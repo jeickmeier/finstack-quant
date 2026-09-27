@@ -11,15 +11,14 @@
           "calendar_id": null,
           "day_count": "act_360",
           "discount_curve_id": "USD-OIS",
+          "fixed_rate": "0.045",
           "id": "DEP-USD-6M",
           "maturity": "2024-07-01",
           "notional": {
             "amount": "100000",
             "currency": "USD"
           },
-          "quote_rate": "0.045",
-          "settlement_days": 2,
-          "start_date": "2024-01-01"
+          "start_date": "2024-01-03"
         },
         "type": "deposit"
       },
@@ -1310,7 +1309,7 @@
     },
     "d_8dbf50e93309e9ee85f5": {
       "additionalProperties": false,
-      "description": "Simple deposit instrument with optional quoted rate.\n\nRepresents a single-period deposit where principal is exchanged\nat start and principal plus interest at maturity.\n\n# Market Convention Fields\n\nThe instrument supports optional settlement convention fields for proper\nbusiness-day adjusted cashflow generation:\n\n- `settlement_days`: T+N business days from trade date to spot (effective start) date (market convention: 2 for USD/EUR/JPY, 0 for GBP)\n- `business_day_convention`: Business day convention for date adjustment (default: ModifiedFollowing)\n- `calendar_id`: Holiday calendar identifier for business day logic (e.g., \"nyse\", \"target\")\n\nWhen these fields are set, the effective start date is computed as\n`start + settlement_days` adjusted by the business day convention. In this case,\n`start` is treated as the trade date; otherwise it is the accrual start date.",
+      "description": "Simple deposit instrument with optional quoted rate.\n\nRepresents a single-period deposit where principal is exchanged\nat start and principal plus interest at maturity.\n\n# Market Convention Fields\n\nThe instrument supports optional settlement convention fields for proper\nbusiness-day adjusted cashflow generation:\n\n- `business_day_convention`: Business day convention for date adjustment (default: ModifiedFollowing)\n- `calendar_id`: Holiday calendar identifier for business day logic (e.g., \"nyse\", \"target\")\n\n`start_date` is always the accrual start (spot) date. Callers holding a\ntrade date compute the spot date before building (see\n[`Deposit::from_conventions`]). When `calendar_id` is set, `start_date` and\n`maturity` are adjusted by the business day convention.",
       "properties": {
         "attributes": {
           "$ref": "#/$defs/d_2c88e4d1e2e4f7c22e02",
@@ -1340,6 +1339,18 @@
           "$ref": "#/$defs/d_9c3fc047c6fea21344ad",
           "description": "Discount curve id used for valuation and par extraction."
         },
+        "fixed_rate": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/d_18f3ba1ec18ab2be13b2"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Optional contractual simple rate r (annualised decimal, 0.045 = 4.5%) for the deposit.\n\nNote: `cashflow_schedule()` requires `fixed_rate` to be set. Leaving it as `None`\nis only appropriate if the caller never requests cashflow generation/PV from\nthis instrument (e.g., constructing placeholders)."
+        },
         "id": {
           "$ref": "#/$defs/d_9c3fc047c6fea21344ad",
           "description": "Unique identifier for the deposit."
@@ -1360,30 +1371,9 @@
           "$ref": "#/$defs/d_4ba43030fede59fe5993",
           "description": "Principal amount of the deposit."
         },
-        "quote_rate": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/d_18f3ba1ec18ab2be13b2"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "description": "Optional quoted simple rate r (annualised) for the deposit.\n\nNote: `cashflow_schedule()` requires `quote_rate` to be set. Leaving it as `None`\nis only appropriate if the caller never requests cashflow generation/PV from\nthis instrument (e.g., constructing placeholders)."
-        },
         "scenario_pricing_overrides": {
           "$ref": "#/$defs/d_f80c8a31d359e1cb5dd4",
           "description": "Scenario-only pricing adjustments."
-        },
-        "settlement_days": {
-          "description": "Optional T+N settlement (spot) lag in business days from trade date to effective start.\n\nMarket convention: T+2 for USD/EUR/JPY, T+0 for GBP.\nIf not set, the raw `start` date is used without adjustment.",
-          "format": "uint32",
-          "minimum": 0,
-          "type": [
-            "integer",
-            "null"
-          ]
         },
         "start_date": {
           "$ref": "#/$defs/d_1b2ccb88c9229e7463e8",

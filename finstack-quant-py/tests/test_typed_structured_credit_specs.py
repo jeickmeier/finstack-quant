@@ -197,7 +197,7 @@ def test_typed_facility_terms_are_accepted_by_the_facility_builder() -> None:
         .borrowing_base_rules(BorrowingBaseRules([AdvanceRate("high_yield_bond", 0.8)]))
         .commitment(usd(45_000_000.0))
         .drawn(usd(30_000_000.0))
-        .spread_bp(500.0)
+        .rate(0.05)
         .closing_date(CLOSE)
         .revolving_end(datetime.date(2026, 1, 15))
         .maturity(MATURITY)

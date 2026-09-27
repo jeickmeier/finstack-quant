@@ -2,8 +2,8 @@
   "instrument": {
     "spec": {
       "amortization": {
-        "percent_per_period": {
-          "bp": 250
+        "percent_of_remaining_per_period": {
+          "pct": 0.025
         }
       },
       "attributes": {},
@@ -31,7 +31,7 @@
       "oid_eir": null,
       "rate": {
         "fixed": {
-          "rate_bp": 600
+          "rate": 0.06
         }
       },
       "settlement_days": 2,

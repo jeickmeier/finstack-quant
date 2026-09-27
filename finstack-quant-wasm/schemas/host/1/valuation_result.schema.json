@@ -167,7 +167,7 @@
               },
               "version": 1
             },
-            "version": "0.8.0"
+            "version": "0.9.0"
           },
           "description": "Audit stamp: numeric mode, rounding context, and FX policy in force."
         },
@@ -1052,7 +1052,7 @@
       "description": "Metadata for FX-bearing valuation paths (FX forwards, FX options, quanto).\n\nCaptures the FX policy applied at pricing time so downstream audit /\nreconciliation can trace whether a quoted rate came from a direct\nmarket quote or via triangulation through the matrix pivot currency.\nMirrors the cross-cutting invariant documented in\n`.claude/rules/project-description.md` (\"FX policy visibility: Applied\nconversion strategy recorded per layer (e.g., valuations, statements,\nportfolio)\").",
       "properties": {
         "fx_triangulated": {
-          "description": "`true` when the FX spot was obtained via triangulation through the\n[`FxMatrix`](finstack_quant_core::money::fx::FxMatrix) pivot currency\nrather than a direct quote. Mirrors\n[`FxRateResult.triangulated`](finstack_quant_core::money::fx::FxRateResult).\n`None` when the instrument resolved spot from an explicit market\nscalar (`fx_rate_id`) rather than the matrix.",
+          "description": "`true` when the FX spot was obtained via triangulation through the\n[`FxMatrix`](finstack_quant_core::money::fx::FxMatrix) pivot currency\nrather than a direct quote. Mirrors\n[`FxRateResult.triangulated`](finstack_quant_core::money::fx::FxRateResult).\n`None` when the instrument resolved spot from an explicit market\nscalar (`fx_spot_id`) rather than the matrix.",
           "type": [
             "boolean",
             "null"

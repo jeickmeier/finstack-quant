@@ -2,8 +2,8 @@
   "instrument": {
     "spec": {
       "attributes": {},
+      "base_cpi": 100.0,
       "base_date": "2024-01-15",
-      "base_index": 100.0,
       "business_day_convention": "unadjusted",
       "calendar_id": null,
       "day_count": "act_act_isma",

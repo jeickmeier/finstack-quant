@@ -21,8 +21,8 @@ export default [
             },
             "id": "YOYSWAP-USD-5Y",
             "inflation_index_id": "US-CPI",
-            "interpolation_override": null,
-            "lag_override": {
+            "interpolation": null,
+            "lag": {
               "months": 3
             },
             "maturity": "2029-01-15",
@@ -1281,34 +1281,34 @@ export default [
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#"
   },
   {
-    "path": "#/$defs/d_6c7cf0810b445d318ec1/properties/interpolation_override",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/rates/yoy_inflation_swap.schema.json#/$defs/YoYInflationSwap/properties/interpolation_override",
-    "description": "Contractual monthly reference-index interpolation. Overrides index metadata;\nwithout either source the default is monthly step interpolation."
+    "path": "#/$defs/d_6c7cf0810b445d318ec1/properties/interpolation",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/rates/yoy_inflation_swap.schema.json#/$defs/YoYInflationSwap/properties/interpolation",
+    "description": "Contractual monthly reference-index interpolation; takes precedence over index metadata;\nwithout either source the default is monthly step interpolation."
   },
   {
-    "path": "#/$defs/d_6c7cf0810b445d318ec1/properties/interpolation_override/anyOf/0",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/rates/yoy_inflation_swap.schema.json#/$defs/YoYInflationSwap/properties/interpolation_override/anyOf/0",
+    "path": "#/$defs/d_6c7cf0810b445d318ec1/properties/interpolation/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/rates/yoy_inflation_swap.schema.json#/$defs/YoYInflationSwap/properties/interpolation/anyOf/0",
     "ref": "#/$defs/InflationInterpolation",
     "resolvedRef": "https://finstack_quant.dev/schemas/instrument/1/rates/yoy_inflation_swap.schema.json#/$defs/InflationInterpolation"
   },
   {
-    "path": "#/$defs/d_6c7cf0810b445d318ec1/properties/interpolation_override/anyOf/1",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/rates/yoy_inflation_swap.schema.json#/$defs/YoYInflationSwap/properties/interpolation_override/anyOf/1"
+    "path": "#/$defs/d_6c7cf0810b445d318ec1/properties/interpolation/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/rates/yoy_inflation_swap.schema.json#/$defs/YoYInflationSwap/properties/interpolation/anyOf/1"
   },
   {
-    "path": "#/$defs/d_6c7cf0810b445d318ec1/properties/lag_override",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/rates/yoy_inflation_swap.schema.json#/$defs/YoYInflationSwap/properties/lag_override",
-    "description": "Optional contract-level lag override (if set, overrides index lag)"
+    "path": "#/$defs/d_6c7cf0810b445d318ec1/properties/lag",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/rates/yoy_inflation_swap.schema.json#/$defs/YoYInflationSwap/properties/lag",
+    "description": "Contractual CPI observation lag; when `None` the index lag, then the\ncurve's indexation lag, applies."
   },
   {
-    "path": "#/$defs/d_6c7cf0810b445d318ec1/properties/lag_override/anyOf/0",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/rates/yoy_inflation_swap.schema.json#/$defs/YoYInflationSwap/properties/lag_override/anyOf/0",
+    "path": "#/$defs/d_6c7cf0810b445d318ec1/properties/lag/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/rates/yoy_inflation_swap.schema.json#/$defs/YoYInflationSwap/properties/lag/anyOf/0",
     "ref": "#/$defs/InflationLag",
     "resolvedRef": "https://finstack_quant.dev/schemas/instrument/1/rates/yoy_inflation_swap.schema.json#/$defs/InflationLag"
   },
   {
-    "path": "#/$defs/d_6c7cf0810b445d318ec1/properties/lag_override/anyOf/1",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/rates/yoy_inflation_swap.schema.json#/$defs/YoYInflationSwap/properties/lag_override/anyOf/1"
+    "path": "#/$defs/d_6c7cf0810b445d318ec1/properties/lag/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/rates/yoy_inflation_swap.schema.json#/$defs/YoYInflationSwap/properties/lag/anyOf/1"
   },
   {
     "path": "#/$defs/d_6c7cf0810b445d318ec1/properties/maturity",

@@ -9,8 +9,21 @@ export default [
         "instrument": {
           "spec": {
             "attributes": {},
-            "coupon_dates": [
-              "2026-06-30",
+            "coupon_floor": 0,
+            "day_count": "act_360",
+            "discount_curve_id": "USD-OIS",
+            "fixed_rate": "0.06",
+            "forward_curve_id": "USD-SOFR-6M",
+            "id": "TARN-USD-5Y",
+            "index_tenor": {
+              "count": 6,
+              "unit": "months"
+            },
+            "notional": {
+              "amount": "1000000",
+              "currency": "USD"
+            },
+            "payment_dates": [
               "2026-12-31",
               "2027-06-30",
               "2027-12-31",
@@ -21,20 +34,7 @@ export default [
               "2030-06-30",
               "2030-12-31"
             ],
-            "coupon_floor": 0,
-            "day_count": "act_360",
-            "discount_curve_id": "USD-OIS",
-            "fixed_rate": 0.06,
-            "floating_index_id": "USD-SOFR-6M",
-            "floating_tenor": {
-              "count": 6,
-              "unit": "months"
-            },
-            "id": "TARN-USD-5Y",
-            "notional": {
-              "amount": "1000000",
-              "currency": "USD"
-            },
+            "start_date": "2026-06-30",
             "target_coupon": 0.15,
             "vol_surface_id": "USD-SOFR-HW-VOL"
           },
@@ -352,6 +352,18 @@ export default [
     "description": "Recovery model governing the notional-to-recovery mapping.",
     "ref": "#/$defs/RecoveryModel",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/RecoveryModel"
+  },
+  {
+    "path": "#/$defs/d_18f3ba1ec18ab2be13b2",
+    "source": "https://finstack_quant.dev/schemas/common/1/decimal.schema.json#",
+    "description": "Exact decimal encoded as a JSON string.",
+    "examples": [
+      "1000000",
+      "0.0425",
+      "-1234.56789"
+    ],
+    "pattern": "^-?\\d+(\\.\\d+)?([eE][+-]?\\d+)?$",
+    "title": "Decimal"
   },
   {
     "path": "#/$defs/d_1b2ccb88c9229e7463e8",
@@ -1266,17 +1278,6 @@ export default [
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/attributes.schema.json#"
   },
   {
-    "path": "#/$defs/d_8af284dde09995f0ad8c/properties/coupon_dates",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/exotics/tarn.schema.json#/$defs/Tarn/properties/coupon_dates",
-    "description": "Coupon payment dates (must be sorted ascending)."
-  },
-  {
-    "path": "#/$defs/d_8af284dde09995f0ad8c/properties/coupon_dates/items",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/exotics/tarn.schema.json#/$defs/Tarn/properties/coupon_dates/items",
-    "ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
-    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/date.schema.json#"
-  },
-  {
     "path": "#/$defs/d_8af284dde09995f0ad8c/properties/coupon_floor",
     "source": "https://finstack_quant.dev/schemas/instrument/1/exotics/tarn.schema.json#/$defs/Tarn/properties/coupon_floor",
     "description": "Floor on each period's coupon (typically 0.0).",
@@ -1299,22 +1300,16 @@ export default [
   {
     "path": "#/$defs/d_8af284dde09995f0ad8c/properties/fixed_rate",
     "source": "https://finstack_quant.dev/schemas/instrument/1/exotics/tarn.schema.json#/$defs/Tarn/properties/fixed_rate",
-    "description": "Fixed coupon rate (the \"strike\" rate).",
-    "format": "double"
+    "description": "Fixed coupon rate (the \"strike\" rate) as a decimal annual rate (0.05 = 5%).",
+    "ref": "https://finstack_quant.dev/schemas/common/1/decimal.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/decimal.schema.json#"
   },
   {
-    "path": "#/$defs/d_8af284dde09995f0ad8c/properties/floating_index_id",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/exotics/tarn.schema.json#/$defs/Tarn/properties/floating_index_id",
-    "description": "Floating rate index identifier.",
+    "path": "#/$defs/d_8af284dde09995f0ad8c/properties/forward_curve_id",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/exotics/tarn.schema.json#/$defs/Tarn/properties/forward_curve_id",
+    "description": "Rates forward curve that projects the floating index (also the fixing-series key).",
     "ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/id.schema.json#"
-  },
-  {
-    "path": "#/$defs/d_8af284dde09995f0ad8c/properties/floating_tenor",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/exotics/tarn.schema.json#/$defs/Tarn/properties/floating_tenor",
-    "description": "Floating rate tenor (e.g., \"3M\", \"6M\").",
-    "ref": "https://finstack_quant.dev/schemas/common/1/tenor.schema.json",
-    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/tenor.schema.json#"
   },
   {
     "path": "#/$defs/d_8af284dde09995f0ad8c/properties/id",
@@ -1322,6 +1317,13 @@ export default [
     "description": "Unique instrument identifier.",
     "ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/id.schema.json#"
+  },
+  {
+    "path": "#/$defs/d_8af284dde09995f0ad8c/properties/index_tenor",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/exotics/tarn.schema.json#/$defs/Tarn/properties/index_tenor",
+    "description": "Contractual tenor of the observed floating index (e.g. 3M, 6M); must match the forward curve tenor.",
+    "ref": "https://finstack_quant.dev/schemas/common/1/tenor.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/tenor.schema.json#"
   },
   {
     "path": "#/$defs/d_8af284dde09995f0ad8c/properties/instrument_pricing_overrides",
@@ -1345,11 +1347,29 @@ export default [
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/money.schema.json#"
   },
   {
+    "path": "#/$defs/d_8af284dde09995f0ad8c/properties/payment_dates",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/exotics/tarn.schema.json#/$defs/Tarn/properties/payment_dates",
+    "description": "Coupon payment dates, one per period, strictly ascending and after\n`start_date`. Period `i` accrues from the previous payment date (or\n`start_date`) to `payment_dates[i]` and fixes in advance at its start."
+  },
+  {
+    "path": "#/$defs/d_8af284dde09995f0ad8c/properties/payment_dates/items",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/exotics/tarn.schema.json#/$defs/Tarn/properties/payment_dates/items",
+    "ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/date.schema.json#"
+  },
+  {
     "path": "#/$defs/d_8af284dde09995f0ad8c/properties/scenario_pricing_overrides",
     "source": "https://finstack_quant.dev/schemas/instrument/1/exotics/tarn.schema.json#/$defs/Tarn/properties/scenario_pricing_overrides",
     "description": "Scenario-only pricing adjustments.",
     "ref": "https://finstack_quant.dev/schemas/common/1/scenario_pricing_overrides.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/scenario_pricing_overrides.schema.json#"
+  },
+  {
+    "path": "#/$defs/d_8af284dde09995f0ad8c/properties/start_date",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/exotics/tarn.schema.json#/$defs/Tarn/properties/start_date",
+    "description": "Accrual start of the first coupon period; also the first in-advance\nfixing date.",
+    "ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/date.schema.json#"
   },
   {
     "path": "#/$defs/d_8af284dde09995f0ad8c/properties/target_coupon",

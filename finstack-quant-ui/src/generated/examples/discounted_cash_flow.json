@@ -3,6 +3,13 @@
     "spec": {
       "attributes": {},
       "currency": "USD",
+      "equity_bridge": {
+        "cash": 0.0,
+        "minority_interest": 0.0,
+        "non_operating_assets": 0.0,
+        "preferred_equity": 0.0,
+        "total_debt": 15000000.0
+      },
       "flows": [
         [
           "2026-01-01",
@@ -27,10 +34,9 @@
       ],
       "id": "DCF-TECH-CO",
       "mid_year_convention": true,
-      "net_debt": 15000000.0,
       "shares_outstanding": 10000000.0,
       "terminal_value": {
-        "growth_rate": 0.02,
+        "stable_growth_rate": 0.02,
         "type": "gordon_growth"
       },
       "valuation_date": "2025-01-01",

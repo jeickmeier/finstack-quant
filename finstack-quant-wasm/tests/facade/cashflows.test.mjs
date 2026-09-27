@@ -186,7 +186,7 @@ test('cashflows rejects malformed schedule JSON', () => {
 
 test('cashflows preserves principal deltas and accrual calendars through JSON', () => {
   const spec = JSON.parse(cashflowSpec);
-  spec.issue = '2025-01-01';
+  spec.issue_date = '2025-01-01';
   spec.maturity = '2025-04-01';
   Object.assign(spec.coupon_program[0].spec, {
     rate: '0.1',
@@ -220,7 +220,7 @@ test('cashflows preserves principal deltas and accrual calendars through JSON', 
 
 test('cashflows retains earned accrual until the delayed payment', () => {
   const spec = JSON.parse(cashflowSpec);
-  spec.issue = '2025-01-01';
+  spec.issue_date = '2025-01-01';
   spec.maturity = '2025-07-01';
   Object.assign(spec.coupon_program[0].spec, {
     rate: '0.1',
@@ -242,7 +242,7 @@ test('cashflows accrual preserves ICMA reference periods and ISDA termination da
     ['2024-08-31', '2025-02-28', '30e_360_isda', '2025-01-31', (100000 * 150) / 360],
   ]) {
     const spec = JSON.parse(cashflowSpec);
-    Object.assign(spec, { issue, maturity });
+    Object.assign(spec, { issue_date: issue, maturity });
     Object.assign(spec.coupon_program[0].spec, {
       rate: '0.1',
       frequency: { count: 6, unit: 'months' },

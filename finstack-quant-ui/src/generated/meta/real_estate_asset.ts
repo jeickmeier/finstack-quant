@@ -37,7 +37,6 @@ export default [
             ],
             "property_type": "office",
             "terminal_cap_rate": 0.055,
-            "valuation_date": "2025-01-01",
             "valuation_method": "dcf"
           },
           "type": "real_estate_asset"
@@ -4815,17 +4814,10 @@ export default [
     "description": "Real estate asset valuation instrument.\n\nSupports DCF (explicit NOI schedule) and direct capitalization valuation."
   },
   {
-    "path": "#/$defs/d_f056a252f953016e9606/properties/acquisition_cost",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/equity/real_estate_asset.schema.json#/$defs/RealEstateAsset/properties/acquisition_cost",
-    "default": null,
-    "description": "Optional one-time acquisition cost deducted at `as_of` in DCF valuation.\n\nThis is intended for closing costs, fees, and other transaction costs.",
-    "format": "double"
-  },
-  {
     "path": "#/$defs/d_f056a252f953016e9606/properties/acquisition_costs",
     "source": "https://finstack_quant.dev/schemas/instrument/1/equity/real_estate_asset.schema.json#/$defs/RealEstateAsset/properties/acquisition_costs",
     "default": [],
-    "description": "Optional detailed acquisition cost line items (positive outflows) deducted at `as_of`."
+    "description": "Acquisition (closing) cost line items in instrument currency, as\npositive outflow magnitudes deducted at `as_of` in DCF valuation."
   },
   {
     "path": "#/$defs/d_f056a252f953016e9606/properties/acquisition_costs/items",
@@ -5062,13 +5054,6 @@ export default [
     "default": null,
     "description": "Optional terminal growth rate used to project `NOI_{N+1}` for exit valuation.\n\nMarket convention for exit-cap terminal value is \\(TV = NOI_{N+1} / cap\\_rate\\_exit\\).\nWhen not provided, defaults to 0 (uses last NOI as-is).\nValidation range is \\([-100\\%, 20\\%]\\) to guard against configuration errors.",
     "format": "double"
-  },
-  {
-    "path": "#/$defs/d_f056a252f953016e9606/properties/valuation_date",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/equity/real_estate_asset.schema.json#/$defs/RealEstateAsset/properties/valuation_date",
-    "description": "Valuation date (base date for discounting).",
-    "ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
-    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/date.schema.json#"
   },
   {
     "path": "#/$defs/d_f056a252f953016e9606/properties/valuation_method",

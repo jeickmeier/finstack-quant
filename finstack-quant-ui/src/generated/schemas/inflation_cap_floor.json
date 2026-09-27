@@ -17,8 +17,8 @@
           },
           "id": "INFLCAP-USD-5Y",
           "inflation_index_id": "US-CPI",
-          "interpolation_override": null,
-          "lag_override": {
+          "interpolation": null,
+          "lag": {
             "months": 3
           },
           "maturity": "2029-01-15",
@@ -504,11 +504,15 @@
           "description": "Business day convention for schedule and payments."
         },
         "calendar_id": {
-          "description": "Optional holiday calendar identifier.",
-          "type": [
-            "string",
-            "null"
-          ]
+          "anyOf": [
+            {
+              "$ref": "#/$defs/d_9c3fc047c6fea21344ad"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Optional holiday calendar identifier."
         },
         "day_count": {
           "$ref": "#/$defs/d_c0401254ec268b317b65",
@@ -542,7 +546,7 @@
           "$ref": "#/$defs/d_c08279a20372931820e0",
           "description": "Instrument-owned pricing inputs."
         },
-        "interpolation_override": {
+        "interpolation": {
           "anyOf": [
             {
               "$ref": "#/$defs/d_248b18283cf30a5fa9bc"
@@ -551,9 +555,9 @@
               "type": "null"
             }
           ],
-          "description": "Contractual monthly CPI interpolation, overriding index metadata.\nDefaults to monthly step interpolation when neither source supplies it."
+          "description": "Contractual monthly CPI interpolation; takes precedence over index metadata.\nDefaults to monthly step interpolation when neither source supplies it."
         },
-        "lag_override": {
+        "lag": {
           "anyOf": [
             {
               "$ref": "#/$defs/d_c8d5a8dc925586cc9b9d"
@@ -562,7 +566,7 @@
               "type": "null"
             }
           ],
-          "description": "Optional contract-level lag override."
+          "description": "Contractual CPI observation lag; when `None` the index lag, then the\ncurve's indexation lag, applies."
         },
         "maturity": {
           "$ref": "#/$defs/d_1b2ccb88c9229e7463e8",

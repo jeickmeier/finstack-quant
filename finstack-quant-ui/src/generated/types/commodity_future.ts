@@ -10,9 +10,13 @@ export type Date = string;
  */
 export type Date1 = string;
 /**
- * Unique instrument identifier.
+ * Commodity forward `PriceCurve` used for projected observations.
  */
 export type Id = string;
+/**
+ * Unique instrument identifier.
+ */
+export type Id1 = string;
 /**
  * A phantom-typed identifier that prevents mixing different kinds of IDs.
  *
@@ -278,10 +282,6 @@ export type DB556Bbeb1Ecf96C44C5A =
   | "ZMW"
   | "ZWL";
 /**
- * Price-curve identifier used for projected observations.
- */
-export type Id1 = string;
-/**
  * Currency in which variation margin is paid.
  */
 export type Currency =
@@ -499,16 +499,16 @@ export interface D_0B12Afbc933Deb6F9Dbc {
         past_fixings?: [Date1, number][];
         type: "arithmetic_average";
       };
-  id: Id;
+  forward_curve_id: Id;
+  id: Id1;
   instrument_pricing_overrides?: InstrumentPricingOverrides;
   metric_pricing_overrides?: MetricPricingOverrides;
-  price_curve_id: Id1;
   scenario_pricing_overrides?: ScenarioPricingOverrides;
   terms: D_198D478E527B197Aa55F;
   /**
    * Exchange symbol or underlying label.
    */
-  underlying: string;
+  underlying_ticker: string;
 }
 /**
  * Attributes for selection and reporting.

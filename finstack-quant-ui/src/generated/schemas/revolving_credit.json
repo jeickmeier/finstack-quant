@@ -7,31 +7,12 @@
       "instrument": {
         "spec": {
           "attributes": {},
-          "base_rate_spec": {
-            "floating": {
-              "all_in_cap_bp": null,
-              "all_in_floor_bp": null,
-              "fixing_calendar_id": null,
-              "gearing": "1",
-              "gearing_includes_spread": true,
-              "index_cap_bp": null,
-              "index_floor_bp": "0",
-              "index_id": "USD-SOFR-3M",
-              "reset_frequency": {
-                "count": 3,
-                "unit": "months"
-              },
-              "reset_lag_days": 2,
-              "spread_bp": "250"
-            }
-          },
           "business_day_convention": "modified_following",
           "calendar_id": "usny",
-          "commitment_amount": {
+          "commitment": {
             "amount": "50000000",
             "currency": "USD"
           },
-          "commitment_date": "2024-01-01",
           "commitment_steps": [],
           "credit_curve_id": null,
           "day_count": "act_360",
@@ -56,7 +37,7 @@
               }
             ]
           },
-          "drawn_amount": {
+          "drawn": {
             "amount": "10000000",
             "currency": "USD"
           },
@@ -82,12 +63,31 @@
             "unit": "months"
           },
           "id": "RCF-USD-3Y",
+          "issue_date": "2024-01-01",
           "lc": null,
           "leq": 0,
           "margin_steps": [],
           "maturity": "2027-01-01",
           "oid_eir": null,
           "payment_lag_days": 0,
+          "rate": {
+            "floating": {
+              "all_in_cap_bp": null,
+              "all_in_floor_bp": null,
+              "fixing_calendar_id": null,
+              "forward_curve_id": "USD-SOFR-3M",
+              "gearing": "1",
+              "gearing_includes_spread": true,
+              "index_cap_bp": null,
+              "index_floor_bp": "0",
+              "reset_frequency": {
+                "count": 3,
+                "unit": "months"
+              },
+              "reset_lag_days": 2,
+              "spread_bp": "250"
+            }
+          },
           "recovery_rate": 0,
           "scheduled_fees": [],
           "settlement_days": 0,
@@ -721,33 +721,34 @@
       "description": "Utilization process for stochastic draws/repayments.\n\nFor the 80/20 implementation, we support a single mean-reverting process.\nThis can be extended in the future to support other processes (jump-diffusion,\nregime-switching, etc.).",
       "properties": {
         "mean_reverting": {
+          "additionalProperties": false,
           "properties": {
-            "speed": {
-              "description": "Mean reversion speed (annualized).",
+            "kappa": {
+              "description": "Mean-reversion speed κ, per year.",
+              "format": "double",
+              "type": "number"
+            },
+            "sigma": {
+              "description": "Utilization volatility σ, annualized (absolute utilization units).",
               "format": "double",
               "type": "number"
             },
             "spread_sensitivity": {
               "default": 0,
-              "description": "Sensitivity of the utilization target to the simulated credit\nspread (adverse selection), as a decimal per unit of relative\nspread change.\n\nThe target used by the OU step becomes\n`θ(t) = clamp(target_rate + spread_sensitivity · (s(t) / s(0) − 1), 0, 1)`\nwhere `s(t)` is the simulated spread and `s(0)` its initial level,\nso a spread that doubles raises the target by `spread_sensitivity`.\nDefaults to `0.0` (no link); the utilization/credit shock\ncorrelation in `McConfig` applies on top of it. Ignored when the\nfacility has no credit-spread process.",
+              "description": "Sensitivity of the utilization target to the simulated credit\nspread (adverse selection), as a decimal per unit of relative\nspread change.\n\nThe target used by the OU step becomes\n`θ(t) = clamp(theta + spread_sensitivity · (s(t) / s(0) − 1), 0, 1)`\nwhere `s(t)` is the simulated spread and `s(0)` its initial level,\nso a spread that doubles raises the target by `spread_sensitivity`.\nDefaults to `0.0` (no link); the utilization/credit shock\ncorrelation in `McConfig` applies on top of it. Ignored when the\nfacility has no credit-spread process.",
               "format": "double",
               "type": "number"
             },
-            "target_rate": {
-              "description": "Target utilization rate (0.0 to 1.0).",
-              "format": "double",
-              "type": "number"
-            },
-            "volatility": {
-              "description": "Volatility of utilization changes (annualized).",
+            "theta": {
+              "description": "Long-run utilization level θ, as a fraction in `[0, 1]`.",
               "format": "double",
               "type": "number"
             }
           },
           "required": [
-            "target_rate",
-            "speed",
-            "volatility"
+            "theta",
+            "kappa",
+            "sigma"
           ],
           "type": "object"
         }
@@ -945,34 +946,30 @@
           "$ref": "#/$defs/d_2c88e4d1e2e4f7c22e02",
           "description": "Attributes for scenario selection and tagging"
         },
-        "base_rate_spec": {
-          "$ref": "#/$defs/d_44a783489fd714980a9b",
-          "description": "Base rate specification (fixed or floating)."
-        },
         "business_day_convention": {
           "$ref": "#/$defs/d_01cd6b2e4ad257352fdb",
           "default": "modified_following",
           "description": "Business-day convention applied to payment dates (interest, fees and\nprincipal) and to the fixing-date roll. Accrual boundaries stay\nunadjusted. Defaults to `ModifiedFollowing`."
         },
         "calendar_id": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/d_9c3fc047c6fea21344ad"
+            },
+            {
+              "type": "null"
+            }
+          ],
           "default": null,
-          "description": "Holiday calendar identifier (for example `\"usny\"`) used to adjust\npayment dates, roll fixing dates and count settlement days. `None`\nadjusts for weekends only. Validation rejects an unknown identifier.\n`FloatingRateSpec::fixing_calendar_id` overrides it for the fixing\ndate alone.",
-          "type": [
-            "string",
-            "null"
-          ]
+          "description": "Holiday calendar identifier (for example `\"usny\"`) used to adjust\npayment dates, roll fixing dates and count settlement days. `None`\nadjusts for weekends only. Validation rejects an unknown identifier.\n`FloatingRateSpec::fixing_calendar_id` overrides it for the fixing\ndate alone."
         },
-        "commitment_amount": {
+        "commitment": {
           "$ref": "#/$defs/d_4ba43030fede59fe5993",
-          "description": "Opening commitment of the facility, in force from `commitment_date`\nuntil the first entry of `commitment_steps`."
-        },
-        "commitment_date": {
-          "$ref": "#/$defs/d_1b2ccb88c9229e7463e8",
-          "description": "Date when the facility becomes available."
+          "description": "Opening commitment of the facility, in force from `issue_date`\nuntil the first entry of `commitment_steps`."
         },
         "commitment_steps": {
           "default": [],
-          "description": "Scheduled commitment changes (amortizing commitments, availability\nexpiries, accordions), each in force from its date until the next.\nDates must be strictly increasing, after `commitment_date` and on or\nbefore `maturity`; the drawn balance plus outstanding letters of\ncredit must never exceed the commitment in force. A step down pays its\n`fee_bp` on the reduced amount. Empty by default.",
+          "description": "Scheduled commitment changes (amortizing commitments, availability\nexpiries, accordions), each in force from its date until the next.\nDates must be strictly increasing, after `issue_date` and on or\nbefore `maturity`; the drawn balance plus outstanding letters of\ncredit must never exceed the commitment in force. A step down pays its\n`fee_bp` on the reduced amount. Empty by default.",
           "items": {
             "$ref": "#/$defs/d_ba391d15759d4194c067"
           },
@@ -1002,9 +999,9 @@
           "$ref": "#/$defs/d_faba840aea87211d6300",
           "description": "Draw and repayment schedule (deterministic or stochastic)."
         },
-        "drawn_amount": {
+        "drawn": {
           "$ref": "#/$defs/d_4ba43030fede59fe5993",
-          "description": "Drawn balance at the simulation anchor, the later of `commitment_date`\nand the valuation date, in both deterministic and stochastic mode.\n\nFor a new facility this is the balance funded at commitment; for a\nseasoned facility it is the balance observed on the valuation date.\nDeterministic draw/repay events describe the future only: an event\ndated on or before the valuation date is rejected by the cashflow\nengine, because the position at the anchor is defined by this field\nalone. The accrual period containing the valuation date accrues on\nthis balance from its accrual start."
+          "description": "Drawn balance at the simulation anchor, the later of `issue_date`\nand the valuation date, in both deterministic and stochastic mode.\n\nFor a new facility this is the balance funded at commitment; for a\nseasoned facility it is the balance observed on the valuation date.\nDeterministic draw/repay events describe the future only: an event\ndated on or before the valuation date is rejected by the cashflow\nengine, because the position at the anchor is defined by this field\nalone. The accrual period containing the valuation date accrues on\nthis balance from its accrual start."
         },
         "fees": {
           "$ref": "#/$defs/d_21e99cfd351458495cc5",
@@ -1021,6 +1018,10 @@
         "instrument_pricing_overrides": {
           "$ref": "#/$defs/d_c08279a20372931820e0",
           "description": "Instrument-owned pricing inputs."
+        },
+        "issue_date": {
+          "$ref": "#/$defs/d_1b2ccb88c9229e7463e8",
+          "description": "Date when the facility becomes available."
         },
         "lc": {
           "anyOf": [
@@ -1075,6 +1076,10 @@
           "minimum": 0,
           "type": "integer"
         },
+        "rate": {
+          "$ref": "#/$defs/d_3c319da7190ff52c5100",
+          "description": "Base rate specification (fixed or floating)."
+        },
         "recovery_rate": {
           "description": "Recovery rate on default (used when credit_curve_id is present).\n\nRepresents the fraction of exposure recovered in the event of default.\nTypical values: 0.30-0.50 for senior secured facilities.\nCallers must provide the value explicitly; zero recovery remains valid.",
           "format": "double",
@@ -1107,11 +1112,11 @@
       },
       "required": [
         "id",
-        "commitment_amount",
-        "drawn_amount",
-        "commitment_date",
+        "commitment",
+        "drawn",
+        "issue_date",
         "maturity",
-        "base_rate_spec",
+        "rate",
         "day_count",
         "frequency",
         "fees",
@@ -1303,17 +1308,18 @@
       ],
       "type": "object"
     },
-    "d_44a783489fd714980a9b": {
-      "description": "Base rate specification for revolving credit interest.\n\nDefines whether the facility pays a fixed rate or a floating rate\ntied to a market index plus margin.",
+    "d_3c319da7190ff52c5100": {
+      "description": "Contractual coupon of a loan facility or note: a fixed all-in rate or a\nfloating index plus spread.\n\nShared by `TermLoan.rate`, `RevolvingCredit.rate`, `AssetBackedFacility.rate`\nand structured-credit `Tranche.coupon`.\n\n# Examples\n\n```rust\nuse finstack_quant_valuations::instruments::fixed_income::loan_terms::RateSpec;\n\nlet fixed = RateSpec::Fixed { rate: 0.06 }; // 6% all-in\nassert!(matches!(fixed, RateSpec::Fixed { .. }));\n```",
       "oneOf": [
         {
           "additionalProperties": false,
-          "description": "Fixed rate (annualized).",
+          "description": "Fixed all-in annual rate.",
           "properties": {
             "fixed": {
+              "additionalProperties": false,
               "properties": {
                 "rate": {
-                  "description": "Annual interest rate (e.g., 0.05 for 5%).",
+                  "description": "Annual rate as a decimal (`0.06` = 6%).",
                   "format": "double",
                   "type": "number"
                 }
@@ -1331,7 +1337,7 @@
         },
         {
           "additionalProperties": false,
-          "description": "Floating rate using canonical FloatingRateSpec.\n\nComposes the standard floating rate specification with full support\nfor floors, caps, and gearing.",
+          "description": "Floating index plus spread, with the canonical floor, cap, gearing and\nreset conventions of [`FloatingRateSpec`].",
           "properties": {
             "floating": {
               "$ref": "#/$defs/d_879c942d15cfcad2445b"
@@ -2049,7 +2055,7 @@
     },
     "d_879c942d15cfcad2445b": {
       "additionalProperties": false,
-      "description": "Canonical floating rate specification for all instruments.\n\nUsed by bonds, swaps, credit facilities, and structured products.\nAll instruments should compose this type rather than defining their own\nfloating rate specifications.\n\n# Rate Calculation\n\nThe all-in rate is computed as:\n1. Look up forward rate from `index_id` curve for the accrual period\n2. Apply `index_floor_bp` to index rate (if specified) - applied BEFORE adding spread\n3. Add `spread_bp` to get base rate\n4. Multiply by `gearing` (typically 1.0)\n5. Apply `all_in_cap_bp` to final rate (if specified) - applied AFTER spread and gearing\n\nFormula: `cap(gearing * (floor(index) + spread))`\n\n# Negative Rate Handling\n\nNegative index rates are supported and will flow through calculations\nunless constrained by floors. For markets with negative rates (EUR, JPY, CHF):\n\n- Set `index_floor_bp: Some(0.0)` to floor the index at zero\n- Set `all_in_floor_bp: Some(0.0)` to floor the total coupon at zero\n- Omit floors to allow negative coupons (rare but valid in some structures)\n\nThe implementation does not reject negative rates; the policy is controlled\nby the floor configuration.\n\n# Seasoned Instruments (Historical Fixings)\n\nHistorical fixings **are supported** via the `MarketContext`: store a\n`ScalarTimeSeries` under the canonical id `FIXING:{index_id}` (see\n`finstack_quant_core::market_data::fixings`) containing realized index\nobservations. Observation dates strictly before the forward curve base\ndate then resolve from that series instead of the curve:\n\n- **Overnight observations** (compounded/averaged paths) use LOCF lookup\n  (last observation carried forward), matching RFR publication\n  conventions where a fixing carries over non-publication days\n  (ARRC 2020 SOFR conventions; ISDA 2021 Supp. 70 §7.1(g)). A partially\n  seasoned compounding window seamlessly mixes realized fixings and\n  curve-projected forwards with identical `(rate, days)` weighting.\n- **Term-rate resets** use exact-date lookup on the (business-day\n  adjusted) reset date — a term rate fixes on a specific published date.\n  The fixing is the index rate only; gearing/spread/floors/caps apply on\n  top exactly as for projected rates.\n\nAn observation exactly on the curve base date prefers a published\nsame-day fixing when the series has one, otherwise projects from `t = 0`.\n\nThe [`FloatingRateFallback`] policy applies only when **no** fixing\nseries is provided: `Error` (the default) fails the build with a\ndescriptive message naming the date, index, and expected series id;\n`FixedRate(r)` uses `r` as the index rate for the affected coupon;\n`SpreadOnly` projects spread-only.\n\n# Example\n\n```rust\nuse finstack_quant_core::dates::Tenor;\nuse finstack_quant_cashflows::builder::{FloatingRateSpec, OvernightIndexConstraintApplication};\nuse rust_decimal_macros::dec;\n\n// 3M SOFR + 200bps with 0% floor\nlet spec = FloatingRateSpec {\n    index_id: \"USD-SOFR-3M\".into(),\n    spread_bp: dec!(200.0),\n    gearing: dec!(1.0),\n    gearing_includes_spread: true,\n    index_floor_bp: Some(dec!(0.0)),\n    all_in_floor_bp: None,\n    all_in_cap_bp: None,\n    index_cap_bp: None,\n    overnight_index_constraints: OvernightIndexConstraintApplication::Daily,\n    reset_frequency: Tenor::quarterly(),\n    index_tenor: None,\n    reset_lag_days: 2,\n    fixing_calendar_id: None,\n    overnight_compounding: None,\n    overnight_basis: None,\n    fallback: Default::default(),\n};\n```",
+      "description": "Canonical floating rate specification for all instruments.\n\nUsed by bonds, swaps, credit facilities, and structured products.\nAll instruments should compose this type rather than defining their own\nfloating rate specifications.\n\n# Rate Calculation\n\nThe all-in rate is computed as:\n1. Look up forward rate from `forward_curve_id` curve for the accrual period\n2. Apply `index_floor_bp` to index rate (if specified) - applied BEFORE adding spread\n3. Add `spread_bp` to get base rate\n4. Multiply by `gearing` (typically 1.0)\n5. Apply `all_in_cap_bp` to final rate (if specified) - applied AFTER spread and gearing\n\nFormula: `cap(gearing * (floor(index) + spread))`\n\n# Negative Rate Handling\n\nNegative index rates are supported and will flow through calculations\nunless constrained by floors. For markets with negative rates (EUR, JPY, CHF):\n\n- Set `index_floor_bp: Some(0.0)` to floor the index at zero\n- Set `all_in_floor_bp: Some(0.0)` to floor the total coupon at zero\n- Omit floors to allow negative coupons (rare but valid in some structures)\n\nThe implementation does not reject negative rates; the policy is controlled\nby the floor configuration.\n\n# Seasoned Instruments (Historical Fixings)\n\nHistorical fixings **are supported** via the `MarketContext`: store a\n`ScalarTimeSeries` under the canonical id `FIXING:{forward_curve_id}` (see\n`finstack_quant_core::market_data::fixings`) containing realized index\nobservations. Observation dates strictly before the forward curve base\ndate then resolve from that series instead of the curve:\n\n- **Overnight observations** (compounded/averaged paths) use LOCF lookup\n  (last observation carried forward), matching RFR publication\n  conventions where a fixing carries over non-publication days\n  (ARRC 2020 SOFR conventions; ISDA 2021 Supp. 70 §7.1(g)). A partially\n  seasoned compounding window seamlessly mixes realized fixings and\n  curve-projected forwards with identical `(rate, days)` weighting.\n- **Term-rate resets** use exact-date lookup on the (business-day\n  adjusted) reset date — a term rate fixes on a specific published date.\n  The fixing is the index rate only; gearing/spread/floors/caps apply on\n  top exactly as for projected rates.\n\nAn observation exactly on the curve base date prefers a published\nsame-day fixing when the series has one, otherwise projects from `t = 0`.\n\nThe [`FloatingRateFallback`] policy applies only when **no** fixing\nseries is provided: `Error` (the default) fails the build with a\ndescriptive message naming the date, index, and expected series id;\n`FixedRate(r)` uses `r` as the index rate for the affected coupon;\n`SpreadOnly` projects spread-only.\n\n# Example\n\n```rust\nuse finstack_quant_core::dates::Tenor;\nuse finstack_quant_cashflows::builder::{FloatingRateSpec, OvernightIndexConstraintApplication};\nuse rust_decimal_macros::dec;\n\n// 3M SOFR + 200bps with 0% floor\nlet spec = FloatingRateSpec {\n    forward_curve_id: \"USD-SOFR-3M\".into(),\n    spread_bp: dec!(200.0),\n    gearing: dec!(1.0),\n    gearing_includes_spread: true,\n    index_floor_bp: Some(dec!(0.0)),\n    all_in_floor_bp: None,\n    all_in_cap_bp: None,\n    index_cap_bp: None,\n    overnight_index_constraints: OvernightIndexConstraintApplication::Daily,\n    reset_frequency: Tenor::quarterly(),\n    index_tenor: None,\n    reset_lag_days: 2,\n    fixing_calendar_id: None,\n    overnight_compounding: None,\n    overnight_basis: None,\n    fallback: Default::default(),\n};\n```",
       "properties": {
         "all_in_cap_bp": {
           "anyOf": [
@@ -2080,12 +2086,20 @@
           "description": "Policy when forward curve lookup fails during emission.\n\nDefaults to `Error`, which surfaces curve lookup failures.\nSet to `SpreadOnly` for spread-only projection, or `FixedRate(r)`\nto use a fixed index rate."
         },
         "fixing_calendar_id": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/d_9c3fc047c6fea21344ad"
+            },
+            {
+              "type": "null"
+            }
+          ],
           "default": null,
-          "description": "Optional calendar for rate fixing (reset lag).\n\nIf not provided, defaults to the coupon schedule calendar.",
-          "type": [
-            "string",
-            "null"
-          ]
+          "description": "Optional calendar for rate fixing (reset lag).\n\nIf not provided, defaults to the coupon schedule calendar."
+        },
+        "forward_curve_id": {
+          "$ref": "#/$defs/d_9c3fc047c6fea21344ad",
+          "description": "Forward curve identifier (e.g., \"USD-SOFR-3M\", \"EUR-EURIBOR-6M\")."
         },
         "gearing": {
           "$ref": "#/$defs/d_18f3ba1ec18ab2be13b2",
@@ -2120,10 +2134,6 @@
           ],
           "default": null,
           "description": "Floor on index rate in basis points (applied to index component).\n\nExample: index_floor_bp = Some(0.0) ensures index rate >= 0%."
-        },
-        "index_id": {
-          "$ref": "#/$defs/d_9c3fc047c6fea21344ad",
-          "description": "Forward curve identifier (e.g., \"USD-SOFR-3M\", \"EUR-EURIBOR-6M\")."
         },
         "index_tenor": {
           "anyOf": [
@@ -2178,7 +2188,7 @@
         }
       },
       "required": [
-        "index_id",
+        "forward_curve_id",
         "spread_bp",
         "reset_frequency"
       ],
@@ -2260,9 +2270,8 @@
           "description": "Effective-from date of the margin change."
         },
         "delta_bp": {
-          "description": "Change in margin, in basis points (100 = 1%); negative steps down.",
-          "format": "int32",
-          "type": "integer"
+          "$ref": "#/$defs/d_18f3ba1ec18ab2be13b2",
+          "description": "Change in margin, in basis points (`100` = 1%); negative steps down."
         }
       },
       "required": [
@@ -4146,7 +4155,7 @@
     },
     "d_ba391d15759d4194c067": {
       "additionalProperties": false,
-      "description": "A scheduled change of a facility's commitment.\n\nThe commitment equals `amount` from `date` forward until the next step.\nSteps down are amortizing commitments, availability expiries and voluntary\nreductions; steps up are accordion exercises. Utilization is always drawn\nbalance over the commitment in force, so a stochastic revolving facility\nbooks the implied principal change at the step.\n\nA delayed-draw term loan (`DdtlSpec::commitment_steps`) accepts only\nnon-increasing steps inside its availability window and no reduction fee\n(`fee_bp` must be `0.0`).",
+      "description": "A scheduled change of a facility's commitment.\n\nThe commitment equals `amount` from `date` forward until the next step.\nSteps down are amortizing commitments, availability expiries and voluntary\nreductions; steps up are accordion exercises. Utilization is always drawn\nbalance over the commitment in force, so a stochastic revolving facility\nbooks the implied principal change at the step.\n\nA delayed-draw term loan (`DdtlSpec::commitment_steps`) accepts only\nnon-increasing steps inside its availability window and no reduction fee\n(`reduction_fee_bp` must be zero).",
       "properties": {
         "amount": {
           "$ref": "#/$defs/d_4ba43030fede59fe5993",
@@ -4156,11 +4165,10 @@
           "$ref": "#/$defs/d_1b2ccb88c9229e7463e8",
           "description": "Date the new commitment takes effect (strictly after the commitment\ndate, on or before maturity)."
         },
-        "fee_bp": {
-          "default": 0,
-          "description": "Reduction or cancellation fee, in basis points of the reduced amount,\npaid by the borrower on `date` when the commitment steps down. Ignored\non a step up. Defaults to `0.0`.",
-          "format": "double",
-          "type": "number"
+        "reduction_fee_bp": {
+          "$ref": "#/$defs/d_18f3ba1ec18ab2be13b2",
+          "default": "0",
+          "description": "One-off reduction or cancellation fee, in basis points of the reduced\namount (not per annum), paid by the borrower on `date` when the\ncommitment steps down. Ignored on a step up. Defaults to zero."
         }
       },
       "required": [
@@ -4276,7 +4284,7 @@
       "type": "object"
     },
     "d_c338b2b6a7bb9038a413": {
-      "description": "Upfront (arrangement or original-issue-discount) fee of a facility.\n\nPaid by the borrower to the lender on the commitment date. Enters the\npresent value only while the commitment date lies after the valuation\ndate, and the effective-interest-rate metrics always.",
+      "description": "Upfront (arrangement or original-issue-discount) fee of a facility.\n\nPaid by the borrower to the lender on the issue date. Enters the\npresent value only while the commitment date lies after the valuation\ndate, and the effective-interest-rate metrics always.",
       "oneOf": [
         {
           "additionalProperties": false,

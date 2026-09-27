@@ -5261,7 +5261,7 @@ export interface BondConstructor {
    * @param stub - Stub policy: `none`, `short_front`, `short_back`, `long_front`, or `long_back`.
    * @param discountCurveId - Discount curve identifier used for pricing.
    * @returns The validated fixed-rate bond.
-   * @throws If validation fails (e.g. maturity not after issue).
+   * @throws If validation fails (e.g. maturity not after issue_date).
    */
   fixed(
     id: string,
@@ -7325,9 +7325,13 @@ export interface CompositeRebalanceResult {
  * are the generated valuation-result contract types, re-exported unchanged.
  */
 export type CompositeExposureReport = import('./types/valuation-result').CompositeExposureReport;
-/** One primitive exposure path in a resolved composite. */
+/**
+ * One primitive exposure path in a resolved composite.
+ */
 export type PrimitiveExposure = import('./types/valuation-result').PrimitiveExposure;
-/** Net and gross concentration for one primitive identifier. */
+/**
+ * Net and gross concentration for one primitive identifier.
+ */
 export type PrimitiveAggregate = import('./types/valuation-result').PrimitiveAggregate;
 
 /**

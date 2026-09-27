@@ -29,7 +29,7 @@ export default [
             "past_fixings": [],
             "quantity": 1000,
             "strike": 75,
-            "ticker": "CL",
+            "underlying_ticker": "CL",
             "unit": "BBL",
             "vol_surface_id": "CL-VOL"
           },
@@ -1074,9 +1074,9 @@ export default [
     "resolvedRef": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_asian_option.schema.json#/$defs/PositiveF64Wire"
   },
   {
-    "path": "#/$defs/d_630fb6613f366870c6aa/properties/ticker",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_asian_option.schema.json#/$defs/CommodityAsianOption/properties/ticker",
-    "description": "Ticker/identifier for market data lookup (e.g., \"CL\", \"GC\", \"NG\")"
+    "path": "#/$defs/d_630fb6613f366870c6aa/properties/underlying_ticker",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_asian_option.schema.json#/$defs/CommodityAsianOption/properties/underlying_ticker",
+    "description": "Commodity symbol label (e.g., \"CL\", \"GC\", \"NG\"); never a market-data key."
   },
   {
     "path": "#/$defs/d_630fb6613f366870c6aa/properties/unit",

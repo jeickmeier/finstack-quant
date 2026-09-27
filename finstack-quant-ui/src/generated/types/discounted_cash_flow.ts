@@ -464,8 +464,8 @@ export interface DB7951C6B1F5A9B193F7A {
  *
  * # Equity Bridge
  *
- * When [`equity_bridge`](Self::equity_bridge) is `Some`, it takes precedence over
- * the flat [`net_debt`](Self::net_debt) field for the EV-to-equity conversion.
+ * [`equity_bridge`](Self::equity_bridge) is the single EV-to-equity channel; a
+ * flat net-debt deduction sets only its `total_debt` and `cash`.
  *
  * # Mid-Year Convention
  *
@@ -491,12 +491,7 @@ export interface D_05Fc0451Dee1E185F517 {
    * Dilutive securities (options, warrants, RSUs, convertibles) for treasury stock method.
    */
   dilution_securities?: D_0Cec8C79C0F6Ac6E12Ca[];
-  /**
-   * Structured equity bridge for EV-to-equity conversion.
-   *
-   * When present, takes precedence over the flat `net_debt` field.
-   */
-  equity_bridge?: DE3Fba31E59Ae8C9A690E | null;
+  equity_bridge: DE3Fba31E59Ae8C9A690E;
   /**
    * Explicit period free cash flows (date, amount pairs).
    */
@@ -521,12 +516,6 @@ export interface D_05Fc0451Dee1E185F517 {
    * terminal values are not shifted (point-in-time sale at the horizon).
    */
   mid_year_convention?: boolean;
-  /**
-   * Net debt (debt - cash) to subtract from enterprise value.
-   *
-   * Ignored when [`equity_bridge`](Self::equity_bridge) is `Some`.
-   */
-  net_debt: number;
   scenario_pricing_overrides?: ScenarioPricingOverrides;
   /**
    * Basic shares outstanding for per-share value calculation.
@@ -552,9 +541,10 @@ export interface D_05Fc0451Dee1E185F517 {
   terminal_value:
     | {
         /**
-         * Perpetual growth rate (e.g., 0.02 for 2%)
+         * Perpetual stable growth rate as an annual decimal (e.g., 0.02 for
+         * 2%). Must be < WACC.
          */
-        growth_rate: number;
+        stable_growth_rate: number;
         type: "gordon_growth";
         [k: string]: unknown;
       }
@@ -632,16 +622,9 @@ export interface D_0Cec8C79C0F6Ac6E12Ca {
   quantity: number;
 }
 /**
- * Structured equity bridge for converting Enterprise Value to Equity Value.
- *
- * Standard professional bridge:
- * ```text
- * Equity = EV - Total Debt + Cash - Preferred Equity - Minority Interest
- *          + Non-Operating Assets + Σ(other adjustments)
- * ```
- *
- * When attached to a [`DiscountedCashFlow`], this takes precedence over the
- * flat `net_debt` scalar.
+ * Equity bridge from enterprise value to equity value (debt, cash,
+ * preferred equity, minority interest, non-operating assets and other
+ * adjustments), in instrument currency.
  */
 export interface DE3Fba31E59Ae8C9A690E {
   /**

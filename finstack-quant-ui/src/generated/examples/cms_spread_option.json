@@ -5,9 +5,10 @@
       "correlation": 0.85,
       "day_count": "act_360",
       "discount_curve_id": "USD-OIS",
-      "expiry_date": "2027-03-29",
+      "expiry": "2027-03-29",
       "forward_curve_id": "USD-SOFR-3M",
       "id": "CMS-SPREAD-10Y2Y",
+      "index_id": "USD-SOFR-OIS",
       "long_cms_tenor": {
         "count": 10,
         "unit": "years"
@@ -24,8 +25,7 @@
         "unit": "years"
       },
       "short_vol_surface_id": "USD-SWAPTION-VOL-2Y",
-      "strike": 0.005,
-      "swap_convention": "usd_sofr"
+      "strike": "0.005"
     },
     "type": "cms_spread_option"
   },

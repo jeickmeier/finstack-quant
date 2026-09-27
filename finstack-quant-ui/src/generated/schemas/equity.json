@@ -12,9 +12,9 @@
           "discrete_dividends": [],
           "div_yield_id": "AAPL-DIV",
           "id": "EQUITY-AAPL",
-          "price_id": "AAPL-SPOT",
-          "price_quote": null,
-          "shares": 100,
+          "quantity": 100,
+          "quoted_spot": null,
+          "spot_id": "AAPL-SPOT",
           "ticker": "AAPL"
         },
         "type": "equity"
@@ -1347,7 +1347,7 @@
               "type": "null"
             }
           ],
-          "description": "Explicit scalar identifier used to resolve the dividend yield."
+          "description": "Market-scalar id of the unitless continuous dividend yield (decimal,\n0.02 = 2%). `None` means a zero dividend yield."
         },
         "id": {
           "$ref": "#/$defs/d_9c3fc047c6fea21344ad",
@@ -1361,19 +1361,16 @@
           "$ref": "#/$defs/d_00292b2cd9779815232f",
           "description": "Metric-time pricing configuration."
         },
-        "price_id": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/d_9c3fc047c6fea21344ad"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "Explicit scalar identifier used to resolve the spot price."
+        "quantity": {
+          "description": "Optional number of shares held (defaults to 1 if not specified).",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
         },
-        "price_quote": {
-          "description": "Optional price quote (if not provided, will look up from market data)",
+        "quoted_spot": {
+          "description": "Optional quoted spot price per share in `currency`. When set it wins\nover the `spot_id` market lookup.",
           "format": "double",
           "type": [
             "number",
@@ -1384,13 +1381,16 @@
           "$ref": "#/$defs/d_f80c8a31d359e1cb5dd4",
           "description": "Scenario-only pricing adjustments."
         },
-        "shares": {
-          "description": "Optional number of shares (defaults to 1 if not specified)",
-          "format": "double",
-          "type": [
-            "number",
-            "null"
-          ]
+        "spot_id": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/d_9c3fc047c6fea21344ad"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Market-scalar id (`MarketContext::get_price`) of the spot price per\nshare. Required unless `quoted_spot` is set; no id is ever derived from\nthe ticker or instrument id."
         },
         "ticker": {
           "description": "Ticker symbol (e.g., \"AAPL\", \"MSFT\")",

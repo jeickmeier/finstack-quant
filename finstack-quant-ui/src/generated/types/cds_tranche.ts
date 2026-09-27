@@ -7,9 +7,13 @@
 export type BusinessDayConvention =
   "unadjusted" | "following" | "modified_following" | "preceding" | "modified_preceding" | "nearest";
 /**
- * Credit index identifier for survival/loss modeling (placeholder)
+ * Opaque string identifier.
  */
 export type Id = string;
+/**
+ * Opaque string identifier.
+ */
+export type Id1 = string;
 /**
  * Day count (typically Act/360)
  */
@@ -28,17 +32,13 @@ export type DayCount =
   | "act_act_afb"
   | "bus_252";
 /**
- * Discount curve identifier (by quote currency)
- */
-export type Id1 = string;
-/**
- * ISO 8601 calendar date string.
- */
-export type Date = string;
-/**
- * Unique instrument identifier
+ * Opaque string identifier.
  */
 export type Id2 = string;
+/**
+ * Opaque string identifier.
+ */
+export type Id3 = string;
 /**
  * A phantom-typed identifier that prevents mixing different kinds of IDs.
  *
@@ -130,9 +130,9 @@ export type D_02A11B30Ee627630F221 = "per_name" | "large_homogeneous";
  */
 export type DEc89Adc17436F33De839 = "black" | "normal";
 /**
- * ISO 8601 calendar date string.
+ * Maturity date of the tranche
  */
-export type Date1 = string;
+export type Date = string;
 /**
  * Basis used for bond duration, convexity, and DV01-style risk metrics.
  */
@@ -308,6 +308,10 @@ export type DB556Bbeb1Ecf96C44C5A =
   | "ZMW"
   | "ZWL";
 /**
+ * ISO 8601 calendar date string.
+ */
+export type Date1 = string;
+/**
  * Canonical schema marker for persisted instrument envelopes.
  */
 export type DE389772Eba468Cc1563B = "finstack_quant.instrument/1";
@@ -336,30 +340,26 @@ export interface D_1376Bb75255Ac32C8B77 {
   /**
    * Optional holiday calendar id
    */
-  calendar_id?: string | null;
+  calendar_id?: Id | null;
   /**
    * Running coupon in basis points (e.g., 100 = 1.00%)
    */
   coupon_bp: number;
-  credit_index_id: Id;
+  credit_index_id: Id1;
   day_count: DayCount;
   /**
    * Detachment point in percent (e.g., 3.0 for 0-3% tranche)
    */
   detach_pct: number;
-  discount_curve_id: Id1;
-  /**
-   * Optional effective date for schedule anchoring (if None, uses as_of date)
-   */
-  effective_date?: Date | null;
+  discount_curve_id: Id2;
   frequency: Tenor;
-  id: Id2;
+  id: Id3;
   /**
    * Index name (e.g., "CDX.NA.IG", "CDX.NA.HY", "iTraxx EUR")
    */
   index_name: string;
   instrument_pricing_overrides?: InstrumentPricingOverrides;
-  maturity: Date1;
+  maturity: Date;
   metric_pricing_overrides?: MetricPricingOverrides;
   notional: Money;
   /**
@@ -384,6 +384,10 @@ export interface D_1376Bb75255Ac32C8B77 {
    */
   side: "buy_protection" | "sell_protection";
   /**
+   * Optional effective date for schedule anchoring (if None, uses as_of date)
+   */
+  start_date?: Date1 | null;
+  /**
    * Stub convention for a bespoke (`roll_rule = none`) coupon schedule.
    * Defaults to `short_front`.
    */
@@ -394,7 +398,7 @@ export interface D_1376Bb75255Ac32C8B77 {
    * @minItems 2
    * @maxItems 2
    */
-  upfront?: [Date, Money1] | null;
+  upfront?: [Date1, Money1] | null;
 }
 /**
  * Attributes for scenario selection and tagging

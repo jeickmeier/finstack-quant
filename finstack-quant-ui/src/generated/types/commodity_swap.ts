@@ -182,10 +182,6 @@ export type Currency =
  */
 export type Id1 = string;
 /**
- * Fixed price per unit.
- */
-export type Decimal = string;
-/**
  * Opaque string identifier.
  */
 export type Id2 = string;
@@ -514,8 +510,8 @@ export interface D_921Fa1B968E60C3C7Bf0 {
  *     .id(InstrumentId::new("NG-SWAP-2025"))
  *     .underlying(CommodityUnderlyingParams::new("Energy", "NG", "MMBTU", Currency::USD))
  *     .quantity(10000.0)
- *     .fixed_price(rust_decimal::Decimal::try_from(3.50).expect("valid decimal"))
- *     .floating_index_id(CurveId::new("NG-SPOT-AVG"))
+ *     .fixed_price(3.50)
+ *     .forward_curve_id(CurveId::new("NG-SPOT-AVG"))
  *     .side(PayReceive::Pay)
  *     .start_date(Date::from_calendar_date(2025, Month::January, 1).unwrap())
  *     .maturity(Date::from_calendar_date(2025, Month::December, 31).unwrap())
@@ -538,8 +534,11 @@ export interface D_6A0B21D7E4Dfcb5Ae18C {
   commodity_type: string;
   currency: Currency;
   discount_curve_id: Id1;
-  fixed_price: Decimal;
-  floating_index_id: Id2;
+  /**
+   * Fixed price per commodity unit, in the notional currency (finite).
+   */
+  fixed_price: number;
+  forward_curve_id: Id2;
   frequency: Tenor;
   id: Id3;
   /**
@@ -572,9 +571,9 @@ export interface D_6A0B21D7E4Dfcb5Ae18C {
   side?: "pay" | "receive";
   start_date: Date2;
   /**
-   * Ticker/identifier for market data lookup (e.g., "CL", "GC", "NG")
+   * Commodity symbol label (e.g., "CL", "GC", "NG"); never a market-data key.
    */
-  ticker: string;
+  underlying_ticker: string;
   /**
    * Unit of measurement (e.g., "BBL", "OZ", "MT", "MMBTU")
    */

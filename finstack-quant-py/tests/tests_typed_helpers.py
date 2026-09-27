@@ -279,6 +279,9 @@ def build_convertible() -> ConvertibleBond:
         "dividend_adjustment": "none",
         "dilution_events": [],
     })
+    # A zero-coupon convertible is a fixed cashflow spec with rate "0".
+    zero_coupon = ConvertibleBond.example().cashflow_spec
+    zero_coupon["fixed"]["rate"] = "0"
     return (
         ConvertibleBond
         .builder()
@@ -288,6 +291,7 @@ def build_convertible() -> ConvertibleBond:
         .maturity(datetime.date(2029, 1, 15))
         .discount_curve_id("USD-OIS")
         .conversion(conversion)
+        .cashflow_spec(zero_coupon)
         .spot_id("ACME")
         .vol_surface_id("ACME-VOL")
         .build()

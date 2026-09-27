@@ -28,6 +28,7 @@ export default [
                 }
               ]
             },
+            "calendar_id": "nyse",
             "closing_date": "2024-01-15",
             "collateral": {
               "assets": [
@@ -41,26 +42,25 @@ export default [
                     "currency": "USD"
                   },
                   "contractual_payment": null,
-                  "credit_quality": null,
                   "day_count": "act_360",
                   "default_date": null,
+                  "defaulted": false,
+                  "forward_curve_id": null,
                   "id": "COLLATERAL-1",
-                  "index_id": null,
                   "industry": null,
-                  "is_defaulted": false,
                   "maturity": "2034-01-01",
                   "mdr_override": null,
                   "obligor_id": null,
                   "origination_date": null,
                   "purchase_price": null,
                   "rate": 0.07,
+                  "rating": null,
                   "recovery_amount": null,
                   "recovery_rate": null,
                   "smm_override": null,
                   "spread_bp": null
                 }
               ],
-              "base_currency": "USD",
               "collection_account": {
                 "amount": "0",
                 "currency": "USD"
@@ -81,6 +81,7 @@ export default [
                 "amount": "0",
                 "currency": "USD"
               },
+              "currency": "USD",
               "deal_type": "clo",
               "excess_spread_account": {
                 "amount": "0",
@@ -98,6 +99,7 @@ export default [
               "amount": "80000000",
               "currency": "USD"
             },
+            "commitment_fee_bp": "50",
             "day_count": "act_360",
             "default_spec": {
               "cdr": 0.02,
@@ -113,12 +115,15 @@ export default [
               "unit": "months"
             },
             "id": "ABF-EXAMPLE",
-            "margin_bp": 600,
             "maturity": "2030-01-15",
-            "payment_calendar_id": "nyse",
             "prepayment_spec": {
               "cpr": 0.2,
               "curve": null
+            },
+            "rate": {
+              "fixed": {
+                "rate": 0.06
+              }
             },
             "readvance_to_borrowing_base": false,
             "recovery_spec": {
@@ -128,8 +133,7 @@ export default [
             "revolving_end": "2026-01-15",
             "term_out": {
               "months": 24
-            },
-            "unused_fee_bp": 50
+            }
           },
           "type": "asset_backed_facility"
         },

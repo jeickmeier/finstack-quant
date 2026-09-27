@@ -16,8 +16,8 @@
             "past_fixings": [],
             "type": "arithmetic_average"
           },
+          "forward_curve_id": "IRON-ORE-FORWARD",
           "id": "SGX-IRON-ORE-DEC26",
-          "price_curve_id": "IRON-ORE-FORWARD",
           "terms": {
             "contracts": 10,
             "currency": "USD",
@@ -30,7 +30,7 @@
             },
             "settlement_date": "2027-01-04"
           },
-          "underlying": "TSI-62-FE"
+          "underlying_ticker": "TSI-62-FE"
         },
         "type": "commodity_future"
       },
@@ -168,6 +168,10 @@
           "$ref": "#/$defs/d_3bc0029016b9f7c8451a",
           "description": "Final-settlement price fixing rule (single observation or average)."
         },
+        "forward_curve_id": {
+          "$ref": "#/$defs/d_9c3fc047c6fea21344ad",
+          "description": "Commodity forward `PriceCurve` used for projected observations."
+        },
         "id": {
           "$ref": "#/$defs/d_9c3fc047c6fea21344ad",
           "description": "Unique instrument identifier."
@@ -180,10 +184,6 @@
           "$ref": "#/$defs/d_00292b2cd9779815232f",
           "description": "Metric-time pricing configuration."
         },
-        "price_curve_id": {
-          "$ref": "#/$defs/d_9c3fc047c6fea21344ad",
-          "description": "Price-curve identifier used for projected observations."
-        },
         "scenario_pricing_overrides": {
           "$ref": "#/$defs/d_f80c8a31d359e1cb5dd4",
           "description": "Scenario-only pricing adjustments."
@@ -192,16 +192,16 @@
           "$ref": "#/$defs/d_198d478e527b197aa55f",
           "description": "Standard listed position and lifecycle terms."
         },
-        "underlying": {
+        "underlying_ticker": {
           "description": "Exchange symbol or underlying label.",
           "type": "string"
         }
       },
       "required": [
         "id",
-        "underlying",
+        "underlying_ticker",
         "terms",
-        "price_curve_id",
+        "forward_curve_id",
         "fixing"
       ],
       "type": "object"

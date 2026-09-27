@@ -18,7 +18,7 @@
             "amount": "10000000",
             "currency": "USD"
           },
-          "reset_lag": 2,
+          "reset_lag_days": 2,
           "side": "receive",
           "start_date": "2024-04-03"
         },
@@ -1136,7 +1136,7 @@
               "type": "null"
             }
           ],
-          "description": "Rate fixing date. If `None`, inferred from `start_date - reset_lag` business days."
+          "description": "Rate fixing date. If `None`, inferred from `start_date - reset_lag_days` business days."
         },
         "forward_curve_id": {
           "$ref": "#/$defs/d_9c3fc047c6fea21344ad",
@@ -1170,7 +1170,7 @@
             "null"
           ]
         },
-        "reset_lag": {
+        "reset_lag_days": {
           "description": "Reset lag in business days (fixing to value date)",
           "format": "int32",
           "type": "integer"
@@ -1196,7 +1196,7 @@
         "maturity",
         "fixed_rate",
         "day_count",
-        "reset_lag",
+        "reset_lag_days",
         "discount_curve_id",
         "forward_curve_id",
         "attributes"

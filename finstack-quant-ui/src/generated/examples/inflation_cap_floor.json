@@ -12,8 +12,8 @@
       },
       "id": "INFLCAP-USD-5Y",
       "inflation_index_id": "US-CPI",
-      "interpolation_override": null,
-      "lag_override": {
+      "interpolation": null,
+      "lag": {
         "months": 3
       },
       "maturity": "2029-01-15",

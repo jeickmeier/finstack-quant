@@ -274,10 +274,6 @@ export type DB556Bbeb1Ecf96C44C5A =
   | "ZMW"
   | "ZWL";
 /**
- * ISO 8601 calendar date string.
- */
-export type Date1 = string;
-/**
  * Day count convention
  */
 export type DayCount =
@@ -482,6 +478,10 @@ export type Id5 = string;
  */
 export type Id6 = string;
 /**
+ * ISO 8601 calendar date string.
+ */
+export type Date1 = string;
+/**
  * Opaque string identifier.
  */
 export type Id7 = string;
@@ -555,9 +555,10 @@ export interface DDb20612Dc309C7165418 {
    */
   call_dates: Date[];
   /**
-   * Lockout period in number of coupon periods before first call.
+   * End of the no-call (lockout) period. Call dates on or before this
+   * date are dropped (exclusive bound); `None` means no lockout.
    */
-  lockout_periods: number;
+  lockout_end?: Date | null;
   /**
    * Redemption price in percent of par (`100.0` = par). The pricer pays
    * `notional * price_pct_of_par / 100` at exercise.
@@ -1466,7 +1467,6 @@ export interface DE49387F97C0F9D510642 {
  * Range accrual contract terms (no identity, attributes or overrides of their own).
  */
 export interface DDe9Dcde9D5Fad54Ea251 {
-  accrual_start_date: Date1;
   /**
    * How to interpret the range bounds (default: Absolute)
    */
@@ -1481,6 +1481,18 @@ export interface DDe9Dcde9D5Fad54Ea251 {
    * Optional dividend-yield scalar ID
    */
   div_yield_id?: Id2 | null;
+  /**
+   * Rates forward curve that projects the observed index of a rate-linked range accrual.
+   */
+  forward_curve_id?: Id2 | null;
+  /**
+   * Rate-index identity (e.g. `USD-SOFR`) of a rate-linked range accrual.
+   */
+  index_id?: Id2 | null;
+  /**
+   * Contractual tenor of the observed rate index.
+   */
+  index_tenor?: Tenor | null;
   /**
    * Lower bound of accrual range (interpretation depends on bounds_type)
    */
@@ -1500,24 +1512,13 @@ export interface DDe9Dcde9D5Fad54Ea251 {
    */
   payment_date?: Date | null;
   /**
-   * Projection curve for a rate-linked range accrual.
-   */
-  projection_curve_id?: Id2 | null;
-  /**
    * Optional quanto adjustment parameters. When provided, applies a drift
    * correction for instruments whose payoff currency differs from the
    * underlying asset currency.
    */
   quanto?: DB94B8826Eae88515056F | null;
-  /**
-   * Explicit rate index for rate-linked range accruals.
-   */
-  rate_index_id?: Id2 | null;
-  /**
-   * Contractual tenor of the observed reference rate.
-   */
-  reference_tenor?: Tenor | null;
   spot_id: Id6;
+  start_date: Date1;
   /**
    * Total number of past observations (for mid-life valuations).
    * Must be provided if `past_observations_in_range` is set.
@@ -1532,6 +1533,21 @@ export interface DDe9Dcde9D5Fad54Ea251 {
    */
   upper_bound: number;
   vol_surface_id: Id7;
+}
+/**
+ * Parsed financial tenor.
+ */
+export interface Tenor {
+  /**
+   * Number of `unit` periods in the tenor. Must be at least 1; `0` is
+   * rejected because a zero-length period makes schedule generation loop.
+   */
+  count: number;
+  /**
+   * Calendar unit the count is expressed in, such as days, weeks, months,
+   * or years.
+   */
+  unit: "days" | "weeks" | "months" | "years";
 }
 /**
  * Notional amount
@@ -1722,21 +1738,6 @@ export interface DB94B8826Eae88515056F {
   correlation: number;
   fx_spot_id: Id4;
   fx_vol_surface_id: Id5;
-}
-/**
- * Parsed financial tenor.
- */
-export interface Tenor {
-  /**
-   * Number of `unit` periods in the tenor. Must be at least 1; `0` is
-   * rejected because a zero-length period makes schedule generation loop.
-   */
-  count: number;
-  /**
-   * Calendar unit the count is expressed in, such as days, weeks, months,
-   * or years.
-   */
-  unit: "days" | "weeks" | "months" | "years";
 }
 /**
  * Scenario-only pricing adjustments.

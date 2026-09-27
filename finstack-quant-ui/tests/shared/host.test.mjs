@@ -82,8 +82,8 @@ const composite = valuations.composite.initialize(
     reporting_currency: "USD",
     capital: { amount: "100", currency: "USD" },
     legs: [
-      { instrument_id: "A", instrument: equity("A", 100), weight: 1 },
-      { instrument_id: "B", instrument: equity("B", 90), weight: -1 },
+      { instrument_id: "A", instrument: equity("A", 100), score: 1 },
+      { instrument_id: "B", instrument: equity("B", 90), score: -1 },
     ],
     weighting_method: { kind: "fixed_quantity" },
     rebalance_rule: { kind: "manual" },

@@ -44,15 +44,15 @@
       ],
       "id": "PMF-EXAMPLE",
       "waterfall_spec": {
-        "catchup_mode": "full",
+        "catch_up_mode": "full",
         "clawback": null,
-        "irr_basis": "act_365f",
+        "day_count": "act_365f",
         "style": "european",
         "tranches": [
           "return_of_capital",
           {
             "preferred_irr": {
-              "irr": 0.08
+              "hurdle_irr": 0.08
             }
           },
           {
@@ -63,11 +63,7 @@
           {
             "promote_tier": {
               "gp_share": 0.2,
-              "hurdle": {
-                "irr": {
-                  "rate": 0.12
-                }
-              },
+              "hurdle_irr": 0.12,
               "lp_share": 0.8
             }
           }

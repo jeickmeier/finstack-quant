@@ -19,9 +19,9 @@ export default [
             },
             "quote_calendar_id": null,
             "quote_currency": "USD",
+            "quoted_spot": 1.1,
             "settlement_date": null,
-            "settlement_days": 2,
-            "spot_rate": 1.1
+            "settlement_days": 2
           },
           "type": "fx_spot"
         },
@@ -1171,7 +1171,7 @@ export default [
   {
     "path": "#/$defs/d_81828a2fc42ad3c4ad70",
     "source": "https://finstack_quant.dev/schemas/instrument/1/fx/fx_spot.schema.json#/$defs/FxSpot",
-    "description": "FX Spot instrument (1 unit of `base` priced in `quote`).\n\nRepresents the spot exchange rate between two currencies following\nstandard market quoting conventions (base/quote or CCY1/CCY2).\n\n# Quote Convention\n\nThe rate is interpreted as: **1 unit of base = rate units of quote**\n\nFor example, if `base = EUR`, `quote = USD`, and `spot_rate = 1.10`:\n- 1 EUR = 1.10 USD\n- This is the \"EUR/USD\" rate\n\n# Settlement\n\nWhen `settlement_days` is `None`, the pair-aware default is T+1 for\nUSD↔CAD and USD↔TRY and T+2 otherwise (including EUR/USD). An explicit\n`settlement_days` overrides that default; `settlement_date` overrides both.\n\nSee module-level documentation for comprehensive FX quoting conventions."
+    "description": "FX Spot instrument (1 unit of `base` priced in `quote`).\n\nRepresents the spot exchange rate between two currencies following\nstandard market quoting conventions (base/quote or CCY1/CCY2).\n\n# Quote Convention\n\nThe rate is interpreted as: **1 unit of base = rate units of quote**\n\nFor example, if `base = EUR`, `quote = USD`, and `quoted_spot = 1.10`:\n- 1 EUR = 1.10 USD\n- This is the \"EUR/USD\" rate\n\n# Settlement\n\nWhen `settlement_days` is `None`, the pair-aware default is T+1 for\nUSD↔CAD and USD↔TRY and T+2 otherwise (including EUR/USD). An explicit\n`settlement_days` overrides that default; `settlement_date` overrides both.\n\nSee module-level documentation for comprehensive FX quoting conventions."
   },
   {
     "path": "#/$defs/d_81828a2fc42ad3c4ad70/properties/attributes",
@@ -1201,20 +1201,20 @@ export default [
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/business_day_convention.schema.json#"
   },
   {
-    "path": "#/$defs/d_81828a2fc42ad3c4ad70/properties/discount_curve_id",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/fx/fx_spot.schema.json#/$defs/FxSpot/properties/discount_curve_id",
+    "path": "#/$defs/d_81828a2fc42ad3c4ad70/properties/domestic_discount_curve_id",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/fx/fx_spot.schema.json#/$defs/FxSpot/properties/domestic_discount_curve_id",
     "default": null,
     "description": "Optional quote-currency discount curve for PV-ing the settlement\ncashflow. When absent the settlement amount is reported undiscounted\n(a 1–2 day effect for standard spot lags)."
   },
   {
-    "path": "#/$defs/d_81828a2fc42ad3c4ad70/properties/discount_curve_id/anyOf/0",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/fx/fx_spot.schema.json#/$defs/FxSpot/properties/discount_curve_id/anyOf/0",
+    "path": "#/$defs/d_81828a2fc42ad3c4ad70/properties/domestic_discount_curve_id/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/fx/fx_spot.schema.json#/$defs/FxSpot/properties/domestic_discount_curve_id/anyOf/0",
     "ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/id.schema.json#"
   },
   {
-    "path": "#/$defs/d_81828a2fc42ad3c4ad70/properties/discount_curve_id/anyOf/1",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/fx/fx_spot.schema.json#/$defs/FxSpot/properties/discount_curve_id/anyOf/1"
+    "path": "#/$defs/d_81828a2fc42ad3c4ad70/properties/domestic_discount_curve_id/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/fx/fx_spot.schema.json#/$defs/FxSpot/properties/domestic_discount_curve_id/anyOf/1"
   },
   {
     "path": "#/$defs/d_81828a2fc42ad3c4ad70/properties/id",
@@ -1261,6 +1261,12 @@ export default [
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/currency.schema.json#"
   },
   {
+    "path": "#/$defs/d_81828a2fc42ad3c4ad70/properties/quoted_spot",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/fx/fx_spot.schema.json#/$defs/FxSpot/properties/quoted_spot",
+    "description": "Optional quoted FX spot rate (quote per base); `None` reads the FxMatrix.",
+    "format": "double"
+  },
+  {
     "path": "#/$defs/d_81828a2fc42ad3c4ad70/properties/scenario_pricing_overrides",
     "source": "https://finstack_quant.dev/schemas/instrument/1/fx/fx_spot.schema.json#/$defs/FxSpot/properties/scenario_pricing_overrides",
     "default": {},
@@ -1290,12 +1296,6 @@ export default [
     "description": "Optional T+N settlement lag in business days when `settlement_date` is not provided.\n\n`None` uses the pair-aware default: T+1 for USD↔CAD and USD↔TRY, T+2 otherwise.",
     "format": "uint32",
     "minimum": 0
-  },
-  {
-    "path": "#/$defs/d_81828a2fc42ad3c4ad70/properties/spot_rate",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/fx/fx_spot.schema.json#/$defs/FxSpot/properties/spot_rate",
-    "description": "Optional spot rate (if not provided, will look up from market data)",
-    "format": "double"
   },
   {
     "path": "#/$defs/d_8a837e6f142b34e8cfd4",

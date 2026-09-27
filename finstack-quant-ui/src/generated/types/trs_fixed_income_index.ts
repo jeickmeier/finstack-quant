@@ -519,6 +519,12 @@ export type Date = string;
 export type BusinessDayConvention =
   "unadjusted" | "following" | "modified_following" | "preceding" | "modified_preceding" | "nearest";
 /**
+ * Holiday calendar identifier used together with `business_day_convention`.
+ *
+ * Use `"weekends_only"` when only Saturday/Sunday adjustment is needed.
+ */
+export type Id4 = string;
+/**
  * Day-count convention used to convert each generated accrual period into a
  * year fraction.
  */
@@ -541,7 +547,7 @@ export type DayCount1 =
  */
 export type Date1 = string;
 /**
- * Base currency of the index
+ * Currency the index (and so the swap notional) is denominated in.
  */
 export type Currency1 =
   | "AED"
@@ -704,9 +710,13 @@ export type Currency1 =
   | "ZMW"
   | "ZWL";
 /**
- * Index identifier (e.g., "CDX.IG", "HY.BOND.INDEX")
+ * Opaque string identifier.
  */
-export type Id4 = string;
+export type Id5 = string;
+/**
+ * Opaque string identifier.
+ */
+export type Id6 = string;
 /**
  * Canonical schema marker for persisted instrument envelopes.
  */
@@ -3332,12 +3342,7 @@ export interface ScheduleParams {
    */
   adjust_accrual_dates?: boolean;
   business_day_convention?: BusinessDayConvention;
-  /**
-   * Holiday calendar identifier used together with `business_day_convention`.
-   *
-   * Use `"weekends_only"` when only Saturday/Sunday adjustment is needed.
-   */
-  calendar_id: string;
+  calendar_id: Id4;
   day_count: DayCount1;
   /**
    * Whether end-of-month rolling should be preserved when generating the
@@ -3384,15 +3389,15 @@ export interface Tenor {
  * Underlying index parameters (index ID, yield, duration, base currency).
  */
 export interface D_302F94Ee7E57481D4351 {
-  base_currency: Currency1;
+  currency: Currency1;
   /**
    * Market scalar identifier for signed index duration in years. Required when
    * requesting FI TRS duration risk; the scalar must be unitless and finite. No duration is inferred from index name or maturity.
    */
-  duration_id?: string | null;
-  index_id: Id4;
+  duration_id?: Id5 | null;
+  index_id: Id6;
   /**
    * Optional yield curve/scalar identifier for carry calculation
    */
-  yield_id?: string | null;
+  yield_id?: Id5 | null;
 }

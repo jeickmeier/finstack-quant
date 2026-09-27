@@ -8,6 +8,22 @@
         "spec": {
           "attributes": {},
           "call_put": null,
+          "cashflow_spec": {
+            "fixed": {
+              "business_day_convention": "following",
+              "calendar_id": "weekends_only",
+              "coupon_type": "cash",
+              "day_count": "30_360",
+              "end_of_month": false,
+              "frequency": {
+                "count": 6,
+                "unit": "months"
+              },
+              "payment_lag_days": 0,
+              "rate": "0.02",
+              "stub": "none"
+            }
+          },
           "conversion": {
             "anti_dilution": "none",
             "dilution_events": [],
@@ -18,21 +34,7 @@
           },
           "credit_curve_id": "USD-CREDIT-BBB",
           "discount_curve_id": "USD-IG",
-          "fixed_coupon": {
-            "business_day_convention": "following",
-            "calendar_id": "weekends_only",
-            "coupon_type": "cash",
-            "day_count": "30_360",
-            "end_of_month": false,
-            "frequency": {
-              "count": 6,
-              "unit": "months"
-            },
-            "payment_lag_days": 0,
-            "rate": "0.02",
-            "stub": "none"
-          },
-          "floating_coupon": null,
+          "div_yield_id": null,
           "id": "CB-TECH-5Y",
           "issue_date": "2024-01-15",
           "maturity": "2029-01-15",
@@ -41,7 +43,8 @@
             "currency": "USD"
           },
           "recovery_rate": 0,
-          "underlying_equity_id": "TECH"
+          "spot_id": "TECH",
+          "vol_surface_id": "TECH-VOL"
         },
         "type": "convertible_bond"
       },
@@ -407,7 +410,7 @@
     },
     "d_14e8725a09f7b41c7021": {
       "additionalProperties": false,
-      "description": "Canonical floating rate specification for all instruments.\n\nUsed by bonds, swaps, credit facilities, and structured products.\nAll instruments should compose this type rather than defining their own\nfloating rate specifications.\n\n# Rate Calculation\n\nThe all-in rate is computed as:\n1. Look up forward rate from `index_id` curve for the accrual period\n2. Apply `index_floor_bp` to index rate (if specified) - applied BEFORE adding spread\n3. Add `spread_bp` to get base rate\n4. Multiply by `gearing` (typically 1.0)\n5. Apply `all_in_cap_bp` to final rate (if specified) - applied AFTER spread and gearing\n\nFormula: `cap(gearing * (floor(index) + spread))`\n\n# Negative Rate Handling\n\nNegative index rates are supported and will flow through calculations\nunless constrained by floors. For markets with negative rates (EUR, JPY, CHF):\n\n- Set `index_floor_bp: Some(0.0)` to floor the index at zero\n- Set `all_in_floor_bp: Some(0.0)` to floor the total coupon at zero\n- Omit floors to allow negative coupons (rare but valid in some structures)\n\nThe implementation does not reject negative rates; the policy is controlled\nby the floor configuration.\n\n# Seasoned Instruments (Historical Fixings)\n\nHistorical fixings **are supported** via the `MarketContext`: store a\n`ScalarTimeSeries` under the canonical id `FIXING:{index_id}` (see\n`finstack_quant_core::market_data::fixings`) containing realized index\nobservations. Observation dates strictly before the forward curve base\ndate then resolve from that series instead of the curve:\n\n- **Overnight observations** (compounded/averaged paths) use LOCF lookup\n  (last observation carried forward), matching RFR publication\n  conventions where a fixing carries over non-publication days\n  (ARRC 2020 SOFR conventions; ISDA 2021 Supp. 70 §7.1(g)). A partially\n  seasoned compounding window seamlessly mixes realized fixings and\n  curve-projected forwards with identical `(rate, days)` weighting.\n- **Term-rate resets** use exact-date lookup on the (business-day\n  adjusted) reset date — a term rate fixes on a specific published date.\n  The fixing is the index rate only; gearing/spread/floors/caps apply on\n  top exactly as for projected rates.\n\nAn observation exactly on the curve base date prefers a published\nsame-day fixing when the series has one, otherwise projects from `t = 0`.\n\nThe [`FloatingRateFallback`] policy applies only when **no** fixing\nseries is provided: `Error` (the default) fails the build with a\ndescriptive message naming the date, index, and expected series id;\n`FixedRate(r)` uses `r` as the index rate for the affected coupon;\n`SpreadOnly` projects spread-only.\n\n# Example\n\n```rust\nuse finstack_quant_core::dates::Tenor;\nuse finstack_quant_cashflows::builder::{FloatingRateSpec, OvernightIndexConstraintApplication};\nuse rust_decimal_macros::dec;\n\n// 3M SOFR + 200bps with 0% floor\nlet spec = FloatingRateSpec {\n    index_id: \"USD-SOFR-3M\".into(),\n    spread_bp: dec!(200.0),\n    gearing: dec!(1.0),\n    gearing_includes_spread: true,\n    index_floor_bp: Some(dec!(0.0)),\n    all_in_floor_bp: None,\n    all_in_cap_bp: None,\n    index_cap_bp: None,\n    overnight_index_constraints: OvernightIndexConstraintApplication::Daily,\n    reset_frequency: Tenor::quarterly(),\n    index_tenor: None,\n    reset_lag_days: 2,\n    fixing_calendar_id: None,\n    overnight_compounding: None,\n    overnight_basis: None,\n    fallback: Default::default(),\n};\n```",
+      "description": "Canonical floating rate specification for all instruments.\n\nUsed by bonds, swaps, credit facilities, and structured products.\nAll instruments should compose this type rather than defining their own\nfloating rate specifications.\n\n# Rate Calculation\n\nThe all-in rate is computed as:\n1. Look up forward rate from `forward_curve_id` curve for the accrual period\n2. Apply `index_floor_bp` to index rate (if specified) - applied BEFORE adding spread\n3. Add `spread_bp` to get base rate\n4. Multiply by `gearing` (typically 1.0)\n5. Apply `all_in_cap_bp` to final rate (if specified) - applied AFTER spread and gearing\n\nFormula: `cap(gearing * (floor(index) + spread))`\n\n# Negative Rate Handling\n\nNegative index rates are supported and will flow through calculations\nunless constrained by floors. For markets with negative rates (EUR, JPY, CHF):\n\n- Set `index_floor_bp: Some(0.0)` to floor the index at zero\n- Set `all_in_floor_bp: Some(0.0)` to floor the total coupon at zero\n- Omit floors to allow negative coupons (rare but valid in some structures)\n\nThe implementation does not reject negative rates; the policy is controlled\nby the floor configuration.\n\n# Seasoned Instruments (Historical Fixings)\n\nHistorical fixings **are supported** via the `MarketContext`: store a\n`ScalarTimeSeries` under the canonical id `FIXING:{forward_curve_id}` (see\n`finstack_quant_core::market_data::fixings`) containing realized index\nobservations. Observation dates strictly before the forward curve base\ndate then resolve from that series instead of the curve:\n\n- **Overnight observations** (compounded/averaged paths) use LOCF lookup\n  (last observation carried forward), matching RFR publication\n  conventions where a fixing carries over non-publication days\n  (ARRC 2020 SOFR conventions; ISDA 2021 Supp. 70 §7.1(g)). A partially\n  seasoned compounding window seamlessly mixes realized fixings and\n  curve-projected forwards with identical `(rate, days)` weighting.\n- **Term-rate resets** use exact-date lookup on the (business-day\n  adjusted) reset date — a term rate fixes on a specific published date.\n  The fixing is the index rate only; gearing/spread/floors/caps apply on\n  top exactly as for projected rates.\n\nAn observation exactly on the curve base date prefers a published\nsame-day fixing when the series has one, otherwise projects from `t = 0`.\n\nThe [`FloatingRateFallback`] policy applies only when **no** fixing\nseries is provided: `Error` (the default) fails the build with a\ndescriptive message naming the date, index, and expected series id;\n`FixedRate(r)` uses `r` as the index rate for the affected coupon;\n`SpreadOnly` projects spread-only.\n\n# Example\n\n```rust\nuse finstack_quant_core::dates::Tenor;\nuse finstack_quant_cashflows::builder::{FloatingRateSpec, OvernightIndexConstraintApplication};\nuse rust_decimal_macros::dec;\n\n// 3M SOFR + 200bps with 0% floor\nlet spec = FloatingRateSpec {\n    forward_curve_id: \"USD-SOFR-3M\".into(),\n    spread_bp: dec!(200.0),\n    gearing: dec!(1.0),\n    gearing_includes_spread: true,\n    index_floor_bp: Some(dec!(0.0)),\n    all_in_floor_bp: None,\n    all_in_cap_bp: None,\n    index_cap_bp: None,\n    overnight_index_constraints: OvernightIndexConstraintApplication::Daily,\n    reset_frequency: Tenor::quarterly(),\n    index_tenor: None,\n    reset_lag_days: 2,\n    fixing_calendar_id: None,\n    overnight_compounding: None,\n    overnight_basis: None,\n    fallback: Default::default(),\n};\n```",
       "properties": {
         "all_in_cap_bp": {
           "anyOf": [
@@ -438,12 +441,20 @@
           "description": "Policy when forward curve lookup fails during emission.\n\nDefaults to `Error`, which surfaces curve lookup failures.\nSet to `SpreadOnly` for spread-only projection, or `FixedRate(r)`\nto use a fixed index rate."
         },
         "fixing_calendar_id": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/d_9c3fc047c6fea21344ad"
+            },
+            {
+              "type": "null"
+            }
+          ],
           "default": null,
-          "description": "Optional calendar for rate fixing (reset lag).\n\nIf not provided, defaults to the coupon schedule calendar.",
-          "type": [
-            "string",
-            "null"
-          ]
+          "description": "Optional calendar for rate fixing (reset lag).\n\nIf not provided, defaults to the coupon schedule calendar."
+        },
+        "forward_curve_id": {
+          "$ref": "#/$defs/d_9c3fc047c6fea21344ad",
+          "description": "Forward curve identifier (e.g., \"USD-SOFR-3M\", \"EUR-EURIBOR-6M\")."
         },
         "gearing": {
           "$ref": "#/$defs/d_18f3ba1ec18ab2be13b2",
@@ -478,10 +489,6 @@
           ],
           "default": null,
           "description": "Floor on index rate in basis points (applied to index component).\n\nExample: index_floor_bp = Some(0.0) ensures index rate >= 0%."
-        },
-        "index_id": {
-          "$ref": "#/$defs/d_9c3fc047c6fea21344ad",
-          "description": "Forward curve identifier (e.g., \"USD-SOFR-3M\", \"EUR-EURIBOR-6M\")."
         },
         "index_tenor": {
           "anyOf": [
@@ -536,7 +543,7 @@
         }
       },
       "required": [
-        "index_id",
+        "forward_curve_id",
         "spread_bp",
         "reset_frequency"
       ],
@@ -968,8 +975,8 @@
           "description": "Business-day convention applied when rolling **payment dates** onto\nvalid business days.\n\nAccrual boundaries are left unadjusted (bond/ICMA convention) unless\n[`Self::adjust_accrual_dates`] is `true`, in which case the same\nconvention also rolls both accrual-period boundaries (swap/ISDA 2006\n§4.10 convention)."
         },
         "calendar_id": {
-          "description": "Holiday calendar identifier used together with `business_day_convention`.\n\nUse `\"weekends_only\"` when only Saturday/Sunday adjustment is needed.",
-          "type": "string"
+          "$ref": "#/$defs/d_9c3fc047c6fea21344ad",
+          "description": "Holiday calendar identifier used together with `business_day_convention`.\n\nUse `\"weekends_only\"` when only Saturday/Sunday adjustment is needed."
         },
         "coupon_type": {
           "$ref": "#/$defs/d_cdd9cb6ed505205e6ebe",
@@ -1195,6 +1202,106 @@
       "title": "Money",
       "type": "object"
     },
+    "d_4dbcb82ab8c03d1c8c9c": {
+      "description": "Thin facade over canonical builder coupon specs for bond cashflows.\n\nWraps `FixedCouponSpec` and `FloatingCouponSpec` from the cashflow builder,\nproviding convenience constructors with sensible defaults for common bond use cases.\nThis ensures parity with all builder features (floors/caps, BDC, calendars, PIK, etc.)\nwhile keeping the bond API simple.",
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "description": "Fixed-rate bond using the canonical `FixedCouponSpec`.",
+          "properties": {
+            "fixed": {
+              "$ref": "#/$defs/d_67346ed55fd8e55563e7"
+            }
+          },
+          "required": [
+            "fixed"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Floating-rate note using the canonical `FloatingCouponSpec`.",
+          "properties": {
+            "floating": {
+              "$ref": "#/$defs/d_355963a7acbc2c62fdf5"
+            }
+          },
+          "required": [
+            "floating"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Step-up/step-down coupon bond with scheduled rate changes.",
+          "properties": {
+            "step_up": {
+              "$ref": "#/$defs/d_ab47b22b96d81a7d172a"
+            }
+          },
+          "required": [
+            "step_up"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Amortizing bond (principal payments during life).",
+          "properties": {
+            "amortizing": {
+              "properties": {
+                "base": {
+                  "$ref": "#/$defs/d_4dbcb82ab8c03d1c8c9c",
+                  "description": "Base cashflow specification (fixed or floating)."
+                },
+                "schedule": {
+                  "$ref": "#/$defs/d_e25099d894855568a222",
+                  "description": "Amortization schedule."
+                }
+              },
+              "required": [
+                "base",
+                "schedule"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "amortizing"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "d_51885e17c080d760db74": {
+      "additionalProperties": false,
+      "description": "Share-price trigger of a convertible bond: the last sale price must be at\nleast `threshold_pct` of the conversion price on `required_days_above` of\n`observation_days` consecutive trading days.\n\nUsed for the issuer's soft call (`ConvertibleBond::soft_call_trigger`) and\nthe holder's contingent conversion\n(`ConversionPolicy::UponEvent(ConversionEvent::PriceTrigger(..))`).\n\n# Industry Practice\n\nThe standard trigger is 130% of the conversion price on 20 of 30\nconsecutive trading days; some issues use 120% or 150%.\n\n# Modeling scope\n\nThe tree evaluates the trigger on the instantaneous node spot. The soft\ncall applies a Broadie-Glasserman-Kou-style barrier shift scaled by\n`required_days_above / observation_days`; contingent conversion compares\nthe node spot with the nominal level and does not model the observation\nwindow.",
+      "properties": {
+        "observation_days": {
+          "description": "Number of trading days in the observation window (e.g., 30).",
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "required_days_above": {
+          "description": "Minimum number of days within the window on which the share price\nmust be at or above the level (e.g., 20 of 30).",
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "threshold_pct": {
+          "description": "Trigger level as a percent of the conversion price (`130.0` = 130%);\nmust exceed 100.",
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "required": [
+        "threshold_pct",
+        "observation_days",
+        "required_days_above"
+      ],
+      "type": "object"
+    },
     "d_572ad1befb7d94914652": {
       "additionalProperties": false,
       "description": "Model selection and tree pricing parameters.",
@@ -1408,6 +1515,10 @@
           ],
           "description": "Optional call/put schedule (issuer/holder redemption before maturity)."
         },
+        "cashflow_spec": {
+          "$ref": "#/$defs/d_4dbcb82ab8c03d1c8c9c",
+          "description": "Coupon leg (fixed, floating, step-up or amortizing), the same type as\n`Bond.cashflow_spec`. A zero-coupon convertible is a fixed spec with\nrate `0`."
+        },
         "conversion": {
           "$ref": "#/$defs/d_8d9e4ad211395ba91969",
           "description": "Conversion terms for equity conversion."
@@ -1427,27 +1538,16 @@
           "$ref": "#/$defs/d_9c3fc047c6fea21344ad",
           "description": "Discount curve identifier for the debt component (risk-free or funding)."
         },
-        "fixed_coupon": {
+        "div_yield_id": {
           "anyOf": [
             {
-              "$ref": "#/$defs/d_67346ed55fd8e55563e7"
+              "$ref": "#/$defs/d_9c3fc047c6fea21344ad"
             },
             {
               "type": "null"
             }
           ],
-          "description": "Fixed coupon specification (if applicable)."
-        },
-        "floating_coupon": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/d_355963a7acbc2c62fdf5"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "Floating coupon specification (if applicable)."
+          "description": "Optional unitless continuous dividend-yield scalar id (decimal,\n0.02 = 2%). `None` means a zero dividend yield; a configured id must\nresolve."
         },
         "id": {
           "$ref": "#/$defs/d_9c3fc047c6fea21344ad",
@@ -1497,7 +1597,7 @@
         "soft_call_trigger": {
           "anyOf": [
             {
-              "$ref": "#/$defs/d_d4a0870426c46698b6d9"
+              "$ref": "#/$defs/d_51885e17c080d760db74"
             },
             {
               "type": "null"
@@ -1505,12 +1605,13 @@
           ],
           "description": "Optional soft-call trigger condition.\n\nWhen set, the issuer can only exercise call provisions if the underlying\nstock price satisfies the trigger condition (e.g., above 130% of conversion\nprice for 20 of 30 trading days).\n\n**Modeling scope**: a single trigger gates the ENTIRE callable life —\nevery window in [`Self::call_put`] is subject to it. A soft-call period\nfollowed by an unconditional hard-call period is not representable\n(omit the trigger to model an unconditional call). In the tree the\ntrigger is evaluated on the instantaneous node spot with a\nBroadie-Glasserman-Kou-style barrier adjustment approximating the\nk-of-n-days observation window; the realized path is not tracked."
         },
-        "underlying_equity_id": {
-          "description": "Optional underlying equity identifier (ticker or instrument id).",
-          "type": [
-            "string",
-            "null"
-          ]
+        "spot_id": {
+          "$ref": "#/$defs/d_9c3fc047c6fea21344ad",
+          "description": "Market-scalar id (`MarketContext::get_price`) of the underlying share\nprice, as a price in the bond's currency or a unitless level."
+        },
+        "vol_surface_id": {
+          "$ref": "#/$defs/d_9c3fc047c6fea21344ad",
+          "description": "Equity volatility id: a volatility surface read at the conversion strike\nand maturity, or a unitless scalar holding a flat volatility."
         }
       },
       "required": [
@@ -1520,6 +1621,9 @@
         "maturity",
         "discount_curve_id",
         "conversion",
+        "spot_id",
+        "vol_surface_id",
+        "cashflow_spec",
         "attributes"
       ],
       "type": "object"
@@ -1600,8 +1704,8 @@
           "description": "Business-day convention applied when rolling **payment dates** onto\nvalid business days.\n\nAccrual boundaries are left unadjusted (bond/ICMA convention) unless\n[`Self::adjust_accrual_dates`] is `true`, in which case the same\nconvention also rolls both accrual-period boundaries (swap/ISDA 2006\n§4.10 convention)."
         },
         "calendar_id": {
-          "description": "Holiday calendar identifier used together with `business_day_convention`.\n\nUse `\"weekends_only\"` when only Saturday/Sunday adjustment is needed.",
-          "type": "string"
+          "$ref": "#/$defs/d_9c3fc047c6fea21344ad",
+          "description": "Holiday calendar identifier used together with `business_day_convention`.\n\nUse `\"weekends_only\"` when only Saturday/Sunday adjustment is needed."
         },
         "coupon_type": {
           "$ref": "#/$defs/d_a561434dff1275f40d83",
@@ -1936,11 +2040,11 @@
     },
     "d_8b07d188ef24f2b5a810": {
       "additionalProperties": false,
-      "description": "Call or put option on a bond.\n\nRepresents a single call or put option with an exercise period and redemption price.\nCall options allow the issuer to redeem early; put options allow the holder to redeem early.\n\n# Examples\n\n```rust\nuse finstack_quant_valuations::instruments::fixed_income::bond::CallPut;\nuse finstack_quant_core::dates::Date;\nuse time::Month;\n\n// Discrete call option: issuer can redeem at 102% of par on Jan 1, 2027\nlet call = CallPut {\n    start_date: Date::from_calendar_date(2027, Month::January, 1).unwrap(),\n    end_date: Date::from_calendar_date(2027, Month::January, 1).unwrap(),\n    price_pct_of_par: 102.0,\n    make_whole: None,\n};\n```",
+      "description": "Call or put option on a bond.\n\nRepresents a single call or put option with an exercise period and redemption price.\nCall options allow the issuer to redeem early; put options allow the holder to redeem early.\n\n# Examples\n\n```rust\nuse finstack_quant_valuations::instruments::fixed_income::bond::CallPut;\nuse finstack_quant_core::dates::Date;\nuse time::Month;\n\n// Discrete call option: issuer can redeem at 102% of par on Jan 1, 2027\nlet call = CallPut {\n    start: Date::from_calendar_date(2027, Month::January, 1).unwrap(),\n    end: Date::from_calendar_date(2027, Month::January, 1).unwrap(),\n    price_pct_of_par: 102.0,\n    make_whole: None,\n};\n```",
       "properties": {
-        "end_date": {
+        "end": {
           "$ref": "#/$defs/d_1b2ccb88c9229e7463e8",
-          "description": "Last date when the option can be exercised, inclusive.\n\nUse the same value as `start_date` for one-day/discrete exercise."
+          "description": "Last date when the option can be exercised, inclusive.\n\nUse the same value as `start` for one-day/discrete exercise."
         },
         "make_whole": {
           "anyOf": [
@@ -1958,14 +2062,14 @@
           "format": "double",
           "type": "number"
         },
-        "start_date": {
+        "start": {
           "$ref": "#/$defs/d_1b2ccb88c9229e7463e8",
           "description": "First date when the option can be exercised."
         }
       },
       "required": [
-        "start_date",
-        "end_date",
+        "start",
+        "end",
         "price_pct_of_par"
       ],
       "type": "object"
@@ -3018,6 +3122,87 @@
           "type": "object"
         }
       ]
+    },
+    "d_ab47b22b96d81a7d172a": {
+      "additionalProperties": false,
+      "description": "Step-up/step-down coupon specification.\n\nDefines a coupon that changes rate at specified dates, commonly used\nin bank capital instruments (AT1/Tier 2) and some agency bonds.\n\nThe rate for each coupon period is determined by the last step date\nthat falls on or before the period start date. If no step has occurred,\nthe initial rate is used.\n\n# Examples\n\n```rust\nuse finstack_quant_core::dates::{Date, DayCount, Tenor, BusinessDayConvention, StubKind};\nuse finstack_quant_cashflows::builder::{CouponType, ScheduleParams, StepUpCouponSpec};\nuse rust_decimal_macros::dec;\nuse time::Month;\n\nlet spec = StepUpCouponSpec {\n    coupon_type: CouponType::Cash,\n    initial_rate: dec!(0.03),\n    step_schedule: vec![\n        (Date::from_calendar_date(2027, Month::January, 1).unwrap(), dec!(0.04)),\n        (Date::from_calendar_date(2029, Month::January, 1).unwrap(), dec!(0.05)),\n    ],\n    schedule: ScheduleParams {\n        frequency: Tenor::semi_annual(),\n        day_count: DayCount::Thirty360,\n        business_day_convention: BusinessDayConvention::Following,\n        calendar_id: \"weekends_only\".into(),\n        stub: StubKind::None,\n        end_of_month: false,\n        payment_lag_days: 0,\n        adjust_accrual_dates: false,\n        roll_rule: finstack_quant_cashflows::builder::specs::RollRule::None,\n    },\n};\n```",
+      "properties": {
+        "adjust_accrual_dates": {
+          "description": "Whether accrual-period boundaries are business-day adjusted with\n`business_day_convention`.\n\n- `false` (default, bond convention): accrual periods run between the\n  unadjusted schedule anchors; only payment dates roll.\n- `true` (swap convention, ISDA 2006 §4.10 / ARRC SOFR conventions):\n  both accrual-period boundaries are rolled with `business_day_convention` before year\n  fractions and overnight observation windows are computed. The swap\n  presets ([`Self::usd_sofr_swap`], [`Self::eur_estr_swap`],\n  [`Self::gbp_sonia_swap`], [`Self::jpy_tona_swap`]) set this to\n  `true`.\n\nSerialized only when `true`, so existing wire payloads are unchanged.",
+          "type": "boolean"
+        },
+        "business_day_convention": {
+          "$ref": "#/$defs/d_01cd6b2e4ad257352fdb",
+          "default": "modified_following",
+          "description": "Business-day convention applied when rolling **payment dates** onto\nvalid business days.\n\nAccrual boundaries are left unadjusted (bond/ICMA convention) unless\n[`Self::adjust_accrual_dates`] is `true`, in which case the same\nconvention also rolls both accrual-period boundaries (swap/ISDA 2006\n§4.10 convention)."
+        },
+        "calendar_id": {
+          "$ref": "#/$defs/d_9c3fc047c6fea21344ad",
+          "description": "Holiday calendar identifier used together with `business_day_convention`.\n\nUse `\"weekends_only\"` when only Saturday/Sunday adjustment is needed."
+        },
+        "coupon_type": {
+          "$ref": "#/$defs/d_cdd9cb6ed505205e6ebe",
+          "default": "cash",
+          "description": "Coupon type (Cash/PIK/Split)."
+        },
+        "day_count": {
+          "$ref": "#/$defs/d_c0401254ec268b317b65",
+          "description": "Day-count convention used to convert each generated accrual period into a\nyear fraction."
+        },
+        "end_of_month": {
+          "default": false,
+          "description": "Whether end-of-month rolling should be preserved when generating the\nschedule.",
+          "type": "boolean"
+        },
+        "frequency": {
+          "$ref": "#/$defs/d_47e5e74524615b78a19f",
+          "description": "Accrual and payment frequency used to generate the schedule boundaries."
+        },
+        "initial_rate": {
+          "$ref": "#/$defs/d_18f3ba1ec18ab2be13b2",
+          "description": "Initial coupon rate (annual, decimal). Used until the first step date."
+        },
+        "payment_lag_days": {
+          "default": 0,
+          "description": "Payment lag in business days after the adjusted accrual end date.",
+          "format": "int32",
+          "type": "integer"
+        },
+        "roll_rule": {
+          "$ref": "#/$defs/d_08ba4deaa5e49b4541a5",
+          "description": "Roll-date rule for schedule anchors (standard IMM or CDS IMM grids).\n\n[`RollRule::None`] (default) keeps plain tenor stepping. The IMM modes\noverride `frequency`/`stub` with quarterly / short-back; see [`RollRule`].\n\nSerialized only when not `None`, so existing wire payloads are\nunchanged."
+        },
+        "step_schedule": {
+          "description": "Step schedule: (effective_date, new_rate). Must be sorted by date.\nEach entry sets the rate from that date forward until the next step.\n\n**Date convention:** `effective_date` is compared against each\naccrual period's *unadjusted* `accrual_start`. Specify dates as\nunadjusted accrual-period boundaries (typically the issue date plus\ninteger multiples of `frequency`); business-day adjustment is not\napplied here. The rate is set at accrual start (per market\nconvention for step-up bonds).",
+          "items": {
+            "maxItems": 2,
+            "minItems": 2,
+            "prefixItems": [
+              {
+                "$ref": "#/$defs/d_1b2ccb88c9229e7463e8"
+              },
+              {
+                "$ref": "#/$defs/d_18f3ba1ec18ab2be13b2"
+              }
+            ],
+            "type": "array"
+          },
+          "type": "array"
+        },
+        "stub": {
+          "$ref": "#/$defs/d_0f73294362e40332de67",
+          "default": "short_front",
+          "description": "Stub-handling rule used when the start/end dates do not fit an exact\nwhole number of periods."
+        }
+      },
+      "required": [
+        "initial_rate",
+        "step_schedule",
+        "frequency",
+        "day_count",
+        "calendar_id"
+      ],
+      "type": "object"
     },
     "d_ae5d75ed4e313ae3bc25": {
       "description": "Which valuation parameter to solve the breakeven for.\n\n# Result units\n\nThe breakeven metric is a bare `f64` whose unit depends on the target. Read\nthe per-variant docs before interpreting a value:\n\n| Target             | Sensitivity     | Result unit          |\n|--------------------|-----------------|----------------------|\n| `ZSpread`          | CS01            | basis points         |\n| `Ytm`              | DV01            | basis points         |\n| `Oas`              | CS01            | basis points         |\n| `ImpliedVol`       | Vega            | vol points (1 = 1%)  |\n| `BaseCorrelation`  | Correlation01   | correlation points   |",
@@ -4318,35 +4503,6 @@
         }
       ]
     },
-    "d_d4a0870426c46698b6d9": {
-      "additionalProperties": false,
-      "description": "Soft-call trigger condition for convertible bonds.\n\nA soft call allows the issuer to call the bond only if the underlying stock\nprice has been trading above a threshold (typically 130% of the conversion\nprice) for a sustained period. This protects holders from having their\nconversion option terminated when the stock is only marginally above parity.\n\n# Industry Practice\n\nThe standard soft-call trigger is:\n- **Threshold**: 130% of conversion price (most common)\n- **Observation period**: 20 of 30 consecutive trading days\n\nSome issuances use 120% or 150% thresholds.",
-      "properties": {
-        "observation_days": {
-          "description": "Number of trading days in the observation window (e.g., 30).",
-          "format": "uint32",
-          "minimum": 0,
-          "type": "integer"
-        },
-        "required_days_above": {
-          "description": "Minimum number of days within the window that the stock must exceed\nthe threshold (e.g., 20 out of 30 days).",
-          "format": "uint32",
-          "minimum": 0,
-          "type": "integer"
-        },
-        "threshold_pct": {
-          "description": "Threshold as a percentage of conversion price (e.g., 130.0 = 130%).\n\nThe issuer can only exercise the call if the stock price exceeds\n`threshold_pct / 100 * conversion_price` for the required number of days.",
-          "format": "double",
-          "type": "number"
-        }
-      },
-      "required": [
-        "threshold_pct",
-        "observation_days",
-        "required_days_above"
-      ],
-      "type": "object"
-    },
     "d_d4ba69c121b73ac48a10": {
       "description": "Barrier-crossing detection policy for first-passage default simulation.\n\n`Discrete` only checks the barrier at grid points (fast but biased for\ncoarse time steps). `BrownianBridge` uses a Brownian-bridge crossing\nprobability between grid points to approximate continuous monitoring.",
       "oneOf": [
@@ -4444,27 +4600,10 @@
         },
         {
           "additionalProperties": false,
-          "description": "Forced conversion if share price meets threshold for a lookback period.",
+          "description": "Contingent conversion once the share price meets the trigger level\n(a percent of the conversion price) over the observation window.",
           "properties": {
             "price_trigger": {
-              "properties": {
-                "lookback_days": {
-                  "description": "Lookback days.",
-                  "format": "uint32",
-                  "minimum": 0,
-                  "type": "integer"
-                },
-                "threshold": {
-                  "description": "Threshold.",
-                  "format": "double",
-                  "type": "number"
-                }
-              },
-              "required": [
-                "threshold",
-                "lookback_days"
-              ],
-              "type": "object"
+              "$ref": "#/$defs/d_51885e17c080d760db74"
             }
           },
           "required": [
@@ -4505,6 +4644,187 @@
           "const": "below",
           "description": "PIK when state < threshold (e.g., distance-to-default below limit).",
           "type": "string"
+        }
+      ]
+    },
+    "d_e25099d894855568a222": {
+      "description": "Amortization specification for principal over time.\n\nDescribes how principal amortizes or is exchanged during the life of the contract.\nUsed by instruments (e.g., bonds) and cashflow legs for consistent behavior.",
+      "oneOf": [
+        {
+          "const": "none",
+          "description": "No amortization – principal remains constant until final redemption.",
+          "type": "string"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Linear principal paydown towards a target final notional amount over all periods.",
+          "properties": {
+            "linear_to": {
+              "additionalProperties": false,
+              "properties": {
+                "final_notional": {
+                  "$ref": "#/$defs/d_4ba43030fede59fe5993",
+                  "description": "Target remaining principal at the end of the amortization schedule."
+                }
+              },
+              "required": [
+                "final_notional"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "linear_to"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Explicit schedule of remaining principal amounts after given dates.\nEach pair stores `(date, remaining_principal_after_date)`.",
+          "properties": {
+            "step_remaining": {
+              "additionalProperties": false,
+              "properties": {
+                "schedule": {
+                  "description": "Ordered list of `(date, remaining_principal_after_date)`.",
+                  "items": {
+                    "maxItems": 2,
+                    "minItems": 2,
+                    "prefixItems": [
+                      {
+                        "$ref": "#/$defs/d_1b2ccb88c9229e7463e8"
+                      },
+                      {
+                        "$ref": "#/$defs/d_4ba43030fede59fe5993"
+                      }
+                    ],
+                    "type": "array"
+                  },
+                  "type": "array"
+                }
+              },
+              "required": [
+                "schedule"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "step_remaining"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Fixed percentage of **original** notional paid each period (capped by remaining outstanding).\n\nThis is a sinking-fund style amortization where the payment amount is constant\nacross periods: `initial_notional * pct`. It does **not** compound (i.e., it is\nNOT percentage-of-remaining / declining-balance / mortgage-style).",
+          "properties": {
+            "percent_of_original_per_period": {
+              "additionalProperties": false,
+              "properties": {
+                "pct": {
+                  "description": "Fraction of original notional paid per period (e.g., 0.05 = 5%).",
+                  "format": "double",
+                  "type": "number"
+                }
+              },
+              "required": [
+                "pct"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "percent_of_original_per_period"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Fixed percentage of the **remaining** outstanding paid each period\n(declining balance): the payment is `outstanding * pct`, so it falls\ngeometrically from period to period.",
+          "properties": {
+            "percent_of_remaining_per_period": {
+              "additionalProperties": false,
+              "properties": {
+                "pct": {
+                  "description": "Fraction of the outstanding principal paid per period (e.g.,\n0.025 = 2.5%), in `[0, 1]`.",
+                  "format": "double",
+                  "type": "number"
+                }
+              },
+              "required": [
+                "pct"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "percent_of_remaining_per_period"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Equal principal installments on every payment date in `(start, end]`,\nrepaying the outstanding principal in full by `end`.",
+          "properties": {
+            "linear_between": {
+              "additionalProperties": false,
+              "properties": {
+                "end": {
+                  "$ref": "#/$defs/d_1b2ccb88c9229e7463e8",
+                  "description": "Amortization end (full repayment), on or before maturity."
+                },
+                "start": {
+                  "$ref": "#/$defs/d_1b2ccb88c9229e7463e8",
+                  "description": "Amortization start; installments fall on payment dates strictly\nafter it."
+                }
+              },
+              "required": [
+                "start",
+                "end"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "linear_between"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Custom principal exchanges on specific dates (absolute cash amounts).\nPositive amounts reduce outstanding (i.e., principal paid by issuer).",
+          "properties": {
+            "custom_principal": {
+              "additionalProperties": false,
+              "properties": {
+                "items": {
+                  "description": "List of `(date, principal_amount)` exchanges; amounts are absolute cashflows.",
+                  "items": {
+                    "maxItems": 2,
+                    "minItems": 2,
+                    "prefixItems": [
+                      {
+                        "$ref": "#/$defs/d_1b2ccb88c9229e7463e8"
+                      },
+                      {
+                        "$ref": "#/$defs/d_4ba43030fede59fe5993"
+                      }
+                    ],
+                    "type": "array"
+                  },
+                  "type": "array"
+                }
+              },
+              "required": [
+                "items"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "custom_principal"
+          ],
+          "type": "object"
         }
       ]
     },
@@ -4554,7 +4874,7 @@
     },
     "d_e61aca20d5275e83942b": {
       "additionalProperties": false,
-      "description": "Schedule of call and put options for a bond.\n\nContains lists of call and put options that can be exercised during the bond's life.\nUsed for pricing callable/putable bonds and calculating yield-to-worst.\n\n# Examples\n\n```rust\nuse finstack_quant_valuations::instruments::fixed_income::bond::{CallPut, CallPutSchedule};\nuse finstack_quant_core::dates::Date;\nuse time::Month;\n\nlet mut schedule = CallPutSchedule::default();\nschedule.calls.push(CallPut {\n    start_date: Date::from_calendar_date(2027, Month::January, 1).unwrap(),\n    end_date: Date::from_calendar_date(2027, Month::January, 1).unwrap(),\n    price_pct_of_par: 102.0,\n    make_whole: None,\n});\n```",
+      "description": "Schedule of call and put options for a bond.\n\nContains lists of call and put options that can be exercised during the bond's life.\nUsed for pricing callable/putable bonds and calculating yield-to-worst.\n\n# Examples\n\n```rust\nuse finstack_quant_valuations::instruments::fixed_income::bond::{CallPut, CallPutSchedule};\nuse finstack_quant_core::dates::Date;\nuse time::Month;\n\nlet mut schedule = CallPutSchedule::default();\nschedule.calls.push(CallPut {\n    start: Date::from_calendar_date(2027, Month::January, 1).unwrap(),\n    end: Date::from_calendar_date(2027, Month::January, 1).unwrap(),\n    price_pct_of_par: 102.0,\n    make_whole: None,\n});\n```",
       "properties": {
         "calls": {
           "description": "Call options (issuer can redeem early).",

@@ -17,9 +17,9 @@
           },
           "quote_calendar_id": null,
           "quote_currency": "USD",
+          "quoted_spot": 1.1,
           "settlement_date": null,
-          "settlement_days": 2,
-          "spot_rate": 1.1
+          "settlement_days": 2
         },
         "type": "fx_spot"
       },
@@ -1242,7 +1242,7 @@
     },
     "d_81828a2fc42ad3c4ad70": {
       "additionalProperties": false,
-      "description": "FX Spot instrument (1 unit of `base` priced in `quote`).\n\nRepresents the spot exchange rate between two currencies following\nstandard market quoting conventions (base/quote or CCY1/CCY2).\n\n# Quote Convention\n\nThe rate is interpreted as: **1 unit of base = rate units of quote**\n\nFor example, if `base = EUR`, `quote = USD`, and `spot_rate = 1.10`:\n- 1 EUR = 1.10 USD\n- This is the \"EUR/USD\" rate\n\n# Settlement\n\nWhen `settlement_days` is `None`, the pair-aware default is T+1 for\nUSD↔CAD and USD↔TRY and T+2 otherwise (including EUR/USD). An explicit\n`settlement_days` overrides that default; `settlement_date` overrides both.\n\nSee module-level documentation for comprehensive FX quoting conventions.",
+      "description": "FX Spot instrument (1 unit of `base` priced in `quote`).\n\nRepresents the spot exchange rate between two currencies following\nstandard market quoting conventions (base/quote or CCY1/CCY2).\n\n# Quote Convention\n\nThe rate is interpreted as: **1 unit of base = rate units of quote**\n\nFor example, if `base = EUR`, `quote = USD`, and `quoted_spot = 1.10`:\n- 1 EUR = 1.10 USD\n- This is the \"EUR/USD\" rate\n\n# Settlement\n\nWhen `settlement_days` is `None`, the pair-aware default is T+1 for\nUSD↔CAD and USD↔TRY and T+2 otherwise (including EUR/USD). An explicit\n`settlement_days` overrides that default; `settlement_date` overrides both.\n\nSee module-level documentation for comprehensive FX quoting conventions.",
       "properties": {
         "attributes": {
           "$ref": "#/$defs/d_2c88e4d1e2e4f7c22e02",
@@ -1264,7 +1264,7 @@
           "default": "modified_following",
           "description": "Business day convention to apply when adjusting settlement (default: ModifiedFollowing)\n\nNote: Default changed from `Following` to `ModifiedFollowing` in v0.8.0 to align\nwith ISDA standard FX settlement conventions."
         },
-        "discount_curve_id": {
+        "domestic_discount_curve_id": {
           "anyOf": [
             {
               "$ref": "#/$defs/d_9c3fc047c6fea21344ad"
@@ -1307,6 +1307,14 @@
           "$ref": "#/$defs/d_be98333e68c25ab5ae57",
           "description": "Quote currency (the currency used for pricing)"
         },
+        "quoted_spot": {
+          "description": "Optional quoted FX spot rate (quote per base); `None` reads the FxMatrix.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
         "scenario_pricing_overrides": {
           "$ref": "#/$defs/d_f80c8a31d359e1cb5dd4",
           "default": {},
@@ -1330,14 +1338,6 @@
           "minimum": 0,
           "type": [
             "integer",
-            "null"
-          ]
-        },
-        "spot_rate": {
-          "description": "Optional spot rate (if not provided, will look up from market data)",
-          "format": "double",
-          "type": [
-            "number",
             "null"
           ]
         }

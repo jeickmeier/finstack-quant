@@ -12,8 +12,8 @@
       "leg1_vol_surface_id": "RBOB-VOL",
       "leg2_forward_curve_id": "WTI-FORWARD",
       "leg2_vol_surface_id": "WTI-VOL",
-      "notional": 10000.0,
       "option_type": "call",
+      "quantity": 10000.0,
       "strike": 5.0
     },
     "type": "commodity_spread_option"

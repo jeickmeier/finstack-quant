@@ -101,6 +101,10 @@ export type DEc89Adc17436F33De839 = "black" | "normal";
 export type BusinessDayConvention =
   "unadjusted" | "following" | "modified_following" | "preceding" | "modified_preceding" | "nearest";
 /**
+ * Opaque string identifier.
+ */
+export type Id1 = string;
+/**
  * Leg currency.
  */
 export type Currency =
@@ -281,17 +285,17 @@ export type DayCount =
   | "act_act_afb"
   | "bus_252";
 /**
- * Discount curve for PV in leg currency.
+ * Opaque string identifier.
  */
-export type Id1 = string;
+export type Id2 = string;
 /**
  * End date of the leg.
  */
 export type Date = string;
 /**
- * Projection forward curve.
+ * Opaque string identifier.
  */
-export type Id2 = string;
+export type Id3 = string;
 /**
  * Spread in basis points (e.g. `Decimal::from(5)` = 5bp).
  */
@@ -1455,7 +1459,7 @@ export interface D_8426Ebf5Dcce24Ed2Cdf {
   /**
    * Calendar identifier for schedule generation and lags.
    */
-  calendar_id?: string | null;
+  calendar_id?: Id1 | null;
   /**
    * Overnight vs term compounding for this floating leg.
    *
@@ -1500,9 +1504,9 @@ export interface D_8426Ebf5Dcce24Ed2Cdf {
       };
   currency: Currency;
   day_count: DayCount;
-  discount_curve_id: Id1;
+  discount_curve_id: Id2;
   end: Date;
-  forward_curve_id: Id2;
+  forward_curve_id: Id3;
   frequency: Tenor;
   notional: Money;
   /**
@@ -1728,7 +1732,7 @@ export interface D_8426Ebf5Dcce24Ed2Cdf1 {
   /**
    * Calendar identifier for schedule generation and lags.
    */
-  calendar_id?: string | null;
+  calendar_id?: Id1 | null;
   /**
    * Overnight vs term compounding for this floating leg.
    *
@@ -1773,9 +1777,9 @@ export interface D_8426Ebf5Dcce24Ed2Cdf1 {
       };
   currency: Currency;
   day_count: DayCount;
-  discount_curve_id: Id1;
+  discount_curve_id: Id2;
   end: Date;
-  forward_curve_id: Id2;
+  forward_curve_id: Id3;
   frequency: Tenor;
   notional: Money;
   /**

@@ -478,25 +478,29 @@ export interface DA39Cc24B914A22260377 {
    */
   discrete_dividends?: [Date, number][];
   /**
-   * Explicit scalar identifier used to resolve the dividend yield.
+   * Market-scalar id of the unitless continuous dividend yield (decimal,
+   * 0.02 = 2%). `None` means a zero dividend yield.
    */
   div_yield_id?: Id1 | null;
   id: Id2;
   instrument_pricing_overrides?: InstrumentPricingOverrides;
   metric_pricing_overrides?: MetricPricingOverrides;
   /**
-   * Explicit scalar identifier used to resolve the spot price.
+   * Optional number of shares held (defaults to 1 if not specified).
    */
-  price_id?: Id1 | null;
+  quantity?: number | null;
   /**
-   * Optional price quote (if not provided, will look up from market data)
+   * Optional quoted spot price per share in `currency`. When set it wins
+   * over the `spot_id` market lookup.
    */
-  price_quote?: number | null;
+  quoted_spot?: number | null;
   scenario_pricing_overrides?: ScenarioPricingOverrides;
   /**
-   * Optional number of shares (defaults to 1 if not specified)
+   * Market-scalar id (`MarketContext::get_price`) of the spot price per
+   * share. Required unless `quoted_spot` is set; no id is ever derived from
+   * the ticker or instrument id.
    */
-  shares?: number | null;
+  spot_id?: Id1 | null;
   /**
    * Ticker symbol (e.g., "AAPL", "MSFT")
    */

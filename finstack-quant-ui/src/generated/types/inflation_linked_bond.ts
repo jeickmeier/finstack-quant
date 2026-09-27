@@ -340,11 +340,11 @@ export interface DD5865E0389Fd175A593A {
  */
 export interface DCf0Ae253Da617678Cc3E {
   attributes: Attributes;
-  base_date: Date;
   /**
    * Base CPI/index value at issue
    */
-  base_index: number;
+  base_cpi: number;
+  base_date: Date;
   business_day_convention?: BusinessDayConvention;
   /**
    * Holiday calendar identifier

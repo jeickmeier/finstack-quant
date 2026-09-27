@@ -14,9 +14,9 @@ export default [
             "discrete_dividends": [],
             "div_yield_id": "AAPL-DIV",
             "id": "EQUITY-AAPL",
-            "price_id": "AAPL-SPOT",
-            "price_quote": null,
-            "shares": 100,
+            "quantity": 100,
+            "quoted_spot": null,
+            "spot_id": "AAPL-SPOT",
             "ticker": "AAPL"
           },
           "type": "equity"
@@ -1253,7 +1253,7 @@ export default [
   {
     "path": "#/$defs/d_a39cc24b914a22260377/properties/div_yield_id",
     "source": "https://finstack_quant.dev/schemas/instrument/1/equity/equity.schema.json#/$defs/Equity/properties/div_yield_id",
-    "description": "Explicit scalar identifier used to resolve the dividend yield."
+    "description": "Market-scalar id of the unitless continuous dividend yield (decimal,\n0.02 = 2%). `None` means a zero dividend yield."
   },
   {
     "path": "#/$defs/d_a39cc24b914a22260377/properties/div_yield_id/anyOf/0",
@@ -1287,24 +1287,15 @@ export default [
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json#"
   },
   {
-    "path": "#/$defs/d_a39cc24b914a22260377/properties/price_id",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/equity/equity.schema.json#/$defs/Equity/properties/price_id",
-    "description": "Explicit scalar identifier used to resolve the spot price."
+    "path": "#/$defs/d_a39cc24b914a22260377/properties/quantity",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/equity/equity.schema.json#/$defs/Equity/properties/quantity",
+    "description": "Optional number of shares held (defaults to 1 if not specified).",
+    "format": "double"
   },
   {
-    "path": "#/$defs/d_a39cc24b914a22260377/properties/price_id/anyOf/0",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/equity/equity.schema.json#/$defs/Equity/properties/price_id/anyOf/0",
-    "ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
-    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/id.schema.json#"
-  },
-  {
-    "path": "#/$defs/d_a39cc24b914a22260377/properties/price_id/anyOf/1",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/equity/equity.schema.json#/$defs/Equity/properties/price_id/anyOf/1"
-  },
-  {
-    "path": "#/$defs/d_a39cc24b914a22260377/properties/price_quote",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/equity/equity.schema.json#/$defs/Equity/properties/price_quote",
-    "description": "Optional price quote (if not provided, will look up from market data)",
+    "path": "#/$defs/d_a39cc24b914a22260377/properties/quoted_spot",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/equity/equity.schema.json#/$defs/Equity/properties/quoted_spot",
+    "description": "Optional quoted spot price per share in `currency`. When set it wins\nover the `spot_id` market lookup.",
     "format": "double"
   },
   {
@@ -1315,10 +1306,19 @@ export default [
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/scenario_pricing_overrides.schema.json#"
   },
   {
-    "path": "#/$defs/d_a39cc24b914a22260377/properties/shares",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/equity/equity.schema.json#/$defs/Equity/properties/shares",
-    "description": "Optional number of shares (defaults to 1 if not specified)",
-    "format": "double"
+    "path": "#/$defs/d_a39cc24b914a22260377/properties/spot_id",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/equity/equity.schema.json#/$defs/Equity/properties/spot_id",
+    "description": "Market-scalar id (`MarketContext::get_price`) of the spot price per\nshare. Required unless `quoted_spot` is set; no id is ever derived from\nthe ticker or instrument id."
+  },
+  {
+    "path": "#/$defs/d_a39cc24b914a22260377/properties/spot_id/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/equity/equity.schema.json#/$defs/Equity/properties/spot_id/anyOf/0",
+    "ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/id.schema.json#"
+  },
+  {
+    "path": "#/$defs/d_a39cc24b914a22260377/properties/spot_id/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/equity/equity.schema.json#/$defs/Equity/properties/spot_id/anyOf/1"
   },
   {
     "path": "#/$defs/d_a39cc24b914a22260377/properties/ticker",

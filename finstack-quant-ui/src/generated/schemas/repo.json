@@ -1538,12 +1538,12 @@
           "description": "Type of collateral (general vs special)"
         },
         "instrument_id": {
-          "description": "Identifier for the collateral instrument",
-          "type": "string"
+          "$ref": "#/$defs/d_9c3fc047c6fea21344ad",
+          "description": "Identifier of the collateral security (for special collateral, the\nspecial security itself)."
         },
         "market_value_id": {
-          "description": "Market value identifier in MarketContext (e.g., \"BOND_ABC_PRICE\")",
-          "type": "string"
+          "$ref": "#/$defs/d_9c3fc047c6fea21344ad",
+          "description": "Market value identifier in MarketContext (e.g., \"BOND_ABC_PRICE\")"
         },
         "quantity": {
           "description": "Quantity/face value of collateral",
@@ -2465,9 +2465,10 @@
         },
         {
           "additionalProperties": false,
-          "description": "Special collateral (specific securities in high demand, may trade at lower rates)",
+          "description": "Special collateral (specific securities in high demand, may trade at lower rates)\n\nThe special security is identified by [`CollateralSpec::instrument_id`].",
           "properties": {
             "special": {
+              "additionalProperties": false,
               "properties": {
                 "rate_adjustment_bp": {
                   "description": "Optional special rate adjustment in basis points (negative = lower rate)",
@@ -2476,15 +2477,8 @@
                     "number",
                     "null"
                   ]
-                },
-                "security_id": {
-                  "description": "Identifier of the specific security",
-                  "type": "string"
                 }
               },
-              "required": [
-                "security_id"
-              ],
               "type": "object"
             }
           },

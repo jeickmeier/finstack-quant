@@ -18,8 +18,8 @@ export default [
               "past_fixings": [],
               "type": "arithmetic_average"
             },
+            "forward_curve_id": "IRON-ORE-FORWARD",
             "id": "SGX-IRON-ORE-DEC26",
-            "price_curve_id": "IRON-ORE-FORWARD",
             "terms": {
               "contracts": 10,
               "currency": "USD",
@@ -32,7 +32,7 @@ export default [
               },
               "settlement_date": "2027-01-04"
             },
-            "underlying": "TSI-62-FE"
+            "underlying_ticker": "TSI-62-FE"
           },
           "type": "commodity_future"
         },
@@ -188,6 +188,13 @@ export default [
     "resolvedRef": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_future.schema.json#/$defs/CommodityFutureFixing"
   },
   {
+    "path": "#/$defs/d_0b12afbc933deb6f9dbc/properties/forward_curve_id",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_future.schema.json#/$defs/CommodityFuture/properties/forward_curve_id",
+    "description": "Commodity forward `PriceCurve` used for projected observations.",
+    "ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/id.schema.json#"
+  },
+  {
     "path": "#/$defs/d_0b12afbc933deb6f9dbc/properties/id",
     "source": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_future.schema.json#/$defs/CommodityFuture/properties/id",
     "description": "Unique instrument identifier.",
@@ -209,13 +216,6 @@ export default [
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json#"
   },
   {
-    "path": "#/$defs/d_0b12afbc933deb6f9dbc/properties/price_curve_id",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_future.schema.json#/$defs/CommodityFuture/properties/price_curve_id",
-    "description": "Price-curve identifier used for projected observations.",
-    "ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
-    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/id.schema.json#"
-  },
-  {
     "path": "#/$defs/d_0b12afbc933deb6f9dbc/properties/scenario_pricing_overrides",
     "source": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_future.schema.json#/$defs/CommodityFuture/properties/scenario_pricing_overrides",
     "description": "Scenario-only pricing adjustments.",
@@ -230,8 +230,8 @@ export default [
     "resolvedRef": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_future.schema.json#/$defs/ListedFutureTerms"
   },
   {
-    "path": "#/$defs/d_0b12afbc933deb6f9dbc/properties/underlying",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_future.schema.json#/$defs/CommodityFuture/properties/underlying",
+    "path": "#/$defs/d_0b12afbc933deb6f9dbc/properties/underlying_ticker",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_future.schema.json#/$defs/CommodityFuture/properties/underlying_ticker",
     "description": "Exchange symbol or underlying label."
   },
   {

@@ -2,7 +2,8 @@
 // JSON wire shape only; runtime constraints remain in the schema.
 
 /**
- * Underlying-currency discount curve used for equity carry.
+ * Settlement-currency discount curve. Without `quanto` the settlement and
+ * underlying currencies match, so this curve also carries the equity.
  */
 export type Id = string;
 /**
@@ -282,6 +283,169 @@ export type DB556Bbeb1Ecf96C44C5A =
   | "ZMW"
   | "ZWL";
 /**
+ * Currency in which the underlying asset is quoted and financed.
+ */
+export type Currency =
+  | "AED"
+  | "AFN"
+  | "ALL"
+  | "AMD"
+  | "ANG"
+  | "AOA"
+  | "ARS"
+  | "AUD"
+  | "AWG"
+  | "AZN"
+  | "BAM"
+  | "BBD"
+  | "BDT"
+  | "BGN"
+  | "BHD"
+  | "BIF"
+  | "BMD"
+  | "BND"
+  | "BOB"
+  | "BRL"
+  | "BSD"
+  | "BTN"
+  | "BWP"
+  | "BYN"
+  | "BZD"
+  | "CAD"
+  | "CDF"
+  | "CHF"
+  | "CLF"
+  | "CLP"
+  | "CNY"
+  | "COP"
+  | "CRC"
+  | "CUC"
+  | "CUP"
+  | "CVE"
+  | "CZK"
+  | "DJF"
+  | "DKK"
+  | "DOP"
+  | "DZD"
+  | "EGP"
+  | "ERN"
+  | "ETB"
+  | "EUR"
+  | "FJD"
+  | "FKP"
+  | "GBP"
+  | "GEL"
+  | "GHS"
+  | "GIP"
+  | "GMD"
+  | "GNF"
+  | "GTQ"
+  | "GYD"
+  | "HKD"
+  | "HNL"
+  | "HRK"
+  | "HTG"
+  | "HUF"
+  | "IDR"
+  | "ILS"
+  | "INR"
+  | "IQD"
+  | "IRR"
+  | "ISK"
+  | "JMD"
+  | "JOD"
+  | "JPY"
+  | "KES"
+  | "KGS"
+  | "KHR"
+  | "KMF"
+  | "KPW"
+  | "KRW"
+  | "KWD"
+  | "KYD"
+  | "KZT"
+  | "LAK"
+  | "LBP"
+  | "LKR"
+  | "LRD"
+  | "LSL"
+  | "LYD"
+  | "MAD"
+  | "MDL"
+  | "MGA"
+  | "MKD"
+  | "MMK"
+  | "MNT"
+  | "MOP"
+  | "MRU"
+  | "MUR"
+  | "MVR"
+  | "MWK"
+  | "MXN"
+  | "MYR"
+  | "MZN"
+  | "NAD"
+  | "NGN"
+  | "NIO"
+  | "NOK"
+  | "NPR"
+  | "NZD"
+  | "OMR"
+  | "PAB"
+  | "PEN"
+  | "PGK"
+  | "PHP"
+  | "PKR"
+  | "PLN"
+  | "PYG"
+  | "QAR"
+  | "RON"
+  | "RSD"
+  | "RUB"
+  | "RWF"
+  | "SAR"
+  | "SBD"
+  | "SCR"
+  | "SDG"
+  | "SEK"
+  | "SGD"
+  | "SHP"
+  | "SLE"
+  | "SLL"
+  | "SOS"
+  | "SRD"
+  | "SSP"
+  | "STN"
+  | "SYP"
+  | "SZL"
+  | "THB"
+  | "TJS"
+  | "TMT"
+  | "TND"
+  | "TOP"
+  | "TRY"
+  | "TTD"
+  | "TWD"
+  | "TZS"
+  | "UAH"
+  | "UGX"
+  | "USD"
+  | "UYU"
+  | "UZS"
+  | "VED"
+  | "VES"
+  | "VND"
+  | "VUV"
+  | "WST"
+  | "XAF"
+  | "XCD"
+  | "XOF"
+  | "XPF"
+  | "YER"
+  | "ZAR"
+  | "ZMW"
+  | "ZWL";
+/**
  * Opaque string identifier.
  */
 export type Id3 = string;
@@ -298,13 +462,9 @@ export type Id5 = string;
  */
 export type Id6 = string;
 /**
- * Opaque string identifier.
- */
-export type Id7 = string;
-/**
  * Currency in which variation margin is paid.
  */
-export type Currency =
+export type Currency1 =
   | "AED"
   | "AFN"
   | "ALL"
@@ -475,7 +635,7 @@ export type Date2 = string;
 /**
  * Currency in which the underlying spot and dividends are quoted.
  */
-export type Currency1 =
+export type Currency2 =
   | "AED"
   | "AFN"
   | "ALL"
@@ -669,17 +829,24 @@ export interface D_692Ed7Bfacfc146Cc47B {
   instrument_pricing_overrides?: InstrumentPricingOverrides;
   metric_pricing_overrides?: MetricPricingOverrides;
   /**
-   * Required quanto adjustment when settlement and underlying currencies differ.
+   * Required quanto adjustment when settlement and underlying currencies
+   * differ. `quanto.asset_discount_curve_id` is the underlying-currency
+   * carry curve and `quanto.asset_currency` must equal `underlying_currency`.
    */
-  quanto?: D_86172Abce129044113Ad | null;
+  quanto?: D_50F51C755E0B3762A2Ad | null;
   scenario_pricing_overrides?: ScenarioPricingOverrides;
-  spot_id: Id7;
+  spot_id: Id6;
   terms: D_3D5B799023F59E08E8Fc;
-  underlying_currency: Currency1;
+  underlying_currency: Currency2;
   /**
    * Equity or index ticker.
    */
   underlying_ticker: string;
+  /**
+   * Equity volatility surface (decimal vol per square-root year). Required
+   * with `quanto`, where it drives the quanto drift.
+   */
+  vol_surface_id?: Id1 | null;
 }
 /**
  * Attributes for selection and reporting.
@@ -1595,17 +1762,19 @@ export interface DE49387F97C0F9D510642 {
   reporting_currency?: DB556Bbeb1Ecf96C44C5A | null;
 }
 /**
- * Market inputs for a fixed-currency quanto equity future.
+ * Quanto adjustment parameters for instruments where payoff currency differs from
+ * underlying currency.
  */
-export interface D_86172Abce129044113Ad {
+export interface D_50F51C755E0B3762A2Ad {
+  asset_currency: Currency;
+  asset_discount_curve_id: Id3;
   /**
-   * Correlation between equity returns and the settlement-per-underlying FX rate.
+   * Correlation between the asset price and payoff-currency units per asset-currency unit.
+   * Must be in [-1, 1].
    */
   correlation: number;
-  equity_vol_surface_id: Id3;
   fx_spot_id: Id4;
   fx_vol_surface_id: Id5;
-  settlement_discount_curve_id: Id6;
 }
 /**
  * Scenario-only pricing adjustments.
@@ -1644,7 +1813,7 @@ export interface D_3D5B799023F59E08E8Fc {
    * portfolio aggregation but must be finite and strictly positive.
    */
   contracts: number;
-  currency: Currency;
+  currency: Currency1;
   /**
    * Trade fill price in the same price-point units as the market mark.
    */

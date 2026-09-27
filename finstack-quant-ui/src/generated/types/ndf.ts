@@ -213,7 +213,7 @@ export type Date = string;
  *     .contract_rate(7.25)
  *     .domestic_discount_curve_id(CurveId::new("USD-OIS"))
  *     .quote_convention(NdfQuoteConvention::BasePerSettlement)
- *     .fixing_source_enum_opt(Some(NdfFixingSource::Pboc))
+ *     .fixing_source_opt(Some(NdfFixingSource::Pboc))
  *     .build()
  *     .expect("Valid NDF");
  * ```
@@ -746,22 +746,19 @@ export interface D_6737E7813812De86Cf9B {
   base_currency: Currency;
   /**
    * Contract forward rate. Interpretation depends on `quote_convention`.
+   * `None` values the NDF at-market.
    */
-  contract_rate: number;
+  contract_rate?: number | null;
   domestic_discount_curve_id: Id;
   fixing_date: Date;
   /**
    * Official fixing source/benchmark enum for type-safe specification.
    */
-  fixing_source_enum?: D_1F0Bf95E27D8096E424E | null;
+  fixing_source?: D_1F0Bf95E27D8096E424E | null;
   /**
    * Optional foreign (base) currency discount curve ID.
    */
   foreign_discount_curve_id?: Id1 | null;
-  /**
-   * Explicit pre-fixing forward rate in `quote_convention` units.
-   */
-  forward_rate_override?: number | null;
   id: Id2;
   instrument_pricing_overrides?: InstrumentPricingOverrides;
   maturity: Date1;
@@ -772,19 +769,23 @@ export interface D_6737E7813812De86Cf9B {
    */
   observed_fixing?: number | null;
   /**
-   * Optional settlement currency calendar.
-   */
-  quote_calendar_id?: string | null;
-  /**
    * Quote convention for contract_rate and observed_fixing.
    */
   quote_convention: "base_per_settlement" | "settlement_per_base";
-  scenario_pricing_overrides?: ScenarioPricingOverrides;
-  settlement_currency: Currency1;
+  /**
+   * Explicit pre-fixing forward rate in `quote_convention` units.
+   */
+  quoted_forward?: number | null;
   /**
    * Optional spot rate override for forward rate calculation.
    */
-  spot_rate_override?: number | null;
+  quoted_spot?: number | null;
+  scenario_pricing_overrides?: ScenarioPricingOverrides;
+  /**
+   * Optional settlement currency calendar.
+   */
+  settlement_calendar_id?: string | null;
+  settlement_currency: Currency1;
 }
 /**
  * Attributes for scenario selection and tagging.

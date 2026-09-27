@@ -1706,11 +1706,15 @@
           "description": "Discount curve identifier"
         },
         "fixing_calendar_id": {
-          "description": "Optional overnight fixing calendar identifier.\n\nRequired only when the contract currency has no registered standard\novernight calendar. Otherwise the currency standard is used.",
-          "type": [
-            "string",
-            "null"
-          ]
+          "anyOf": [
+            {
+              "$ref": "#/$defs/d_9c3fc047c6fea21344ad"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Optional overnight fixing calendar identifier.\n\nRequired only when the contract currency has no registered standard\novernight calendar. Otherwise the currency standard is used."
         },
         "fixing_date": {
           "anyOf": [
@@ -1723,7 +1727,15 @@
           ],
           "description": "Underlying rate fixing date.\n\nDefaults to `terms.last_trading_date` when omitted."
         },
-        "fixing_index_id": {
+        "forward_curve_id": {
+          "$ref": "#/$defs/d_9c3fc047c6fea21344ad",
+          "description": "Forward curve identifier"
+        },
+        "id": {
+          "$ref": "#/$defs/d_9c3fc047c6fea21344ad",
+          "description": "Unique identifier"
+        },
+        "index_id": {
           "anyOf": [
             {
               "$ref": "#/$defs/d_9c3fc047c6fea21344ad"
@@ -1732,15 +1744,7 @@
               "type": "null"
             }
           ],
-          "description": "Optional fixing-index identifier.\n\nWhen omitted, historical fixings use `forward_curve_id`. Fixing series\nare looked up strictly as `FIXING:{id}` without alias fallback."
-        },
-        "forward_curve_id": {
-          "$ref": "#/$defs/d_9c3fc047c6fea21344ad",
-          "description": "Forward curve identifier"
-        },
-        "id": {
-          "$ref": "#/$defs/d_9c3fc047c6fea21344ad",
-          "description": "Unique identifier"
+          "description": "Optional rate-index identity keying the historical fixing series.\n\nWhen omitted, historical fixings use `forward_curve_id`. Fixing series\nare looked up strictly as `FIXING:{id}` without alias fallback."
         },
         "instrument_pricing_overrides": {
           "$ref": "#/$defs/d_c08279a20372931820e0",

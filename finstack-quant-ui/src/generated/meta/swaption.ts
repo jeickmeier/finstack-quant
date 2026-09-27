@@ -486,6 +486,16 @@ export default [
     "description": "Optional calendar for business day adjustments"
   },
   {
+    "path": "#/$defs/d_173bb13d95b6e8cec0d7/properties/calendar_id/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/rates/swaption.schema.json#/$defs/FloatLegSpec/properties/calendar_id/anyOf/0",
+    "ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/id.schema.json#"
+  },
+  {
+    "path": "#/$defs/d_173bb13d95b6e8cec0d7/properties/calendar_id/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/rates/swaption.schema.json#/$defs/FloatLegSpec/properties/calendar_id/anyOf/1"
+  },
+  {
     "path": "#/$defs/d_173bb13d95b6e8cec0d7/properties/compounding",
     "source": "https://finstack_quant.dev/schemas/instrument/1/rates/swaption.schema.json#/$defs/FloatLegSpec/properties/compounding",
     "default": "simple",
@@ -525,6 +535,16 @@ export default [
     "source": "https://finstack_quant.dev/schemas/instrument/1/rates/swaption.schema.json#/$defs/FloatLegSpec/properties/fixing_calendar_id",
     "default": null,
     "description": "Optional calendar for rate fixing (reset lag)"
+  },
+  {
+    "path": "#/$defs/d_173bb13d95b6e8cec0d7/properties/fixing_calendar_id/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/rates/swaption.schema.json#/$defs/FloatLegSpec/properties/fixing_calendar_id/anyOf/0",
+    "ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/id.schema.json#"
+  },
+  {
+    "path": "#/$defs/d_173bb13d95b6e8cec0d7/properties/fixing_calendar_id/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/rates/swaption.schema.json#/$defs/FloatLegSpec/properties/fixing_calendar_id/anyOf/1"
   },
   {
     "path": "#/$defs/d_173bb13d95b6e8cec0d7/properties/forward_curve_id",
@@ -4245,6 +4265,16 @@ export default [
     "path": "#/$defs/d_d76aba90a93f590ce184/properties/calendar_id",
     "source": "https://finstack_quant.dev/schemas/instrument/1/rates/swaption.schema.json#/$defs/FixedLegSpec/properties/calendar_id",
     "description": "Optional calendar for business day adjustments"
+  },
+  {
+    "path": "#/$defs/d_d76aba90a93f590ce184/properties/calendar_id/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/rates/swaption.schema.json#/$defs/FixedLegSpec/properties/calendar_id/anyOf/0",
+    "ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/id.schema.json#"
+  },
+  {
+    "path": "#/$defs/d_d76aba90a93f590ce184/properties/calendar_id/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/rates/swaption.schema.json#/$defs/FixedLegSpec/properties/calendar_id/anyOf/1"
   },
   {
     "path": "#/$defs/d_d76aba90a93f590ce184/properties/compounding_simple",

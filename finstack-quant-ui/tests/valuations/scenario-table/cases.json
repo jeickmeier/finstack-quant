@@ -1,6 +1,6 @@
 {
   "instrumentSource": "finstack-quant/valuations/tests/instruments/json_examples/structured_credit.json",
-  "instrumentSha256": "234d97c2dbc0bf9325098189f639a6b0b9a8a6457c54e1e3c67b6cc1ddaafeae",
+  "instrumentSha256": "3edd86cb88dcd3d1c3f84597475eda01bc79e384690c23475266f57217da4b59",
   "marketSource": "finstack-quant-ui/tests/valuations/instruments/pricing-market.json",
   "marketSha256": "d9f52e6d4012bf12e4eafca7b4b031a58c21cca9d8543467b80e2ae86d380474",
   "asOf": "2024-01-01",

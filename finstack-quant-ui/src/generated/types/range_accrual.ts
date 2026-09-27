@@ -2,10 +2,6 @@
 // JSON wire shape only; runtime constraints remain in the schema.
 
 /**
- * Contractual accrual-period start date.
- */
-export type Date = string;
-/**
  * Day count convention
  */
 export type DayCount =
@@ -301,7 +297,7 @@ export type DB556Bbeb1Ecf96C44C5A =
 /**
  * ISO 8601 calendar date string.
  */
-export type Date1 = string;
+export type Date = string;
 /**
  * Currency in which the underlying asset is quoted and financed.
  */
@@ -482,6 +478,10 @@ export type Id5 = string;
  */
 export type Id6 = string;
 /**
+ * ISO 8601 calendar date string.
+ */
+export type Date1 = string;
+/**
  * Opaque string identifier.
  */
 export type Id7 = string;
@@ -521,8 +521,8 @@ export interface D_676A8Cced1Aa018A1106 {
  *
  * # Rate-Linked Underlyings: Pricing Routing
  *
- * The rate-linked fields (`rate_index_id`, `projection_curve_id`,
- * `reference_tenor`) describe the contract but are **not priceable by the
+ * The rate-linked fields (`index_id`, `forward_curve_id`,
+ * `index_tenor`) describe the contract but are **not priceable by the
  * standalone `RangeAccrual` pricers**, which support equity/FX (GBM)
  * underlyings only and return a validation error when these fields are set.
  * Price rate-linked range accrual notes through
@@ -532,7 +532,6 @@ export interface D_676A8Cced1Aa018A1106 {
  * observation.
  */
 export interface DC3Cfabdd5D36E6A2Dfa1 {
-  accrual_start_date: Date;
   attributes: Attributes;
   /**
    * How to interpret the range bounds (default: Absolute)
@@ -548,7 +547,19 @@ export interface DC3Cfabdd5D36E6A2Dfa1 {
    * Optional dividend-yield scalar ID
    */
   div_yield_id?: Id1 | null;
+  /**
+   * Rates forward curve that projects the observed index of a rate-linked range accrual.
+   */
+  forward_curve_id?: Id1 | null;
   id: Id2;
+  /**
+   * Rate-index identity (e.g. `USD-SOFR`) of a rate-linked range accrual.
+   */
+  index_id?: Id1 | null;
+  /**
+   * Contractual tenor of the observed rate index.
+   */
+  index_tenor?: Tenor | null;
   instrument_pricing_overrides?: InstrumentPricingOverrides;
   /**
    * Lower bound of accrual range (interpretation depends on bounds_type)
@@ -559,7 +570,7 @@ export interface DC3Cfabdd5D36E6A2Dfa1 {
   /**
    * Observation dates for range checking (must be sorted ascending)
    */
-  observation_dates: Date1[];
+  observation_dates: Date[];
   /**
    * Number of past observations that were in range (for mid-life valuations).
    * If None, past observations are not included in the accrual calculation.
@@ -568,27 +579,16 @@ export interface DC3Cfabdd5D36E6A2Dfa1 {
   /**
    * Optional payment date (defaults to last observation date)
    */
-  payment_date?: Date1 | null;
-  /**
-   * Projection curve for a rate-linked range accrual.
-   */
-  projection_curve_id?: Id1 | null;
+  payment_date?: Date | null;
   /**
    * Optional quanto adjustment parameters. When provided, applies a drift
    * correction for instruments whose payoff currency differs from the
    * underlying asset currency.
    */
   quanto?: D_90Cc092234A7Fdca45C8 | null;
-  /**
-   * Explicit rate index for rate-linked range accruals.
-   */
-  rate_index_id?: Id1 | null;
-  /**
-   * Contractual tenor of the observed reference rate.
-   */
-  reference_tenor?: Tenor | null;
   scenario_pricing_overrides?: ScenarioPricingOverrides;
   spot_id: Id6;
+  start_date: Date1;
   /**
    * Total number of past observations (for mid-life valuations).
    * Must be provided if `past_observations_in_range` is set.
@@ -618,6 +618,21 @@ export interface Attributes {
    * User-defined tags for categorization.
    */
   tags?: string[];
+}
+/**
+ * Parsed financial tenor.
+ */
+export interface Tenor {
+  /**
+   * Number of `unit` periods in the tenor. Must be at least 1; `0` is
+   * rejected because a zero-length period makes schedule generation loop.
+   */
+  count: number;
+  /**
+   * Calendar unit the count is expressed in, such as days, weeks, months,
+   * or years.
+   */
+  unit: "days" | "weeks" | "months" | "years";
 }
 /**
  * Instrument-owned pricing inputs.
@@ -1706,21 +1721,6 @@ export interface D_90Cc092234A7Fdca45C8 {
   correlation: number;
   fx_spot_id: Id4;
   fx_vol_surface_id: Id5;
-}
-/**
- * Parsed financial tenor.
- */
-export interface Tenor {
-  /**
-   * Number of `unit` periods in the tenor. Must be at least 1; `0` is
-   * rejected because a zero-length period makes schedule generation loop.
-   */
-  count: number;
-  /**
-   * Calendar unit the count is expressed in, such as days, weeks, months,
-   * or years.
-   */
-  unit: "days" | "weeks" | "months" | "years";
 }
 /**
  * Scenario-only pricing adjustments.

@@ -344,7 +344,7 @@ export default [
   {
     "path": "#/$defs/d_05625cf1aa46e3810fc5/properties/repo_curve_id",
     "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/dollar_roll.schema.json#/$defs/DollarRoll/properties/repo_curve_id",
-    "description": "Optional repo/financing curve identifier (carry-only).\n\nForward curve used by roll specialness to calculate the simple\nfinancing rate over the front/back settlement interval on ACT/360.\nThe implied financing rate itself is determined by prices and carry.\nSee the carry calculations (see [`crate::instruments::fixed_income::dollar_roll::carry`]\nmodule). Does **not** affect\nthe mark-to-market PV, which always discounts both legs at\n`discount_curve_id`.\n\nWhen `None`, the discount curve rate is used as the reference\nfinancing rate for carry analytics."
+    "description": "Optional repo/financing curve identifier (carry-only).\n\nDiscount curve used by roll specialness to calculate the simple\nfinancing rate `(DF(front)/DF(back) − 1)/τ` over the front/back\nsettlement interval, with `τ` on ACT/360.\nThe implied financing rate itself is determined by prices and carry.\nSee the carry calculations (see [`crate::instruments::fixed_income::dollar_roll::carry`]\nmodule). Does **not** affect\nthe mark-to-market PV, which always discounts both legs at\n`discount_curve_id`.\n\nWhen `None`, the discount curve rate is used as the reference\nfinancing rate for carry analytics."
   },
   {
     "path": "#/$defs/d_05625cf1aa46e3810fc5/properties/repo_curve_id/anyOf/0",

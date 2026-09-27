@@ -20,7 +20,7 @@ export default [
               "amount": "10000000",
               "currency": "USD"
             },
-            "reset_lag": 2,
+            "reset_lag_days": 2,
             "side": "receive",
             "start_date": "2024-04-03"
           },
@@ -1114,7 +1114,7 @@ export default [
   {
     "path": "#/$defs/d_67b2a2c25aa7ee1e66dd/properties/fixing_date",
     "source": "https://finstack_quant.dev/schemas/instrument/1/rates/forward_rate_agreement.schema.json#/$defs/ForwardRateAgreement/properties/fixing_date",
-    "description": "Rate fixing date. If `None`, inferred from `start_date - reset_lag` business days."
+    "description": "Rate fixing date. If `None`, inferred from `start_date - reset_lag_days` business days."
   },
   {
     "path": "#/$defs/d_67b2a2c25aa7ee1e66dd/properties/fixing_date/anyOf/0",
@@ -1175,8 +1175,8 @@ export default [
     "format": "double"
   },
   {
-    "path": "#/$defs/d_67b2a2c25aa7ee1e66dd/properties/reset_lag",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/rates/forward_rate_agreement.schema.json#/$defs/ForwardRateAgreement/properties/reset_lag",
+    "path": "#/$defs/d_67b2a2c25aa7ee1e66dd/properties/reset_lag_days",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/rates/forward_rate_agreement.schema.json#/$defs/ForwardRateAgreement/properties/reset_lag_days",
     "description": "Reset lag in business days (fixing to value date)",
     "format": "int32"
   },

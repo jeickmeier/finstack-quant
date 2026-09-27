@@ -368,7 +368,7 @@ export interface D_67B2A2C25Aa7Ee1E66Dd {
    */
   fixing_calendar_id?: Id1 | null;
   /**
-   * Rate fixing date. If `None`, inferred from `start_date - reset_lag` business days.
+   * Rate fixing date. If `None`, inferred from `start_date - reset_lag_days` business days.
    */
   fixing_date?: Date | null;
   forward_curve_id: Id2;
@@ -384,7 +384,7 @@ export interface D_67B2A2C25Aa7Ee1E66Dd {
   /**
    * Reset lag in business days (fixing to value date)
    */
-  reset_lag: number;
+  reset_lag_days: number;
   scenario_pricing_overrides?: ScenarioPricingOverrides;
   /**
    * Direction of the FRA: Pay means paying the fixed rate (receiving floating),

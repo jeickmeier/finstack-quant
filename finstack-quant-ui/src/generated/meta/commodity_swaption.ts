@@ -18,15 +18,15 @@ export default [
             "fixed_price": 3.5,
             "forward_curve_id": "NG-FORWARD",
             "id": "NG-SWAPTION-2025",
-            "notional": 10000,
             "option_type": "call",
-            "swap_end": "2026-06-30",
+            "quantity": 10000,
             "swap_frequency": {
               "count": 1,
               "unit": "months"
             },
-            "swap_start": "2025-07-01",
-            "ticker": "NG",
+            "underlying_maturity": "2026-06-30",
+            "underlying_start_date": "2025-07-01",
+            "underlying_ticker": "NG",
             "unit": "MMBTU",
             "vol_surface_id": "NG-VOL"
           },
@@ -3882,7 +3882,7 @@ export default [
   {
     "path": "#/$defs/d_ef370c084100082046d2",
     "source": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_swaption.schema.json#/$defs/CommoditySwaption",
-    "description": "Commodity swaption (option on a fixed-for-floating commodity swap).\n\nThe holder has the right to enter a commodity swap at expiry, paying\n(or receiving) a fixed price in exchange for floating commodity prices.\n\n# Pricing\n\nBlack-76 model on the forward swap rate:\n- Forward swap rate is the weighted average of forward commodity prices\n  over the swap period\n- Annuity factor captures the present value of a unit payment stream\n\n# Examples\n\n```rust\nuse finstack_quant_valuations::instruments::commodity::commodity_swaption::CommoditySwaption;\nuse finstack_quant_valuations::instruments::CommodityUnderlyingParams;\nuse finstack_quant_valuations::instruments::OptionType;\nuse finstack_quant_core::currency::Currency;\nuse finstack_quant_core::dates::{Date, Tenor, TenorUnit};\nuse finstack_quant_core::types::{CurveId, InstrumentId};\nuse time::Month;\n\nlet swaption = CommoditySwaption::builder()\n    .id(InstrumentId::new(\"NG-SWAPTION-2025\"))\n    .underlying(CommodityUnderlyingParams::new(\"Energy\", \"NG\", \"MMBTU\", Currency::USD))\n    .option_type(OptionType::Call)\n    .expiry(Date::from_calendar_date(2025, Month::June, 15).unwrap())\n    .swap_start(Date::from_calendar_date(2025, Month::July, 1).unwrap())\n    .swap_end(Date::from_calendar_date(2026, Month::June, 30).unwrap())\n    .swap_frequency(Tenor::new(1, TenorUnit::Months).expect(\"valid tenor fixture\"))\n    .fixed_price(3.50)\n    .notional(10000.0)\n    .forward_curve_id(CurveId::new(\"NG-FORWARD\"))\n    .discount_curve_id(CurveId::new(\"USD-OIS\"))\n    .vol_surface_id(CurveId::new(\"NG-VOL\"))\n    .build()\n    .expect(\"Valid swaption\");\n```"
+    "description": "Commodity swaption (option on a fixed-for-floating commodity swap).\n\nThe holder has the right to enter a commodity swap at expiry, paying\n(or receiving) a fixed price in exchange for floating commodity prices.\n\n# Pricing\n\nBlack-76 model on the forward swap rate:\n- Forward swap rate is the weighted average of forward commodity prices\n  over the swap period\n- Annuity factor captures the present value of a unit payment stream\n\n# Examples\n\n```rust\nuse finstack_quant_valuations::instruments::commodity::commodity_swaption::CommoditySwaption;\nuse finstack_quant_valuations::instruments::CommodityUnderlyingParams;\nuse finstack_quant_valuations::instruments::OptionType;\nuse finstack_quant_core::currency::Currency;\nuse finstack_quant_core::dates::{Date, Tenor, TenorUnit};\nuse finstack_quant_core::types::{CurveId, InstrumentId};\nuse time::Month;\n\nlet swaption = CommoditySwaption::builder()\n    .id(InstrumentId::new(\"NG-SWAPTION-2025\"))\n    .underlying(CommodityUnderlyingParams::new(\"Energy\", \"NG\", \"MMBTU\", Currency::USD))\n    .option_type(OptionType::Call)\n    .expiry(Date::from_calendar_date(2025, Month::June, 15).unwrap())\n    .underlying_start_date(Date::from_calendar_date(2025, Month::July, 1).unwrap())\n    .underlying_maturity(Date::from_calendar_date(2026, Month::June, 30).unwrap())\n    .swap_frequency(Tenor::new(1, TenorUnit::Months).expect(\"valid tenor fixture\"))\n    .fixed_price(3.50)\n    .quantity(10000.0)\n    .forward_curve_id(CurveId::new(\"NG-FORWARD\"))\n    .discount_curve_id(CurveId::new(\"USD-OIS\"))\n    .vol_surface_id(CurveId::new(\"NG-VOL\"))\n    .build()\n    .expect(\"Valid swaption\");\n```"
   },
   {
     "path": "#/$defs/d_ef370c084100082046d2/properties/attributes",
@@ -3985,18 +3985,18 @@ export default [
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json#"
   },
   {
-    "path": "#/$defs/d_ef370c084100082046d2/properties/notional",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_swaption.schema.json#/$defs/CommoditySwaption/properties/notional",
-    "description": "Notional quantity per period.",
-    "ref": "#/$defs/PositiveF64Wire",
-    "resolvedRef": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_swaption.schema.json#/$defs/PositiveF64Wire"
-  },
-  {
     "path": "#/$defs/d_ef370c084100082046d2/properties/option_type",
     "source": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_swaption.schema.json#/$defs/CommoditySwaption/properties/option_type",
     "description": "Option type (call = right to enter pay-fixed swap, put = right to enter receive-fixed swap).",
     "ref": "#/$defs/OptionType",
     "resolvedRef": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_swaption.schema.json#/$defs/OptionType"
+  },
+  {
+    "path": "#/$defs/d_ef370c084100082046d2/properties/quantity",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_swaption.schema.json#/$defs/CommoditySwaption/properties/quantity",
+    "description": "Notional quantity per period.",
+    "ref": "#/$defs/PositiveF64Wire",
+    "resolvedRef": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_swaption.schema.json#/$defs/PositiveF64Wire"
   },
   {
     "path": "#/$defs/d_ef370c084100082046d2/properties/scenario_pricing_overrides",
@@ -4006,13 +4006,6 @@ export default [
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/scenario_pricing_overrides.schema.json#"
   },
   {
-    "path": "#/$defs/d_ef370c084100082046d2/properties/swap_end",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_swaption.schema.json#/$defs/CommoditySwaption/properties/swap_end",
-    "description": "Underlying swap end date.",
-    "ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
-    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/date.schema.json#"
-  },
-  {
     "path": "#/$defs/d_ef370c084100082046d2/properties/swap_frequency",
     "source": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_swaption.schema.json#/$defs/CommoditySwaption/properties/swap_frequency",
     "description": "Underlying swap payment frequency.",
@@ -4020,16 +4013,23 @@ export default [
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/tenor.schema.json#"
   },
   {
-    "path": "#/$defs/d_ef370c084100082046d2/properties/swap_start",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_swaption.schema.json#/$defs/CommoditySwaption/properties/swap_start",
+    "path": "#/$defs/d_ef370c084100082046d2/properties/underlying_maturity",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_swaption.schema.json#/$defs/CommoditySwaption/properties/underlying_maturity",
+    "description": "Underlying swap end date.",
+    "ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/date.schema.json#"
+  },
+  {
+    "path": "#/$defs/d_ef370c084100082046d2/properties/underlying_start_date",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_swaption.schema.json#/$defs/CommoditySwaption/properties/underlying_start_date",
     "description": "Underlying swap start date.",
     "ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/date.schema.json#"
   },
   {
-    "path": "#/$defs/d_ef370c084100082046d2/properties/ticker",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_swaption.schema.json#/$defs/CommoditySwaption/properties/ticker",
-    "description": "Ticker/identifier for market data lookup (e.g., \"CL\", \"GC\", \"NG\")"
+    "path": "#/$defs/d_ef370c084100082046d2/properties/underlying_ticker",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_swaption.schema.json#/$defs/CommoditySwaption/properties/underlying_ticker",
+    "description": "Commodity symbol label (e.g., \"CL\", \"GC\", \"NG\"); never a market-data key."
   },
   {
     "path": "#/$defs/d_ef370c084100082046d2/properties/unit",

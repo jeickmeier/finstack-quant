@@ -1,7 +1,6 @@
 {
   "instrument": {
     "spec": {
-      "accrual_start_date": "2023-12-31",
       "attributes": {},
       "bounds_type": "relative_to_initial_spot",
       "coupon_rate": 0.08,
@@ -31,6 +30,7 @@
       "past_observations_in_range": null,
       "payment_date": null,
       "spot_id": "SPX-SPOT",
+      "start_date": "2023-12-31",
       "total_past_observations": null,
       "underlying_ticker": "SPX",
       "upper_bound": 1.05,

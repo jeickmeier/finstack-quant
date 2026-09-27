@@ -3,10 +3,6 @@
     "spec": {
       "attributes": {},
       "base_currency": "EUR",
-      "base_notional": {
-        "amount": "1000000",
-        "currency": "EUR"
-      },
       "domestic_discount_curve_id": "USD-OIS",
       "far_date": "2024-07-05",
       "far_rate": 1.12,
@@ -14,6 +10,10 @@
       "id": "FXSWAP-EURUSD-6M",
       "near_date": "2024-01-05",
       "near_rate": 1.1,
+      "notional": {
+        "amount": "1000000",
+        "currency": "EUR"
+      },
       "quote_currency": "USD"
     },
     "type": "fx_swap"

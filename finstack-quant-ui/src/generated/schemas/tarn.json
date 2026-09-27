@@ -7,8 +7,21 @@
       "instrument": {
         "spec": {
           "attributes": {},
-          "coupon_dates": [
-            "2026-06-30",
+          "coupon_floor": 0,
+          "day_count": "act_360",
+          "discount_curve_id": "USD-OIS",
+          "fixed_rate": "0.06",
+          "forward_curve_id": "USD-SOFR-6M",
+          "id": "TARN-USD-5Y",
+          "index_tenor": {
+            "count": 6,
+            "unit": "months"
+          },
+          "notional": {
+            "amount": "1000000",
+            "currency": "USD"
+          },
+          "payment_dates": [
             "2026-12-31",
             "2027-06-30",
             "2027-12-31",
@@ -19,20 +32,7 @@
             "2030-06-30",
             "2030-12-31"
           ],
-          "coupon_floor": 0,
-          "day_count": "act_360",
-          "discount_curve_id": "USD-OIS",
-          "fixed_rate": 0.06,
-          "floating_index_id": "USD-SOFR-6M",
-          "floating_tenor": {
-            "count": 6,
-            "unit": "months"
-          },
-          "id": "TARN-USD-5Y",
-          "notional": {
-            "amount": "1000000",
-            "currency": "USD"
-          },
+          "start_date": "2026-06-30",
           "target_coupon": 0.15,
           "vol_surface_id": "USD-SOFR-HW-VOL"
         },
@@ -332,6 +332,18 @@
         "model"
       ],
       "type": "object"
+    },
+    "d_18f3ba1ec18ab2be13b2": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "description": "Exact decimal encoded as a JSON string.",
+      "examples": [
+        "1000000",
+        "0.0425",
+        "-1234.56789"
+      ],
+      "pattern": "^-?\\d+(\\.\\d+)?([eE][+-]?\\d+)?$",
+      "title": "Decimal",
+      "type": "string"
     },
     "d_1b2ccb88c9229e7463e8": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -1341,13 +1353,6 @@
           "$ref": "#/$defs/d_2c88e4d1e2e4f7c22e02",
           "description": "Attributes for scenario selection."
         },
-        "coupon_dates": {
-          "description": "Coupon payment dates (must be sorted ascending).",
-          "items": {
-            "$ref": "#/$defs/d_1b2ccb88c9229e7463e8"
-          },
-          "type": "array"
-        },
         "coupon_floor": {
           "description": "Floor on each period's coupon (typically 0.0).",
           "format": "double",
@@ -1362,21 +1367,20 @@
           "description": "Discount curve ID for PV calculations."
         },
         "fixed_rate": {
-          "description": "Fixed coupon rate (the \"strike\" rate).",
-          "format": "double",
-          "type": "number"
+          "$ref": "#/$defs/d_18f3ba1ec18ab2be13b2",
+          "description": "Fixed coupon rate (the \"strike\" rate) as a decimal annual rate (0.05 = 5%)."
         },
-        "floating_index_id": {
+        "forward_curve_id": {
           "$ref": "#/$defs/d_9c3fc047c6fea21344ad",
-          "description": "Floating rate index identifier."
-        },
-        "floating_tenor": {
-          "$ref": "#/$defs/d_47e5e74524615b78a19f",
-          "description": "Floating rate tenor (e.g., \"3M\", \"6M\")."
+          "description": "Rates forward curve that projects the floating index (also the fixing-series key)."
         },
         "id": {
           "$ref": "#/$defs/d_9c3fc047c6fea21344ad",
           "description": "Unique instrument identifier."
+        },
+        "index_tenor": {
+          "$ref": "#/$defs/d_47e5e74524615b78a19f",
+          "description": "Contractual tenor of the observed floating index (e.g. 3M, 6M); must match the forward curve tenor."
         },
         "instrument_pricing_overrides": {
           "$ref": "#/$defs/d_c08279a20372931820e0",
@@ -1390,9 +1394,20 @@
           "$ref": "#/$defs/d_4ba43030fede59fe5993",
           "description": "Notional amount."
         },
+        "payment_dates": {
+          "description": "Coupon payment dates, one per period, strictly ascending and after\n`start_date`. Period `i` accrues from the previous payment date (or\n`start_date`) to `payment_dates[i]` and fixes in advance at its start.",
+          "items": {
+            "$ref": "#/$defs/d_1b2ccb88c9229e7463e8"
+          },
+          "type": "array"
+        },
         "scenario_pricing_overrides": {
           "$ref": "#/$defs/d_f80c8a31d359e1cb5dd4",
           "description": "Scenario-only pricing adjustments."
+        },
+        "start_date": {
+          "$ref": "#/$defs/d_1b2ccb88c9229e7463e8",
+          "description": "Accrual start of the first coupon period; also the first in-advance\nfixing date."
         },
         "target_coupon": {
           "description": "Target cumulative coupon level (triggers early redemption).\n\nA zero target is allowed and represents redemption at the first\nfuture coupon date without coupon accrual.",
@@ -1417,9 +1432,10 @@
         "coupon_floor",
         "target_coupon",
         "notional",
-        "coupon_dates",
-        "floating_tenor",
-        "floating_index_id",
+        "start_date",
+        "payment_dates",
+        "index_tenor",
+        "forward_curve_id",
         "discount_curve_id",
         "day_count",
         "attributes"

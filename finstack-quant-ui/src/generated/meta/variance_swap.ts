@@ -12,6 +12,7 @@ export default [
             "close_series_id": null,
             "day_count": "act_365f",
             "discount_curve_id": "USD-OIS",
+            "div_yield_id": "SPX-DIVYIELD",
             "high_series_id": null,
             "id": "VARSPX-1Y",
             "low_series_id": null,
@@ -32,10 +33,12 @@ export default [
             "realized_var_method": "close_to_close",
             "settlement_date": null,
             "side": "receive",
+            "spot_id": "SPX",
             "start_date": "2024-01-01",
             "strike_variance": 0.04,
             "trading_days_per_year": 252,
-            "underlying_ticker": "SPX"
+            "underlying_ticker": "SPX",
+            "vol_surface_id": "SPX-VOL"
           },
           "type": "variance_swap"
         },
@@ -1330,7 +1333,7 @@ export default [
     "path": "#/$defs/d_85bc3ccea16ecaa23151/properties/close_series_id",
     "source": "https://finstack_quant.dev/schemas/instrument/1/equity/variance_swap.schema.json#/$defs/VarianceSwap/properties/close_series_id",
     "default": null,
-    "description": "Series ID for close prices. Defaults to `underlying_ticker` when absent."
+    "description": "Series ID for close prices. Defaults to `spot_id` when absent."
   },
   {
     "path": "#/$defs/d_85bc3ccea16ecaa23151/properties/day_count",
@@ -1347,10 +1350,26 @@ export default [
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/id.schema.json#"
   },
   {
+    "path": "#/$defs/d_85bc3ccea16ecaa23151/properties/div_yield_id",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/equity/variance_swap.schema.json#/$defs/VarianceSwap/properties/div_yield_id",
+    "default": null,
+    "description": "Optional unitless continuous dividend-yield scalar id (decimal,\n0.02 = 2%). `None` means a zero dividend yield."
+  },
+  {
+    "path": "#/$defs/d_85bc3ccea16ecaa23151/properties/div_yield_id/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/equity/variance_swap.schema.json#/$defs/VarianceSwap/properties/div_yield_id/anyOf/0",
+    "ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/id.schema.json#"
+  },
+  {
+    "path": "#/$defs/d_85bc3ccea16ecaa23151/properties/div_yield_id/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/equity/variance_swap.schema.json#/$defs/VarianceSwap/properties/div_yield_id/anyOf/1"
+  },
+  {
     "path": "#/$defs/d_85bc3ccea16ecaa23151/properties/high_series_id",
     "source": "https://finstack_quant.dev/schemas/instrument/1/equity/variance_swap.schema.json#/$defs/VarianceSwap/properties/high_series_id",
     "default": null,
-    "description": "Series ID for high prices (required for Parkinson, GarmanKlass, RogersSatchell, YangZhang).\nDefaults to `underlying_ticker` when absent."
+    "description": "Series ID for high prices (required for Parkinson, GarmanKlass, RogersSatchell, YangZhang)."
   },
   {
     "path": "#/$defs/d_85bc3ccea16ecaa23151/properties/id",
@@ -1370,7 +1389,7 @@ export default [
     "path": "#/$defs/d_85bc3ccea16ecaa23151/properties/low_series_id",
     "source": "https://finstack_quant.dev/schemas/instrument/1/equity/variance_swap.schema.json#/$defs/VarianceSwap/properties/low_series_id",
     "default": null,
-    "description": "Series ID for low prices (required for Parkinson, GarmanKlass, RogersSatchell, YangZhang).\nDefaults to `underlying_ticker` when absent."
+    "description": "Series ID for low prices (required for Parkinson, GarmanKlass, RogersSatchell, YangZhang)."
   },
   {
     "path": "#/$defs/d_85bc3ccea16ecaa23151/properties/maturity",
@@ -1404,7 +1423,9 @@ export default [
   {
     "path": "#/$defs/d_85bc3ccea16ecaa23151/properties/observation_calendar_id",
     "source": "https://finstack_quant.dev/schemas/instrument/1/equity/variance_swap.schema.json#/$defs/VarianceSwap/properties/observation_calendar_id",
-    "description": "Exchange/fixing calendar used for every realized-variance observation."
+    "description": "Exchange/fixing calendar used for every realized-variance observation.",
+    "ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/id.schema.json#"
   },
   {
     "path": "#/$defs/d_85bc3ccea16ecaa23151/properties/observation_end_of_month",
@@ -1423,7 +1444,7 @@ export default [
     "path": "#/$defs/d_85bc3ccea16ecaa23151/properties/open_series_id",
     "source": "https://finstack_quant.dev/schemas/instrument/1/equity/variance_swap.schema.json#/$defs/VarianceSwap/properties/open_series_id",
     "default": null,
-    "description": "Series ID for open prices (required for Parkinson, GarmanKlass, RogersSatchell, YangZhang).\nDefaults to `underlying_ticker` when absent."
+    "description": "Series ID for open prices (required for Parkinson, GarmanKlass, RogersSatchell, YangZhang)."
   },
   {
     "path": "#/$defs/d_85bc3ccea16ecaa23151/properties/price_series_policy",
@@ -1471,6 +1492,13 @@ export default [
     "resolvedRef": "https://finstack_quant.dev/schemas/instrument/1/equity/variance_swap.schema.json#/$defs/PayReceive"
   },
   {
+    "path": "#/$defs/d_85bc3ccea16ecaa23151/properties/spot_id",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/equity/variance_swap.schema.json#/$defs/VarianceSwap/properties/spot_id",
+    "description": "Market-scalar id (`MarketContext::get_price`) of the underlying spot\nlevel. It is also the default close-price series id.",
+    "ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/id.schema.json#"
+  },
+  {
     "path": "#/$defs/d_85bc3ccea16ecaa23151/properties/start_date",
     "source": "https://finstack_quant.dev/schemas/instrument/1/equity/variance_swap.schema.json#/$defs/VarianceSwap/properties/start_date",
     "description": "Start date of observation period",
@@ -1493,7 +1521,14 @@ export default [
   {
     "path": "#/$defs/d_85bc3ccea16ecaa23151/properties/underlying_ticker",
     "source": "https://finstack_quant.dev/schemas/instrument/1/equity/variance_swap.schema.json#/$defs/VarianceSwap/properties/underlying_ticker",
-    "description": "Underlying identifier (equity/index)"
+    "description": "Underlying symbol (equity/index). A label only; market data is read\nthrough `spot_id`, `vol_surface_id` and `div_yield_id`."
+  },
+  {
+    "path": "#/$defs/d_85bc3ccea16ecaa23151/properties/vol_surface_id",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/equity/variance_swap.schema.json#/$defs/VarianceSwap/properties/vol_surface_id",
+    "description": "Volatility surface used to replicate the unobserved variance.",
+    "ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/id.schema.json#"
   },
   {
     "path": "#/$defs/d_8a837e6f142b34e8cfd4",

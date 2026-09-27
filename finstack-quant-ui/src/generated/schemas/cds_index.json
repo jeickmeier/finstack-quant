@@ -1760,11 +1760,15 @@
           "description": "Business day convention"
         },
         "calendar_id": {
-          "description": "Holiday calendar identifier",
-          "type": [
-            "string",
-            "null"
-          ]
+          "anyOf": [
+            {
+              "$ref": "#/$defs/d_9c3fc047c6fea21344ad"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Holiday calendar identifier"
         },
         "coupon_bp": {
           "$ref": "#/$defs/d_18f3ba1ec18ab2be13b2",
