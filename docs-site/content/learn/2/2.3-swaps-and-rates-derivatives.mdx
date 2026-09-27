@@ -108,12 +108,12 @@ swap_terms = swap['instrument']['spec']
 print({'rates_stage_added': sorted(set(rates_inputs) - foundation_ids),
        'swap_terms': {'id': swap_terms['id'], 'currency': swap_terms['notional']['currency'],
                       'notional': swap_terms['notional']['amount'],
-                      'fixed_rate_decimal': swap_terms['fixed']['rate'],
-                      'discount_curve': swap_terms['fixed']['discount_curve_id'],
-                      'projection_curve': swap_terms['float']['forward_curve_id']}})
+                      'fixed_rate_decimal': swap_terms['fixed_leg']['rate'],
+                      'discount_curve': swap_terms['fixed_leg']['discount_curve_id'],
+                      'projection_curve': swap_terms['float_leg']['forward_curve_id']}})
 priced = price_instrument(InterestRateSwap.from_json(json.dumps(swap)), market, AS_OF, metrics=['par_rate', 'dv01', 'pv01', 'bucketed_dv01'])
 par = copy.deepcopy(swap)
-par['instrument']['spec']['fixed']['rate'] = str(priced.get_metric('par_rate'))
+par['instrument']['spec']['fixed_leg']['rate'] = str(priced.get_metric('par_rate'))
 par_price = price_instrument(json.dumps(par), market, AS_OF).price
 bond = price_instrument(json.dumps(instruments('rates')['USD-CORP']), market, AS_OF, metrics=['dv01'])
 hedge_units = -bond.get_metric('dv01') / priced.get_metric('dv01')
@@ -337,7 +337,7 @@ for flow in flows:
  pv=float(flow['amount'])*curve.df(t)
  if flow['kind']=='fixed':fixed_pv+=pv
  elif flow['kind']=='float_reset':float_pv+=pv
-annuity=abs(fixed_pv)/float(raw['fixed']['rate']);derived=abs(float_pv)/annuity
+annuity=abs(fixed_pv)/float(raw['fixed_leg']['rate']);derived=abs(float_pv)/annuity
 native=price_instrument(json.dumps(contract),market,AS_OF,metrics=['par_rate']).get_metric('par_rate')
 print({'fixed_leg_PV_USD':fixed_pv,'floating_leg_PV_USD':float_pv,'notional_weighted_annuity_USD_years':annuity,'derived_par_rate':derived,'native_par_rate':native})
 ```

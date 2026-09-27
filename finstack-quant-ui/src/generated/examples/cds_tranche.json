@@ -24,7 +24,7 @@
       "realized_loss": 0.0,
       "roll_rule": "cds_imm",
       "series": 42,
-      "side": "buy_protection",
+      "side": "pay",
       "start_date": null,
       "stub": "short_front",
       "upfront": null

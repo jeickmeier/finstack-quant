@@ -31,7 +31,7 @@ export default [
             "realized_loss": 0,
             "roll_rule": "cds_imm",
             "series": 42,
-            "side": "buy_protection",
+            "side": "pay",
             "start_date": null,
             "stub": "short_front",
             "upfront": null
@@ -199,23 +199,6 @@ export default [
     "description": "Apply the closed-form LHP conditional default probability uniformly to\nevery name. This is the `N → ∞` limit of [`Self::PerName`] — an\nacceptable, faster approximation only for genuinely granular pools."
   },
   {
-    "path": "#/$defs/d_055066044802b6e94af1",
-    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/OasQuoteCompounding",
-    "description": "Quote convention used when reporting or consuming OAS values."
-  },
-  {
-    "path": "#/$defs/d_055066044802b6e94af1/oneOf/0",
-    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/OasQuoteCompounding/oneOf/0",
-    "const": "continuous",
-    "description": "Continuous additive spread, matching the tree's internal short-rate shift."
-  },
-  {
-    "path": "#/$defs/d_055066044802b6e94af1/oneOf/1",
-    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/OasQuoteCompounding/oneOf/1",
-    "const": "semi_annual",
-    "description": "Semiannual bond-equivalent OAS quote."
-  },
-  {
     "path": "#/$defs/d_0fb63ab4f431d629f4d9",
     "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_tranche.schema.json#/$defs/RollRule",
     "description": "Roll-date rule applied when generating schedule anchors.\n\nSelects the core `ScheduleBuilder` date-generation mode. The IMM modes\nforce a quarterly grid: the schedule frequency and stub rule configured on\n[`ScheduleParams`] are overridden with quarterly / short-back, matching\n`ScheduleBuilder::imm` and `ScheduleBuilder::cds_imm`.\n\n# Variants\n\n- **`None`**: plain tenor stepping from the schedule boundaries (default).\n- **`Imm`**: quarterly third Wednesdays of Mar/Jun/Sep/Dec (CME IMM dates\n  for rate, currency, and equity index futures).\n- **`CdsImm`**: 20th of Mar/Jun/Sep/Dec (post-Big-Bang standard CDS roll\n  dates). When the start date is not itself a roll date, the first period\n  accrues from the roll date immediately **preceding** the start (standard\n  front accrual per the ISDA Big Bang Protocol, April 2009).\n\n# Examples\n\n```rust\nuse finstack_quant_cashflows::builder::specs::RollRule;\n\nlet rule = RollRule::default();\nassert_eq!(rule, RollRule::None);\n```\n\n# References\n\n- `docs/REFERENCES.md#isda-cds-standard-model`\n- CME IMM date rules (third Wednesday of the contract month)"
@@ -246,7 +229,7 @@ export default [
   {
     "path": "#/$defs/d_10a2b628165f3f3e10e7/properties/barrier_crossing",
     "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/MertonMcConfig/properties/barrier_crossing",
-    "description": "Barrier-crossing policy used for `BarrierType::FirstPassage`.\n\nDefault: `BrownianBridge` when the Merton model uses `FirstPassage`,\notherwise `Discrete`.",
+    "description": "Barrier-crossing policy used for `MertonBarrierType::FirstPassage`.\n\nDefault: `BrownianBridge` when the Merton model uses `FirstPassage`,\notherwise `Discrete`.",
     "ref": "#/$defs/BarrierCrossing",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/BarrierCrossing"
   },
@@ -397,205 +380,6 @@ export default [
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/PikMode"
   },
   {
-    "path": "#/$defs/d_1376bb75255ac32c8b77",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_tranche.schema.json#/$defs/CDSTranche",
-    "description": "CDS Tranche instrument definition (boilerplate)"
-  },
-  {
-    "path": "#/$defs/d_1376bb75255ac32c8b77/properties/attach_pct",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_tranche.schema.json#/$defs/CDSTranche/properties/attach_pct",
-    "description": "Attachment point in percent (e.g., 0.0 for equity)",
-    "format": "double"
-  },
-  {
-    "path": "#/$defs/d_1376bb75255ac32c8b77/properties/attributes",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_tranche.schema.json#/$defs/CDSTranche/properties/attributes",
-    "description": "Attributes for scenario selection and tagging",
-    "ref": "https://finstack_quant.dev/schemas/common/1/attributes.schema.json",
-    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/attributes.schema.json#"
-  },
-  {
-    "path": "#/$defs/d_1376bb75255ac32c8b77/properties/business_day_convention",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_tranche.schema.json#/$defs/CDSTranche/properties/business_day_convention",
-    "default": "modified_following",
-    "description": "Business day convention",
-    "ref": "https://finstack_quant.dev/schemas/common/1/business_day_convention.schema.json",
-    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/business_day_convention.schema.json#"
-  },
-  {
-    "path": "#/$defs/d_1376bb75255ac32c8b77/properties/calendar_id",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_tranche.schema.json#/$defs/CDSTranche/properties/calendar_id",
-    "description": "Optional holiday calendar id"
-  },
-  {
-    "path": "#/$defs/d_1376bb75255ac32c8b77/properties/calendar_id/anyOf/0",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_tranche.schema.json#/$defs/CDSTranche/properties/calendar_id/anyOf/0",
-    "ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
-    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/id.schema.json#"
-  },
-  {
-    "path": "#/$defs/d_1376bb75255ac32c8b77/properties/calendar_id/anyOf/1",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_tranche.schema.json#/$defs/CDSTranche/properties/calendar_id/anyOf/1"
-  },
-  {
-    "path": "#/$defs/d_1376bb75255ac32c8b77/properties/coupon_bp",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_tranche.schema.json#/$defs/CDSTranche/properties/coupon_bp",
-    "description": "Running coupon in basis points (e.g., 100 = 1.00%)",
-    "format": "double"
-  },
-  {
-    "path": "#/$defs/d_1376bb75255ac32c8b77/properties/credit_index_id",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_tranche.schema.json#/$defs/CDSTranche/properties/credit_index_id",
-    "description": "Credit index identifier for survival/loss modeling (placeholder)",
-    "ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
-    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/id.schema.json#"
-  },
-  {
-    "path": "#/$defs/d_1376bb75255ac32c8b77/properties/day_count",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_tranche.schema.json#/$defs/CDSTranche/properties/day_count",
-    "description": "Day count (typically Act/360)",
-    "ref": "https://finstack_quant.dev/schemas/common/1/day_count.schema.json",
-    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/day_count.schema.json#"
-  },
-  {
-    "path": "#/$defs/d_1376bb75255ac32c8b77/properties/detach_pct",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_tranche.schema.json#/$defs/CDSTranche/properties/detach_pct",
-    "description": "Detachment point in percent (e.g., 3.0 for 0-3% tranche)",
-    "format": "double"
-  },
-  {
-    "path": "#/$defs/d_1376bb75255ac32c8b77/properties/discount_curve_id",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_tranche.schema.json#/$defs/CDSTranche/properties/discount_curve_id",
-    "description": "Discount curve identifier (by quote currency)",
-    "ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
-    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/id.schema.json#"
-  },
-  {
-    "path": "#/$defs/d_1376bb75255ac32c8b77/properties/frequency",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_tranche.schema.json#/$defs/CDSTranche/properties/frequency",
-    "description": "Payment frequency (typically quarterly)",
-    "ref": "https://finstack_quant.dev/schemas/common/1/tenor.schema.json",
-    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/tenor.schema.json#"
-  },
-  {
-    "path": "#/$defs/d_1376bb75255ac32c8b77/properties/id",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_tranche.schema.json#/$defs/CDSTranche/properties/id",
-    "description": "Unique instrument identifier",
-    "ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
-    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/id.schema.json#"
-  },
-  {
-    "path": "#/$defs/d_1376bb75255ac32c8b77/properties/index_name",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_tranche.schema.json#/$defs/CDSTranche/properties/index_name",
-    "description": "Index name (e.g., \"CDX.NA.IG\", \"CDX.NA.HY\", \"iTraxx EUR\")"
-  },
-  {
-    "path": "#/$defs/d_1376bb75255ac32c8b77/properties/instrument_pricing_overrides",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_tranche.schema.json#/$defs/CDSTranche/properties/instrument_pricing_overrides",
-    "description": "Instrument-owned pricing inputs.",
-    "ref": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json",
-    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#"
-  },
-  {
-    "path": "#/$defs/d_1376bb75255ac32c8b77/properties/maturity",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_tranche.schema.json#/$defs/CDSTranche/properties/maturity",
-    "description": "Maturity date of the tranche",
-    "ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
-    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/date.schema.json#"
-  },
-  {
-    "path": "#/$defs/d_1376bb75255ac32c8b77/properties/metric_pricing_overrides",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_tranche.schema.json#/$defs/CDSTranche/properties/metric_pricing_overrides",
-    "description": "Metric-time pricing configuration.",
-    "ref": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json",
-    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json#"
-  },
-  {
-    "path": "#/$defs/d_1376bb75255ac32c8b77/properties/notional",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_tranche.schema.json#/$defs/CDSTranche/properties/notional",
-    "description": "Notional amount of the tranche",
-    "ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
-    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/money.schema.json#"
-  },
-  {
-    "path": "#/$defs/d_1376bb75255ac32c8b77/properties/realized_loss",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_tranche.schema.json#/$defs/CDSTranche/properties/realized_loss",
-    "description": "Realized (settled) loss on the reference pool as a decimal fraction of\nthe original portfolio notional, in `[0, 1]`.",
-    "format": "double"
-  },
-  {
-    "path": "#/$defs/d_1376bb75255ac32c8b77/properties/roll_rule",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_tranche.schema.json#/$defs/CDSTranche/properties/roll_rule",
-    "default": "none",
-    "description": "Coupon roll-date grid. `cds_imm` selects the standard CDS roll dates\n(20th of Mar, Jun, Sep, Dec); `none` (the default) generates a bespoke\nschedule from `frequency` and `stub`. The equity-futures `imm` grid is\nrejected. Use [`Self::standard`] for the IMM constructor.",
-    "ref": "#/$defs/RollRule",
-    "resolvedRef": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_tranche.schema.json#/$defs/RollRule"
-  },
-  {
-    "path": "#/$defs/d_1376bb75255ac32c8b77/properties/scenario_pricing_overrides",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_tranche.schema.json#/$defs/CDSTranche/properties/scenario_pricing_overrides",
-    "description": "Scenario-only pricing adjustments.",
-    "ref": "https://finstack_quant.dev/schemas/common/1/scenario_pricing_overrides.schema.json",
-    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/scenario_pricing_overrides.schema.json#"
-  },
-  {
-    "path": "#/$defs/d_1376bb75255ac32c8b77/properties/series",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_tranche.schema.json#/$defs/CDSTranche/properties/series",
-    "description": "Series number (e.g., 37)",
-    "format": "uint16",
-    "maximum": 65535,
-    "minimum": 0
-  },
-  {
-    "path": "#/$defs/d_1376bb75255ac32c8b77/properties/side",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_tranche.schema.json#/$defs/CDSTranche/properties/side",
-    "description": "Tranche side (buy/sell protection)",
-    "ref": "#/$defs/TrancheSide",
-    "resolvedRef": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_tranche.schema.json#/$defs/TrancheSide"
-  },
-  {
-    "path": "#/$defs/d_1376bb75255ac32c8b77/properties/start_date",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_tranche.schema.json#/$defs/CDSTranche/properties/start_date",
-    "default": null,
-    "description": "Optional effective date for schedule anchoring (if None, uses as_of date)"
-  },
-  {
-    "path": "#/$defs/d_1376bb75255ac32c8b77/properties/start_date/anyOf/0",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_tranche.schema.json#/$defs/CDSTranche/properties/start_date/anyOf/0",
-    "ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
-    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/date.schema.json#"
-  },
-  {
-    "path": "#/$defs/d_1376bb75255ac32c8b77/properties/start_date/anyOf/1",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_tranche.schema.json#/$defs/CDSTranche/properties/start_date/anyOf/1"
-  },
-  {
-    "path": "#/$defs/d_1376bb75255ac32c8b77/properties/stub",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_tranche.schema.json#/$defs/CDSTranche/properties/stub",
-    "default": "short_front",
-    "description": "Stub convention for a bespoke (`roll_rule = none`) coupon schedule.\nDefaults to `short_front`.",
-    "ref": "#/$defs/StubKind",
-    "resolvedRef": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_tranche.schema.json#/$defs/StubKind"
-  },
-  {
-    "path": "#/$defs/d_1376bb75255ac32c8b77/properties/upfront",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_tranche.schema.json#/$defs/CDSTranche/properties/upfront",
-    "default": null,
-    "description": "Optional upfront payment (date, amount). Positive means paid by protection buyer."
-  },
-  {
-    "path": "#/$defs/d_1376bb75255ac32c8b77/properties/upfront/prefixItems/0",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_tranche.schema.json#/$defs/CDSTranche/properties/upfront/prefixItems/0",
-    "ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
-    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/date.schema.json#"
-  },
-  {
-    "path": "#/$defs/d_1376bb75255ac32c8b77/properties/upfront/prefixItems/1",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_tranche.schema.json#/$defs/CDSTranche/properties/upfront/prefixItems/1",
-    "ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
-    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/money.schema.json#"
-  },
-  {
     "path": "#/$defs/d_16451e0bf3b6b78178d8",
     "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/DynamicRecoverySpec",
     "description": "Specification for dynamic (notional-dependent) recovery rate.\n\nModels the relationship between the accreted notional and the recovery\nrate in default. As PIK accrual increases the notional relative to the\noriginal base, recovery declines according to the chosen [`RecoveryModel`]."
@@ -713,6 +497,23 @@ export default [
     "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/ToggleExerciseModel/oneOf/2/properties/optimal_exercise",
     "ref": "#/$defs/OptimalToggle",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/OptimalToggle"
+  },
+  {
+    "path": "#/$defs/d_28b6523781fb1d76052d",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_tranche.schema.json#/$defs/PayReceive",
+    "description": "Direction for instrument legs (universal for IRS, CDS, variance swaps, etc.)\n\nFor interest rate swaps: Pay = pay fixed/receive floating, Receive = receive fixed/pay floating\nFor credit default swaps: Pay = buy protection (pay premium), Receive = sell protection (receive premium)\nFor variance swaps: Pay = short variance, Receive = long variance"
+  },
+  {
+    "path": "#/$defs/d_28b6523781fb1d76052d/oneOf/0",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_tranche.schema.json#/$defs/PayReceive/oneOf/0",
+    "const": "pay",
+    "description": "Pay the primary leg (fixed rate in IRS, protection premium in CDS, short variance)"
+  },
+  {
+    "path": "#/$defs/d_28b6523781fb1d76052d/oneOf/1",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_tranche.schema.json#/$defs/PayReceive/oneOf/1",
+    "const": "receive",
+    "description": "Receive the primary leg (fixed rate in IRS, protection premium in CDS, long variance)"
   },
   {
     "path": "#/$defs/d_2b471f7f53831ad9c93c",
@@ -1069,7 +870,7 @@ export default [
   {
     "path": "#/$defs/d_572ad1befb7d94914652/properties/bdt_sigma",
     "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/ModelConfig/properties/bdt_sigma",
-    "description": "Black-Derman-Toy lognormal short-rate volatility (σ), as an annual\ndecimal proportion of the short rate (`0.20` = 20%).\n\nRead only by the rates-only bond tree when `vol_model = black` selects\nBDT for a bond with embedded exercise rights, where it is required.\nIt is a relative (lognormal) volatility, unlike the absolute\n[`Self::hw1f_sigma`]; typical values are 0.10–0.40. The BDT lattice has\nno mean reversion. Must be finite and non-negative; `0.0` prices on the\ndeterministic curve.",
+    "description": "Black-Derman-Toy lognormal short-rate volatility (σ), as an annual\ndecimal proportion of the short rate (`0.20` = 20%).\n\nRead only by the rates-only bond tree when `tree_model = black_derman_toy` selects\nBDT for a bond with embedded exercise rights, where it is required.\nIt is a relative (lognormal) volatility, unlike the absolute\n[`Self::hw1f_sigma`]; typical values are 0.10–0.40. The BDT lattice has\nno mean reversion. Must be finite and non-negative; `0.0` prices on the\ndeterministic curve.",
     "format": "double"
   },
   {
@@ -1175,8 +976,8 @@ export default [
     "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/ModelConfig/properties/oas_quote_compounding",
     "default": "continuous",
     "description": "Quote compounding convention for OAS inputs and outputs.",
-    "ref": "#/$defs/OasQuoteCompounding",
-    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/OasQuoteCompounding"
+    "ref": "#/$defs/Compounding",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/Compounding"
   },
   {
     "path": "#/$defs/d_572ad1befb7d94914652/properties/rate_credit_correlation",
@@ -1215,6 +1016,21 @@ export default [
     "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/ModelConfig/properties/tree_discount_curve_id/anyOf/1"
   },
   {
+    "path": "#/$defs/d_572ad1befb7d94914652/properties/tree_model",
+    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/ModelConfig/properties/tree_model",
+    "description": "Short-rate lattice for the rates-only bond tree (`hull_white` or\n`black_derman_toy`). `None` selects Hull-White."
+  },
+  {
+    "path": "#/$defs/d_572ad1befb7d94914652/properties/tree_model/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/ModelConfig/properties/tree_model/anyOf/0",
+    "ref": "#/$defs/ShortRateTreeModel",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/ShortRateTreeModel"
+  },
+  {
+    "path": "#/$defs/d_572ad1befb7d94914652/properties/tree_model/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/ModelConfig/properties/tree_model/anyOf/1"
+  },
+  {
     "path": "#/$defs/d_572ad1befb7d94914652/properties/tree_steps",
     "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/ModelConfig/properties/tree_steps",
     "default": null,
@@ -1223,27 +1039,46 @@ export default [
     "minimum": 0
   },
   {
-    "path": "#/$defs/d_572ad1befb7d94914652/properties/vol_model",
-    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/ModelConfig/properties/vol_model",
-    "description": "Volatility model choice for option pricing.\n\nWhen set, overrides the default Black (lognormal) model."
-  },
-  {
-    "path": "#/$defs/d_572ad1befb7d94914652/properties/vol_model/anyOf/0",
-    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/ModelConfig/properties/vol_model/anyOf/0",
-    "ref": "#/$defs/VolatilityModel",
-    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/VolatilityModel"
-  },
-  {
-    "path": "#/$defs/d_572ad1befb7d94914652/properties/vol_model/anyOf/1",
-    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/ModelConfig/properties/vol_model/anyOf/1"
-  },
-  {
     "path": "#/$defs/d_572ad1befb7d94914652/properties/vol_surface_extrapolation",
     "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/ModelConfig/properties/vol_surface_extrapolation",
     "default": "error",
     "description": "Volatility surface extrapolation policy when `implied_volatility` is not set.",
     "ref": "#/$defs/VolSurfaceExtrapolation",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/VolSurfaceExtrapolation"
+  },
+  {
+    "path": "#/$defs/d_5c13df5a55f1da604df2",
+    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/Compounding",
+    "description": "Compounding convention for interest rates.\n\nUsed to specify how interest rates should be quoted or converted.\nAll variants produce mathematically equivalent discount factors when\napplied consistently.\n\n# Relationship Between Conventions\n\nFor a given discount factor DF at time t, the rates under different\nconventions are related by:\n\n```text\nDF = e^(-r_cc × t)                    [Continuous]\n   = (1 + r_ann)^(-t)                 [Annual]\n   = (1 + r_per/n)^(-n×t)             [Periodic(n)]\n   = 1 / (1 + r_simple × t)           [Simple]\n```\n\n# Ordering of Rates\n\nFor positive rates and t > 0: `r_simple > r_annual > r_continuous`\n(less frequent compounding requires a higher quoted rate for the same DF)."
+  },
+  {
+    "path": "#/$defs/d_5c13df5a55f1da604df2/oneOf/0",
+    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/Compounding/oneOf/0",
+    "const": "continuous",
+    "description": "Continuous compounding: r = -ln(DF) / t\n\nMost common for internal calculations, curve construction, and\nquantitative finance models. Provides the simplest mathematical\nproperties (additive over time)."
+  },
+  {
+    "path": "#/$defs/d_5c13df5a55f1da604df2/oneOf/1",
+    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/Compounding/oneOf/1",
+    "const": "annual",
+    "description": "Annual compounding: r = DF^(-1/t) - 1\n\nStandard for many bond markets, particularly UK gilts and\nEuropean government bonds. Also common for Bloomberg zero rate display."
+  },
+  {
+    "path": "#/$defs/d_5c13df5a55f1da604df2/oneOf/2",
+    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/Compounding/oneOf/2",
+    "description": "Periodic compounding with n periods per year: r = n × (DF^(-1/(n×t)) - 1)\n\nCommon values:\n- n=2: Semi-annual (US Treasury, corporate bonds)\n- n=4: Quarterly (some FRNs)\n- n=12: Monthly (rare, some retail products)\n\nNote: Uses [`NonZeroU32`] to prevent division by zero at compile time."
+  },
+  {
+    "path": "#/$defs/d_5c13df5a55f1da604df2/oneOf/2/properties/periodic",
+    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/Compounding/oneOf/2/properties/periodic",
+    "format": "uint32",
+    "minimum": 1
+  },
+  {
+    "path": "#/$defs/d_5c13df5a55f1da604df2/oneOf/3",
+    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/Compounding/oneOf/3",
+    "const": "simple",
+    "description": "Simple interest (no compounding): r = (1/DF - 1) / t\n\nUsed for money market instruments with maturity < 1 year, including:\n- Interbank deposits\n- T-bills and commercial paper\n- SOFR, SONIA, €STR fixings\n\nTypically paired with ACT/360 (USD, EUR) or ACT/365F (GBP) day counts."
   },
   {
     "path": "#/$defs/d_6347b87cc04573a369d9",
@@ -1498,23 +1333,6 @@ export default [
     "description": "Long stub period at the end of the schedule (merges final two periods)."
   },
   {
-    "path": "#/$defs/d_85aa0c7c3653d6c1cc66",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_tranche.schema.json#/$defs/TrancheSide",
-    "description": "Buyer/seller perspective for CDS tranche premium/protection"
-  },
-  {
-    "path": "#/$defs/d_85aa0c7c3653d6c1cc66/oneOf/0",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_tranche.schema.json#/$defs/TrancheSide/oneOf/0",
-    "const": "buy_protection",
-    "description": "Buy protection on the tranche (pay running, receive protection)"
-  },
-  {
-    "path": "#/$defs/d_85aa0c7c3653d6c1cc66/oneOf/1",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_tranche.schema.json#/$defs/TrancheSide/oneOf/1",
-    "const": "sell_protection",
-    "description": "Sell protection on the tranche (receive running, pay protection)"
-  },
-  {
     "path": "#/$defs/d_8a837e6f142b34e8cfd4",
     "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/OptimalToggle",
     "description": "Optimal toggle configuration using nested Monte Carlo simulation.\n\nAt each coupon date the toggle runs a small nested MC to estimate the\nequity value (call-option payoff on the firm's assets) under two\nscenarios:\n\n1. **Cash** – the firm pays out the coupon, reducing asset value by\n   the coupon amount while notional stays unchanged.\n2. **PIK** – the coupon accretes to notional (no cash outflow), so\n   asset value is preserved but the default barrier rises.\n\nPIK is elected when the estimated equity value under PIK exceeds\nthat under cash.  The nested simulation uses a simple GBM forward\nevolution of asset value with a first-passage barrier check."
@@ -1549,6 +1367,23 @@ export default [
     "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/OptimalToggle/properties/risk_free_rate",
     "description": "Risk-free rate (continuous) used as drift in the nested simulation.",
     "format": "double"
+  },
+  {
+    "path": "#/$defs/d_948cdc4db846a21357a4",
+    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/ShortRateTreeModel",
+    "description": "Short-rate lattice used by the rates-only bond tree.\n\nSelected by `instrument_pricing_overrides.model_config.tree_model`; when the\nfield is absent the bond tree uses Hull-White."
+  },
+  {
+    "path": "#/$defs/d_948cdc4db846a21357a4/oneOf/0",
+    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/ShortRateTreeModel/oneOf/0",
+    "const": "hull_white",
+    "description": "Hull-White one-factor (normal short rate) with `(κ, σ)` from\n`model_config.hw1f_mean_reversion` / `model_config.hw1f_sigma` or the\npre-fitted market scalars."
+  },
+  {
+    "path": "#/$defs/d_948cdc4db846a21357a4/oneOf/1",
+    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/ShortRateTreeModel/oneOf/1",
+    "const": "black_derman_toy",
+    "description": "Black-Derman-Toy (lognormal short rate) with volatility\n`model_config.bdt_sigma`."
   },
   {
     "path": "#/$defs/d_94cb251104de5cf587b6",
@@ -2589,6 +2424,205 @@ export default [
     "title": "Id"
   },
   {
+    "path": "#/$defs/d_acd6c3d775d926e416ed",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_tranche.schema.json#/$defs/CdsTranche",
+    "description": "CDS Tranche instrument definition (boilerplate)"
+  },
+  {
+    "path": "#/$defs/d_acd6c3d775d926e416ed/properties/attach_pct",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_tranche.schema.json#/$defs/CdsTranche/properties/attach_pct",
+    "description": "Attachment point in percent (e.g., 0.0 for equity)",
+    "format": "double"
+  },
+  {
+    "path": "#/$defs/d_acd6c3d775d926e416ed/properties/attributes",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_tranche.schema.json#/$defs/CdsTranche/properties/attributes",
+    "description": "Attributes for scenario selection and tagging",
+    "ref": "https://finstack_quant.dev/schemas/common/1/attributes.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/attributes.schema.json#"
+  },
+  {
+    "path": "#/$defs/d_acd6c3d775d926e416ed/properties/business_day_convention",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_tranche.schema.json#/$defs/CdsTranche/properties/business_day_convention",
+    "default": "modified_following",
+    "description": "Business day convention",
+    "ref": "https://finstack_quant.dev/schemas/common/1/business_day_convention.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/business_day_convention.schema.json#"
+  },
+  {
+    "path": "#/$defs/d_acd6c3d775d926e416ed/properties/calendar_id",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_tranche.schema.json#/$defs/CdsTranche/properties/calendar_id",
+    "description": "Optional holiday calendar id"
+  },
+  {
+    "path": "#/$defs/d_acd6c3d775d926e416ed/properties/calendar_id/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_tranche.schema.json#/$defs/CdsTranche/properties/calendar_id/anyOf/0",
+    "ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/id.schema.json#"
+  },
+  {
+    "path": "#/$defs/d_acd6c3d775d926e416ed/properties/calendar_id/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_tranche.schema.json#/$defs/CdsTranche/properties/calendar_id/anyOf/1"
+  },
+  {
+    "path": "#/$defs/d_acd6c3d775d926e416ed/properties/coupon_bp",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_tranche.schema.json#/$defs/CdsTranche/properties/coupon_bp",
+    "description": "Running coupon in basis points (e.g., 100 = 1.00%)",
+    "format": "double"
+  },
+  {
+    "path": "#/$defs/d_acd6c3d775d926e416ed/properties/credit_index_id",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_tranche.schema.json#/$defs/CdsTranche/properties/credit_index_id",
+    "description": "Credit index identifier for survival/loss modeling (placeholder)",
+    "ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/id.schema.json#"
+  },
+  {
+    "path": "#/$defs/d_acd6c3d775d926e416ed/properties/day_count",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_tranche.schema.json#/$defs/CdsTranche/properties/day_count",
+    "description": "Day count (typically Act/360)",
+    "ref": "https://finstack_quant.dev/schemas/common/1/day_count.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/day_count.schema.json#"
+  },
+  {
+    "path": "#/$defs/d_acd6c3d775d926e416ed/properties/detach_pct",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_tranche.schema.json#/$defs/CdsTranche/properties/detach_pct",
+    "description": "Detachment point in percent (e.g., 3.0 for 0-3% tranche)",
+    "format": "double"
+  },
+  {
+    "path": "#/$defs/d_acd6c3d775d926e416ed/properties/discount_curve_id",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_tranche.schema.json#/$defs/CdsTranche/properties/discount_curve_id",
+    "description": "Discount curve identifier (by quote currency)",
+    "ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/id.schema.json#"
+  },
+  {
+    "path": "#/$defs/d_acd6c3d775d926e416ed/properties/frequency",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_tranche.schema.json#/$defs/CdsTranche/properties/frequency",
+    "description": "Payment frequency (typically quarterly)",
+    "ref": "https://finstack_quant.dev/schemas/common/1/tenor.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/tenor.schema.json#"
+  },
+  {
+    "path": "#/$defs/d_acd6c3d775d926e416ed/properties/id",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_tranche.schema.json#/$defs/CdsTranche/properties/id",
+    "description": "Unique instrument identifier",
+    "ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/id.schema.json#"
+  },
+  {
+    "path": "#/$defs/d_acd6c3d775d926e416ed/properties/index_name",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_tranche.schema.json#/$defs/CdsTranche/properties/index_name",
+    "description": "Index name (e.g., \"CDX.NA.IG\", \"CDX.NA.HY\", \"iTraxx EUR\")"
+  },
+  {
+    "path": "#/$defs/d_acd6c3d775d926e416ed/properties/instrument_pricing_overrides",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_tranche.schema.json#/$defs/CdsTranche/properties/instrument_pricing_overrides",
+    "description": "Instrument-owned pricing inputs.",
+    "ref": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#"
+  },
+  {
+    "path": "#/$defs/d_acd6c3d775d926e416ed/properties/maturity",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_tranche.schema.json#/$defs/CdsTranche/properties/maturity",
+    "description": "Maturity date of the tranche",
+    "ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/date.schema.json#"
+  },
+  {
+    "path": "#/$defs/d_acd6c3d775d926e416ed/properties/metric_pricing_overrides",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_tranche.schema.json#/$defs/CdsTranche/properties/metric_pricing_overrides",
+    "description": "Metric-time pricing configuration.",
+    "ref": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json#"
+  },
+  {
+    "path": "#/$defs/d_acd6c3d775d926e416ed/properties/notional",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_tranche.schema.json#/$defs/CdsTranche/properties/notional",
+    "description": "Notional amount of the tranche",
+    "ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/money.schema.json#"
+  },
+  {
+    "path": "#/$defs/d_acd6c3d775d926e416ed/properties/realized_loss",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_tranche.schema.json#/$defs/CdsTranche/properties/realized_loss",
+    "description": "Realized (settled) loss on the reference pool as a decimal fraction of\nthe original portfolio notional, in `[0, 1]`.",
+    "format": "double"
+  },
+  {
+    "path": "#/$defs/d_acd6c3d775d926e416ed/properties/roll_rule",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_tranche.schema.json#/$defs/CdsTranche/properties/roll_rule",
+    "default": "none",
+    "description": "Coupon roll-date grid. `cds_imm` selects the standard CDS roll dates\n(20th of Mar, Jun, Sep, Dec); `none` (the default) generates a bespoke\nschedule from `frequency` and `stub`. The equity-futures `imm` grid is\nrejected. Use [`Self::standard`] for the IMM constructor.",
+    "ref": "#/$defs/RollRule",
+    "resolvedRef": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_tranche.schema.json#/$defs/RollRule"
+  },
+  {
+    "path": "#/$defs/d_acd6c3d775d926e416ed/properties/scenario_pricing_overrides",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_tranche.schema.json#/$defs/CdsTranche/properties/scenario_pricing_overrides",
+    "description": "Scenario-only pricing adjustments.",
+    "ref": "https://finstack_quant.dev/schemas/common/1/scenario_pricing_overrides.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/scenario_pricing_overrides.schema.json#"
+  },
+  {
+    "path": "#/$defs/d_acd6c3d775d926e416ed/properties/series",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_tranche.schema.json#/$defs/CdsTranche/properties/series",
+    "description": "Series number (e.g., 37)",
+    "format": "uint16",
+    "maximum": 65535,
+    "minimum": 0
+  },
+  {
+    "path": "#/$defs/d_acd6c3d775d926e416ed/properties/side",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_tranche.schema.json#/$defs/CdsTranche/properties/side",
+    "description": "Tranche side, as on CDS and CdsIndex: `pay` buys protection (pays the\nrunning premium), `receive` sells protection (receives the premium).",
+    "ref": "#/$defs/PayReceive",
+    "resolvedRef": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_tranche.schema.json#/$defs/PayReceive"
+  },
+  {
+    "path": "#/$defs/d_acd6c3d775d926e416ed/properties/start_date",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_tranche.schema.json#/$defs/CdsTranche/properties/start_date",
+    "default": null,
+    "description": "Optional effective date for schedule anchoring (if None, uses as_of date)"
+  },
+  {
+    "path": "#/$defs/d_acd6c3d775d926e416ed/properties/start_date/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_tranche.schema.json#/$defs/CdsTranche/properties/start_date/anyOf/0",
+    "ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/date.schema.json#"
+  },
+  {
+    "path": "#/$defs/d_acd6c3d775d926e416ed/properties/start_date/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_tranche.schema.json#/$defs/CdsTranche/properties/start_date/anyOf/1"
+  },
+  {
+    "path": "#/$defs/d_acd6c3d775d926e416ed/properties/stub",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_tranche.schema.json#/$defs/CdsTranche/properties/stub",
+    "default": "short_front",
+    "description": "Stub convention for a bespoke (`roll_rule = none`) coupon schedule.\nDefaults to `short_front`.",
+    "ref": "#/$defs/StubKind",
+    "resolvedRef": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_tranche.schema.json#/$defs/StubKind"
+  },
+  {
+    "path": "#/$defs/d_acd6c3d775d926e416ed/properties/upfront",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_tranche.schema.json#/$defs/CdsTranche/properties/upfront",
+    "default": null,
+    "description": "Optional upfront payment (date, amount). Positive means paid by protection buyer."
+  },
+  {
+    "path": "#/$defs/d_acd6c3d775d926e416ed/properties/upfront/prefixItems/0",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_tranche.schema.json#/$defs/CdsTranche/properties/upfront/prefixItems/0",
+    "ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/date.schema.json#"
+  },
+  {
+    "path": "#/$defs/d_acd6c3d775d926e416ed/properties/upfront/prefixItems/1",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_tranche.schema.json#/$defs/CdsTranche/properties/upfront/prefixItems/1",
+    "ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/money.schema.json#"
+  },
+  {
     "path": "#/$defs/d_ae5d75ed4e313ae3bc25",
     "source": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json#/$defs/BreakevenTarget",
     "description": "Which valuation parameter to solve the breakeven for.\n\n# Result units\n\nThe breakeven metric is a bare `f64` whose unit depends on the target. Read\nthe per-variant docs before interpreting a value:\n\n| Target             | Sensitivity     | Result unit          |\n|--------------------|-----------------|----------------------|\n| `ZSpread`          | CS01            | basis points         |\n| `Ytm`              | DV01            | basis points         |\n| `Oas`              | CS01            | basis points         |\n| `ImpliedVol`       | Vega            | vol points (1 = 1%)  |\n| `BaseCorrelation`  | Correlation01   | correlation points   |"
@@ -2648,7 +2682,7 @@ export default [
   {
     "path": "#/$defs/d_b0a5fc543381da6a5722/properties/cds_quote_bp",
     "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/MarketQuoteOverrides/properties/cds_quote_bp",
-    "description": "CreditDefaultSwap clean par-spread quote in basis points.\n\nUsed only by CreditDefaultSwap risk replay, where it replaces the\nmatching contractual hazard-curve pillar. It does not drive PV, and no\nother instrument (CDSIndex included) reads it.",
+    "description": "CreditDefaultSwap clean par-spread quote in basis points.\n\nUsed only by CreditDefaultSwap risk replay, where it replaces the\nmatching contractual hazard-curve pillar. It does not drive PV, and no\nother instrument (CdsIndex included) reads it.",
     "format": "double"
   },
   {
@@ -4075,23 +4109,6 @@ export default [
     "description": "Years (Y)"
   },
   {
-    "path": "#/$defs/d_ec89adc17436f33de839",
-    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/VolatilityModel",
-    "description": "Volatility model for option pricing."
-  },
-  {
-    "path": "#/$defs/d_ec89adc17436f33de839/oneOf/0",
-    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/VolatilityModel/oneOf/0",
-    "const": "black",
-    "description": "Black (lognormal)."
-  },
-  {
-    "path": "#/$defs/d_ec89adc17436f33de839/oneOf/1",
-    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/VolatilityModel/oneOf/1",
-    "const": "normal",
-    "description": "Bachelier / normal model."
-  },
-  {
     "path": "#/$defs/d_ed218c734e46de57eeb9",
     "source": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json#/$defs/BreakevenMode",
     "description": "Linear (first-order) or iterative (full-reprice root-find) solve mode.\n\n# Why the two modes disagree\n\nThe gap between them is usually **not** dominated by convexity. `Linear`\ndivides by the sensitivity measured at `as_of`, whereas `Iterative`\nreprices at the horizon date, where the instrument has less remaining time\nand therefore a different sensitivity. On a 5Y bond over a 6M horizon the\ntwo differ by several percent even though convexity over the ~9bp solved\nshift contributes only a fraction of that. The gap grows with horizon\nlength, not just with curvature.\n\n`Iterative` is the more accurate answer where it is supported; `Linear` is\nthe fast approximation and the default."
@@ -4222,8 +4239,8 @@ export default [
   {
     "path": "#/$defs/d_fe7fd429ac42d87faa68/properties/spec",
     "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_tranche.schema.json#/$defs/cds_tranche/properties/spec",
-    "ref": "#/$defs/CDSTranche",
-    "resolvedRef": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_tranche.schema.json#/$defs/CDSTranche"
+    "ref": "#/$defs/CdsTranche",
+    "resolvedRef": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_tranche.schema.json#/$defs/CdsTranche"
   },
   {
     "path": "#/$defs/d_fe7fd429ac42d87faa68/properties/type",

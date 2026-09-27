@@ -2688,88 +2688,68 @@ export type DayCount =
   | "act_act_afb"
   | "bus_252";
 /**
- * Method for calculating floating leg coupon payments.
+ * How the fixings of one accrual period combine into the period rate.
  *
- * Different reference rates require different compounding conventions:
- * - **Term rates (SOFR 3M, EURIBOR, historical LIBOR)**: Simple interest
- * - **Overnight rates (SOFR, SONIA, €STR, TONA)**: Compounded in arrears
+ * One canonical enum for every floating leg and coupon: swaps, basis and
+ * cross-currency legs, TRS financing, IR futures, FRN / loan / structured
+ * credit coupons.
  *
- * # Market Standards
+ * | Variant | Period rate | Typical use |
+ * |---------|-------------|-------------|
+ * | `simple` | One term fixing / forward over the period | EURIBOR, Term SOFR, legacy IBOR |
+ * | `simple_average` | `(Σ rᵢ·dᵢ) / D` of daily overnight fixings | Averaged overnight loans, Fed-Funds futures |
+ * | `compounded_in_arrears` | `[∏(1 + rᵢ·dᵢ/B) − 1]·B/D` | SOFR / SONIA / €STR / TONA OIS (lookback 0) |
+ * | `compounded_with_observation_shift` | as above, observations and weights shifted | ISDA 2021 observation shift |
+ * | `compounded_with_rate_cutoff` | as above, last fixings frozen | ARRC lockout / SWPM "Rate Cut-Off Days" |
  *
- * ## Simple term-rate coupons
- * - **Formula**: `Coupon = Notional × (Forward_Rate + Spread) × DCF`
- * - **Use for**: current term-rate indices and legacy IBOR transactions
- * - **Standard**: ISDA 2021 Definitions; ISDA 2006 for legacy transactions
+ * Day counts are business days and must be non-negative.
  *
- * ## Compounded In Arrears (RFR-style)
- * - **Formula**: `Coupon = Notional × [∏(1 + r_i × dcf_i) - 1]`
- * - **Use for**: USD SOFR, GBP SONIA, EUR €STR, JPY TONA
- * - **Standard**: ISDA 2021 Definitions
- * - **Observation convention**: plain in-arrears for standard OIS presets;
- *   lookback, observation shift, and cutoff are explicit contract variants
+ * # References
+ *
+ * - ISDA 2021 Definitions, compounded RFR conventions `docs/REFERENCES.md#isda-2021-definitions`
+ * - ARRC (2020). "SOFR: A User's Guide." `docs/REFERENCES.md#arrc-sofr-users-guide`
+ * - BoE SONIA conventions `docs/REFERENCES.md#boe-sonia-key-features`
  *
  * # Examples
  *
  * ```
- * use finstack_quant_valuations::instruments::rates::irs::FloatingLegCompounding;
+ * use finstack_quant_cashflows::builder::FloatingLegCompounding;
  *
- * // LIBOR-style swap (simple compounding)
- * let simple = FloatingLegCompounding::Simple;
- * assert_eq!(simple, FloatingLegCompounding::default());
- *
- * // SOFR OIS swap: plain compounded in arrears (no lookback)
- * let sofr = FloatingLegCompounding::CompoundedInArrears { lookback_days: 0 };
- * assert_eq!(sofr, FloatingLegCompounding::sofr());
- *
- * // SONIA FRN-style leg with the BoE 5-day lookback (explicit, not the OIS preset)
- * let sonia_frn = FloatingLegCompounding::CompoundedInArrears { lookback_days: 5 };
- * assert_ne!(sonia_frn, FloatingLegCompounding::sonia());
+ * assert_eq!(FloatingLegCompounding::default(), FloatingLegCompounding::Simple);
+ * assert_eq!(
+ *     FloatingLegCompounding::sofr(),
+ *     FloatingLegCompounding::CompoundedInArrears { lookback_days: 0 }
+ * );
  * ```
- *
- * # References
- *
- * - **ISDA 2021 Definitions**: Compounded RFR conventions `docs/REFERENCES.md#isda-2021-definitions`
- * - **ARRC** (Alternative Reference Rates Committee): SOFR conventions `docs/REFERENCES.md#arrc-sofr-users-guide`
- * - **BoE** (Bank of England): SONIA conventions `docs/REFERENCES.md#boe-sonia-key-features`
- * - **ECB**: €STR conventions `docs/REFERENCES.md#ecb-estr-methodology`
- *
- * In the IRS instrument implementation, the RFR-style variant
- * (`CompoundedInArrears`) is also used to classify swaps as OIS for
- * discount-only float-leg pricing; see `InterestRateSwap::is_single_curve_ois` for details.
  */
 export type D_9F40E937966E31F97B30 =
   | "simple"
+  | "simple_average"
   | {
       compounded_in_arrears: {
         /**
-         * Number of business days to shift observation dates back from the accrual
-         * period (lookback).  Typically 2–5 days depending on market convention.
-         *
-         * The observation dates are shifted while the day-count-fraction (DCF)
-         * weights remain anchored to the **original** accrual period dates.
-         * This is consistent with "lookback without observation shift" as
-         * described in the ISDA 2021 Definitions and ARRC SOFR conventions.
+         * Business days by which observation dates move backward while the
+         * day-count weights stay on the original accrual dates ("lookback
+         * without observation shift", ISDA 2021 / ARRC). `0` is plain
+         * in-arrears, the cleared-OIS convention.
          */
         lookback_days: number;
-        [k: string]: unknown;
       };
     }
   | {
       compounded_with_observation_shift: {
         /**
-         * Number of business days to shift both observation dates and DCF weights.
+         * Business days to shift both observation dates and weights.
          */
         shift_days: number;
-        [k: string]: unknown;
       };
     }
   | {
       compounded_with_rate_cutoff: {
         /**
-         * Number of business days before period end to freeze the overnight rate.
+         * Business days before period end over which the rate is frozen.
          */
         cutoff_days: number;
-        [k: string]: unknown;
       };
     };
 /**

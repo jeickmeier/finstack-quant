@@ -140,26 +140,11 @@
         }
       ]
     },
-    "d_055066044802b6e94af1": {
-      "description": "Quote convention used when reporting or consuming OAS values.",
-      "oneOf": [
-        {
-          "const": "continuous",
-          "description": "Continuous additive spread, matching the tree's internal short-rate shift.",
-          "type": "string"
-        },
-        {
-          "const": "semi_annual",
-          "description": "Semiannual bond-equivalent OAS quote.",
-          "type": "string"
-        }
-      ]
-    },
     "d_0688739575c4b1492597": {
       "additionalProperties": false,
       "properties": {
         "spec": {
-          "$ref": "#/$defs/d_dc0c483409e01928615c"
+          "$ref": "#/$defs/d_fcc5a617e836258c508e"
         },
         "type": {
           "const": "cds_option",
@@ -193,7 +178,7 @@
       "properties": {
         "barrier_crossing": {
           "$ref": "#/$defs/d_d4ba69c121b73ac48a10",
-          "description": "Barrier-crossing policy used for `BarrierType::FirstPassage`.\n\nDefault: `BrownianBridge` when the Merton model uses `FirstPassage`,\notherwise `Discrete`."
+          "description": "Barrier-crossing policy used for `MertonBarrierType::FirstPassage`.\n\nDefault: `BrownianBridge` when the Merton model uses `FirstPassage`,\notherwise `Discrete`."
         },
         "calibration": {
           "anyOf": [
@@ -876,7 +861,7 @@
           "description": "Optional forward curve identifier for asset-swap spread metrics.\n\nWhen set, ASW par/market metrics project the floating receiver leg from\nthis forward curve instead of using a discount-curve par-rate proxy."
         },
         "bdt_sigma": {
-          "description": "Black-Derman-Toy lognormal short-rate volatility (σ), as an annual\ndecimal proportion of the short rate (`0.20` = 20%).\n\nRead only by the rates-only bond tree when `vol_model = black` selects\nBDT for a bond with embedded exercise rights, where it is required.\nIt is a relative (lognormal) volatility, unlike the absolute\n[`Self::hw1f_sigma`]; typical values are 0.10–0.40. The BDT lattice has\nno mean reversion. Must be finite and non-negative; `0.0` prices on the\ndeterministic curve.",
+          "description": "Black-Derman-Toy lognormal short-rate volatility (σ), as an annual\ndecimal proportion of the short rate (`0.20` = 20%).\n\nRead only by the rates-only bond tree when `tree_model = black_derman_toy` selects\nBDT for a bond with embedded exercise rights, where it is required.\nIt is a relative (lognormal) volatility, unlike the absolute\n[`Self::hw1f_sigma`]; typical values are 0.10–0.40. The BDT lattice has\nno mean reversion. Must be finite and non-negative; `0.0` prices on the\ndeterministic curve.",
           "format": "double",
           "type": [
             "number",
@@ -991,7 +976,7 @@
           "description": "Price/accrual target convention for OAS inversion."
         },
         "oas_quote_compounding": {
-          "$ref": "#/$defs/d_055066044802b6e94af1",
+          "$ref": "#/$defs/d_5c13df5a55f1da604df2",
           "default": "continuous",
           "description": "Quote compounding convention for OAS inputs and outputs."
         },
@@ -1025,6 +1010,17 @@
           ],
           "description": "Optional discount curve identifier for tree-based option/OAS models.\n\nSome vendor OAS screens use a model curve distinct from the bond's pricing\nor spread curve. When set, tree pricers calibrate to this curve while\nnon-tree spread metrics continue to use the instrument's discount curve."
         },
+        "tree_model": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/d_948cdc4db846a21357a4"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Short-rate lattice for the rates-only bond tree (`hull_white` or\n`black_derman_toy`). `None` selects Hull-White."
+        },
         "tree_steps": {
           "default": null,
           "description": "Number of time steps for tree-based pricing (e.g., 100)",
@@ -1035,17 +1031,6 @@
             "null"
           ]
         },
-        "vol_model": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/d_ec89adc17436f33de839"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "Volatility model choice for option pricing.\n\nWhen set, overrides the default Black (lognormal) model."
-        },
         "vol_surface_extrapolation": {
           "$ref": "#/$defs/d_4ac4dad3ab3a5d25d3f9",
           "default": "error",
@@ -1053,6 +1038,41 @@
         }
       },
       "type": "object"
+    },
+    "d_5c13df5a55f1da604df2": {
+      "description": "Compounding convention for interest rates.\n\nUsed to specify how interest rates should be quoted or converted.\nAll variants produce mathematically equivalent discount factors when\napplied consistently.\n\n# Relationship Between Conventions\n\nFor a given discount factor DF at time t, the rates under different\nconventions are related by:\n\n```text\nDF = e^(-r_cc × t)                    [Continuous]\n   = (1 + r_ann)^(-t)                 [Annual]\n   = (1 + r_per/n)^(-n×t)             [Periodic(n)]\n   = 1 / (1 + r_simple × t)           [Simple]\n```\n\n# Ordering of Rates\n\nFor positive rates and t > 0: `r_simple > r_annual > r_continuous`\n(less frequent compounding requires a higher quoted rate for the same DF).",
+      "oneOf": [
+        {
+          "const": "continuous",
+          "description": "Continuous compounding: r = -ln(DF) / t\n\nMost common for internal calculations, curve construction, and\nquantitative finance models. Provides the simplest mathematical\nproperties (additive over time).",
+          "type": "string"
+        },
+        {
+          "const": "annual",
+          "description": "Annual compounding: r = DF^(-1/t) - 1\n\nStandard for many bond markets, particularly UK gilts and\nEuropean government bonds. Also common for Bloomberg zero rate display.",
+          "type": "string"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Periodic compounding with n periods per year: r = n × (DF^(-1/(n×t)) - 1)\n\nCommon values:\n- n=2: Semi-annual (US Treasury, corporate bonds)\n- n=4: Quarterly (some FRNs)\n- n=12: Monthly (rare, some retail products)\n\nNote: Uses [`NonZeroU32`] to prevent division by zero at compile time.",
+          "properties": {
+            "periodic": {
+              "format": "uint32",
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "periodic"
+          ],
+          "type": "object"
+        },
+        {
+          "const": "simple",
+          "description": "Simple interest (no compounding): r = (1/DF - 1) / t\n\nUsed for money market instruments with maturity < 1 year, including:\n- Interbank deposits\n- T-bills and commercial paper\n- SOFR, SONIA, €STR fixings\n\nTypically paired with ACT/360 (USD, EUR) or ACT/365F (GBP) day counts.",
+          "type": "string"
+        }
+      ]
     },
     "d_6347b87cc04573a369d9": {
       "description": "Which credit metric drives the toggle decision.",
@@ -1222,6 +1242,37 @@
         }
       ]
     },
+    "d_7c4b78c24d7d35f10a0b": {
+      "description": "Typed CDS-option strike: forward-spread or clean-price convention.\n\nWire format: externally tagged JSON — `{\"spread\": \"0.0325\"}` or\n`{\"clean_price_pct\": \"107.0\"}` — with no bare-decimal fallback.\n\n# Examples\n\n```rust\nuse finstack_quant_valuations::instruments::credit_derivatives::cds_option::CdsOptionStrike;\nuse rust_decimal::Decimal;\n\nlet spread = CdsOptionStrike::Spread(Decimal::new(325, 4)); // 0.0325 = 325 bp\nassert!(spread.spread_decimal().is_some());\nassert_eq!(spread.native_surface_coordinate().unwrap(), 0.0325);\n\nlet price = CdsOptionStrike::CleanPricePct(Decimal::new(1070, 1)); // 107.0\nassert_eq!(price.native_surface_coordinate().unwrap(), 107.0);\nassert!((price.clean_price_fraction().unwrap() - 1.07).abs() < 1e-15);\n```",
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "description": "Strike forward spread as a decimal annual rate (`0.0325` = 325 bp).",
+          "properties": {
+            "spread": {
+              "$ref": "#/$defs/d_18f3ba1ec18ab2be13b2"
+            }
+          },
+          "required": [
+            "spread"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Strike clean price in percentage-price points (`107.0` = fraction\n`1.07`). CDX HY index options are quoted this way.",
+          "properties": {
+            "clean_price_pct": {
+              "$ref": "#/$defs/d_18f3ba1ec18ab2be13b2"
+            }
+          },
+          "required": [
+            "clean_price_pct"
+          ],
+          "type": "object"
+        }
+      ]
+    },
     "d_7dd9bdea4c4382f447f9": {
       "additionalProperties": false,
       "description": "A parsed tenor representing a time period.\n\nTenors are commonly used in financial markets to specify maturities,\npayment frequencies, and rate fixing periods.\n\n# Examples\n\n```rust\nuse finstack_quant_core::dates::{Tenor, TenorUnit};\n# fn main() -> finstack_quant_core::Result<()> {\n\nlet tenor = Tenor::new(3, TenorUnit::Months).expect(\"valid tenor fixture\");\nassert_eq!(tenor.count(), 3);\nassert_eq!(tenor.unit(), TenorUnit::Months);\n\n// Parse from string\nlet parsed = Tenor::parse(\"6M\")?;\nassert_eq!(parsed.count(), 6);\nassert_eq!(parsed.unit(), TenorUnit::Months);\n# Ok(())\n# }\n```",
@@ -1352,6 +1403,21 @@
         "horizon"
       ],
       "type": "object"
+    },
+    "d_948cdc4db846a21357a4": {
+      "description": "Short-rate lattice used by the rates-only bond tree.\n\nSelected by `instrument_pricing_overrides.model_config.tree_model`; when the\nfield is absent the bond tree uses Hull-White.",
+      "oneOf": [
+        {
+          "const": "hull_white",
+          "description": "Hull-White one-factor (normal short rate) with `(κ, σ)` from\n`model_config.hw1f_mean_reversion` / `model_config.hw1f_sigma` or the\npre-fitted market scalars.",
+          "type": "string"
+        },
+        {
+          "const": "black_derman_toy",
+          "description": "Black-Derman-Toy (lognormal short rate) with volatility\n`model_config.bdt_sigma`.",
+          "type": "string"
+        }
+      ]
     },
     "d_94cb251104de5cf587b6": {
       "description": "A phantom-typed identifier that prevents mixing different kinds of IDs.\n\nThis type wraps a string identifier with a phantom type parameter to ensure\ntype safety at compile time. Different `Id<T>` types with different `T`\ncannot be compared or mixed accidentally, preventing entire classes of bugs.\n\n# Type Parameters\n\n* `T` - Phantom type tag that distinguishes this ID from IDs with different tags\n\n# Invariants\n\n- Storage uses `Arc<str>` for efficient cloning\n- The phantom marker has zero size and runtime cost\n- Two `Id<T>` values are equal if their string values are equal\n- IDs with different type tags (`Id<A>` vs `Id<B>`) cannot be compared\n\n# Examples\n\n```rust\nuse finstack_quant_core::types::{CurveId, InstrumentId};\n\n// Create IDs with different type tags\nlet curve = CurveId::from(\"USD-SOFR\");\nlet bond = InstrumentId::from(\"ISIN:US912828XG60\");\n\n// Can compare IDs of the same type\nassert_eq!(curve, CurveId::from(\"USD-SOFR\"));\nassert_ne!(curve, CurveId::from(\"EUR-ESTR\"));\n\n// Cannot compare IDs of different types (compile error):\n// let _ = curve == bond;  // Error: mismatched types\n```\n\n# Thread Safety\n\n`Id<T>` is `Send + Sync` as it wraps an `Arc<str>`. Multiple threads can\nsafely share and clone IDs with minimal synchronization overhead.",
@@ -2303,7 +2369,7 @@
       "description": "Overrides for market-quoted values (prices, vols, spreads, upfront payments).\n\n# Price-driving fields\n\nThe following fields, when set, override the model PV returned by\n[`Instrument::base_value`](crate::instruments::common_impl::traits::Instrument::base_value)\nfor bonds. At most one may be set at a time — [`Self::validate`] enforces this.\nPrecedence (applied top-to-bottom inside `Bond::base_value`):\n\n1. `quoted_dirty_price_currency` — currency units (bond native currency)\n2. `quoted_clean_price_pct` — percentage of par\n3. `quoted_ytm` — decimal YTM (e.g. `0.055` = 5.5%)\n4. `quoted_ytw` — decimal yield-to-worst\n5. `quoted_z_spread` — decimal Z-spread\n6. `quoted_oas` — decimal OAS\n7. `quoted_discount_margin` — decimal DM (FRNs)\n8. `quoted_i_spread` — decimal I-spread\n9. `quoted_asw_market` — decimal ASW (market convention)\n10. `quoted_japanese_simple_yield` — decimal Tokyo simple yield (単利)",
       "properties": {
         "cds_quote_bp": {
-          "description": "CreditDefaultSwap clean par-spread quote in basis points.\n\nUsed only by CreditDefaultSwap risk replay, where it replaces the\nmatching contractual hazard-curve pillar. It does not drive PV, and no\nother instrument (CDSIndex included) reads it.",
+          "description": "CreditDefaultSwap clean par-spread quote in basis points.\n\nUsed only by CreditDefaultSwap risk replay, where it replaces the\nmatching contractual hazard-curve pillar. It does not drive PV, and no\nother instrument (CdsIndex included) reads it.",
           "format": "double",
           "type": [
             "number",
@@ -3419,7 +3485,205 @@
         }
       ]
     },
-    "d_dc0c483409e01928615c": {
+    "d_e42076b4d2ef6e393ce5": {
+      "description": "Which structural parameter to calibrate in the MC engine.",
+      "oneOf": [
+        {
+          "const": "debt_barrier",
+          "description": "Calibrate the debt barrier B.",
+          "type": "string"
+        },
+        {
+          "const": "asset_vol",
+          "description": "Calibrate the asset volatility sigma_V.",
+          "type": "string"
+        }
+      ]
+    },
+    "d_e49387f97c0f9d510642": {
+      "additionalProperties": false,
+      "description": "Configuration for VaR calculation.\n\nControls statistical properties such as confidence level and pricing method.\nThe historical window/observation count is derived from [`MarketHistory`].",
+      "properties": {
+        "confidence_level": {
+          "$ref": "#/$defs/d_7e19cc4df9954b864180",
+          "default": 0.95,
+          "description": "Confidence level (e.g., 0.95 for 95% VaR, 0.99 for 99% VaR)"
+        },
+        "method": {
+          "$ref": "#/$defs/d_f80f2b90e7af690c5898",
+          "default": "full_revaluation",
+          "description": "VaR calculation method"
+        },
+        "reporting_currency": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/d_b556bbeb1ecf96c44c5a"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Optional reporting currency for portfolio aggregation.\n\nWhen omitted, same-currency portfolios use their natural currency.\nMixed-currency portfolios must set this explicitly."
+        }
+      },
+      "type": "object"
+    },
+    "d_e96c399d588508b4c77b": {
+      "description": "Exercise schedule convention for option models.",
+      "oneOf": [
+        {
+          "const": "european",
+          "description": "Exercise only at expiry.",
+          "type": "string"
+        },
+        {
+          "const": "american",
+          "description": "Exercise at any eligible time through expiry.",
+          "type": "string"
+        },
+        {
+          "const": "bermudan",
+          "description": "Exercise on a finite schedule of eligible dates.",
+          "type": "string"
+        }
+      ]
+    },
+    "d_ec4e993309e09fe83294": {
+      "description": "Unit of a tenor period.",
+      "oneOf": [
+        {
+          "const": "days",
+          "description": "Days (D)",
+          "type": "string"
+        },
+        {
+          "const": "weeks",
+          "description": "Weeks (W)",
+          "type": "string"
+        },
+        {
+          "const": "months",
+          "description": "Months (M)",
+          "type": "string"
+        },
+        {
+          "const": "years",
+          "description": "Years (Y)",
+          "type": "string"
+        }
+      ]
+    },
+    "d_ed218c734e46de57eeb9": {
+      "description": "Linear (first-order) or iterative (full-reprice root-find) solve mode.\n\n# Why the two modes disagree\n\nThe gap between them is usually **not** dominated by convexity. `Linear`\ndivides by the sensitivity measured at `as_of`, whereas `Iterative`\nreprices at the horizon date, where the instrument has less remaining time\nand therefore a different sensitivity. On a 5Y bond over a 6M horizon the\ntwo differ by several percent even though convexity over the ~9bp solved\nshift contributes only a fraction of that. The gap grows with horizon\nlength, not just with curvature.\n\n`Iterative` is the more accurate answer where it is supported; `Linear` is\nthe fast approximation and the default.",
+      "oneOf": [
+        {
+          "const": "linear",
+          "description": "`-(carry_total) / sensitivity`, using the sensitivity at `as_of`.\n\nFast, first-order: ignores both convexity and the change in sensitivity\nover the horizon.",
+          "type": "string"
+        },
+        {
+          "const": "iterative",
+          "description": "Brent root-find with a full reprice at the horizon date.\n\nCaptures convexity *and* the horizon change in sensitivity. Not\nsupported for [`BreakevenTarget::BaseCorrelation`], nor for\ncredit-curve instruments under `ZSpread`/`Oas` — see\n[`BreakevenTarget`] and the calculator docs for why.",
+          "type": "string"
+        }
+      ]
+    },
+    "d_ee4323acfdb49e4fe15b": {
+      "description": "Merton structural credit model.\n\nModels a firm's equity as a call option on its assets, where default\noccurs when asset value falls below the debt barrier.\n\n# Fields\n\n- `asset_value` (V_0): Current market value of the firm's assets.\n- `asset_vol` (sigma_V): Annualized volatility of asset returns.\n- `debt_barrier` (B): Face value of debt / default point.\n- `risk_free_rate` (r): Continuous risk-free rate.\n- `payout_rate` (q): Continuous dividend / payout yield on assets.\n- `barrier_type`: Terminal or first-passage barrier monitoring.\n- `dynamics`: Asset return dynamics specification.\n\n# Wire format\n\nDeserialization is routed through [`MertonModel::new_with_dynamics`] via\n[`RawMertonModel`], so a model loaded from JSON satisfies exactly the same\ninvariants as one built in Rust. The serialized field set is unchanged.",
+      "properties": {
+        "asset_value": {
+          "description": "Current firm asset value `V_0`, in the issuer's reporting currency.\nStrictly positive.",
+          "format": "double",
+          "type": "number"
+        },
+        "asset_vol": {
+          "description": "Asset volatility `sigma_V`, annualized and expressed as a decimal\nfraction (`0.25` is 25%). Strictly positive.",
+          "format": "double",
+          "type": "number"
+        },
+        "barrier_type": {
+          "$ref": "#/$defs/d_780b68ee5d41351b65ca",
+          "description": "Whether default is tested only at maturity or continuously over the\nlife of the debt."
+        },
+        "debt_barrier": {
+          "description": "Default barrier `B`, the debt face value the asset value is compared\nagainst. Strictly positive and in the same currency as `asset_value`.",
+          "format": "double",
+          "type": "number"
+        },
+        "dynamics": {
+          "$ref": "#/$defs/d_46455be5cce6b8020e50",
+          "description": "Stochastic process governing the asset value."
+        },
+        "payout_rate": {
+          "description": "Continuous payout (dividend) rate on assets, as a decimal fraction.\nReduces the drift of the asset process under the risk-neutral measure.",
+          "format": "double",
+          "type": "number"
+        },
+        "risk_free_rate": {
+          "description": "Continuously compounded risk-free rate `r`, as a decimal fraction.",
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "required": [
+        "asset_value",
+        "asset_vol",
+        "debt_barrier",
+        "risk_free_rate",
+        "payout_rate",
+        "barrier_type",
+        "dynamics"
+      ],
+      "type": "object"
+    },
+    "d_f80c8a31d359e1cb5dd4": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false,
+      "description": "Scenario-only price and spread shocks.",
+      "examples": [
+        {},
+        {
+          "scenario_spread_shock_bp": 150
+        }
+      ],
+      "properties": {
+        "scenario_price_shock_decimal": {
+          "description": "Scenario price shock as a decimal fraction (`-0.05` = a -5% price\nshock).\n\nWhen set, valuation helpers apply it as a multiplier:\n`price * (1 + scenario_price_shock_decimal)`.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "scenario_spread_shock_bp": {
+          "description": "Scenario spread shock in basis points (e.g., `150.0` for +150 bp widening).\n\nApplied as an additional flat Z-spread during valuation by pricers that\nsupport spread-based revaluation. Currently consumed by `Bond::base_value`\nfor bonds without embedded options, without an assigned credit curve, and\nwithout a price-pinning quote override other than `quoted_z_spread`\n(where the shock is additive on the quoted spread). See\n[`Instrument::scenario_spread_shock_supported`](crate::instruments::common_impl::traits::Instrument::scenario_spread_shock_supported).\n\nSetting this on an unsupported configuration produces a validation error\nat pricing time rather than a silent no-op. For hazard-priced (credit\ncurve) bonds, shock the hazard curve instead (e.g. a par-CDS curve bump).",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        }
+      },
+      "title": "Scenario Pricing Overrides",
+      "type": "object"
+    },
+    "d_f80f2b90e7af690c5898": {
+      "description": "VaR calculation method.",
+      "oneOf": [
+        {
+          "const": "full_revaluation",
+          "description": "Full revaluation of instrument under each historical scenario.\n\nMost accurate method - reprices the instrument under each historical\nmarket scenario. Captures all non-linearities and path dependencies.",
+          "type": "string"
+        },
+        {
+          "const": "taylor_approximation",
+          "description": "Taylor approximation using sensitivities (Greeks).\n\nFaster method - approximates P&L using pre-computed sensitivities.\nGood for linear instruments and large portfolios, but may be\ninaccurate for highly non-linear instruments (deep OTM options).",
+          "type": "string"
+        }
+      ]
+    },
+    "d_fcc5a617e836258c508e": {
       "additionalProperties": false,
       "description": "Credit option instrument (option on CDS spread or clean index price)\n\nThe public pricing surface supports European options with cash or\nphysical settlement. Before expiry, cash- and physical-settled options\ncarry the same cash-equivalent model NPV and route through the same\nquadrature; the clean payoff excludes accrued because the same underlying\naccrued appears on both sides before exercise and cancels. A physical\nexercise cashflow at settlement is dirty (includes accrued at exercise\nsettlement), and this pricer does not create or deliver a live underlying\nCDS position — valuation at or after a physical exercise boundary fails\nexplicitly. Non-European exercise is rejected at pricing time so\ndeserialized instruments cannot silently fall through to an unsupported\nengine.",
       "properties": {
@@ -3534,11 +3798,11 @@
           "description": "Settlement type"
         },
         "strike": {
-          "$ref": "#/$defs/d_dea2f6321b8d83288c8e",
+          "$ref": "#/$defs/d_7c4b78c24d7d35f10a0b",
           "description": "Typed option strike: a decimal forward spread (`{\"spread\": \"0.0325\"}`)\nor a clean price in percentage points (`{\"clean_price_pct\": \"107.0\"}`)."
         },
         "strike_index_factor": {
-          "description": "Original index factor `f0` attached to the option strike.\n\nDistinct from [`Self::index_factor`], which is the current factor\n`f` at valuation: defaults settled between option strike and\nvaluation reduce `f` below `f0`. A clean-price strike quotes the\nprice on `f0` notional, so its deterministic payoff term scales by\n`f0 / f`; the strike factor is therefore required for clean-price\nstrikes (`CDSOptionStrike::CleanPricePct`) and must not be inferred\nfrom the current factor after a default. Rejected for spread\nstrikes, whose payoff does not reference it.",
+          "description": "Original index factor `f0` attached to the option strike.\n\nDistinct from [`Self::index_factor`], which is the current factor\n`f` at valuation: defaults settled between option strike and\nvaluation reduce `f` below `f0`. A clean-price strike quotes the\nprice on `f0` notional, so its deterministic payoff term scales by\n`f0 / f`; the strike factor is therefore required for clean-price\nstrikes (`CdsOptionStrike::CleanPricePct`) and must not be inferred\nfrom the current factor after a default. Rejected for spread\nstrikes, whose payoff does not reference it.",
           "format": "double",
           "type": [
             "number",
@@ -3590,250 +3854,6 @@
         "vol_surface_id"
       ],
       "type": "object"
-    },
-    "d_dea2f6321b8d83288c8e": {
-      "description": "Typed CDS-option strike: forward-spread or clean-price convention.\n\nWire format: externally tagged JSON — `{\"spread\": \"0.0325\"}` or\n`{\"clean_price_pct\": \"107.0\"}` — with no bare-decimal fallback.\n\n# Examples\n\n```rust\nuse finstack_quant_valuations::instruments::credit_derivatives::cds_option::CDSOptionStrike;\nuse rust_decimal::Decimal;\n\nlet spread = CDSOptionStrike::Spread(Decimal::new(325, 4)); // 0.0325 = 325 bp\nassert!(spread.spread_decimal().is_some());\nassert_eq!(spread.native_surface_coordinate().unwrap(), 0.0325);\n\nlet price = CDSOptionStrike::CleanPricePct(Decimal::new(1070, 1)); // 107.0\nassert_eq!(price.native_surface_coordinate().unwrap(), 107.0);\nassert!((price.clean_price_fraction().unwrap() - 1.07).abs() < 1e-15);\n```",
-      "oneOf": [
-        {
-          "additionalProperties": false,
-          "description": "Strike forward spread as a decimal annual rate (`0.0325` = 325 bp).",
-          "properties": {
-            "spread": {
-              "$ref": "#/$defs/d_18f3ba1ec18ab2be13b2"
-            }
-          },
-          "required": [
-            "spread"
-          ],
-          "type": "object"
-        },
-        {
-          "additionalProperties": false,
-          "description": "Strike clean price in percentage-price points (`107.0` = fraction\n`1.07`). CDX HY index options are quoted this way.",
-          "properties": {
-            "clean_price_pct": {
-              "$ref": "#/$defs/d_18f3ba1ec18ab2be13b2"
-            }
-          },
-          "required": [
-            "clean_price_pct"
-          ],
-          "type": "object"
-        }
-      ]
-    },
-    "d_e42076b4d2ef6e393ce5": {
-      "description": "Which structural parameter to calibrate in the MC engine.",
-      "oneOf": [
-        {
-          "const": "debt_barrier",
-          "description": "Calibrate the debt barrier B.",
-          "type": "string"
-        },
-        {
-          "const": "asset_vol",
-          "description": "Calibrate the asset volatility sigma_V.",
-          "type": "string"
-        }
-      ]
-    },
-    "d_e49387f97c0f9d510642": {
-      "additionalProperties": false,
-      "description": "Configuration for VaR calculation.\n\nControls statistical properties such as confidence level and pricing method.\nThe historical window/observation count is derived from [`MarketHistory`].",
-      "properties": {
-        "confidence_level": {
-          "$ref": "#/$defs/d_7e19cc4df9954b864180",
-          "default": 0.95,
-          "description": "Confidence level (e.g., 0.95 for 95% VaR, 0.99 for 99% VaR)"
-        },
-        "method": {
-          "$ref": "#/$defs/d_f80f2b90e7af690c5898",
-          "default": "full_revaluation",
-          "description": "VaR calculation method"
-        },
-        "reporting_currency": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/d_b556bbeb1ecf96c44c5a"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "description": "Optional reporting currency for portfolio aggregation.\n\nWhen omitted, same-currency portfolios use their natural currency.\nMixed-currency portfolios must set this explicitly."
-        }
-      },
-      "type": "object"
-    },
-    "d_e96c399d588508b4c77b": {
-      "description": "Exercise schedule convention for option models.",
-      "oneOf": [
-        {
-          "const": "european",
-          "description": "Exercise only at expiry.",
-          "type": "string"
-        },
-        {
-          "const": "american",
-          "description": "Exercise at any eligible time through expiry.",
-          "type": "string"
-        },
-        {
-          "const": "bermudan",
-          "description": "Exercise on a finite schedule of eligible dates.",
-          "type": "string"
-        }
-      ]
-    },
-    "d_ec4e993309e09fe83294": {
-      "description": "Unit of a tenor period.",
-      "oneOf": [
-        {
-          "const": "days",
-          "description": "Days (D)",
-          "type": "string"
-        },
-        {
-          "const": "weeks",
-          "description": "Weeks (W)",
-          "type": "string"
-        },
-        {
-          "const": "months",
-          "description": "Months (M)",
-          "type": "string"
-        },
-        {
-          "const": "years",
-          "description": "Years (Y)",
-          "type": "string"
-        }
-      ]
-    },
-    "d_ec89adc17436f33de839": {
-      "description": "Volatility model for option pricing.",
-      "oneOf": [
-        {
-          "const": "black",
-          "description": "Black (lognormal).",
-          "type": "string"
-        },
-        {
-          "const": "normal",
-          "description": "Bachelier / normal model.",
-          "type": "string"
-        }
-      ]
-    },
-    "d_ed218c734e46de57eeb9": {
-      "description": "Linear (first-order) or iterative (full-reprice root-find) solve mode.\n\n# Why the two modes disagree\n\nThe gap between them is usually **not** dominated by convexity. `Linear`\ndivides by the sensitivity measured at `as_of`, whereas `Iterative`\nreprices at the horizon date, where the instrument has less remaining time\nand therefore a different sensitivity. On a 5Y bond over a 6M horizon the\ntwo differ by several percent even though convexity over the ~9bp solved\nshift contributes only a fraction of that. The gap grows with horizon\nlength, not just with curvature.\n\n`Iterative` is the more accurate answer where it is supported; `Linear` is\nthe fast approximation and the default.",
-      "oneOf": [
-        {
-          "const": "linear",
-          "description": "`-(carry_total) / sensitivity`, using the sensitivity at `as_of`.\n\nFast, first-order: ignores both convexity and the change in sensitivity\nover the horizon.",
-          "type": "string"
-        },
-        {
-          "const": "iterative",
-          "description": "Brent root-find with a full reprice at the horizon date.\n\nCaptures convexity *and* the horizon change in sensitivity. Not\nsupported for [`BreakevenTarget::BaseCorrelation`], nor for\ncredit-curve instruments under `ZSpread`/`Oas` — see\n[`BreakevenTarget`] and the calculator docs for why.",
-          "type": "string"
-        }
-      ]
-    },
-    "d_ee4323acfdb49e4fe15b": {
-      "description": "Merton structural credit model.\n\nModels a firm's equity as a call option on its assets, where default\noccurs when asset value falls below the debt barrier.\n\n# Fields\n\n- `asset_value` (V_0): Current market value of the firm's assets.\n- `asset_vol` (sigma_V): Annualized volatility of asset returns.\n- `debt_barrier` (B): Face value of debt / default point.\n- `risk_free_rate` (r): Continuous risk-free rate.\n- `payout_rate` (q): Continuous dividend / payout yield on assets.\n- `barrier_type`: Terminal or first-passage barrier monitoring.\n- `dynamics`: Asset return dynamics specification.\n\n# Wire format\n\nDeserialization is routed through [`MertonModel::new_with_dynamics`] via\n[`RawMertonModel`], so a model loaded from JSON satisfies exactly the same\ninvariants as one built in Rust. The serialized field set is unchanged.",
-      "properties": {
-        "asset_value": {
-          "description": "Current firm asset value `V_0`, in the issuer's reporting currency.\nStrictly positive.",
-          "format": "double",
-          "type": "number"
-        },
-        "asset_vol": {
-          "description": "Asset volatility `sigma_V`, annualized and expressed as a decimal\nfraction (`0.25` is 25%). Strictly positive.",
-          "format": "double",
-          "type": "number"
-        },
-        "barrier_type": {
-          "$ref": "#/$defs/d_780b68ee5d41351b65ca",
-          "description": "Whether default is tested only at maturity or continuously over the\nlife of the debt."
-        },
-        "debt_barrier": {
-          "description": "Default barrier `B`, the debt face value the asset value is compared\nagainst. Strictly positive and in the same currency as `asset_value`.",
-          "format": "double",
-          "type": "number"
-        },
-        "dynamics": {
-          "$ref": "#/$defs/d_46455be5cce6b8020e50",
-          "description": "Stochastic process governing the asset value."
-        },
-        "payout_rate": {
-          "description": "Continuous payout (dividend) rate on assets, as a decimal fraction.\nReduces the drift of the asset process under the risk-neutral measure.",
-          "format": "double",
-          "type": "number"
-        },
-        "risk_free_rate": {
-          "description": "Continuously compounded risk-free rate `r`, as a decimal fraction.",
-          "format": "double",
-          "type": "number"
-        }
-      },
-      "required": [
-        "asset_value",
-        "asset_vol",
-        "debt_barrier",
-        "risk_free_rate",
-        "payout_rate",
-        "barrier_type",
-        "dynamics"
-      ],
-      "type": "object"
-    },
-    "d_f80c8a31d359e1cb5dd4": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "additionalProperties": false,
-      "description": "Scenario-only price and spread shocks.",
-      "examples": [
-        {},
-        {
-          "scenario_spread_shock_bp": 150
-        }
-      ],
-      "properties": {
-        "scenario_price_shock_decimal": {
-          "description": "Scenario price shock as a decimal fraction (`-0.05` = a -5% price\nshock).\n\nWhen set, valuation helpers apply it as a multiplier:\n`price * (1 + scenario_price_shock_decimal)`.",
-          "format": "double",
-          "type": [
-            "number",
-            "null"
-          ]
-        },
-        "scenario_spread_shock_bp": {
-          "description": "Scenario spread shock in basis points (e.g., `150.0` for +150 bp widening).\n\nApplied as an additional flat Z-spread during valuation by pricers that\nsupport spread-based revaluation. Currently consumed by `Bond::base_value`\nfor bonds without embedded options, without an assigned credit curve, and\nwithout a price-pinning quote override other than `quoted_z_spread`\n(where the shock is additive on the quoted spread). See\n[`Instrument::scenario_spread_shock_supported`](crate::instruments::common_impl::traits::Instrument::scenario_spread_shock_supported).\n\nSetting this on an unsupported configuration produces a validation error\nat pricing time rather than a silent no-op. For hazard-priced (credit\ncurve) bonds, shock the hazard curve instead (e.g. a par-CDS curve bump).",
-          "format": "double",
-          "type": [
-            "number",
-            "null"
-          ]
-        }
-      },
-      "title": "Scenario Pricing Overrides",
-      "type": "object"
-    },
-    "d_f80f2b90e7af690c5898": {
-      "description": "VaR calculation method.",
-      "oneOf": [
-        {
-          "const": "full_revaluation",
-          "description": "Full revaluation of instrument under each historical scenario.\n\nMost accurate method - reprices the instrument under each historical\nmarket scenario. Captures all non-linearities and path dependencies.",
-          "type": "string"
-        },
-        {
-          "const": "taylor_approximation",
-          "description": "Taylor approximation using sensitivities (Greeks).\n\nFaster method - approximates P&L using pre-computed sensitivities.\nGood for linear instruments and large portfolios, but may be\ninaccurate for highly non-linear instruments (deep OTM options).",
-          "type": "string"
-        }
-      ]
     },
     "d_fd618cd5743ec18a168f": {
       "description": "Basis used for bond duration, convexity, and DV01-style risk metrics.",

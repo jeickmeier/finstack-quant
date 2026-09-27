@@ -9,8 +9,8 @@
           "attributes": {},
           "dividend_settlement": "on_dividend_date",
           "dividend_tax_rate": 0,
-          "financing": {
-            "compounding": "term_rate",
+          "financing_leg": {
+            "compounding": "simple",
             "day_count": "act_360",
             "discount_curve_id": "USD-OIS",
             "forward_curve_id": "USD-SOFR-3M",
@@ -38,7 +38,7 @@
             },
             "start": "2024-01-01"
           },
-          "side": "receive_total_return",
+          "side": "receive",
           "underlying": {
             "contract_size": 1,
             "currency": "USD",
@@ -228,21 +228,6 @@
       ],
       "type": "object"
     },
-    "d_055066044802b6e94af1": {
-      "description": "Quote convention used when reporting or consuming OAS values.",
-      "oneOf": [
-        {
-          "const": "continuous",
-          "description": "Continuous additive spread, matching the tree's internal short-rate shift.",
-          "type": "string"
-        },
-        {
-          "const": "semi_annual",
-          "description": "Semiannual bond-equivalent OAS quote.",
-          "type": "string"
-        }
-      ]
-    },
     "d_105aee679a95f34523aa": {
       "additionalProperties": false,
       "description": "Maturity constraints for eligible collateral.\n\nSome CSAs restrict collateral based on remaining maturity to limit\nduration risk in the collateral portfolio.",
@@ -276,7 +261,7 @@
       "properties": {
         "barrier_crossing": {
           "$ref": "#/$defs/d_d4ba69c121b73ac48a10",
-          "description": "Barrier-crossing policy used for `BarrierType::FirstPassage`.\n\nDefault: `BrownianBridge` when the Merton model uses `FirstPassage`,\notherwise `Discrete`."
+          "description": "Barrier-crossing policy used for `MertonBarrierType::FirstPassage`.\n\nDefault: `BrownianBridge` when the Merton model uses `FirstPassage`,\notherwise `Discrete`."
         },
         "calibration": {
           "anyOf": [
@@ -413,6 +398,99 @@
           },
           "required": [
             "stepped"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "d_114e9cce0334b4ed200f": {
+      "description": "How the fixings of one accrual period combine into the period rate.\n\nOne canonical enum for every floating leg and coupon: swaps, basis and\ncross-currency legs, TRS financing, IR futures, FRN / loan / structured\ncredit coupons.\n\n| Variant | Period rate | Typical use |\n|---------|-------------|-------------|\n| `simple` | One term fixing / forward over the period | EURIBOR, Term SOFR, legacy IBOR |\n| `simple_average` | `(Σ rᵢ·dᵢ) / D` of daily overnight fixings | Averaged overnight loans, Fed-Funds futures |\n| `compounded_in_arrears` | `[∏(1 + rᵢ·dᵢ/B) − 1]·B/D` | SOFR / SONIA / €STR / TONA OIS (lookback 0) |\n| `compounded_with_observation_shift` | as above, observations and weights shifted | ISDA 2021 observation shift |\n| `compounded_with_rate_cutoff` | as above, last fixings frozen | ARRC lockout / SWPM \"Rate Cut-Off Days\" |\n\nDay counts are business days and must be non-negative.\n\n# References\n\n- ISDA 2021 Definitions, compounded RFR conventions `docs/REFERENCES.md#isda-2021-definitions`\n- ARRC (2020). \"SOFR: A User's Guide.\" `docs/REFERENCES.md#arrc-sofr-users-guide`\n- BoE SONIA conventions `docs/REFERENCES.md#boe-sonia-key-features`\n\n# Examples\n\n```\nuse finstack_quant_cashflows::builder::FloatingLegCompounding;\n\nassert_eq!(FloatingLegCompounding::default(), FloatingLegCompounding::Simple);\nassert_eq!(\n    FloatingLegCompounding::sofr(),\n    FloatingLegCompounding::CompoundedInArrears { lookback_days: 0 }\n);\n```",
+      "oneOf": [
+        {
+          "const": "simple",
+          "description": "Simple term-rate projection: one fixing or forward over the period.\n\n`Coupon = Notional × (Forward_Rate + Spread) × DCF`. This is the\ndefault; a registered overnight RFR index rejects it.",
+          "type": "string"
+        },
+        {
+          "const": "simple_average",
+          "description": "Arithmetic average of daily overnight fixings weighted by accrual days,\n`Rate = (Σ rᵢ·dᵢ) / D`, for instruments that contractually specify a\nsimple-average overnight index.",
+          "type": "string"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Compounded in arrears (overnight RFR rates).\n\n`Coupon = Notional × [∏(1 + rᵢ·dᵢ/B) − 1]` over the daily observations\nof the accrual period.",
+          "properties": {
+            "compounded_in_arrears": {
+              "additionalProperties": false,
+              "properties": {
+                "lookback_days": {
+                  "description": "Business days by which observation dates move backward while the\nday-count weights stay on the original accrual dates (\"lookback\nwithout observation shift\", ISDA 2021 / ARRC). `0` is plain\nin-arrears, the cleared-OIS convention.",
+                  "format": "uint32",
+                  "maximum": 31,
+                  "minimum": 0,
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "lookback_days"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "compounded_in_arrears"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Compounded in arrears with ISDA 2021 observation shift: both the\nobservation dates and their day-count weights move back\n(ISDA 2021 Definitions Section 4.5(c)).",
+          "properties": {
+            "compounded_with_observation_shift": {
+              "additionalProperties": false,
+              "properties": {
+                "shift_days": {
+                  "description": "Business days to shift both observation dates and weights.",
+                  "format": "uint32",
+                  "maximum": 31,
+                  "minimum": 0,
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "shift_days"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "compounded_with_observation_shift"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Compounded in arrears with a rate cut-off near the period end.\n\nThe last `cutoff_days` business-day observations are frozen at the\nfixing immediately preceding them: for fixings `b_1..b_n` the source is\n`b_{n-cutoff}`, so a positive cut-off must leave a preceding fixing.\nReference: ARRC, December 3, 2021 Statement, Appendix A (\"Lockout\").",
+          "properties": {
+            "compounded_with_rate_cutoff": {
+              "additionalProperties": false,
+              "properties": {
+                "cutoff_days": {
+                  "description": "Business days before period end over which the rate is frozen.",
+                  "format": "uint32",
+                  "maximum": 31,
+                  "minimum": 0,
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "cutoff_days"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "compounded_with_rate_cutoff"
           ],
           "type": "object"
         }
@@ -1187,9 +1265,9 @@
       "description": "Specification for TRS financing legs",
       "properties": {
         "compounding": {
-          "$ref": "#/$defs/d_adae8d7958c08486f94b",
-          "default": "term_rate",
-          "description": "Rate-compounding convention (term-rate vs overnight-compounded).\n\nDefaults to [`FinancingRateCompounding::TermRate`]. Set to\n[`FinancingRateCompounding::OvernightCompounded`] for SOFR/SONIA/€STR\novernight-funded TRS so the financing rate captures daily-compounding\nconvexity."
+          "$ref": "#/$defs/d_114e9cce0334b4ed200f",
+          "default": "simple",
+          "description": "Rate-compounding convention of the financing rate.\n\nDefaults to `simple` (one term forward per period, e.g. 3M Term SOFR or\nEURIBOR). Use a `compounded_*` variant for SOFR/SONIA/€STR\novernight-funded TRS so the financing rate captures the daily\ncompounding convexity (typically 12–15 bp of rate on an upward curve).\n`simple_average` is rejected."
         },
         "day_count": {
           "$ref": "#/$defs/d_c0401254ec268b317b65",
@@ -1277,7 +1355,7 @@
           "description": "Optional forward curve identifier for asset-swap spread metrics.\n\nWhen set, ASW par/market metrics project the floating receiver leg from\nthis forward curve instead of using a discount-curve par-rate proxy."
         },
         "bdt_sigma": {
-          "description": "Black-Derman-Toy lognormal short-rate volatility (σ), as an annual\ndecimal proportion of the short rate (`0.20` = 20%).\n\nRead only by the rates-only bond tree when `vol_model = black` selects\nBDT for a bond with embedded exercise rights, where it is required.\nIt is a relative (lognormal) volatility, unlike the absolute\n[`Self::hw1f_sigma`]; typical values are 0.10–0.40. The BDT lattice has\nno mean reversion. Must be finite and non-negative; `0.0` prices on the\ndeterministic curve.",
+          "description": "Black-Derman-Toy lognormal short-rate volatility (σ), as an annual\ndecimal proportion of the short rate (`0.20` = 20%).\n\nRead only by the rates-only bond tree when `tree_model = black_derman_toy` selects\nBDT for a bond with embedded exercise rights, where it is required.\nIt is a relative (lognormal) volatility, unlike the absolute\n[`Self::hw1f_sigma`]; typical values are 0.10–0.40. The BDT lattice has\nno mean reversion. Must be finite and non-negative; `0.0` prices on the\ndeterministic curve.",
           "format": "double",
           "type": [
             "number",
@@ -1392,7 +1470,7 @@
           "description": "Price/accrual target convention for OAS inversion."
         },
         "oas_quote_compounding": {
-          "$ref": "#/$defs/d_055066044802b6e94af1",
+          "$ref": "#/$defs/d_5c13df5a55f1da604df2",
           "default": "continuous",
           "description": "Quote compounding convention for OAS inputs and outputs."
         },
@@ -1426,6 +1504,17 @@
           ],
           "description": "Optional discount curve identifier for tree-based option/OAS models.\n\nSome vendor OAS screens use a model curve distinct from the bond's pricing\nor spread curve. When set, tree pricers calibrate to this curve while\nnon-tree spread metrics continue to use the instrument's discount curve."
         },
+        "tree_model": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/d_948cdc4db846a21357a4"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Short-rate lattice for the rates-only bond tree (`hull_white` or\n`black_derman_toy`). `None` selects Hull-White."
+        },
         "tree_steps": {
           "default": null,
           "description": "Number of time steps for tree-based pricing (e.g., 100)",
@@ -1435,17 +1524,6 @@
             "integer",
             "null"
           ]
-        },
-        "vol_model": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/d_ec89adc17436f33de839"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "Volatility model choice for option pricing.\n\nWhen set, overrides the default Black (lognormal) model."
         },
         "vol_surface_extrapolation": {
           "$ref": "#/$defs/d_4ac4dad3ab3a5d25d3f9",
@@ -1495,6 +1573,41 @@
         "settlement_lag"
       ],
       "type": "object"
+    },
+    "d_5c13df5a55f1da604df2": {
+      "description": "Compounding convention for interest rates.\n\nUsed to specify how interest rates should be quoted or converted.\nAll variants produce mathematically equivalent discount factors when\napplied consistently.\n\n# Relationship Between Conventions\n\nFor a given discount factor DF at time t, the rates under different\nconventions are related by:\n\n```text\nDF = e^(-r_cc × t)                    [Continuous]\n   = (1 + r_ann)^(-t)                 [Annual]\n   = (1 + r_per/n)^(-n×t)             [Periodic(n)]\n   = 1 / (1 + r_simple × t)           [Simple]\n```\n\n# Ordering of Rates\n\nFor positive rates and t > 0: `r_simple > r_annual > r_continuous`\n(less frequent compounding requires a higher quoted rate for the same DF).",
+      "oneOf": [
+        {
+          "const": "continuous",
+          "description": "Continuous compounding: r = -ln(DF) / t\n\nMost common for internal calculations, curve construction, and\nquantitative finance models. Provides the simplest mathematical\nproperties (additive over time).",
+          "type": "string"
+        },
+        {
+          "const": "annual",
+          "description": "Annual compounding: r = DF^(-1/t) - 1\n\nStandard for many bond markets, particularly UK gilts and\nEuropean government bonds. Also common for Bloomberg zero rate display.",
+          "type": "string"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Periodic compounding with n periods per year: r = n × (DF^(-1/(n×t)) - 1)\n\nCommon values:\n- n=2: Semi-annual (US Treasury, corporate bonds)\n- n=4: Quarterly (some FRNs)\n- n=12: Monthly (rare, some retail products)\n\nNote: Uses [`NonZeroU32`] to prevent division by zero at compile time.",
+          "properties": {
+            "periodic": {
+              "format": "uint32",
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "periodic"
+          ],
+          "type": "object"
+        },
+        {
+          "const": "simple",
+          "description": "Simple interest (no compounding): r = (1/DF - 1) / t\n\nUsed for money market instruments with maturity < 1 year, including:\n- Interbank deposits\n- T-bills and commercial paper\n- SOFR, SONIA, €STR fixings\n\nTypically paired with ACT/360 (USD, EUR) or ACT/365F (GBP) day counts.",
+          "type": "string"
+        }
+      ]
     },
     "d_6347b87cc04573a369d9": {
       "description": "Which credit metric drives the toggle decision.",
@@ -1681,7 +1794,7 @@
     },
     "d_785f04c4ffd82f89f1ab": {
       "additionalProperties": false,
-      "description": "Equity total-return swap exchanging price and net dividend return against\nfloating-rate financing plus a contractual spread.\n\nSeasoned trades require the observed level at the current period start in\n`past_fixings`, except that `initial_level` may anchor the first period.\n\n# Construction\n\n```\nuse finstack_quant_core::{\n    currency::Currency, dates::DayCount, money::Money, types::InstrumentId,\n};\nuse finstack_quant_cashflows::builder::ScheduleParams;\nuse finstack_quant_valuations::instruments::{\n    Attributes, EquityUnderlyingParams, FinancingLegSpec,\n};\nuse finstack_quant_valuations::instruments::equity::equity_trs::{\n    EquityTotalReturnSwap, TrsDividendSettlement, TrsScheduleSpec, TrsSide,\n};\nuse rust_decimal::Decimal;\nuse time::macros::date;\n\n# fn main() -> finstack_quant_core::Result<()> {\nlet trs = EquityTotalReturnSwap::builder()\n    .id(InstrumentId::new(\"SPX-TRS\"))\n    .notional(Money::from((10_000_000_i64, Currency::USD)))\n    .underlying(\n        EquityUnderlyingParams::new(\"SPX\", \"SPX-SPOT\", Currency::USD)\n            .with_dividend_yield(\"SPX-DIV\"),\n    )\n    .financing(FinancingLegSpec::new(\n        \"USD-OIS\", \"USD-SOFR-3M\", Decimal::from(50), DayCount::Act360,\n    ))\n    .schedule(TrsScheduleSpec::from_params(\n        date!(2026 - 01 - 02),\n        date!(2027 - 01 - 02),\n        ScheduleParams::quarterly_act360(),\n    ))\n    .side(TrsSide::ReceiveTotalReturn)\n    .dividend_settlement(TrsDividendSettlement::OnDividendDate)\n    .initial_level_opt(None)\n    .attributes(Attributes::new())\n    .build()?;\nassert_eq!(trs.notional.currency(), Currency::USD);\n# Ok(())\n# }\n```",
+      "description": "Equity total-return swap exchanging price and net dividend return against\nfloating-rate financing plus a contractual spread.\n\nSeasoned trades require the observed level at the current period start in\n`past_fixings`, except that `initial_level` may anchor the first period.\n\n# Construction\n\n```\nuse finstack_quant_core::{\n    currency::Currency, dates::DayCount, money::Money, types::InstrumentId,\n};\nuse finstack_quant_cashflows::builder::ScheduleParams;\nuse finstack_quant_valuations::instruments::{\n    Attributes, EquityUnderlyingParams, FinancingLegSpec, PayReceive,\n};\nuse finstack_quant_valuations::instruments::equity::equity_trs::{\n    EquityTotalReturnSwap, TrsDividendSettlement, TrsScheduleSpec,\n};\nuse rust_decimal::Decimal;\nuse time::macros::date;\n\n# fn main() -> finstack_quant_core::Result<()> {\nlet trs = EquityTotalReturnSwap::builder()\n    .id(InstrumentId::new(\"SPX-TRS\"))\n    .notional(Money::from((10_000_000_i64, Currency::USD)))\n    .underlying(\n        EquityUnderlyingParams::new(\"SPX\", \"SPX-SPOT\", Currency::USD)\n            .with_dividend_yield(\"SPX-DIV\"),\n    )\n    .financing_leg(FinancingLegSpec::new(\n        \"USD-OIS\", \"USD-SOFR-3M\", Decimal::from(50), DayCount::Act360,\n    ))\n    .schedule(TrsScheduleSpec::from_params(\n        date!(2026 - 01 - 02),\n        date!(2027 - 01 - 02),\n        ScheduleParams::quarterly_act360(),\n    ))\n    .side(PayReceive::Receive)\n    .dividend_settlement(TrsDividendSettlement::OnDividendDate)\n    .initial_level_opt(None)\n    .attributes(Attributes::new())\n    .build()?;\nassert_eq!(trs.notional.currency(), Currency::USD);\n# Ok(())\n# }\n```",
       "properties": {
         "attributes": {
           "$ref": "#/$defs/d_2c88e4d1e2e4f7c22e02",
@@ -1716,7 +1829,7 @@
           "format": "double",
           "type": "number"
         },
-        "financing": {
+        "financing_leg": {
           "$ref": "#/$defs/d_4cb0722b5a138347a415",
           "description": "Financing leg specification (curves, spread, day count)."
         },
@@ -1789,7 +1902,7 @@
           "description": "Schedule specification (payment dates and frequency)."
         },
         "side": {
-          "$ref": "#/$defs/d_b86816c7c1b4448b4b80",
+          "$ref": "#/$defs/d_7b6677ace9e975e6ff97",
           "description": "Trade side (receive/pay total return)."
         },
         "underlying": {
@@ -1801,13 +1914,28 @@
         "id",
         "notional",
         "underlying",
-        "financing",
+        "financing_leg",
         "schedule",
         "side",
         "dividend_settlement",
         "attributes"
       ],
       "type": "object"
+    },
+    "d_7b6677ace9e975e6ff97": {
+      "description": "Direction for instrument legs (universal for IRS, CDS, variance swaps, etc.)\n\nFor interest rate swaps: Pay = pay fixed/receive floating, Receive = receive fixed/pay floating\nFor credit default swaps: Pay = buy protection (pay premium), Receive = sell protection (receive premium)\nFor variance swaps: Pay = short variance, Receive = long variance",
+      "oneOf": [
+        {
+          "const": "pay",
+          "description": "Pay the primary leg (fixed rate in IRS, protection premium in CDS, short variance)",
+          "type": "string"
+        },
+        {
+          "const": "receive",
+          "description": "Receive the primary leg (fixed rate in IRS, protection premium in CDS, long variance)",
+          "type": "string"
+        }
+      ]
     },
     "d_7bbbddac6f6b1d1f4de1": {
       "description": "Roll-date rule applied when generating schedule anchors.\n\nSelects the core `ScheduleBuilder` date-generation mode. The IMM modes\nforce a quarterly grid: the schedule frequency and stub rule configured on\n[`ScheduleParams`] are overridden with quarterly / short-back, matching\n`ScheduleBuilder::imm` and `ScheduleBuilder::cds_imm`.\n\n# Variants\n\n- **`None`**: plain tenor stepping from the schedule boundaries (default).\n- **`Imm`**: quarterly third Wednesdays of Mar/Jun/Sep/Dec (CME IMM dates\n  for rate, currency, and equity index futures).\n- **`CdsImm`**: 20th of Mar/Jun/Sep/Dec (post-Big-Bang standard CDS roll\n  dates). When the start date is not itself a roll date, the first period\n  accrues from the roll date immediately **preceding** the start (standard\n  front accrual per the ISDA Big Bang Protocol, April 2009).\n\n# Examples\n\n```rust\nuse finstack_quant_cashflows::builder::specs::RollRule;\n\nlet rule = RollRule::default();\nassert_eq!(rule, RollRule::None);\n```\n\n# References\n\n- `docs/REFERENCES.md#isda-cds-standard-model`\n- CME IMM date rules (third Wednesday of the contract month)",
@@ -2013,6 +2141,21 @@
         {
           "const": "on_demand",
           "description": "On-demand margin calls (used for repos and some bilateral agreements)",
+          "type": "string"
+        }
+      ]
+    },
+    "d_948cdc4db846a21357a4": {
+      "description": "Short-rate lattice used by the rates-only bond tree.\n\nSelected by `instrument_pricing_overrides.model_config.tree_model`; when the\nfield is absent the bond tree uses Hull-White.",
+      "oneOf": [
+        {
+          "const": "hull_white",
+          "description": "Hull-White one-factor (normal short rate) with `(κ, σ)` from\n`model_config.hw1f_mean_reversion` / `model_config.hw1f_sigma` or the\npre-fitted market scalars.",
+          "type": "string"
+        },
+        {
+          "const": "black_derman_toy",
+          "description": "Black-Derman-Toy (lognormal short rate) with volatility\n`model_config.bdt_sigma`.",
           "type": "string"
         }
       ]
@@ -3042,21 +3185,6 @@
         }
       ]
     },
-    "d_adae8d7958c08486f94b": {
-      "description": "Rate-compounding convention for a TRS financing leg.\n\nDistinguishes how each accrual period's floating rate is projected from the\nforward curve. The two conventions differ by the daily-compounding convexity\n— typically 12–15 bp of rate at current levels on an upward-sloping curve.",
-      "oneOf": [
-        {
-          "const": "term_rate",
-          "description": "Term-rate financing (e.g. 3M Term SOFR, EURIBOR): the period rate is the\nsimple arithmetic-average forward over the accrual period. This is the\ndefault and matches a conventional term-rate-funded TRS.",
-          "type": "string"
-        },
-        {
-          "const": "overnight_compounded",
-          "description": "Overnight-indexed (OIS / RFR) financing — SOFR, SONIA, €STR, TONA: the\nperiod rate daily-compounds the overnight forward,\n`R = (∏(1 + rᵢ·dᵢ) − 1) / τ`, picking up the compounding convexity that\nthe simple arithmetic average drops.",
-          "type": "string"
-        }
-      ]
-    },
     "d_ae5d75ed4e313ae3bc25": {
       "description": "Which valuation parameter to solve the breakeven for.\n\n# Result units\n\nThe breakeven metric is a bare `f64` whose unit depends on the target. Read\nthe per-variant docs before interpreting a value:\n\n| Target             | Sensitivity     | Result unit          |\n|--------------------|-----------------|----------------------|\n| `ZSpread`          | CS01            | basis points         |\n| `Ytm`              | DV01            | basis points         |\n| `Oas`              | CS01            | basis points         |\n| `ImpliedVol`       | Vega            | vol points (1 = 1%)  |\n| `BaseCorrelation`  | Correlation01   | correlation points   |",
       "oneOf": [
@@ -3107,7 +3235,7 @@
       "description": "Overrides for market-quoted values (prices, vols, spreads, upfront payments).\n\n# Price-driving fields\n\nThe following fields, when set, override the model PV returned by\n[`Instrument::base_value`](crate::instruments::common_impl::traits::Instrument::base_value)\nfor bonds. At most one may be set at a time — [`Self::validate`] enforces this.\nPrecedence (applied top-to-bottom inside `Bond::base_value`):\n\n1. `quoted_dirty_price_currency` — currency units (bond native currency)\n2. `quoted_clean_price_pct` — percentage of par\n3. `quoted_ytm` — decimal YTM (e.g. `0.055` = 5.5%)\n4. `quoted_ytw` — decimal yield-to-worst\n5. `quoted_z_spread` — decimal Z-spread\n6. `quoted_oas` — decimal OAS\n7. `quoted_discount_margin` — decimal DM (FRNs)\n8. `quoted_i_spread` — decimal I-spread\n9. `quoted_asw_market` — decimal ASW (market convention)\n10. `quoted_japanese_simple_yield` — decimal Tokyo simple yield (単利)",
       "properties": {
         "cds_quote_bp": {
-          "description": "CreditDefaultSwap clean par-spread quote in basis points.\n\nUsed only by CreditDefaultSwap risk replay, where it replaces the\nmatching contractual hazard-curve pillar. It does not drive PV, and no\nother instrument (CDSIndex included) reads it.",
+          "description": "CreditDefaultSwap clean par-spread quote in basis points.\n\nUsed only by CreditDefaultSwap risk replay, where it replaces the\nmatching contractual hazard-curve pillar. It does not drive PV, and no\nother instrument (CdsIndex included) reads it.",
           "format": "double",
           "type": [
             "number",
@@ -4009,21 +4137,6 @@
         {
           "const": "ZWL",
           "description": "Zimbabwe Dollar (932)",
-          "type": "string"
-        }
-      ]
-    },
-    "d_b86816c7c1b4448b4b80": {
-      "description": "Side of the TRS trade from the party's perspective.\n\nDetermines whether the party receives or pays the total return leg.\n\n# Examples\n\n```\nuse finstack_quant_valuations::instruments::TrsSide;\n\nlet side = TrsSide::ReceiveTotalReturn;\nassert_eq!(side.sign(), 1.0);\n\nlet side = TrsSide::PayTotalReturn;\nassert_eq!(side.sign(), -1.0);\n```",
-      "oneOf": [
-        {
-          "const": "receive_total_return",
-          "description": "Receive total return, pay financing.",
-          "type": "string"
-        },
-        {
-          "const": "pay_total_return",
-          "description": "Pay total return, receive financing.",
           "type": "string"
         }
       ]
@@ -5382,21 +5495,6 @@
         {
           "const": "years",
           "description": "Years (Y)",
-          "type": "string"
-        }
-      ]
-    },
-    "d_ec89adc17436f33de839": {
-      "description": "Volatility model for option pricing.",
-      "oneOf": [
-        {
-          "const": "black",
-          "description": "Black (lognormal).",
-          "type": "string"
-        },
-        {
-          "const": "normal",
-          "description": "Bachelier / normal model.",
           "type": "string"
         }
       ]

@@ -204,23 +204,6 @@ export default [
     "description": "Apply the closed-form LHP conditional default probability uniformly to\nevery name. This is the `N → ∞` limit of [`Self::PerName`] — an\nacceptable, faster approximation only for genuinely granular pools."
   },
   {
-    "path": "#/$defs/d_055066044802b6e94af1",
-    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/OasQuoteCompounding",
-    "description": "Quote convention used when reporting or consuming OAS values."
-  },
-  {
-    "path": "#/$defs/d_055066044802b6e94af1/oneOf/0",
-    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/OasQuoteCompounding/oneOf/0",
-    "const": "continuous",
-    "description": "Continuous additive spread, matching the tree's internal short-rate shift."
-  },
-  {
-    "path": "#/$defs/d_055066044802b6e94af1/oneOf/1",
-    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/OasQuoteCompounding/oneOf/1",
-    "const": "semi_annual",
-    "description": "Semiannual bond-equivalent OAS quote."
-  },
-  {
     "path": "#/$defs/d_10a2b628165f3f3e10e7",
     "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/MertonMcConfig",
     "description": "Configuration for Monte Carlo PIK bond pricing."
@@ -228,7 +211,7 @@ export default [
   {
     "path": "#/$defs/d_10a2b628165f3f3e10e7/properties/barrier_crossing",
     "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/MertonMcConfig/properties/barrier_crossing",
-    "description": "Barrier-crossing policy used for `BarrierType::FirstPassage`.\n\nDefault: `BrownianBridge` when the Merton model uses `FirstPassage`,\notherwise `Discrete`.",
+    "description": "Barrier-crossing policy used for `MertonBarrierType::FirstPassage`.\n\nDefault: `BrownianBridge` when the Merton model uses `FirstPassage`,\notherwise `Discrete`.",
     "ref": "#/$defs/BarrierCrossing",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/BarrierCrossing"
   },
@@ -852,7 +835,7 @@ export default [
   {
     "path": "#/$defs/d_572ad1befb7d94914652/properties/bdt_sigma",
     "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/ModelConfig/properties/bdt_sigma",
-    "description": "Black-Derman-Toy lognormal short-rate volatility (σ), as an annual\ndecimal proportion of the short rate (`0.20` = 20%).\n\nRead only by the rates-only bond tree when `vol_model = black` selects\nBDT for a bond with embedded exercise rights, where it is required.\nIt is a relative (lognormal) volatility, unlike the absolute\n[`Self::hw1f_sigma`]; typical values are 0.10–0.40. The BDT lattice has\nno mean reversion. Must be finite and non-negative; `0.0` prices on the\ndeterministic curve.",
+    "description": "Black-Derman-Toy lognormal short-rate volatility (σ), as an annual\ndecimal proportion of the short rate (`0.20` = 20%).\n\nRead only by the rates-only bond tree when `tree_model = black_derman_toy` selects\nBDT for a bond with embedded exercise rights, where it is required.\nIt is a relative (lognormal) volatility, unlike the absolute\n[`Self::hw1f_sigma`]; typical values are 0.10–0.40. The BDT lattice has\nno mean reversion. Must be finite and non-negative; `0.0` prices on the\ndeterministic curve.",
     "format": "double"
   },
   {
@@ -958,8 +941,8 @@ export default [
     "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/ModelConfig/properties/oas_quote_compounding",
     "default": "continuous",
     "description": "Quote compounding convention for OAS inputs and outputs.",
-    "ref": "#/$defs/OasQuoteCompounding",
-    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/OasQuoteCompounding"
+    "ref": "#/$defs/Compounding",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/Compounding"
   },
   {
     "path": "#/$defs/d_572ad1befb7d94914652/properties/rate_credit_correlation",
@@ -998,6 +981,21 @@ export default [
     "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/ModelConfig/properties/tree_discount_curve_id/anyOf/1"
   },
   {
+    "path": "#/$defs/d_572ad1befb7d94914652/properties/tree_model",
+    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/ModelConfig/properties/tree_model",
+    "description": "Short-rate lattice for the rates-only bond tree (`hull_white` or\n`black_derman_toy`). `None` selects Hull-White."
+  },
+  {
+    "path": "#/$defs/d_572ad1befb7d94914652/properties/tree_model/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/ModelConfig/properties/tree_model/anyOf/0",
+    "ref": "#/$defs/ShortRateTreeModel",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/ShortRateTreeModel"
+  },
+  {
+    "path": "#/$defs/d_572ad1befb7d94914652/properties/tree_model/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/ModelConfig/properties/tree_model/anyOf/1"
+  },
+  {
     "path": "#/$defs/d_572ad1befb7d94914652/properties/tree_steps",
     "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/ModelConfig/properties/tree_steps",
     "default": null,
@@ -1006,27 +1004,46 @@ export default [
     "minimum": 0
   },
   {
-    "path": "#/$defs/d_572ad1befb7d94914652/properties/vol_model",
-    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/ModelConfig/properties/vol_model",
-    "description": "Volatility model choice for option pricing.\n\nWhen set, overrides the default Black (lognormal) model."
-  },
-  {
-    "path": "#/$defs/d_572ad1befb7d94914652/properties/vol_model/anyOf/0",
-    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/ModelConfig/properties/vol_model/anyOf/0",
-    "ref": "#/$defs/VolatilityModel",
-    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/VolatilityModel"
-  },
-  {
-    "path": "#/$defs/d_572ad1befb7d94914652/properties/vol_model/anyOf/1",
-    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/ModelConfig/properties/vol_model/anyOf/1"
-  },
-  {
     "path": "#/$defs/d_572ad1befb7d94914652/properties/vol_surface_extrapolation",
     "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/ModelConfig/properties/vol_surface_extrapolation",
     "default": "error",
     "description": "Volatility surface extrapolation policy when `implied_volatility` is not set.",
     "ref": "#/$defs/VolSurfaceExtrapolation",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/VolSurfaceExtrapolation"
+  },
+  {
+    "path": "#/$defs/d_5c13df5a55f1da604df2",
+    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/Compounding",
+    "description": "Compounding convention for interest rates.\n\nUsed to specify how interest rates should be quoted or converted.\nAll variants produce mathematically equivalent discount factors when\napplied consistently.\n\n# Relationship Between Conventions\n\nFor a given discount factor DF at time t, the rates under different\nconventions are related by:\n\n```text\nDF = e^(-r_cc × t)                    [Continuous]\n   = (1 + r_ann)^(-t)                 [Annual]\n   = (1 + r_per/n)^(-n×t)             [Periodic(n)]\n   = 1 / (1 + r_simple × t)           [Simple]\n```\n\n# Ordering of Rates\n\nFor positive rates and t > 0: `r_simple > r_annual > r_continuous`\n(less frequent compounding requires a higher quoted rate for the same DF)."
+  },
+  {
+    "path": "#/$defs/d_5c13df5a55f1da604df2/oneOf/0",
+    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/Compounding/oneOf/0",
+    "const": "continuous",
+    "description": "Continuous compounding: r = -ln(DF) / t\n\nMost common for internal calculations, curve construction, and\nquantitative finance models. Provides the simplest mathematical\nproperties (additive over time)."
+  },
+  {
+    "path": "#/$defs/d_5c13df5a55f1da604df2/oneOf/1",
+    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/Compounding/oneOf/1",
+    "const": "annual",
+    "description": "Annual compounding: r = DF^(-1/t) - 1\n\nStandard for many bond markets, particularly UK gilts and\nEuropean government bonds. Also common for Bloomberg zero rate display."
+  },
+  {
+    "path": "#/$defs/d_5c13df5a55f1da604df2/oneOf/2",
+    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/Compounding/oneOf/2",
+    "description": "Periodic compounding with n periods per year: r = n × (DF^(-1/(n×t)) - 1)\n\nCommon values:\n- n=2: Semi-annual (US Treasury, corporate bonds)\n- n=4: Quarterly (some FRNs)\n- n=12: Monthly (rare, some retail products)\n\nNote: Uses [`NonZeroU32`] to prevent division by zero at compile time."
+  },
+  {
+    "path": "#/$defs/d_5c13df5a55f1da604df2/oneOf/2/properties/periodic",
+    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/Compounding/oneOf/2/properties/periodic",
+    "format": "uint32",
+    "minimum": 1
+  },
+  {
+    "path": "#/$defs/d_5c13df5a55f1da604df2/oneOf/3",
+    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/Compounding/oneOf/3",
+    "const": "simple",
+    "description": "Simple interest (no compounding): r = (1/DF - 1) / t\n\nUsed for money market instruments with maturity < 1 year, including:\n- Interbank deposits\n- T-bills and commercial paper\n- SOFR, SONIA, €STR fixings\n\nTypically paired with ACT/360 (USD, EUR) or ACT/365F (GBP) day counts."
   },
   {
     "path": "#/$defs/d_6347b87cc04573a369d9",
@@ -1517,6 +1534,23 @@ export default [
     "path": "#/$defs/d_9098e54fc41f56cb1edb/properties/type",
     "source": "https://finstack_quant.dev/schemas/instrument/1/fx/fx_variance_swap.schema.json#/$defs/fx_variance_swap/properties/type",
     "const": "fx_variance_swap"
+  },
+  {
+    "path": "#/$defs/d_948cdc4db846a21357a4",
+    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/ShortRateTreeModel",
+    "description": "Short-rate lattice used by the rates-only bond tree.\n\nSelected by `instrument_pricing_overrides.model_config.tree_model`; when the\nfield is absent the bond tree uses Hull-White."
+  },
+  {
+    "path": "#/$defs/d_948cdc4db846a21357a4/oneOf/0",
+    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/ShortRateTreeModel/oneOf/0",
+    "const": "hull_white",
+    "description": "Hull-White one-factor (normal short rate) with `(κ, σ)` from\n`model_config.hw1f_mean_reversion` / `model_config.hw1f_sigma` or the\npre-fitted market scalars."
+  },
+  {
+    "path": "#/$defs/d_948cdc4db846a21357a4/oneOf/1",
+    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/ShortRateTreeModel/oneOf/1",
+    "const": "black_derman_toy",
+    "description": "Black-Derman-Toy (lognormal short rate) with volatility\n`model_config.bdt_sigma`."
   },
   {
     "path": "#/$defs/d_94cb251104de5cf587b6",
@@ -2616,7 +2650,7 @@ export default [
   {
     "path": "#/$defs/d_b0a5fc543381da6a5722/properties/cds_quote_bp",
     "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/MarketQuoteOverrides/properties/cds_quote_bp",
-    "description": "CreditDefaultSwap clean par-spread quote in basis points.\n\nUsed only by CreditDefaultSwap risk replay, where it replaces the\nmatching contractual hazard-curve pillar. It does not drive PV, and no\nother instrument (CDSIndex included) reads it.",
+    "description": "CreditDefaultSwap clean par-spread quote in basis points.\n\nUsed only by CreditDefaultSwap risk replay, where it replaces the\nmatching contractual hazard-curve pillar. It does not drive PV, and no\nother instrument (CdsIndex included) reads it.",
     "format": "double"
   },
   {
@@ -5058,23 +5092,6 @@ export default [
     "source": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json#/$defs/TenorUnit/oneOf/3",
     "const": "years",
     "description": "Years (Y)"
-  },
-  {
-    "path": "#/$defs/d_ec89adc17436f33de839",
-    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/VolatilityModel",
-    "description": "Volatility model for option pricing."
-  },
-  {
-    "path": "#/$defs/d_ec89adc17436f33de839/oneOf/0",
-    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/VolatilityModel/oneOf/0",
-    "const": "black",
-    "description": "Black (lognormal)."
-  },
-  {
-    "path": "#/$defs/d_ec89adc17436f33de839/oneOf/1",
-    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/VolatilityModel/oneOf/1",
-    "const": "normal",
-    "description": "Bachelier / normal model."
   },
   {
     "path": "#/$defs/d_ed218c734e46de57eeb9",

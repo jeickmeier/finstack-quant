@@ -124,14 +124,14 @@ cds_terms = cds['instrument']['spec']
 print({'base_stage_added': sorted(set(base_inputs) - option_ids),
        'cds_terms': {'id': cds_terms['id'], 'currency': cds_terms['notional']['currency'],
                      'notional': cds_terms['notional']['amount'],
-                     'spread_bp': cds_terms['premium']['coupon_bp'],
-                     'discount_curve': cds_terms['premium']['discount_curve_id'],
-                     'credit_curve': cds_terms['protection']['credit_curve_id']}})
+                     'spread_bp': cds_terms['premium_leg']['coupon_bp'],
+                     'discount_curve': cds_terms['premium_leg']['discount_curve_id'],
+                     'credit_curve': cds_terms['protection_leg']['credit_curve_id']}})
 priced = price_instrument(CreditDefaultSwap.from_json(json.dumps(cds)), market, AS_OF,
     metrics=['par_spread', 'cs01', 'bucketed_cs01', 'protection_leg_pv', 'premium_leg_pv', 'risky_annuity'])
 par_spread_bp = priced.get_metric('par_spread')
 par = copy.deepcopy(cds)
-par['instrument']['spec']['premium']['coupon_bp'] = str(par_spread_bp)
+par['instrument']['spec']['premium_leg']['coupon_bp'] = str(par_spread_bp)
 notional = float(cds['instrument']['spec']['notional']['amount'])
 upfront_pv_fraction = priced.price / notional
 boundaries = [date(year, month, 20) for year in range(2025, 2031) for month in (3, 6, 9, 12)
@@ -139,7 +139,7 @@ boundaries = [date(year, month, 20) for year in range(2025, 2031) for month in (
 previous, protection_rows = 0.0, []
 for end in boundaries:
     truncated = copy.deepcopy(cds)
-    truncated['instrument']['spec']['premium']['end'] = end.isoformat()
+    truncated['instrument']['spec']['premium_leg']['end'] = end.isoformat()
     cumulative = price_instrument(json.dumps(truncated), market, AS_OF, metrics=['protection_leg_pv']).get_metric('protection_leg_pv')
     protection_rows.append((end.isoformat(), cumulative - previous))
     previous = cumulative
@@ -167,7 +167,7 @@ market=build_market('base');contract=instruments('base')['ACME-CDS']
 result=price_instrument(json.dumps(contract),market,AS_OF,metrics=['par_spread','risky_annuity'])
 settlement=add_business_days(AS_OF,3,'usny');t=DayCount.ACT_365F.year_fraction(AS_OF,settlement)
 upfront_cash=result.price/market.get_discount('USD-OIS').df(t)
-print({'illustrative_trade_upfront_settlement':settlement,'contract_premium_start':contract['instrument']['spec']['premium']['start'],'standard_coupon_bp':100.,'par_spread_bp':result.get_metric('par_spread'),'buyer_upfront_USD':upfront_cash,'buyer_upfront_percent':100*upfront_cash/1_000_000})
+print({'illustrative_trade_upfront_settlement':settlement,'contract_premium_start':contract['instrument']['spec']['premium_leg']['start'],'standard_coupon_bp':100.,'par_spread_bp':result.get_metric('par_spread'),'buyer_upfront_USD':upfront_cash,'buyer_upfront_percent':100*upfront_cash/1_000_000})
 ```
 {/* /notebook-block */}
 

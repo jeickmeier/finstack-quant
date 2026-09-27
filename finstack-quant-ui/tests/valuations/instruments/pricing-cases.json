@@ -24,7 +24,7 @@
       "type": "agency_cmo",
       "instrumentSource": {
         "path": "finstack-quant/valuations/tests/instruments/json_examples/agency_cmo.json",
-        "sha256": "5afa975949c3fb3ccc98261888b35a9a9e3b869d93125cf30a21d890e99d70c0",
+        "sha256": "23ec1ff50166b38bf93822e6ca37c68512544a1d4f7552263be45c6c77267e82",
         "pointer": []
       },
       "instrumentPatches": [],
@@ -62,7 +62,7 @@
       "type": "agency_mbs_passthrough",
       "instrumentSource": {
         "path": "finstack-quant/valuations/tests/instruments/json_examples/agency_mbs_passthrough.json",
-        "sha256": "0bc71d1904254e9a7f05dc0dbf60e7a9e61627bfd9524fd1ee56e24cd6244647",
+        "sha256": "850e5ea25ec14994ed937c22e3fd7015472d1555bb76b8800c739a7f9b48d8f4",
         "pointer": []
       },
       "instrumentPatches": [],
@@ -106,7 +106,7 @@
       "type": "agency_tba",
       "instrumentSource": {
         "path": "finstack-quant/valuations/tests/instruments/json_examples/agency_tba.json",
-        "sha256": "b81bfd9c05b61bdb850b30702be59ca6220cc0a50f0b88ff1ed88e6a6b2a6047",
+        "sha256": "de74543efee2e1992714a28591dc80aba70a0f1ad1e5a81bdb0f8196db9b1128",
         "pointer": []
       },
       "instrumentPatches": [],
@@ -1399,7 +1399,7 @@
       "type": "dollar_roll",
       "instrumentSource": {
         "path": "finstack-quant/valuations/tests/instruments/json_examples/dollar_roll.json",
-        "sha256": "9a7a977d53eeefed8f2f561d0b744c61e583a0001357189fc755f5e04b9b915e",
+        "sha256": "a4d846dd6e53ab0b499831bc5ebff879747df1bcce8ca4f7263d4521cc21fd58",
         "pointer": []
       },
       "instrumentPatches": [],
@@ -2354,7 +2354,7 @@
       "type": "ndf",
       "instrumentSource": {
         "path": "finstack-quant/valuations/tests/instruments/json_examples/ndf.json",
-        "sha256": "e6ffba3adc018bff214601b71d382326e57ab9480ed5e89cdf494be3a2a45042",
+        "sha256": "8c9bf2e605799bdf2422fa80a6877ca8bf0fa51ff38bcb7c9eb783363760e8ed",
         "pointer": []
       },
       "instrumentPatches": [],
@@ -3033,7 +3033,7 @@
       "type": "xccy_swap",
       "instrumentSource": {
         "path": "finstack-quant/valuations/tests/instruments/json_examples/xccy_swap.json",
-        "sha256": "2f371805375b4b767e0058c879ee7eab6241c2cd5c4204544bd8e2d064789b2f",
+        "sha256": "f27bf15ac2194c1147df4a84da48a4240d2fc0370b777f49e40b3c2cb1f2fb5f",
         "pointer": []
       },
       "instrumentPatches": [],

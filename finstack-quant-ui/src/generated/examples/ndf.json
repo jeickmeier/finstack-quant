@@ -13,7 +13,7 @@
       "contract_rate": 7.25,
       "domestic_discount_curve_id": "USD-OIS",
       "fixing_date": "2025-03-13",
-      "fixing_source": "PBOC",
+      "fixing_source": "pboc",
       "id": "USDCNY-NDF-3M",
       "maturity": "2025-03-15",
       "notional": {

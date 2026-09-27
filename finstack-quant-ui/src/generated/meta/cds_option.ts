@@ -151,31 +151,14 @@ export default [
     "description": "Apply the closed-form LHP conditional default probability uniformly to\nevery name. This is the `N → ∞` limit of [`Self::PerName`] — an\nacceptable, faster approximation only for genuinely granular pools."
   },
   {
-    "path": "#/$defs/d_055066044802b6e94af1",
-    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/OasQuoteCompounding",
-    "description": "Quote convention used when reporting or consuming OAS values."
-  },
-  {
-    "path": "#/$defs/d_055066044802b6e94af1/oneOf/0",
-    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/OasQuoteCompounding/oneOf/0",
-    "const": "continuous",
-    "description": "Continuous additive spread, matching the tree's internal short-rate shift."
-  },
-  {
-    "path": "#/$defs/d_055066044802b6e94af1/oneOf/1",
-    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/OasQuoteCompounding/oneOf/1",
-    "const": "semi_annual",
-    "description": "Semiannual bond-equivalent OAS quote."
-  },
-  {
     "path": "#/$defs/d_0688739575c4b1492597",
     "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_option.schema.json#/$defs/cds_option"
   },
   {
     "path": "#/$defs/d_0688739575c4b1492597/properties/spec",
     "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_option.schema.json#/$defs/cds_option/properties/spec",
-    "ref": "#/$defs/CDSOption",
-    "resolvedRef": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_option.schema.json#/$defs/CDSOption"
+    "ref": "#/$defs/CdsOption",
+    "resolvedRef": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_option.schema.json#/$defs/CdsOption"
   },
   {
     "path": "#/$defs/d_0688739575c4b1492597/properties/type",
@@ -207,7 +190,7 @@ export default [
   {
     "path": "#/$defs/d_10a2b628165f3f3e10e7/properties/barrier_crossing",
     "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/MertonMcConfig/properties/barrier_crossing",
-    "description": "Barrier-crossing policy used for `BarrierType::FirstPassage`.\n\nDefault: `BrownianBridge` when the Merton model uses `FirstPassage`,\notherwise `Discrete`.",
+    "description": "Barrier-crossing policy used for `MertonBarrierType::FirstPassage`.\n\nDefault: `BrownianBridge` when the Merton model uses `FirstPassage`,\notherwise `Discrete`.",
     "ref": "#/$defs/BarrierCrossing",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/BarrierCrossing"
   },
@@ -836,7 +819,7 @@ export default [
   {
     "path": "#/$defs/d_572ad1befb7d94914652/properties/bdt_sigma",
     "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/ModelConfig/properties/bdt_sigma",
-    "description": "Black-Derman-Toy lognormal short-rate volatility (σ), as an annual\ndecimal proportion of the short rate (`0.20` = 20%).\n\nRead only by the rates-only bond tree when `vol_model = black` selects\nBDT for a bond with embedded exercise rights, where it is required.\nIt is a relative (lognormal) volatility, unlike the absolute\n[`Self::hw1f_sigma`]; typical values are 0.10–0.40. The BDT lattice has\nno mean reversion. Must be finite and non-negative; `0.0` prices on the\ndeterministic curve.",
+    "description": "Black-Derman-Toy lognormal short-rate volatility (σ), as an annual\ndecimal proportion of the short rate (`0.20` = 20%).\n\nRead only by the rates-only bond tree when `tree_model = black_derman_toy` selects\nBDT for a bond with embedded exercise rights, where it is required.\nIt is a relative (lognormal) volatility, unlike the absolute\n[`Self::hw1f_sigma`]; typical values are 0.10–0.40. The BDT lattice has\nno mean reversion. Must be finite and non-negative; `0.0` prices on the\ndeterministic curve.",
     "format": "double"
   },
   {
@@ -942,8 +925,8 @@ export default [
     "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/ModelConfig/properties/oas_quote_compounding",
     "default": "continuous",
     "description": "Quote compounding convention for OAS inputs and outputs.",
-    "ref": "#/$defs/OasQuoteCompounding",
-    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/OasQuoteCompounding"
+    "ref": "#/$defs/Compounding",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/Compounding"
   },
   {
     "path": "#/$defs/d_572ad1befb7d94914652/properties/rate_credit_correlation",
@@ -982,6 +965,21 @@ export default [
     "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/ModelConfig/properties/tree_discount_curve_id/anyOf/1"
   },
   {
+    "path": "#/$defs/d_572ad1befb7d94914652/properties/tree_model",
+    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/ModelConfig/properties/tree_model",
+    "description": "Short-rate lattice for the rates-only bond tree (`hull_white` or\n`black_derman_toy`). `None` selects Hull-White."
+  },
+  {
+    "path": "#/$defs/d_572ad1befb7d94914652/properties/tree_model/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/ModelConfig/properties/tree_model/anyOf/0",
+    "ref": "#/$defs/ShortRateTreeModel",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/ShortRateTreeModel"
+  },
+  {
+    "path": "#/$defs/d_572ad1befb7d94914652/properties/tree_model/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/ModelConfig/properties/tree_model/anyOf/1"
+  },
+  {
     "path": "#/$defs/d_572ad1befb7d94914652/properties/tree_steps",
     "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/ModelConfig/properties/tree_steps",
     "default": null,
@@ -990,27 +988,46 @@ export default [
     "minimum": 0
   },
   {
-    "path": "#/$defs/d_572ad1befb7d94914652/properties/vol_model",
-    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/ModelConfig/properties/vol_model",
-    "description": "Volatility model choice for option pricing.\n\nWhen set, overrides the default Black (lognormal) model."
-  },
-  {
-    "path": "#/$defs/d_572ad1befb7d94914652/properties/vol_model/anyOf/0",
-    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/ModelConfig/properties/vol_model/anyOf/0",
-    "ref": "#/$defs/VolatilityModel",
-    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/VolatilityModel"
-  },
-  {
-    "path": "#/$defs/d_572ad1befb7d94914652/properties/vol_model/anyOf/1",
-    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/ModelConfig/properties/vol_model/anyOf/1"
-  },
-  {
     "path": "#/$defs/d_572ad1befb7d94914652/properties/vol_surface_extrapolation",
     "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/ModelConfig/properties/vol_surface_extrapolation",
     "default": "error",
     "description": "Volatility surface extrapolation policy when `implied_volatility` is not set.",
     "ref": "#/$defs/VolSurfaceExtrapolation",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/VolSurfaceExtrapolation"
+  },
+  {
+    "path": "#/$defs/d_5c13df5a55f1da604df2",
+    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/Compounding",
+    "description": "Compounding convention for interest rates.\n\nUsed to specify how interest rates should be quoted or converted.\nAll variants produce mathematically equivalent discount factors when\napplied consistently.\n\n# Relationship Between Conventions\n\nFor a given discount factor DF at time t, the rates under different\nconventions are related by:\n\n```text\nDF = e^(-r_cc × t)                    [Continuous]\n   = (1 + r_ann)^(-t)                 [Annual]\n   = (1 + r_per/n)^(-n×t)             [Periodic(n)]\n   = 1 / (1 + r_simple × t)           [Simple]\n```\n\n# Ordering of Rates\n\nFor positive rates and t > 0: `r_simple > r_annual > r_continuous`\n(less frequent compounding requires a higher quoted rate for the same DF)."
+  },
+  {
+    "path": "#/$defs/d_5c13df5a55f1da604df2/oneOf/0",
+    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/Compounding/oneOf/0",
+    "const": "continuous",
+    "description": "Continuous compounding: r = -ln(DF) / t\n\nMost common for internal calculations, curve construction, and\nquantitative finance models. Provides the simplest mathematical\nproperties (additive over time)."
+  },
+  {
+    "path": "#/$defs/d_5c13df5a55f1da604df2/oneOf/1",
+    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/Compounding/oneOf/1",
+    "const": "annual",
+    "description": "Annual compounding: r = DF^(-1/t) - 1\n\nStandard for many bond markets, particularly UK gilts and\nEuropean government bonds. Also common for Bloomberg zero rate display."
+  },
+  {
+    "path": "#/$defs/d_5c13df5a55f1da604df2/oneOf/2",
+    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/Compounding/oneOf/2",
+    "description": "Periodic compounding with n periods per year: r = n × (DF^(-1/(n×t)) - 1)\n\nCommon values:\n- n=2: Semi-annual (US Treasury, corporate bonds)\n- n=4: Quarterly (some FRNs)\n- n=12: Monthly (rare, some retail products)\n\nNote: Uses [`NonZeroU32`] to prevent division by zero at compile time."
+  },
+  {
+    "path": "#/$defs/d_5c13df5a55f1da604df2/oneOf/2/properties/periodic",
+    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/Compounding/oneOf/2/properties/periodic",
+    "format": "uint32",
+    "minimum": 1
+  },
+  {
+    "path": "#/$defs/d_5c13df5a55f1da604df2/oneOf/3",
+    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/Compounding/oneOf/3",
+    "const": "simple",
+    "description": "Simple interest (no compounding): r = (1/DF - 1) / t\n\nUsed for money market instruments with maturity < 1 year, including:\n- Interbank deposits\n- T-bills and commercial paper\n- SOFR, SONIA, €STR fixings\n\nTypically paired with ACT/360 (USD, EUR) or ACT/365F (GBP) day counts."
   },
   {
     "path": "#/$defs/d_6347b87cc04573a369d9",
@@ -1159,6 +1176,33 @@ export default [
     "format": "double"
   },
   {
+    "path": "#/$defs/d_7c4b78c24d7d35f10a0b",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_option.schema.json#/$defs/CdsOptionStrike",
+    "description": "Typed CDS-option strike: forward-spread or clean-price convention.\n\nWire format: externally tagged JSON — `{\"spread\": \"0.0325\"}` or\n`{\"clean_price_pct\": \"107.0\"}` — with no bare-decimal fallback.\n\n# Examples\n\n```rust\nuse finstack_quant_valuations::instruments::credit_derivatives::cds_option::CdsOptionStrike;\nuse rust_decimal::Decimal;\n\nlet spread = CdsOptionStrike::Spread(Decimal::new(325, 4)); // 0.0325 = 325 bp\nassert!(spread.spread_decimal().is_some());\nassert_eq!(spread.native_surface_coordinate().unwrap(), 0.0325);\n\nlet price = CdsOptionStrike::CleanPricePct(Decimal::new(1070, 1)); // 107.0\nassert_eq!(price.native_surface_coordinate().unwrap(), 107.0);\nassert!((price.clean_price_fraction().unwrap() - 1.07).abs() < 1e-15);\n```"
+  },
+  {
+    "path": "#/$defs/d_7c4b78c24d7d35f10a0b/oneOf/0",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_option.schema.json#/$defs/CdsOptionStrike/oneOf/0",
+    "description": "Strike forward spread as a decimal annual rate (`0.0325` = 325 bp)."
+  },
+  {
+    "path": "#/$defs/d_7c4b78c24d7d35f10a0b/oneOf/0/properties/spread",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_option.schema.json#/$defs/CdsOptionStrike/oneOf/0/properties/spread",
+    "ref": "https://finstack_quant.dev/schemas/common/1/decimal.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/decimal.schema.json#"
+  },
+  {
+    "path": "#/$defs/d_7c4b78c24d7d35f10a0b/oneOf/1",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_option.schema.json#/$defs/CdsOptionStrike/oneOf/1",
+    "description": "Strike clean price in percentage-price points (`107.0` = fraction\n`1.07`). CDX HY index options are quoted this way."
+  },
+  {
+    "path": "#/$defs/d_7c4b78c24d7d35f10a0b/oneOf/1/properties/clean_price_pct",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_option.schema.json#/$defs/CdsOptionStrike/oneOf/1/properties/clean_price_pct",
+    "ref": "https://finstack_quant.dev/schemas/common/1/decimal.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/decimal.schema.json#"
+  },
+  {
     "path": "#/$defs/d_7dd9bdea4c4382f447f9",
     "source": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json#/$defs/Tenor",
     "description": "A parsed tenor representing a time period.\n\nTenors are commonly used in financial markets to specify maturities,\npayment frequencies, and rate fixing periods.\n\n# Examples\n\n```rust\nuse finstack_quant_core::dates::{Tenor, TenorUnit};\n# fn main() -> finstack_quant_core::Result<()> {\n\nlet tenor = Tenor::new(3, TenorUnit::Months).expect(\"valid tenor fixture\");\nassert_eq!(tenor.count(), 3);\nassert_eq!(tenor.unit(), TenorUnit::Months);\n\n// Parse from string\nlet parsed = Tenor::parse(\"6M\")?;\nassert_eq!(parsed.count(), 6);\nassert_eq!(parsed.unit(), TenorUnit::Months);\n# Ok(())\n# }\n```"
@@ -1281,6 +1325,23 @@ export default [
     "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/OptimalToggle/properties/risk_free_rate",
     "description": "Risk-free rate (continuous) used as drift in the nested simulation.",
     "format": "double"
+  },
+  {
+    "path": "#/$defs/d_948cdc4db846a21357a4",
+    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/ShortRateTreeModel",
+    "description": "Short-rate lattice used by the rates-only bond tree.\n\nSelected by `instrument_pricing_overrides.model_config.tree_model`; when the\nfield is absent the bond tree uses Hull-White."
+  },
+  {
+    "path": "#/$defs/d_948cdc4db846a21357a4/oneOf/0",
+    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/ShortRateTreeModel/oneOf/0",
+    "const": "hull_white",
+    "description": "Hull-White one-factor (normal short rate) with `(κ, σ)` from\n`model_config.hw1f_mean_reversion` / `model_config.hw1f_sigma` or the\npre-fitted market scalars."
+  },
+  {
+    "path": "#/$defs/d_948cdc4db846a21357a4/oneOf/1",
+    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/ShortRateTreeModel/oneOf/1",
+    "const": "black_derman_toy",
+    "description": "Black-Derman-Toy (lognormal short rate) with volatility\n`model_config.bdt_sigma`."
   },
   {
     "path": "#/$defs/d_94cb251104de5cf587b6",
@@ -2380,7 +2441,7 @@ export default [
   {
     "path": "#/$defs/d_b0a5fc543381da6a5722/properties/cds_quote_bp",
     "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/MarketQuoteOverrides/properties/cds_quote_bp",
-    "description": "CreditDefaultSwap clean par-spread quote in basis points.\n\nUsed only by CreditDefaultSwap risk replay, where it replaces the\nmatching contractual hazard-curve pillar. It does not drive PV, and no\nother instrument (CDSIndex included) reads it.",
+    "description": "CreditDefaultSwap clean par-spread quote in basis points.\n\nUsed only by CreditDefaultSwap risk replay, where it replaces the\nmatching contractual hazard-curve pillar. It does not drive PV, and no\nother instrument (CdsIndex included) reads it.",
     "format": "double"
   },
   {
@@ -3629,259 +3690,6 @@ export default [
     "description": "PIK when state < threshold (e.g., distance-to-default below limit)."
   },
   {
-    "path": "#/$defs/d_dc0c483409e01928615c",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_option.schema.json#/$defs/CDSOption",
-    "description": "Credit option instrument (option on CDS spread or clean index price)\n\nThe public pricing surface supports European options with cash or\nphysical settlement. Before expiry, cash- and physical-settled options\ncarry the same cash-equivalent model NPV and route through the same\nquadrature; the clean payoff excludes accrued because the same underlying\naccrued appears on both sides before exercise and cancels. A physical\nexercise cashflow at settlement is dirty (includes accrued at exercise\nsettlement), and this pricer does not create or deliver a live underlying\nCDS position — valuation at or after a physical exercise boundary fails\nexplicitly. Non-European exercise is rejected at pricing time so\ndeserialized instruments cannot silently fall through to an unsupported\nengine."
-  },
-  {
-    "path": "#/$defs/d_dc0c483409e01928615c/properties/attributes",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_option.schema.json#/$defs/CDSOption/properties/attributes",
-    "default": {},
-    "description": "Additional attributes",
-    "ref": "https://finstack_quant.dev/schemas/common/1/attributes.schema.json",
-    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/attributes.schema.json#"
-  },
-  {
-    "path": "#/$defs/d_dc0c483409e01928615c/properties/coupon_bp",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_option.schema.json#/$defs/CDSOption/properties/coupon_bp",
-    "default": null,
-    "description": "Contractual running coupon `c` of the underlying CDS, in basis points\n(e.g., `100` for the standard CDX.NA.IG coupon, `500` for the\nstandard CDX.NA.HY coupon). When `None`, the synthetic underlying\nCDS uses `strike` as its running coupon — the appropriate single-name\nSNAC default where the trade is struck at the par spread. For CDS\nindex options where the index has a fixed standard coupon different\nfrom the option strike, set this explicitly so the strike-adjustment\nterm `H(K) = ξN(c − K)A(K)` (DOCS 2055833 Eq. 2.4) is populated."
-  },
-  {
-    "path": "#/$defs/d_dc0c483409e01928615c/properties/coupon_bp/anyOf/0",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_option.schema.json#/$defs/CDSOption/properties/coupon_bp/anyOf/0",
-    "ref": "https://finstack_quant.dev/schemas/common/1/decimal.schema.json",
-    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/decimal.schema.json#"
-  },
-  {
-    "path": "#/$defs/d_dc0c483409e01928615c/properties/coupon_bp/anyOf/1",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_option.schema.json#/$defs/CDSOption/properties/coupon_bp/anyOf/1"
-  },
-  {
-    "path": "#/$defs/d_dc0c483409e01928615c/properties/credit_curve_id",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_option.schema.json#/$defs/CDSOption/properties/credit_curve_id",
-    "description": "Credit curve identifier",
-    "ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
-    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/id.schema.json#"
-  },
-  {
-    "path": "#/$defs/d_dc0c483409e01928615c/properties/discount_curve_id",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_option.schema.json#/$defs/CDSOption/properties/discount_curve_id",
-    "description": "Discount curve identifier",
-    "ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
-    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/id.schema.json#"
-  },
-  {
-    "path": "#/$defs/d_dc0c483409e01928615c/properties/exercise_settlement_date",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_option.schema.json#/$defs/CDSOption/properties/exercise_settlement_date",
-    "description": "Payment date of the exercise proceeds, defaulting to legal expiry.\nMust be on or after expiry and before CDS maturity. Discounting uses\nthis date; spread variance ends at legal expiry."
-  },
-  {
-    "path": "#/$defs/d_dc0c483409e01928615c/properties/exercise_settlement_date/anyOf/0",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_option.schema.json#/$defs/CDSOption/properties/exercise_settlement_date/anyOf/0",
-    "ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
-    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/date.schema.json#"
-  },
-  {
-    "path": "#/$defs/d_dc0c483409e01928615c/properties/exercise_settlement_date/anyOf/1",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_option.schema.json#/$defs/CDSOption/properties/exercise_settlement_date/anyOf/1"
-  },
-  {
-    "path": "#/$defs/d_dc0c483409e01928615c/properties/exercise_style",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_option.schema.json#/$defs/CDSOption/properties/exercise_style",
-    "description": "Exercise style",
-    "ref": "#/$defs/ExerciseStyle",
-    "resolvedRef": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_option.schema.json#/$defs/ExerciseStyle"
-  },
-  {
-    "path": "#/$defs/d_dc0c483409e01928615c/properties/expiry",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_option.schema.json#/$defs/CDSOption/properties/expiry",
-    "description": "Option expiry date",
-    "ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
-    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/date.schema.json#"
-  },
-  {
-    "path": "#/$defs/d_dc0c483409e01928615c/properties/id",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_option.schema.json#/$defs/CDSOption/properties/id",
-    "description": "Unique instrument identifier",
-    "ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
-    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/id.schema.json#"
-  },
-  {
-    "path": "#/$defs/d_dc0c483409e01928615c/properties/index_factor",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_option.schema.json#/$defs/CDSOption/properties/index_factor",
-    "default": 1,
-    "description": "Current index factor `f` at valuation: the surviving fraction of the\noriginal index notional, in `(0, 1]`. Defaults to `1.0` (no settled\ndefaults) and scales the notional only when `underlying_is_index`.\nSee [`Self::strike_index_factor`] for the original factor `f0`\nattached to a clean-price strike.",
-    "format": "double"
-  },
-  {
-    "path": "#/$defs/d_dc0c483409e01928615c/properties/instrument_pricing_overrides",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_option.schema.json#/$defs/CDSOption/properties/instrument_pricing_overrides",
-    "description": "Instrument-owned pricing inputs.",
-    "ref": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json",
-    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#"
-  },
-  {
-    "path": "#/$defs/d_dc0c483409e01928615c/properties/knockout",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_option.schema.json#/$defs/CDSOption/properties/knockout",
-    "default": false,
-    "description": "Whether the option knocks out if the underlying defaults before\nexercise. This is contract-specific; new instruments default to\nno-knockout and legacy single-name books can opt in explicitly."
-  },
-  {
-    "path": "#/$defs/d_dc0c483409e01928615c/properties/metric_pricing_overrides",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_option.schema.json#/$defs/CDSOption/properties/metric_pricing_overrides",
-    "description": "Metric-time pricing configuration.",
-    "ref": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json",
-    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json#"
-  },
-  {
-    "path": "#/$defs/d_dc0c483409e01928615c/properties/notional",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_option.schema.json#/$defs/CDSOption/properties/notional",
-    "description": "Notional amount",
-    "ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
-    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/money.schema.json#"
-  },
-  {
-    "path": "#/$defs/d_dc0c483409e01928615c/properties/option_type",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_option.schema.json#/$defs/CDSOption/properties/option_type",
-    "description": "Option type (Call = right to buy protection, Put = right to sell protection)",
-    "ref": "#/$defs/OptionType",
-    "resolvedRef": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_option.schema.json#/$defs/OptionType"
-  },
-  {
-    "path": "#/$defs/d_dc0c483409e01928615c/properties/premium_settlement_date",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_option.schema.json#/$defs/CDSOption/properties/premium_settlement_date",
-    "description": "Payment date of the option premium, returned by the settlement-date\naccessor. This does not change variance time or front-end protection;\nthe option value excludes the separately agreed trade premium."
-  },
-  {
-    "path": "#/$defs/d_dc0c483409e01928615c/properties/premium_settlement_date/anyOf/0",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_option.schema.json#/$defs/CDSOption/properties/premium_settlement_date/anyOf/0",
-    "ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
-    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/date.schema.json#"
-  },
-  {
-    "path": "#/$defs/d_dc0c483409e01928615c/properties/premium_settlement_date/anyOf/1",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_option.schema.json#/$defs/CDSOption/properties/premium_settlement_date/anyOf/1"
-  },
-  {
-    "path": "#/$defs/d_dc0c483409e01928615c/properties/protection_start_convention",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_option.schema.json#/$defs/CDSOption/properties/protection_start_convention",
-    "default": "spot",
-    "description": "Convention used to select the synthetic underlying CDS accrual start\nwhen `underlying_start_date` is not explicitly supplied.",
-    "ref": "#/$defs/ProtectionStartConvention",
-    "resolvedRef": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_option.schema.json#/$defs/ProtectionStartConvention"
-  },
-  {
-    "path": "#/$defs/d_dc0c483409e01928615c/properties/realized_loss",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_option.schema.json#/$defs/CDSOption/properties/realized_loss",
-    "default": 0,
-    "description": "Realized (settled) cumulative index loss from option inception to\nvaluation date, as a decimal fraction of the original index notional\nin `[0, 1]`. Defaults to `0.0`.\n\nBloomberg CDSO treats index options as no-knockout. Settled losses\nafter option inception are therefore deterministic payoff adjustments\nat exercise (DOCS 2055833 Eq. 2.5 and DOCS 2151513). Single-name\noptions knock out instead and must leave this at `0.0`.",
-    "format": "double"
-  },
-  {
-    "path": "#/$defs/d_dc0c483409e01928615c/properties/recovery_rate",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_option.schema.json#/$defs/CDSOption/properties/recovery_rate",
-    "description": "Recovery rate assumption",
-    "format": "double"
-  },
-  {
-    "path": "#/$defs/d_dc0c483409e01928615c/properties/scenario_pricing_overrides",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_option.schema.json#/$defs/CDSOption/properties/scenario_pricing_overrides",
-    "description": "Scenario-only pricing adjustments.",
-    "ref": "https://finstack_quant.dev/schemas/common/1/scenario_pricing_overrides.schema.json",
-    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/scenario_pricing_overrides.schema.json#"
-  },
-  {
-    "path": "#/$defs/d_dc0c483409e01928615c/properties/settlement",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_option.schema.json#/$defs/CDSOption/properties/settlement",
-    "description": "Settlement type",
-    "ref": "#/$defs/SettlementType",
-    "resolvedRef": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_option.schema.json#/$defs/SettlementType"
-  },
-  {
-    "path": "#/$defs/d_dc0c483409e01928615c/properties/strike",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_option.schema.json#/$defs/CDSOption/properties/strike",
-    "description": "Typed option strike: a decimal forward spread (`{\"spread\": \"0.0325\"}`)\nor a clean price in percentage points (`{\"clean_price_pct\": \"107.0\"}`).",
-    "ref": "#/$defs/CDSOptionStrike",
-    "resolvedRef": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_option.schema.json#/$defs/CDSOptionStrike"
-  },
-  {
-    "path": "#/$defs/d_dc0c483409e01928615c/properties/strike_index_factor",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_option.schema.json#/$defs/CDSOption/properties/strike_index_factor",
-    "description": "Original index factor `f0` attached to the option strike.\n\nDistinct from [`Self::index_factor`], which is the current factor\n`f` at valuation: defaults settled between option strike and\nvaluation reduce `f` below `f0`. A clean-price strike quotes the\nprice on `f0` notional, so its deterministic payoff term scales by\n`f0 / f`; the strike factor is therefore required for clean-price\nstrikes (`CDSOptionStrike::CleanPricePct`) and must not be inferred\nfrom the current factor after a default. Rejected for spread\nstrikes, whose payoff does not reference it.",
-    "format": "double"
-  },
-  {
-    "path": "#/$defs/d_dc0c483409e01928615c/properties/underlying_convention",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_option.schema.json#/$defs/CDSOption/properties/underlying_convention",
-    "default": "isda_na",
-    "description": "Convention used by the underlying CDS contract.\n\nThis controls the CDS schedule, settlement lag, business day convention,\nand other market-standard mechanics used when deriving forward spread and\nrisky annuity for the option's underlying.",
-    "ref": "#/$defs/CdsConvention",
-    "resolvedRef": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_option.schema.json#/$defs/CdsConvention"
-  },
-  {
-    "path": "#/$defs/d_dc0c483409e01928615c/properties/underlying_is_index",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_option.schema.json#/$defs/CDSOption/properties/underlying_is_index",
-    "default": false,
-    "description": "If true, the underlying is a CDS index; else single-name CDS.\n\nThe Bloomberg CDSO model treats the two cases differently in the\nno-knockout calibration `F_0 = E[V_te]` (DOCS 2055833 §1.2): index\noptions trade no-knockout and the calibration target includes the\n`(1−R)·(1−q_te)` FEP-equivalent contribution; single-name options\nknock out on default and skip it."
-  },
-  {
-    "path": "#/$defs/d_dc0c483409e01928615c/properties/underlying_maturity",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_option.schema.json#/$defs/CDSOption/properties/underlying_maturity",
-    "description": "Underlying CDS maturity date",
-    "ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
-    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/date.schema.json#"
-  },
-  {
-    "path": "#/$defs/d_dc0c483409e01928615c/properties/underlying_start_date",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_option.schema.json#/$defs/CDSOption/properties/underlying_start_date",
-    "description": "Underlying CDS accrual-effective date used for forward spread and risky\nannuity. Bloomberg CDSO can quote a standard CDS effective date before\noption expiry; in that case premium accrues from this date while\nprotection starts at expiry."
-  },
-  {
-    "path": "#/$defs/d_dc0c483409e01928615c/properties/underlying_start_date/anyOf/0",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_option.schema.json#/$defs/CDSOption/properties/underlying_start_date/anyOf/0",
-    "ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
-    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/date.schema.json#"
-  },
-  {
-    "path": "#/$defs/d_dc0c483409e01928615c/properties/underlying_start_date/anyOf/1",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_option.schema.json#/$defs/CDSOption/properties/underlying_start_date/anyOf/1"
-  },
-  {
-    "path": "#/$defs/d_dc0c483409e01928615c/properties/vol_surface_id",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_option.schema.json#/$defs/CDSOption/properties/vol_surface_id",
-    "description": "Volatility surface identifier",
-    "ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
-    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/id.schema.json#"
-  },
-  {
-    "path": "#/$defs/d_dea2f6321b8d83288c8e",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_option.schema.json#/$defs/CDSOptionStrike",
-    "description": "Typed CDS-option strike: forward-spread or clean-price convention.\n\nWire format: externally tagged JSON — `{\"spread\": \"0.0325\"}` or\n`{\"clean_price_pct\": \"107.0\"}` — with no bare-decimal fallback.\n\n# Examples\n\n```rust\nuse finstack_quant_valuations::instruments::credit_derivatives::cds_option::CDSOptionStrike;\nuse rust_decimal::Decimal;\n\nlet spread = CDSOptionStrike::Spread(Decimal::new(325, 4)); // 0.0325 = 325 bp\nassert!(spread.spread_decimal().is_some());\nassert_eq!(spread.native_surface_coordinate().unwrap(), 0.0325);\n\nlet price = CDSOptionStrike::CleanPricePct(Decimal::new(1070, 1)); // 107.0\nassert_eq!(price.native_surface_coordinate().unwrap(), 107.0);\nassert!((price.clean_price_fraction().unwrap() - 1.07).abs() < 1e-15);\n```"
-  },
-  {
-    "path": "#/$defs/d_dea2f6321b8d83288c8e/oneOf/0",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_option.schema.json#/$defs/CDSOptionStrike/oneOf/0",
-    "description": "Strike forward spread as a decimal annual rate (`0.0325` = 325 bp)."
-  },
-  {
-    "path": "#/$defs/d_dea2f6321b8d83288c8e/oneOf/0/properties/spread",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_option.schema.json#/$defs/CDSOptionStrike/oneOf/0/properties/spread",
-    "ref": "https://finstack_quant.dev/schemas/common/1/decimal.schema.json",
-    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/decimal.schema.json#"
-  },
-  {
-    "path": "#/$defs/d_dea2f6321b8d83288c8e/oneOf/1",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_option.schema.json#/$defs/CDSOptionStrike/oneOf/1",
-    "description": "Strike clean price in percentage-price points (`107.0` = fraction\n`1.07`). CDX HY index options are quoted this way."
-  },
-  {
-    "path": "#/$defs/d_dea2f6321b8d83288c8e/oneOf/1/properties/clean_price_pct",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_option.schema.json#/$defs/CDSOptionStrike/oneOf/1/properties/clean_price_pct",
-    "ref": "https://finstack_quant.dev/schemas/common/1/decimal.schema.json",
-    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/decimal.schema.json#"
-  },
-  {
     "path": "#/$defs/d_e42076b4d2ef6e393ce5",
     "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/CalibrationParameter",
     "description": "Which structural parameter to calibrate in the MC engine."
@@ -3986,23 +3794,6 @@ export default [
     "source": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json#/$defs/TenorUnit/oneOf/3",
     "const": "years",
     "description": "Years (Y)"
-  },
-  {
-    "path": "#/$defs/d_ec89adc17436f33de839",
-    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/VolatilityModel",
-    "description": "Volatility model for option pricing."
-  },
-  {
-    "path": "#/$defs/d_ec89adc17436f33de839/oneOf/0",
-    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/VolatilityModel/oneOf/0",
-    "const": "black",
-    "description": "Black (lognormal)."
-  },
-  {
-    "path": "#/$defs/d_ec89adc17436f33de839/oneOf/1",
-    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/VolatilityModel/oneOf/1",
-    "const": "normal",
-    "description": "Bachelier / normal model."
   },
   {
     "path": "#/$defs/d_ed218c734e46de57eeb9",
@@ -4110,6 +3901,232 @@ export default [
     "source": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json#/$defs/VarMethod/oneOf/1",
     "const": "taylor_approximation",
     "description": "Taylor approximation using sensitivities (Greeks).\n\nFaster method - approximates P&L using pre-computed sensitivities.\nGood for linear instruments and large portfolios, but may be\ninaccurate for highly non-linear instruments (deep OTM options)."
+  },
+  {
+    "path": "#/$defs/d_fcc5a617e836258c508e",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_option.schema.json#/$defs/CdsOption",
+    "description": "Credit option instrument (option on CDS spread or clean index price)\n\nThe public pricing surface supports European options with cash or\nphysical settlement. Before expiry, cash- and physical-settled options\ncarry the same cash-equivalent model NPV and route through the same\nquadrature; the clean payoff excludes accrued because the same underlying\naccrued appears on both sides before exercise and cancels. A physical\nexercise cashflow at settlement is dirty (includes accrued at exercise\nsettlement), and this pricer does not create or deliver a live underlying\nCDS position — valuation at or after a physical exercise boundary fails\nexplicitly. Non-European exercise is rejected at pricing time so\ndeserialized instruments cannot silently fall through to an unsupported\nengine."
+  },
+  {
+    "path": "#/$defs/d_fcc5a617e836258c508e/properties/attributes",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_option.schema.json#/$defs/CdsOption/properties/attributes",
+    "default": {},
+    "description": "Additional attributes",
+    "ref": "https://finstack_quant.dev/schemas/common/1/attributes.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/attributes.schema.json#"
+  },
+  {
+    "path": "#/$defs/d_fcc5a617e836258c508e/properties/coupon_bp",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_option.schema.json#/$defs/CdsOption/properties/coupon_bp",
+    "default": null,
+    "description": "Contractual running coupon `c` of the underlying CDS, in basis points\n(e.g., `100` for the standard CDX.NA.IG coupon, `500` for the\nstandard CDX.NA.HY coupon). When `None`, the synthetic underlying\nCDS uses `strike` as its running coupon — the appropriate single-name\nSNAC default where the trade is struck at the par spread. For CDS\nindex options where the index has a fixed standard coupon different\nfrom the option strike, set this explicitly so the strike-adjustment\nterm `H(K) = ξN(c − K)A(K)` (DOCS 2055833 Eq. 2.4) is populated."
+  },
+  {
+    "path": "#/$defs/d_fcc5a617e836258c508e/properties/coupon_bp/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_option.schema.json#/$defs/CdsOption/properties/coupon_bp/anyOf/0",
+    "ref": "https://finstack_quant.dev/schemas/common/1/decimal.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/decimal.schema.json#"
+  },
+  {
+    "path": "#/$defs/d_fcc5a617e836258c508e/properties/coupon_bp/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_option.schema.json#/$defs/CdsOption/properties/coupon_bp/anyOf/1"
+  },
+  {
+    "path": "#/$defs/d_fcc5a617e836258c508e/properties/credit_curve_id",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_option.schema.json#/$defs/CdsOption/properties/credit_curve_id",
+    "description": "Credit curve identifier",
+    "ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/id.schema.json#"
+  },
+  {
+    "path": "#/$defs/d_fcc5a617e836258c508e/properties/discount_curve_id",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_option.schema.json#/$defs/CdsOption/properties/discount_curve_id",
+    "description": "Discount curve identifier",
+    "ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/id.schema.json#"
+  },
+  {
+    "path": "#/$defs/d_fcc5a617e836258c508e/properties/exercise_settlement_date",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_option.schema.json#/$defs/CdsOption/properties/exercise_settlement_date",
+    "description": "Payment date of the exercise proceeds, defaulting to legal expiry.\nMust be on or after expiry and before CDS maturity. Discounting uses\nthis date; spread variance ends at legal expiry."
+  },
+  {
+    "path": "#/$defs/d_fcc5a617e836258c508e/properties/exercise_settlement_date/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_option.schema.json#/$defs/CdsOption/properties/exercise_settlement_date/anyOf/0",
+    "ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/date.schema.json#"
+  },
+  {
+    "path": "#/$defs/d_fcc5a617e836258c508e/properties/exercise_settlement_date/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_option.schema.json#/$defs/CdsOption/properties/exercise_settlement_date/anyOf/1"
+  },
+  {
+    "path": "#/$defs/d_fcc5a617e836258c508e/properties/exercise_style",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_option.schema.json#/$defs/CdsOption/properties/exercise_style",
+    "description": "Exercise style",
+    "ref": "#/$defs/ExerciseStyle",
+    "resolvedRef": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_option.schema.json#/$defs/ExerciseStyle"
+  },
+  {
+    "path": "#/$defs/d_fcc5a617e836258c508e/properties/expiry",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_option.schema.json#/$defs/CdsOption/properties/expiry",
+    "description": "Option expiry date",
+    "ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/date.schema.json#"
+  },
+  {
+    "path": "#/$defs/d_fcc5a617e836258c508e/properties/id",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_option.schema.json#/$defs/CdsOption/properties/id",
+    "description": "Unique instrument identifier",
+    "ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/id.schema.json#"
+  },
+  {
+    "path": "#/$defs/d_fcc5a617e836258c508e/properties/index_factor",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_option.schema.json#/$defs/CdsOption/properties/index_factor",
+    "default": 1,
+    "description": "Current index factor `f` at valuation: the surviving fraction of the\noriginal index notional, in `(0, 1]`. Defaults to `1.0` (no settled\ndefaults) and scales the notional only when `underlying_is_index`.\nSee [`Self::strike_index_factor`] for the original factor `f0`\nattached to a clean-price strike.",
+    "format": "double"
+  },
+  {
+    "path": "#/$defs/d_fcc5a617e836258c508e/properties/instrument_pricing_overrides",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_option.schema.json#/$defs/CdsOption/properties/instrument_pricing_overrides",
+    "description": "Instrument-owned pricing inputs.",
+    "ref": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#"
+  },
+  {
+    "path": "#/$defs/d_fcc5a617e836258c508e/properties/knockout",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_option.schema.json#/$defs/CdsOption/properties/knockout",
+    "default": false,
+    "description": "Whether the option knocks out if the underlying defaults before\nexercise. This is contract-specific; new instruments default to\nno-knockout and legacy single-name books can opt in explicitly."
+  },
+  {
+    "path": "#/$defs/d_fcc5a617e836258c508e/properties/metric_pricing_overrides",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_option.schema.json#/$defs/CdsOption/properties/metric_pricing_overrides",
+    "description": "Metric-time pricing configuration.",
+    "ref": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json#"
+  },
+  {
+    "path": "#/$defs/d_fcc5a617e836258c508e/properties/notional",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_option.schema.json#/$defs/CdsOption/properties/notional",
+    "description": "Notional amount",
+    "ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/money.schema.json#"
+  },
+  {
+    "path": "#/$defs/d_fcc5a617e836258c508e/properties/option_type",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_option.schema.json#/$defs/CdsOption/properties/option_type",
+    "description": "Option type (Call = right to buy protection, Put = right to sell protection)",
+    "ref": "#/$defs/OptionType",
+    "resolvedRef": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_option.schema.json#/$defs/OptionType"
+  },
+  {
+    "path": "#/$defs/d_fcc5a617e836258c508e/properties/premium_settlement_date",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_option.schema.json#/$defs/CdsOption/properties/premium_settlement_date",
+    "description": "Payment date of the option premium, returned by the settlement-date\naccessor. This does not change variance time or front-end protection;\nthe option value excludes the separately agreed trade premium."
+  },
+  {
+    "path": "#/$defs/d_fcc5a617e836258c508e/properties/premium_settlement_date/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_option.schema.json#/$defs/CdsOption/properties/premium_settlement_date/anyOf/0",
+    "ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/date.schema.json#"
+  },
+  {
+    "path": "#/$defs/d_fcc5a617e836258c508e/properties/premium_settlement_date/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_option.schema.json#/$defs/CdsOption/properties/premium_settlement_date/anyOf/1"
+  },
+  {
+    "path": "#/$defs/d_fcc5a617e836258c508e/properties/protection_start_convention",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_option.schema.json#/$defs/CdsOption/properties/protection_start_convention",
+    "default": "spot",
+    "description": "Convention used to select the synthetic underlying CDS accrual start\nwhen `underlying_start_date` is not explicitly supplied.",
+    "ref": "#/$defs/ProtectionStartConvention",
+    "resolvedRef": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_option.schema.json#/$defs/ProtectionStartConvention"
+  },
+  {
+    "path": "#/$defs/d_fcc5a617e836258c508e/properties/realized_loss",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_option.schema.json#/$defs/CdsOption/properties/realized_loss",
+    "default": 0,
+    "description": "Realized (settled) cumulative index loss from option inception to\nvaluation date, as a decimal fraction of the original index notional\nin `[0, 1]`. Defaults to `0.0`.\n\nBloomberg CDSO treats index options as no-knockout. Settled losses\nafter option inception are therefore deterministic payoff adjustments\nat exercise (DOCS 2055833 Eq. 2.5 and DOCS 2151513). Single-name\noptions knock out instead and must leave this at `0.0`.",
+    "format": "double"
+  },
+  {
+    "path": "#/$defs/d_fcc5a617e836258c508e/properties/recovery_rate",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_option.schema.json#/$defs/CdsOption/properties/recovery_rate",
+    "description": "Recovery rate assumption",
+    "format": "double"
+  },
+  {
+    "path": "#/$defs/d_fcc5a617e836258c508e/properties/scenario_pricing_overrides",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_option.schema.json#/$defs/CdsOption/properties/scenario_pricing_overrides",
+    "description": "Scenario-only pricing adjustments.",
+    "ref": "https://finstack_quant.dev/schemas/common/1/scenario_pricing_overrides.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/scenario_pricing_overrides.schema.json#"
+  },
+  {
+    "path": "#/$defs/d_fcc5a617e836258c508e/properties/settlement",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_option.schema.json#/$defs/CdsOption/properties/settlement",
+    "description": "Settlement type",
+    "ref": "#/$defs/SettlementType",
+    "resolvedRef": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_option.schema.json#/$defs/SettlementType"
+  },
+  {
+    "path": "#/$defs/d_fcc5a617e836258c508e/properties/strike",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_option.schema.json#/$defs/CdsOption/properties/strike",
+    "description": "Typed option strike: a decimal forward spread (`{\"spread\": \"0.0325\"}`)\nor a clean price in percentage points (`{\"clean_price_pct\": \"107.0\"}`).",
+    "ref": "#/$defs/CdsOptionStrike",
+    "resolvedRef": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_option.schema.json#/$defs/CdsOptionStrike"
+  },
+  {
+    "path": "#/$defs/d_fcc5a617e836258c508e/properties/strike_index_factor",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_option.schema.json#/$defs/CdsOption/properties/strike_index_factor",
+    "description": "Original index factor `f0` attached to the option strike.\n\nDistinct from [`Self::index_factor`], which is the current factor\n`f` at valuation: defaults settled between option strike and\nvaluation reduce `f` below `f0`. A clean-price strike quotes the\nprice on `f0` notional, so its deterministic payoff term scales by\n`f0 / f`; the strike factor is therefore required for clean-price\nstrikes (`CdsOptionStrike::CleanPricePct`) and must not be inferred\nfrom the current factor after a default. Rejected for spread\nstrikes, whose payoff does not reference it.",
+    "format": "double"
+  },
+  {
+    "path": "#/$defs/d_fcc5a617e836258c508e/properties/underlying_convention",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_option.schema.json#/$defs/CdsOption/properties/underlying_convention",
+    "default": "isda_na",
+    "description": "Convention used by the underlying CDS contract.\n\nThis controls the CDS schedule, settlement lag, business day convention,\nand other market-standard mechanics used when deriving forward spread and\nrisky annuity for the option's underlying.",
+    "ref": "#/$defs/CdsConvention",
+    "resolvedRef": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_option.schema.json#/$defs/CdsConvention"
+  },
+  {
+    "path": "#/$defs/d_fcc5a617e836258c508e/properties/underlying_is_index",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_option.schema.json#/$defs/CdsOption/properties/underlying_is_index",
+    "default": false,
+    "description": "If true, the underlying is a CDS index; else single-name CDS.\n\nThe Bloomberg CDSO model treats the two cases differently in the\nno-knockout calibration `F_0 = E[V_te]` (DOCS 2055833 §1.2): index\noptions trade no-knockout and the calibration target includes the\n`(1−R)·(1−q_te)` FEP-equivalent contribution; single-name options\nknock out on default and skip it."
+  },
+  {
+    "path": "#/$defs/d_fcc5a617e836258c508e/properties/underlying_maturity",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_option.schema.json#/$defs/CdsOption/properties/underlying_maturity",
+    "description": "Underlying CDS maturity date",
+    "ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/date.schema.json#"
+  },
+  {
+    "path": "#/$defs/d_fcc5a617e836258c508e/properties/underlying_start_date",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_option.schema.json#/$defs/CdsOption/properties/underlying_start_date",
+    "description": "Underlying CDS accrual-effective date used for forward spread and risky\nannuity. Bloomberg CDSO can quote a standard CDS effective date before\noption expiry; in that case premium accrues from this date while\nprotection starts at expiry."
+  },
+  {
+    "path": "#/$defs/d_fcc5a617e836258c508e/properties/underlying_start_date/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_option.schema.json#/$defs/CdsOption/properties/underlying_start_date/anyOf/0",
+    "ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/date.schema.json#"
+  },
+  {
+    "path": "#/$defs/d_fcc5a617e836258c508e/properties/underlying_start_date/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_option.schema.json#/$defs/CdsOption/properties/underlying_start_date/anyOf/1"
+  },
+  {
+    "path": "#/$defs/d_fcc5a617e836258c508e/properties/vol_surface_id",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_option.schema.json#/$defs/CdsOption/properties/vol_surface_id",
+    "description": "Volatility surface identifier",
+    "ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/id.schema.json#"
   },
   {
     "path": "#/$defs/d_fd618cd5743ec18a168f",

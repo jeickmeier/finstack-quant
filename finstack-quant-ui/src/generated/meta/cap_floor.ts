@@ -197,23 +197,6 @@ export default [
     "description": "Apply the closed-form LHP conditional default probability uniformly to\nevery name. This is the `N → ∞` limit of [`Self::PerName`] — an\nacceptable, faster approximation only for genuinely granular pools."
   },
   {
-    "path": "#/$defs/d_055066044802b6e94af1",
-    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/OasQuoteCompounding",
-    "description": "Quote convention used when reporting or consuming OAS values."
-  },
-  {
-    "path": "#/$defs/d_055066044802b6e94af1/oneOf/0",
-    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/OasQuoteCompounding/oneOf/0",
-    "const": "continuous",
-    "description": "Continuous additive spread, matching the tree's internal short-rate shift."
-  },
-  {
-    "path": "#/$defs/d_055066044802b6e94af1/oneOf/1",
-    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/OasQuoteCompounding/oneOf/1",
-    "const": "semi_annual",
-    "description": "Semiannual bond-equivalent OAS quote."
-  },
-  {
     "path": "#/$defs/d_0f0bc7eb50b67f9d73d0",
     "source": "https://finstack_quant.dev/schemas/instrument/1/rates/cap_floor.schema.json#/$defs/CapFloor",
     "description": "Interest rate option instrument.\n\n# Pre-1.0 API evolution\n\nCompounded-RFR contractual terms and contractual spread are typed public\nfields. Adding them is intentionally source-breaking for downstream exhaustive\nstruct literals; canonical constructors and the generated builder retain\nbackward-compatible defaults. Prefer those construction APIs for forward\ncompatibility."
@@ -432,7 +415,7 @@ export default [
   {
     "path": "#/$defs/d_10a2b628165f3f3e10e7/properties/barrier_crossing",
     "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/MertonMcConfig/properties/barrier_crossing",
-    "description": "Barrier-crossing policy used for `BarrierType::FirstPassage`.\n\nDefault: `BrownianBridge` when the Merton model uses `FirstPassage`,\notherwise `Discrete`.",
+    "description": "Barrier-crossing policy used for `MertonBarrierType::FirstPassage`.\n\nDefault: `BrownianBridge` when the Merton model uses `FirstPassage`,\notherwise `Discrete`.",
     "ref": "#/$defs/BarrierCrossing",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/BarrierCrossing"
   },
@@ -1135,7 +1118,7 @@ export default [
   {
     "path": "#/$defs/d_572ad1befb7d94914652/properties/bdt_sigma",
     "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/ModelConfig/properties/bdt_sigma",
-    "description": "Black-Derman-Toy lognormal short-rate volatility (σ), as an annual\ndecimal proportion of the short rate (`0.20` = 20%).\n\nRead only by the rates-only bond tree when `vol_model = black` selects\nBDT for a bond with embedded exercise rights, where it is required.\nIt is a relative (lognormal) volatility, unlike the absolute\n[`Self::hw1f_sigma`]; typical values are 0.10–0.40. The BDT lattice has\nno mean reversion. Must be finite and non-negative; `0.0` prices on the\ndeterministic curve.",
+    "description": "Black-Derman-Toy lognormal short-rate volatility (σ), as an annual\ndecimal proportion of the short rate (`0.20` = 20%).\n\nRead only by the rates-only bond tree when `tree_model = black_derman_toy` selects\nBDT for a bond with embedded exercise rights, where it is required.\nIt is a relative (lognormal) volatility, unlike the absolute\n[`Self::hw1f_sigma`]; typical values are 0.10–0.40. The BDT lattice has\nno mean reversion. Must be finite and non-negative; `0.0` prices on the\ndeterministic curve.",
     "format": "double"
   },
   {
@@ -1241,8 +1224,8 @@ export default [
     "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/ModelConfig/properties/oas_quote_compounding",
     "default": "continuous",
     "description": "Quote compounding convention for OAS inputs and outputs.",
-    "ref": "#/$defs/OasQuoteCompounding",
-    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/OasQuoteCompounding"
+    "ref": "#/$defs/Compounding",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/Compounding"
   },
   {
     "path": "#/$defs/d_572ad1befb7d94914652/properties/rate_credit_correlation",
@@ -1281,6 +1264,21 @@ export default [
     "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/ModelConfig/properties/tree_discount_curve_id/anyOf/1"
   },
   {
+    "path": "#/$defs/d_572ad1befb7d94914652/properties/tree_model",
+    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/ModelConfig/properties/tree_model",
+    "description": "Short-rate lattice for the rates-only bond tree (`hull_white` or\n`black_derman_toy`). `None` selects Hull-White."
+  },
+  {
+    "path": "#/$defs/d_572ad1befb7d94914652/properties/tree_model/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/ModelConfig/properties/tree_model/anyOf/0",
+    "ref": "#/$defs/ShortRateTreeModel",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/ShortRateTreeModel"
+  },
+  {
+    "path": "#/$defs/d_572ad1befb7d94914652/properties/tree_model/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/ModelConfig/properties/tree_model/anyOf/1"
+  },
+  {
     "path": "#/$defs/d_572ad1befb7d94914652/properties/tree_steps",
     "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/ModelConfig/properties/tree_steps",
     "default": null,
@@ -1289,27 +1287,46 @@ export default [
     "minimum": 0
   },
   {
-    "path": "#/$defs/d_572ad1befb7d94914652/properties/vol_model",
-    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/ModelConfig/properties/vol_model",
-    "description": "Volatility model choice for option pricing.\n\nWhen set, overrides the default Black (lognormal) model."
-  },
-  {
-    "path": "#/$defs/d_572ad1befb7d94914652/properties/vol_model/anyOf/0",
-    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/ModelConfig/properties/vol_model/anyOf/0",
-    "ref": "#/$defs/VolatilityModel",
-    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/VolatilityModel"
-  },
-  {
-    "path": "#/$defs/d_572ad1befb7d94914652/properties/vol_model/anyOf/1",
-    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/ModelConfig/properties/vol_model/anyOf/1"
-  },
-  {
     "path": "#/$defs/d_572ad1befb7d94914652/properties/vol_surface_extrapolation",
     "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/ModelConfig/properties/vol_surface_extrapolation",
     "default": "error",
     "description": "Volatility surface extrapolation policy when `implied_volatility` is not set.",
     "ref": "#/$defs/VolSurfaceExtrapolation",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/VolSurfaceExtrapolation"
+  },
+  {
+    "path": "#/$defs/d_5c13df5a55f1da604df2",
+    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/Compounding",
+    "description": "Compounding convention for interest rates.\n\nUsed to specify how interest rates should be quoted or converted.\nAll variants produce mathematically equivalent discount factors when\napplied consistently.\n\n# Relationship Between Conventions\n\nFor a given discount factor DF at time t, the rates under different\nconventions are related by:\n\n```text\nDF = e^(-r_cc × t)                    [Continuous]\n   = (1 + r_ann)^(-t)                 [Annual]\n   = (1 + r_per/n)^(-n×t)             [Periodic(n)]\n   = 1 / (1 + r_simple × t)           [Simple]\n```\n\n# Ordering of Rates\n\nFor positive rates and t > 0: `r_simple > r_annual > r_continuous`\n(less frequent compounding requires a higher quoted rate for the same DF)."
+  },
+  {
+    "path": "#/$defs/d_5c13df5a55f1da604df2/oneOf/0",
+    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/Compounding/oneOf/0",
+    "const": "continuous",
+    "description": "Continuous compounding: r = -ln(DF) / t\n\nMost common for internal calculations, curve construction, and\nquantitative finance models. Provides the simplest mathematical\nproperties (additive over time)."
+  },
+  {
+    "path": "#/$defs/d_5c13df5a55f1da604df2/oneOf/1",
+    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/Compounding/oneOf/1",
+    "const": "annual",
+    "description": "Annual compounding: r = DF^(-1/t) - 1\n\nStandard for many bond markets, particularly UK gilts and\nEuropean government bonds. Also common for Bloomberg zero rate display."
+  },
+  {
+    "path": "#/$defs/d_5c13df5a55f1da604df2/oneOf/2",
+    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/Compounding/oneOf/2",
+    "description": "Periodic compounding with n periods per year: r = n × (DF^(-1/(n×t)) - 1)\n\nCommon values:\n- n=2: Semi-annual (US Treasury, corporate bonds)\n- n=4: Quarterly (some FRNs)\n- n=12: Monthly (rare, some retail products)\n\nNote: Uses [`NonZeroU32`] to prevent division by zero at compile time."
+  },
+  {
+    "path": "#/$defs/d_5c13df5a55f1da604df2/oneOf/2/properties/periodic",
+    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/Compounding/oneOf/2/properties/periodic",
+    "format": "uint32",
+    "minimum": 1
+  },
+  {
+    "path": "#/$defs/d_5c13df5a55f1da604df2/oneOf/3",
+    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/Compounding/oneOf/3",
+    "const": "simple",
+    "description": "Simple interest (no compounding): r = (1/DF - 1) / t\n\nUsed for money market instruments with maturity < 1 year, including:\n- Interbank deposits\n- T-bills and commercial paper\n- SOFR, SONIA, €STR fixings\n\nTypically paired with ACT/360 (USD, EUR) or ACT/365F (GBP) day counts."
   },
   {
     "path": "#/$defs/d_6347b87cc04573a369d9",
@@ -1598,6 +1615,23 @@ export default [
     "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/OptimalToggle/properties/risk_free_rate",
     "description": "Risk-free rate (continuous) used as drift in the nested simulation.",
     "format": "double"
+  },
+  {
+    "path": "#/$defs/d_948cdc4db846a21357a4",
+    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/ShortRateTreeModel",
+    "description": "Short-rate lattice used by the rates-only bond tree.\n\nSelected by `instrument_pricing_overrides.model_config.tree_model`; when the\nfield is absent the bond tree uses Hull-White."
+  },
+  {
+    "path": "#/$defs/d_948cdc4db846a21357a4/oneOf/0",
+    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/ShortRateTreeModel/oneOf/0",
+    "const": "hull_white",
+    "description": "Hull-White one-factor (normal short rate) with `(κ, σ)` from\n`model_config.hw1f_mean_reversion` / `model_config.hw1f_sigma` or the\npre-fitted market scalars."
+  },
+  {
+    "path": "#/$defs/d_948cdc4db846a21357a4/oneOf/1",
+    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/ShortRateTreeModel/oneOf/1",
+    "const": "black_derman_toy",
+    "description": "Black-Derman-Toy (lognormal short rate) with volatility\n`model_config.bdt_sigma`."
   },
   {
     "path": "#/$defs/d_94cb251104de5cf587b6",
@@ -2756,7 +2790,7 @@ export default [
   {
     "path": "#/$defs/d_b0a5fc543381da6a5722/properties/cds_quote_bp",
     "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/MarketQuoteOverrides/properties/cds_quote_bp",
-    "description": "CreditDefaultSwap clean par-spread quote in basis points.\n\nUsed only by CreditDefaultSwap risk replay, where it replaces the\nmatching contractual hazard-curve pillar. It does not drive PV, and no\nother instrument (CDSIndex included) reads it.",
+    "description": "CreditDefaultSwap clean par-spread quote in basis points.\n\nUsed only by CreditDefaultSwap risk replay, where it replaces the\nmatching contractual hazard-curve pillar. It does not drive PV, and no\nother instrument (CdsIndex included) reads it.",
     "format": "double"
   },
   {
@@ -4068,62 +4102,68 @@ export default [
   {
     "path": "#/$defs/d_d5a07a5b3af3f2e84a38",
     "source": "https://finstack_quant.dev/schemas/instrument/1/rates/cap_floor.schema.json#/$defs/FloatingLegCompounding",
-    "description": "Method for calculating floating leg coupon payments.\n\nDifferent reference rates require different compounding conventions:\n- **Term rates (SOFR 3M, EURIBOR, historical LIBOR)**: Simple interest\n- **Overnight rates (SOFR, SONIA, €STR, TONA)**: Compounded in arrears\n\n# Market Standards\n\n## Simple term-rate coupons\n- **Formula**: `Coupon = Notional × (Forward_Rate + Spread) × DCF`\n- **Use for**: current term-rate indices and legacy IBOR transactions\n- **Standard**: ISDA 2021 Definitions; ISDA 2006 for legacy transactions\n\n## Compounded In Arrears (RFR-style)\n- **Formula**: `Coupon = Notional × [∏(1 + r_i × dcf_i) - 1]`\n- **Use for**: USD SOFR, GBP SONIA, EUR €STR, JPY TONA\n- **Standard**: ISDA 2021 Definitions\n- **Observation convention**: plain in-arrears for standard OIS presets;\n  lookback, observation shift, and cutoff are explicit contract variants\n\n# Examples\n\n```\nuse finstack_quant_valuations::instruments::rates::irs::FloatingLegCompounding;\n\n// LIBOR-style swap (simple compounding)\nlet simple = FloatingLegCompounding::Simple;\nassert_eq!(simple, FloatingLegCompounding::default());\n\n// SOFR OIS swap: plain compounded in arrears (no lookback)\nlet sofr = FloatingLegCompounding::CompoundedInArrears { lookback_days: 0 };\nassert_eq!(sofr, FloatingLegCompounding::sofr());\n\n// SONIA FRN-style leg with the BoE 5-day lookback (explicit, not the OIS preset)\nlet sonia_frn = FloatingLegCompounding::CompoundedInArrears { lookback_days: 5 };\nassert_ne!(sonia_frn, FloatingLegCompounding::sonia());\n```\n\n# References\n\n- **ISDA 2021 Definitions**: Compounded RFR conventions `docs/REFERENCES.md#isda-2021-definitions`\n- **ARRC** (Alternative Reference Rates Committee): SOFR conventions `docs/REFERENCES.md#arrc-sofr-users-guide`\n- **BoE** (Bank of England): SONIA conventions `docs/REFERENCES.md#boe-sonia-key-features`\n- **ECB**: €STR conventions `docs/REFERENCES.md#ecb-estr-methodology`\n\nIn the IRS instrument implementation, the RFR-style variant\n(`CompoundedInArrears`) is also used to classify swaps as OIS for\ndiscount-only float-leg pricing; see `InterestRateSwap::is_single_curve_ois` for details."
+    "description": "How the fixings of one accrual period combine into the period rate.\n\nOne canonical enum for every floating leg and coupon: swaps, basis and\ncross-currency legs, TRS financing, IR futures, FRN / loan / structured\ncredit coupons.\n\n| Variant | Period rate | Typical use |\n|---------|-------------|-------------|\n| `simple` | One term fixing / forward over the period | EURIBOR, Term SOFR, legacy IBOR |\n| `simple_average` | `(Σ rᵢ·dᵢ) / D` of daily overnight fixings | Averaged overnight loans, Fed-Funds futures |\n| `compounded_in_arrears` | `[∏(1 + rᵢ·dᵢ/B) − 1]·B/D` | SOFR / SONIA / €STR / TONA OIS (lookback 0) |\n| `compounded_with_observation_shift` | as above, observations and weights shifted | ISDA 2021 observation shift |\n| `compounded_with_rate_cutoff` | as above, last fixings frozen | ARRC lockout / SWPM \"Rate Cut-Off Days\" |\n\nDay counts are business days and must be non-negative.\n\n# References\n\n- ISDA 2021 Definitions, compounded RFR conventions `docs/REFERENCES.md#isda-2021-definitions`\n- ARRC (2020). \"SOFR: A User's Guide.\" `docs/REFERENCES.md#arrc-sofr-users-guide`\n- BoE SONIA conventions `docs/REFERENCES.md#boe-sonia-key-features`\n\n# Examples\n\n```\nuse finstack_quant_cashflows::builder::FloatingLegCompounding;\n\nassert_eq!(FloatingLegCompounding::default(), FloatingLegCompounding::Simple);\nassert_eq!(\n    FloatingLegCompounding::sofr(),\n    FloatingLegCompounding::CompoundedInArrears { lookback_days: 0 }\n);\n```"
   },
   {
     "path": "#/$defs/d_d5a07a5b3af3f2e84a38/oneOf/0",
     "source": "https://finstack_quant.dev/schemas/instrument/1/rates/cap_floor.schema.json#/$defs/FloatingLegCompounding/oneOf/0",
     "const": "simple",
-    "description": "Simple interest compounding (term-rate style).\n\nCoupon = Notional × (Forward_Rate + Spread) × Day_Count_Fraction\n\nUse for:\n- Current fixed-tenor term-rate indices\n- Legacy USD/EUR/GBP LIBOR swaps\n\nThis is the generic vanilla-IRS default; the rate-index convention\nregistry selects compounded RFR terms for overnight indices."
+    "description": "Simple term-rate projection: one fixing or forward over the period.\n\n`Coupon = Notional × (Forward_Rate + Spread) × DCF`. This is the\ndefault; a registered overnight RFR index rejects it."
   },
   {
     "path": "#/$defs/d_d5a07a5b3af3f2e84a38/oneOf/1",
     "source": "https://finstack_quant.dev/schemas/instrument/1/rates/cap_floor.schema.json#/$defs/FloatingLegCompounding/oneOf/1",
-    "description": "Compounded in arrears (overnight RFR rates).\n\nCoupon = Notional × [∏(1 + r_i × dcf_i) - 1] where the product\nis taken over daily observations in the accrual period.\n\nUse for:\n- USD SOFR (Secured Overnight Financing Rate)\n- GBP SONIA (Sterling Overnight Index Average)\n- EUR €STR (Euro Short-Term Rate)\n- JPY TONA (Tokyo Overnight Average Rate)\n\n# Fields\n\n- `lookback_days`: Business days by which observation dates move\n  backward while accrual day-count weights remain unshifted.\n\nStandard cleared OIS presets use zero lookback. Non-zero lookbacks are\nexplicit contractual variants, commonly used for RFR-linked notes."
-  },
-  {
-    "path": "#/$defs/d_d5a07a5b3af3f2e84a38/oneOf/1/properties/compounded_in_arrears",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/rates/cap_floor.schema.json#/$defs/FloatingLegCompounding/oneOf/1/properties/compounded_in_arrears"
-  },
-  {
-    "path": "#/$defs/d_d5a07a5b3af3f2e84a38/oneOf/1/properties/compounded_in_arrears/properties/lookback_days",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/rates/cap_floor.schema.json#/$defs/FloatingLegCompounding/oneOf/1/properties/compounded_in_arrears/properties/lookback_days",
-    "description": "Number of business days to shift observation dates back from the accrual\nperiod (lookback).  Typically 2–5 days depending on market convention.\n\nThe observation dates are shifted while the day-count-fraction (DCF)\nweights remain anchored to the **original** accrual period dates.\nThis is consistent with \"lookback without observation shift\" as\ndescribed in the ISDA 2021 Definitions and ARRC SOFR conventions.",
-    "format": "int32",
-    "maximum": 31,
-    "minimum": 0
+    "const": "simple_average",
+    "description": "Arithmetic average of daily overnight fixings weighted by accrual days,\n`Rate = (Σ rᵢ·dᵢ) / D`, for instruments that contractually specify a\nsimple-average overnight index."
   },
   {
     "path": "#/$defs/d_d5a07a5b3af3f2e84a38/oneOf/2",
     "source": "https://finstack_quant.dev/schemas/instrument/1/rates/cap_floor.schema.json#/$defs/FloatingLegCompounding/oneOf/2",
-    "description": "Compounded in arrears with true ISDA 2021 observation shift.\n\nUnlike `CompoundedInArrears` (lookback semantics), this variant shifts\n**both** the observation dates AND the day-count-fraction (DCF) weights.\nThis matches ISDA 2021 Definitions Section 4.5(c).\n\n```text\nLookback:           DCF(d, d+1)           × rate(d - shift, d+1 - shift)\nObservation Shift:  DCF(d - shift, d+1 - shift) × rate(d - shift, d+1 - shift)\n```"
+    "description": "Compounded in arrears (overnight RFR rates).\n\n`Coupon = Notional × [∏(1 + rᵢ·dᵢ/B) − 1]` over the daily observations\nof the accrual period."
   },
   {
-    "path": "#/$defs/d_d5a07a5b3af3f2e84a38/oneOf/2/properties/compounded_with_observation_shift",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/rates/cap_floor.schema.json#/$defs/FloatingLegCompounding/oneOf/2/properties/compounded_with_observation_shift"
+    "path": "#/$defs/d_d5a07a5b3af3f2e84a38/oneOf/2/properties/compounded_in_arrears",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/rates/cap_floor.schema.json#/$defs/FloatingLegCompounding/oneOf/2/properties/compounded_in_arrears"
   },
   {
-    "path": "#/$defs/d_d5a07a5b3af3f2e84a38/oneOf/2/properties/compounded_with_observation_shift/properties/shift_days",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/rates/cap_floor.schema.json#/$defs/FloatingLegCompounding/oneOf/2/properties/compounded_with_observation_shift/properties/shift_days",
-    "description": "Number of business days to shift both observation dates and DCF weights.",
-    "format": "int32",
+    "path": "#/$defs/d_d5a07a5b3af3f2e84a38/oneOf/2/properties/compounded_in_arrears/properties/lookback_days",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/rates/cap_floor.schema.json#/$defs/FloatingLegCompounding/oneOf/2/properties/compounded_in_arrears/properties/lookback_days",
+    "description": "Business days by which observation dates move backward while the\nday-count weights stay on the original accrual dates (\"lookback\nwithout observation shift\", ISDA 2021 / ARRC). `0` is plain\nin-arrears, the cleared-OIS convention.",
+    "format": "uint32",
     "maximum": 31,
     "minimum": 0
   },
   {
     "path": "#/$defs/d_d5a07a5b3af3f2e84a38/oneOf/3",
     "source": "https://finstack_quant.dev/schemas/instrument/1/rates/cap_floor.schema.json#/$defs/FloatingLegCompounding/oneOf/3",
-    "description": "Compounded in arrears with a rate cut-off near the period end.\n\nThis freezes the last observed overnight rate for the final `cutoff_days`\nbusiness days of the accrual period. Bloomberg SWPM labels this\nconvention as \"Rate Cut-Off Days\"."
+    "description": "Compounded in arrears with ISDA 2021 observation shift: both the\nobservation dates and their day-count weights move back\n(ISDA 2021 Definitions Section 4.5(c))."
   },
   {
-    "path": "#/$defs/d_d5a07a5b3af3f2e84a38/oneOf/3/properties/compounded_with_rate_cutoff",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/rates/cap_floor.schema.json#/$defs/FloatingLegCompounding/oneOf/3/properties/compounded_with_rate_cutoff"
+    "path": "#/$defs/d_d5a07a5b3af3f2e84a38/oneOf/3/properties/compounded_with_observation_shift",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/rates/cap_floor.schema.json#/$defs/FloatingLegCompounding/oneOf/3/properties/compounded_with_observation_shift"
   },
   {
-    "path": "#/$defs/d_d5a07a5b3af3f2e84a38/oneOf/3/properties/compounded_with_rate_cutoff/properties/cutoff_days",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/rates/cap_floor.schema.json#/$defs/FloatingLegCompounding/oneOf/3/properties/compounded_with_rate_cutoff/properties/cutoff_days",
-    "description": "Number of business days before period end to freeze the overnight rate.",
-    "format": "int32",
+    "path": "#/$defs/d_d5a07a5b3af3f2e84a38/oneOf/3/properties/compounded_with_observation_shift/properties/shift_days",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/rates/cap_floor.schema.json#/$defs/FloatingLegCompounding/oneOf/3/properties/compounded_with_observation_shift/properties/shift_days",
+    "description": "Business days to shift both observation dates and weights.",
+    "format": "uint32",
+    "maximum": 31,
+    "minimum": 0
+  },
+  {
+    "path": "#/$defs/d_d5a07a5b3af3f2e84a38/oneOf/4",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/rates/cap_floor.schema.json#/$defs/FloatingLegCompounding/oneOf/4",
+    "description": "Compounded in arrears with a rate cut-off near the period end.\n\nThe last `cutoff_days` business-day observations are frozen at the\nfixing immediately preceding them: for fixings `b_1..b_n` the source is\n`b_{n-cutoff}`, so a positive cut-off must leave a preceding fixing.\nReference: ARRC, December 3, 2021 Statement, Appendix A (\"Lockout\")."
+  },
+  {
+    "path": "#/$defs/d_d5a07a5b3af3f2e84a38/oneOf/4/properties/compounded_with_rate_cutoff",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/rates/cap_floor.schema.json#/$defs/FloatingLegCompounding/oneOf/4/properties/compounded_with_rate_cutoff"
+  },
+  {
+    "path": "#/$defs/d_d5a07a5b3af3f2e84a38/oneOf/4/properties/compounded_with_rate_cutoff/properties/cutoff_days",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/rates/cap_floor.schema.json#/$defs/FloatingLegCompounding/oneOf/4/properties/compounded_with_rate_cutoff/properties/cutoff_days",
+    "description": "Business days before period end over which the rate is frozen.",
+    "format": "uint32",
     "maximum": 31,
     "minimum": 0
   },
@@ -4306,23 +4346,6 @@ export default [
     "source": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json#/$defs/TenorUnit/oneOf/3",
     "const": "years",
     "description": "Years (Y)"
-  },
-  {
-    "path": "#/$defs/d_ec89adc17436f33de839",
-    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/VolatilityModel",
-    "description": "Volatility model for option pricing."
-  },
-  {
-    "path": "#/$defs/d_ec89adc17436f33de839/oneOf/0",
-    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/VolatilityModel/oneOf/0",
-    "const": "black",
-    "description": "Black (lognormal)."
-  },
-  {
-    "path": "#/$defs/d_ec89adc17436f33de839/oneOf/1",
-    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/VolatilityModel/oneOf/1",
-    "const": "normal",
-    "description": "Bachelier / normal model."
   },
   {
     "path": "#/$defs/d_ed218c734e46de57eeb9",

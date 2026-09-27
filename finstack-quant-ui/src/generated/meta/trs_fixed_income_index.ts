@@ -9,8 +9,8 @@ export default [
         "instrument": {
           "spec": {
             "attributes": {},
-            "financing": {
-              "compounding": "term_rate",
+            "financing_leg": {
+              "compounding": "simple",
               "day_count": "act_360",
               "discount_curve_id": "USD-OIS",
               "forward_curve_id": "USD-SOFR-3M",
@@ -38,7 +38,7 @@ export default [
               },
               "start": "2024-01-01"
             },
-            "side": "receive_total_return",
+            "side": "receive",
             "underlying": {
               "currency": "USD",
               "duration_id": "US-CORP-DURATION",
@@ -269,23 +269,6 @@ export default [
     "description": "Clearing house methodology\n\nCCP-specific IM calculation (typically VaR or SPAN-based).\nExamples: LCH SwapClear, CME, ICE Clear Credit"
   },
   {
-    "path": "#/$defs/d_055066044802b6e94af1",
-    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/OasQuoteCompounding",
-    "description": "Quote convention used when reporting or consuming OAS values."
-  },
-  {
-    "path": "#/$defs/d_055066044802b6e94af1/oneOf/0",
-    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/OasQuoteCompounding/oneOf/0",
-    "const": "continuous",
-    "description": "Continuous additive spread, matching the tree's internal short-rate shift."
-  },
-  {
-    "path": "#/$defs/d_055066044802b6e94af1/oneOf/1",
-    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/OasQuoteCompounding/oneOf/1",
-    "const": "semi_annual",
-    "description": "Semiannual bond-equivalent OAS quote."
-  },
-  {
     "path": "#/$defs/d_10a2b628165f3f3e10e7",
     "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/MertonMcConfig",
     "description": "Configuration for Monte Carlo PIK bond pricing."
@@ -293,7 +276,7 @@ export default [
   {
     "path": "#/$defs/d_10a2b628165f3f3e10e7/properties/barrier_crossing",
     "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/MertonMcConfig/properties/barrier_crossing",
-    "description": "Barrier-crossing policy used for `BarrierType::FirstPassage`.\n\nDefault: `BrownianBridge` when the Merton model uses `FirstPassage`,\notherwise `Discrete`.",
+    "description": "Barrier-crossing policy used for `MertonBarrierType::FirstPassage`.\n\nDefault: `BrownianBridge` when the Merton model uses `FirstPassage`,\notherwise `Discrete`.",
     "ref": "#/$defs/BarrierCrossing",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/BarrierCrossing"
   },
@@ -768,8 +751,8 @@ export default [
   {
     "path": "#/$defs/d_29a90d894679a1e11782/properties/spec",
     "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/trs_fixed_income_index.schema.json#/$defs/trs_fixed_income_index/properties/spec",
-    "ref": "#/$defs/FIIndexTotalReturnSwap",
-    "resolvedRef": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/trs_fixed_income_index.schema.json#/$defs/FIIndexTotalReturnSwap"
+    "ref": "#/$defs/FiIndexTotalReturnSwap",
+    "resolvedRef": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/trs_fixed_income_index.schema.json#/$defs/FiIndexTotalReturnSwap"
   },
   {
     "path": "#/$defs/d_29a90d894679a1e11782/properties/type",
@@ -1095,6 +1078,23 @@ export default [
     "format": "double"
   },
   {
+    "path": "#/$defs/d_321169e9d26d19fc2c3e",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/trs_fixed_income_index.schema.json#/$defs/PayReceive",
+    "description": "Direction for instrument legs (universal for IRS, CDS, variance swaps, etc.)\n\nFor interest rate swaps: Pay = pay fixed/receive floating, Receive = receive fixed/pay floating\nFor credit default swaps: Pay = buy protection (pay premium), Receive = sell protection (receive premium)\nFor variance swaps: Pay = short variance, Receive = long variance"
+  },
+  {
+    "path": "#/$defs/d_321169e9d26d19fc2c3e/oneOf/0",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/trs_fixed_income_index.schema.json#/$defs/PayReceive/oneOf/0",
+    "const": "pay",
+    "description": "Pay the primary leg (fixed rate in IRS, protection premium in CDS, short variance)"
+  },
+  {
+    "path": "#/$defs/d_321169e9d26d19fc2c3e/oneOf/1",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/trs_fixed_income_index.schema.json#/$defs/PayReceive/oneOf/1",
+    "const": "receive",
+    "description": "Receive the primary leg (fixed rate in IRS, protection premium in CDS, long variance)"
+  },
+  {
     "path": "#/$defs/d_3b6317ccf6af6bd82703",
     "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/trs_fixed_income_index.schema.json#/$defs/MarginTenor",
     "description": "Margin call frequency.\n\nDetermines how often margin calls are made and collateral is exchanged.\nIndustry standard for OTC derivatives is daily under BCBS-IOSCO rules."
@@ -1325,7 +1325,7 @@ export default [
   {
     "path": "#/$defs/d_572ad1befb7d94914652/properties/bdt_sigma",
     "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/ModelConfig/properties/bdt_sigma",
-    "description": "Black-Derman-Toy lognormal short-rate volatility (σ), as an annual\ndecimal proportion of the short rate (`0.20` = 20%).\n\nRead only by the rates-only bond tree when `vol_model = black` selects\nBDT for a bond with embedded exercise rights, where it is required.\nIt is a relative (lognormal) volatility, unlike the absolute\n[`Self::hw1f_sigma`]; typical values are 0.10–0.40. The BDT lattice has\nno mean reversion. Must be finite and non-negative; `0.0` prices on the\ndeterministic curve.",
+    "description": "Black-Derman-Toy lognormal short-rate volatility (σ), as an annual\ndecimal proportion of the short rate (`0.20` = 20%).\n\nRead only by the rates-only bond tree when `tree_model = black_derman_toy` selects\nBDT for a bond with embedded exercise rights, where it is required.\nIt is a relative (lognormal) volatility, unlike the absolute\n[`Self::hw1f_sigma`]; typical values are 0.10–0.40. The BDT lattice has\nno mean reversion. Must be finite and non-negative; `0.0` prices on the\ndeterministic curve.",
     "format": "double"
   },
   {
@@ -1431,8 +1431,8 @@ export default [
     "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/ModelConfig/properties/oas_quote_compounding",
     "default": "continuous",
     "description": "Quote compounding convention for OAS inputs and outputs.",
-    "ref": "#/$defs/OasQuoteCompounding",
-    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/OasQuoteCompounding"
+    "ref": "#/$defs/Compounding",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/Compounding"
   },
   {
     "path": "#/$defs/d_572ad1befb7d94914652/properties/rate_credit_correlation",
@@ -1471,27 +1471,27 @@ export default [
     "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/ModelConfig/properties/tree_discount_curve_id/anyOf/1"
   },
   {
+    "path": "#/$defs/d_572ad1befb7d94914652/properties/tree_model",
+    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/ModelConfig/properties/tree_model",
+    "description": "Short-rate lattice for the rates-only bond tree (`hull_white` or\n`black_derman_toy`). `None` selects Hull-White."
+  },
+  {
+    "path": "#/$defs/d_572ad1befb7d94914652/properties/tree_model/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/ModelConfig/properties/tree_model/anyOf/0",
+    "ref": "#/$defs/ShortRateTreeModel",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/ShortRateTreeModel"
+  },
+  {
+    "path": "#/$defs/d_572ad1befb7d94914652/properties/tree_model/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/ModelConfig/properties/tree_model/anyOf/1"
+  },
+  {
     "path": "#/$defs/d_572ad1befb7d94914652/properties/tree_steps",
     "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/ModelConfig/properties/tree_steps",
     "default": null,
     "description": "Number of time steps for tree-based pricing (e.g., 100)",
     "format": "uint",
     "minimum": 0
-  },
-  {
-    "path": "#/$defs/d_572ad1befb7d94914652/properties/vol_model",
-    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/ModelConfig/properties/vol_model",
-    "description": "Volatility model choice for option pricing.\n\nWhen set, overrides the default Black (lognormal) model."
-  },
-  {
-    "path": "#/$defs/d_572ad1befb7d94914652/properties/vol_model/anyOf/0",
-    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/ModelConfig/properties/vol_model/anyOf/0",
-    "ref": "#/$defs/VolatilityModel",
-    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/VolatilityModel"
-  },
-  {
-    "path": "#/$defs/d_572ad1befb7d94914652/properties/vol_model/anyOf/1",
-    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/ModelConfig/properties/vol_model/anyOf/1"
   },
   {
     "path": "#/$defs/d_572ad1befb7d94914652/properties/vol_surface_extrapolation",
@@ -1509,10 +1509,10 @@ export default [
   {
     "path": "#/$defs/d_57dc608fb91a32cf109e/properties/compounding",
     "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/trs_fixed_income_index.schema.json#/$defs/FinancingLegSpec/properties/compounding",
-    "default": "term_rate",
-    "description": "Rate-compounding convention (term-rate vs overnight-compounded).\n\nDefaults to [`FinancingRateCompounding::TermRate`]. Set to\n[`FinancingRateCompounding::OvernightCompounded`] for SOFR/SONIA/€STR\novernight-funded TRS so the financing rate captures daily-compounding\nconvexity.",
-    "ref": "#/$defs/FinancingRateCompounding",
-    "resolvedRef": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/trs_fixed_income_index.schema.json#/$defs/FinancingRateCompounding"
+    "default": "simple",
+    "description": "Rate-compounding convention of the financing rate.\n\nDefaults to `simple` (one term forward per period, e.g. 3M Term SOFR or\nEURIBOR). Use a `compounded_*` variant for SOFR/SONIA/€STR\novernight-funded TRS so the financing rate captures the daily\ncompounding convexity (typically 12–15 bp of rate on an upward curve).\n`simple_average` is rejected.",
+    "ref": "#/$defs/FloatingLegCompounding",
+    "resolvedRef": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/trs_fixed_income_index.schema.json#/$defs/FloatingLegCompounding"
   },
   {
     "path": "#/$defs/d_57dc608fb91a32cf109e/properties/day_count",
@@ -1541,6 +1541,40 @@ export default [
     "description": "Spread in basis points over the floating rate (e.g., 50 = 50bp = 0.5%)",
     "ref": "https://finstack_quant.dev/schemas/common/1/decimal.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/decimal.schema.json#"
+  },
+  {
+    "path": "#/$defs/d_5c13df5a55f1da604df2",
+    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/Compounding",
+    "description": "Compounding convention for interest rates.\n\nUsed to specify how interest rates should be quoted or converted.\nAll variants produce mathematically equivalent discount factors when\napplied consistently.\n\n# Relationship Between Conventions\n\nFor a given discount factor DF at time t, the rates under different\nconventions are related by:\n\n```text\nDF = e^(-r_cc × t)                    [Continuous]\n   = (1 + r_ann)^(-t)                 [Annual]\n   = (1 + r_per/n)^(-n×t)             [Periodic(n)]\n   = 1 / (1 + r_simple × t)           [Simple]\n```\n\n# Ordering of Rates\n\nFor positive rates and t > 0: `r_simple > r_annual > r_continuous`\n(less frequent compounding requires a higher quoted rate for the same DF)."
+  },
+  {
+    "path": "#/$defs/d_5c13df5a55f1da604df2/oneOf/0",
+    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/Compounding/oneOf/0",
+    "const": "continuous",
+    "description": "Continuous compounding: r = -ln(DF) / t\n\nMost common for internal calculations, curve construction, and\nquantitative finance models. Provides the simplest mathematical\nproperties (additive over time)."
+  },
+  {
+    "path": "#/$defs/d_5c13df5a55f1da604df2/oneOf/1",
+    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/Compounding/oneOf/1",
+    "const": "annual",
+    "description": "Annual compounding: r = DF^(-1/t) - 1\n\nStandard for many bond markets, particularly UK gilts and\nEuropean government bonds. Also common for Bloomberg zero rate display."
+  },
+  {
+    "path": "#/$defs/d_5c13df5a55f1da604df2/oneOf/2",
+    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/Compounding/oneOf/2",
+    "description": "Periodic compounding with n periods per year: r = n × (DF^(-1/(n×t)) - 1)\n\nCommon values:\n- n=2: Semi-annual (US Treasury, corporate bonds)\n- n=4: Quarterly (some FRNs)\n- n=12: Monthly (rare, some retail products)\n\nNote: Uses [`NonZeroU32`] to prevent division by zero at compile time."
+  },
+  {
+    "path": "#/$defs/d_5c13df5a55f1da604df2/oneOf/2/properties/periodic",
+    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/Compounding/oneOf/2/properties/periodic",
+    "format": "uint32",
+    "minimum": 1
+  },
+  {
+    "path": "#/$defs/d_5c13df5a55f1da604df2/oneOf/3",
+    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/Compounding/oneOf/3",
+    "const": "simple",
+    "description": "Simple interest (no compounding): r = (1/DF - 1) / t\n\nUsed for money market instruments with maturity < 1 year, including:\n- Interbank deposits\n- T-bills and commercial paper\n- SOFR, SONIA, €STR fixings\n\nTypically paired with ACT/360 (USD, EUR) or ACT/365F (GBP) day counts."
   },
   {
     "path": "#/$defs/d_5df6b28785697e5790b4",
@@ -1624,23 +1658,6 @@ export default [
     "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/trs_fixed_income_index.schema.json#/$defs/SimmCreditSector/oneOf/9",
     "const": "high_yield_consumer_goods",
     "description": "Bucket 10: HY / non-rated consumer goods and services."
-  },
-  {
-    "path": "#/$defs/d_60decbb57561f672980e",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/trs_fixed_income_index.schema.json#/$defs/FinancingRateCompounding",
-    "description": "Rate-compounding convention for a TRS financing leg.\n\nDistinguishes how each accrual period's floating rate is projected from the\nforward curve. The two conventions differ by the daily-compounding convexity\n— typically 12–15 bp of rate at current levels on an upward-sloping curve."
-  },
-  {
-    "path": "#/$defs/d_60decbb57561f672980e/oneOf/0",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/trs_fixed_income_index.schema.json#/$defs/FinancingRateCompounding/oneOf/0",
-    "const": "term_rate",
-    "description": "Term-rate financing (e.g. 3M Term SOFR, EURIBOR): the period rate is the\nsimple arithmetic-average forward over the accrual period. This is the\ndefault and matches a conventional term-rate-funded TRS."
-  },
-  {
-    "path": "#/$defs/d_60decbb57561f672980e/oneOf/1",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/trs_fixed_income_index.schema.json#/$defs/FinancingRateCompounding/oneOf/1",
-    "const": "overnight_compounded",
-    "description": "Overnight-indexed (OIS / RFR) financing — SOFR, SONIA, €STR, TONA: the\nperiod rate daily-compounds the overnight forward,\n`R = (∏(1 + rᵢ·dᵢ) − 1) / τ`, picking up the compounding convexity that\nthe simple arithmetic average drops."
   },
   {
     "path": "#/$defs/d_6347b87cc04573a369d9",
@@ -1885,6 +1902,102 @@ export default [
     "resolvedRef": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/trs_fixed_income_index.schema.json#/$defs/VmParameters"
   },
   {
+    "path": "#/$defs/d_73fdb35378247123d02d",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/trs_fixed_income_index.schema.json#/$defs/FiIndexTotalReturnSwap",
+    "description": "Fixed-income index total-return swap priced with a carry analytic.\n\nFor each scheduled period, the total-return leg uses\n`exp(y × accrual_fraction) - 1`, where `y` is an annual continuously\ncompounded decimal yield and the accrual fraction uses the schedule day\ncount. Both legs are discounted with `financing.discount_curve_id`; the\nfinancing leg projects `financing.forward_curve_id` plus `spread_bp`.\nReceive-total-return value is `PV(total return) - PV(financing)`;\npay-total-return value reverses that sign.\n\n# Model limitations\n\nThis deterministic carry analytic omits roll-down, underlying rate/spread\nmark-to-market, stochastic credit, constituent decomposition, early\ntermination, and bespoke fees. The period in progress on the valuation\ndate is valued from the live index level (`underlying.index_id`) against\n`initial_level`, then carried at the index yield to period end; a period\nthat has ended but is not yet paid stays in the PV at its projected carry.\nCashflow-schedule APIs\nreturn payment dates with zero amounts; use\n[`Self::pv_total_return_leg`] and [`Self::pv_financing_leg`] for projected\nleg values.\n\n# Construction\n\n```\nuse finstack_quant_core::{\n    currency::Currency, dates::DayCount, money::Money, types::InstrumentId,\n};\nuse finstack_quant_cashflows::builder::ScheduleParams;\nuse finstack_quant_valuations::instruments::{\n    Attributes, FinancingLegSpec, IndexUnderlyingParams, PayReceive,\n};\nuse finstack_quant_valuations::instruments::fixed_income::fi_trs::FiIndexTotalReturnSwap;\nuse finstack_quant_valuations::instruments::fixed_income::fi_trs::{\n    TrsScheduleSpec,\n};\nuse rust_decimal::Decimal;\nuse time::macros::date;\n\n# fn main() -> finstack_quant_core::Result<()> {\nlet trs = FiIndexTotalReturnSwap::builder()\n    .id(InstrumentId::new(\"CORP-TRS\"))\n    .notional(Money::from((10_000_000_i64, Currency::USD)))\n    .underlying(\n        IndexUnderlyingParams::new(\"US-CORP\", Currency::USD)\n            .with_yield(\"US-CORP-YIELD\")\n            .with_duration(\"US-CORP-DURATION\"),\n    )\n    .financing_leg(FinancingLegSpec::new(\n        \"USD-OIS\", \"USD-SOFR-3M\", Decimal::from(35), DayCount::Act360,\n    ))\n    .schedule(TrsScheduleSpec::from_params(\n        date!(2026 - 01 - 02),\n        date!(2027 - 01 - 02),\n        ScheduleParams::quarterly_act360(),\n    ))\n    .side(PayReceive::Receive)\n    .initial_level_opt(None)\n    .attributes(Attributes::new())\n    .build()?;\nassert_eq!(trs.notional.currency(), Currency::USD);\n# Ok(())\n# }\n```"
+  },
+  {
+    "path": "#/$defs/d_73fdb35378247123d02d/properties/attributes",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/trs_fixed_income_index.schema.json#/$defs/FiIndexTotalReturnSwap/properties/attributes",
+    "description": "Attributes for scenario selection and tagging",
+    "ref": "https://finstack_quant.dev/schemas/common/1/attributes.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/attributes.schema.json#"
+  },
+  {
+    "path": "#/$defs/d_73fdb35378247123d02d/properties/financing_leg",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/trs_fixed_income_index.schema.json#/$defs/FiIndexTotalReturnSwap/properties/financing_leg",
+    "description": "Financing leg specification (curves, spread, day count).",
+    "ref": "#/$defs/FinancingLegSpec",
+    "resolvedRef": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/trs_fixed_income_index.schema.json#/$defs/FinancingLegSpec"
+  },
+  {
+    "path": "#/$defs/d_73fdb35378247123d02d/properties/id",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/trs_fixed_income_index.schema.json#/$defs/FiIndexTotalReturnSwap/properties/id",
+    "description": "Unique instrument identifier.",
+    "ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/id.schema.json#"
+  },
+  {
+    "path": "#/$defs/d_73fdb35378247123d02d/properties/initial_level",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/trs_fixed_income_index.schema.json#/$defs/FiIndexTotalReturnSwap/properties/initial_level",
+    "description": "Index level at the reset of the return period in progress, in the\nindex's own units.\n\nRequired when the valuation date falls inside a return period; the\nrealized return to date is `index_level / initial_level`. Unused for\nunseasoned trades. Must be positive and finite when set.",
+    "format": "double"
+  },
+  {
+    "path": "#/$defs/d_73fdb35378247123d02d/properties/instrument_pricing_overrides",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/trs_fixed_income_index.schema.json#/$defs/FiIndexTotalReturnSwap/properties/instrument_pricing_overrides",
+    "description": "Instrument-owned pricing inputs.",
+    "ref": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#"
+  },
+  {
+    "path": "#/$defs/d_73fdb35378247123d02d/properties/margin_spec",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/trs_fixed_income_index.schema.json#/$defs/FiIndexTotalReturnSwap/properties/margin_spec",
+    "description": "Optional OTC margin specification for VM/IM.\n\nFixed income index TRS use duration-based margin calculations."
+  },
+  {
+    "path": "#/$defs/d_73fdb35378247123d02d/properties/margin_spec/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/trs_fixed_income_index.schema.json#/$defs/FiIndexTotalReturnSwap/properties/margin_spec/anyOf/0",
+    "ref": "#/$defs/OtcMarginSpec",
+    "resolvedRef": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/trs_fixed_income_index.schema.json#/$defs/OtcMarginSpec"
+  },
+  {
+    "path": "#/$defs/d_73fdb35378247123d02d/properties/margin_spec/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/trs_fixed_income_index.schema.json#/$defs/FiIndexTotalReturnSwap/properties/margin_spec/anyOf/1"
+  },
+  {
+    "path": "#/$defs/d_73fdb35378247123d02d/properties/metric_pricing_overrides",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/trs_fixed_income_index.schema.json#/$defs/FiIndexTotalReturnSwap/properties/metric_pricing_overrides",
+    "description": "Metric-time pricing configuration.",
+    "ref": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json#"
+  },
+  {
+    "path": "#/$defs/d_73fdb35378247123d02d/properties/notional",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/trs_fixed_income_index.schema.json#/$defs/FiIndexTotalReturnSwap/properties/notional",
+    "description": "Notional amount for the swap.",
+    "ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/money.schema.json#"
+  },
+  {
+    "path": "#/$defs/d_73fdb35378247123d02d/properties/scenario_pricing_overrides",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/trs_fixed_income_index.schema.json#/$defs/FiIndexTotalReturnSwap/properties/scenario_pricing_overrides",
+    "description": "Scenario-only pricing adjustments.",
+    "ref": "https://finstack_quant.dev/schemas/common/1/scenario_pricing_overrides.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/scenario_pricing_overrides.schema.json#"
+  },
+  {
+    "path": "#/$defs/d_73fdb35378247123d02d/properties/schedule",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/trs_fixed_income_index.schema.json#/$defs/FiIndexTotalReturnSwap/properties/schedule",
+    "description": "Schedule specification (payment dates and frequency).",
+    "ref": "#/$defs/TrsScheduleSpec",
+    "resolvedRef": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/trs_fixed_income_index.schema.json#/$defs/TrsScheduleSpec"
+  },
+  {
+    "path": "#/$defs/d_73fdb35378247123d02d/properties/side",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/trs_fixed_income_index.schema.json#/$defs/FiIndexTotalReturnSwap/properties/side",
+    "description": "Trade side: `receive` receives the total-return leg and pays financing;\n`pay` pays the total return and receives financing.",
+    "ref": "#/$defs/PayReceive",
+    "resolvedRef": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/trs_fixed_income_index.schema.json#/$defs/PayReceive"
+  },
+  {
+    "path": "#/$defs/d_73fdb35378247123d02d/properties/underlying",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/trs_fixed_income_index.schema.json#/$defs/FiIndexTotalReturnSwap/properties/underlying",
+    "description": "Underlying index parameters (index ID, yield, duration, base currency).",
+    "ref": "#/$defs/IndexUnderlyingParams",
+    "resolvedRef": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/trs_fixed_income_index.schema.json#/$defs/IndexUnderlyingParams"
+  },
+  {
     "path": "#/$defs/d_780b68ee5d41351b65ca",
     "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/MertonBarrierType",
     "description": "Barrier monitoring type for default determination."
@@ -2039,6 +2152,23 @@ export default [
     "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/OptimalToggle/properties/risk_free_rate",
     "description": "Risk-free rate (continuous) used as drift in the nested simulation.",
     "format": "double"
+  },
+  {
+    "path": "#/$defs/d_948cdc4db846a21357a4",
+    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/ShortRateTreeModel",
+    "description": "Short-rate lattice used by the rates-only bond tree.\n\nSelected by `instrument_pricing_overrides.model_config.tree_model`; when the\nfield is absent the bond tree uses Hull-White."
+  },
+  {
+    "path": "#/$defs/d_948cdc4db846a21357a4/oneOf/0",
+    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/ShortRateTreeModel/oneOf/0",
+    "const": "hull_white",
+    "description": "Hull-White one-factor (normal short rate) with `(κ, σ)` from\n`model_config.hw1f_mean_reversion` / `model_config.hw1f_sigma` or the\npre-fitted market scalars."
+  },
+  {
+    "path": "#/$defs/d_948cdc4db846a21357a4/oneOf/1",
+    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/ShortRateTreeModel/oneOf/1",
+    "const": "black_derman_toy",
+    "description": "Black-Derman-Toy (lognormal short rate) with volatility\n`model_config.bdt_sigma`."
   },
   {
     "path": "#/$defs/d_94cb251104de5cf587b6",
@@ -3223,7 +3353,7 @@ export default [
   {
     "path": "#/$defs/d_b0a5fc543381da6a5722/properties/cds_quote_bp",
     "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/MarketQuoteOverrides/properties/cds_quote_bp",
-    "description": "CreditDefaultSwap clean par-spread quote in basis points.\n\nUsed only by CreditDefaultSwap risk replay, where it replaces the\nmatching contractual hazard-curve pillar. It does not drive PV, and no\nother instrument (CDSIndex included) reads it.",
+    "description": "CreditDefaultSwap clean par-spread quote in basis points.\n\nUsed only by CreditDefaultSwap risk replay, where it replaces the\nmatching contractual hazard-curve pillar. It does not drive PV, and no\nother instrument (CdsIndex included) reads it.",
     "format": "double"
   },
   {
@@ -5416,102 +5546,6 @@ export default [
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/ModelConfig"
   },
   {
-    "path": "#/$defs/d_cb8c39a490fd5e64f385",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/trs_fixed_income_index.schema.json#/$defs/FIIndexTotalReturnSwap",
-    "description": "Fixed-income index total-return swap priced with a carry analytic.\n\nFor each scheduled period, the total-return leg uses\n`exp(y × accrual_fraction) - 1`, where `y` is an annual continuously\ncompounded decimal yield and the accrual fraction uses the schedule day\ncount. Both legs are discounted with `financing.discount_curve_id`; the\nfinancing leg projects `financing.forward_curve_id` plus `spread_bp`.\nReceive-total-return value is `PV(total return) - PV(financing)`;\npay-total-return value reverses that sign.\n\n# Model limitations\n\nThis deterministic carry analytic omits roll-down, underlying rate/spread\nmark-to-market, stochastic credit, constituent decomposition, early\ntermination, and bespoke fees. The period in progress on the valuation\ndate is valued from the live index level (`underlying.index_id`) against\n`initial_level`, then carried at the index yield to period end; a period\nthat has ended but is not yet paid stays in the PV at its projected carry.\nCashflow-schedule APIs\nreturn payment dates with zero amounts; use\n[`Self::pv_total_return_leg`] and [`Self::pv_financing_leg`] for projected\nleg values.\n\n# Construction\n\n```\nuse finstack_quant_core::{\n    currency::Currency, dates::DayCount, money::Money, types::InstrumentId,\n};\nuse finstack_quant_cashflows::builder::ScheduleParams;\nuse finstack_quant_valuations::instruments::{\n    Attributes, FinancingLegSpec, IndexUnderlyingParams,\n};\nuse finstack_quant_valuations::instruments::fixed_income::fi_trs::FIIndexTotalReturnSwap;\nuse finstack_quant_valuations::instruments::fixed_income::fi_trs::{\n    TrsScheduleSpec, TrsSide,\n};\nuse rust_decimal::Decimal;\nuse time::macros::date;\n\n# fn main() -> finstack_quant_core::Result<()> {\nlet trs = FIIndexTotalReturnSwap::builder()\n    .id(InstrumentId::new(\"CORP-TRS\"))\n    .notional(Money::from((10_000_000_i64, Currency::USD)))\n    .underlying(\n        IndexUnderlyingParams::new(\"US-CORP\", Currency::USD)\n            .with_yield(\"US-CORP-YIELD\")\n            .with_duration(\"US-CORP-DURATION\"),\n    )\n    .financing(FinancingLegSpec::new(\n        \"USD-OIS\", \"USD-SOFR-3M\", Decimal::from(35), DayCount::Act360,\n    ))\n    .schedule(TrsScheduleSpec::from_params(\n        date!(2026 - 01 - 02),\n        date!(2027 - 01 - 02),\n        ScheduleParams::quarterly_act360(),\n    ))\n    .side(TrsSide::ReceiveTotalReturn)\n    .initial_level_opt(None)\n    .attributes(Attributes::new())\n    .build()?;\nassert_eq!(trs.notional.currency(), Currency::USD);\n# Ok(())\n# }\n```"
-  },
-  {
-    "path": "#/$defs/d_cb8c39a490fd5e64f385/properties/attributes",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/trs_fixed_income_index.schema.json#/$defs/FIIndexTotalReturnSwap/properties/attributes",
-    "description": "Attributes for scenario selection and tagging",
-    "ref": "https://finstack_quant.dev/schemas/common/1/attributes.schema.json",
-    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/attributes.schema.json#"
-  },
-  {
-    "path": "#/$defs/d_cb8c39a490fd5e64f385/properties/financing",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/trs_fixed_income_index.schema.json#/$defs/FIIndexTotalReturnSwap/properties/financing",
-    "description": "Financing leg specification (curves, spread, day count).",
-    "ref": "#/$defs/FinancingLegSpec",
-    "resolvedRef": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/trs_fixed_income_index.schema.json#/$defs/FinancingLegSpec"
-  },
-  {
-    "path": "#/$defs/d_cb8c39a490fd5e64f385/properties/id",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/trs_fixed_income_index.schema.json#/$defs/FIIndexTotalReturnSwap/properties/id",
-    "description": "Unique instrument identifier.",
-    "ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
-    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/id.schema.json#"
-  },
-  {
-    "path": "#/$defs/d_cb8c39a490fd5e64f385/properties/initial_level",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/trs_fixed_income_index.schema.json#/$defs/FIIndexTotalReturnSwap/properties/initial_level",
-    "description": "Index level at the reset of the return period in progress, in the\nindex's own units.\n\nRequired when the valuation date falls inside a return period; the\nrealized return to date is `index_level / initial_level`. Unused for\nunseasoned trades. Must be positive and finite when set.",
-    "format": "double"
-  },
-  {
-    "path": "#/$defs/d_cb8c39a490fd5e64f385/properties/instrument_pricing_overrides",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/trs_fixed_income_index.schema.json#/$defs/FIIndexTotalReturnSwap/properties/instrument_pricing_overrides",
-    "description": "Instrument-owned pricing inputs.",
-    "ref": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json",
-    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#"
-  },
-  {
-    "path": "#/$defs/d_cb8c39a490fd5e64f385/properties/margin_spec",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/trs_fixed_income_index.schema.json#/$defs/FIIndexTotalReturnSwap/properties/margin_spec",
-    "description": "Optional OTC margin specification for VM/IM.\n\nFixed income index TRS use duration-based margin calculations."
-  },
-  {
-    "path": "#/$defs/d_cb8c39a490fd5e64f385/properties/margin_spec/anyOf/0",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/trs_fixed_income_index.schema.json#/$defs/FIIndexTotalReturnSwap/properties/margin_spec/anyOf/0",
-    "ref": "#/$defs/OtcMarginSpec",
-    "resolvedRef": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/trs_fixed_income_index.schema.json#/$defs/OtcMarginSpec"
-  },
-  {
-    "path": "#/$defs/d_cb8c39a490fd5e64f385/properties/margin_spec/anyOf/1",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/trs_fixed_income_index.schema.json#/$defs/FIIndexTotalReturnSwap/properties/margin_spec/anyOf/1"
-  },
-  {
-    "path": "#/$defs/d_cb8c39a490fd5e64f385/properties/metric_pricing_overrides",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/trs_fixed_income_index.schema.json#/$defs/FIIndexTotalReturnSwap/properties/metric_pricing_overrides",
-    "description": "Metric-time pricing configuration.",
-    "ref": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json",
-    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json#"
-  },
-  {
-    "path": "#/$defs/d_cb8c39a490fd5e64f385/properties/notional",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/trs_fixed_income_index.schema.json#/$defs/FIIndexTotalReturnSwap/properties/notional",
-    "description": "Notional amount for the swap.",
-    "ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
-    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/money.schema.json#"
-  },
-  {
-    "path": "#/$defs/d_cb8c39a490fd5e64f385/properties/scenario_pricing_overrides",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/trs_fixed_income_index.schema.json#/$defs/FIIndexTotalReturnSwap/properties/scenario_pricing_overrides",
-    "description": "Scenario-only pricing adjustments.",
-    "ref": "https://finstack_quant.dev/schemas/common/1/scenario_pricing_overrides.schema.json",
-    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/scenario_pricing_overrides.schema.json#"
-  },
-  {
-    "path": "#/$defs/d_cb8c39a490fd5e64f385/properties/schedule",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/trs_fixed_income_index.schema.json#/$defs/FIIndexTotalReturnSwap/properties/schedule",
-    "description": "Schedule specification (payment dates and frequency).",
-    "ref": "#/$defs/TrsScheduleSpec",
-    "resolvedRef": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/trs_fixed_income_index.schema.json#/$defs/TrsScheduleSpec"
-  },
-  {
-    "path": "#/$defs/d_cb8c39a490fd5e64f385/properties/side",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/trs_fixed_income_index.schema.json#/$defs/FIIndexTotalReturnSwap/properties/side",
-    "description": "Trade side (receive/pay total return).",
-    "ref": "#/$defs/TrsSide",
-    "resolvedRef": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/trs_fixed_income_index.schema.json#/$defs/TrsSide"
-  },
-  {
-    "path": "#/$defs/d_cb8c39a490fd5e64f385/properties/underlying",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/trs_fixed_income_index.schema.json#/$defs/FIIndexTotalReturnSwap/properties/underlying",
-    "description": "Underlying index parameters (index ID, yield, duration, base currency).",
-    "ref": "#/$defs/IndexUnderlyingParams",
-    "resolvedRef": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/trs_fixed_income_index.schema.json#/$defs/IndexUnderlyingParams"
-  },
-  {
     "path": "#/$defs/d_cc8ed166abbb10ad4451",
     "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/EndogenousHazardSpec",
     "description": "Specification for endogenous (leverage-dependent) hazard rate.\n\nModels the relationship between a firm's leverage and its instantaneous\nhazard rate, enabling a feedback loop where PIK accrual increases the\nnotional (and hence leverage), which drives the hazard rate higher."
@@ -5779,23 +5813,6 @@ export default [
     "description": "Years (Y)"
   },
   {
-    "path": "#/$defs/d_ec89adc17436f33de839",
-    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/VolatilityModel",
-    "description": "Volatility model for option pricing."
-  },
-  {
-    "path": "#/$defs/d_ec89adc17436f33de839/oneOf/0",
-    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/VolatilityModel/oneOf/0",
-    "const": "black",
-    "description": "Black (lognormal)."
-  },
-  {
-    "path": "#/$defs/d_ec89adc17436f33de839/oneOf/1",
-    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/VolatilityModel/oneOf/1",
-    "const": "normal",
-    "description": "Bachelier / normal model."
-  },
-  {
     "path": "#/$defs/d_ed218c734e46de57eeb9",
     "source": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json#/$defs/BreakevenMode",
     "description": "Linear (first-order) or iterative (full-reprice root-find) solve mode.\n\n# Why the two modes disagree\n\nThe gap between them is usually **not** dominated by convexity. `Linear`\ndivides by the sensitivity measured at `as_of`, whereas `Iterative`\nreprices at the horizon date, where the instrument has less remaining time\nand therefore a different sensitivity. On a 5Y bond over a 6M horizon the\ntwo differ by several percent even though convexity over the ~9bp solved\nshift contributes only a fraction of that. The gap grows with horizon\nlength, not just with curvature.\n\n`Iterative` is the more accurate answer where it is supported; `Linear` is\nthe fast approximation and the default."
@@ -5862,23 +5879,6 @@ export default [
     "format": "double"
   },
   {
-    "path": "#/$defs/d_f12526cbf56d3897db83",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/trs_fixed_income_index.schema.json#/$defs/TrsSide",
-    "description": "Side of the TRS trade from the party's perspective.\n\nDetermines whether the party receives or pays the total return leg.\n\n# Examples\n\n```\nuse finstack_quant_valuations::instruments::TrsSide;\n\nlet side = TrsSide::ReceiveTotalReturn;\nassert_eq!(side.sign(), 1.0);\n\nlet side = TrsSide::PayTotalReturn;\nassert_eq!(side.sign(), -1.0);\n```"
-  },
-  {
-    "path": "#/$defs/d_f12526cbf56d3897db83/oneOf/0",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/trs_fixed_income_index.schema.json#/$defs/TrsSide/oneOf/0",
-    "const": "receive_total_return",
-    "description": "Receive total return, pay financing."
-  },
-  {
-    "path": "#/$defs/d_f12526cbf56d3897db83/oneOf/1",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/trs_fixed_income_index.schema.json#/$defs/TrsSide/oneOf/1",
-    "const": "pay_total_return",
-    "description": "Pay total return, receive financing."
-  },
-  {
     "path": "#/$defs/d_f80c8a31d359e1cb5dd4",
     "source": "https://finstack_quant.dev/schemas/common/1/scenario_pricing_overrides.schema.json#",
     "description": "Scenario-only price and spread shocks.",
@@ -5935,6 +5935,74 @@ export default [
     "source": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json#/$defs/BondRiskBasis/oneOf/1",
     "const": "callable_oas",
     "description": "Use callable/putable option model repricing under the bond's OAS/tree configuration."
+  },
+  {
+    "path": "#/$defs/d_fe5ed9f19e4d56cdef5d",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/trs_fixed_income_index.schema.json#/$defs/FloatingLegCompounding",
+    "description": "How the fixings of one accrual period combine into the period rate.\n\nOne canonical enum for every floating leg and coupon: swaps, basis and\ncross-currency legs, TRS financing, IR futures, FRN / loan / structured\ncredit coupons.\n\n| Variant | Period rate | Typical use |\n|---------|-------------|-------------|\n| `simple` | One term fixing / forward over the period | EURIBOR, Term SOFR, legacy IBOR |\n| `simple_average` | `(Σ rᵢ·dᵢ) / D` of daily overnight fixings | Averaged overnight loans, Fed-Funds futures |\n| `compounded_in_arrears` | `[∏(1 + rᵢ·dᵢ/B) − 1]·B/D` | SOFR / SONIA / €STR / TONA OIS (lookback 0) |\n| `compounded_with_observation_shift` | as above, observations and weights shifted | ISDA 2021 observation shift |\n| `compounded_with_rate_cutoff` | as above, last fixings frozen | ARRC lockout / SWPM \"Rate Cut-Off Days\" |\n\nDay counts are business days and must be non-negative.\n\n# References\n\n- ISDA 2021 Definitions, compounded RFR conventions `docs/REFERENCES.md#isda-2021-definitions`\n- ARRC (2020). \"SOFR: A User's Guide.\" `docs/REFERENCES.md#arrc-sofr-users-guide`\n- BoE SONIA conventions `docs/REFERENCES.md#boe-sonia-key-features`\n\n# Examples\n\n```\nuse finstack_quant_cashflows::builder::FloatingLegCompounding;\n\nassert_eq!(FloatingLegCompounding::default(), FloatingLegCompounding::Simple);\nassert_eq!(\n    FloatingLegCompounding::sofr(),\n    FloatingLegCompounding::CompoundedInArrears { lookback_days: 0 }\n);\n```"
+  },
+  {
+    "path": "#/$defs/d_fe5ed9f19e4d56cdef5d/oneOf/0",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/trs_fixed_income_index.schema.json#/$defs/FloatingLegCompounding/oneOf/0",
+    "const": "simple",
+    "description": "Simple term-rate projection: one fixing or forward over the period.\n\n`Coupon = Notional × (Forward_Rate + Spread) × DCF`. This is the\ndefault; a registered overnight RFR index rejects it."
+  },
+  {
+    "path": "#/$defs/d_fe5ed9f19e4d56cdef5d/oneOf/1",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/trs_fixed_income_index.schema.json#/$defs/FloatingLegCompounding/oneOf/1",
+    "const": "simple_average",
+    "description": "Arithmetic average of daily overnight fixings weighted by accrual days,\n`Rate = (Σ rᵢ·dᵢ) / D`, for instruments that contractually specify a\nsimple-average overnight index."
+  },
+  {
+    "path": "#/$defs/d_fe5ed9f19e4d56cdef5d/oneOf/2",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/trs_fixed_income_index.schema.json#/$defs/FloatingLegCompounding/oneOf/2",
+    "description": "Compounded in arrears (overnight RFR rates).\n\n`Coupon = Notional × [∏(1 + rᵢ·dᵢ/B) − 1]` over the daily observations\nof the accrual period."
+  },
+  {
+    "path": "#/$defs/d_fe5ed9f19e4d56cdef5d/oneOf/2/properties/compounded_in_arrears",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/trs_fixed_income_index.schema.json#/$defs/FloatingLegCompounding/oneOf/2/properties/compounded_in_arrears"
+  },
+  {
+    "path": "#/$defs/d_fe5ed9f19e4d56cdef5d/oneOf/2/properties/compounded_in_arrears/properties/lookback_days",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/trs_fixed_income_index.schema.json#/$defs/FloatingLegCompounding/oneOf/2/properties/compounded_in_arrears/properties/lookback_days",
+    "description": "Business days by which observation dates move backward while the\nday-count weights stay on the original accrual dates (\"lookback\nwithout observation shift\", ISDA 2021 / ARRC). `0` is plain\nin-arrears, the cleared-OIS convention.",
+    "format": "uint32",
+    "maximum": 31,
+    "minimum": 0
+  },
+  {
+    "path": "#/$defs/d_fe5ed9f19e4d56cdef5d/oneOf/3",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/trs_fixed_income_index.schema.json#/$defs/FloatingLegCompounding/oneOf/3",
+    "description": "Compounded in arrears with ISDA 2021 observation shift: both the\nobservation dates and their day-count weights move back\n(ISDA 2021 Definitions Section 4.5(c))."
+  },
+  {
+    "path": "#/$defs/d_fe5ed9f19e4d56cdef5d/oneOf/3/properties/compounded_with_observation_shift",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/trs_fixed_income_index.schema.json#/$defs/FloatingLegCompounding/oneOf/3/properties/compounded_with_observation_shift"
+  },
+  {
+    "path": "#/$defs/d_fe5ed9f19e4d56cdef5d/oneOf/3/properties/compounded_with_observation_shift/properties/shift_days",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/trs_fixed_income_index.schema.json#/$defs/FloatingLegCompounding/oneOf/3/properties/compounded_with_observation_shift/properties/shift_days",
+    "description": "Business days to shift both observation dates and weights.",
+    "format": "uint32",
+    "maximum": 31,
+    "minimum": 0
+  },
+  {
+    "path": "#/$defs/d_fe5ed9f19e4d56cdef5d/oneOf/4",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/trs_fixed_income_index.schema.json#/$defs/FloatingLegCompounding/oneOf/4",
+    "description": "Compounded in arrears with a rate cut-off near the period end.\n\nThe last `cutoff_days` business-day observations are frozen at the\nfixing immediately preceding them: for fixings `b_1..b_n` the source is\n`b_{n-cutoff}`, so a positive cut-off must leave a preceding fixing.\nReference: ARRC, December 3, 2021 Statement, Appendix A (\"Lockout\")."
+  },
+  {
+    "path": "#/$defs/d_fe5ed9f19e4d56cdef5d/oneOf/4/properties/compounded_with_rate_cutoff",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/trs_fixed_income_index.schema.json#/$defs/FloatingLegCompounding/oneOf/4/properties/compounded_with_rate_cutoff"
+  },
+  {
+    "path": "#/$defs/d_fe5ed9f19e4d56cdef5d/oneOf/4/properties/compounded_with_rate_cutoff/properties/cutoff_days",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/trs_fixed_income_index.schema.json#/$defs/FloatingLegCompounding/oneOf/4/properties/compounded_with_rate_cutoff/properties/cutoff_days",
+    "description": "Business days before period end over which the rate is frozen.",
+    "format": "uint32",
+    "maximum": 31,
+    "minimum": 0
   },
   {
     "path": "#/properties/instrument",

@@ -114,6 +114,71 @@ export type DayCount1 =
  */
 export type Decimal5 = string;
 /**
+ * How the fixings of one accrual period combine into the period rate.
+ *
+ * One canonical enum for every floating leg and coupon: swaps, basis and
+ * cross-currency legs, TRS financing, IR futures, FRN / loan / structured
+ * credit coupons.
+ *
+ * | Variant | Period rate | Typical use |
+ * |---------|-------------|-------------|
+ * | `simple` | One term fixing / forward over the period | EURIBOR, Term SOFR, legacy IBOR |
+ * | `simple_average` | `(Σ rᵢ·dᵢ) / D` of daily overnight fixings | Averaged overnight loans, Fed-Funds futures |
+ * | `compounded_in_arrears` | `[∏(1 + rᵢ·dᵢ/B) − 1]·B/D` | SOFR / SONIA / €STR / TONA OIS (lookback 0) |
+ * | `compounded_with_observation_shift` | as above, observations and weights shifted | ISDA 2021 observation shift |
+ * | `compounded_with_rate_cutoff` | as above, last fixings frozen | ARRC lockout / SWPM "Rate Cut-Off Days" |
+ *
+ * Day counts are business days and must be non-negative.
+ *
+ * # References
+ *
+ * - ISDA 2021 Definitions, compounded RFR conventions `docs/REFERENCES.md#isda-2021-definitions`
+ * - ARRC (2020). "SOFR: A User's Guide." `docs/REFERENCES.md#arrc-sofr-users-guide`
+ * - BoE SONIA conventions `docs/REFERENCES.md#boe-sonia-key-features`
+ *
+ * # Examples
+ *
+ * ```
+ * use finstack_quant_cashflows::builder::FloatingLegCompounding;
+ *
+ * assert_eq!(FloatingLegCompounding::default(), FloatingLegCompounding::Simple);
+ * assert_eq!(
+ *     FloatingLegCompounding::sofr(),
+ *     FloatingLegCompounding::CompoundedInArrears { lookback_days: 0 }
+ * );
+ * ```
+ */
+export type D_21Bc542D2146358A7021 =
+  | "simple"
+  | "simple_average"
+  | {
+      compounded_in_arrears: {
+        /**
+         * Business days by which observation dates move backward while the
+         * day-count weights stay on the original accrual dates ("lookback
+         * without observation shift", ISDA 2021 / ARRC). `0` is plain
+         * in-arrears, the cleared-OIS convention.
+         */
+        lookback_days: number;
+      };
+    }
+  | {
+      compounded_with_observation_shift: {
+        /**
+         * Business days to shift both observation dates and weights.
+         */
+        shift_days: number;
+      };
+    }
+  | {
+      compounded_with_rate_cutoff: {
+        /**
+         * Business days before period end over which the rate is frozen.
+         */
+        cutoff_days: number;
+      };
+    };
+/**
  * Opaque string identifier.
  */
 export type Id3 = string;
@@ -142,56 +207,6 @@ export type DayCount2 =
   | "act_act_isma"
   | "act_act_afb"
   | "bus_252";
-/**
- * Compounding method for overnight rate indices (SOFR, ESTR, SONIA).
- *
- * Controls how daily overnight fixings are aggregated into a period rate
- * for floating rate coupons. The choice of compounding method affects both
- * the accrued amount and the payment timing/certainty.
- *
- * # Market Conventions
- *
- * | Index | Standard Method | Lookback | Reference |
- * |-------|----------------|----------|-----------|
- * | USD SOFR | CompoundedInArrears | 2 BD | ISDA 2021 |
- * | EUR €STR | CompoundedWithObservationShift | 2 BD | ECB |
- * | GBP SONIA | CompoundedWithObservationShift | 5 BD | BoE |
- * | JPY TONA | CompoundedInArrears | 2 BD | BoJ |
- *
- * # Reference
- *
- * - ISDA (2021). "IBOR Fallbacks Supplement." Section 7.
- * - ARRC (2020). "SOFR: A User's Guide." Federal Reserve Bank of New York. `docs/REFERENCES.md#arrc-sofr-users-guide`
- * - `docs/REFERENCES.md#andersen-piterbarg-interest-rate-modeling`
- * - `docs/REFERENCES.md#isda-2006-definitions`
- */
-export type D_5A59De6972B72Fed4E2E =
-  | "simple_average"
-  | "compounded_in_arrears"
-  | {
-      compounded_with_lookback: {
-        /**
-         * Number of business days to look back for rate observations.
-         */
-        lookback_days: number;
-      };
-    }
-  | {
-      compounded_with_lockout: {
-        /**
-         * Number of business days before period end to freeze the rate.
-         */
-        lockout_days: number;
-      };
-    }
-  | {
-      compounded_with_observation_shift: {
-        /**
-         * Number of business days to shift observations.
-         */
-        shift_days: number;
-      };
-    };
 /**
  * Exact decimal encoded as a JSON string.
  */
@@ -457,9 +472,12 @@ export type D_2701Caf4934336A2Dd86 =
  */
 export type D_02A11B30Ee627630F221 = "per_name" | "large_homogeneous";
 /**
- * Volatility model for option pricing.
+ * Short-rate lattice used by the rates-only bond tree.
+ *
+ * Selected by `instrument_pricing_overrides.model_config.tree_model`; when the
+ * field is absent the bond tree uses Hull-White.
  */
-export type DEc89Adc17436F33De839 = "black" | "normal";
+export type D_948Cdc4Db846A21357A4 = "hull_white" | "black_derman_toy";
 /**
  * ISO 8601 calendar date string.
  */
@@ -1102,6 +1120,16 @@ export interface DAfaff9B4B34177Ac633E {
    */
   all_in_floor_bp?: Decimal5 | null;
   /**
+   * How each accrual period's fixings combine into the period rate.
+   *
+   * An overnight variant (anything but `simple`) computes the period rate
+   * from daily overnight fixings. `simple` projects one term forward over
+   * the period. `None` leaves the choice to the instrument: pricers that
+   * know the index resolve it from the rate-index convention registry, and
+   * the bare cashflow builder treats it as `simple`.
+   */
+  compounding?: D_21Bc542D2146358A7021 | null;
+  /**
    * Policy when forward curve lookup fails during emission.
    *
    * Defaults to `Error`, which surfaces curve lookup failures.
@@ -1159,23 +1187,13 @@ export interface DAfaff9B4B34177Ac633E {
    * overnight fixings (e.g., 360 for SOFR/€STR/TONA, 365 for SONIA).
    * It is independent of the leg's accrual day count when set explicitly.
    *
-   * When `None` and `overnight_compounding` is set, the coupon
+   * When `None` and `compounding` is an overnight variant, the coupon
    * `schedule.day_count` is used if it is `Act360` or `Act365F`. Other
    * coupon day counts (for example `Thirty360`) error unless an explicit
    * `Act360` or `Act365F` basis is supplied. Ignored when
-   * `overnight_compounding` is `None`.
+   * `compounding` is not an overnight variant.
    */
   overnight_basis?: DayCount2 | null;
-  /**
-   * Overnight compounding method for overnight rate indices (SOFR, ESTR, SONIA).
-   *
-   * When set to `Some(method)`, the rate for each accrual period is computed
-   * by compounding daily overnight fixings according to the specified method,
-   * rather than looking up a single forward rate for the period.
-   *
-   * Leave as `None` for term rates (e.g., 3M EURIBOR, 6M LIBOR).
-   */
-  overnight_compounding?: D_5A59De6972B72Fed4E2E | null;
   /**
    * Index floor/cap application policy for overnight-compounded coupons.
    */
@@ -2288,7 +2306,7 @@ export interface DB0A5Fc543381Da6A5722 {
    *
    * Used only by CreditDefaultSwap risk replay, where it replaces the
    * matching contractual hazard-curve pillar. It does not drive PV, and no
-   * other instrument (CDSIndex included) reads it.
+   * other instrument (CdsIndex included) reads it.
    */
   cds_quote_bp?: number | null;
   /**
@@ -2367,7 +2385,7 @@ export interface D_572Ad1Befb7D94914652 {
    * Black-Derman-Toy lognormal short-rate volatility (σ), as an annual
    * decimal proportion of the short rate (`0.20` = 20%).
    *
-   * Read only by the rates-only bond tree when `vol_model = black` selects
+   * Read only by the rates-only bond tree when `tree_model = black_derman_toy` selects
    * BDT for a bond with embedded exercise rights, where it is required.
    * It is a relative (lognormal) volatility, unlike the absolute
    * [`Self::hw1f_sigma`]; typical values are 0.10–0.40. The BDT lattice has
@@ -2537,7 +2555,13 @@ export interface D_572Ad1Befb7D94914652 {
   /**
    * Quote compounding convention for OAS inputs and outputs.
    */
-  oas_quote_compounding?: "continuous" | "semi_annual";
+  oas_quote_compounding?:
+    | "continuous"
+    | "annual"
+    | {
+        periodic: number;
+      }
+    | "simple";
   /**
    * Instantaneous correlation between the short-rate and hazard-rate
    * shocks on the rates-credit lattice, in `[-1, 1]`.
@@ -2571,15 +2595,14 @@ export interface D_572Ad1Befb7D94914652 {
    */
   tree_discount_curve_id?: D_94Cb251104De5Cf587B6 | null;
   /**
+   * Short-rate lattice for the rates-only bond tree (`hull_white` or
+   * `black_derman_toy`). `None` selects Hull-White.
+   */
+  tree_model?: D_948Cdc4Db846A21357A4 | null;
+  /**
    * Number of time steps for tree-based pricing (e.g., 100)
    */
   tree_steps?: number | null;
-  /**
-   * Volatility model choice for option pricing.
-   *
-   * When set, overrides the default Black (lognormal) model.
-   */
-  vol_model?: DEc89Adc17436F33De839 | null;
   /**
    * Volatility surface extrapolation policy when `implied_volatility` is not set.
    */
@@ -2603,7 +2626,7 @@ export interface DCdb8Fddc0106047270C4 {
  */
 export interface DBffef9E684Ff0C351C83 {
   /**
-   * Barrier-crossing policy used for `BarrierType::FirstPassage`.
+   * Barrier-crossing policy used for `MertonBarrierType::FirstPassage`.
    *
    * Default: `BrownianBridge` when the Merton model uses `FirstPassage`,
    * otherwise `Discrete`.

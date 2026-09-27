@@ -19,7 +19,7 @@ export default [
               "currency": "USD"
             },
             "num_constituents": 125,
-            "premium": {
+            "premium_leg": {
               "business_day_convention": "modified_following",
               "calendar_id": "nyse",
               "coupon_bp": "60",
@@ -35,7 +35,7 @@ export default [
               "stub": "short_front"
             },
             "pricing": "single_curve",
-            "protection": {
+            "protection_leg": {
               "credit_curve_id": "CDX.NA.IG.HAZARD",
               "recovery_rate": 0.4,
               "settlement_delay": 3
@@ -213,23 +213,6 @@ export default [
     "description": "Apply the closed-form LHP conditional default probability uniformly to\nevery name. This is the `N → ∞` limit of [`Self::PerName`] — an\nacceptable, faster approximation only for genuinely granular pools."
   },
   {
-    "path": "#/$defs/d_055066044802b6e94af1",
-    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/OasQuoteCompounding",
-    "description": "Quote convention used when reporting or consuming OAS values."
-  },
-  {
-    "path": "#/$defs/d_055066044802b6e94af1/oneOf/0",
-    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/OasQuoteCompounding/oneOf/0",
-    "const": "continuous",
-    "description": "Continuous additive spread, matching the tree's internal short-rate shift."
-  },
-  {
-    "path": "#/$defs/d_055066044802b6e94af1/oneOf/1",
-    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/OasQuoteCompounding/oneOf/1",
-    "const": "semi_annual",
-    "description": "Semiannual bond-equivalent OAS quote."
-  },
-  {
     "path": "#/$defs/d_10a2b628165f3f3e10e7",
     "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/MertonMcConfig",
     "description": "Configuration for Monte Carlo PIK bond pricing."
@@ -237,7 +220,7 @@ export default [
   {
     "path": "#/$defs/d_10a2b628165f3f3e10e7/properties/barrier_crossing",
     "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/MertonMcConfig/properties/barrier_crossing",
-    "description": "Barrier-crossing policy used for `BarrierType::FirstPassage`.\n\nDefault: `BrownianBridge` when the Merton model uses `FirstPassage`,\notherwise `Discrete`.",
+    "description": "Barrier-crossing policy used for `MertonBarrierType::FirstPassage`.\n\nDefault: `BrownianBridge` when the Merton model uses `FirstPassage`,\notherwise `Discrete`.",
     "ref": "#/$defs/BarrierCrossing",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/BarrierCrossing"
   },
@@ -1098,7 +1081,7 @@ export default [
   {
     "path": "#/$defs/d_572ad1befb7d94914652/properties/bdt_sigma",
     "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/ModelConfig/properties/bdt_sigma",
-    "description": "Black-Derman-Toy lognormal short-rate volatility (σ), as an annual\ndecimal proportion of the short rate (`0.20` = 20%).\n\nRead only by the rates-only bond tree when `vol_model = black` selects\nBDT for a bond with embedded exercise rights, where it is required.\nIt is a relative (lognormal) volatility, unlike the absolute\n[`Self::hw1f_sigma`]; typical values are 0.10–0.40. The BDT lattice has\nno mean reversion. Must be finite and non-negative; `0.0` prices on the\ndeterministic curve.",
+    "description": "Black-Derman-Toy lognormal short-rate volatility (σ), as an annual\ndecimal proportion of the short rate (`0.20` = 20%).\n\nRead only by the rates-only bond tree when `tree_model = black_derman_toy` selects\nBDT for a bond with embedded exercise rights, where it is required.\nIt is a relative (lognormal) volatility, unlike the absolute\n[`Self::hw1f_sigma`]; typical values are 0.10–0.40. The BDT lattice has\nno mean reversion. Must be finite and non-negative; `0.0` prices on the\ndeterministic curve.",
     "format": "double"
   },
   {
@@ -1204,8 +1187,8 @@ export default [
     "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/ModelConfig/properties/oas_quote_compounding",
     "default": "continuous",
     "description": "Quote compounding convention for OAS inputs and outputs.",
-    "ref": "#/$defs/OasQuoteCompounding",
-    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/OasQuoteCompounding"
+    "ref": "#/$defs/Compounding",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/Compounding"
   },
   {
     "path": "#/$defs/d_572ad1befb7d94914652/properties/rate_credit_correlation",
@@ -1244,6 +1227,21 @@ export default [
     "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/ModelConfig/properties/tree_discount_curve_id/anyOf/1"
   },
   {
+    "path": "#/$defs/d_572ad1befb7d94914652/properties/tree_model",
+    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/ModelConfig/properties/tree_model",
+    "description": "Short-rate lattice for the rates-only bond tree (`hull_white` or\n`black_derman_toy`). `None` selects Hull-White."
+  },
+  {
+    "path": "#/$defs/d_572ad1befb7d94914652/properties/tree_model/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/ModelConfig/properties/tree_model/anyOf/0",
+    "ref": "#/$defs/ShortRateTreeModel",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/ShortRateTreeModel"
+  },
+  {
+    "path": "#/$defs/d_572ad1befb7d94914652/properties/tree_model/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/ModelConfig/properties/tree_model/anyOf/1"
+  },
+  {
     "path": "#/$defs/d_572ad1befb7d94914652/properties/tree_steps",
     "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/ModelConfig/properties/tree_steps",
     "default": null,
@@ -1252,27 +1250,46 @@ export default [
     "minimum": 0
   },
   {
-    "path": "#/$defs/d_572ad1befb7d94914652/properties/vol_model",
-    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/ModelConfig/properties/vol_model",
-    "description": "Volatility model choice for option pricing.\n\nWhen set, overrides the default Black (lognormal) model."
-  },
-  {
-    "path": "#/$defs/d_572ad1befb7d94914652/properties/vol_model/anyOf/0",
-    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/ModelConfig/properties/vol_model/anyOf/0",
-    "ref": "#/$defs/VolatilityModel",
-    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/VolatilityModel"
-  },
-  {
-    "path": "#/$defs/d_572ad1befb7d94914652/properties/vol_model/anyOf/1",
-    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/ModelConfig/properties/vol_model/anyOf/1"
-  },
-  {
     "path": "#/$defs/d_572ad1befb7d94914652/properties/vol_surface_extrapolation",
     "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/ModelConfig/properties/vol_surface_extrapolation",
     "default": "error",
     "description": "Volatility surface extrapolation policy when `implied_volatility` is not set.",
     "ref": "#/$defs/VolSurfaceExtrapolation",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/VolSurfaceExtrapolation"
+  },
+  {
+    "path": "#/$defs/d_5c13df5a55f1da604df2",
+    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/Compounding",
+    "description": "Compounding convention for interest rates.\n\nUsed to specify how interest rates should be quoted or converted.\nAll variants produce mathematically equivalent discount factors when\napplied consistently.\n\n# Relationship Between Conventions\n\nFor a given discount factor DF at time t, the rates under different\nconventions are related by:\n\n```text\nDF = e^(-r_cc × t)                    [Continuous]\n   = (1 + r_ann)^(-t)                 [Annual]\n   = (1 + r_per/n)^(-n×t)             [Periodic(n)]\n   = 1 / (1 + r_simple × t)           [Simple]\n```\n\n# Ordering of Rates\n\nFor positive rates and t > 0: `r_simple > r_annual > r_continuous`\n(less frequent compounding requires a higher quoted rate for the same DF)."
+  },
+  {
+    "path": "#/$defs/d_5c13df5a55f1da604df2/oneOf/0",
+    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/Compounding/oneOf/0",
+    "const": "continuous",
+    "description": "Continuous compounding: r = -ln(DF) / t\n\nMost common for internal calculations, curve construction, and\nquantitative finance models. Provides the simplest mathematical\nproperties (additive over time)."
+  },
+  {
+    "path": "#/$defs/d_5c13df5a55f1da604df2/oneOf/1",
+    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/Compounding/oneOf/1",
+    "const": "annual",
+    "description": "Annual compounding: r = DF^(-1/t) - 1\n\nStandard for many bond markets, particularly UK gilts and\nEuropean government bonds. Also common for Bloomberg zero rate display."
+  },
+  {
+    "path": "#/$defs/d_5c13df5a55f1da604df2/oneOf/2",
+    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/Compounding/oneOf/2",
+    "description": "Periodic compounding with n periods per year: r = n × (DF^(-1/(n×t)) - 1)\n\nCommon values:\n- n=2: Semi-annual (US Treasury, corporate bonds)\n- n=4: Quarterly (some FRNs)\n- n=12: Monthly (rare, some retail products)\n\nNote: Uses [`NonZeroU32`] to prevent division by zero at compile time."
+  },
+  {
+    "path": "#/$defs/d_5c13df5a55f1da604df2/oneOf/2/properties/periodic",
+    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/Compounding/oneOf/2/properties/periodic",
+    "format": "uint32",
+    "minimum": 1
+  },
+  {
+    "path": "#/$defs/d_5c13df5a55f1da604df2/oneOf/3",
+    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/Compounding/oneOf/3",
+    "const": "simple",
+    "description": "Simple interest (no compounding): r = (1/DF - 1) / t\n\nUsed for money market instruments with maturity < 1 year, including:\n- Interbank deposits\n- T-bills and commercial paper\n- SOFR, SONIA, €STR fixings\n\nTypically paired with ACT/360 (USD, EUR) or ACT/365F (GBP) day counts."
   },
   {
     "path": "#/$defs/d_6347b87cc04573a369d9",
@@ -1501,6 +1518,167 @@ export default [
     "description": "Whether rehypothecation of posted collateral is permitted\n\nFor IM under BCBS-IOSCO rules, rehypothecation is prohibited.\nFor VM, rehypothecation may be permitted by bilateral agreement."
   },
   {
+    "path": "#/$defs/d_765a4643a287f5eb4b9d",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_index.schema.json#/$defs/CdsIndex",
+    "description": "CDS Index instrument definition"
+  },
+  {
+    "path": "#/$defs/d_765a4643a287f5eb4b9d/properties/attributes",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_index.schema.json#/$defs/CdsIndex/properties/attributes",
+    "default": {},
+    "description": "Attributes for tagging and selection",
+    "ref": "https://finstack_quant.dev/schemas/common/1/attributes.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/attributes.schema.json#"
+  },
+  {
+    "path": "#/$defs/d_765a4643a287f5eb4b9d/properties/constituents",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_index.schema.json#/$defs/CdsIndex/properties/constituents",
+    "description": "Optional list of constituents when using `IndexPricing::Constituents`"
+  },
+  {
+    "path": "#/$defs/d_765a4643a287f5eb4b9d/properties/constituents/items",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_index.schema.json#/$defs/CdsIndex/properties/constituents/items",
+    "ref": "#/$defs/CdsIndexConstituent",
+    "resolvedRef": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_index.schema.json#/$defs/CdsIndexConstituent"
+  },
+  {
+    "path": "#/$defs/d_765a4643a287f5eb4b9d/properties/convention",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_index.schema.json#/$defs/CdsIndex/properties/convention",
+    "description": "Regional ISDA convention",
+    "ref": "#/$defs/CdsConvention",
+    "resolvedRef": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_index.schema.json#/$defs/CdsConvention"
+  },
+  {
+    "path": "#/$defs/d_765a4643a287f5eb4b9d/properties/id",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_index.schema.json#/$defs/CdsIndex/properties/id",
+    "description": "Unique instrument identifier",
+    "ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/id.schema.json#"
+  },
+  {
+    "path": "#/$defs/d_765a4643a287f5eb4b9d/properties/index_factor",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_index.schema.json#/$defs/CdsIndex/properties/index_factor",
+    "description": "Index factor (fraction of surviving notional since series inception)",
+    "format": "double"
+  },
+  {
+    "path": "#/$defs/d_765a4643a287f5eb4b9d/properties/index_name",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_index.schema.json#/$defs/CdsIndex/properties/index_name",
+    "description": "Index name, e.g., \"CDX.NA.IG\", \"CDX.NA.HY\", \"iTraxx Europe\""
+  },
+  {
+    "path": "#/$defs/d_765a4643a287f5eb4b9d/properties/instrument_pricing_overrides",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_index.schema.json#/$defs/CdsIndex/properties/instrument_pricing_overrides",
+    "description": "Instrument-owned pricing inputs.",
+    "ref": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#"
+  },
+  {
+    "path": "#/$defs/d_765a4643a287f5eb4b9d/properties/margin_spec",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_index.schema.json#/$defs/CdsIndex/properties/margin_spec",
+    "description": "Optional OTC margin specification for VM/IM.\n\nCDS indices are typically cleared through ICE Clear Credit. Use\n`OtcMarginSpec::cleared(\"ICE\", Currency::USD)` for standard cleared\nindices. Bilateral SIMM indices must attach an explicit\n`SimmCreditClassification` rather than infer qualifying status from the\nindex name."
+  },
+  {
+    "path": "#/$defs/d_765a4643a287f5eb4b9d/properties/margin_spec/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_index.schema.json#/$defs/CdsIndex/properties/margin_spec/anyOf/0",
+    "ref": "#/$defs/OtcMarginSpec",
+    "resolvedRef": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_index.schema.json#/$defs/OtcMarginSpec"
+  },
+  {
+    "path": "#/$defs/d_765a4643a287f5eb4b9d/properties/margin_spec/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_index.schema.json#/$defs/CdsIndex/properties/margin_spec/anyOf/1"
+  },
+  {
+    "path": "#/$defs/d_765a4643a287f5eb4b9d/properties/metric_pricing_overrides",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_index.schema.json#/$defs/CdsIndex/properties/metric_pricing_overrides",
+    "description": "Metric-time pricing configuration.",
+    "ref": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json#"
+  },
+  {
+    "path": "#/$defs/d_765a4643a287f5eb4b9d/properties/notional",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_index.schema.json#/$defs/CdsIndex/properties/notional",
+    "description": "Notional amount of the index",
+    "ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/money.schema.json#"
+  },
+  {
+    "path": "#/$defs/d_765a4643a287f5eb4b9d/properties/num_constituents",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_index.schema.json#/$defs/CdsIndex/properties/num_constituents",
+    "default": null,
+    "description": "Number of reference entities in the index pool.\n\nRequired for portfolio-level analytics (e.g. jump-to-default) when\n`constituents` is empty (`SingleCurve` mode), since the per-name\nrisk number is `notional / N · LGD`. Index pool sizes drift with\nseries — iTraxx Crossover has been 75 names only since Series 9,\nand CDX.NA.HY membership varies — so this is supplied explicitly\nrather than inferred from `index_name`. Standard presets populate\nit via `CdsIndex::from_preset`; set it directly with\n`with_num_constituents` for custom indices.",
+    "format": "uint32",
+    "minimum": 0
+  },
+  {
+    "path": "#/$defs/d_765a4643a287f5eb4b9d/properties/premium_leg",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_index.schema.json#/$defs/CdsIndex/properties/premium_leg",
+    "description": "Premium leg specification (coupon schedule and discounting)",
+    "ref": "#/$defs/PremiumLegSpec",
+    "resolvedRef": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_index.schema.json#/$defs/PremiumLegSpec"
+  },
+  {
+    "path": "#/$defs/d_765a4643a287f5eb4b9d/properties/pricing",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_index.schema.json#/$defs/CdsIndex/properties/pricing",
+    "description": "Pricing aggregation mode",
+    "ref": "#/$defs/IndexPricing",
+    "resolvedRef": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_index.schema.json#/$defs/IndexPricing"
+  },
+  {
+    "path": "#/$defs/d_765a4643a287f5eb4b9d/properties/protection_leg",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_index.schema.json#/$defs/CdsIndex/properties/protection_leg",
+    "description": "Protection leg specification (credit curve and settlement)",
+    "ref": "#/$defs/ProtectionLegSpec",
+    "resolvedRef": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_index.schema.json#/$defs/ProtectionLegSpec"
+  },
+  {
+    "path": "#/$defs/d_765a4643a287f5eb4b9d/properties/scenario_pricing_overrides",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_index.schema.json#/$defs/CdsIndex/properties/scenario_pricing_overrides",
+    "description": "Scenario-only pricing adjustments.",
+    "ref": "https://finstack_quant.dev/schemas/common/1/scenario_pricing_overrides.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/scenario_pricing_overrides.schema.json#"
+  },
+  {
+    "path": "#/$defs/d_765a4643a287f5eb4b9d/properties/series",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_index.schema.json#/$defs/CdsIndex/properties/series",
+    "description": "Series number (e.g., 42)",
+    "format": "uint16",
+    "maximum": 65535,
+    "minimum": 0
+  },
+  {
+    "path": "#/$defs/d_765a4643a287f5eb4b9d/properties/side",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_index.schema.json#/$defs/CdsIndex/properties/side",
+    "description": "Protection buyer/seller perspective",
+    "ref": "#/$defs/PayReceive",
+    "resolvedRef": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_index.schema.json#/$defs/PayReceive"
+  },
+  {
+    "path": "#/$defs/d_765a4643a287f5eb4b9d/properties/upfront",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_index.schema.json#/$defs/CdsIndex/properties/upfront",
+    "description": "Contractual upfront payment `(payment date, amount)` on the index\nnotional. A positive amount is paid by the protection buyer to the\nseller; a negative amount by the seller to the buyer. It is\ndiscounted from its payment date and dropped once that date is before\nthe valuation date."
+  },
+  {
+    "path": "#/$defs/d_765a4643a287f5eb4b9d/properties/upfront/prefixItems/0",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_index.schema.json#/$defs/CdsIndex/properties/upfront/prefixItems/0",
+    "ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/date.schema.json#"
+  },
+  {
+    "path": "#/$defs/d_765a4643a287f5eb4b9d/properties/upfront/prefixItems/1",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_index.schema.json#/$defs/CdsIndex/properties/upfront/prefixItems/1",
+    "ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/money.schema.json#"
+  },
+  {
+    "path": "#/$defs/d_765a4643a287f5eb4b9d/properties/version",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_index.schema.json#/$defs/CdsIndex/properties/version",
+    "description": "Version number within series",
+    "format": "uint16",
+    "maximum": 65535,
+    "minimum": 0
+  },
+  {
     "path": "#/$defs/d_767dbcbd0caffa0ec733",
     "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_index.schema.json#/$defs/ClearingStatus",
     "description": "Clearing status for OTC derivatives.\n\nDetermines whether a trade is cleared through a CCP or remains bilateral\nunder a CSA agreement."
@@ -1621,6 +1799,30 @@ export default [
     "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/PikMode/oneOf/3",
     "const": "toggle",
     "description": "Deferred to the [`ToggleExerciseModel`] on the config.\nFalls back to `Cash` if no toggle model is set."
+  },
+  {
+    "path": "#/$defs/d_80e139d6f4d92c281a38",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_index.schema.json#/$defs/CdsIndexConstituent",
+    "description": "Constituent in a CDS index with weight and credit parameters."
+  },
+  {
+    "path": "#/$defs/d_80e139d6f4d92c281a38/properties/credit",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_index.schema.json#/$defs/CdsIndexConstituent/properties/credit",
+    "description": "Credit configuration for the issuer (includes hazard curve id and recovery)",
+    "ref": "#/$defs/CreditParams",
+    "resolvedRef": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_index.schema.json#/$defs/CreditParams"
+  },
+  {
+    "path": "#/$defs/d_80e139d6f4d92c281a38/properties/defaulted",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_index.schema.json#/$defs/CdsIndexConstituent/properties/defaulted",
+    "default": false,
+    "description": "Whether the constituent has defaulted. Defaulted names are excluded from the\npremium leg but their settled protection payment is already reflected in `index_factor`.\nPer O'Kane (2008) Ch. 7: \"On default, the protection payment is settled and the\nname is removed from the index. The index factor adjusts to reflect the reduced notional.\""
+  },
+  {
+    "path": "#/$defs/d_80e139d6f4d92c281a38/properties/weight",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_index.schema.json#/$defs/CdsIndexConstituent/properties/weight",
+    "description": "Weight of the issuer in the index notional (e.g., 1/125.0 for CDX IG)",
+    "format": "double"
   },
   {
     "path": "#/$defs/d_8204e80b991bc1d1befd",
@@ -1788,6 +1990,23 @@ export default [
     "description": "Stub convention",
     "ref": "#/$defs/StubKind",
     "resolvedRef": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_index.schema.json#/$defs/StubKind"
+  },
+  {
+    "path": "#/$defs/d_948cdc4db846a21357a4",
+    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/ShortRateTreeModel",
+    "description": "Short-rate lattice used by the rates-only bond tree.\n\nSelected by `instrument_pricing_overrides.model_config.tree_model`; when the\nfield is absent the bond tree uses Hull-White."
+  },
+  {
+    "path": "#/$defs/d_948cdc4db846a21357a4/oneOf/0",
+    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/ShortRateTreeModel/oneOf/0",
+    "const": "hull_white",
+    "description": "Hull-White one-factor (normal short rate) with `(κ, σ)` from\n`model_config.hw1f_mean_reversion` / `model_config.hw1f_sigma` or the\npre-fitted market scalars."
+  },
+  {
+    "path": "#/$defs/d_948cdc4db846a21357a4/oneOf/1",
+    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/ShortRateTreeModel/oneOf/1",
+    "const": "black_derman_toy",
+    "description": "Black-Derman-Toy (lognormal short rate) with volatility\n`model_config.bdt_sigma`."
   },
   {
     "path": "#/$defs/d_94cb251104de5cf587b6",
@@ -3004,7 +3223,7 @@ export default [
   {
     "path": "#/$defs/d_b0a5fc543381da6a5722/properties/cds_quote_bp",
     "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/MarketQuoteOverrides/properties/cds_quote_bp",
-    "description": "CreditDefaultSwap clean par-spread quote in basis points.\n\nUsed only by CreditDefaultSwap risk replay, where it replaces the\nmatching contractual hazard-curve pillar. It does not drive PV, and no\nother instrument (CDSIndex included) reads it.",
+    "description": "CreditDefaultSwap clean par-spread quote in basis points.\n\nUsed only by CreditDefaultSwap risk replay, where it replaces the\nmatching contractual hazard-curve pillar. It does not drive PV, and no\nother instrument (CdsIndex included) reads it.",
     "format": "double"
   },
   {
@@ -4072,167 +4291,6 @@ export default [
     "source": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json#/$defs/Currency/oneOf/99",
     "const": "NGN",
     "description": "Naira (566)"
-  },
-  {
-    "path": "#/$defs/d_ba7b65e7700701bfc692",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_index.schema.json#/$defs/CDSIndex",
-    "description": "CDS Index instrument definition"
-  },
-  {
-    "path": "#/$defs/d_ba7b65e7700701bfc692/properties/attributes",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_index.schema.json#/$defs/CDSIndex/properties/attributes",
-    "default": {},
-    "description": "Attributes for tagging and selection",
-    "ref": "https://finstack_quant.dev/schemas/common/1/attributes.schema.json",
-    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/attributes.schema.json#"
-  },
-  {
-    "path": "#/$defs/d_ba7b65e7700701bfc692/properties/constituents",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_index.schema.json#/$defs/CDSIndex/properties/constituents",
-    "description": "Optional list of constituents when using `IndexPricing::Constituents`"
-  },
-  {
-    "path": "#/$defs/d_ba7b65e7700701bfc692/properties/constituents/items",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_index.schema.json#/$defs/CDSIndex/properties/constituents/items",
-    "ref": "#/$defs/CDSIndexConstituent",
-    "resolvedRef": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_index.schema.json#/$defs/CDSIndexConstituent"
-  },
-  {
-    "path": "#/$defs/d_ba7b65e7700701bfc692/properties/convention",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_index.schema.json#/$defs/CDSIndex/properties/convention",
-    "description": "Regional ISDA convention",
-    "ref": "#/$defs/CdsConvention",
-    "resolvedRef": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_index.schema.json#/$defs/CdsConvention"
-  },
-  {
-    "path": "#/$defs/d_ba7b65e7700701bfc692/properties/id",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_index.schema.json#/$defs/CDSIndex/properties/id",
-    "description": "Unique instrument identifier",
-    "ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
-    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/id.schema.json#"
-  },
-  {
-    "path": "#/$defs/d_ba7b65e7700701bfc692/properties/index_factor",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_index.schema.json#/$defs/CDSIndex/properties/index_factor",
-    "description": "Index factor (fraction of surviving notional since series inception)",
-    "format": "double"
-  },
-  {
-    "path": "#/$defs/d_ba7b65e7700701bfc692/properties/index_name",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_index.schema.json#/$defs/CDSIndex/properties/index_name",
-    "description": "Index name, e.g., \"CDX.NA.IG\", \"CDX.NA.HY\", \"iTraxx Europe\""
-  },
-  {
-    "path": "#/$defs/d_ba7b65e7700701bfc692/properties/instrument_pricing_overrides",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_index.schema.json#/$defs/CDSIndex/properties/instrument_pricing_overrides",
-    "description": "Instrument-owned pricing inputs.",
-    "ref": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json",
-    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#"
-  },
-  {
-    "path": "#/$defs/d_ba7b65e7700701bfc692/properties/margin_spec",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_index.schema.json#/$defs/CDSIndex/properties/margin_spec",
-    "description": "Optional OTC margin specification for VM/IM.\n\nCDS indices are typically cleared through ICE Clear Credit. Use\n`OtcMarginSpec::cleared(\"ICE\", Currency::USD)` for standard cleared\nindices. Bilateral SIMM indices must attach an explicit\n`SimmCreditClassification` rather than infer qualifying status from the\nindex name."
-  },
-  {
-    "path": "#/$defs/d_ba7b65e7700701bfc692/properties/margin_spec/anyOf/0",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_index.schema.json#/$defs/CDSIndex/properties/margin_spec/anyOf/0",
-    "ref": "#/$defs/OtcMarginSpec",
-    "resolvedRef": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_index.schema.json#/$defs/OtcMarginSpec"
-  },
-  {
-    "path": "#/$defs/d_ba7b65e7700701bfc692/properties/margin_spec/anyOf/1",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_index.schema.json#/$defs/CDSIndex/properties/margin_spec/anyOf/1"
-  },
-  {
-    "path": "#/$defs/d_ba7b65e7700701bfc692/properties/metric_pricing_overrides",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_index.schema.json#/$defs/CDSIndex/properties/metric_pricing_overrides",
-    "description": "Metric-time pricing configuration.",
-    "ref": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json",
-    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json#"
-  },
-  {
-    "path": "#/$defs/d_ba7b65e7700701bfc692/properties/notional",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_index.schema.json#/$defs/CDSIndex/properties/notional",
-    "description": "Notional amount of the index",
-    "ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
-    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/money.schema.json#"
-  },
-  {
-    "path": "#/$defs/d_ba7b65e7700701bfc692/properties/num_constituents",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_index.schema.json#/$defs/CDSIndex/properties/num_constituents",
-    "default": null,
-    "description": "Number of reference entities in the index pool.\n\nRequired for portfolio-level analytics (e.g. jump-to-default) when\n`constituents` is empty (`SingleCurve` mode), since the per-name\nrisk number is `notional / N · LGD`. Index pool sizes drift with\nseries — iTraxx Crossover has been 75 names only since Series 9,\nand CDX.NA.HY membership varies — so this is supplied explicitly\nrather than inferred from `index_name`. Standard presets populate\nit via `CDSIndex::from_preset`; set it directly with\n`with_num_constituents` for custom indices.",
-    "format": "uint32",
-    "minimum": 0
-  },
-  {
-    "path": "#/$defs/d_ba7b65e7700701bfc692/properties/premium",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_index.schema.json#/$defs/CDSIndex/properties/premium",
-    "description": "Premium leg specification (coupon schedule and discounting)",
-    "ref": "#/$defs/PremiumLegSpec",
-    "resolvedRef": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_index.schema.json#/$defs/PremiumLegSpec"
-  },
-  {
-    "path": "#/$defs/d_ba7b65e7700701bfc692/properties/pricing",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_index.schema.json#/$defs/CDSIndex/properties/pricing",
-    "description": "Pricing aggregation mode",
-    "ref": "#/$defs/IndexPricing",
-    "resolvedRef": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_index.schema.json#/$defs/IndexPricing"
-  },
-  {
-    "path": "#/$defs/d_ba7b65e7700701bfc692/properties/protection",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_index.schema.json#/$defs/CDSIndex/properties/protection",
-    "description": "Protection leg specification (credit curve and settlement)",
-    "ref": "#/$defs/ProtectionLegSpec",
-    "resolvedRef": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_index.schema.json#/$defs/ProtectionLegSpec"
-  },
-  {
-    "path": "#/$defs/d_ba7b65e7700701bfc692/properties/scenario_pricing_overrides",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_index.schema.json#/$defs/CDSIndex/properties/scenario_pricing_overrides",
-    "description": "Scenario-only pricing adjustments.",
-    "ref": "https://finstack_quant.dev/schemas/common/1/scenario_pricing_overrides.schema.json",
-    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/scenario_pricing_overrides.schema.json#"
-  },
-  {
-    "path": "#/$defs/d_ba7b65e7700701bfc692/properties/series",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_index.schema.json#/$defs/CDSIndex/properties/series",
-    "description": "Series number (e.g., 42)",
-    "format": "uint16",
-    "maximum": 65535,
-    "minimum": 0
-  },
-  {
-    "path": "#/$defs/d_ba7b65e7700701bfc692/properties/side",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_index.schema.json#/$defs/CDSIndex/properties/side",
-    "description": "Protection buyer/seller perspective",
-    "ref": "#/$defs/PayReceive",
-    "resolvedRef": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_index.schema.json#/$defs/PayReceive"
-  },
-  {
-    "path": "#/$defs/d_ba7b65e7700701bfc692/properties/upfront",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_index.schema.json#/$defs/CDSIndex/properties/upfront",
-    "description": "Contractual upfront payment `(payment date, amount)` on the index\nnotional. A positive amount is paid by the protection buyer to the\nseller; a negative amount by the seller to the buyer. It is\ndiscounted from its payment date and dropped once that date is before\nthe valuation date."
-  },
-  {
-    "path": "#/$defs/d_ba7b65e7700701bfc692/properties/upfront/prefixItems/0",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_index.schema.json#/$defs/CDSIndex/properties/upfront/prefixItems/0",
-    "ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
-    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/date.schema.json#"
-  },
-  {
-    "path": "#/$defs/d_ba7b65e7700701bfc692/properties/upfront/prefixItems/1",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_index.schema.json#/$defs/CDSIndex/properties/upfront/prefixItems/1",
-    "ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
-    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/money.schema.json#"
-  },
-  {
-    "path": "#/$defs/d_ba7b65e7700701bfc692/properties/version",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_index.schema.json#/$defs/CDSIndex/properties/version",
-    "description": "Version number within series",
-    "format": "uint16",
-    "maximum": 65535,
-    "minimum": 0
   },
   {
     "path": "#/$defs/d_bdf84b73c34f6ec51af5",
@@ -5331,37 +5389,13 @@ export default [
   {
     "path": "#/$defs/d_c1fd3b4654f67b71db17/properties/spec",
     "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_index.schema.json#/$defs/cds_index/properties/spec",
-    "ref": "#/$defs/CDSIndex",
-    "resolvedRef": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_index.schema.json#/$defs/CDSIndex"
+    "ref": "#/$defs/CdsIndex",
+    "resolvedRef": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_index.schema.json#/$defs/CdsIndex"
   },
   {
     "path": "#/$defs/d_c1fd3b4654f67b71db17/properties/type",
     "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_index.schema.json#/$defs/cds_index/properties/type",
     "const": "cds_index"
-  },
-  {
-    "path": "#/$defs/d_c24f7776db47c93496f5",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_index.schema.json#/$defs/CDSIndexConstituent",
-    "description": "Constituent in a CDS index with weight and credit parameters."
-  },
-  {
-    "path": "#/$defs/d_c24f7776db47c93496f5/properties/credit",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_index.schema.json#/$defs/CDSIndexConstituent/properties/credit",
-    "description": "Credit configuration for the issuer (includes hazard curve id and recovery)",
-    "ref": "#/$defs/CreditParams",
-    "resolvedRef": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_index.schema.json#/$defs/CreditParams"
-  },
-  {
-    "path": "#/$defs/d_c24f7776db47c93496f5/properties/defaulted",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_index.schema.json#/$defs/CDSIndexConstituent/properties/defaulted",
-    "default": false,
-    "description": "Whether the constituent has defaulted. Defaulted names are excluded from the\npremium leg but their settled protection payment is already reflected in `index_factor`.\nPer O'Kane (2008) Ch. 7: \"On default, the protection payment is settled and the\nname is removed from the index. The index factor adjusts to reflect the reduced notional.\""
-  },
-  {
-    "path": "#/$defs/d_c24f7776db47c93496f5/properties/weight",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_index.schema.json#/$defs/CDSIndexConstituent/properties/weight",
-    "description": "Weight of the issuer in the index notional (e.g., 1/125.0 for CDX IG)",
-    "format": "double"
   },
   {
     "path": "#/$defs/d_c715f4b1329a743ff4a3",
@@ -5718,23 +5752,6 @@ export default [
     "source": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json#/$defs/TenorUnit/oneOf/3",
     "const": "years",
     "description": "Years (Y)"
-  },
-  {
-    "path": "#/$defs/d_ec89adc17436f33de839",
-    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/VolatilityModel",
-    "description": "Volatility model for option pricing."
-  },
-  {
-    "path": "#/$defs/d_ec89adc17436f33de839/oneOf/0",
-    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/VolatilityModel/oneOf/0",
-    "const": "black",
-    "description": "Black (lognormal)."
-  },
-  {
-    "path": "#/$defs/d_ec89adc17436f33de839/oneOf/1",
-    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/VolatilityModel/oneOf/1",
-    "const": "normal",
-    "description": "Bachelier / normal model."
   },
   {
     "path": "#/$defs/d_ed218c734e46de57eeb9",

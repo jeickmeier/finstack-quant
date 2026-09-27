@@ -16,6 +16,8 @@
         "day_count": "act_360",
         "discount_curve_id": "USD-OIS",
         "end": "2029-01-03",
+        "end_of_month": false,
+        "fixing_calendar_id": null,
         "forward_curve_id": "USD-SOFR-3M",
         "frequency": {
           "count": 3,
@@ -34,6 +36,8 @@
         "day_count": "act_360",
         "discount_curve_id": "USD-OIS",
         "end": "2029-01-03",
+        "end_of_month": false,
+        "fixing_calendar_id": null,
         "forward_curve_id": "USD-SOFR-1M",
         "frequency": {
           "count": 1,

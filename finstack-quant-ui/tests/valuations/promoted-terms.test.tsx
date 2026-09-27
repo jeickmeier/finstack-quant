@@ -172,7 +172,8 @@ it.each([
         key
           .split(".")
           .reduce<unknown>(
-            (node, part) => (node as Record<string, unknown> | undefined)?.[part],
+            (node, part) =>
+              (node as Record<string, unknown> | undefined)?.[part],
             spec[branch],
           ) === text,
     );

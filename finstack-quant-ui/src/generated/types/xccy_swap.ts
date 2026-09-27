@@ -92,11 +92,14 @@ export type D_2701Caf4934336A2Dd86 =
  */
 export type D_02A11B30Ee627630F221 = "per_name" | "large_homogeneous";
 /**
- * Volatility model for option pricing.
+ * Short-rate lattice used by the rates-only bond tree.
+ *
+ * Selected by `instrument_pricing_overrides.model_config.tree_model`; when the
+ * field is absent the bond tree uses Hull-White.
  */
-export type DEc89Adc17436F33De839 = "black" | "normal";
+export type D_948Cdc4Db846A21357A4 = "hull_white" | "black_derman_toy";
 /**
- * Business day convention for schedule dates.
+ * Business day convention for payment dates
  */
 export type BusinessDayConvention =
   "unadjusted" | "following" | "modified_following" | "preceding" | "modified_preceding" | "nearest";
@@ -105,170 +108,7 @@ export type BusinessDayConvention =
  */
 export type Id1 = string;
 /**
- * Leg currency.
- */
-export type Currency =
-  | "AED"
-  | "AFN"
-  | "ALL"
-  | "AMD"
-  | "ANG"
-  | "AOA"
-  | "ARS"
-  | "AUD"
-  | "AWG"
-  | "AZN"
-  | "BAM"
-  | "BBD"
-  | "BDT"
-  | "BGN"
-  | "BHD"
-  | "BIF"
-  | "BMD"
-  | "BND"
-  | "BOB"
-  | "BRL"
-  | "BSD"
-  | "BTN"
-  | "BWP"
-  | "BYN"
-  | "BZD"
-  | "CAD"
-  | "CDF"
-  | "CHF"
-  | "CLF"
-  | "CLP"
-  | "CNY"
-  | "COP"
-  | "CRC"
-  | "CUC"
-  | "CUP"
-  | "CVE"
-  | "CZK"
-  | "DJF"
-  | "DKK"
-  | "DOP"
-  | "DZD"
-  | "EGP"
-  | "ERN"
-  | "ETB"
-  | "EUR"
-  | "FJD"
-  | "FKP"
-  | "GBP"
-  | "GEL"
-  | "GHS"
-  | "GIP"
-  | "GMD"
-  | "GNF"
-  | "GTQ"
-  | "GYD"
-  | "HKD"
-  | "HNL"
-  | "HRK"
-  | "HTG"
-  | "HUF"
-  | "IDR"
-  | "ILS"
-  | "INR"
-  | "IQD"
-  | "IRR"
-  | "ISK"
-  | "JMD"
-  | "JOD"
-  | "JPY"
-  | "KES"
-  | "KGS"
-  | "KHR"
-  | "KMF"
-  | "KPW"
-  | "KRW"
-  | "KWD"
-  | "KYD"
-  | "KZT"
-  | "LAK"
-  | "LBP"
-  | "LKR"
-  | "LRD"
-  | "LSL"
-  | "LYD"
-  | "MAD"
-  | "MDL"
-  | "MGA"
-  | "MKD"
-  | "MMK"
-  | "MNT"
-  | "MOP"
-  | "MRU"
-  | "MUR"
-  | "MVR"
-  | "MWK"
-  | "MXN"
-  | "MYR"
-  | "MZN"
-  | "NAD"
-  | "NGN"
-  | "NIO"
-  | "NOK"
-  | "NPR"
-  | "NZD"
-  | "OMR"
-  | "PAB"
-  | "PEN"
-  | "PGK"
-  | "PHP"
-  | "PKR"
-  | "PLN"
-  | "PYG"
-  | "QAR"
-  | "RON"
-  | "RSD"
-  | "RUB"
-  | "RWF"
-  | "SAR"
-  | "SBD"
-  | "SCR"
-  | "SDG"
-  | "SEK"
-  | "SGD"
-  | "SHP"
-  | "SLE"
-  | "SLL"
-  | "SOS"
-  | "SRD"
-  | "SSP"
-  | "STN"
-  | "SYP"
-  | "SZL"
-  | "THB"
-  | "TJS"
-  | "TMT"
-  | "TND"
-  | "TOP"
-  | "TRY"
-  | "TTD"
-  | "TWD"
-  | "TZS"
-  | "UAH"
-  | "UGX"
-  | "USD"
-  | "UYU"
-  | "UZS"
-  | "VED"
-  | "VES"
-  | "VND"
-  | "VUV"
-  | "WST"
-  | "XAF"
-  | "XCD"
-  | "XOF"
-  | "XPF"
-  | "YER"
-  | "ZAR"
-  | "ZMW"
-  | "ZWL";
-/**
- * Accrual day count.
+ * Day count convention for accrual
  */
 export type DayCount =
   | "one_one"
@@ -289,7 +129,7 @@ export type DayCount =
  */
 export type Id2 = string;
 /**
- * End date of the leg.
+ * End date of the floating leg
  */
 export type Date = string;
 /**
@@ -297,11 +137,11 @@ export type Date = string;
  */
 export type Id3 = string;
 /**
- * Spread in basis points (e.g. `Decimal::from(5)` = 5bp).
+ * Spread in basis points added to the forward rate
  */
 export type Decimal = string;
 /**
- * Start date of the leg.
+ * Start date of the floating leg
  */
 export type Date1 = string;
 /**
@@ -481,7 +321,7 @@ export type DB556Bbeb1Ecf96C44C5A =
 /**
  * PV reporting currency (output currency of `value`/`npv`).
  */
-export type Currency1 =
+export type Currency =
   | "AED"
   | "AFN"
   | "ALL"
@@ -664,6 +504,13 @@ export interface DF06508C6090720Ff6727 {
  * only holds the instrument identity, notional exchange mode, and reporting currency.
  */
 export interface D_3Be43Bb3476C3B55E034 {
+  /**
+   * Allow a weekends-only calendar when either leg's `leg.calendar_id` is
+   * missing or cannot be resolved.
+   *
+   * When `false` (default), missing calendars are treated as input errors.
+   */
+  allow_calendar_fallback?: boolean;
   attributes: Attributes;
   id: Id;
   instrument_pricing_overrides?: InstrumentPricingOverrides;
@@ -686,7 +533,7 @@ export interface D_3Be43Bb3476C3B55E034 {
           [k: string]: unknown;
         };
       };
-  reporting_currency: Currency1;
+  reporting_currency: Currency;
   scenario_pricing_overrides?: ScenarioPricingOverrides;
 }
 /**
@@ -720,7 +567,7 @@ export interface DB0A5Fc543381Da6A5722 {
    *
    * Used only by CreditDefaultSwap risk replay, where it replaces the
    * matching contractual hazard-curve pillar. It does not drive PV, and no
-   * other instrument (CDSIndex included) reads it.
+   * other instrument (CdsIndex included) reads it.
    */
   cds_quote_bp?: number | null;
   /**
@@ -799,7 +646,7 @@ export interface D_572Ad1Befb7D94914652 {
    * Black-Derman-Toy lognormal short-rate volatility (σ), as an annual
    * decimal proportion of the short rate (`0.20` = 20%).
    *
-   * Read only by the rates-only bond tree when `vol_model = black` selects
+   * Read only by the rates-only bond tree when `tree_model = black_derman_toy` selects
    * BDT for a bond with embedded exercise rights, where it is required.
    * It is a relative (lognormal) volatility, unlike the absolute
    * [`Self::hw1f_sigma`]; typical values are 0.10–0.40. The BDT lattice has
@@ -969,7 +816,13 @@ export interface D_572Ad1Befb7D94914652 {
   /**
    * Quote compounding convention for OAS inputs and outputs.
    */
-  oas_quote_compounding?: "continuous" | "semi_annual";
+  oas_quote_compounding?:
+    | "continuous"
+    | "annual"
+    | {
+        periodic: number;
+      }
+    | "simple";
   /**
    * Instantaneous correlation between the short-rate and hazard-rate
    * shocks on the rates-credit lattice, in `[-1, 1]`.
@@ -1003,15 +856,14 @@ export interface D_572Ad1Befb7D94914652 {
    */
   tree_discount_curve_id?: D_94Cb251104De5Cf587B6 | null;
   /**
+   * Short-rate lattice for the rates-only bond tree (`hull_white` or
+   * `black_derman_toy`). `None` selects Hull-White.
+   */
+  tree_model?: D_948Cdc4Db846A21357A4 | null;
+  /**
    * Number of time steps for tree-based pricing (e.g., 100)
    */
   tree_steps?: number | null;
-  /**
-   * Volatility model choice for option pricing.
-   *
-   * When set, overrides the default Black (lognormal) model.
-   */
-  vol_model?: DEc89Adc17436F33De839 | null;
   /**
    * Volatility surface extrapolation policy when `implied_volatility` is not set.
    */
@@ -1035,7 +887,7 @@ export interface DCdb8Fddc0106047270C4 {
  */
 export interface DBffef9E684Ff0C351C83 {
   /**
-   * Barrier-crossing policy used for `BarrierType::FirstPassage`.
+   * Barrier-crossing policy used for `MertonBarrierType::FirstPassage`.
    *
    * Default: `BrownianBridge` when the Merton model uses `FirstPassage`,
    * otherwise `Discrete`.
@@ -1449,87 +1301,123 @@ export interface D_8A837E6F142B34E8Cfd4 {
  * First leg.
  */
 export interface D_8426Ebf5Dcce24Ed2Cdf {
+  leg: D_2479A404Fecfb3F42644;
+  notional: Money;
   /**
-   * Allow calendar-day fallback when the calendar cannot be resolved.
-   *
-   * When `false` (default), missing calendars are treated as input errors.
+   * Pay/receive direction for this leg.
    */
-  allow_calendar_fallback?: boolean;
+  side: "pay" | "receive";
+}
+/**
+ * Floating-leg terms (curves, dates, frequency, spread in bp, lags,
+ * calendars, compounding).
+ */
+export interface D_2479A404Fecfb3F42644 {
   business_day_convention?: BusinessDayConvention;
   /**
-   * Calendar identifier for schedule generation and lags.
+   * Optional calendar for business day adjustments
    */
   calendar_id?: Id1 | null;
   /**
-   * Overnight vs term compounding for this floating leg.
+   * Compounding method for floating coupons.
    *
-   * Defaults to Simple (term EURIBOR / term SOFR). Set a compounded
-   * variant when the forward curve is an overnight RFR such as €STR or
-   * SOFR OIS.
+   * Determines how floating rate coupons are calculated:
+   * - `simple` (default): one term forward per period
+   * - `compounded_*`: SOFR/SONIA-style daily compounding
+   * - `simple_average` is rejected by [`Self::validate`]
+   *
+   * # Implementation Notes
+   *
+   * Compounded-in-arrears is implemented for IRS pricing in `instruments::irs` with
+   * support for lookback and observation shift conventions. For seasoned (already
+   * started) compounded swaps, pricing requires explicit fixings for observation
+   * dates prior to `as_of`.
    */
   compounding?:
     | "simple"
+    | "simple_average"
     | {
         compounded_in_arrears: {
           /**
-           * Number of business days to shift observation dates back from the accrual
-           * period (lookback).  Typically 2–5 days depending on market convention.
-           *
-           * The observation dates are shifted while the day-count-fraction (DCF)
-           * weights remain anchored to the **original** accrual period dates.
-           * This is consistent with "lookback without observation shift" as
-           * described in the ISDA 2021 Definitions and ARRC SOFR conventions.
+           * Business days by which observation dates move backward while the
+           * day-count weights stay on the original accrual dates ("lookback
+           * without observation shift", ISDA 2021 / ARRC). `0` is plain
+           * in-arrears, the cleared-OIS convention.
            */
           lookback_days: number;
-          [k: string]: unknown;
         };
       }
     | {
         compounded_with_observation_shift: {
           /**
-           * Number of business days to shift both observation dates and DCF weights.
+           * Business days to shift both observation dates and weights.
            */
           shift_days: number;
-          [k: string]: unknown;
         };
       }
     | {
         compounded_with_rate_cutoff: {
           /**
-           * Number of business days before period end to freeze the overnight rate.
+           * Business days before period end over which the rate is frozen.
            */
           cutoff_days: number;
-          [k: string]: unknown;
         };
       };
-  currency: Currency;
   day_count: DayCount;
   discount_curve_id: Id2;
   end: Date;
+  /**
+   * End-of-month roll convention (default: false).
+   *
+   * When `true`, if the start date falls on the last business day of a month,
+   * all subsequent roll dates will also fall on the last business day of their
+   * respective months. This matches QuantLib's `MakeOIS` default behavior.
+   *
+   * # Market Standard
+   *
+   * Per ISDA 2006 Definitions Section 4.18, the End-of-Month convention should
+   * be applied when the effective date is the last business day of a month.
+   * Most professional systems (QuantLib, Bloomberg SWDF) default to `true`.
+   */
+  end_of_month?: boolean;
+  /**
+   * Optional calendar for rate fixing (reset lag)
+   */
+  fixing_calendar_id?: Id1 | null;
   forward_curve_id: Id3;
   frequency: Tenor;
-  notional: Money;
   /**
    * Payment lag in business days after period end (default: 0).
+   *
+   * Bloomberg OIS swaps typically use 2 business days payment lag.
+   * The actual payment date is adjusted from the period end date by
+   * this many business days using the leg's calendar.
    */
   payment_lag_days?: number;
   /**
-   * Reset lag in business days before the accrual start (e.g. 2 for T-2 fixing).
+   * Reset lag in business days for floating rate fixing (default: 0).
+   *
+   * - **0** (default): fixing on the accrual start date. A swap whose first
+   *   accrual period starts on or after the valuation date then prices off
+   *   the forward curve without historical fixings.
+   * - **Positive** (e.g., 2): T-2 fixing (2 business days before accrual
+   *   start). Use `RateIndexConventions::default_reset_lag_days` (or
+   *   `InterestRateSwap::from_conventions`) for the market default of a
+   *   given index.
+   * - **Negative** (e.g., -1): resolved at pricing time to the registered
+   *   index convention default; rejected when the forward curve id is not a
+   *   registered rate index.
    */
-  reset_lag_days?: number | null;
-  /**
-   * Pay/receive direction for this leg.
-   */
-  side: "receive" | "pay";
-  spread_bp?: Decimal;
+  reset_lag_days?: number;
+  spread_bp: Decimal;
   start: Date1;
   /**
-   * Stub period handling rule.
+   * Stub period handling rule
    */
   stub?: "none" | "short_front" | "short_back" | "long_front" | "long_back";
 }
 /**
- * Coupon frequency.
+ * Payment frequency
  */
 export interface Tenor {
   /**
@@ -1544,7 +1432,7 @@ export interface Tenor {
   unit: "days" | "weeks" | "months" | "years";
 }
 /**
- * Leg notional (in leg currency).
+ * Leg notional in the leg currency.
  */
 export interface Money {
   /**
@@ -1722,84 +1610,12 @@ export interface Money {
  * Second leg.
  */
 export interface D_8426Ebf5Dcce24Ed2Cdf1 {
-  /**
-   * Allow calendar-day fallback when the calendar cannot be resolved.
-   *
-   * When `false` (default), missing calendars are treated as input errors.
-   */
-  allow_calendar_fallback?: boolean;
-  business_day_convention?: BusinessDayConvention;
-  /**
-   * Calendar identifier for schedule generation and lags.
-   */
-  calendar_id?: Id1 | null;
-  /**
-   * Overnight vs term compounding for this floating leg.
-   *
-   * Defaults to Simple (term EURIBOR / term SOFR). Set a compounded
-   * variant when the forward curve is an overnight RFR such as €STR or
-   * SOFR OIS.
-   */
-  compounding?:
-    | "simple"
-    | {
-        compounded_in_arrears: {
-          /**
-           * Number of business days to shift observation dates back from the accrual
-           * period (lookback).  Typically 2–5 days depending on market convention.
-           *
-           * The observation dates are shifted while the day-count-fraction (DCF)
-           * weights remain anchored to the **original** accrual period dates.
-           * This is consistent with "lookback without observation shift" as
-           * described in the ISDA 2021 Definitions and ARRC SOFR conventions.
-           */
-          lookback_days: number;
-          [k: string]: unknown;
-        };
-      }
-    | {
-        compounded_with_observation_shift: {
-          /**
-           * Number of business days to shift both observation dates and DCF weights.
-           */
-          shift_days: number;
-          [k: string]: unknown;
-        };
-      }
-    | {
-        compounded_with_rate_cutoff: {
-          /**
-           * Number of business days before period end to freeze the overnight rate.
-           */
-          cutoff_days: number;
-          [k: string]: unknown;
-        };
-      };
-  currency: Currency;
-  day_count: DayCount;
-  discount_curve_id: Id2;
-  end: Date;
-  forward_curve_id: Id3;
-  frequency: Tenor;
+  leg: D_2479A404Fecfb3F42644;
   notional: Money;
-  /**
-   * Payment lag in business days after period end (default: 0).
-   */
-  payment_lag_days?: number;
-  /**
-   * Reset lag in business days before the accrual start (e.g. 2 for T-2 fixing).
-   */
-  reset_lag_days?: number | null;
   /**
    * Pay/receive direction for this leg.
    */
-  side: "receive" | "pay";
-  spread_bp?: Decimal;
-  start: Date1;
-  /**
-   * Stub period handling rule.
-   */
-  stub?: "none" | "short_front" | "short_back" | "long_front" | "long_back";
+  side: "pay" | "receive";
 }
 /**
  * Metric-time pricing configuration.

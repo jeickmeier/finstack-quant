@@ -40,7 +40,6 @@
           "underlying_fixed_leg": {
             "business_day_convention": "modified_following",
             "calendar_id": null,
-            "compounding_simple": true,
             "day_count": "30_360",
             "discount_curve_id": "USD-OIS",
             "end": "2037-01-17",
@@ -230,28 +229,13 @@
         }
       ]
     },
-    "d_055066044802b6e94af1": {
-      "description": "Quote convention used when reporting or consuming OAS values.",
-      "oneOf": [
-        {
-          "const": "continuous",
-          "description": "Continuous additive spread, matching the tree's internal short-rate shift.",
-          "type": "string"
-        },
-        {
-          "const": "semi_annual",
-          "description": "Semiannual bond-equivalent OAS quote.",
-          "type": "string"
-        }
-      ]
-    },
     "d_10a2b628165f3f3e10e7": {
       "additionalProperties": false,
       "description": "Configuration for Monte Carlo PIK bond pricing.",
       "properties": {
         "barrier_crossing": {
           "$ref": "#/$defs/d_d4ba69c121b73ac48a10",
-          "description": "Barrier-crossing policy used for `BarrierType::FirstPassage`.\n\nDefault: `BrownianBridge` when the Merton model uses `FirstPassage`,\notherwise `Discrete`."
+          "description": "Barrier-crossing policy used for `MertonBarrierType::FirstPassage`.\n\nDefault: `BrownianBridge` when the Merton model uses `FirstPassage`,\notherwise `Discrete`."
         },
         "calibration": {
           "anyOf": [
@@ -979,7 +963,7 @@
           "description": "Optional forward curve identifier for asset-swap spread metrics.\n\nWhen set, ASW par/market metrics project the floating receiver leg from\nthis forward curve instead of using a discount-curve par-rate proxy."
         },
         "bdt_sigma": {
-          "description": "Black-Derman-Toy lognormal short-rate volatility (σ), as an annual\ndecimal proportion of the short rate (`0.20` = 20%).\n\nRead only by the rates-only bond tree when `vol_model = black` selects\nBDT for a bond with embedded exercise rights, where it is required.\nIt is a relative (lognormal) volatility, unlike the absolute\n[`Self::hw1f_sigma`]; typical values are 0.10–0.40. The BDT lattice has\nno mean reversion. Must be finite and non-negative; `0.0` prices on the\ndeterministic curve.",
+          "description": "Black-Derman-Toy lognormal short-rate volatility (σ), as an annual\ndecimal proportion of the short rate (`0.20` = 20%).\n\nRead only by the rates-only bond tree when `tree_model = black_derman_toy` selects\nBDT for a bond with embedded exercise rights, where it is required.\nIt is a relative (lognormal) volatility, unlike the absolute\n[`Self::hw1f_sigma`]; typical values are 0.10–0.40. The BDT lattice has\nno mean reversion. Must be finite and non-negative; `0.0` prices on the\ndeterministic curve.",
           "format": "double",
           "type": [
             "number",
@@ -1094,7 +1078,7 @@
           "description": "Price/accrual target convention for OAS inversion."
         },
         "oas_quote_compounding": {
-          "$ref": "#/$defs/d_055066044802b6e94af1",
+          "$ref": "#/$defs/d_5c13df5a55f1da604df2",
           "default": "continuous",
           "description": "Quote compounding convention for OAS inputs and outputs."
         },
@@ -1128,6 +1112,17 @@
           ],
           "description": "Optional discount curve identifier for tree-based option/OAS models.\n\nSome vendor OAS screens use a model curve distinct from the bond's pricing\nor spread curve. When set, tree pricers calibrate to this curve while\nnon-tree spread metrics continue to use the instrument's discount curve."
         },
+        "tree_model": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/d_948cdc4db846a21357a4"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Short-rate lattice for the rates-only bond tree (`hull_white` or\n`black_derman_toy`). `None` selects Hull-White."
+        },
         "tree_steps": {
           "default": null,
           "description": "Number of time steps for tree-based pricing (e.g., 100)",
@@ -1138,17 +1133,6 @@
             "null"
           ]
         },
-        "vol_model": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/d_ec89adc17436f33de839"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "Volatility model choice for option pricing.\n\nWhen set, overrides the default Black (lognormal) model."
-        },
         "vol_surface_extrapolation": {
           "$ref": "#/$defs/d_4ac4dad3ab3a5d25d3f9",
           "default": "error",
@@ -1156,6 +1140,41 @@
         }
       },
       "type": "object"
+    },
+    "d_5c13df5a55f1da604df2": {
+      "description": "Compounding convention for interest rates.\n\nUsed to specify how interest rates should be quoted or converted.\nAll variants produce mathematically equivalent discount factors when\napplied consistently.\n\n# Relationship Between Conventions\n\nFor a given discount factor DF at time t, the rates under different\nconventions are related by:\n\n```text\nDF = e^(-r_cc × t)                    [Continuous]\n   = (1 + r_ann)^(-t)                 [Annual]\n   = (1 + r_per/n)^(-n×t)             [Periodic(n)]\n   = 1 / (1 + r_simple × t)           [Simple]\n```\n\n# Ordering of Rates\n\nFor positive rates and t > 0: `r_simple > r_annual > r_continuous`\n(less frequent compounding requires a higher quoted rate for the same DF).",
+      "oneOf": [
+        {
+          "const": "continuous",
+          "description": "Continuous compounding: r = -ln(DF) / t\n\nMost common for internal calculations, curve construction, and\nquantitative finance models. Provides the simplest mathematical\nproperties (additive over time).",
+          "type": "string"
+        },
+        {
+          "const": "annual",
+          "description": "Annual compounding: r = DF^(-1/t) - 1\n\nStandard for many bond markets, particularly UK gilts and\nEuropean government bonds. Also common for Bloomberg zero rate display.",
+          "type": "string"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Periodic compounding with n periods per year: r = n × (DF^(-1/(n×t)) - 1)\n\nCommon values:\n- n=2: Semi-annual (US Treasury, corporate bonds)\n- n=4: Quarterly (some FRNs)\n- n=12: Monthly (rare, some retail products)\n\nNote: Uses [`NonZeroU32`] to prevent division by zero at compile time.",
+          "properties": {
+            "periodic": {
+              "format": "uint32",
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "periodic"
+          ],
+          "type": "object"
+        },
+        {
+          "const": "simple",
+          "description": "Simple interest (no compounding): r = (1/DF - 1) / t\n\nUsed for money market instruments with maturity < 1 year, including:\n- Interbank deposits\n- T-bills and commercial paper\n- SOFR, SONIA, €STR fixings\n\nTypically paired with ACT/360 (USD, EUR) or ACT/365F (GBP) day counts.",
+          "type": "string"
+        }
+      ]
     },
     "d_6347b87cc04573a369d9": {
       "description": "Which credit metric drives the toggle decision.",
@@ -1173,21 +1192,6 @@
         {
           "const": "leverage",
           "description": "Use the leverage ratio.",
-          "type": "string"
-        }
-      ]
-    },
-    "d_65ab8342c981e0aa1c55": {
-      "description": "Swaption settlement method",
-      "oneOf": [
-        {
-          "const": "physical",
-          "description": "Physical settlement (enter into underlying swap)",
-          "type": "string"
-        },
-        {
-          "const": "cash",
-          "description": "Cash settlement (receive NPV of swap)",
           "type": "string"
         }
       ]
@@ -1330,7 +1334,7 @@
         "compounding": {
           "$ref": "#/$defs/d_c2e67bb3fe26d39944ea",
           "default": "simple",
-          "description": "Compounding method for floating coupons.\n\nDetermines how floating rate coupons are calculated:\n- `Simple` (default): LIBOR-style simple interest\n- `CompoundedInArrears`: SOFR/SONIA-style daily compounding\n\n# Implementation Notes\n\nCompounded-in-arrears is implemented for IRS pricing in `instruments::irs` with\nsupport for lookback and observation shift conventions. For seasoned (already\nstarted) compounded swaps, pricing requires explicit fixings for observation\ndates prior to `as_of`."
+          "description": "Compounding method for floating coupons.\n\nDetermines how floating rate coupons are calculated:\n- `simple` (default): one term forward per period\n- `compounded_*`: SOFR/SONIA-style daily compounding\n- `simple_average` is rejected by [`Self::validate`]\n\n# Implementation Notes\n\nCompounded-in-arrears is implemented for IRS pricing in `instruments::irs` with\nsupport for lookback and observation shift conventions. For seasoned (already\nstarted) compounded swaps, pricing requires explicit fixings for observation\ndates prior to `as_of`."
         },
         "day_count": {
           "$ref": "#/$defs/d_c0401254ec268b317b65",
@@ -1554,6 +1558,21 @@
         "horizon"
       ],
       "type": "object"
+    },
+    "d_948cdc4db846a21357a4": {
+      "description": "Short-rate lattice used by the rates-only bond tree.\n\nSelected by `instrument_pricing_overrides.model_config.tree_model`; when the\nfield is absent the bond tree uses Hull-White.",
+      "oneOf": [
+        {
+          "const": "hull_white",
+          "description": "Hull-White one-factor (normal short rate) with `(κ, σ)` from\n`model_config.hw1f_mean_reversion` / `model_config.hw1f_sigma` or the\npre-fitted market scalars.",
+          "type": "string"
+        },
+        {
+          "const": "black_derman_toy",
+          "description": "Black-Derman-Toy (lognormal short rate) with volatility\n`model_config.bdt_sigma`.",
+          "type": "string"
+        }
+      ]
     },
     "d_94cb251104de5cf587b6": {
       "description": "A phantom-typed identifier that prevents mixing different kinds of IDs.\n\nThis type wraps a string identifier with a phantom type parameter to ensure\ntype safety at compile time. Different `Id<T>` types with different `T`\ncannot be compared or mixed accidentally, preventing entire classes of bugs.\n\n# Type Parameters\n\n* `T` - Phantom type tag that distinguishes this ID from IDs with different tags\n\n# Invariants\n\n- Storage uses `Arc<str>` for efficient cloning\n- The phantom marker has zero size and runtime cost\n- Two `Id<T>` values are equal if their string values are equal\n- IDs with different type tags (`Id<A>` vs `Id<B>`) cannot be compared\n\n# Examples\n\n```rust\nuse finstack_quant_core::types::{CurveId, InstrumentId};\n\n// Create IDs with different type tags\nlet curve = CurveId::from(\"USD-SOFR\");\nlet bond = InstrumentId::from(\"ISIN:US912828XG60\");\n\n// Can compare IDs of the same type\nassert_eq!(curve, CurveId::from(\"USD-SOFR\"));\nassert_ne!(curve, CurveId::from(\"EUR-ESTR\"));\n\n// Cannot compare IDs of different types (compile error):\n// let _ = curve == bond;  // Error: mismatched types\n```\n\n# Thread Safety\n\n`Id<T>` is `Send + Sync` as it wraps an `Arc<str>`. Multiple threads can\nsafely share and clone IDs with minimal synchronization overhead.",
@@ -2520,7 +2539,7 @@
       "description": "Overrides for market-quoted values (prices, vols, spreads, upfront payments).\n\n# Price-driving fields\n\nThe following fields, when set, override the model PV returned by\n[`Instrument::base_value`](crate::instruments::common_impl::traits::Instrument::base_value)\nfor bonds. At most one may be set at a time — [`Self::validate`] enforces this.\nPrecedence (applied top-to-bottom inside `Bond::base_value`):\n\n1. `quoted_dirty_price_currency` — currency units (bond native currency)\n2. `quoted_clean_price_pct` — percentage of par\n3. `quoted_ytm` — decimal YTM (e.g. `0.055` = 5.5%)\n4. `quoted_ytw` — decimal yield-to-worst\n5. `quoted_z_spread` — decimal Z-spread\n6. `quoted_oas` — decimal OAS\n7. `quoted_discount_margin` — decimal DM (FRNs)\n8. `quoted_i_spread` — decimal I-spread\n9. `quoted_asw_market` — decimal ASW (market convention)\n10. `quoted_japanese_simple_yield` — decimal Tokyo simple yield (単利)",
       "properties": {
         "cds_quote_bp": {
-          "description": "CreditDefaultSwap clean par-spread quote in basis points.\n\nUsed only by CreditDefaultSwap risk replay, where it replaces the\nmatching contractual hazard-curve pillar. It does not drive PV, and no\nother instrument (CDSIndex included) reads it.",
+          "description": "CreditDefaultSwap clean par-spread quote in basis points.\n\nUsed only by CreditDefaultSwap risk replay, where it replaces the\nmatching contractual hazard-curve pillar. It does not drive PV, and no\nother instrument (CdsIndex included) reads it.",
           "format": "double",
           "type": [
             "number",
@@ -2646,10 +2665,6 @@
           ],
           "description": "Optional calendar for business day adjustments"
         },
-        "compounding_simple": {
-          "description": "If true, use simple interest on accrual fraction",
-          "type": "boolean"
-        },
         "day_count": {
           "$ref": "#/$defs/d_c0401254ec268b317b65",
           "description": "Day count convention for accrual"
@@ -2708,14 +2723,13 @@
         "frequency",
         "day_count",
         "start",
-        "end",
-        "compounding_simple"
+        "end"
       ],
       "type": "object"
     },
     "d_b532a9f21fa25370d47c": {
       "additionalProperties": false,
-      "description": "Bermudan swaption with multiple exercise dates.\n\nA Bermudan swaption gives the holder the right to enter into an interest rate\nswap at any of a set of predetermined exercise dates. This is the most common\ntype of exotic swaption in the market, used extensively for:\n\n- Callable bond hedging\n- Mortgage prepayment risk management\n- Structured product hedging\n\n# Pricing Methods\n\nBermudan swaptions require numerical methods for pricing:\n- **Hull-White Tree** (default): Industry standard, calibrated to swaption\n  volatility. Official PV and risk use this path unless a caller selects\n  [`crate::pricer::ModelKey::MonteCarloHullWhite1F`].\n- **LSMC**: Longstaff-Schwartz Monte Carlo, opt-in for path-dependent\n  validation and model comparison.\n\n# Example\n\n```\nuse finstack_quant_valuations::instruments::rates::swaption::{\n    BermudanSwaption, BermudanSchedule, BermudanType, SwaptionSettlement,\n};\n\n// Create a 10NC2 (10-year swap, callable after 2 years)\nlet swaption = BermudanSwaption::example();\n```",
+      "description": "Bermudan swaption with multiple exercise dates.\n\nA Bermudan swaption gives the holder the right to enter into an interest rate\nswap at any of a set of predetermined exercise dates. This is the most common\ntype of exotic swaption in the market, used extensively for:\n\n- Callable bond hedging\n- Mortgage prepayment risk management\n- Structured product hedging\n\n# Pricing Methods\n\nBermudan swaptions require numerical methods for pricing:\n- **Hull-White Tree** (default): Industry standard, calibrated to swaption\n  volatility. Official PV and risk use this path unless a caller selects\n  [`crate::pricer::ModelKey::MonteCarloHullWhite1F`].\n- **LSMC**: Longstaff-Schwartz Monte Carlo, opt-in for path-dependent\n  validation and model comparison.\n\n# Example\n\n```\nuse finstack_quant_valuations::instruments::rates::swaption::{\n    BermudanSwaption, BermudanSchedule, BermudanType,\n};\nuse finstack_quant_valuations::instruments::SettlementType;\n\n// Create a 10NC2 (10-year swap, callable after 2 years)\nlet swaption = BermudanSwaption::example();\n```",
       "properties": {
         "attributes": {
           "$ref": "#/$defs/d_2c88e4d1e2e4f7c22e02",
@@ -2754,7 +2768,7 @@
           "description": "Scenario-only pricing adjustments."
         },
         "settlement": {
-          "$ref": "#/$defs/d_65ab8342c981e0aa1c55",
+          "$ref": "#/$defs/d_d43bd2510e9b19df3f66",
           "description": "Settlement method (physical or cash)"
         },
         "underlying_fixed_leg": {
@@ -3727,22 +3741,28 @@
       "type": "object"
     },
     "d_c2e67bb3fe26d39944ea": {
-      "description": "Method for calculating floating leg coupon payments.\n\nDifferent reference rates require different compounding conventions:\n- **Term rates (SOFR 3M, EURIBOR, historical LIBOR)**: Simple interest\n- **Overnight rates (SOFR, SONIA, €STR, TONA)**: Compounded in arrears\n\n# Market Standards\n\n## Simple term-rate coupons\n- **Formula**: `Coupon = Notional × (Forward_Rate + Spread) × DCF`\n- **Use for**: current term-rate indices and legacy IBOR transactions\n- **Standard**: ISDA 2021 Definitions; ISDA 2006 for legacy transactions\n\n## Compounded In Arrears (RFR-style)\n- **Formula**: `Coupon = Notional × [∏(1 + r_i × dcf_i) - 1]`\n- **Use for**: USD SOFR, GBP SONIA, EUR €STR, JPY TONA\n- **Standard**: ISDA 2021 Definitions\n- **Observation convention**: plain in-arrears for standard OIS presets;\n  lookback, observation shift, and cutoff are explicit contract variants\n\n# Examples\n\n```\nuse finstack_quant_valuations::instruments::rates::irs::FloatingLegCompounding;\n\n// LIBOR-style swap (simple compounding)\nlet simple = FloatingLegCompounding::Simple;\nassert_eq!(simple, FloatingLegCompounding::default());\n\n// SOFR OIS swap: plain compounded in arrears (no lookback)\nlet sofr = FloatingLegCompounding::CompoundedInArrears { lookback_days: 0 };\nassert_eq!(sofr, FloatingLegCompounding::sofr());\n\n// SONIA FRN-style leg with the BoE 5-day lookback (explicit, not the OIS preset)\nlet sonia_frn = FloatingLegCompounding::CompoundedInArrears { lookback_days: 5 };\nassert_ne!(sonia_frn, FloatingLegCompounding::sonia());\n```\n\n# References\n\n- **ISDA 2021 Definitions**: Compounded RFR conventions `docs/REFERENCES.md#isda-2021-definitions`\n- **ARRC** (Alternative Reference Rates Committee): SOFR conventions `docs/REFERENCES.md#arrc-sofr-users-guide`\n- **BoE** (Bank of England): SONIA conventions `docs/REFERENCES.md#boe-sonia-key-features`\n- **ECB**: €STR conventions `docs/REFERENCES.md#ecb-estr-methodology`\n\nIn the IRS instrument implementation, the RFR-style variant\n(`CompoundedInArrears`) is also used to classify swaps as OIS for\ndiscount-only float-leg pricing; see `InterestRateSwap::is_single_curve_ois` for details.",
+      "description": "How the fixings of one accrual period combine into the period rate.\n\nOne canonical enum for every floating leg and coupon: swaps, basis and\ncross-currency legs, TRS financing, IR futures, FRN / loan / structured\ncredit coupons.\n\n| Variant | Period rate | Typical use |\n|---------|-------------|-------------|\n| `simple` | One term fixing / forward over the period | EURIBOR, Term SOFR, legacy IBOR |\n| `simple_average` | `(Σ rᵢ·dᵢ) / D` of daily overnight fixings | Averaged overnight loans, Fed-Funds futures |\n| `compounded_in_arrears` | `[∏(1 + rᵢ·dᵢ/B) − 1]·B/D` | SOFR / SONIA / €STR / TONA OIS (lookback 0) |\n| `compounded_with_observation_shift` | as above, observations and weights shifted | ISDA 2021 observation shift |\n| `compounded_with_rate_cutoff` | as above, last fixings frozen | ARRC lockout / SWPM \"Rate Cut-Off Days\" |\n\nDay counts are business days and must be non-negative.\n\n# References\n\n- ISDA 2021 Definitions, compounded RFR conventions `docs/REFERENCES.md#isda-2021-definitions`\n- ARRC (2020). \"SOFR: A User's Guide.\" `docs/REFERENCES.md#arrc-sofr-users-guide`\n- BoE SONIA conventions `docs/REFERENCES.md#boe-sonia-key-features`\n\n# Examples\n\n```\nuse finstack_quant_cashflows::builder::FloatingLegCompounding;\n\nassert_eq!(FloatingLegCompounding::default(), FloatingLegCompounding::Simple);\nassert_eq!(\n    FloatingLegCompounding::sofr(),\n    FloatingLegCompounding::CompoundedInArrears { lookback_days: 0 }\n);\n```",
       "oneOf": [
         {
           "const": "simple",
-          "description": "Simple interest compounding (term-rate style).\n\nCoupon = Notional × (Forward_Rate + Spread) × Day_Count_Fraction\n\nUse for:\n- Current fixed-tenor term-rate indices\n- Legacy USD/EUR/GBP LIBOR swaps\n\nThis is the generic vanilla-IRS default; the rate-index convention\nregistry selects compounded RFR terms for overnight indices.",
+          "description": "Simple term-rate projection: one fixing or forward over the period.\n\n`Coupon = Notional × (Forward_Rate + Spread) × DCF`. This is the\ndefault; a registered overnight RFR index rejects it.",
+          "type": "string"
+        },
+        {
+          "const": "simple_average",
+          "description": "Arithmetic average of daily overnight fixings weighted by accrual days,\n`Rate = (Σ rᵢ·dᵢ) / D`, for instruments that contractually specify a\nsimple-average overnight index.",
           "type": "string"
         },
         {
           "additionalProperties": false,
-          "description": "Compounded in arrears (overnight RFR rates).\n\nCoupon = Notional × [∏(1 + r_i × dcf_i) - 1] where the product\nis taken over daily observations in the accrual period.\n\nUse for:\n- USD SOFR (Secured Overnight Financing Rate)\n- GBP SONIA (Sterling Overnight Index Average)\n- EUR €STR (Euro Short-Term Rate)\n- JPY TONA (Tokyo Overnight Average Rate)\n\n# Fields\n\n- `lookback_days`: Business days by which observation dates move\n  backward while accrual day-count weights remain unshifted.\n\nStandard cleared OIS presets use zero lookback. Non-zero lookbacks are\nexplicit contractual variants, commonly used for RFR-linked notes.",
+          "description": "Compounded in arrears (overnight RFR rates).\n\n`Coupon = Notional × [∏(1 + rᵢ·dᵢ/B) − 1]` over the daily observations\nof the accrual period.",
           "properties": {
             "compounded_in_arrears": {
+              "additionalProperties": false,
               "properties": {
                 "lookback_days": {
-                  "description": "Number of business days to shift observation dates back from the accrual\nperiod (lookback).  Typically 2–5 days depending on market convention.\n\nThe observation dates are shifted while the day-count-fraction (DCF)\nweights remain anchored to the **original** accrual period dates.\nThis is consistent with \"lookback without observation shift\" as\ndescribed in the ISDA 2021 Definitions and ARRC SOFR conventions.",
-                  "format": "int32",
+                  "description": "Business days by which observation dates move backward while the\nday-count weights stay on the original accrual dates (\"lookback\nwithout observation shift\", ISDA 2021 / ARRC). `0` is plain\nin-arrears, the cleared-OIS convention.",
+                  "format": "uint32",
                   "maximum": 31,
                   "minimum": 0,
                   "type": "integer"
@@ -3761,13 +3781,14 @@
         },
         {
           "additionalProperties": false,
-          "description": "Compounded in arrears with true ISDA 2021 observation shift.\n\nUnlike `CompoundedInArrears` (lookback semantics), this variant shifts\n**both** the observation dates AND the day-count-fraction (DCF) weights.\nThis matches ISDA 2021 Definitions Section 4.5(c).\n\n```text\nLookback:           DCF(d, d+1)           × rate(d - shift, d+1 - shift)\nObservation Shift:  DCF(d - shift, d+1 - shift) × rate(d - shift, d+1 - shift)\n```",
+          "description": "Compounded in arrears with ISDA 2021 observation shift: both the\nobservation dates and their day-count weights move back\n(ISDA 2021 Definitions Section 4.5(c)).",
           "properties": {
             "compounded_with_observation_shift": {
+              "additionalProperties": false,
               "properties": {
                 "shift_days": {
-                  "description": "Number of business days to shift both observation dates and DCF weights.",
-                  "format": "int32",
+                  "description": "Business days to shift both observation dates and weights.",
+                  "format": "uint32",
                   "maximum": 31,
                   "minimum": 0,
                   "type": "integer"
@@ -3786,13 +3807,14 @@
         },
         {
           "additionalProperties": false,
-          "description": "Compounded in arrears with a rate cut-off near the period end.\n\nThis freezes the last observed overnight rate for the final `cutoff_days`\nbusiness days of the accrual period. Bloomberg SWPM labels this\nconvention as \"Rate Cut-Off Days\".",
+          "description": "Compounded in arrears with a rate cut-off near the period end.\n\nThe last `cutoff_days` business-day observations are frozen at the\nfixing immediately preceding them: for fixings `b_1..b_n` the source is\n`b_{n-cutoff}`, so a positive cut-off must leave a preceding fixing.\nReference: ARRC, December 3, 2021 Statement, Appendix A (\"Lockout\").",
           "properties": {
             "compounded_with_rate_cutoff": {
+              "additionalProperties": false,
               "properties": {
                 "cutoff_days": {
-                  "description": "Number of business days before period end to freeze the overnight rate.",
-                  "format": "int32",
+                  "description": "Business days before period end over which the rate is frozen.",
+                  "format": "uint32",
                   "maximum": 31,
                   "minimum": 0,
                   "type": "integer"
@@ -3887,6 +3909,21 @@
         {
           "const": "trading_252",
           "description": "Trading-day theta: annual theta divided by\n[`crate::constants::TRADING_DAYS_PER_YEAR`] (252).",
+          "type": "string"
+        }
+      ]
+    },
+    "d_d43bd2510e9b19df3f66": {
+      "description": "Settlement type for options",
+      "oneOf": [
+        {
+          "const": "physical",
+          "description": "Physical delivery",
+          "type": "string"
+        },
+        {
+          "const": "cash",
+          "description": "Cash settlement",
           "type": "string"
         }
       ]
@@ -4107,21 +4144,6 @@
         {
           "const": "years",
           "description": "Years (Y)",
-          "type": "string"
-        }
-      ]
-    },
-    "d_ec89adc17436f33de839": {
-      "description": "Volatility model for option pricing.",
-      "oneOf": [
-        {
-          "const": "black",
-          "description": "Black (lognormal).",
-          "type": "string"
-        },
-        {
-          "const": "normal",
-          "description": "Bachelier / normal model.",
           "type": "string"
         }
       ]

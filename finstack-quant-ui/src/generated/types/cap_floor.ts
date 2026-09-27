@@ -126,9 +126,12 @@ export type D_2701Caf4934336A2Dd86 =
  */
 export type D_02A11B30Ee627630F221 = "per_name" | "large_homogeneous";
 /**
- * Volatility model for option pricing.
+ * Short-rate lattice used by the rates-only bond tree.
+ *
+ * Selected by `instrument_pricing_overrides.model_config.tree_model`; when the
+ * field is absent the bond tree uses Hull-White.
  */
-export type DEc89Adc17436F33De839 = "black" | "normal";
+export type D_948Cdc4Db846A21357A4 = "hull_white" | "black_derman_toy";
 /**
  * End date of underlying period
  */
@@ -488,7 +491,7 @@ export interface DB0A5Fc543381Da6A5722 {
    *
    * Used only by CreditDefaultSwap risk replay, where it replaces the
    * matching contractual hazard-curve pillar. It does not drive PV, and no
-   * other instrument (CDSIndex included) reads it.
+   * other instrument (CdsIndex included) reads it.
    */
   cds_quote_bp?: number | null;
   /**
@@ -567,7 +570,7 @@ export interface D_572Ad1Befb7D94914652 {
    * Black-Derman-Toy lognormal short-rate volatility (σ), as an annual
    * decimal proportion of the short rate (`0.20` = 20%).
    *
-   * Read only by the rates-only bond tree when `vol_model = black` selects
+   * Read only by the rates-only bond tree when `tree_model = black_derman_toy` selects
    * BDT for a bond with embedded exercise rights, where it is required.
    * It is a relative (lognormal) volatility, unlike the absolute
    * [`Self::hw1f_sigma`]; typical values are 0.10–0.40. The BDT lattice has
@@ -737,7 +740,13 @@ export interface D_572Ad1Befb7D94914652 {
   /**
    * Quote compounding convention for OAS inputs and outputs.
    */
-  oas_quote_compounding?: "continuous" | "semi_annual";
+  oas_quote_compounding?:
+    | "continuous"
+    | "annual"
+    | {
+        periodic: number;
+      }
+    | "simple";
   /**
    * Instantaneous correlation between the short-rate and hazard-rate
    * shocks on the rates-credit lattice, in `[-1, 1]`.
@@ -771,15 +780,14 @@ export interface D_572Ad1Befb7D94914652 {
    */
   tree_discount_curve_id?: D_94Cb251104De5Cf587B6 | null;
   /**
+   * Short-rate lattice for the rates-only bond tree (`hull_white` or
+   * `black_derman_toy`). `None` selects Hull-White.
+   */
+  tree_model?: D_948Cdc4Db846A21357A4 | null;
+  /**
    * Number of time steps for tree-based pricing (e.g., 100)
    */
   tree_steps?: number | null;
-  /**
-   * Volatility model choice for option pricing.
-   *
-   * When set, overrides the default Black (lognormal) model.
-   */
-  vol_model?: DEc89Adc17436F33De839 | null;
   /**
    * Volatility surface extrapolation policy when `implied_volatility` is not set.
    */
@@ -803,7 +811,7 @@ export interface DCdb8Fddc0106047270C4 {
  */
 export interface DBffef9E684Ff0C351C83 {
   /**
-   * Barrier-crossing policy used for `BarrierType::FirstPassage`.
+   * Barrier-crossing policy used for `MertonBarrierType::FirstPassage`.
    *
    * Default: `BrownianBridge` when the Merton model uses `FirstPassage`,
    * otherwise `Discrete`.
@@ -1559,37 +1567,32 @@ export interface DA56D24Fc48Ebcf32A7Ae {
    */
   compounding:
     | "simple"
+    | "simple_average"
     | {
         compounded_in_arrears: {
           /**
-           * Number of business days to shift observation dates back from the accrual
-           * period (lookback).  Typically 2–5 days depending on market convention.
-           *
-           * The observation dates are shifted while the day-count-fraction (DCF)
-           * weights remain anchored to the **original** accrual period dates.
-           * This is consistent with "lookback without observation shift" as
-           * described in the ISDA 2021 Definitions and ARRC SOFR conventions.
+           * Business days by which observation dates move backward while the
+           * day-count weights stay on the original accrual dates ("lookback
+           * without observation shift", ISDA 2021 / ARRC). `0` is plain
+           * in-arrears, the cleared-OIS convention.
            */
           lookback_days: number;
-          [k: string]: unknown;
         };
       }
     | {
         compounded_with_observation_shift: {
           /**
-           * Number of business days to shift both observation dates and DCF weights.
+           * Business days to shift both observation dates and weights.
            */
           shift_days: number;
-          [k: string]: unknown;
         };
       }
     | {
         compounded_with_rate_cutoff: {
           /**
-           * Number of business days before period end to freeze the overnight rate.
+           * Business days before period end over which the rate is frozen.
            */
           cutoff_days: number;
-          [k: string]: unknown;
         };
       };
   /**

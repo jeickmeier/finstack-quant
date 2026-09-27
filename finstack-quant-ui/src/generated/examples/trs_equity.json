@@ -4,8 +4,8 @@
       "attributes": {},
       "dividend_settlement": "on_dividend_date",
       "dividend_tax_rate": 0.0,
-      "financing": {
-        "compounding": "term_rate",
+      "financing_leg": {
+        "compounding": "simple",
         "day_count": "act_360",
         "discount_curve_id": "USD-OIS",
         "forward_curve_id": "USD-SOFR-3M",
@@ -33,7 +33,7 @@
         },
         "start": "2024-01-01"
       },
-      "side": "receive_total_return",
+      "side": "receive",
       "underlying": {
         "contract_size": 1.0,
         "currency": "USD",

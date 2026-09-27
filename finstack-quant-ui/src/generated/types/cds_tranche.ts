@@ -126,9 +126,12 @@ export type D_2701Caf4934336A2Dd86 =
  */
 export type D_02A11B30Ee627630F221 = "per_name" | "large_homogeneous";
 /**
- * Volatility model for option pricing.
+ * Short-rate lattice used by the rates-only bond tree.
+ *
+ * Selected by `instrument_pricing_overrides.model_config.tree_model`; when the
+ * field is absent the bond tree uses Hull-White.
  */
-export type DEc89Adc17436F33De839 = "black" | "normal";
+export type D_948Cdc4Db846A21357A4 = "hull_white" | "black_derman_toy";
 /**
  * Maturity date of the tranche
  */
@@ -324,13 +327,13 @@ export interface CdsTrancheWire {
   schema: DE389772Eba468Cc1563B;
 }
 export interface DFe7Fd429Ac42D87Faa68 {
-  spec: D_1376Bb75255Ac32C8B77;
+  spec: DAcd6C3D775D926E416Ed;
   type: "cds_tranche";
 }
 /**
  * CDS Tranche instrument definition (boilerplate)
  */
-export interface D_1376Bb75255Ac32C8B77 {
+export interface DAcd6C3D775D926E416Ed {
   /**
    * Attachment point in percent (e.g., 0.0 for equity)
    */
@@ -380,9 +383,10 @@ export interface D_1376Bb75255Ac32C8B77 {
    */
   series: number;
   /**
-   * Tranche side (buy/sell protection)
+   * Tranche side, as on CDS and CdsIndex: `pay` buys protection (pays the
+   * running premium), `receive` sells protection (receives the premium).
    */
-  side: "buy_protection" | "sell_protection";
+  side: "pay" | "receive";
   /**
    * Optional effective date for schedule anchoring (if None, uses as_of date)
    */
@@ -446,7 +450,7 @@ export interface DB0A5Fc543381Da6A5722 {
    *
    * Used only by CreditDefaultSwap risk replay, where it replaces the
    * matching contractual hazard-curve pillar. It does not drive PV, and no
-   * other instrument (CDSIndex included) reads it.
+   * other instrument (CdsIndex included) reads it.
    */
   cds_quote_bp?: number | null;
   /**
@@ -525,7 +529,7 @@ export interface D_572Ad1Befb7D94914652 {
    * Black-Derman-Toy lognormal short-rate volatility (σ), as an annual
    * decimal proportion of the short rate (`0.20` = 20%).
    *
-   * Read only by the rates-only bond tree when `vol_model = black` selects
+   * Read only by the rates-only bond tree when `tree_model = black_derman_toy` selects
    * BDT for a bond with embedded exercise rights, where it is required.
    * It is a relative (lognormal) volatility, unlike the absolute
    * [`Self::hw1f_sigma`]; typical values are 0.10–0.40. The BDT lattice has
@@ -695,7 +699,13 @@ export interface D_572Ad1Befb7D94914652 {
   /**
    * Quote compounding convention for OAS inputs and outputs.
    */
-  oas_quote_compounding?: "continuous" | "semi_annual";
+  oas_quote_compounding?:
+    | "continuous"
+    | "annual"
+    | {
+        periodic: number;
+      }
+    | "simple";
   /**
    * Instantaneous correlation between the short-rate and hazard-rate
    * shocks on the rates-credit lattice, in `[-1, 1]`.
@@ -729,15 +739,14 @@ export interface D_572Ad1Befb7D94914652 {
    */
   tree_discount_curve_id?: D_94Cb251104De5Cf587B6 | null;
   /**
+   * Short-rate lattice for the rates-only bond tree (`hull_white` or
+   * `black_derman_toy`). `None` selects Hull-White.
+   */
+  tree_model?: D_948Cdc4Db846A21357A4 | null;
+  /**
    * Number of time steps for tree-based pricing (e.g., 100)
    */
   tree_steps?: number | null;
-  /**
-   * Volatility model choice for option pricing.
-   *
-   * When set, overrides the default Black (lognormal) model.
-   */
-  vol_model?: DEc89Adc17436F33De839 | null;
   /**
    * Volatility surface extrapolation policy when `implied_volatility` is not set.
    */
@@ -761,7 +770,7 @@ export interface DCdb8Fddc0106047270C4 {
  */
 export interface DBffef9E684Ff0C351C83 {
   /**
-   * Barrier-crossing policy used for `BarrierType::FirstPassage`.
+   * Barrier-crossing policy used for `MertonBarrierType::FirstPassage`.
    *
    * Default: `BrownianBridge` when the Merton model uses `FirstPassage`,
    * otherwise `Discrete`.

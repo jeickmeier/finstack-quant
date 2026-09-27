@@ -12,7 +12,7 @@
         "currency": "USD"
       },
       "num_constituents": 125,
-      "premium": {
+      "premium_leg": {
         "business_day_convention": "modified_following",
         "calendar_id": "nyse",
         "coupon_bp": "60",
@@ -28,7 +28,7 @@
         "stub": "short_front"
       },
       "pricing": "single_curve",
-      "protection": {
+      "protection_leg": {
         "credit_curve_id": "CDX.NA.IG.HAZARD",
         "recovery_rate": 0.4,
         "settlement_delay": 3

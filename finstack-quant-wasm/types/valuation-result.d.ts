@@ -533,7 +533,7 @@ export type SchemaVersion = number;
  * remaining** — which is essentially every real deal, since
  * `build_scenario_tree_config` sets `num_periods` to months-to-maturity.
  *
- * The default is [`PricingMode::MonteCarlo`] — the mode that can price the
+ * The default is [`StructuredCreditPricingMode::MonteCarlo`] — the mode that can price the
  * deals this module is built for at realistic horizons (the public
  * `price_stochastic` entry point also selects Monte Carlo). Tree remains
  * available and correct for genuinely short horizons; select it explicitly.

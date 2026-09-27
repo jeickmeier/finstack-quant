@@ -565,7 +565,8 @@ export default [
     "path": "#/$defs/d_687d85aab3f98d958ef7/oneOf/1/properties/compounded_in_arrears/properties/lookback_days",
     "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/RateCalibrationOisCompounding/oneOf/1/properties/compounded_in_arrears/properties/lookback_days",
     "description": "Business-day lookback applied to rate observations.",
-    "format": "int32"
+    "format": "uint32",
+    "minimum": 0
   },
   {
     "path": "#/$defs/d_687d85aab3f98d958ef7/oneOf/2",
@@ -580,7 +581,8 @@ export default [
     "path": "#/$defs/d_687d85aab3f98d958ef7/oneOf/2/properties/compounded_with_observation_shift/properties/shift_days",
     "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/RateCalibrationOisCompounding/oneOf/2/properties/compounded_with_observation_shift/properties/shift_days",
     "description": "Business days by which observations and accrual weights are shifted.",
-    "format": "int32"
+    "format": "uint32",
+    "minimum": 0
   },
   {
     "path": "#/$defs/d_687d85aab3f98d958ef7/oneOf/3",
@@ -595,7 +597,8 @@ export default [
     "path": "#/$defs/d_687d85aab3f98d958ef7/oneOf/3/properties/compounded_with_rate_cutoff/properties/cutoff_days",
     "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/RateCalibrationOisCompounding/oneOf/3/properties/compounded_with_rate_cutoff/properties/cutoff_days",
     "description": "Number of business days in the rate-cutoff window.",
-    "format": "int32"
+    "format": "uint32",
+    "minimum": 0
   },
   {
     "path": "#/$defs/d_7294ceac8716eaa72c7a",

@@ -216,7 +216,7 @@ def test_builder_build_does_not_run_pricing_validation() -> None:
 
 
 def test_builder_names_missing_field() -> None:
-    with pytest.raises(ValueError, match=r"InterestRateSwapBuilder.*'float'"):
+    with pytest.raises(ValueError, match=r"InterestRateSwapBuilder.*'float_leg'"):
         (
             InterestRateSwap
             .builder()
@@ -625,7 +625,7 @@ def test_cap_floor_example_getters_and_new_setters() -> None:
         .notional(5_000_000.0, currency="USD")
         .strike(Rate(0.02))
         .spread_bp(0.0)
-        .premium_leg("2025-01-20", 10_000.0, currency="USD")
+        .premium("2025-01-20", 10_000.0, currency="USD")
         .start_date("2025-01-15")
         .maturity("2028-01-15")
         .frequency(Tenor.quarterly())

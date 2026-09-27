@@ -392,30 +392,30 @@ export default [
   {
     "path": "#/$defs/AgencyProgram",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/AgencyProgram",
-    "description": "Agency program enumeration.\n\nIdentifies the government-sponsored enterprise (GSE) or government agency\nthat guarantees the mortgage-backed security.\n\n# GNMA Programs\n\nGinnie Mae has two distinct programs with different payment delay conventions:\n- **GNMA I**: Single-issuer pools with a 45-day stated delay. Payments on the 15th.\n- **GNMA II**: Multi-issuer pools with a 50-day stated delay. Payments on the 20th.\n\nUse `GnmaI` or `GnmaII` to select the appropriate convention. Their\npersisted values are exactly `GNMA_I` and `GNMA_II`, respectively."
+    "description": "Agency program enumeration.\n\nIdentifies the government-sponsored enterprise (GSE) or government agency\nthat guarantees the mortgage-backed security.\n\n# GNMA Programs\n\nGinnie Mae has two distinct programs with different payment delay conventions:\n- **GNMA I**: Single-issuer pools with a 45-day stated delay. Payments on the 15th.\n- **GNMA II**: Multi-issuer pools with a 50-day stated delay. Payments on the 20th.\n\nUse `GnmaI` or `GnmaII` to select the appropriate convention. Their\npersisted values are exactly `gnma_i` and `gnma_ii`, respectively."
   },
   {
     "path": "#/$defs/AgencyProgram/oneOf/0",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/AgencyProgram/oneOf/0",
-    "const": "FNMA",
+    "const": "fnma",
     "description": "Fannie Mae (Federal National Mortgage Association)"
   },
   {
     "path": "#/$defs/AgencyProgram/oneOf/1",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/AgencyProgram/oneOf/1",
-    "const": "FHLMC",
+    "const": "fhlmc",
     "description": "Freddie Mac (Federal Home Loan Mortgage Corporation)"
   },
   {
     "path": "#/$defs/AgencyProgram/oneOf/2",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/AgencyProgram/oneOf/2",
-    "const": "GNMA_I",
+    "const": "gnma_i",
     "description": "Ginnie Mae I - single-issuer pools with 45-day stated delay.\n\nGNMA I securities pay on the 15th of the month following the accrual\nperiod, resulting in a 45-day stated delay from accrual start."
   },
   {
     "path": "#/$defs/AgencyProgram/oneOf/3",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/AgencyProgram/oneOf/3",
-    "const": "GNMA_II",
+    "const": "gnma_ii",
     "description": "Ginnie Mae II - multi-issuer pools with 50-day stated delay.\n\nGNMA II securities pay on the 20th of the month following the accrual\nperiod, resulting in a ~50-day stated delay from accrual start. This is\nthe larger and more actively traded GNMA program."
   },
   {
@@ -2404,7 +2404,7 @@ export default [
   {
     "path": "#/$defs/BasisSwap",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/BasisSwap",
-    "description": "Basis swap instrument that exchanges two floating rate payments with different tenors.\n\nA basis swap allows parties to exchange floating rate payments based on different\nreference rates (e.g., 3M SOFR vs 6M SOFR) plus an optional spread on one leg.\nThe primary leg typically receives the spread, while the reference leg pays flat.\n\nEach leg owns its own dates, discount curve, calendar, and stub conventions,\nfollowing the IRS leg-centric pattern.\n\n# Cross-Currency (XCCY) Basis Swaps\n\n**Important**: This implementation supports **single-currency** basis swaps only.\nFor cross-currency basis swaps, use `XccySwap` instead.\n\n# Examples\n```rust\nuse finstack_quant_core::{dates::*, money::Money, currency::Currency, types::CurveId};\nuse finstack_quant_valuations::instruments::rates::basis_swap::{BasisSwap, BasisSwapLeg};\nuse time::Month;\n\nlet start = Date::from_calendar_date(2024, Month::January, 3).expect(\"valid date\");\nlet end = Date::from_calendar_date(2025, Month::January, 3).expect(\"valid date\");\n\nlet primary_leg = BasisSwapLeg {\n    forward_curve_id: CurveId::new(\"3M-SOFR\"),\n    discount_curve_id: CurveId::new(\"OIS\"),\n    start,\n    end,\n    frequency: Tenor::quarterly(),\n    day_count: DayCount::Act360,\n    business_day_convention: BusinessDayConvention::ModifiedFollowing,\n    calendar_id: None,\n    stub: StubKind::ShortFront,\n    spread_bp: rust_decimal::Decimal::from(5),\n    payment_lag_days: 0,\n    reset_lag_days: 0,\n    compounding: Default::default(),\n};\n\nlet reference_leg = BasisSwapLeg {\n    forward_curve_id: CurveId::new(\"6M-SOFR\"),\n    discount_curve_id: CurveId::new(\"OIS\"),\n    start,\n    end,\n    frequency: Tenor::semi_annual(),\n    day_count: DayCount::Act360,\n    business_day_convention: BusinessDayConvention::ModifiedFollowing,\n    calendar_id: None,\n    stub: StubKind::ShortFront,\n    spread_bp: rust_decimal::Decimal::ZERO,\n    payment_lag_days: 0,\n    reset_lag_days: 0,\n    compounding: Default::default(),\n};\n\nlet swap = BasisSwap::new(\n    \"BASIS_SWAP_001\",\n    Money::from((1_000_000_i64, Currency::USD)),\n    primary_leg,\n    reference_leg,\n);\n```"
+    "description": "Basis swap instrument that exchanges two floating rate payments with different tenors.\n\nA basis swap allows parties to exchange floating rate payments based on different\nreference rates (e.g., 3M SOFR vs 6M SOFR) plus an optional spread on one leg.\nThe primary leg typically receives the spread, while the reference leg pays flat.\n\nEach leg owns its own dates, discount curve, calendar, and stub conventions,\nfollowing the IRS leg-centric pattern.\n\n# Cross-Currency (XCCY) Basis Swaps\n\n**Important**: This implementation supports **single-currency** basis swaps only.\nFor cross-currency basis swaps, use `XccySwap` instead.\n\n# Examples\n```rust\nuse finstack_quant_core::{dates::*, money::Money, currency::Currency, types::CurveId};\nuse finstack_quant_valuations::instruments::rates::basis_swap::BasisSwap;\nuse time::Month;\n\nlet start = Date::from_calendar_date(2024, Month::January, 3).expect(\"valid date\");\nlet end = Date::from_calendar_date(2025, Month::January, 3).expect(\"valid date\");\n\nlet primary_leg = FloatLegSpec {\n    forward_curve_id: CurveId::new(\"3M-SOFR\"),\n    discount_curve_id: CurveId::new(\"OIS\"),\n    start,\n    end,\n    frequency: Tenor::quarterly(),\n    day_count: DayCount::Act360,\n    business_day_convention: BusinessDayConvention::ModifiedFollowing,\n    calendar_id: None,\n    stub: StubKind::ShortFront,\n    spread_bp: rust_decimal::Decimal::from(5),\n    payment_lag_days: 0,\n    reset_lag_days: 0,\n    compounding: Default::default(),\n};\n\nlet reference_leg = FloatLegSpec {\n    forward_curve_id: CurveId::new(\"6M-SOFR\"),\n    discount_curve_id: CurveId::new(\"OIS\"),\n    start,\n    end,\n    frequency: Tenor::semi_annual(),\n    day_count: DayCount::Act360,\n    business_day_convention: BusinessDayConvention::ModifiedFollowing,\n    calendar_id: None,\n    stub: StubKind::ShortFront,\n    spread_bp: rust_decimal::Decimal::ZERO,\n    payment_lag_days: 0,\n    reset_lag_days: 0,\n    compounding: Default::default(),\n};\n\nlet swap = BasisSwap::new(\n    \"BASIS_SWAP_001\",\n    Money::from((1_000_000_i64, Currency::USD)),\n    primary_leg,\n    reference_leg,\n);\n```"
   },
   {
     "path": "#/$defs/BasisSwap/properties/allow_calendar_fallback",
@@ -2457,15 +2457,15 @@ export default [
     "path": "#/$defs/BasisSwap/properties/primary_leg",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/BasisSwap/properties/primary_leg",
     "description": "Primary leg that typically receives the spread.",
-    "ref": "#/$defs/BasisSwapLeg",
-    "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/BasisSwapLeg"
+    "ref": "#/$defs/FloatLegSpec",
+    "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/FloatLegSpec"
   },
   {
     "path": "#/$defs/BasisSwap/properties/reference_leg",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/BasisSwap/properties/reference_leg",
     "description": "Reference leg that typically pays flat.",
-    "ref": "#/$defs/BasisSwapLeg",
-    "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/BasisSwapLeg"
+    "ref": "#/$defs/FloatLegSpec",
+    "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/FloatLegSpec"
   },
   {
     "path": "#/$defs/BasisSwap/properties/scenario_pricing_overrides",
@@ -2473,113 +2473,6 @@ export default [
     "description": "Scenario-only pricing adjustments.",
     "ref": "https://finstack_quant.dev/schemas/common/1/scenario_pricing_overrides.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/scenario_pricing_overrides.schema.json#"
-  },
-  {
-    "path": "#/$defs/BasisSwapLeg",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/BasisSwapLeg",
-    "description": "Specification for basis swap legs (floating vs floating)\n\nA basis swap leg represents one side of a floating-for-floating interest rate swap,\nwhere two parties exchange payments linked to different floating rate indices\n(e.g., 3M SOFR vs 6M SOFR).\n\nEach leg owns its own dates, discount curve, schedule conventions, and calendar,\nfollowing the IRS leg-centric pattern used by `FixedLegSpec` and `FloatLegSpec`."
-  },
-  {
-    "path": "#/$defs/BasisSwapLeg/properties/business_day_convention",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/BasisSwapLeg/properties/business_day_convention",
-    "default": "modified_following",
-    "description": "Business day convention for date adjustments",
-    "ref": "https://finstack_quant.dev/schemas/common/1/business_day_convention.schema.json",
-    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/business_day_convention.schema.json#"
-  },
-  {
-    "path": "#/$defs/BasisSwapLeg/properties/calendar_id",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/BasisSwapLeg/properties/calendar_id",
-    "description": "Optional calendar identifier for business day adjustments"
-  },
-  {
-    "path": "#/$defs/BasisSwapLeg/properties/calendar_id/anyOf/0",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/BasisSwapLeg/properties/calendar_id/anyOf/0",
-    "ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
-    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/id.schema.json#"
-  },
-  {
-    "path": "#/$defs/BasisSwapLeg/properties/calendar_id/anyOf/1",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/BasisSwapLeg/properties/calendar_id/anyOf/1"
-  },
-  {
-    "path": "#/$defs/BasisSwapLeg/properties/compounding",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/BasisSwapLeg/properties/compounding",
-    "default": "simple",
-    "description": "Overnight vs term compounding for this floating leg.\n\nDefaults to [`crate::instruments::rates::irs::FloatingLegCompounding::Simple`] so tenor-basis swaps\n(3s1s, EURIBOR 6s3s) keep term projection. Set a compounded variant\nfor an overnight RFR leg such as SOFR OIS or €STR.",
-    "ref": "#/$defs/FloatingLegCompounding",
-    "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/FloatingLegCompounding"
-  },
-  {
-    "path": "#/$defs/BasisSwapLeg/properties/day_count",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/BasisSwapLeg/properties/day_count",
-    "description": "Day count convention for accrual calculations",
-    "ref": "https://finstack_quant.dev/schemas/common/1/day_count.schema.json",
-    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/day_count.schema.json#"
-  },
-  {
-    "path": "#/$defs/BasisSwapLeg/properties/discount_curve_id",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/BasisSwapLeg/properties/discount_curve_id",
-    "description": "Discount curve identifier for present value calculations",
-    "ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
-    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/id.schema.json#"
-  },
-  {
-    "path": "#/$defs/BasisSwapLeg/properties/end",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/BasisSwapLeg/properties/end",
-    "description": "End date of the leg",
-    "ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
-    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/date.schema.json#"
-  },
-  {
-    "path": "#/$defs/BasisSwapLeg/properties/forward_curve_id",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/BasisSwapLeg/properties/forward_curve_id",
-    "description": "Forward curve identifier for this leg",
-    "ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
-    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/id.schema.json#"
-  },
-  {
-    "path": "#/$defs/BasisSwapLeg/properties/frequency",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/BasisSwapLeg/properties/frequency",
-    "description": "Payment frequency for the leg",
-    "ref": "https://finstack_quant.dev/schemas/common/1/tenor.schema.json",
-    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/tenor.schema.json#"
-  },
-  {
-    "path": "#/$defs/BasisSwapLeg/properties/payment_lag_days",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/BasisSwapLeg/properties/payment_lag_days",
-    "default": 0,
-    "description": "Payment lag in business days after period end (default: 0).\n\nE.g., `payment_lag_days: 2` means payment occurs 2 business days after the\naccrual period end date.",
-    "format": "int32"
-  },
-  {
-    "path": "#/$defs/BasisSwapLeg/properties/reset_lag_days",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/BasisSwapLeg/properties/reset_lag_days",
-    "default": 0,
-    "description": "Reset lag in business days before period start (default: 0).\n\nE.g., `reset_lag_days: 2` means the rate fixing occurs 2 business days before\nthe accrual period start date. This follows standard market convention where\nfixing typically precedes the accrual period.",
-    "format": "int32"
-  },
-  {
-    "path": "#/$defs/BasisSwapLeg/properties/spread_bp",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/BasisSwapLeg/properties/spread_bp",
-    "description": "Spread added to the floating rate, in **basis points**.\n\n# Units\n\n- `Decimal::from(5)` represents 5 basis points (5bp)\n- `Decimal::from(100)` represents 100 basis points (1%)\n- `Decimal::from(-10)` represents -10 basis points\n\nThis is consistent with `FloatLegSpec::spread_bp` and `PremiumLegSpec::spread_bp`.\n\n# Typical Market Range\n\nBasis spreads in liquid markets typically range from -50bp to +50bp.\nValues outside ±5000bp are considered extreme and\nwill trigger a validation warning during pricing.",
-    "ref": "https://finstack_quant.dev/schemas/common/1/decimal.schema.json",
-    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/decimal.schema.json#"
-  },
-  {
-    "path": "#/$defs/BasisSwapLeg/properties/start",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/BasisSwapLeg/properties/start",
-    "description": "Start date of the leg",
-    "ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
-    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/date.schema.json#"
-  },
-  {
-    "path": "#/$defs/BasisSwapLeg/properties/stub",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/BasisSwapLeg/properties/stub",
-    "default": "short_front",
-    "description": "Stub period handling rule",
-    "ref": "#/$defs/StubKind",
-    "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/StubKind"
   },
   {
     "path": "#/$defs/Basket",
@@ -2838,7 +2731,7 @@ export default [
   {
     "path": "#/$defs/BermudanSwaption",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/BermudanSwaption",
-    "description": "Bermudan swaption with multiple exercise dates.\n\nA Bermudan swaption gives the holder the right to enter into an interest rate\nswap at any of a set of predetermined exercise dates. This is the most common\ntype of exotic swaption in the market, used extensively for:\n\n- Callable bond hedging\n- Mortgage prepayment risk management\n- Structured product hedging\n\n# Pricing Methods\n\nBermudan swaptions require numerical methods for pricing:\n- **Hull-White Tree** (default): Industry standard, calibrated to swaption\n  volatility. Official PV and risk use this path unless a caller selects\n  [`crate::pricer::ModelKey::MonteCarloHullWhite1F`].\n- **LSMC**: Longstaff-Schwartz Monte Carlo, opt-in for path-dependent\n  validation and model comparison.\n\n# Example\n\n```\nuse finstack_quant_valuations::instruments::rates::swaption::{\n    BermudanSwaption, BermudanSchedule, BermudanType, SwaptionSettlement,\n};\n\n// Create a 10NC2 (10-year swap, callable after 2 years)\nlet swaption = BermudanSwaption::example();\n```"
+    "description": "Bermudan swaption with multiple exercise dates.\n\nA Bermudan swaption gives the holder the right to enter into an interest rate\nswap at any of a set of predetermined exercise dates. This is the most common\ntype of exotic swaption in the market, used extensively for:\n\n- Callable bond hedging\n- Mortgage prepayment risk management\n- Structured product hedging\n\n# Pricing Methods\n\nBermudan swaptions require numerical methods for pricing:\n- **Hull-White Tree** (default): Industry standard, calibrated to swaption\n  volatility. Official PV and risk use this path unless a caller selects\n  [`crate::pricer::ModelKey::MonteCarloHullWhite1F`].\n- **LSMC**: Longstaff-Schwartz Monte Carlo, opt-in for path-dependent\n  validation and model comparison.\n\n# Example\n\n```\nuse finstack_quant_valuations::instruments::rates::swaption::{\n    BermudanSwaption, BermudanSchedule, BermudanType,\n};\nuse finstack_quant_valuations::instruments::SettlementType;\n\n// Create a 10NC2 (10-year swap, callable after 2 years)\nlet swaption = BermudanSwaption::example();\n```"
   },
   {
     "path": "#/$defs/BermudanSwaption/properties/attributes",
@@ -2907,8 +2800,8 @@ export default [
     "path": "#/$defs/BermudanSwaption/properties/settlement",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/BermudanSwaption/properties/settlement",
     "description": "Settlement method (physical or cash)",
-    "ref": "#/$defs/SwaptionSettlement",
-    "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/SwaptionSettlement"
+    "ref": "#/$defs/SettlementType",
+    "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/SettlementType"
   },
   {
     "path": "#/$defs/BermudanSwaption/properties/underlying_fixed_leg",
@@ -4462,639 +4355,639 @@ export default [
     "description": "Custom / Other"
   },
   {
-    "path": "#/$defs/CDSIndex",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CDSIndex",
+    "path": "#/$defs/CdsIndex",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CdsIndex",
     "description": "CDS Index instrument definition"
   },
   {
-    "path": "#/$defs/CDSIndex/properties/attributes",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CDSIndex/properties/attributes",
+    "path": "#/$defs/CdsIndex/properties/attributes",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CdsIndex/properties/attributes",
     "default": {},
     "description": "Attributes for tagging and selection",
     "ref": "https://finstack_quant.dev/schemas/common/1/attributes.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/attributes.schema.json#"
   },
   {
-    "path": "#/$defs/CDSIndex/properties/constituents",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CDSIndex/properties/constituents",
+    "path": "#/$defs/CdsIndex/properties/constituents",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CdsIndex/properties/constituents",
     "description": "Optional list of constituents when using `IndexPricing::Constituents`"
   },
   {
-    "path": "#/$defs/CDSIndex/properties/constituents/items",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CDSIndex/properties/constituents/items",
-    "ref": "#/$defs/CDSIndexConstituent",
-    "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CDSIndexConstituent"
+    "path": "#/$defs/CdsIndex/properties/constituents/items",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CdsIndex/properties/constituents/items",
+    "ref": "#/$defs/CdsIndexConstituent",
+    "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CdsIndexConstituent"
   },
   {
-    "path": "#/$defs/CDSIndex/properties/convention",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CDSIndex/properties/convention",
+    "path": "#/$defs/CdsIndex/properties/convention",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CdsIndex/properties/convention",
     "description": "Regional ISDA convention",
     "ref": "#/$defs/CdsConvention",
     "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CdsConvention"
   },
   {
-    "path": "#/$defs/CDSIndex/properties/id",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CDSIndex/properties/id",
+    "path": "#/$defs/CdsIndex/properties/id",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CdsIndex/properties/id",
     "description": "Unique instrument identifier",
     "ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/id.schema.json#"
   },
   {
-    "path": "#/$defs/CDSIndex/properties/index_factor",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CDSIndex/properties/index_factor",
+    "path": "#/$defs/CdsIndex/properties/index_factor",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CdsIndex/properties/index_factor",
     "description": "Index factor (fraction of surviving notional since series inception)",
     "format": "double"
   },
   {
-    "path": "#/$defs/CDSIndex/properties/index_name",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CDSIndex/properties/index_name",
+    "path": "#/$defs/CdsIndex/properties/index_name",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CdsIndex/properties/index_name",
     "description": "Index name, e.g., \"CDX.NA.IG\", \"CDX.NA.HY\", \"iTraxx Europe\""
   },
   {
-    "path": "#/$defs/CDSIndex/properties/instrument_pricing_overrides",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CDSIndex/properties/instrument_pricing_overrides",
+    "path": "#/$defs/CdsIndex/properties/instrument_pricing_overrides",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CdsIndex/properties/instrument_pricing_overrides",
     "description": "Instrument-owned pricing inputs.",
     "ref": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#"
   },
   {
-    "path": "#/$defs/CDSIndex/properties/margin_spec",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CDSIndex/properties/margin_spec",
+    "path": "#/$defs/CdsIndex/properties/margin_spec",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CdsIndex/properties/margin_spec",
     "description": "Optional OTC margin specification for VM/IM.\n\nCDS indices are typically cleared through ICE Clear Credit. Use\n`OtcMarginSpec::cleared(\"ICE\", Currency::USD)` for standard cleared\nindices. Bilateral SIMM indices must attach an explicit\n`SimmCreditClassification` rather than infer qualifying status from the\nindex name."
   },
   {
-    "path": "#/$defs/CDSIndex/properties/margin_spec/anyOf/0",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CDSIndex/properties/margin_spec/anyOf/0",
+    "path": "#/$defs/CdsIndex/properties/margin_spec/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CdsIndex/properties/margin_spec/anyOf/0",
     "ref": "#/$defs/OtcMarginSpec",
     "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/OtcMarginSpec"
   },
   {
-    "path": "#/$defs/CDSIndex/properties/margin_spec/anyOf/1",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CDSIndex/properties/margin_spec/anyOf/1"
+    "path": "#/$defs/CdsIndex/properties/margin_spec/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CdsIndex/properties/margin_spec/anyOf/1"
   },
   {
-    "path": "#/$defs/CDSIndex/properties/metric_pricing_overrides",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CDSIndex/properties/metric_pricing_overrides",
+    "path": "#/$defs/CdsIndex/properties/metric_pricing_overrides",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CdsIndex/properties/metric_pricing_overrides",
     "description": "Metric-time pricing configuration.",
     "ref": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json#"
   },
   {
-    "path": "#/$defs/CDSIndex/properties/notional",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CDSIndex/properties/notional",
+    "path": "#/$defs/CdsIndex/properties/notional",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CdsIndex/properties/notional",
     "description": "Notional amount of the index",
     "ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/money.schema.json#"
   },
   {
-    "path": "#/$defs/CDSIndex/properties/num_constituents",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CDSIndex/properties/num_constituents",
+    "path": "#/$defs/CdsIndex/properties/num_constituents",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CdsIndex/properties/num_constituents",
     "default": null,
-    "description": "Number of reference entities in the index pool.\n\nRequired for portfolio-level analytics (e.g. jump-to-default) when\n`constituents` is empty (`SingleCurve` mode), since the per-name\nrisk number is `notional / N · LGD`. Index pool sizes drift with\nseries — iTraxx Crossover has been 75 names only since Series 9,\nand CDX.NA.HY membership varies — so this is supplied explicitly\nrather than inferred from `index_name`. Standard presets populate\nit via `CDSIndex::from_preset`; set it directly with\n`with_num_constituents` for custom indices.",
+    "description": "Number of reference entities in the index pool.\n\nRequired for portfolio-level analytics (e.g. jump-to-default) when\n`constituents` is empty (`SingleCurve` mode), since the per-name\nrisk number is `notional / N · LGD`. Index pool sizes drift with\nseries — iTraxx Crossover has been 75 names only since Series 9,\nand CDX.NA.HY membership varies — so this is supplied explicitly\nrather than inferred from `index_name`. Standard presets populate\nit via `CdsIndex::from_preset`; set it directly with\n`with_num_constituents` for custom indices.",
     "format": "uint32",
     "minimum": 0
   },
   {
-    "path": "#/$defs/CDSIndex/properties/premium",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CDSIndex/properties/premium",
+    "path": "#/$defs/CdsIndex/properties/premium_leg",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CdsIndex/properties/premium_leg",
     "description": "Premium leg specification (coupon schedule and discounting)",
     "ref": "#/$defs/PremiumLegSpec",
     "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/PremiumLegSpec"
   },
   {
-    "path": "#/$defs/CDSIndex/properties/pricing",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CDSIndex/properties/pricing",
+    "path": "#/$defs/CdsIndex/properties/pricing",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CdsIndex/properties/pricing",
     "description": "Pricing aggregation mode",
     "ref": "#/$defs/IndexPricing",
     "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/IndexPricing"
   },
   {
-    "path": "#/$defs/CDSIndex/properties/protection",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CDSIndex/properties/protection",
+    "path": "#/$defs/CdsIndex/properties/protection_leg",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CdsIndex/properties/protection_leg",
     "description": "Protection leg specification (credit curve and settlement)",
     "ref": "#/$defs/ProtectionLegSpec",
     "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/ProtectionLegSpec"
   },
   {
-    "path": "#/$defs/CDSIndex/properties/scenario_pricing_overrides",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CDSIndex/properties/scenario_pricing_overrides",
+    "path": "#/$defs/CdsIndex/properties/scenario_pricing_overrides",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CdsIndex/properties/scenario_pricing_overrides",
     "description": "Scenario-only pricing adjustments.",
     "ref": "https://finstack_quant.dev/schemas/common/1/scenario_pricing_overrides.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/scenario_pricing_overrides.schema.json#"
   },
   {
-    "path": "#/$defs/CDSIndex/properties/series",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CDSIndex/properties/series",
+    "path": "#/$defs/CdsIndex/properties/series",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CdsIndex/properties/series",
     "description": "Series number (e.g., 42)",
     "format": "uint16",
     "maximum": 65535,
     "minimum": 0
   },
   {
-    "path": "#/$defs/CDSIndex/properties/side",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CDSIndex/properties/side",
+    "path": "#/$defs/CdsIndex/properties/side",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CdsIndex/properties/side",
     "description": "Protection buyer/seller perspective",
     "ref": "#/$defs/PayReceive",
     "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/PayReceive"
   },
   {
-    "path": "#/$defs/CDSIndex/properties/upfront",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CDSIndex/properties/upfront",
+    "path": "#/$defs/CdsIndex/properties/upfront",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CdsIndex/properties/upfront",
     "description": "Contractual upfront payment `(payment date, amount)` on the index\nnotional. A positive amount is paid by the protection buyer to the\nseller; a negative amount by the seller to the buyer. It is\ndiscounted from its payment date and dropped once that date is before\nthe valuation date."
   },
   {
-    "path": "#/$defs/CDSIndex/properties/upfront/prefixItems/0",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CDSIndex/properties/upfront/prefixItems/0",
+    "path": "#/$defs/CdsIndex/properties/upfront/prefixItems/0",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CdsIndex/properties/upfront/prefixItems/0",
     "ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/date.schema.json#"
   },
   {
-    "path": "#/$defs/CDSIndex/properties/upfront/prefixItems/1",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CDSIndex/properties/upfront/prefixItems/1",
+    "path": "#/$defs/CdsIndex/properties/upfront/prefixItems/1",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CdsIndex/properties/upfront/prefixItems/1",
     "ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/money.schema.json#"
   },
   {
-    "path": "#/$defs/CDSIndex/properties/version",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CDSIndex/properties/version",
+    "path": "#/$defs/CdsIndex/properties/version",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CdsIndex/properties/version",
     "description": "Version number within series",
     "format": "uint16",
     "maximum": 65535,
     "minimum": 0
   },
   {
-    "path": "#/$defs/CDSIndexConstituent",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CDSIndexConstituent",
+    "path": "#/$defs/CdsIndexConstituent",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CdsIndexConstituent",
     "description": "Constituent in a CDS index with weight and credit parameters."
   },
   {
-    "path": "#/$defs/CDSIndexConstituent/properties/credit",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CDSIndexConstituent/properties/credit",
+    "path": "#/$defs/CdsIndexConstituent/properties/credit",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CdsIndexConstituent/properties/credit",
     "description": "Credit configuration for the issuer (includes hazard curve id and recovery)",
     "ref": "#/$defs/CreditParams",
     "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CreditParams"
   },
   {
-    "path": "#/$defs/CDSIndexConstituent/properties/defaulted",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CDSIndexConstituent/properties/defaulted",
+    "path": "#/$defs/CdsIndexConstituent/properties/defaulted",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CdsIndexConstituent/properties/defaulted",
     "default": false,
     "description": "Whether the constituent has defaulted. Defaulted names are excluded from the\npremium leg but their settled protection payment is already reflected in `index_factor`.\nPer O'Kane (2008) Ch. 7: \"On default, the protection payment is settled and the\nname is removed from the index. The index factor adjusts to reflect the reduced notional.\""
   },
   {
-    "path": "#/$defs/CDSIndexConstituent/properties/weight",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CDSIndexConstituent/properties/weight",
+    "path": "#/$defs/CdsIndexConstituent/properties/weight",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CdsIndexConstituent/properties/weight",
     "description": "Weight of the issuer in the index notional (e.g., 1/125.0 for CDX IG)",
     "format": "double"
   },
   {
-    "path": "#/$defs/CDSOption",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CDSOption",
+    "path": "#/$defs/CdsOption",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CdsOption",
     "description": "Credit option instrument (option on CDS spread or clean index price)\n\nThe public pricing surface supports European options with cash or\nphysical settlement. Before expiry, cash- and physical-settled options\ncarry the same cash-equivalent model NPV and route through the same\nquadrature; the clean payoff excludes accrued because the same underlying\naccrued appears on both sides before exercise and cancels. A physical\nexercise cashflow at settlement is dirty (includes accrued at exercise\nsettlement), and this pricer does not create or deliver a live underlying\nCDS position — valuation at or after a physical exercise boundary fails\nexplicitly. Non-European exercise is rejected at pricing time so\ndeserialized instruments cannot silently fall through to an unsupported\nengine."
   },
   {
-    "path": "#/$defs/CDSOption/properties/attributes",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CDSOption/properties/attributes",
+    "path": "#/$defs/CdsOption/properties/attributes",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CdsOption/properties/attributes",
     "default": {},
     "description": "Additional attributes",
     "ref": "https://finstack_quant.dev/schemas/common/1/attributes.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/attributes.schema.json#"
   },
   {
-    "path": "#/$defs/CDSOption/properties/coupon_bp",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CDSOption/properties/coupon_bp",
+    "path": "#/$defs/CdsOption/properties/coupon_bp",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CdsOption/properties/coupon_bp",
     "default": null,
     "description": "Contractual running coupon `c` of the underlying CDS, in basis points\n(e.g., `100` for the standard CDX.NA.IG coupon, `500` for the\nstandard CDX.NA.HY coupon). When `None`, the synthetic underlying\nCDS uses `strike` as its running coupon — the appropriate single-name\nSNAC default where the trade is struck at the par spread. For CDS\nindex options where the index has a fixed standard coupon different\nfrom the option strike, set this explicitly so the strike-adjustment\nterm `H(K) = ξN(c − K)A(K)` (DOCS 2055833 Eq. 2.4) is populated."
   },
   {
-    "path": "#/$defs/CDSOption/properties/coupon_bp/anyOf/0",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CDSOption/properties/coupon_bp/anyOf/0",
+    "path": "#/$defs/CdsOption/properties/coupon_bp/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CdsOption/properties/coupon_bp/anyOf/0",
     "ref": "https://finstack_quant.dev/schemas/common/1/decimal.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/decimal.schema.json#"
   },
   {
-    "path": "#/$defs/CDSOption/properties/coupon_bp/anyOf/1",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CDSOption/properties/coupon_bp/anyOf/1"
+    "path": "#/$defs/CdsOption/properties/coupon_bp/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CdsOption/properties/coupon_bp/anyOf/1"
   },
   {
-    "path": "#/$defs/CDSOption/properties/credit_curve_id",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CDSOption/properties/credit_curve_id",
+    "path": "#/$defs/CdsOption/properties/credit_curve_id",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CdsOption/properties/credit_curve_id",
     "description": "Credit curve identifier",
     "ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/id.schema.json#"
   },
   {
-    "path": "#/$defs/CDSOption/properties/discount_curve_id",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CDSOption/properties/discount_curve_id",
+    "path": "#/$defs/CdsOption/properties/discount_curve_id",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CdsOption/properties/discount_curve_id",
     "description": "Discount curve identifier",
     "ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/id.schema.json#"
   },
   {
-    "path": "#/$defs/CDSOption/properties/exercise_settlement_date",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CDSOption/properties/exercise_settlement_date",
+    "path": "#/$defs/CdsOption/properties/exercise_settlement_date",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CdsOption/properties/exercise_settlement_date",
     "description": "Payment date of the exercise proceeds, defaulting to legal expiry.\nMust be on or after expiry and before CDS maturity. Discounting uses\nthis date; spread variance ends at legal expiry."
   },
   {
-    "path": "#/$defs/CDSOption/properties/exercise_settlement_date/anyOf/0",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CDSOption/properties/exercise_settlement_date/anyOf/0",
+    "path": "#/$defs/CdsOption/properties/exercise_settlement_date/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CdsOption/properties/exercise_settlement_date/anyOf/0",
     "ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/date.schema.json#"
   },
   {
-    "path": "#/$defs/CDSOption/properties/exercise_settlement_date/anyOf/1",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CDSOption/properties/exercise_settlement_date/anyOf/1"
+    "path": "#/$defs/CdsOption/properties/exercise_settlement_date/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CdsOption/properties/exercise_settlement_date/anyOf/1"
   },
   {
-    "path": "#/$defs/CDSOption/properties/exercise_style",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CDSOption/properties/exercise_style",
+    "path": "#/$defs/CdsOption/properties/exercise_style",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CdsOption/properties/exercise_style",
     "description": "Exercise style",
     "ref": "#/$defs/ExerciseStyle",
     "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/ExerciseStyle"
   },
   {
-    "path": "#/$defs/CDSOption/properties/expiry",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CDSOption/properties/expiry",
+    "path": "#/$defs/CdsOption/properties/expiry",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CdsOption/properties/expiry",
     "description": "Option expiry date",
     "ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/date.schema.json#"
   },
   {
-    "path": "#/$defs/CDSOption/properties/id",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CDSOption/properties/id",
+    "path": "#/$defs/CdsOption/properties/id",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CdsOption/properties/id",
     "description": "Unique instrument identifier",
     "ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/id.schema.json#"
   },
   {
-    "path": "#/$defs/CDSOption/properties/index_factor",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CDSOption/properties/index_factor",
+    "path": "#/$defs/CdsOption/properties/index_factor",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CdsOption/properties/index_factor",
     "default": 1,
     "description": "Current index factor `f` at valuation: the surviving fraction of the\noriginal index notional, in `(0, 1]`. Defaults to `1.0` (no settled\ndefaults) and scales the notional only when `underlying_is_index`.\nSee [`Self::strike_index_factor`] for the original factor `f0`\nattached to a clean-price strike.",
     "format": "double"
   },
   {
-    "path": "#/$defs/CDSOption/properties/instrument_pricing_overrides",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CDSOption/properties/instrument_pricing_overrides",
+    "path": "#/$defs/CdsOption/properties/instrument_pricing_overrides",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CdsOption/properties/instrument_pricing_overrides",
     "description": "Instrument-owned pricing inputs.",
     "ref": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#"
   },
   {
-    "path": "#/$defs/CDSOption/properties/knockout",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CDSOption/properties/knockout",
+    "path": "#/$defs/CdsOption/properties/knockout",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CdsOption/properties/knockout",
     "default": false,
     "description": "Whether the option knocks out if the underlying defaults before\nexercise. This is contract-specific; new instruments default to\nno-knockout and legacy single-name books can opt in explicitly."
   },
   {
-    "path": "#/$defs/CDSOption/properties/metric_pricing_overrides",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CDSOption/properties/metric_pricing_overrides",
+    "path": "#/$defs/CdsOption/properties/metric_pricing_overrides",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CdsOption/properties/metric_pricing_overrides",
     "description": "Metric-time pricing configuration.",
     "ref": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json#"
   },
   {
-    "path": "#/$defs/CDSOption/properties/notional",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CDSOption/properties/notional",
+    "path": "#/$defs/CdsOption/properties/notional",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CdsOption/properties/notional",
     "description": "Notional amount",
     "ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/money.schema.json#"
   },
   {
-    "path": "#/$defs/CDSOption/properties/option_type",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CDSOption/properties/option_type",
+    "path": "#/$defs/CdsOption/properties/option_type",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CdsOption/properties/option_type",
     "description": "Option type (Call = right to buy protection, Put = right to sell protection)",
     "ref": "#/$defs/OptionType",
     "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/OptionType"
   },
   {
-    "path": "#/$defs/CDSOption/properties/premium_settlement_date",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CDSOption/properties/premium_settlement_date",
+    "path": "#/$defs/CdsOption/properties/premium_settlement_date",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CdsOption/properties/premium_settlement_date",
     "description": "Payment date of the option premium, returned by the settlement-date\naccessor. This does not change variance time or front-end protection;\nthe option value excludes the separately agreed trade premium."
   },
   {
-    "path": "#/$defs/CDSOption/properties/premium_settlement_date/anyOf/0",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CDSOption/properties/premium_settlement_date/anyOf/0",
+    "path": "#/$defs/CdsOption/properties/premium_settlement_date/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CdsOption/properties/premium_settlement_date/anyOf/0",
     "ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/date.schema.json#"
   },
   {
-    "path": "#/$defs/CDSOption/properties/premium_settlement_date/anyOf/1",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CDSOption/properties/premium_settlement_date/anyOf/1"
+    "path": "#/$defs/CdsOption/properties/premium_settlement_date/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CdsOption/properties/premium_settlement_date/anyOf/1"
   },
   {
-    "path": "#/$defs/CDSOption/properties/protection_start_convention",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CDSOption/properties/protection_start_convention",
+    "path": "#/$defs/CdsOption/properties/protection_start_convention",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CdsOption/properties/protection_start_convention",
     "default": "spot",
     "description": "Convention used to select the synthetic underlying CDS accrual start\nwhen `underlying_start_date` is not explicitly supplied.",
     "ref": "#/$defs/ProtectionStartConvention",
     "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/ProtectionStartConvention"
   },
   {
-    "path": "#/$defs/CDSOption/properties/realized_loss",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CDSOption/properties/realized_loss",
+    "path": "#/$defs/CdsOption/properties/realized_loss",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CdsOption/properties/realized_loss",
     "default": 0,
     "description": "Realized (settled) cumulative index loss from option inception to\nvaluation date, as a decimal fraction of the original index notional\nin `[0, 1]`. Defaults to `0.0`.\n\nBloomberg CDSO treats index options as no-knockout. Settled losses\nafter option inception are therefore deterministic payoff adjustments\nat exercise (DOCS 2055833 Eq. 2.5 and DOCS 2151513). Single-name\noptions knock out instead and must leave this at `0.0`.",
     "format": "double"
   },
   {
-    "path": "#/$defs/CDSOption/properties/recovery_rate",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CDSOption/properties/recovery_rate",
+    "path": "#/$defs/CdsOption/properties/recovery_rate",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CdsOption/properties/recovery_rate",
     "description": "Recovery rate assumption",
     "format": "double"
   },
   {
-    "path": "#/$defs/CDSOption/properties/scenario_pricing_overrides",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CDSOption/properties/scenario_pricing_overrides",
+    "path": "#/$defs/CdsOption/properties/scenario_pricing_overrides",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CdsOption/properties/scenario_pricing_overrides",
     "description": "Scenario-only pricing adjustments.",
     "ref": "https://finstack_quant.dev/schemas/common/1/scenario_pricing_overrides.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/scenario_pricing_overrides.schema.json#"
   },
   {
-    "path": "#/$defs/CDSOption/properties/settlement",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CDSOption/properties/settlement",
+    "path": "#/$defs/CdsOption/properties/settlement",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CdsOption/properties/settlement",
     "description": "Settlement type",
     "ref": "#/$defs/SettlementType",
     "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/SettlementType"
   },
   {
-    "path": "#/$defs/CDSOption/properties/strike",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CDSOption/properties/strike",
+    "path": "#/$defs/CdsOption/properties/strike",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CdsOption/properties/strike",
     "description": "Typed option strike: a decimal forward spread (`{\"spread\": \"0.0325\"}`)\nor a clean price in percentage points (`{\"clean_price_pct\": \"107.0\"}`).",
-    "ref": "#/$defs/CDSOptionStrike",
-    "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CDSOptionStrike"
+    "ref": "#/$defs/CdsOptionStrike",
+    "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CdsOptionStrike"
   },
   {
-    "path": "#/$defs/CDSOption/properties/strike_index_factor",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CDSOption/properties/strike_index_factor",
-    "description": "Original index factor `f0` attached to the option strike.\n\nDistinct from [`Self::index_factor`], which is the current factor\n`f` at valuation: defaults settled between option strike and\nvaluation reduce `f` below `f0`. A clean-price strike quotes the\nprice on `f0` notional, so its deterministic payoff term scales by\n`f0 / f`; the strike factor is therefore required for clean-price\nstrikes (`CDSOptionStrike::CleanPricePct`) and must not be inferred\nfrom the current factor after a default. Rejected for spread\nstrikes, whose payoff does not reference it.",
+    "path": "#/$defs/CdsOption/properties/strike_index_factor",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CdsOption/properties/strike_index_factor",
+    "description": "Original index factor `f0` attached to the option strike.\n\nDistinct from [`Self::index_factor`], which is the current factor\n`f` at valuation: defaults settled between option strike and\nvaluation reduce `f` below `f0`. A clean-price strike quotes the\nprice on `f0` notional, so its deterministic payoff term scales by\n`f0 / f`; the strike factor is therefore required for clean-price\nstrikes (`CdsOptionStrike::CleanPricePct`) and must not be inferred\nfrom the current factor after a default. Rejected for spread\nstrikes, whose payoff does not reference it.",
     "format": "double"
   },
   {
-    "path": "#/$defs/CDSOption/properties/underlying_convention",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CDSOption/properties/underlying_convention",
+    "path": "#/$defs/CdsOption/properties/underlying_convention",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CdsOption/properties/underlying_convention",
     "default": "isda_na",
     "description": "Convention used by the underlying CDS contract.\n\nThis controls the CDS schedule, settlement lag, business day convention,\nand other market-standard mechanics used when deriving forward spread and\nrisky annuity for the option's underlying.",
     "ref": "#/$defs/CdsConvention",
     "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CdsConvention"
   },
   {
-    "path": "#/$defs/CDSOption/properties/underlying_is_index",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CDSOption/properties/underlying_is_index",
+    "path": "#/$defs/CdsOption/properties/underlying_is_index",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CdsOption/properties/underlying_is_index",
     "default": false,
     "description": "If true, the underlying is a CDS index; else single-name CDS.\n\nThe Bloomberg CDSO model treats the two cases differently in the\nno-knockout calibration `F_0 = E[V_te]` (DOCS 2055833 §1.2): index\noptions trade no-knockout and the calibration target includes the\n`(1−R)·(1−q_te)` FEP-equivalent contribution; single-name options\nknock out on default and skip it."
   },
   {
-    "path": "#/$defs/CDSOption/properties/underlying_maturity",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CDSOption/properties/underlying_maturity",
+    "path": "#/$defs/CdsOption/properties/underlying_maturity",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CdsOption/properties/underlying_maturity",
     "description": "Underlying CDS maturity date",
     "ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/date.schema.json#"
   },
   {
-    "path": "#/$defs/CDSOption/properties/underlying_start_date",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CDSOption/properties/underlying_start_date",
+    "path": "#/$defs/CdsOption/properties/underlying_start_date",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CdsOption/properties/underlying_start_date",
     "description": "Underlying CDS accrual-effective date used for forward spread and risky\nannuity. Bloomberg CDSO can quote a standard CDS effective date before\noption expiry; in that case premium accrues from this date while\nprotection starts at expiry."
   },
   {
-    "path": "#/$defs/CDSOption/properties/underlying_start_date/anyOf/0",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CDSOption/properties/underlying_start_date/anyOf/0",
+    "path": "#/$defs/CdsOption/properties/underlying_start_date/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CdsOption/properties/underlying_start_date/anyOf/0",
     "ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/date.schema.json#"
   },
   {
-    "path": "#/$defs/CDSOption/properties/underlying_start_date/anyOf/1",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CDSOption/properties/underlying_start_date/anyOf/1"
+    "path": "#/$defs/CdsOption/properties/underlying_start_date/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CdsOption/properties/underlying_start_date/anyOf/1"
   },
   {
-    "path": "#/$defs/CDSOption/properties/vol_surface_id",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CDSOption/properties/vol_surface_id",
+    "path": "#/$defs/CdsOption/properties/vol_surface_id",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CdsOption/properties/vol_surface_id",
     "description": "Volatility surface identifier",
     "ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/id.schema.json#"
   },
   {
-    "path": "#/$defs/CDSOptionStrike",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CDSOptionStrike",
-    "description": "Typed CDS-option strike: forward-spread or clean-price convention.\n\nWire format: externally tagged JSON — `{\"spread\": \"0.0325\"}` or\n`{\"clean_price_pct\": \"107.0\"}` — with no bare-decimal fallback.\n\n# Examples\n\n```rust\nuse finstack_quant_valuations::instruments::credit_derivatives::cds_option::CDSOptionStrike;\nuse rust_decimal::Decimal;\n\nlet spread = CDSOptionStrike::Spread(Decimal::new(325, 4)); // 0.0325 = 325 bp\nassert!(spread.spread_decimal().is_some());\nassert_eq!(spread.native_surface_coordinate().unwrap(), 0.0325);\n\nlet price = CDSOptionStrike::CleanPricePct(Decimal::new(1070, 1)); // 107.0\nassert_eq!(price.native_surface_coordinate().unwrap(), 107.0);\nassert!((price.clean_price_fraction().unwrap() - 1.07).abs() < 1e-15);\n```"
+    "path": "#/$defs/CdsOptionStrike",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CdsOptionStrike",
+    "description": "Typed CDS-option strike: forward-spread or clean-price convention.\n\nWire format: externally tagged JSON — `{\"spread\": \"0.0325\"}` or\n`{\"clean_price_pct\": \"107.0\"}` — with no bare-decimal fallback.\n\n# Examples\n\n```rust\nuse finstack_quant_valuations::instruments::credit_derivatives::cds_option::CdsOptionStrike;\nuse rust_decimal::Decimal;\n\nlet spread = CdsOptionStrike::Spread(Decimal::new(325, 4)); // 0.0325 = 325 bp\nassert!(spread.spread_decimal().is_some());\nassert_eq!(spread.native_surface_coordinate().unwrap(), 0.0325);\n\nlet price = CdsOptionStrike::CleanPricePct(Decimal::new(1070, 1)); // 107.0\nassert_eq!(price.native_surface_coordinate().unwrap(), 107.0);\nassert!((price.clean_price_fraction().unwrap() - 1.07).abs() < 1e-15);\n```"
   },
   {
-    "path": "#/$defs/CDSOptionStrike/oneOf/0",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CDSOptionStrike/oneOf/0",
+    "path": "#/$defs/CdsOptionStrike/oneOf/0",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CdsOptionStrike/oneOf/0",
     "description": "Strike forward spread as a decimal annual rate (`0.0325` = 325 bp)."
   },
   {
-    "path": "#/$defs/CDSOptionStrike/oneOf/0/properties/spread",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CDSOptionStrike/oneOf/0/properties/spread",
+    "path": "#/$defs/CdsOptionStrike/oneOf/0/properties/spread",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CdsOptionStrike/oneOf/0/properties/spread",
     "ref": "https://finstack_quant.dev/schemas/common/1/decimal.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/decimal.schema.json#"
   },
   {
-    "path": "#/$defs/CDSOptionStrike/oneOf/1",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CDSOptionStrike/oneOf/1",
+    "path": "#/$defs/CdsOptionStrike/oneOf/1",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CdsOptionStrike/oneOf/1",
     "description": "Strike clean price in percentage-price points (`107.0` = fraction\n`1.07`). CDX HY index options are quoted this way."
   },
   {
-    "path": "#/$defs/CDSOptionStrike/oneOf/1/properties/clean_price_pct",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CDSOptionStrike/oneOf/1/properties/clean_price_pct",
+    "path": "#/$defs/CdsOptionStrike/oneOf/1/properties/clean_price_pct",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CdsOptionStrike/oneOf/1/properties/clean_price_pct",
     "ref": "https://finstack_quant.dev/schemas/common/1/decimal.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/decimal.schema.json#"
   },
   {
-    "path": "#/$defs/CDSTranche",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CDSTranche",
+    "path": "#/$defs/CdsTranche",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CdsTranche",
     "description": "CDS Tranche instrument definition (boilerplate)"
   },
   {
-    "path": "#/$defs/CDSTranche/properties/attach_pct",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CDSTranche/properties/attach_pct",
+    "path": "#/$defs/CdsTranche/properties/attach_pct",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CdsTranche/properties/attach_pct",
     "description": "Attachment point in percent (e.g., 0.0 for equity)",
     "format": "double"
   },
   {
-    "path": "#/$defs/CDSTranche/properties/attributes",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CDSTranche/properties/attributes",
+    "path": "#/$defs/CdsTranche/properties/attributes",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CdsTranche/properties/attributes",
     "description": "Attributes for scenario selection and tagging",
     "ref": "https://finstack_quant.dev/schemas/common/1/attributes.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/attributes.schema.json#"
   },
   {
-    "path": "#/$defs/CDSTranche/properties/business_day_convention",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CDSTranche/properties/business_day_convention",
+    "path": "#/$defs/CdsTranche/properties/business_day_convention",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CdsTranche/properties/business_day_convention",
     "default": "modified_following",
     "description": "Business day convention",
     "ref": "https://finstack_quant.dev/schemas/common/1/business_day_convention.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/business_day_convention.schema.json#"
   },
   {
-    "path": "#/$defs/CDSTranche/properties/calendar_id",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CDSTranche/properties/calendar_id",
+    "path": "#/$defs/CdsTranche/properties/calendar_id",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CdsTranche/properties/calendar_id",
     "description": "Optional holiday calendar id"
   },
   {
-    "path": "#/$defs/CDSTranche/properties/calendar_id/anyOf/0",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CDSTranche/properties/calendar_id/anyOf/0",
+    "path": "#/$defs/CdsTranche/properties/calendar_id/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CdsTranche/properties/calendar_id/anyOf/0",
     "ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/id.schema.json#"
   },
   {
-    "path": "#/$defs/CDSTranche/properties/calendar_id/anyOf/1",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CDSTranche/properties/calendar_id/anyOf/1"
+    "path": "#/$defs/CdsTranche/properties/calendar_id/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CdsTranche/properties/calendar_id/anyOf/1"
   },
   {
-    "path": "#/$defs/CDSTranche/properties/coupon_bp",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CDSTranche/properties/coupon_bp",
+    "path": "#/$defs/CdsTranche/properties/coupon_bp",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CdsTranche/properties/coupon_bp",
     "description": "Running coupon in basis points (e.g., 100 = 1.00%)",
     "format": "double"
   },
   {
-    "path": "#/$defs/CDSTranche/properties/credit_index_id",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CDSTranche/properties/credit_index_id",
+    "path": "#/$defs/CdsTranche/properties/credit_index_id",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CdsTranche/properties/credit_index_id",
     "description": "Credit index identifier for survival/loss modeling (placeholder)",
     "ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/id.schema.json#"
   },
   {
-    "path": "#/$defs/CDSTranche/properties/day_count",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CDSTranche/properties/day_count",
+    "path": "#/$defs/CdsTranche/properties/day_count",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CdsTranche/properties/day_count",
     "description": "Day count (typically Act/360)",
     "ref": "https://finstack_quant.dev/schemas/common/1/day_count.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/day_count.schema.json#"
   },
   {
-    "path": "#/$defs/CDSTranche/properties/detach_pct",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CDSTranche/properties/detach_pct",
+    "path": "#/$defs/CdsTranche/properties/detach_pct",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CdsTranche/properties/detach_pct",
     "description": "Detachment point in percent (e.g., 3.0 for 0-3% tranche)",
     "format": "double"
   },
   {
-    "path": "#/$defs/CDSTranche/properties/discount_curve_id",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CDSTranche/properties/discount_curve_id",
+    "path": "#/$defs/CdsTranche/properties/discount_curve_id",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CdsTranche/properties/discount_curve_id",
     "description": "Discount curve identifier (by quote currency)",
     "ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/id.schema.json#"
   },
   {
-    "path": "#/$defs/CDSTranche/properties/frequency",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CDSTranche/properties/frequency",
+    "path": "#/$defs/CdsTranche/properties/frequency",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CdsTranche/properties/frequency",
     "description": "Payment frequency (typically quarterly)",
     "ref": "https://finstack_quant.dev/schemas/common/1/tenor.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/tenor.schema.json#"
   },
   {
-    "path": "#/$defs/CDSTranche/properties/id",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CDSTranche/properties/id",
+    "path": "#/$defs/CdsTranche/properties/id",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CdsTranche/properties/id",
     "description": "Unique instrument identifier",
     "ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/id.schema.json#"
   },
   {
-    "path": "#/$defs/CDSTranche/properties/index_name",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CDSTranche/properties/index_name",
+    "path": "#/$defs/CdsTranche/properties/index_name",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CdsTranche/properties/index_name",
     "description": "Index name (e.g., \"CDX.NA.IG\", \"CDX.NA.HY\", \"iTraxx EUR\")"
   },
   {
-    "path": "#/$defs/CDSTranche/properties/instrument_pricing_overrides",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CDSTranche/properties/instrument_pricing_overrides",
+    "path": "#/$defs/CdsTranche/properties/instrument_pricing_overrides",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CdsTranche/properties/instrument_pricing_overrides",
     "description": "Instrument-owned pricing inputs.",
     "ref": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#"
   },
   {
-    "path": "#/$defs/CDSTranche/properties/maturity",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CDSTranche/properties/maturity",
+    "path": "#/$defs/CdsTranche/properties/maturity",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CdsTranche/properties/maturity",
     "description": "Maturity date of the tranche",
     "ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/date.schema.json#"
   },
   {
-    "path": "#/$defs/CDSTranche/properties/metric_pricing_overrides",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CDSTranche/properties/metric_pricing_overrides",
+    "path": "#/$defs/CdsTranche/properties/metric_pricing_overrides",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CdsTranche/properties/metric_pricing_overrides",
     "description": "Metric-time pricing configuration.",
     "ref": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json#"
   },
   {
-    "path": "#/$defs/CDSTranche/properties/notional",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CDSTranche/properties/notional",
+    "path": "#/$defs/CdsTranche/properties/notional",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CdsTranche/properties/notional",
     "description": "Notional amount of the tranche",
     "ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/money.schema.json#"
   },
   {
-    "path": "#/$defs/CDSTranche/properties/realized_loss",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CDSTranche/properties/realized_loss",
+    "path": "#/$defs/CdsTranche/properties/realized_loss",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CdsTranche/properties/realized_loss",
     "description": "Realized (settled) loss on the reference pool as a decimal fraction of\nthe original portfolio notional, in `[0, 1]`.",
     "format": "double"
   },
   {
-    "path": "#/$defs/CDSTranche/properties/roll_rule",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CDSTranche/properties/roll_rule",
+    "path": "#/$defs/CdsTranche/properties/roll_rule",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CdsTranche/properties/roll_rule",
     "default": "none",
     "description": "Coupon roll-date grid. `cds_imm` selects the standard CDS roll dates\n(20th of Mar, Jun, Sep, Dec); `none` (the default) generates a bespoke\nschedule from `frequency` and `stub`. The equity-futures `imm` grid is\nrejected. Use [`Self::standard`] for the IMM constructor.",
     "ref": "#/$defs/RollRule",
     "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/RollRule"
   },
   {
-    "path": "#/$defs/CDSTranche/properties/scenario_pricing_overrides",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CDSTranche/properties/scenario_pricing_overrides",
+    "path": "#/$defs/CdsTranche/properties/scenario_pricing_overrides",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CdsTranche/properties/scenario_pricing_overrides",
     "description": "Scenario-only pricing adjustments.",
     "ref": "https://finstack_quant.dev/schemas/common/1/scenario_pricing_overrides.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/scenario_pricing_overrides.schema.json#"
   },
   {
-    "path": "#/$defs/CDSTranche/properties/series",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CDSTranche/properties/series",
+    "path": "#/$defs/CdsTranche/properties/series",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CdsTranche/properties/series",
     "description": "Series number (e.g., 37)",
     "format": "uint16",
     "maximum": 65535,
     "minimum": 0
   },
   {
-    "path": "#/$defs/CDSTranche/properties/side",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CDSTranche/properties/side",
-    "description": "Tranche side (buy/sell protection)",
-    "ref": "#/$defs/TrancheSide",
-    "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/TrancheSide"
+    "path": "#/$defs/CdsTranche/properties/side",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CdsTranche/properties/side",
+    "description": "Tranche side, as on CDS and CdsIndex: `pay` buys protection (pays the\nrunning premium), `receive` sells protection (receives the premium).",
+    "ref": "#/$defs/PayReceive",
+    "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/PayReceive"
   },
   {
-    "path": "#/$defs/CDSTranche/properties/start_date",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CDSTranche/properties/start_date",
+    "path": "#/$defs/CdsTranche/properties/start_date",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CdsTranche/properties/start_date",
     "default": null,
     "description": "Optional effective date for schedule anchoring (if None, uses as_of date)"
   },
   {
-    "path": "#/$defs/CDSTranche/properties/start_date/anyOf/0",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CDSTranche/properties/start_date/anyOf/0",
+    "path": "#/$defs/CdsTranche/properties/start_date/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CdsTranche/properties/start_date/anyOf/0",
     "ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/date.schema.json#"
   },
   {
-    "path": "#/$defs/CDSTranche/properties/start_date/anyOf/1",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CDSTranche/properties/start_date/anyOf/1"
+    "path": "#/$defs/CdsTranche/properties/start_date/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CdsTranche/properties/start_date/anyOf/1"
   },
   {
-    "path": "#/$defs/CDSTranche/properties/stub",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CDSTranche/properties/stub",
+    "path": "#/$defs/CdsTranche/properties/stub",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CdsTranche/properties/stub",
     "default": "short_front",
     "description": "Stub convention for a bespoke (`roll_rule = none`) coupon schedule.\nDefaults to `short_front`.",
     "ref": "#/$defs/StubKind",
     "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/StubKind"
   },
   {
-    "path": "#/$defs/CDSTranche/properties/upfront",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CDSTranche/properties/upfront",
+    "path": "#/$defs/CdsTranche/properties/upfront",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CdsTranche/properties/upfront",
     "default": null,
     "description": "Optional upfront payment (date, amount). Positive means paid by protection buyer."
   },
   {
-    "path": "#/$defs/CDSTranche/properties/upfront/prefixItems/0",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CDSTranche/properties/upfront/prefixItems/0",
+    "path": "#/$defs/CdsTranche/properties/upfront/prefixItems/0",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CdsTranche/properties/upfront/prefixItems/0",
     "ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/date.schema.json#"
   },
   {
-    "path": "#/$defs/CDSTranche/properties/upfront/prefixItems/1",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CDSTranche/properties/upfront/prefixItems/1",
+    "path": "#/$defs/CdsTranche/properties/upfront/prefixItems/1",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CdsTranche/properties/upfront/prefixItems/1",
     "ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/money.schema.json#"
   },
@@ -5991,9 +5884,9 @@ export default [
   {
     "path": "#/$defs/CmsSpreadOption/properties/option_type",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CmsSpreadOption/properties/option_type",
-    "description": "Call or put on the spread.",
-    "ref": "#/$defs/CmsSpreadOptionType",
-    "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CmsSpreadOptionType"
+    "description": "Call or put on the spread `CMS_long - CMS_short`: a call pays\n`max(spread - strike, 0)`, a put pays `max(strike - spread, 0)`.",
+    "ref": "#/$defs/OptionType",
+    "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/OptionType"
   },
   {
     "path": "#/$defs/CmsSpreadOption/properties/payment_date",
@@ -6089,23 +5982,6 @@ export default [
   {
     "path": "#/$defs/CmsSpreadOption/properties/swap_float_frequency/anyOf/1",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CmsSpreadOption/properties/swap_float_frequency/anyOf/1"
-  },
-  {
-    "path": "#/$defs/CmsSpreadOptionType",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CmsSpreadOptionType",
-    "description": "Call or put on a CMS spread."
-  },
-  {
-    "path": "#/$defs/CmsSpreadOptionType/oneOf/0",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CmsSpreadOptionType/oneOf/0",
-    "const": "call",
-    "description": "max(CMS_long - CMS_short - K, 0)"
-  },
-  {
-    "path": "#/$defs/CmsSpreadOptionType/oneOf/1",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CmsSpreadOptionType/oneOf/1",
-    "const": "put",
-    "description": "max(K - (CMS_long - CMS_short), 0)"
   },
   {
     "path": "#/$defs/CmsSwap",
@@ -8889,18 +8765,11 @@ export default [
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/money.schema.json#"
   },
   {
-    "path": "#/$defs/CreditDefaultSwap/properties/premium",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CreditDefaultSwap/properties/premium",
+    "path": "#/$defs/CreditDefaultSwap/properties/premium_leg",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CreditDefaultSwap/properties/premium_leg",
     "description": "Premium leg specification",
     "ref": "#/$defs/PremiumLegSpec",
     "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/PremiumLegSpec"
-  },
-  {
-    "path": "#/$defs/CreditDefaultSwap/properties/protection",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CreditDefaultSwap/properties/protection",
-    "description": "Protection leg specification",
-    "ref": "#/$defs/ProtectionLegSpec",
-    "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/ProtectionLegSpec"
   },
   {
     "path": "#/$defs/CreditDefaultSwap/properties/protection_effective_date",
@@ -8916,6 +8785,13 @@ export default [
   {
     "path": "#/$defs/CreditDefaultSwap/properties/protection_effective_date/anyOf/1",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CreditDefaultSwap/properties/protection_effective_date/anyOf/1"
+  },
+  {
+    "path": "#/$defs/CreditDefaultSwap/properties/protection_leg",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CreditDefaultSwap/properties/protection_leg",
+    "description": "Protection leg specification",
+    "ref": "#/$defs/ProtectionLegSpec",
+    "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/ProtectionLegSpec"
   },
   {
     "path": "#/$defs/CreditDefaultSwap/properties/scenario_pricing_overrides",
@@ -9426,23 +9302,6 @@ export default [
     "description": "Apply the closed-form LHP conditional default probability uniformly to\nevery name. This is the `N → ∞` limit of [`Self::PerName`] — an\nacceptable, faster approximation only for genuinely granular pools."
   },
   {
-    "path": "#/$defs/d_055066044802b6e94af1",
-    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/OasQuoteCompounding",
-    "description": "Quote convention used when reporting or consuming OAS values."
-  },
-  {
-    "path": "#/$defs/d_055066044802b6e94af1/oneOf/0",
-    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/OasQuoteCompounding/oneOf/0",
-    "const": "continuous",
-    "description": "Continuous additive spread, matching the tree's internal short-rate shift."
-  },
-  {
-    "path": "#/$defs/d_055066044802b6e94af1/oneOf/1",
-    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/OasQuoteCompounding/oneOf/1",
-    "const": "semi_annual",
-    "description": "Semiannual bond-equivalent OAS quote."
-  },
-  {
     "path": "#/$defs/d_10a2b628165f3f3e10e7",
     "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/MertonMcConfig",
     "description": "Configuration for Monte Carlo PIK bond pricing."
@@ -9450,7 +9309,7 @@ export default [
   {
     "path": "#/$defs/d_10a2b628165f3f3e10e7/properties/barrier_crossing",
     "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/MertonMcConfig/properties/barrier_crossing",
-    "description": "Barrier-crossing policy used for `BarrierType::FirstPassage`.\n\nDefault: `BrownianBridge` when the Merton model uses `FirstPassage`,\notherwise `Discrete`.",
+    "description": "Barrier-crossing policy used for `MertonBarrierType::FirstPassage`.\n\nDefault: `BrownianBridge` when the Merton model uses `FirstPassage`,\notherwise `Discrete`.",
     "ref": "#/$defs/BarrierCrossing",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/BarrierCrossing"
   },
@@ -10329,7 +10188,7 @@ export default [
   {
     "path": "#/$defs/d_572ad1befb7d94914652/properties/bdt_sigma",
     "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/ModelConfig/properties/bdt_sigma",
-    "description": "Black-Derman-Toy lognormal short-rate volatility (σ), as an annual\ndecimal proportion of the short rate (`0.20` = 20%).\n\nRead only by the rates-only bond tree when `vol_model = black` selects\nBDT for a bond with embedded exercise rights, where it is required.\nIt is a relative (lognormal) volatility, unlike the absolute\n[`Self::hw1f_sigma`]; typical values are 0.10–0.40. The BDT lattice has\nno mean reversion. Must be finite and non-negative; `0.0` prices on the\ndeterministic curve.",
+    "description": "Black-Derman-Toy lognormal short-rate volatility (σ), as an annual\ndecimal proportion of the short rate (`0.20` = 20%).\n\nRead only by the rates-only bond tree when `tree_model = black_derman_toy` selects\nBDT for a bond with embedded exercise rights, where it is required.\nIt is a relative (lognormal) volatility, unlike the absolute\n[`Self::hw1f_sigma`]; typical values are 0.10–0.40. The BDT lattice has\nno mean reversion. Must be finite and non-negative; `0.0` prices on the\ndeterministic curve.",
     "format": "double"
   },
   {
@@ -10435,8 +10294,8 @@ export default [
     "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/ModelConfig/properties/oas_quote_compounding",
     "default": "continuous",
     "description": "Quote compounding convention for OAS inputs and outputs.",
-    "ref": "#/$defs/OasQuoteCompounding",
-    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/OasQuoteCompounding"
+    "ref": "#/$defs/Compounding",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/Compounding"
   },
   {
     "path": "#/$defs/d_572ad1befb7d94914652/properties/rate_credit_correlation",
@@ -10475,6 +10334,21 @@ export default [
     "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/ModelConfig/properties/tree_discount_curve_id/anyOf/1"
   },
   {
+    "path": "#/$defs/d_572ad1befb7d94914652/properties/tree_model",
+    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/ModelConfig/properties/tree_model",
+    "description": "Short-rate lattice for the rates-only bond tree (`hull_white` or\n`black_derman_toy`). `None` selects Hull-White."
+  },
+  {
+    "path": "#/$defs/d_572ad1befb7d94914652/properties/tree_model/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/ModelConfig/properties/tree_model/anyOf/0",
+    "ref": "#/$defs/ShortRateTreeModel",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/ShortRateTreeModel"
+  },
+  {
+    "path": "#/$defs/d_572ad1befb7d94914652/properties/tree_model/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/ModelConfig/properties/tree_model/anyOf/1"
+  },
+  {
     "path": "#/$defs/d_572ad1befb7d94914652/properties/tree_steps",
     "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/ModelConfig/properties/tree_steps",
     "default": null,
@@ -10483,27 +10357,46 @@ export default [
     "minimum": 0
   },
   {
-    "path": "#/$defs/d_572ad1befb7d94914652/properties/vol_model",
-    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/ModelConfig/properties/vol_model",
-    "description": "Volatility model choice for option pricing.\n\nWhen set, overrides the default Black (lognormal) model."
-  },
-  {
-    "path": "#/$defs/d_572ad1befb7d94914652/properties/vol_model/anyOf/0",
-    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/ModelConfig/properties/vol_model/anyOf/0",
-    "ref": "#/$defs/VolatilityModel",
-    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/VolatilityModel"
-  },
-  {
-    "path": "#/$defs/d_572ad1befb7d94914652/properties/vol_model/anyOf/1",
-    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/ModelConfig/properties/vol_model/anyOf/1"
-  },
-  {
     "path": "#/$defs/d_572ad1befb7d94914652/properties/vol_surface_extrapolation",
     "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/ModelConfig/properties/vol_surface_extrapolation",
     "default": "error",
     "description": "Volatility surface extrapolation policy when `implied_volatility` is not set.",
     "ref": "#/$defs/VolSurfaceExtrapolation",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/VolSurfaceExtrapolation"
+  },
+  {
+    "path": "#/$defs/d_5c13df5a55f1da604df2",
+    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/Compounding",
+    "description": "Compounding convention for interest rates.\n\nUsed to specify how interest rates should be quoted or converted.\nAll variants produce mathematically equivalent discount factors when\napplied consistently.\n\n# Relationship Between Conventions\n\nFor a given discount factor DF at time t, the rates under different\nconventions are related by:\n\n```text\nDF = e^(-r_cc × t)                    [Continuous]\n   = (1 + r_ann)^(-t)                 [Annual]\n   = (1 + r_per/n)^(-n×t)             [Periodic(n)]\n   = 1 / (1 + r_simple × t)           [Simple]\n```\n\n# Ordering of Rates\n\nFor positive rates and t > 0: `r_simple > r_annual > r_continuous`\n(less frequent compounding requires a higher quoted rate for the same DF)."
+  },
+  {
+    "path": "#/$defs/d_5c13df5a55f1da604df2/oneOf/0",
+    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/Compounding/oneOf/0",
+    "const": "continuous",
+    "description": "Continuous compounding: r = -ln(DF) / t\n\nMost common for internal calculations, curve construction, and\nquantitative finance models. Provides the simplest mathematical\nproperties (additive over time)."
+  },
+  {
+    "path": "#/$defs/d_5c13df5a55f1da604df2/oneOf/1",
+    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/Compounding/oneOf/1",
+    "const": "annual",
+    "description": "Annual compounding: r = DF^(-1/t) - 1\n\nStandard for many bond markets, particularly UK gilts and\nEuropean government bonds. Also common for Bloomberg zero rate display."
+  },
+  {
+    "path": "#/$defs/d_5c13df5a55f1da604df2/oneOf/2",
+    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/Compounding/oneOf/2",
+    "description": "Periodic compounding with n periods per year: r = n × (DF^(-1/(n×t)) - 1)\n\nCommon values:\n- n=2: Semi-annual (US Treasury, corporate bonds)\n- n=4: Quarterly (some FRNs)\n- n=12: Monthly (rare, some retail products)\n\nNote: Uses [`NonZeroU32`] to prevent division by zero at compile time."
+  },
+  {
+    "path": "#/$defs/d_5c13df5a55f1da604df2/oneOf/2/properties/periodic",
+    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/Compounding/oneOf/2/properties/periodic",
+    "format": "uint32",
+    "minimum": 1
+  },
+  {
+    "path": "#/$defs/d_5c13df5a55f1da604df2/oneOf/3",
+    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/Compounding/oneOf/3",
+    "const": "simple",
+    "description": "Simple interest (no compounding): r = (1/DF - 1) / t\n\nUsed for money market instruments with maturity < 1 year, including:\n- Interbank deposits\n- T-bills and commercial paper\n- SOFR, SONIA, €STR fixings\n\nTypically paired with ACT/360 (USD, EUR) or ACT/365F (GBP) day counts."
   },
   {
     "path": "#/$defs/d_6347b87cc04573a369d9",
@@ -11033,6 +10926,23 @@ export default [
     "source": "https://finstack_quant.dev/schemas/cashflow/1/coupon_specs.schema.json#/$defs/StubKind/oneOf/4",
     "const": "long_back",
     "description": "Long stub period at the end of the schedule (merges final two periods)."
+  },
+  {
+    "path": "#/$defs/d_948cdc4db846a21357a4",
+    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/ShortRateTreeModel",
+    "description": "Short-rate lattice used by the rates-only bond tree.\n\nSelected by `instrument_pricing_overrides.model_config.tree_model`; when the\nfield is absent the bond tree uses Hull-White."
+  },
+  {
+    "path": "#/$defs/d_948cdc4db846a21357a4/oneOf/0",
+    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/ShortRateTreeModel/oneOf/0",
+    "const": "hull_white",
+    "description": "Hull-White one-factor (normal short rate) with `(κ, σ)` from\n`model_config.hw1f_mean_reversion` / `model_config.hw1f_sigma` or the\npre-fitted market scalars."
+  },
+  {
+    "path": "#/$defs/d_948cdc4db846a21357a4/oneOf/1",
+    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/ShortRateTreeModel/oneOf/1",
+    "const": "black_derman_toy",
+    "description": "Black-Derman-Toy (lognormal short rate) with volatility\n`model_config.bdt_sigma`."
   },
   {
     "path": "#/$defs/d_94cb251104de5cf587b6",
@@ -12206,7 +12116,7 @@ export default [
   {
     "path": "#/$defs/d_b0a5fc543381da6a5722/properties/cds_quote_bp",
     "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/MarketQuoteOverrides/properties/cds_quote_bp",
-    "description": "CreditDefaultSwap clean par-spread quote in basis points.\n\nUsed only by CreditDefaultSwap risk replay, where it replaces the\nmatching contractual hazard-curve pillar. It does not drive PV, and no\nother instrument (CDSIndex included) reads it.",
+    "description": "CreditDefaultSwap clean par-spread quote in basis points.\n\nUsed only by CreditDefaultSwap risk replay, where it replaces the\nmatching contractual hazard-curve pillar. It does not drive PV, and no\nother instrument (CdsIndex included) reads it.",
     "format": "double"
   },
   {
@@ -14626,23 +14536,6 @@ export default [
     "description": "Years (Y)"
   },
   {
-    "path": "#/$defs/d_ec89adc17436f33de839",
-    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/VolatilityModel",
-    "description": "Volatility model for option pricing."
-  },
-  {
-    "path": "#/$defs/d_ec89adc17436f33de839/oneOf/0",
-    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/VolatilityModel/oneOf/0",
-    "const": "black",
-    "description": "Black (lognormal)."
-  },
-  {
-    "path": "#/$defs/d_ec89adc17436f33de839/oneOf/1",
-    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/VolatilityModel/oneOf/1",
-    "const": "normal",
-    "description": "Bachelier / normal model."
-  },
-  {
     "path": "#/$defs/d_ed218c734e46de57eeb9",
     "source": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json#/$defs/BreakevenMode",
     "description": "Linear (first-order) or iterative (full-reprice root-find) solve mode.\n\n# Why the two modes disagree\n\nThe gap between them is usually **not** dominated by convexity. `Linear`\ndivides by the sensitivity measured at `as_of`, whereas `Iterative`\nreprices at the horizon date, where the instrument has less remaining time\nand therefore a different sensitivity. On a 5Y bond over a 6M horizon the\ntwo differ by several percent even though convexity over the ~9bp solved\nshift contributes only a fraction of that. The gap grows with horizon\nlength, not just with curvature.\n\n`Iterative` is the more accurate answer where it is supported; `Linear` is\nthe fast approximation and the default."
@@ -16613,7 +16506,7 @@ export default [
   {
     "path": "#/$defs/EquityTotalReturnSwap",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/EquityTotalReturnSwap",
-    "description": "Equity total-return swap exchanging price and net dividend return against\nfloating-rate financing plus a contractual spread.\n\nSeasoned trades require the observed level at the current period start in\n`past_fixings`, except that `initial_level` may anchor the first period.\n\n# Construction\n\n```\nuse finstack_quant_core::{\n    currency::Currency, dates::DayCount, money::Money, types::InstrumentId,\n};\nuse finstack_quant_cashflows::builder::ScheduleParams;\nuse finstack_quant_valuations::instruments::{\n    Attributes, EquityUnderlyingParams, FinancingLegSpec,\n};\nuse finstack_quant_valuations::instruments::equity::equity_trs::{\n    EquityTotalReturnSwap, TrsDividendSettlement, TrsScheduleSpec, TrsSide,\n};\nuse rust_decimal::Decimal;\nuse time::macros::date;\n\n# fn main() -> finstack_quant_core::Result<()> {\nlet trs = EquityTotalReturnSwap::builder()\n    .id(InstrumentId::new(\"SPX-TRS\"))\n    .notional(Money::from((10_000_000_i64, Currency::USD)))\n    .underlying(\n        EquityUnderlyingParams::new(\"SPX\", \"SPX-SPOT\", Currency::USD)\n            .with_dividend_yield(\"SPX-DIV\"),\n    )\n    .financing(FinancingLegSpec::new(\n        \"USD-OIS\", \"USD-SOFR-3M\", Decimal::from(50), DayCount::Act360,\n    ))\n    .schedule(TrsScheduleSpec::from_params(\n        date!(2026 - 01 - 02),\n        date!(2027 - 01 - 02),\n        ScheduleParams::quarterly_act360(),\n    ))\n    .side(TrsSide::ReceiveTotalReturn)\n    .dividend_settlement(TrsDividendSettlement::OnDividendDate)\n    .initial_level_opt(None)\n    .attributes(Attributes::new())\n    .build()?;\nassert_eq!(trs.notional.currency(), Currency::USD);\n# Ok(())\n# }\n```"
+    "description": "Equity total-return swap exchanging price and net dividend return against\nfloating-rate financing plus a contractual spread.\n\nSeasoned trades require the observed level at the current period start in\n`past_fixings`, except that `initial_level` may anchor the first period.\n\n# Construction\n\n```\nuse finstack_quant_core::{\n    currency::Currency, dates::DayCount, money::Money, types::InstrumentId,\n};\nuse finstack_quant_cashflows::builder::ScheduleParams;\nuse finstack_quant_valuations::instruments::{\n    Attributes, EquityUnderlyingParams, FinancingLegSpec, PayReceive,\n};\nuse finstack_quant_valuations::instruments::equity::equity_trs::{\n    EquityTotalReturnSwap, TrsDividendSettlement, TrsScheduleSpec,\n};\nuse rust_decimal::Decimal;\nuse time::macros::date;\n\n# fn main() -> finstack_quant_core::Result<()> {\nlet trs = EquityTotalReturnSwap::builder()\n    .id(InstrumentId::new(\"SPX-TRS\"))\n    .notional(Money::from((10_000_000_i64, Currency::USD)))\n    .underlying(\n        EquityUnderlyingParams::new(\"SPX\", \"SPX-SPOT\", Currency::USD)\n            .with_dividend_yield(\"SPX-DIV\"),\n    )\n    .financing_leg(FinancingLegSpec::new(\n        \"USD-OIS\", \"USD-SOFR-3M\", Decimal::from(50), DayCount::Act360,\n    ))\n    .schedule(TrsScheduleSpec::from_params(\n        date!(2026 - 01 - 02),\n        date!(2027 - 01 - 02),\n        ScheduleParams::quarterly_act360(),\n    ))\n    .side(PayReceive::Receive)\n    .dividend_settlement(TrsDividendSettlement::OnDividendDate)\n    .initial_level_opt(None)\n    .attributes(Attributes::new())\n    .build()?;\nassert_eq!(trs.notional.currency(), Currency::USD);\n# Ok(())\n# }\n```"
   },
   {
     "path": "#/$defs/EquityTotalReturnSwap/properties/attributes",
@@ -16658,8 +16551,8 @@ export default [
     "format": "double"
   },
   {
-    "path": "#/$defs/EquityTotalReturnSwap/properties/financing",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/EquityTotalReturnSwap/properties/financing",
+    "path": "#/$defs/EquityTotalReturnSwap/properties/financing_leg",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/EquityTotalReturnSwap/properties/financing_leg",
     "description": "Financing leg specification (curves, spread, day count).",
     "ref": "#/$defs/FinancingLegSpec",
     "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/FinancingLegSpec"
@@ -16758,8 +16651,8 @@ export default [
     "path": "#/$defs/EquityTotalReturnSwap/properties/side",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/EquityTotalReturnSwap/properties/side",
     "description": "Trade side (receive/pay total return).",
-    "ref": "#/$defs/TrsSide",
-    "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/TrsSide"
+    "ref": "#/$defs/PayReceive",
+    "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/PayReceive"
   },
   {
     "path": "#/$defs/EquityTotalReturnSwap/properties/underlying",
@@ -17077,97 +16970,97 @@ export default [
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/decimal.schema.json#"
   },
   {
-    "path": "#/$defs/FIIndexTotalReturnSwap",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/FIIndexTotalReturnSwap",
-    "description": "Fixed-income index total-return swap priced with a carry analytic.\n\nFor each scheduled period, the total-return leg uses\n`exp(y × accrual_fraction) - 1`, where `y` is an annual continuously\ncompounded decimal yield and the accrual fraction uses the schedule day\ncount. Both legs are discounted with `financing.discount_curve_id`; the\nfinancing leg projects `financing.forward_curve_id` plus `spread_bp`.\nReceive-total-return value is `PV(total return) - PV(financing)`;\npay-total-return value reverses that sign.\n\n# Model limitations\n\nThis deterministic carry analytic omits roll-down, underlying rate/spread\nmark-to-market, stochastic credit, constituent decomposition, early\ntermination, and bespoke fees. The period in progress on the valuation\ndate is valued from the live index level (`underlying.index_id`) against\n`initial_level`, then carried at the index yield to period end; a period\nthat has ended but is not yet paid stays in the PV at its projected carry.\nCashflow-schedule APIs\nreturn payment dates with zero amounts; use\n[`Self::pv_total_return_leg`] and [`Self::pv_financing_leg`] for projected\nleg values.\n\n# Construction\n\n```\nuse finstack_quant_core::{\n    currency::Currency, dates::DayCount, money::Money, types::InstrumentId,\n};\nuse finstack_quant_cashflows::builder::ScheduleParams;\nuse finstack_quant_valuations::instruments::{\n    Attributes, FinancingLegSpec, IndexUnderlyingParams,\n};\nuse finstack_quant_valuations::instruments::fixed_income::fi_trs::FIIndexTotalReturnSwap;\nuse finstack_quant_valuations::instruments::fixed_income::fi_trs::{\n    TrsScheduleSpec, TrsSide,\n};\nuse rust_decimal::Decimal;\nuse time::macros::date;\n\n# fn main() -> finstack_quant_core::Result<()> {\nlet trs = FIIndexTotalReturnSwap::builder()\n    .id(InstrumentId::new(\"CORP-TRS\"))\n    .notional(Money::from((10_000_000_i64, Currency::USD)))\n    .underlying(\n        IndexUnderlyingParams::new(\"US-CORP\", Currency::USD)\n            .with_yield(\"US-CORP-YIELD\")\n            .with_duration(\"US-CORP-DURATION\"),\n    )\n    .financing(FinancingLegSpec::new(\n        \"USD-OIS\", \"USD-SOFR-3M\", Decimal::from(35), DayCount::Act360,\n    ))\n    .schedule(TrsScheduleSpec::from_params(\n        date!(2026 - 01 - 02),\n        date!(2027 - 01 - 02),\n        ScheduleParams::quarterly_act360(),\n    ))\n    .side(TrsSide::ReceiveTotalReturn)\n    .initial_level_opt(None)\n    .attributes(Attributes::new())\n    .build()?;\nassert_eq!(trs.notional.currency(), Currency::USD);\n# Ok(())\n# }\n```"
+    "path": "#/$defs/FiIndexTotalReturnSwap",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/FiIndexTotalReturnSwap",
+    "description": "Fixed-income index total-return swap priced with a carry analytic.\n\nFor each scheduled period, the total-return leg uses\n`exp(y × accrual_fraction) - 1`, where `y` is an annual continuously\ncompounded decimal yield and the accrual fraction uses the schedule day\ncount. Both legs are discounted with `financing.discount_curve_id`; the\nfinancing leg projects `financing.forward_curve_id` plus `spread_bp`.\nReceive-total-return value is `PV(total return) - PV(financing)`;\npay-total-return value reverses that sign.\n\n# Model limitations\n\nThis deterministic carry analytic omits roll-down, underlying rate/spread\nmark-to-market, stochastic credit, constituent decomposition, early\ntermination, and bespoke fees. The period in progress on the valuation\ndate is valued from the live index level (`underlying.index_id`) against\n`initial_level`, then carried at the index yield to period end; a period\nthat has ended but is not yet paid stays in the PV at its projected carry.\nCashflow-schedule APIs\nreturn payment dates with zero amounts; use\n[`Self::pv_total_return_leg`] and [`Self::pv_financing_leg`] for projected\nleg values.\n\n# Construction\n\n```\nuse finstack_quant_core::{\n    currency::Currency, dates::DayCount, money::Money, types::InstrumentId,\n};\nuse finstack_quant_cashflows::builder::ScheduleParams;\nuse finstack_quant_valuations::instruments::{\n    Attributes, FinancingLegSpec, IndexUnderlyingParams, PayReceive,\n};\nuse finstack_quant_valuations::instruments::fixed_income::fi_trs::FiIndexTotalReturnSwap;\nuse finstack_quant_valuations::instruments::fixed_income::fi_trs::{\n    TrsScheduleSpec,\n};\nuse rust_decimal::Decimal;\nuse time::macros::date;\n\n# fn main() -> finstack_quant_core::Result<()> {\nlet trs = FiIndexTotalReturnSwap::builder()\n    .id(InstrumentId::new(\"CORP-TRS\"))\n    .notional(Money::from((10_000_000_i64, Currency::USD)))\n    .underlying(\n        IndexUnderlyingParams::new(\"US-CORP\", Currency::USD)\n            .with_yield(\"US-CORP-YIELD\")\n            .with_duration(\"US-CORP-DURATION\"),\n    )\n    .financing_leg(FinancingLegSpec::new(\n        \"USD-OIS\", \"USD-SOFR-3M\", Decimal::from(35), DayCount::Act360,\n    ))\n    .schedule(TrsScheduleSpec::from_params(\n        date!(2026 - 01 - 02),\n        date!(2027 - 01 - 02),\n        ScheduleParams::quarterly_act360(),\n    ))\n    .side(PayReceive::Receive)\n    .initial_level_opt(None)\n    .attributes(Attributes::new())\n    .build()?;\nassert_eq!(trs.notional.currency(), Currency::USD);\n# Ok(())\n# }\n```"
   },
   {
-    "path": "#/$defs/FIIndexTotalReturnSwap/properties/attributes",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/FIIndexTotalReturnSwap/properties/attributes",
+    "path": "#/$defs/FiIndexTotalReturnSwap/properties/attributes",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/FiIndexTotalReturnSwap/properties/attributes",
     "description": "Attributes for scenario selection and tagging",
     "ref": "https://finstack_quant.dev/schemas/common/1/attributes.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/attributes.schema.json#"
   },
   {
-    "path": "#/$defs/FIIndexTotalReturnSwap/properties/financing",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/FIIndexTotalReturnSwap/properties/financing",
+    "path": "#/$defs/FiIndexTotalReturnSwap/properties/financing_leg",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/FiIndexTotalReturnSwap/properties/financing_leg",
     "description": "Financing leg specification (curves, spread, day count).",
     "ref": "#/$defs/FinancingLegSpec",
     "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/FinancingLegSpec"
   },
   {
-    "path": "#/$defs/FIIndexTotalReturnSwap/properties/id",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/FIIndexTotalReturnSwap/properties/id",
+    "path": "#/$defs/FiIndexTotalReturnSwap/properties/id",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/FiIndexTotalReturnSwap/properties/id",
     "description": "Unique instrument identifier.",
     "ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/id.schema.json#"
   },
   {
-    "path": "#/$defs/FIIndexTotalReturnSwap/properties/initial_level",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/FIIndexTotalReturnSwap/properties/initial_level",
+    "path": "#/$defs/FiIndexTotalReturnSwap/properties/initial_level",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/FiIndexTotalReturnSwap/properties/initial_level",
     "description": "Index level at the reset of the return period in progress, in the\nindex's own units.\n\nRequired when the valuation date falls inside a return period; the\nrealized return to date is `index_level / initial_level`. Unused for\nunseasoned trades. Must be positive and finite when set.",
     "format": "double"
   },
   {
-    "path": "#/$defs/FIIndexTotalReturnSwap/properties/instrument_pricing_overrides",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/FIIndexTotalReturnSwap/properties/instrument_pricing_overrides",
+    "path": "#/$defs/FiIndexTotalReturnSwap/properties/instrument_pricing_overrides",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/FiIndexTotalReturnSwap/properties/instrument_pricing_overrides",
     "description": "Instrument-owned pricing inputs.",
     "ref": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#"
   },
   {
-    "path": "#/$defs/FIIndexTotalReturnSwap/properties/margin_spec",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/FIIndexTotalReturnSwap/properties/margin_spec",
+    "path": "#/$defs/FiIndexTotalReturnSwap/properties/margin_spec",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/FiIndexTotalReturnSwap/properties/margin_spec",
     "description": "Optional OTC margin specification for VM/IM.\n\nFixed income index TRS use duration-based margin calculations."
   },
   {
-    "path": "#/$defs/FIIndexTotalReturnSwap/properties/margin_spec/anyOf/0",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/FIIndexTotalReturnSwap/properties/margin_spec/anyOf/0",
+    "path": "#/$defs/FiIndexTotalReturnSwap/properties/margin_spec/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/FiIndexTotalReturnSwap/properties/margin_spec/anyOf/0",
     "ref": "#/$defs/OtcMarginSpec",
     "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/OtcMarginSpec"
   },
   {
-    "path": "#/$defs/FIIndexTotalReturnSwap/properties/margin_spec/anyOf/1",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/FIIndexTotalReturnSwap/properties/margin_spec/anyOf/1"
+    "path": "#/$defs/FiIndexTotalReturnSwap/properties/margin_spec/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/FiIndexTotalReturnSwap/properties/margin_spec/anyOf/1"
   },
   {
-    "path": "#/$defs/FIIndexTotalReturnSwap/properties/metric_pricing_overrides",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/FIIndexTotalReturnSwap/properties/metric_pricing_overrides",
+    "path": "#/$defs/FiIndexTotalReturnSwap/properties/metric_pricing_overrides",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/FiIndexTotalReturnSwap/properties/metric_pricing_overrides",
     "description": "Metric-time pricing configuration.",
     "ref": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json#"
   },
   {
-    "path": "#/$defs/FIIndexTotalReturnSwap/properties/notional",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/FIIndexTotalReturnSwap/properties/notional",
+    "path": "#/$defs/FiIndexTotalReturnSwap/properties/notional",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/FiIndexTotalReturnSwap/properties/notional",
     "description": "Notional amount for the swap.",
     "ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/money.schema.json#"
   },
   {
-    "path": "#/$defs/FIIndexTotalReturnSwap/properties/scenario_pricing_overrides",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/FIIndexTotalReturnSwap/properties/scenario_pricing_overrides",
+    "path": "#/$defs/FiIndexTotalReturnSwap/properties/scenario_pricing_overrides",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/FiIndexTotalReturnSwap/properties/scenario_pricing_overrides",
     "description": "Scenario-only pricing adjustments.",
     "ref": "https://finstack_quant.dev/schemas/common/1/scenario_pricing_overrides.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/scenario_pricing_overrides.schema.json#"
   },
   {
-    "path": "#/$defs/FIIndexTotalReturnSwap/properties/schedule",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/FIIndexTotalReturnSwap/properties/schedule",
+    "path": "#/$defs/FiIndexTotalReturnSwap/properties/schedule",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/FiIndexTotalReturnSwap/properties/schedule",
     "description": "Schedule specification (payment dates and frequency).",
     "ref": "#/$defs/TrsScheduleSpec",
     "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/TrsScheduleSpec"
   },
   {
-    "path": "#/$defs/FIIndexTotalReturnSwap/properties/side",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/FIIndexTotalReturnSwap/properties/side",
-    "description": "Trade side (receive/pay total return).",
-    "ref": "#/$defs/TrsSide",
-    "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/TrsSide"
+    "path": "#/$defs/FiIndexTotalReturnSwap/properties/side",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/FiIndexTotalReturnSwap/properties/side",
+    "description": "Trade side: `receive` receives the total-return leg and pays financing;\n`pay` pays the total return and receives financing.",
+    "ref": "#/$defs/PayReceive",
+    "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/PayReceive"
   },
   {
-    "path": "#/$defs/FIIndexTotalReturnSwap/properties/underlying",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/FIIndexTotalReturnSwap/properties/underlying",
+    "path": "#/$defs/FiIndexTotalReturnSwap/properties/underlying",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/FiIndexTotalReturnSwap/properties/underlying",
     "description": "Underlying index parameters (index ID, yield, duration, base currency).",
     "ref": "#/$defs/IndexUnderlyingParams",
     "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/IndexUnderlyingParams"
@@ -17236,10 +17129,10 @@ export default [
   {
     "path": "#/$defs/FinancingLegSpec/properties/compounding",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/FinancingLegSpec/properties/compounding",
-    "default": "term_rate",
-    "description": "Rate-compounding convention (term-rate vs overnight-compounded).\n\nDefaults to [`FinancingRateCompounding::TermRate`]. Set to\n[`FinancingRateCompounding::OvernightCompounded`] for SOFR/SONIA/€STR\novernight-funded TRS so the financing rate captures daily-compounding\nconvexity.",
-    "ref": "#/$defs/FinancingRateCompounding",
-    "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/FinancingRateCompounding"
+    "default": "simple",
+    "description": "Rate-compounding convention of the financing rate.\n\nDefaults to `simple` (one term forward per period, e.g. 3M Term SOFR or\nEURIBOR). Use a `compounded_*` variant for SOFR/SONIA/€STR\novernight-funded TRS so the financing rate captures the daily\ncompounding convexity (typically 12–15 bp of rate on an upward curve).\n`simple_average` is rejected.",
+    "ref": "#/$defs/FloatingLegCompounding",
+    "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/FloatingLegCompounding"
   },
   {
     "path": "#/$defs/FinancingLegSpec/properties/day_count",
@@ -17270,23 +17163,6 @@ export default [
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/decimal.schema.json#"
   },
   {
-    "path": "#/$defs/FinancingRateCompounding",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/FinancingRateCompounding",
-    "description": "Rate-compounding convention for a TRS financing leg.\n\nDistinguishes how each accrual period's floating rate is projected from the\nforward curve. The two conventions differ by the daily-compounding convexity\n— typically 12–15 bp of rate at current levels on an upward-sloping curve."
-  },
-  {
-    "path": "#/$defs/FinancingRateCompounding/oneOf/0",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/FinancingRateCompounding/oneOf/0",
-    "const": "term_rate",
-    "description": "Term-rate financing (e.g. 3M Term SOFR, EURIBOR): the period rate is the\nsimple arithmetic-average forward over the accrual period. This is the\ndefault and matches a conventional term-rate-funded TRS."
-  },
-  {
-    "path": "#/$defs/FinancingRateCompounding/oneOf/1",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/FinancingRateCompounding/oneOf/1",
-    "const": "overnight_compounded",
-    "description": "Overnight-indexed (OIS / RFR) financing — SOFR, SONIA, €STR, TONA: the\nperiod rate daily-compounds the overnight forward,\n`R = (∏(1 + rᵢ·dᵢ) − 1) / τ`, picking up the compounding convexity that\nthe simple arithmetic average drops."
-  },
-  {
     "path": "#/$defs/FixedLegSpec",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/FixedLegSpec",
     "description": "Specification for fixed rate legs in interest rate swaps"
@@ -17313,11 +17189,6 @@ export default [
   {
     "path": "#/$defs/FixedLegSpec/properties/calendar_id/anyOf/1",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/FixedLegSpec/properties/calendar_id/anyOf/1"
-  },
-  {
-    "path": "#/$defs/FixedLegSpec/properties/compounding_simple",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/FixedLegSpec/properties/compounding_simple",
-    "description": "If true, use simple interest on accrual fraction"
   },
   {
     "path": "#/$defs/FixedLegSpec/properties/day_count",
@@ -17482,62 +17353,68 @@ export default [
   {
     "path": "#/$defs/FloatingLegCompounding",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/FloatingLegCompounding",
-    "description": "Method for calculating floating leg coupon payments.\n\nDifferent reference rates require different compounding conventions:\n- **Term rates (SOFR 3M, EURIBOR, historical LIBOR)**: Simple interest\n- **Overnight rates (SOFR, SONIA, €STR, TONA)**: Compounded in arrears\n\n# Market Standards\n\n## Simple term-rate coupons\n- **Formula**: `Coupon = Notional × (Forward_Rate + Spread) × DCF`\n- **Use for**: current term-rate indices and legacy IBOR transactions\n- **Standard**: ISDA 2021 Definitions; ISDA 2006 for legacy transactions\n\n## Compounded In Arrears (RFR-style)\n- **Formula**: `Coupon = Notional × [∏(1 + r_i × dcf_i) - 1]`\n- **Use for**: USD SOFR, GBP SONIA, EUR €STR, JPY TONA\n- **Standard**: ISDA 2021 Definitions\n- **Observation convention**: plain in-arrears for standard OIS presets;\n  lookback, observation shift, and cutoff are explicit contract variants\n\n# Examples\n\n```\nuse finstack_quant_valuations::instruments::rates::irs::FloatingLegCompounding;\n\n// LIBOR-style swap (simple compounding)\nlet simple = FloatingLegCompounding::Simple;\nassert_eq!(simple, FloatingLegCompounding::default());\n\n// SOFR OIS swap: plain compounded in arrears (no lookback)\nlet sofr = FloatingLegCompounding::CompoundedInArrears { lookback_days: 0 };\nassert_eq!(sofr, FloatingLegCompounding::sofr());\n\n// SONIA FRN-style leg with the BoE 5-day lookback (explicit, not the OIS preset)\nlet sonia_frn = FloatingLegCompounding::CompoundedInArrears { lookback_days: 5 };\nassert_ne!(sonia_frn, FloatingLegCompounding::sonia());\n```\n\n# References\n\n- **ISDA 2021 Definitions**: Compounded RFR conventions `docs/REFERENCES.md#isda-2021-definitions`\n- **ARRC** (Alternative Reference Rates Committee): SOFR conventions `docs/REFERENCES.md#arrc-sofr-users-guide`\n- **BoE** (Bank of England): SONIA conventions `docs/REFERENCES.md#boe-sonia-key-features`\n- **ECB**: €STR conventions `docs/REFERENCES.md#ecb-estr-methodology`\n\nIn the IRS instrument implementation, the RFR-style variant\n(`CompoundedInArrears`) is also used to classify swaps as OIS for\ndiscount-only float-leg pricing; see `InterestRateSwap::is_single_curve_ois` for details."
+    "description": "How the fixings of one accrual period combine into the period rate.\n\nOne canonical enum for every floating leg and coupon: swaps, basis and\ncross-currency legs, TRS financing, IR futures, FRN / loan / structured\ncredit coupons.\n\n| Variant | Period rate | Typical use |\n|---------|-------------|-------------|\n| `simple` | One term fixing / forward over the period | EURIBOR, Term SOFR, legacy IBOR |\n| `simple_average` | `(Σ rᵢ·dᵢ) / D` of daily overnight fixings | Averaged overnight loans, Fed-Funds futures |\n| `compounded_in_arrears` | `[∏(1 + rᵢ·dᵢ/B) − 1]·B/D` | SOFR / SONIA / €STR / TONA OIS (lookback 0) |\n| `compounded_with_observation_shift` | as above, observations and weights shifted | ISDA 2021 observation shift |\n| `compounded_with_rate_cutoff` | as above, last fixings frozen | ARRC lockout / SWPM \"Rate Cut-Off Days\" |\n\nDay counts are business days and must be non-negative.\n\n# References\n\n- ISDA 2021 Definitions, compounded RFR conventions `docs/REFERENCES.md#isda-2021-definitions`\n- ARRC (2020). \"SOFR: A User's Guide.\" `docs/REFERENCES.md#arrc-sofr-users-guide`\n- BoE SONIA conventions `docs/REFERENCES.md#boe-sonia-key-features`\n\n# Examples\n\n```\nuse finstack_quant_cashflows::builder::FloatingLegCompounding;\n\nassert_eq!(FloatingLegCompounding::default(), FloatingLegCompounding::Simple);\nassert_eq!(\n    FloatingLegCompounding::sofr(),\n    FloatingLegCompounding::CompoundedInArrears { lookback_days: 0 }\n);\n```"
   },
   {
     "path": "#/$defs/FloatingLegCompounding/oneOf/0",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/FloatingLegCompounding/oneOf/0",
     "const": "simple",
-    "description": "Simple interest compounding (term-rate style).\n\nCoupon = Notional × (Forward_Rate + Spread) × Day_Count_Fraction\n\nUse for:\n- Current fixed-tenor term-rate indices\n- Legacy USD/EUR/GBP LIBOR swaps\n\nThis is the generic vanilla-IRS default; the rate-index convention\nregistry selects compounded RFR terms for overnight indices."
+    "description": "Simple term-rate projection: one fixing or forward over the period.\n\n`Coupon = Notional × (Forward_Rate + Spread) × DCF`. This is the\ndefault; a registered overnight RFR index rejects it."
   },
   {
     "path": "#/$defs/FloatingLegCompounding/oneOf/1",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/FloatingLegCompounding/oneOf/1",
-    "description": "Compounded in arrears (overnight RFR rates).\n\nCoupon = Notional × [∏(1 + r_i × dcf_i) - 1] where the product\nis taken over daily observations in the accrual period.\n\nUse for:\n- USD SOFR (Secured Overnight Financing Rate)\n- GBP SONIA (Sterling Overnight Index Average)\n- EUR €STR (Euro Short-Term Rate)\n- JPY TONA (Tokyo Overnight Average Rate)\n\n# Fields\n\n- `lookback_days`: Business days by which observation dates move\n  backward while accrual day-count weights remain unshifted.\n\nStandard cleared OIS presets use zero lookback. Non-zero lookbacks are\nexplicit contractual variants, commonly used for RFR-linked notes."
-  },
-  {
-    "path": "#/$defs/FloatingLegCompounding/oneOf/1/properties/compounded_in_arrears",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/FloatingLegCompounding/oneOf/1/properties/compounded_in_arrears"
-  },
-  {
-    "path": "#/$defs/FloatingLegCompounding/oneOf/1/properties/compounded_in_arrears/properties/lookback_days",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/FloatingLegCompounding/oneOf/1/properties/compounded_in_arrears/properties/lookback_days",
-    "description": "Number of business days to shift observation dates back from the accrual\nperiod (lookback).  Typically 2–5 days depending on market convention.\n\nThe observation dates are shifted while the day-count-fraction (DCF)\nweights remain anchored to the **original** accrual period dates.\nThis is consistent with \"lookback without observation shift\" as\ndescribed in the ISDA 2021 Definitions and ARRC SOFR conventions.",
-    "format": "int32",
-    "maximum": 31,
-    "minimum": 0
+    "const": "simple_average",
+    "description": "Arithmetic average of daily overnight fixings weighted by accrual days,\n`Rate = (Σ rᵢ·dᵢ) / D`, for instruments that contractually specify a\nsimple-average overnight index."
   },
   {
     "path": "#/$defs/FloatingLegCompounding/oneOf/2",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/FloatingLegCompounding/oneOf/2",
-    "description": "Compounded in arrears with true ISDA 2021 observation shift.\n\nUnlike `CompoundedInArrears` (lookback semantics), this variant shifts\n**both** the observation dates AND the day-count-fraction (DCF) weights.\nThis matches ISDA 2021 Definitions Section 4.5(c).\n\n```text\nLookback:           DCF(d, d+1)           × rate(d - shift, d+1 - shift)\nObservation Shift:  DCF(d - shift, d+1 - shift) × rate(d - shift, d+1 - shift)\n```"
+    "description": "Compounded in arrears (overnight RFR rates).\n\n`Coupon = Notional × [∏(1 + rᵢ·dᵢ/B) − 1]` over the daily observations\nof the accrual period."
   },
   {
-    "path": "#/$defs/FloatingLegCompounding/oneOf/2/properties/compounded_with_observation_shift",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/FloatingLegCompounding/oneOf/2/properties/compounded_with_observation_shift"
+    "path": "#/$defs/FloatingLegCompounding/oneOf/2/properties/compounded_in_arrears",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/FloatingLegCompounding/oneOf/2/properties/compounded_in_arrears"
   },
   {
-    "path": "#/$defs/FloatingLegCompounding/oneOf/2/properties/compounded_with_observation_shift/properties/shift_days",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/FloatingLegCompounding/oneOf/2/properties/compounded_with_observation_shift/properties/shift_days",
-    "description": "Number of business days to shift both observation dates and DCF weights.",
-    "format": "int32",
+    "path": "#/$defs/FloatingLegCompounding/oneOf/2/properties/compounded_in_arrears/properties/lookback_days",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/FloatingLegCompounding/oneOf/2/properties/compounded_in_arrears/properties/lookback_days",
+    "description": "Business days by which observation dates move backward while the\nday-count weights stay on the original accrual dates (\"lookback\nwithout observation shift\", ISDA 2021 / ARRC). `0` is plain\nin-arrears, the cleared-OIS convention.",
+    "format": "uint32",
     "maximum": 31,
     "minimum": 0
   },
   {
     "path": "#/$defs/FloatingLegCompounding/oneOf/3",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/FloatingLegCompounding/oneOf/3",
-    "description": "Compounded in arrears with a rate cut-off near the period end.\n\nThis freezes the last observed overnight rate for the final `cutoff_days`\nbusiness days of the accrual period. Bloomberg SWPM labels this\nconvention as \"Rate Cut-Off Days\"."
+    "description": "Compounded in arrears with ISDA 2021 observation shift: both the\nobservation dates and their day-count weights move back\n(ISDA 2021 Definitions Section 4.5(c))."
   },
   {
-    "path": "#/$defs/FloatingLegCompounding/oneOf/3/properties/compounded_with_rate_cutoff",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/FloatingLegCompounding/oneOf/3/properties/compounded_with_rate_cutoff"
+    "path": "#/$defs/FloatingLegCompounding/oneOf/3/properties/compounded_with_observation_shift",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/FloatingLegCompounding/oneOf/3/properties/compounded_with_observation_shift"
   },
   {
-    "path": "#/$defs/FloatingLegCompounding/oneOf/3/properties/compounded_with_rate_cutoff/properties/cutoff_days",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/FloatingLegCompounding/oneOf/3/properties/compounded_with_rate_cutoff/properties/cutoff_days",
-    "description": "Number of business days before period end to freeze the overnight rate.",
-    "format": "int32",
+    "path": "#/$defs/FloatingLegCompounding/oneOf/3/properties/compounded_with_observation_shift/properties/shift_days",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/FloatingLegCompounding/oneOf/3/properties/compounded_with_observation_shift/properties/shift_days",
+    "description": "Business days to shift both observation dates and weights.",
+    "format": "uint32",
+    "maximum": 31,
+    "minimum": 0
+  },
+  {
+    "path": "#/$defs/FloatingLegCompounding/oneOf/4",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/FloatingLegCompounding/oneOf/4",
+    "description": "Compounded in arrears with a rate cut-off near the period end.\n\nThe last `cutoff_days` business-day observations are frozen at the\nfixing immediately preceding them: for fixings `b_1..b_n` the source is\n`b_{n-cutoff}`, so a positive cut-off must leave a preceding fixing.\nReference: ARRC, December 3, 2021 Statement, Appendix A (\"Lockout\")."
+  },
+  {
+    "path": "#/$defs/FloatingLegCompounding/oneOf/4/properties/compounded_with_rate_cutoff",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/FloatingLegCompounding/oneOf/4/properties/compounded_with_rate_cutoff"
+  },
+  {
+    "path": "#/$defs/FloatingLegCompounding/oneOf/4/properties/compounded_with_rate_cutoff/properties/cutoff_days",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/FloatingLegCompounding/oneOf/4/properties/compounded_with_rate_cutoff/properties/cutoff_days",
+    "description": "Business days before period end over which the rate is frozen.",
+    "format": "uint32",
     "maximum": 31,
     "minimum": 0
   },
@@ -17572,7 +17449,7 @@ export default [
   {
     "path": "#/$defs/FloatingRateSpec",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/FloatingRateSpec",
-    "description": "Canonical floating rate specification for all instruments.\n\nUsed by bonds, swaps, credit facilities, and structured products.\nAll instruments should compose this type rather than defining their own\nfloating rate specifications.\n\n# Rate Calculation\n\nThe all-in rate is computed as:\n1. Look up forward rate from `forward_curve_id` curve for the accrual period\n2. Apply `index_floor_bp` to index rate (if specified) - applied BEFORE adding spread\n3. Add `spread_bp` to get base rate\n4. Multiply by `gearing` (typically 1.0)\n5. Apply `all_in_cap_bp` to final rate (if specified) - applied AFTER spread and gearing\n\nFormula: `cap(gearing * (floor(index) + spread))`\n\n# Negative Rate Handling\n\nNegative index rates are supported and will flow through calculations\nunless constrained by floors. For markets with negative rates (EUR, JPY, CHF):\n\n- Set `index_floor_bp: Some(0.0)` to floor the index at zero\n- Set `all_in_floor_bp: Some(0.0)` to floor the total coupon at zero\n- Omit floors to allow negative coupons (rare but valid in some structures)\n\nThe implementation does not reject negative rates; the policy is controlled\nby the floor configuration.\n\n# Seasoned Instruments (Historical Fixings)\n\nHistorical fixings **are supported** via the `MarketContext`: store a\n`ScalarTimeSeries` under the canonical id `FIXING:{forward_curve_id}` (see\n`finstack_quant_core::market_data::fixings`) containing realized index\nobservations. Observation dates strictly before the forward curve base\ndate then resolve from that series instead of the curve:\n\n- **Overnight observations** (compounded/averaged paths) use LOCF lookup\n  (last observation carried forward), matching RFR publication\n  conventions where a fixing carries over non-publication days\n  (ARRC 2020 SOFR conventions; ISDA 2021 Supp. 70 §7.1(g)). A partially\n  seasoned compounding window seamlessly mixes realized fixings and\n  curve-projected forwards with identical `(rate, days)` weighting.\n- **Term-rate resets** use exact-date lookup on the (business-day\n  adjusted) reset date — a term rate fixes on a specific published date.\n  The fixing is the index rate only; gearing/spread/floors/caps apply on\n  top exactly as for projected rates.\n\nAn observation exactly on the curve base date prefers a published\nsame-day fixing when the series has one, otherwise projects from `t = 0`.\n\nThe [`FloatingRateFallback`] policy applies only when **no** fixing\nseries is provided: `Error` (the default) fails the build with a\ndescriptive message naming the date, index, and expected series id;\n`FixedRate(r)` uses `r` as the index rate for the affected coupon;\n`SpreadOnly` projects spread-only.\n\n# Example\n\n```rust\nuse finstack_quant_core::dates::Tenor;\nuse finstack_quant_cashflows::builder::{FloatingRateSpec, OvernightIndexConstraintApplication};\nuse rust_decimal_macros::dec;\n\n// 3M SOFR + 200bps with 0% floor\nlet spec = FloatingRateSpec {\n    forward_curve_id: \"USD-SOFR-3M\".into(),\n    spread_bp: dec!(200.0),\n    gearing: dec!(1.0),\n    gearing_includes_spread: true,\n    index_floor_bp: Some(dec!(0.0)),\n    all_in_floor_bp: None,\n    all_in_cap_bp: None,\n    index_cap_bp: None,\n    overnight_index_constraints: OvernightIndexConstraintApplication::Daily,\n    reset_frequency: Tenor::quarterly(),\n    index_tenor: None,\n    reset_lag_days: 2,\n    fixing_calendar_id: None,\n    overnight_compounding: None,\n    overnight_basis: None,\n    fallback: Default::default(),\n};\n```"
+    "description": "Canonical floating rate specification for all instruments.\n\nUsed by bonds, swaps, credit facilities, and structured products.\nAll instruments should compose this type rather than defining their own\nfloating rate specifications.\n\n# Rate Calculation\n\nThe all-in rate is computed as:\n1. Look up forward rate from `forward_curve_id` curve for the accrual period\n2. Apply `index_floor_bp` to index rate (if specified) - applied BEFORE adding spread\n3. Add `spread_bp` to get base rate\n4. Multiply by `gearing` (typically 1.0)\n5. Apply `all_in_cap_bp` to final rate (if specified) - applied AFTER spread and gearing\n\nFormula: `cap(gearing * (floor(index) + spread))`\n\n# Negative Rate Handling\n\nNegative index rates are supported and will flow through calculations\nunless constrained by floors. For markets with negative rates (EUR, JPY, CHF):\n\n- Set `index_floor_bp: Some(0.0)` to floor the index at zero\n- Set `all_in_floor_bp: Some(0.0)` to floor the total coupon at zero\n- Omit floors to allow negative coupons (rare but valid in some structures)\n\nThe implementation does not reject negative rates; the policy is controlled\nby the floor configuration.\n\n# Seasoned Instruments (Historical Fixings)\n\nHistorical fixings **are supported** via the `MarketContext`: store a\n`ScalarTimeSeries` under the canonical id `FIXING:{forward_curve_id}` (see\n`finstack_quant_core::market_data::fixings`) containing realized index\nobservations. Observation dates strictly before the forward curve base\ndate then resolve from that series instead of the curve:\n\n- **Overnight observations** (compounded/averaged paths) use LOCF lookup\n  (last observation carried forward), matching RFR publication\n  conventions where a fixing carries over non-publication days\n  (ARRC 2020 SOFR conventions; ISDA 2021 Supp. 70 §7.1(g)). A partially\n  seasoned compounding window seamlessly mixes realized fixings and\n  curve-projected forwards with identical `(rate, days)` weighting.\n- **Term-rate resets** use exact-date lookup on the (business-day\n  adjusted) reset date — a term rate fixes on a specific published date.\n  The fixing is the index rate only; gearing/spread/floors/caps apply on\n  top exactly as for projected rates.\n\nAn observation exactly on the curve base date prefers a published\nsame-day fixing when the series has one, otherwise projects from `t = 0`.\n\nThe [`FloatingRateFallback`] policy applies only when **no** fixing\nseries is provided: `Error` (the default) fails the build with a\ndescriptive message naming the date, index, and expected series id;\n`FixedRate(r)` uses `r` as the index rate for the affected coupon;\n`SpreadOnly` projects spread-only.\n\n# Example\n\n```rust\nuse finstack_quant_core::dates::Tenor;\nuse finstack_quant_cashflows::builder::{FloatingRateSpec, OvernightIndexConstraintApplication};\nuse rust_decimal_macros::dec;\n\n// 3M SOFR + 200bps with 0% floor\nlet spec = FloatingRateSpec {\n    forward_curve_id: \"USD-SOFR-3M\".into(),\n    spread_bp: dec!(200.0),\n    gearing: dec!(1.0),\n    gearing_includes_spread: true,\n    index_floor_bp: Some(dec!(0.0)),\n    all_in_floor_bp: None,\n    all_in_cap_bp: None,\n    index_cap_bp: None,\n    overnight_index_constraints: OvernightIndexConstraintApplication::Daily,\n    reset_frequency: Tenor::quarterly(),\n    index_tenor: None,\n    reset_lag_days: 2,\n    fixing_calendar_id: None,\n    compounding: None,\n    overnight_basis: None,\n    fallback: Default::default(),\n};\n```"
   },
   {
     "path": "#/$defs/FloatingRateSpec/properties/all_in_cap_bp",
@@ -17605,6 +17482,21 @@ export default [
   {
     "path": "#/$defs/FloatingRateSpec/properties/all_in_floor_bp/anyOf/1",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/FloatingRateSpec/properties/all_in_floor_bp/anyOf/1"
+  },
+  {
+    "path": "#/$defs/FloatingRateSpec/properties/compounding",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/FloatingRateSpec/properties/compounding",
+    "description": "How each accrual period's fixings combine into the period rate.\n\nAn overnight variant (anything but `simple`) computes the period rate\nfrom daily overnight fixings. `simple` projects one term forward over\nthe period. `None` leaves the choice to the instrument: pricers that\nknow the index resolve it from the rate-index convention registry, and\nthe bare cashflow builder treats it as `simple`."
+  },
+  {
+    "path": "#/$defs/FloatingRateSpec/properties/compounding/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/FloatingRateSpec/properties/compounding/anyOf/0",
+    "ref": "#/$defs/FloatingLegCompounding",
+    "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/FloatingLegCompounding"
+  },
+  {
+    "path": "#/$defs/FloatingRateSpec/properties/compounding/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/FloatingRateSpec/properties/compounding/anyOf/1"
   },
   {
     "path": "#/$defs/FloatingRateSpec/properties/fallback",
@@ -17700,7 +17592,7 @@ export default [
   {
     "path": "#/$defs/FloatingRateSpec/properties/overnight_basis",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/FloatingRateSpec/properties/overnight_basis",
-    "description": "Day-count basis for the overnight compounding denominator.\n\nThis controls the annualization factor used when compounding daily\novernight fixings (e.g., 360 for SOFR/€STR/TONA, 365 for SONIA).\nIt is independent of the leg's accrual day count when set explicitly.\n\nWhen `None` and `overnight_compounding` is set, the coupon\n`schedule.day_count` is used if it is `Act360` or `Act365F`. Other\ncoupon day counts (for example `Thirty360`) error unless an explicit\n`Act360` or `Act365F` basis is supplied. Ignored when\n`overnight_compounding` is `None`."
+    "description": "Day-count basis for the overnight compounding denominator.\n\nThis controls the annualization factor used when compounding daily\novernight fixings (e.g., 360 for SOFR/€STR/TONA, 365 for SONIA).\nIt is independent of the leg's accrual day count when set explicitly.\n\nWhen `None` and `compounding` is an overnight variant, the coupon\n`schedule.day_count` is used if it is `Act360` or `Act365F`. Other\ncoupon day counts (for example `Thirty360`) error unless an explicit\n`Act360` or `Act365F` basis is supplied. Ignored when\n`compounding` is not an overnight variant."
   },
   {
     "path": "#/$defs/FloatingRateSpec/properties/overnight_basis/anyOf/0",
@@ -17711,21 +17603,6 @@ export default [
   {
     "path": "#/$defs/FloatingRateSpec/properties/overnight_basis/anyOf/1",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/FloatingRateSpec/properties/overnight_basis/anyOf/1"
-  },
-  {
-    "path": "#/$defs/FloatingRateSpec/properties/overnight_compounding",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/FloatingRateSpec/properties/overnight_compounding",
-    "description": "Overnight compounding method for overnight rate indices (SOFR, ESTR, SONIA).\n\nWhen set to `Some(method)`, the rate for each accrual period is computed\nby compounding daily overnight fixings according to the specified method,\nrather than looking up a single forward rate for the period.\n\nLeave as `None` for term rates (e.g., 3M EURIBOR, 6M LIBOR)."
-  },
-  {
-    "path": "#/$defs/FloatingRateSpec/properties/overnight_compounding/anyOf/0",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/FloatingRateSpec/properties/overnight_compounding/anyOf/0",
-    "ref": "#/$defs/OvernightCompoundingMethod",
-    "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/OvernightCompoundingMethod"
-  },
-  {
-    "path": "#/$defs/FloatingRateSpec/properties/overnight_compounding/anyOf/1",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/FloatingRateSpec/properties/overnight_compounding/anyOf/1"
   },
   {
     "path": "#/$defs/FloatingRateSpec/properties/overnight_index_constraints",
@@ -17787,7 +17664,7 @@ export default [
     "path": "#/$defs/FloatLegSpec/properties/compounding",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/FloatLegSpec/properties/compounding",
     "default": "simple",
-    "description": "Compounding method for floating coupons.\n\nDetermines how floating rate coupons are calculated:\n- `Simple` (default): LIBOR-style simple interest\n- `CompoundedInArrears`: SOFR/SONIA-style daily compounding\n\n# Implementation Notes\n\nCompounded-in-arrears is implemented for IRS pricing in `instruments::irs` with\nsupport for lookback and observation shift conventions. For seasoned (already\nstarted) compounded swaps, pricing requires explicit fixings for observation\ndates prior to `as_of`.",
+    "description": "Compounding method for floating coupons.\n\nDetermines how floating rate coupons are calculated:\n- `simple` (default): one term forward per period\n- `compounded_*`: SOFR/SONIA-style daily compounding\n- `simple_average` is rejected by [`Self::validate`]\n\n# Implementation Notes\n\nCompounded-in-arrears is implemented for IRS pricing in `instruments::irs` with\nsupport for lookback and observation shift conventions. For seasoned (already\nstarted) compounded swaps, pricing requires explicit fixings for observation\ndates prior to `as_of`.",
     "ref": "#/$defs/FloatingLegCompounding",
     "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/FloatingLegCompounding"
   },
@@ -20500,11 +20377,11 @@ export default [
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/money.schema.json#"
   },
   {
-    "path": "#/$defs/InflationCapFloor/properties/option_type",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/InflationCapFloor/properties/option_type",
-    "description": "Cap/floor type (cap, floor, caplet, floorlet).",
-    "ref": "#/$defs/InflationCapFloorType",
-    "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/InflationCapFloorType"
+    "path": "#/$defs/InflationCapFloor/properties/rate_option_type",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/InflationCapFloor/properties/rate_option_type",
+    "description": "Cap/floor type (cap, floor, caplet, floorlet). Caplet and floorlet price a\nsingle period.",
+    "ref": "#/$defs/RateOptionType",
+    "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/RateOptionType"
   },
   {
     "path": "#/$defs/InflationCapFloor/properties/scenario_pricing_overrides",
@@ -20541,35 +20418,6 @@ export default [
     "description": "Volatility surface identifier.",
     "ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/id.schema.json#"
-  },
-  {
-    "path": "#/$defs/InflationCapFloorType",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/InflationCapFloorType",
-    "description": "Inflation option type."
-  },
-  {
-    "path": "#/$defs/InflationCapFloorType/oneOf/0",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/InflationCapFloorType/oneOf/0",
-    "const": "cap",
-    "description": "Cap (portfolio of caplets)."
-  },
-  {
-    "path": "#/$defs/InflationCapFloorType/oneOf/1",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/InflationCapFloorType/oneOf/1",
-    "const": "floor",
-    "description": "Floor (portfolio of floorlets)."
-  },
-  {
-    "path": "#/$defs/InflationCapFloorType/oneOf/2",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/InflationCapFloorType/oneOf/2",
-    "const": "caplet",
-    "description": "Single-period caplet."
-  },
-  {
-    "path": "#/$defs/InflationCapFloorType/oneOf/3",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/InflationCapFloorType/oneOf/3",
-    "const": "floorlet",
-    "description": "Single-period floorlet."
   },
   {
     "path": "#/$defs/InflationInterpolation",
@@ -21373,8 +21221,8 @@ export default [
   {
     "path": "#/$defs/InstrumentJson/oneOf/26/properties/spec",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/InstrumentJson/oneOf/26/properties/spec",
-    "ref": "#/$defs/CDSIndex",
-    "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CDSIndex"
+    "ref": "#/$defs/CdsIndex",
+    "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CdsIndex"
   },
   {
     "path": "#/$defs/InstrumentJson/oneOf/26/properties/type",
@@ -21389,8 +21237,8 @@ export default [
   {
     "path": "#/$defs/InstrumentJson/oneOf/27/properties/spec",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/InstrumentJson/oneOf/27/properties/spec",
-    "ref": "#/$defs/CDSTranche",
-    "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CDSTranche"
+    "ref": "#/$defs/CdsTranche",
+    "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CdsTranche"
   },
   {
     "path": "#/$defs/InstrumentJson/oneOf/27/properties/type",
@@ -21405,8 +21253,8 @@ export default [
   {
     "path": "#/$defs/InstrumentJson/oneOf/28/properties/spec",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/InstrumentJson/oneOf/28/properties/spec",
-    "ref": "#/$defs/CDSOption",
-    "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CDSOption"
+    "ref": "#/$defs/CdsOption",
+    "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CdsOption"
   },
   {
     "path": "#/$defs/InstrumentJson/oneOf/28/properties/type",
@@ -22093,8 +21941,8 @@ export default [
   {
     "path": "#/$defs/InstrumentJson/oneOf/67/properties/spec",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/InstrumentJson/oneOf/67/properties/spec",
-    "ref": "#/$defs/FIIndexTotalReturnSwap",
-    "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/FIIndexTotalReturnSwap"
+    "ref": "#/$defs/FiIndexTotalReturnSwap",
+    "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/FiIndexTotalReturnSwap"
   },
   {
     "path": "#/$defs/InstrumentJson/oneOf/67/properties/type",
@@ -22328,6 +22176,13 @@ export default [
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/attributes.schema.json#"
   },
   {
+    "path": "#/$defs/InterestRateFuture/properties/compounding",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/InterestRateFuture/properties/compounding",
+    "description": "Reference-rate method defined by the exchange contract: `simple` (one\nterm fixing, e.g. EURIBOR / 3M Term), `simple_average` (calendar-day\nweighted arithmetic average of overnight fixings, e.g. CME 1M SOFR /\nFed Funds) or `compounded_in_arrears` with zero lookback (daily\ncompounded overnight fixings, e.g. CME 3M SOFR). Other variants are\nrejected by validation.",
+    "ref": "#/$defs/FloatingLegCompounding",
+    "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/FloatingLegCompounding"
+  },
+  {
     "path": "#/$defs/InterestRateFuture/properties/contract_specs",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/InterestRateFuture/properties/contract_specs",
     "description": "Contract specifications",
@@ -22452,13 +22307,6 @@ export default [
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/InterestRateFuture/properties/period_start/anyOf/1"
   },
   {
-    "path": "#/$defs/InterestRateFuture/properties/rate_averaging",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/InterestRateFuture/properties/rate_averaging",
-    "description": "Rate settlement method defined by the exchange contract.",
-    "ref": "#/$defs/RateAveragingMethod",
-    "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/RateAveragingMethod"
-  },
-  {
     "path": "#/$defs/InterestRateFuture/properties/scenario_pricing_overrides",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/InterestRateFuture/properties/scenario_pricing_overrides",
     "description": "Scenario-only pricing adjustments.",
@@ -22581,15 +22429,15 @@ export default [
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/attributes.schema.json#"
   },
   {
-    "path": "#/$defs/InterestRateSwap/properties/fixed",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/InterestRateSwap/properties/fixed",
+    "path": "#/$defs/InterestRateSwap/properties/fixed_leg",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/InterestRateSwap/properties/fixed_leg",
     "description": "Fixed leg specification.",
     "ref": "#/$defs/FixedLegSpec",
     "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/FixedLegSpec"
   },
   {
-    "path": "#/$defs/InterestRateSwap/properties/float",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/InterestRateSwap/properties/float",
+    "path": "#/$defs/InterestRateSwap/properties/float_leg",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/InterestRateSwap/properties/float_leg",
     "description": "Floating leg specification.",
     "ref": "#/$defs/FloatLegSpec",
     "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/FloatLegSpec"
@@ -22706,23 +22554,6 @@ export default [
     "path": "#/$defs/LcEvent/properties/is_issue",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/LcEvent/properties/is_issue",
     "description": "`true` for an issuance (LC outstanding rises), `false` for an expiry\nor cancellation."
-  },
-  {
-    "path": "#/$defs/LegSide",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/LegSide",
-    "description": "Whether the holder pays or receives a leg."
-  },
-  {
-    "path": "#/$defs/LegSide/oneOf/0",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/LegSide/oneOf/0",
-    "const": "receive",
-    "description": "Receive the leg's coupons (and final notional, if exchanged)."
-  },
-  {
-    "path": "#/$defs/LegSide/oneOf/1",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/LegSide/oneOf/1",
-    "const": "pay",
-    "description": "Pay the leg's coupons (and final notional, if exchanged)."
   },
   {
     "path": "#/$defs/LetterOfCreditSpec",
@@ -23740,61 +23571,61 @@ export default [
   {
     "path": "#/$defs/NdfFixingSource/oneOf/0",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/NdfFixingSource/oneOf/0",
-    "const": "PBOC",
+    "const": "pboc",
     "description": "PBOC - People's Bank of China CNY/USD fixing.\nPublished daily at 9:15 AM Beijing time."
   },
   {
     "path": "#/$defs/NdfFixingSource/oneOf/1",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/NdfFixingSource/oneOf/1",
-    "const": "CNHFIX",
+    "const": "cnhfix",
     "description": "CNHFIX - Treasury Markets Association CNH/USD fixing (offshore CNY).\nPublished daily at 11:15 AM Hong Kong time."
   },
   {
     "path": "#/$defs/NdfFixingSource/oneOf/2",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/NdfFixingSource/oneOf/2",
-    "const": "RBI",
+    "const": "rbi",
     "description": "RBI - Reserve Bank of India INR/USD reference rate.\nPublished daily around 1:30 PM Mumbai time."
   },
   {
     "path": "#/$defs/NdfFixingSource/oneOf/3",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/NdfFixingSource/oneOf/3",
-    "const": "KFTC",
+    "const": "kftc",
     "description": "KFTC - Korea Financial Telecommunications and Clearings Institute.\nKRW/USD fixing published at 3:30 PM Seoul time."
   },
   {
     "path": "#/$defs/NdfFixingSource/oneOf/4",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/NdfFixingSource/oneOf/4",
-    "const": "PTAX",
+    "const": "ptax",
     "description": "PTAX - Banco Central do Brasil BRL/USD reference rate.\nPublished daily, settlement uses PTAX 800 (closing rate)."
   },
   {
     "path": "#/$defs/NdfFixingSource/oneOf/5",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/NdfFixingSource/oneOf/5",
-    "const": "TAIFX",
+    "const": "taifx",
     "description": "TAIFX - Taipei Forex Inc. TWD/USD fixing.\nPublished daily at 11:00 AM Taipei time."
   },
   {
     "path": "#/$defs/NdfFixingSource/oneOf/6",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/NdfFixingSource/oneOf/6",
-    "const": "PHP_BVAL",
+    "const": "php_bval",
     "description": "BVAL - Bankers Association of the Philippines PHP/USD reference rate.\nAlso known as PHP BVAL or PDEx."
   },
   {
     "path": "#/$defs/NdfFixingSource/oneOf/7",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/NdfFixingSource/oneOf/7",
-    "const": "JISDOR",
+    "const": "jisdor",
     "description": "JISDOR - Jakarta Interbank Spot Dollar Rate (Bank Indonesia).\nIDR/USD fixing published daily at 10:00 AM Jakarta time."
   },
   {
     "path": "#/$defs/NdfFixingSource/oneOf/8",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/NdfFixingSource/oneOf/8",
-    "const": "BNM",
+    "const": "bnm",
     "description": "BNM - Bank Negara Malaysia MYR/USD fixing.\nPublished daily at 3:30 PM Kuala Lumpur time."
   },
   {
     "path": "#/$defs/NdfFixingSource/oneOf/9",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/NdfFixingSource/oneOf/9",
-    "const": "OTHER",
+    "const": "other",
     "description": "Custom or other fixing source not covered by the enum."
   },
   {
@@ -24010,71 +23841,6 @@ export default [
     "description": "Variation margin exchange frequency",
     "ref": "#/$defs/MarginTenor",
     "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/MarginTenor"
-  },
-  {
-    "path": "#/$defs/OvernightCompoundingMethod",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/OvernightCompoundingMethod",
-    "description": "Compounding method for overnight rate indices (SOFR, ESTR, SONIA).\n\nControls how daily overnight fixings are aggregated into a period rate\nfor floating rate coupons. The choice of compounding method affects both\nthe accrued amount and the payment timing/certainty.\n\n# Market Conventions\n\n| Index | Standard Method | Lookback | Reference |\n|-------|----------------|----------|-----------|\n| USD SOFR | CompoundedInArrears | 2 BD | ISDA 2021 |\n| EUR €STR | CompoundedWithObservationShift | 2 BD | ECB |\n| GBP SONIA | CompoundedWithObservationShift | 5 BD | BoE |\n| JPY TONA | CompoundedInArrears | 2 BD | BoJ |\n\n# Reference\n\n- ISDA (2021). \"IBOR Fallbacks Supplement.\" Section 7.\n- ARRC (2020). \"SOFR: A User's Guide.\" Federal Reserve Bank of New York. `docs/REFERENCES.md#arrc-sofr-users-guide`\n- `docs/REFERENCES.md#andersen-piterbarg-interest-rate-modeling`\n- `docs/REFERENCES.md#isda-2006-definitions`"
-  },
-  {
-    "path": "#/$defs/OvernightCompoundingMethod/oneOf/0",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/OvernightCompoundingMethod/oneOf/0",
-    "const": "simple_average",
-    "description": "Arithmetic (non-compounded) average of daily overnight fixings,\nweighted by accrual days: `Rate = (Σ rᵢ·dᵢ) / D`.\n\nThis is a fully supported convention. It is the correct choice for\ninstruments that contractually specify a simple-average overnight\nindex (some bilateral loans and older FRNs) rather than the\ncompounded ISDA 2021 convention. Use [`Self::CompoundedInArrears`]\nfor standard SOFR/ESTR/TONA legs."
-  },
-  {
-    "path": "#/$defs/OvernightCompoundingMethod/oneOf/1",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/OvernightCompoundingMethod/oneOf/1",
-    "const": "compounded_in_arrears",
-    "description": "Compounded in arrears with daily compounding (ISDA 2021 standard).\n\n```text\nRate = [∏(1 + r_i × d_i/360) - 1] × 360/D\n```"
-  },
-  {
-    "path": "#/$defs/OvernightCompoundingMethod/oneOf/2",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/OvernightCompoundingMethod/oneOf/2",
-    "description": "Compounded in arrears with lookback (shift observation period).\n\nUses rates from `lookback_days` business days before each accrual date."
-  },
-  {
-    "path": "#/$defs/OvernightCompoundingMethod/oneOf/2/properties/compounded_with_lookback",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/OvernightCompoundingMethod/oneOf/2/properties/compounded_with_lookback"
-  },
-  {
-    "path": "#/$defs/OvernightCompoundingMethod/oneOf/2/properties/compounded_with_lookback/properties/lookback_days",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/OvernightCompoundingMethod/oneOf/2/properties/compounded_with_lookback/properties/lookback_days",
-    "description": "Number of business days to look back for rate observations.",
-    "format": "uint32",
-    "minimum": 0
-  },
-  {
-    "path": "#/$defs/OvernightCompoundingMethod/oneOf/3",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/OvernightCompoundingMethod/oneOf/3",
-    "description": "Compounded in arrears with lockout (rate cut-off near end of period).\n\nFreeze the last `lockout_days` business-day observations at the fixing\nimmediately preceding those days. For fixings `b_1..b_n`, the source is\n`b_{n-lockout}`. A positive lockout must leave a preceding fixing.\n\nReference: ARRC, December 3, 2021 Statement, Appendix A, definition of\n\"Lockout\": <https://www.newyorkfed.org/medialibrary/Microsites/arrc/files/2021/ARRC-Statement-LIBOR-tenors-Legislation.pdf>."
-  },
-  {
-    "path": "#/$defs/OvernightCompoundingMethod/oneOf/3/properties/compounded_with_lockout",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/OvernightCompoundingMethod/oneOf/3/properties/compounded_with_lockout"
-  },
-  {
-    "path": "#/$defs/OvernightCompoundingMethod/oneOf/3/properties/compounded_with_lockout/properties/lockout_days",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/OvernightCompoundingMethod/oneOf/3/properties/compounded_with_lockout/properties/lockout_days",
-    "description": "Number of business days before period end to freeze the rate.",
-    "format": "uint32",
-    "minimum": 0
-  },
-  {
-    "path": "#/$defs/OvernightCompoundingMethod/oneOf/4",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/OvernightCompoundingMethod/oneOf/4",
-    "description": "Compounded in arrears with observation shift.\n\nBoth observation dates AND weights are shifted back by `shift_days`\nbusiness days. This is the ISDA 2021 recommended convention for SOFR\nand the standard for GBP SONIA and EUR €STR."
-  },
-  {
-    "path": "#/$defs/OvernightCompoundingMethod/oneOf/4/properties/compounded_with_observation_shift",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/OvernightCompoundingMethod/oneOf/4/properties/compounded_with_observation_shift"
-  },
-  {
-    "path": "#/$defs/OvernightCompoundingMethod/oneOf/4/properties/compounded_with_observation_shift/properties/shift_days",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/OvernightCompoundingMethod/oneOf/4/properties/compounded_with_observation_shift/properties/shift_days",
-    "description": "Number of business days to shift observations.",
-    "format": "uint32",
-    "minimum": 0
   },
   {
     "path": "#/$defs/OvernightCouponConvention",
@@ -24679,7 +24445,7 @@ export default [
   {
     "path": "#/$defs/PeFundWaterfallTranche/oneOf/3",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/PeFundWaterfallTranche/oneOf/3",
-    "description": "Promote tier with hurdle and LP/GP split.\n\n**Hard-hurdle gating semantics**: before the split activates, the LP\nis paid at 100% until the LP-net IRR reaches this tier's `hurdle_irr`;\nonly cash above the hurdle is split `lp_share`/`gp_share` (cascading\nto the next tier once the next tier's hurdle is reached). If a\n[`Tranche::CatchUp`] precedes a promote tier whose `hurdle_irr` sits above\nthe preferred return, the LP-100% infill between the catch-up and the\nhurdle dilutes the GP's realized share back below the catch-up\ntarget. LPAs where all post-catch-up dollars split continuously at\n`lp_share`/`gp_share` should set this tier's hurdle equal to the\npreceding preferred return (or `0.0` when there is no gap to fill),\nso the LP-100% infill is empty."
+    "description": "Promote tier with hurdle and LP/GP split.\n\n**Hard-hurdle gating semantics**: before the split activates, the LP\nis paid at 100% until the LP-net IRR reaches this tier's `hurdle_irr`;\nonly cash above the hurdle is split `lp_share`/`gp_share` (cascading\nto the next tier once the next tier's hurdle is reached). If a\n[`PeFundWaterfallTranche::CatchUp`] precedes a promote tier whose `hurdle_irr` sits above\nthe preferred return, the LP-100% infill between the catch-up and the\nhurdle dilutes the GP's realized share back below the catch-up\ntarget. LPAs where all post-catch-up dollars split continuously at\n`lp_share`/`gp_share` should set this tier's hurdle equal to the\npreceding preferred return (or `0.0` when there is no gap to fill),\nso the LP-100% infill is empty."
   },
   {
     "path": "#/$defs/PeFundWaterfallTranche/oneOf/3/properties/promote_tier",
@@ -26345,29 +26111,6 @@ export default [
     "description": "Volatility surface ID",
     "ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/id.schema.json#"
-  },
-  {
-    "path": "#/$defs/RateAveragingMethod",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/RateAveragingMethod",
-    "description": "Exchange settlement method for the reference rate underlying a listed future."
-  },
-  {
-    "path": "#/$defs/RateAveragingMethod/oneOf/0",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/RateAveragingMethod/oneOf/0",
-    "const": "term",
-    "description": "One term fixing or forward rate over the contractual reference period."
-  },
-  {
-    "path": "#/$defs/RateAveragingMethod/oneOf/1",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/RateAveragingMethod/oneOf/1",
-    "const": "arithmetic_average",
-    "description": "Calendar-day-weighted arithmetic average of overnight observations."
-  },
-  {
-    "path": "#/$defs/RateAveragingMethod/oneOf/2",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/RateAveragingMethod/oneOf/2",
-    "const": "compounded_overnight",
-    "description": "Daily compounded overnight observations over the reference period."
   },
   {
     "path": "#/$defs/RateOptionType",
@@ -29703,8 +29446,8 @@ export default [
     "path": "#/$defs/Swaption/properties/exercise_style",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/Swaption/properties/exercise_style",
     "description": "Exercise style (European, Bermudan, American). Defaults to European.",
-    "ref": "#/$defs/SwaptionExercise",
-    "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/SwaptionExercise"
+    "ref": "#/$defs/ExerciseStyle",
+    "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/ExerciseStyle"
   },
   {
     "path": "#/$defs/Swaption/properties/expiry",
@@ -29774,8 +29517,8 @@ export default [
     "path": "#/$defs/Swaption/properties/settlement",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/Swaption/properties/settlement",
     "description": "Settlement method (physical or cash)",
-    "ref": "#/$defs/SwaptionSettlement",
-    "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/SwaptionSettlement"
+    "ref": "#/$defs/SettlementType",
+    "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/SettlementType"
   },
   {
     "path": "#/$defs/Swaption/properties/underlying_fixed_leg",
@@ -29795,8 +29538,8 @@ export default [
     "path": "#/$defs/Swaption/properties/vol_model",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/Swaption/properties/vol_model",
     "description": "Volatility model (Black or Normal)",
-    "ref": "#/$defs/SwaptionVolatilityModel",
-    "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/SwaptionVolatilityModel"
+    "ref": "#/$defs/VolatilityModel",
+    "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/VolatilityModel"
   },
   {
     "path": "#/$defs/Swaption/properties/vol_surface_id",
@@ -29804,63 +29547,6 @@ export default [
     "description": "Volatility surface ID for option pricing",
     "ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/id.schema.json#"
-  },
-  {
-    "path": "#/$defs/SwaptionExercise",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/SwaptionExercise",
-    "description": "Swaption exercise style"
-  },
-  {
-    "path": "#/$defs/SwaptionExercise/oneOf/0",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/SwaptionExercise/oneOf/0",
-    "const": "european",
-    "description": "European exercise (only at expiry)"
-  },
-  {
-    "path": "#/$defs/SwaptionExercise/oneOf/1",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/SwaptionExercise/oneOf/1",
-    "const": "bermudan",
-    "description": "Bermudan exercise (at discrete dates)"
-  },
-  {
-    "path": "#/$defs/SwaptionExercise/oneOf/2",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/SwaptionExercise/oneOf/2",
-    "const": "american",
-    "description": "American exercise (any time before expiry)"
-  },
-  {
-    "path": "#/$defs/SwaptionSettlement",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/SwaptionSettlement",
-    "description": "Swaption settlement method"
-  },
-  {
-    "path": "#/$defs/SwaptionSettlement/oneOf/0",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/SwaptionSettlement/oneOf/0",
-    "const": "physical",
-    "description": "Physical settlement (enter into underlying swap)"
-  },
-  {
-    "path": "#/$defs/SwaptionSettlement/oneOf/1",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/SwaptionSettlement/oneOf/1",
-    "const": "cash",
-    "description": "Cash settlement (receive NPV of swap)"
-  },
-  {
-    "path": "#/$defs/SwaptionVolatilityModel",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/SwaptionVolatilityModel",
-    "description": "Volatility model for pricing"
-  },
-  {
-    "path": "#/$defs/SwaptionVolatilityModel/oneOf/0",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/SwaptionVolatilityModel/oneOf/0",
-    "const": "black",
-    "description": "Black (Lognormal) model (1976)"
-  },
-  {
-    "path": "#/$defs/SwaptionVolatilityModel/oneOf/1",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/SwaptionVolatilityModel/oneOf/1",
-    "const": "normal",
-    "description": "Bachelier (Normal) model"
   },
   {
     "path": "#/$defs/TargetOcSpec",
@@ -30633,23 +30319,6 @@ export default [
     "description": "Equity/first loss piece"
   },
   {
-    "path": "#/$defs/TrancheSide",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/TrancheSide",
-    "description": "Buyer/seller perspective for CDS tranche premium/protection"
-  },
-  {
-    "path": "#/$defs/TrancheSide/oneOf/0",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/TrancheSide/oneOf/0",
-    "const": "buy_protection",
-    "description": "Buy protection on the tranche (pay running, receive protection)"
-  },
-  {
-    "path": "#/$defs/TrancheSide/oneOf/1",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/TrancheSide/oneOf/1",
-    "const": "sell_protection",
-    "description": "Sell protection on the tranche (receive running, pay protection)"
-  },
-  {
     "path": "#/$defs/TrancheStructure",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/TrancheStructure",
     "description": "Collection of tranches forming the capital structure"
@@ -30736,23 +30405,6 @@ export default [
     "description": "Start date for the TRS leg.",
     "ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/date.schema.json#"
-  },
-  {
-    "path": "#/$defs/TrsSide",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/TrsSide",
-    "description": "Side of the TRS trade from the party's perspective.\n\nDetermines whether the party receives or pays the total return leg.\n\n# Examples\n\n```\nuse finstack_quant_valuations::instruments::TrsSide;\n\nlet side = TrsSide::ReceiveTotalReturn;\nassert_eq!(side.sign(), 1.0);\n\nlet side = TrsSide::PayTotalReturn;\nassert_eq!(side.sign(), -1.0);\n```"
-  },
-  {
-    "path": "#/$defs/TrsSide/oneOf/0",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/TrsSide/oneOf/0",
-    "const": "receive_total_return",
-    "description": "Receive total return, pay financing."
-  },
-  {
-    "path": "#/$defs/TrsSide/oneOf/1",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/TrsSide/oneOf/1",
-    "const": "pay_total_return",
-    "description": "Pay total return, receive financing."
   },
   {
     "path": "#/$defs/UnaryOp",
@@ -31225,6 +30877,23 @@ export default [
     "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/FutureOptionTerms"
   },
   {
+    "path": "#/$defs/VolatilityModel",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/VolatilityModel",
+    "description": "Volatility convention (Black lognormal or Bachelier normal) used to price\na swaption. Wire values: `black`, `normal`."
+  },
+  {
+    "path": "#/$defs/VolatilityModel/oneOf/0",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/VolatilityModel/oneOf/0",
+    "const": "black",
+    "description": "Black (lognormal)."
+  },
+  {
+    "path": "#/$defs/VolatilityModel/oneOf/1",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/VolatilityModel/oneOf/1",
+    "const": "normal",
+    "description": "Bachelier / normal model."
+  },
+  {
     "path": "#/$defs/Waterfall",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/Waterfall",
     "description": "Main waterfall engine with tier-based distribution"
@@ -31626,6 +31295,12 @@ export default [
     "description": "Cross-currency floating-for-floating swap.\n\nEach leg owns its own dates, stub conventions, and calendar. The parent struct\nonly holds the instrument identity, notional exchange mode, and reporting currency."
   },
   {
+    "path": "#/$defs/XccySwap/properties/allow_calendar_fallback",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/XccySwap/properties/allow_calendar_fallback",
+    "default": false,
+    "description": "Allow a weekends-only calendar when either leg's `leg.calendar_id` is\nmissing or cannot be resolved.\n\nWhen `false` (default), missing calendars are treated as input errors."
+  },
+  {
     "path": "#/$defs/XccySwap/properties/attributes",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/XccySwap/properties/attributes",
     "description": "Attributes for instrument selection and tagging.",
@@ -31692,136 +31367,28 @@ export default [
   {
     "path": "#/$defs/XccySwapLeg",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/XccySwapLeg",
-    "description": "One floating leg of an XCCY swap.\n\nEach leg owns its own dates, discount curve, calendar, and stub conventions,\nfollowing the IRS leg-centric pattern."
+    "description": "One floating leg of an XCCY swap.\n\nThe leg's schedule, curves, spread, lags and compounding are a canonical\n[`FloatLegSpec`]; the leg currency is `notional`'s currency. A reset lag of\n`0` fixes on the accrual start; negative reset lags are rejected."
   },
   {
-    "path": "#/$defs/XccySwapLeg/properties/allow_calendar_fallback",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/XccySwapLeg/properties/allow_calendar_fallback",
-    "default": false,
-    "description": "Allow calendar-day fallback when the calendar cannot be resolved.\n\nWhen `false` (default), missing calendars are treated as input errors."
-  },
-  {
-    "path": "#/$defs/XccySwapLeg/properties/business_day_convention",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/XccySwapLeg/properties/business_day_convention",
-    "default": "modified_following",
-    "description": "Business day convention for schedule dates.",
-    "ref": "https://finstack_quant.dev/schemas/common/1/business_day_convention.schema.json",
-    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/business_day_convention.schema.json#"
-  },
-  {
-    "path": "#/$defs/XccySwapLeg/properties/calendar_id",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/XccySwapLeg/properties/calendar_id",
-    "description": "Calendar identifier for schedule generation and lags."
-  },
-  {
-    "path": "#/$defs/XccySwapLeg/properties/calendar_id/anyOf/0",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/XccySwapLeg/properties/calendar_id/anyOf/0",
-    "ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
-    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/id.schema.json#"
-  },
-  {
-    "path": "#/$defs/XccySwapLeg/properties/calendar_id/anyOf/1",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/XccySwapLeg/properties/calendar_id/anyOf/1"
-  },
-  {
-    "path": "#/$defs/XccySwapLeg/properties/compounding",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/XccySwapLeg/properties/compounding",
-    "default": "simple",
-    "description": "Overnight vs term compounding for this floating leg.\n\nDefaults to Simple (term EURIBOR / term SOFR). Set a compounded\nvariant when the forward curve is an overnight RFR such as €STR or\nSOFR OIS.",
-    "ref": "#/$defs/FloatingLegCompounding",
-    "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/FloatingLegCompounding"
-  },
-  {
-    "path": "#/$defs/XccySwapLeg/properties/currency",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/XccySwapLeg/properties/currency",
-    "description": "Leg currency.",
-    "ref": "https://finstack_quant.dev/schemas/common/1/currency.schema.json",
-    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/currency.schema.json#"
-  },
-  {
-    "path": "#/$defs/XccySwapLeg/properties/day_count",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/XccySwapLeg/properties/day_count",
-    "description": "Accrual day count.",
-    "ref": "https://finstack_quant.dev/schemas/common/1/day_count.schema.json",
-    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/day_count.schema.json#"
-  },
-  {
-    "path": "#/$defs/XccySwapLeg/properties/discount_curve_id",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/XccySwapLeg/properties/discount_curve_id",
-    "description": "Discount curve for PV in leg currency.",
-    "ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
-    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/id.schema.json#"
-  },
-  {
-    "path": "#/$defs/XccySwapLeg/properties/end",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/XccySwapLeg/properties/end",
-    "description": "End date of the leg.",
-    "ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
-    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/date.schema.json#"
-  },
-  {
-    "path": "#/$defs/XccySwapLeg/properties/forward_curve_id",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/XccySwapLeg/properties/forward_curve_id",
-    "description": "Projection forward curve.",
-    "ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
-    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/id.schema.json#"
-  },
-  {
-    "path": "#/$defs/XccySwapLeg/properties/frequency",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/XccySwapLeg/properties/frequency",
-    "description": "Coupon frequency.",
-    "ref": "https://finstack_quant.dev/schemas/common/1/tenor.schema.json",
-    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/tenor.schema.json#"
+    "path": "#/$defs/XccySwapLeg/properties/leg",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/XccySwapLeg/properties/leg",
+    "description": "Floating-leg terms (curves, dates, frequency, spread in bp, lags,\ncalendars, compounding).",
+    "ref": "#/$defs/FloatLegSpec",
+    "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/FloatLegSpec"
   },
   {
     "path": "#/$defs/XccySwapLeg/properties/notional",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/XccySwapLeg/properties/notional",
-    "description": "Leg notional (in leg currency).",
+    "description": "Leg notional in the leg currency.",
     "ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/money.schema.json#"
-  },
-  {
-    "path": "#/$defs/XccySwapLeg/properties/payment_lag_days",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/XccySwapLeg/properties/payment_lag_days",
-    "default": 0,
-    "description": "Payment lag in business days after period end (default: 0).",
-    "format": "int32"
-  },
-  {
-    "path": "#/$defs/XccySwapLeg/properties/reset_lag_days",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/XccySwapLeg/properties/reset_lag_days",
-    "description": "Reset lag in business days before the accrual start (e.g. 2 for T-2 fixing).",
-    "format": "int32"
   },
   {
     "path": "#/$defs/XccySwapLeg/properties/side",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/XccySwapLeg/properties/side",
     "description": "Pay/receive direction for this leg.",
-    "ref": "#/$defs/LegSide",
-    "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/LegSide"
-  },
-  {
-    "path": "#/$defs/XccySwapLeg/properties/spread_bp",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/XccySwapLeg/properties/spread_bp",
-    "default": "0",
-    "description": "Spread in basis points (e.g. `Decimal::from(5)` = 5bp).",
-    "ref": "https://finstack_quant.dev/schemas/common/1/decimal.schema.json",
-    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/decimal.schema.json#"
-  },
-  {
-    "path": "#/$defs/XccySwapLeg/properties/start",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/XccySwapLeg/properties/start",
-    "description": "Start date of the leg.",
-    "ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
-    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/date.schema.json#"
-  },
-  {
-    "path": "#/$defs/XccySwapLeg/properties/stub",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/XccySwapLeg/properties/stub",
-    "default": "short_front",
-    "description": "Stub period handling rule.",
-    "ref": "#/$defs/StubKind",
-    "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/StubKind"
+    "ref": "#/$defs/PayReceive",
+    "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/PayReceive"
   },
   {
     "path": "#/$defs/YoYInflationSwap",
@@ -32124,12 +31691,6 @@ export default [
     "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/BasisSwap"
   },
   {
-    "path": "#/properties/BasisSwapLeg",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/properties/BasisSwapLeg",
-    "ref": "#/$defs/BasisSwapLeg",
-    "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/BasisSwapLeg"
-  },
-  {
     "path": "#/properties/Basket",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/properties/Basket",
     "ref": "#/$defs/Basket",
@@ -32340,34 +31901,34 @@ export default [
     "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CdsDocClause"
   },
   {
-    "path": "#/properties/CDSIndex",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/properties/CDSIndex",
-    "ref": "#/$defs/CDSIndex",
-    "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CDSIndex"
+    "path": "#/properties/CdsIndex",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/properties/CdsIndex",
+    "ref": "#/$defs/CdsIndex",
+    "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CdsIndex"
   },
   {
-    "path": "#/properties/CDSIndexConstituent",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/properties/CDSIndexConstituent",
-    "ref": "#/$defs/CDSIndexConstituent",
-    "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CDSIndexConstituent"
+    "path": "#/properties/CdsIndexConstituent",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/properties/CdsIndexConstituent",
+    "ref": "#/$defs/CdsIndexConstituent",
+    "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CdsIndexConstituent"
   },
   {
-    "path": "#/properties/CDSOption",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/properties/CDSOption",
-    "ref": "#/$defs/CDSOption",
-    "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CDSOption"
+    "path": "#/properties/CdsOption",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/properties/CdsOption",
+    "ref": "#/$defs/CdsOption",
+    "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CdsOption"
   },
   {
-    "path": "#/properties/CDSOptionStrike",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/properties/CDSOptionStrike",
-    "ref": "#/$defs/CDSOptionStrike",
-    "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CDSOptionStrike"
+    "path": "#/properties/CdsOptionStrike",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/properties/CdsOptionStrike",
+    "ref": "#/$defs/CdsOptionStrike",
+    "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CdsOptionStrike"
   },
   {
-    "path": "#/properties/CDSTranche",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/properties/CDSTranche",
-    "ref": "#/$defs/CDSTranche",
-    "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CDSTranche"
+    "path": "#/properties/CdsTranche",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/properties/CdsTranche",
+    "ref": "#/$defs/CdsTranche",
+    "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CdsTranche"
   },
   {
     "path": "#/properties/CdsValuationConvention",
@@ -32446,12 +32007,6 @@ export default [
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/properties/CmsSpreadOption",
     "ref": "#/$defs/CmsSpreadOption",
     "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CmsSpreadOption"
-  },
-  {
-    "path": "#/properties/CmsSpreadOptionType",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/properties/CmsSpreadOptionType",
-    "ref": "#/$defs/CmsSpreadOptionType",
-    "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CmsSpreadOptionType"
   },
   {
     "path": "#/properties/CmsSwap",
@@ -32952,10 +32507,10 @@ export default [
     "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/FeeTier"
   },
   {
-    "path": "#/properties/FIIndexTotalReturnSwap",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/properties/FIIndexTotalReturnSwap",
-    "ref": "#/$defs/FIIndexTotalReturnSwap",
-    "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/FIIndexTotalReturnSwap"
+    "path": "#/properties/FiIndexTotalReturnSwap",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/properties/FiIndexTotalReturnSwap",
+    "ref": "#/$defs/FiIndexTotalReturnSwap",
+    "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/FiIndexTotalReturnSwap"
   },
   {
     "path": "#/properties/FinalPayoffType",
@@ -32968,12 +32523,6 @@ export default [
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/properties/FinancingLegSpec",
     "ref": "#/$defs/FinancingLegSpec",
     "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/FinancingLegSpec"
-  },
-  {
-    "path": "#/properties/FinancingRateCompounding",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/properties/FinancingRateCompounding",
-    "ref": "#/$defs/FinancingRateCompounding",
-    "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/FinancingRateCompounding"
   },
   {
     "path": "#/properties/FixedLegSpec",
@@ -33210,12 +32759,6 @@ export default [
     "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/InflationCapFloor"
   },
   {
-    "path": "#/properties/InflationCapFloorType",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/properties/InflationCapFloorType",
-    "ref": "#/$defs/InflationCapFloorType",
-    "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/InflationCapFloorType"
-  },
-  {
     "path": "#/properties/InflationInterpolation",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/properties/InflationInterpolation",
     "ref": "#/$defs/InflationInterpolation",
@@ -33298,12 +32841,6 @@ export default [
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/properties/LcEvent",
     "ref": "#/$defs/LcEvent",
     "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/LcEvent"
-  },
-  {
-    "path": "#/properties/LegSide",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/properties/LegSide",
-    "ref": "#/$defs/LegSide",
-    "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/LegSide"
   },
   {
     "path": "#/properties/LetterOfCreditSpec",
@@ -33510,12 +33047,6 @@ export default [
     "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/OtcMarginSpec"
   },
   {
-    "path": "#/properties/OvernightCompoundingMethod",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/properties/OvernightCompoundingMethod",
-    "ref": "#/$defs/OvernightCompoundingMethod",
-    "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/OvernightCompoundingMethod"
-  },
-  {
     "path": "#/properties/OvernightCouponConvention",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/properties/OvernightCouponConvention",
     "ref": "#/$defs/OvernightCouponConvention",
@@ -33700,12 +33231,6 @@ export default [
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/properties/RangeAccrualTerms",
     "ref": "#/$defs/RangeAccrualTerms",
     "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/RangeAccrualTerms"
-  },
-  {
-    "path": "#/properties/RateAveragingMethod",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/properties/RateAveragingMethod",
-    "ref": "#/$defs/RateAveragingMethod",
-    "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/RateAveragingMethod"
   },
   {
     "path": "#/properties/RateOptionType",
@@ -34032,24 +33557,6 @@ export default [
     "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/Swaption"
   },
   {
-    "path": "#/properties/SwaptionExercise",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/properties/SwaptionExercise",
-    "ref": "#/$defs/SwaptionExercise",
-    "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/SwaptionExercise"
-  },
-  {
-    "path": "#/properties/SwaptionSettlement",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/properties/SwaptionSettlement",
-    "ref": "#/$defs/SwaptionSettlement",
-    "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/SwaptionSettlement"
-  },
-  {
-    "path": "#/properties/SwaptionVolatilityModel",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/properties/SwaptionVolatilityModel",
-    "ref": "#/$defs/SwaptionVolatilityModel",
-    "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/SwaptionVolatilityModel"
-  },
-  {
     "path": "#/properties/TargetOcSpec",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/properties/TargetOcSpec",
     "ref": "#/$defs/TargetOcSpec",
@@ -34122,12 +33629,6 @@ export default [
     "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/TrancheSeniority"
   },
   {
-    "path": "#/properties/TrancheSide",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/properties/TrancheSide",
-    "ref": "#/$defs/TrancheSide",
-    "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/TrancheSide"
-  },
-  {
     "path": "#/properties/TrancheStructure",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/properties/TrancheStructure",
     "ref": "#/$defs/TrancheStructure",
@@ -34150,12 +33651,6 @@ export default [
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/properties/TrsScheduleSpec",
     "ref": "#/$defs/TrsScheduleSpec",
     "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/TrsScheduleSpec"
-  },
-  {
-    "path": "#/properties/TrsSide",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/properties/TrsSide",
-    "ref": "#/$defs/TrsSide",
-    "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/TrsSide"
   },
   {
     "path": "#/properties/UnaryOp",
@@ -34204,6 +33699,12 @@ export default [
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/properties/VolatilityIndexFutureOption",
     "ref": "#/$defs/VolatilityIndexFutureOption",
     "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/VolatilityIndexFutureOption"
+  },
+  {
+    "path": "#/properties/VolatilityModel",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/properties/VolatilityModel",
+    "ref": "#/$defs/VolatilityModel",
+    "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/VolatilityModel"
   },
   {
     "path": "#/properties/Waterfall",
