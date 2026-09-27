@@ -362,7 +362,7 @@ are written for POSIX shells.
 
 ## Common commands
 
-`mise.toml` defines 82 tasks named `<domain>-<action>`. `all-*` fans out across
+`mise.toml` defines tasks named `<domain>-<action>`. `all-*` fans out across
 all three languages, `rust-*` / `python-*` / `wasm-*` are per-language, and the
 rest are narrower (`goldens-*`, `wheel-*`, `pre-commit-*`, `materialization-*`,
 `check-*`). `*-fmt` tasks mutate; `*-lint` tasks are check-only. Run
@@ -388,12 +388,14 @@ rest are narrower (`goldens-*`, `wheel-*`, `pre-commit-*`, `materialization-*`,
 | `mise run python-build` | Build the Python extension in place (dev profile) |
 | `mise run python-build -- --release` | Build the Python extension in release mode |
 | `mise run python-test` | Build the dev extension, then run fast Python tests |
+| `mise run python-test-file -- <file-or-node-id>` | Rerun a focused Python test against the already built extension |
 | `mise run python-typecheck` | Type-check the Python bindings with `ty` |
 | `mise run python-examples` | Execute every example notebook |
 | `mise run python-bench` | Benchmark the Python bindings against a release build |
 | `mise run wasm-build` | Build the WASM package (web target) |
 | `mise run wasm-pkg` | Build the web and Node WASM packages |
 | `mise run wasm-test` | Run wasm-bindgen and Node facade tests |
+| `mise run wasm-test-built` | Rerun Node facade tests against the already built WASM package |
 | `mise run ui-fmt` | Format the UI package with Prettier (mutating) |
 | `mise run ui-typecheck` | Type-check the UI package with `tsc` |
 | `mise run ui-test` | Run the UI Vitest suite |
@@ -408,11 +410,19 @@ Do not run `cargo test` directly: it pulls in doc tests, which are owned by
 `mise run rust-doc`. Use `mise run rust-test` (nextest) for unit and integration
 tests.
 
+For repeated binding tests, run `mise run python-build` or `mise run wasm-test`
+after source changes, then use `python-test-file` or `wasm-test-built` while
+iterating on tests. Use `mise run wasm-pkg` when packaging or checking size.
+
 Release and full-suite Criterion builds use fat LTO and one codegen unit, so
 their links are deliberately slow. Use the scoped Rust tasks and the dev-profile
 `python-build` for normal iteration. The four-case PR benchmark gate uses thin
 LTO and 16 codegen units on both base and head to shorten linking; the weekly
 full benchmark suite keeps the release-like profile.
+
+Production release and full-suite benchmark tasks disable incremental codegen
+so inherited shell settings do not override Cargo's release-profile default;
+dev and test builds remain incremental for repeat edits.
 
 Benchmarks are measurement tasks and stay outside `all-test`, nextest,
 `rust-fmt`, and `rust-lint`. PR CI compares four fixed cases; the full suite runs

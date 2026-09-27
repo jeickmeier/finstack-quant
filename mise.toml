@@ -34,7 +34,6 @@ node = "24"
 "aqua:google/osv-scanner" = "2.3.5"
 
 [env]
-CARGO_INCREMENTAL = "{{ env.CARGO_INCREMENTAL | default(value='1') }}"
 CARGO_HOME = "{{ env.CARGO_HOME | default(value=env.HOME ~ '/.cargo') }}"
 RUSTUP_HOME = "{{ env.RUSTUP_HOME | default(value=env.HOME ~ '/.rustup') }}"
 # Keep builds on the pinned stable toolchain when mise also provisions
@@ -149,7 +148,7 @@ run = "cargo build --workspace --exclude finstack-quant-py --exclude finstack-qu
 
 [tasks.rust-build-prod]
 description = "Release build without debug info"
-env = { RUSTFLAGS = "-C debuginfo=0" }
+env = { RUSTFLAGS = "-C debuginfo=0", CARGO_INCREMENTAL = "0" }
 run = "cargo build --workspace --exclude finstack-quant-py --exclude finstack-quant-wasm --release"
 
 [tasks.rust-test-crate]
@@ -234,7 +233,7 @@ run = '''
 set -e
 pkg="${usage_package?}"
 if [ "${usage_release:-false}" = "true" ]; then
-  cargo build -p "$pkg" --release
+  CARGO_INCREMENTAL=0 cargo build -p "$pkg" --release
 else
   cargo build -p "$pkg"
 fi
@@ -393,10 +392,11 @@ description = "Build Python bindings in-place (pass --release for optimized buil
 usage = '''
 flag "--release" help="Build with release profile (slower compile, faster runtime)"
 '''
-run = 'uv run --no-sync maturin develop{% if usage.release %} --release{% endif %}'
+run = '{% if usage.release %}CARGO_INCREMENTAL=0 {% endif %}uv run --no-sync maturin develop{% if usage.release %} --release{% endif %}'
 
 [tasks.materialization-benchmark-fixtures]
 description = "Generate deterministic portfolio materialization benchmark fixtures"
+env = { CARGO_INCREMENTAL = "0" }
 run = "cargo run --release --quiet -p finstack-quant-portfolio --example materialization_fixtures -- target/materialization-benchmarks"
 
 [tasks.python-bench]
@@ -417,6 +417,7 @@ uv run --no-sync pytest finstack-quant-py/benchmarks/bench_bindings.py \
 
 [tasks.wasm-bench-materialization]
 description = "Regenerate fixtures, release-build WASM, and benchmark materialization"
+env = { CARGO_INCREMENTAL = "0" }
 run = """
 mise run materialization-benchmark-fixtures
 npm --prefix finstack-quant-wasm run build:node
@@ -488,6 +489,11 @@ run = """
 mise run python-build
 uv run --no-sync pytest -v -m 'not slow'
 """
+
+[tasks.python-test-file]
+description = "Run one Python test file or node ID against the already built extension"
+usage = 'arg "<test>" help="Pytest file path or node ID; run python-build after binding changes"'
+run = 'uv run --no-sync pytest -q "${usage_test?}"'
 
 [tasks.python-test-slow]
 description = "Build dev Python bindings, then run slow Python tests"
@@ -567,16 +573,21 @@ run = "python3 scripts/clean_workspace.py --wasm"
 
 [tasks.wasm-build]
 description = "Build WASM package (web target)"
+env = { CARGO_INCREMENTAL = "0" }
 run = "wasm-pack build finstack-quant-wasm --target web"
 
 [tasks.wasm-test]
 description = "Run WASM package tests (wasm-bindgen + Node facade)"
 run = [
   "npm --prefix finstack-quant-wasm run test",
-  "npm --prefix finstack-quant-wasm run build",
-  "npm --prefix finstack-quant-wasm run build:node",
+  "CARGO_INCREMENTAL=0 npm --prefix finstack-quant-wasm run build",
+  "CARGO_INCREMENTAL=0 npm --prefix finstack-quant-wasm run build:node",
   "npm --prefix finstack-quant-wasm run test:facade",
 ]
+
+[tasks.wasm-test-built]
+description = "Run Node facade tests against the already built web and Node WASM packages"
+run = "npm --prefix finstack-quant-wasm run test:facade"
 
 [tasks.wasm-test-cov]
 description = "Run WASM binding tests with HTML coverage report"
@@ -634,6 +645,7 @@ run = [
 
 [tasks.wasm-pkg]
 description = "Build WASM package (web + node targets)"
+env = { CARGO_INCREMENTAL = "0" }
 run = [
   "node finstack-quant-wasm/scripts/build-web.mjs",
   "wasm-pack build finstack-quant-wasm --target nodejs --release --out-dir pkg-node",
@@ -677,11 +689,11 @@ run = [
 
 [tasks.wheel-local]
 description = "Build wheel for current platform + Python"
-run = "uv run maturin build --release -o target/wheels"
+run = "CARGO_INCREMENTAL=0 uv run maturin build --release -o target/wheels"
 
 [tasks.wheel-all]
 description = "Build wheels for all locally-available Python versions"
-run = "uv run maturin build --release --find-interpreter -o target/wheels"
+run = "CARGO_INCREMENTAL=0 uv run maturin build --release --find-interpreter -o target/wheels"
 
 # ─────────────────────────────────────────────────────────────────
 # Schemas
@@ -818,10 +830,12 @@ run = [
 
 [tasks.rust-flamegraph]
 description = "Generate a CPU flamegraph using the bench profile (keeps symbols; pass cargo-flamegraph args after --). Example: mise run rust-flamegraph -- -p finstack-quant-portfolio --bench materialization --open"
+env = { CARGO_INCREMENTAL = "0" }
 run = "cargo flamegraph --profile bench"
 
 [tasks.rust-bench-crate]
 description = "Run one Criterion bench in one crate (preferred during iteration)"
+env = { CARGO_INCREMENTAL = "0" }
 usage = '''
 arg "<package>" help="Cargo package (e.g. finstack-quant-valuations, finstack-quant-portfolio)"
 arg "<bench>" help="Bench target name (e.g. bond_pricing, materialization)"
@@ -838,6 +852,7 @@ cargo bench -p "${usage_package?}" --profile bench --bench "${usage_bench?}" -- 
 
 [tasks.rust-bench]
 description = "Run all workspace Rust benchmarks (use rust-bench-crate while iterating)"
+env = { CARGO_INCREMENTAL = "0" }
 run = "cargo bench --profile bench --bench '*' -- --sample-size ${FQ_BENCH_SAMPLE_SIZE:-10} --warm-up-time ${FQ_BENCH_WARM_UP_TIME:-1} --measurement-time ${FQ_BENCH_MEASUREMENT_TIME:-1} --nresamples ${FQ_BENCH_NRESAMPLES:-1000} --noplot"
 
 [tasks.rust-bench-pr-baseline]

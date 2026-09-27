@@ -33,7 +33,8 @@
   - `mise run rust-bench-crate -- <package> <bench>` — one Criterion target
   - Path → package mapping lives in `.agents/rules/selective-test-running.mdc`
 - **Full-workspace gates (plan end / pre-commit / CI):** `mise run rust-lint`, `mise run rust-test`, `mise run rust-bench`, `mise run all-lint`, `mise run all-test`. `mise run all` runs tests and lint; use `mise run all-build` when an explicit build pass is needed.
-- Python test tasks rebuild the extension with the fast dev profile before running pytest. Use `mise run python-build -- --release` only for release validation, performance-sensitive runs, or when explicitly requested. Use `mise run python-sync` first (or whenever Python deps change) to refresh the `uv` virtualenv.
+- Full Python test tasks rebuild the extension with the fast dev profile before running pytest. For repeated focused tests after one explicit `mise run python-build`, use `mise run python-test-file -- <file-or-node-id>`; it does not rebuild. Use `mise run python-build -- --release` only for release validation, performance-sensitive runs, or when explicitly requested. Use `mise run python-sync` first (or whenever Python deps change) to refresh the `uv` virtualenv.
+- After `mise run wasm-test` or `mise run wasm-pkg`, use `mise run wasm-test-built` to rerun Node facade tests without rebuilding the WASM package. Run `mise run wasm-test` after binding changes for the complete Rust, web, and Node validation gate.
 - Pre-commit runs `cargo clippy` and `cargo deny check` (Rust supply-chain: advisories + licenses + bans)
 - CI additionally runs OSV-Scanner across `Cargo.lock`, `uv.lock`, and `package-lock.json` for cross-ecosystem CVE coverage
 - Clippy runs with `-D warnings`; all warnings are treated as errors
