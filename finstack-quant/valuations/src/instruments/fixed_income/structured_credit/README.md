@@ -878,7 +878,6 @@ registry — it does not validate this file's contents.
 - [`INVARIANTS.md`](../../../../../../INVARIANTS.md) — Decimal/f64, determinism and serde invariants
 - [`docs/REFERENCES.md`](../../../../../../docs/REFERENCES.md) — bibliography
 
-
 ### Collection accounts and current-state inputs
 
 The waterfall keeps interest and principal in separate accounts. Fees and coupons
