@@ -8,6 +8,7 @@ repository.workspace = true
 authors.workspace = true
 description = "Reusable analytical, numerical, credit, correlation, and stochastic models for quantitative finance"
 autobenches = false
+autotests = false
 
 [dependencies]
 finstack-quant-core = { path = "../core", version = "0.9.0", default-features = false }
@@ -91,3 +92,8 @@ required-features = ["json-schema"]
 
 [lints]
 workspace = true
+
+# Consolidated integration tests
+[[test]]
+name = "models"
+path = "tests/main.rs"

@@ -741,7 +741,7 @@ run = [
   "cargo test -p finstack-quant-calibration --test calibration schema_parity --no-fail-fast",
   "cargo test -p finstack-quant-statements --test schema_contract --no-fail-fast",
   "cargo test -p finstack-quant-scenarios --test schema_contract --no-fail-fast",
-  "cargo test -p finstack-quant-models --test factor_schema_contract --no-fail-fast",
+  "cargo test -p finstack-quant-models --test models factor_schema_contract --no-fail-fast",
   "cargo test -p finstack-quant-valuations --test valuations schema_parity --no-fail-fast",
   "cargo test -p finstack-quant-valuations --lib test_instrument_schema_union_parity --no-fail-fast",
   "cargo test -p finstack-quant-valuations --test valuations schema_audit --no-fail-fast",
