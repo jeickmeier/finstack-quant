@@ -2,7 +2,7 @@
 //!
 //! canonical captures explainability traces at the per-step report level.
 
-use crate::calibration_support as cal_utils;
+use crate::calibration::calibration_support as cal_utils;
 use finstack_quant_calibration::api::engine;
 use finstack_quant_calibration::api::schema::{
     CalibrationEnvelope, CalibrationPlan, CalibrationStep, ForwardCurveParams, StepParams,

@@ -1,6 +1,6 @@
 //! Tests for the plan-driven calibration canonical API.
 
-use crate::calibration_support as cal_utils;
+use crate::calibration::calibration_support as cal_utils;
 use finstack_quant_calibration::api::engine;
 use finstack_quant_calibration::api::market_datum::MarketDatum;
 use finstack_quant_calibration::api::schema::{

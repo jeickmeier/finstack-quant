@@ -6,7 +6,7 @@
 //! - `market/quotes/inflation.rs`
 //! - `market/quotes/vol.rs`
 
-use crate::common::tolerances;
+use crate::calibration::common::tolerances;
 use finstack_quant_calibration::quotes::cds::CdsQuote;
 use finstack_quant_calibration::quotes::cds_tranche::CdsTrancheQuote;
 use finstack_quant_calibration::quotes::ids::{Pillar, QuoteId};

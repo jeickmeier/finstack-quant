@@ -5,7 +5,7 @@
 //! - `StepParams` for discount/forward/hazard/inflation/vol/swaption/base-correlation
 //! - Domain quotes (`MarketQuote` + concrete quote enums)
 
-use crate::calibration_support as cal_utils;
+use crate::calibration::calibration_support as cal_utils;
 use finstack_quant_calibration::api::market_datum::MarketDatum;
 use finstack_quant_calibration::api::schema::{
     BaseCorrelationParams, CalibrationEnvelope, CalibrationPlan, CalibrationStep,
