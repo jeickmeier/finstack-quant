@@ -723,44 +723,83 @@ run = [
   "mise run rust-serde-audit",
   "uv run --no-sync pytest scripts/tests/test_check_schema_residue.py -q",
   "uv run --no-sync python scripts/check_schema_residue.py",
-  "cargo run -p finstack-quant-core --bin gen_core_schemas -- --check",
-  "cargo run -p finstack-quant-attribution --bin gen_attribution_schemas -- --check",
-  "cargo run -p finstack-quant-calibration --bin gen_calibration_schemas -- --check",
-  "cargo run -p finstack-quant-cashflows --bin gen_cashflow_schemas -- --check",
-  "cargo run -p finstack-quant-models --bin gen_factor_model_schemas -- --check",
-  "cargo run -p finstack-quant-margin --bin gen_margin_schema -- --check",
-  "cargo run -p finstack-quant-scenarios --bin gen_scenario_schemas -- --check",
-  "cargo run -p finstack-quant-statements --bin gen_statement_schemas -- --check",
-  "cargo run -p finstack-quant-valuations --bin gen_schemas -- --check",
-  "cargo run -p finstack-quant-portfolio --bin gen_materialization_schemas -- --check",
+  """
+  set -eu
+  cargo build \
+    -p finstack-quant-core --bin gen_core_schemas \
+    -p finstack-quant-attribution --bin gen_attribution_schemas \
+    -p finstack-quant-calibration --bin gen_calibration_schemas \
+    -p finstack-quant-cashflows --bin gen_cashflow_schemas \
+    -p finstack-quant-models --bin gen_factor_model_schemas \
+    -p finstack-quant-margin --bin gen_margin_schema \
+    -p finstack-quant-scenarios --bin gen_scenario_schemas \
+    -p finstack-quant-statements --bin gen_statement_schemas \
+    -p finstack-quant-valuations --bin gen_schemas \
+    -p finstack-quant-portfolio --bin gen_materialization_schemas
+  target_dir="${CARGO_TARGET_DIR:-target}"
+  for bin in \
+    gen_core_schemas \
+    gen_attribution_schemas \
+    gen_calibration_schemas \
+    gen_cashflow_schemas \
+    gen_factor_model_schemas \
+    gen_margin_schema \
+    gen_scenario_schemas \
+    gen_statement_schemas \
+    gen_schemas \
+    gen_materialization_schemas
+  do
+    "${target_dir}/debug/${bin}" --check
+  done
+  """,
   "uv run --no-sync python scripts/check_schema_generation.py",
-  "cargo test -p finstack-quant-cashflows --test cashflows schema_roundtrip:: --no-fail-fast",
-  "cargo test -p finstack-quant-portfolio --test portfolio materialization_schema --no-fail-fast",
-  "cargo test -p finstack-quant-margin --test margin schema_parity --no-fail-fast",
-  "cargo test -p finstack-quant-attribution --test attribution attribution::schema_contract:: --no-fail-fast",
-  "cargo test -p finstack-quant-calibration --test calibration schema_parity --no-fail-fast",
-  "cargo test -p finstack-quant-statements --test statements schema_contract --no-fail-fast",
-  "cargo test -p finstack-quant-scenarios --test scenarios schema_contract --no-fail-fast",
-  "cargo test -p finstack-quant-models --test models factor_schema_contract --no-fail-fast",
-  "cargo test -p finstack-quant-valuations --test valuations schema_parity --no-fail-fast",
-  "cargo test -p finstack-quant-valuations --lib test_instrument_schema_union_parity --no-fail-fast",
-  "cargo test -p finstack-quant-valuations --test valuations schema_audit --no-fail-fast",
+  """
+  cargo nextest run --no-fail-fast -E '\
+    (binary_id(finstack-quant-cashflows::cashflows) & test(/schema_roundtrip::/)) | \
+    (binary_id(finstack-quant-portfolio::portfolio) & test(/materialization_schema/)) | \
+    (binary_id(finstack-quant-margin::margin) & test(/schema_parity/)) | \
+    (binary_id(finstack-quant-attribution::attribution) & test(/attribution::schema_contract::/)) | \
+    (binary_id(finstack-quant-calibration::calibration) & test(/schema_parity/)) | \
+    (binary_id(finstack-quant-statements::statements) & test(/schema_contract/)) | \
+    (binary_id(finstack-quant-scenarios::scenarios) & test(/schema_contract/)) | \
+    (binary_id(finstack-quant-models::models) & test(/factor_schema_contract/)) | \
+    (binary_id(finstack-quant-valuations::valuations) & test(/schema_parity/)) | \
+    (package(finstack-quant-valuations) & kind(lib) & test(/test_instrument_schema_union_parity/)) | \
+    (binary_id(finstack-quant-valuations::valuations) & test(/schema_audit/))'
+  """,
 ]
 
 [tasks.rust-gen-schemas]
 description = "Regenerate typed JSON schemas from Rust types"
-run = [
-  "cargo run -p finstack-quant-core --bin gen_core_schemas -- --write",
-  "cargo run -p finstack-quant-attribution --bin gen_attribution_schemas -- --write",
-  "cargo run -p finstack-quant-calibration --bin gen_calibration_schemas -- --write",
-  "cargo run -p finstack-quant-cashflows --bin gen_cashflow_schemas -- --write",
-  "cargo run -p finstack-quant-models --bin gen_factor_model_schemas -- --write",
-  "cargo run -p finstack-quant-margin --bin gen_margin_schema -- --write",
-  "cargo run -p finstack-quant-scenarios --bin gen_scenario_schemas -- --write",
-  "cargo run -p finstack-quant-statements --bin gen_statement_schemas -- --write",
-  "cargo run -p finstack-quant-valuations --bin gen_schemas -- --write",
-  "cargo run -p finstack-quant-portfolio --bin gen_materialization_schemas -- --write",
-]
+run = '''
+set -eu
+cargo build \
+  -p finstack-quant-core --bin gen_core_schemas \
+  -p finstack-quant-attribution --bin gen_attribution_schemas \
+  -p finstack-quant-calibration --bin gen_calibration_schemas \
+  -p finstack-quant-cashflows --bin gen_cashflow_schemas \
+  -p finstack-quant-models --bin gen_factor_model_schemas \
+  -p finstack-quant-margin --bin gen_margin_schema \
+  -p finstack-quant-scenarios --bin gen_scenario_schemas \
+  -p finstack-quant-statements --bin gen_statement_schemas \
+  -p finstack-quant-valuations --bin gen_schemas \
+  -p finstack-quant-portfolio --bin gen_materialization_schemas
+target_dir="${CARGO_TARGET_DIR:-target}"
+for bin in \
+  gen_core_schemas \
+  gen_attribution_schemas \
+  gen_calibration_schemas \
+  gen_cashflow_schemas \
+  gen_factor_model_schemas \
+  gen_margin_schema \
+  gen_scenario_schemas \
+  gen_statement_schemas \
+  gen_schemas \
+  gen_materialization_schemas
+do
+  "${target_dir}/debug/${bin}" --write
+done
+'''
 
 [tasks.core-gen-data]
 description = "Generate core currency and lunar reference tables from maintained CSV data"
