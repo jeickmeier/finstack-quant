@@ -769,7 +769,7 @@ export interface DA04857579E2F6Abbb6Fa {
  *     .notional(Money::from((10_000_000_i64, Currency::USD)))
  *     .underlying(
  *         EquityUnderlyingParams::new("SPX", "SPX-SPOT", Currency::USD)
- *             .with_dividend_yield("SPX-DIV"),
+ *             .with_div_yield_id("SPX-DIV"),
  *     )
  *     .financing_leg(FinancingLegSpec::new(
  *         "USD-OIS", "USD-SOFR-3M", Decimal::from(50), DayCount::Act360,

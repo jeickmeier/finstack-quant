@@ -38,7 +38,7 @@
         "version": 1
       },
       "fx_policy_applied": null,
-      "timestamp": "+002026-09-27T21:42:35.057000000Z",
+      "timestamp": "+002026-09-28T01:16:08.031000000Z",
       "version": "0.9.0"
     },
     "covenants": null
@@ -430,5 +430,5 @@
       "bucketed": true
     }
   ],
-  "facadeWasmSha256": "c8a8df42f7af8faea3ba01304b472e54dcb5555cfd6280fdd1e1ab4778c3b75d"
+  "facadeWasmSha256": "6d948f6b4889cba04f4f0671702158a4cec27b45567b28b997a322d46c36cc9f"
 }

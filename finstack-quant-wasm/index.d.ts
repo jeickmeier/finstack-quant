@@ -7259,19 +7259,19 @@ export interface CreditDerivativesNamespace {
   /**
    * Example tagged `CreditDefaultSwap` instrument JSON.
    * @returns Example tagged `CreditDefaultSwap` instrument JSON.
-   * @throws Error - Throws a JavaScript exception if the example envelope cannot be serialized to JSON.
+   * @throws Error - Throws a JavaScript exception if the example instrument fails validation or the example envelope cannot be serialized to JSON.
    */
   creditDefaultSwapExampleJson(): string;
   /**
    * Example tagged `CdsIndex` instrument JSON.
    * @returns Example tagged `CdsIndex` instrument JSON.
-   * @throws Error - Throws a JavaScript exception if the example envelope cannot be serialized to JSON.
+   * @throws Error - Throws a JavaScript exception if the example instrument fails validation or the example envelope cannot be serialized to JSON.
    */
   cdsIndexExampleJson(): string;
   /**
    * Example tagged `CdsTranche` instrument JSON.
    * @returns Example tagged `CdsTranche` instrument JSON.
-   * @throws Error - Throws a JavaScript exception if the example envelope cannot be serialized to JSON.
+   * @throws Error - Throws a JavaScript exception if the example instrument fails validation or the example envelope cannot be serialized to JSON.
    */
   cdsTrancheExampleJson(): string;
   /**

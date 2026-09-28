@@ -35061,7 +35061,7 @@ export interface FloatLegSpec4 {
  * use finstack_quant_valuations::instruments::SettlementType;
  *
  * // Create a 10NC2 (10-year swap, callable after 2 years)
- * let swaption = BermudanSwaption::example();
+ * let swaption = BermudanSwaption::example().expect("example");
  * ```
  *
  * This interface was referenced by `SharedDefs`'s JSON-Schema
@@ -48508,7 +48508,7 @@ export interface Tenor25 {
  *     .notional(Money::from((10_000_000_i64, Currency::USD)))
  *     .underlying(
  *         EquityUnderlyingParams::new("SPX", "SPX-SPOT", Currency::USD)
- *             .with_dividend_yield("SPX-DIV"),
+ *             .with_div_yield_id("SPX-DIV"),
  *     )
  *     .financing_leg(FinancingLegSpec::new(
  *         "USD-OIS", "USD-SOFR-3M", Decimal::from(50), DayCount::Act360,
@@ -49066,8 +49066,8 @@ export interface EquityUnderlyingParams {
  *     .notional(Money::from((10_000_000_i64, Currency::USD)))
  *     .underlying(
  *         IndexUnderlyingParams::new("US-CORP", Currency::USD)
- *             .with_yield("US-CORP-YIELD")
- *             .with_duration("US-CORP-DURATION"),
+ *             .with_yield_id("US-CORP-YIELD")
+ *             .with_duration_id("US-CORP-DURATION"),
  *     )
  *     .financing_leg(FinancingLegSpec::new(
  *         "USD-OIS", "USD-SOFR-3M", Decimal::from(35), DayCount::Act360,

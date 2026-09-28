@@ -783,8 +783,8 @@ export interface D_29A90D894679A1E11782 {
  *     .notional(Money::from((10_000_000_i64, Currency::USD)))
  *     .underlying(
  *         IndexUnderlyingParams::new("US-CORP", Currency::USD)
- *             .with_yield("US-CORP-YIELD")
- *             .with_duration("US-CORP-DURATION"),
+ *             .with_yield_id("US-CORP-YIELD")
+ *             .with_duration_id("US-CORP-DURATION"),
  *     )
  *     .financing_leg(FinancingLegSpec::new(
  *         "USD-OIS", "USD-SOFR-3M", Decimal::from(35), DayCount::Act360,

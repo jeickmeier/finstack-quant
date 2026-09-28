@@ -413,7 +413,7 @@ export interface D_2A0Ca8Ab319Aae74249A {
  * use finstack_quant_valuations::instruments::SettlementType;
  *
  * // Create a 10NC2 (10-year swap, callable after 2 years)
- * let swaption = BermudanSwaption::example();
+ * let swaption = BermudanSwaption::example().expect("example");
  * ```
  */
 export interface DB532A9F21Fa25370D47C {
