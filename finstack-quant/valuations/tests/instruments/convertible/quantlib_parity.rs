@@ -17,7 +17,7 @@
 //! to properly capture the embedded equity option and early exercise features.
 
 use super::fixtures::with_tree_steps;
-use crate::parity::ParityConfig;
+use crate::instruments::parity::ParityConfig;
 use finstack_quant_cashflows::builder::specs::{CouponType, FixedCouponSpec};
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{BusinessDayConvention, Date, DayCount, StubKind, Tenor};

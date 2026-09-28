@@ -1,6 +1,6 @@
 //! Determinism and smoke tests for calibration canonical.
 
-use crate::calibration_support as cal_utils;
+use crate::calibration::calibration_support as cal_utils;
 use finstack_quant_calibration::api::engine;
 use finstack_quant_calibration::api::schema::{
     CalibrationEnvelope, CalibrationPlan, CalibrationStep, DiscountCurveParams, StepParams,

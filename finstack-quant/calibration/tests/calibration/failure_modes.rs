@@ -1,7 +1,7 @@
 //! Failure mode coverage for plan-driven calibration preflight checks.
 
-use crate::calibration_support as cal_utils;
-use crate::common::fixtures;
+use crate::calibration::calibration_support as cal_utils;
+use crate::calibration::common::fixtures;
 use finstack_quant_calibration::api::engine;
 use finstack_quant_calibration::api::schema::{
     BaseCorrelationParams, CalibrationEnvelope, CalibrationPlan, CalibrationStep,

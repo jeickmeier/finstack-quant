@@ -1,6 +1,6 @@
 //! Tests for the surrounding crate component and its documented behavior.
 //!
-use crate::common::builders::{test_market, test_option};
+use crate::metrics::common::builders::{test_market, test_option};
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DayCount};
 use finstack_quant_core::market_data::context::MarketContext;

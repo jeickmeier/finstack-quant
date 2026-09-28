@@ -13,7 +13,7 @@
 //!
 //! Run all metrics tests:
 //! ```bash
-//! cargo test --test metrics
+//! cargo nextest run -p finstack-quant-valuations --test valuations metrics::
 //! ```
 
 // Shared Test Utilities
@@ -22,23 +22,21 @@
 #[path = "common/mod.rs"]
 mod common;
 
-#[path = "support/credit.rs"]
-#[allow(dead_code, unused_imports)]
-mod credit_support;
-#[path = "support/date.rs"]
-#[allow(dead_code, unused_imports)]
-mod date_support;
-#[path = "support/discount_forward_curves.rs"]
-#[allow(dead_code, unused_imports)]
-mod discount_forward_curve_support;
-#[path = "support/equity_fx_options.rs"]
-#[allow(dead_code, unused_imports)]
-mod option_support;
-#[path = "support/volatility.rs"]
-#[allow(dead_code, unused_imports)]
-mod volatility_support;
+// `instruments::test_support` already loads these files. A second `mod` in this
+// crate is `clippy::duplicate_mod`.
+#[allow(unused_imports)]
+pub(crate) use crate::instruments::test_support::credit as credit_support;
+#[allow(unused_imports)]
+pub(crate) use crate::instruments::test_support::date as date_support;
+#[allow(unused_imports)]
+pub(crate) use crate::instruments::test_support::discount_forward_curves as discount_forward_curve_support;
+#[allow(unused_imports)]
+pub(crate) use crate::instruments::test_support::equity_fx_options as option_support;
+#[allow(unused_imports)]
+pub(crate) use crate::instruments::test_support::volatility as volatility_support;
 
 // Metrics Tests
 
 #[path = "metrics/mod.rs"]
+#[allow(clippy::module_inception)]
 mod metrics;

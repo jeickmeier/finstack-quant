@@ -168,6 +168,14 @@ impl<'a> TsiveriotisZhangEngine<'a> {
             .unwrap_or(0.0);
         let terminal_put = self.valuator.put_price_at_step(self.steps);
 
+        // Log-spot spacing between adjacent terminal nodes (for a trinomial the
+        // adjacent ratio is `up / middle`, so read it off the lattice itself).
+        let terminal_log_spacing = if num_nodes > 1 {
+            (get_spot(self.steps, 1) / get_spot(self.steps, 0)).ln()
+        } else {
+            0.0
+        };
+
         for i in 0..num_nodes {
             let node_spot = get_spot(self.steps, i);
             let conversion_val = self
@@ -175,35 +183,50 @@ impl<'a> TsiveriotisZhangEngine<'a> {
                 .conversion_value(node_spot, terminal_accretion);
 
             let coupon = terminal_coupon;
-            let redemption_val = self.valuator.face_value;
+            // Cash redemption available at maturity: face, or an accreting put
+            // price above it. The holder maximizes over conversion and cash.
+            let cash_level = match terminal_put {
+                Some(put_price) => self.valuator.face_value.max(put_price),
+                None => self.valuator.face_value,
+            };
 
             let can_convert = self.valuator.conversion_allowed(self.steps, node_spot);
 
-            let (mut ex_coupon_total, mut ex_coupon_cash) = if can_convert && mandatory {
+            let (ex_coupon_total, ex_coupon_cash) = if can_convert && mandatory {
                 // Mandatory conversion: holder must convert regardless of optimality.
                 // For PERCS/DECS below the lower strike, this correctly reflects
-                // the holder bearing equity downside risk.
+                // the holder bearing equity downside risk. Forced conversion
+                // overrides any put right.
                 (conversion_val, 0.0)
-            } else if can_convert && conversion_val > redemption_val {
-                (conversion_val, 0.0)
+            } else if can_convert {
+                // Optional conversion: total = max(conversion, cash). The
+                // Tsiveriotis-Zhang cash/equity split is a step function of
+                // spot at `conversion == cash_level`, and a terminal node that
+                // sits on that boundary (spot == conversion price with an even
+                // step count) flips from all-cash (risky discounting) to
+                // all-equity (risk-free discounting), producing a PV jump in
+                // the initial spot and spurious finite-difference deltas.
+                //
+                // Smooth the split over the node's log-spot cell
+                // `[ln S_i - Δ/2, ln S_i + Δ/2]`: the equity weight `w` is the
+                // fraction of the cell where conversion (proportional to spot
+                // for optional policies) exceeds `cash_level`. Nodes whose cell
+                // lies fully on one side keep w ∈ {0, 1} exactly as before.
+                let total = conversion_val.max(cash_level);
+                let equity_weight = if terminal_log_spacing > 0.0 && conversion_val > 0.0 {
+                    let log_distance = (conversion_val / cash_level).ln();
+                    (0.5 + log_distance / terminal_log_spacing).clamp(0.0, 1.0)
+                } else if conversion_val > cash_level {
+                    1.0
+                } else {
+                    0.0
+                };
+                (total, (1.0 - equity_weight) * cash_level)
             } else {
-                (redemption_val, redemption_val)
+                // No conversion right at maturity: redeem at face or put
+                // (an issuer call at maturity cannot undercut face).
+                (cash_level, cash_level)
             };
-
-            // Put at maturity: an accreting put whose window extends to the
-            // final date lets the holder redeem at the put price instead of
-            // face. The holder maximizes; the put payoff is all-cash. Forced
-            // (mandatory) conversion overrides the put right. An issuer call
-            // at maturity is deliberately ignored: the contractual redemption
-            // at face dominates, so a call cannot reduce the maturity payoff.
-            if !(can_convert && mandatory) {
-                if let Some(put_price) = terminal_put {
-                    if ex_coupon_total < put_price {
-                        ex_coupon_total = put_price;
-                        ex_coupon_cash = put_price;
-                    }
-                }
-            }
 
             // Coupon entitlement is independent of the exercise choice under
             // the public contract (there is no coupon-forfeiture flag). Make

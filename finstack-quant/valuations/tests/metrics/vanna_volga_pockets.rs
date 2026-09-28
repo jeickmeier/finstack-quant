@@ -4,10 +4,10 @@
 //! - Exercise the calculators through the standard registry (public API).
 //! - Validate results against an explicit finite-difference reference implementation.
 
-use crate::date_support::date;
-use crate::discount_forward_curve_support::flat_discount_with_tenor;
-use crate::option_support::{equity_option_european_call, fx_option_european_call};
-use crate::volatility_support::flat_vol_surface;
+use crate::metrics::date_support::date;
+use crate::metrics::discount_forward_curve_support::flat_discount_with_tenor;
+use crate::metrics::option_support::{equity_option_european_call, fx_option_european_call};
+use crate::metrics::volatility_support::flat_vol_surface;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::bumps::{

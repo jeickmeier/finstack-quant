@@ -1,6 +1,6 @@
 //! Expiry-related edge cases
 
-use crate::swaption::common::*;
+use crate::instruments::swaption::common::*;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_models::SabrParameters;

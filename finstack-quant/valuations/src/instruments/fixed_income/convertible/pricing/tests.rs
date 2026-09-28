@@ -948,3 +948,78 @@ fn tree_steps_come_from_model_config() {
     )
     .is_err());
 }
+
+/// At-the-money convertible with a credit spread: ratio 10, face 1,000
+/// (conversion price 100), 5y, risk-free 3% zero curve and a flat 3% hazard
+/// curve at zero recovery (a 6% risky rate).
+fn atm_credit_risky_case(spot: f64) -> (ConvertibleBond, MarketContext) {
+    let issue = Date::from_calendar_date(2025, Month::January, 1).expect("valid date");
+    let mut bond = create_test_bond();
+    bond.credit_curve_id = Some("USD-RISKY".into());
+    bond.recovery_rate = Some(0.0);
+    let ois = DiscountCurve::builder("USD-OIS")
+        .base_date(issue)
+        .knots([(0.0, 1.0), (10.0, (-0.03_f64 * 10.0).exp())])
+        .interp(finstack_quant_core::math::interp::InterpStyle::LogLinear)
+        .build()
+        .expect("curve");
+    let hazard =
+        finstack_quant_core::market_data::term_structures::HazardCurve::builder("USD-RISKY")
+            .base_date(issue)
+            .knots([(0.0, 0.03), (10.0, 0.03)])
+            .recovery_rate(0.0)
+            .build()
+            .expect("hazard curve");
+    let market = MarketContext::new()
+        .insert(ois)
+        .insert(hazard)
+        .insert_price("AAPL", MarketScalar::Unitless(spot))
+        .insert_price("AAPL-VOL", MarketScalar::Unitless(0.25))
+        .insert_price("AAPL-DIVYIELD", MarketScalar::Unitless(0.0));
+    (bond, market)
+}
+
+/// Regression: with an even step count and spot at the conversion price the
+/// centre terminal node sits on the conversion boundary. The terminal
+/// cash/equity split used to flip there (all-cash below, all-equity at or
+/// above), so PV jumped as spot crossed the conversion price and the
+/// central-difference delta exceeded the conversion ratio.
+#[test]
+fn pv_is_continuous_and_delta_bounded_at_conversion_price() {
+    let as_of = Date::from_calendar_date(2025, Month::January, 1).expect("valid date");
+    let tree = ConvertibleTreeType::default();
+    let price_at = |spot: f64| {
+        let (bond, market) = atm_credit_risky_case(spot);
+        price_convertible_bond(&bond, &market, tree, as_of)
+            .expect("price")
+            .amount()
+    };
+
+    let below = price_at(100.0 - 1e-4);
+    let at = price_at(100.0);
+    // Local slope is ~7 per unit spot, so an honest step of 1e-4 moves PV by
+    // ~1e-3; the boundary flip used to move it by several units.
+    assert!(
+        (at - below).abs() < 0.01,
+        "PV must be continuous at the conversion price: {below} -> {at}"
+    );
+
+    let (bond, market) = atm_credit_risky_case(100.0);
+    let greeks = calculate_convertible_greeks(&bond, &market, tree, GreekBumps::default(), as_of)
+        .expect("greeks");
+    assert!(
+        greeks.delta > 0.0 && greeks.delta < 10.0,
+        "delta must lie inside (0, conversion ratio 10); got {}",
+        greeks.delta
+    );
+
+    // Even and odd step counts should now agree closely.
+    let (bond, market) = atm_credit_risky_case(100.0);
+    let odd = price_convertible_bond(&with_tree_steps(&bond, 201), &market, tree, as_of)
+        .expect("price")
+        .amount();
+    assert!(
+        (at - odd).abs() / at < 5e-4,
+        "200 vs 201 steps diverge: {at} vs {odd}"
+    );
+}

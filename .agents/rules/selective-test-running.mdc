@@ -19,7 +19,7 @@ alwaysApply: true
 | `rust-lint-crate --lib` | `mise run rust-lint-crate -- finstack-quant-core --lib` |
 | `rust-fix-crate` | `mise run rust-fix-crate -- finstack-quant-scenarios` |
 | `rust-test-crate` | `mise run rust-test-crate -- finstack-quant-valuations` |
-| `rust-test-integration` | `mise run rust-test-integration -- finstack-quant-valuations instruments` |
+| `rust-test-integration` | `mise run rust-test-integration -- finstack-quant-valuations valuations` |
 | `rust-test-filter` | `mise run rust-test-filter -- finstack-quant-core test_bond_pricing` |
 | `rust-bench-crate` | `mise run rust-bench-crate -- finstack-quant-portfolio materialization` |
 | `rust-build-crate` | `mise run rust-build-crate -- finstack-quant-portfolio` |

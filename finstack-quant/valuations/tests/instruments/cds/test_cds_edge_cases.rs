@@ -55,7 +55,7 @@ fn test_zero_notional() {
 
     let market = MarketContext::new().insert(disc).insert(hazard);
 
-    let cds = crate::test_support::credit::cds_buy_protection(
+    let cds = crate::instruments::test_support::credit::cds_buy_protection(
         "ZERO_NOTIONAL",
         Money::new(0.0, Currency::USD).expect("valid money fixture"),
         100.0,
@@ -78,7 +78,7 @@ fn test_zero_spread() {
 
     let market = MarketContext::new().insert(disc).insert(hazard);
 
-    let cds = crate::test_support::credit::cds_buy_protection(
+    let cds = crate::instruments::test_support::credit::cds_buy_protection(
         "ZERO_SPREAD",
         Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
         0.0,
@@ -107,7 +107,7 @@ fn test_negative_spread() {
 
     let market = MarketContext::new().insert(disc).insert(hazard);
 
-    let cds = crate::test_support::credit::cds_buy_protection(
+    let cds = crate::instruments::test_support::credit::cds_buy_protection(
         "NEG_SPREAD",
         Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
         -50.0, // Negative spread
@@ -138,7 +138,7 @@ fn test_very_high_spread() {
 
     let market = MarketContext::new().insert(disc).insert(hazard);
 
-    let cds = crate::test_support::credit::cds_buy_protection(
+    let cds = crate::instruments::test_support::credit::cds_buy_protection(
         "HIGH_SPREAD",
         Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
         10000.0, // 10000 bp = 100%
@@ -177,7 +177,7 @@ fn test_zero_recovery_rate() {
 
     let market = MarketContext::new().insert(disc).insert(hazard);
 
-    let mut cds = crate::test_support::credit::cds_buy_protection(
+    let mut cds = crate::instruments::test_support::credit::cds_buy_protection(
         "ZERO_RECOVERY",
         Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
         100.0,
@@ -217,7 +217,7 @@ fn test_full_recovery_rate_is_rejected() {
 
     let market = MarketContext::new().insert(disc).insert(hazard);
 
-    let mut cds = crate::test_support::credit::cds_buy_protection(
+    let mut cds = crate::instruments::test_support::credit::cds_buy_protection(
         "FULL_RECOVERY",
         Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
         100.0,
@@ -257,7 +257,7 @@ fn test_very_short_tenor() {
 
     let market = MarketContext::new().insert(disc).insert(hazard);
 
-    let cds = crate::test_support::credit::cds_buy_protection(
+    let cds = crate::instruments::test_support::credit::cds_buy_protection(
         "ONE_DAY",
         Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
         100.0,
@@ -280,7 +280,7 @@ fn test_maturity_equals_valuation_date() {
 
     let market = MarketContext::new().insert(disc).insert(hazard);
 
-    let cds = crate::test_support::credit::cds_buy_protection(
+    let cds = crate::instruments::test_support::credit::cds_buy_protection(
         "EXPIRED",
         Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
         100.0,
@@ -311,7 +311,7 @@ fn test_valuation_after_maturity() {
 
     let market = MarketContext::new().insert(disc).insert(hazard);
 
-    let cds = crate::test_support::credit::cds_buy_protection(
+    let cds = crate::instruments::test_support::credit::cds_buy_protection(
         "PAST_MATURITY",
         Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
         100.0,
@@ -354,7 +354,7 @@ fn test_very_high_hazard_rate() {
 
     let market = MarketContext::new().insert(disc).insert(hazard);
 
-    let cds = crate::test_support::credit::cds_buy_protection(
+    let cds = crate::instruments::test_support::credit::cds_buy_protection(
         "HIGH_HAZARD",
         Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
         1000.0,
@@ -393,7 +393,7 @@ fn test_zero_hazard_rate() {
 
     let market = MarketContext::new().insert(disc).insert(hazard);
 
-    let cds = crate::test_support::credit::cds_buy_protection(
+    let cds = crate::instruments::test_support::credit::cds_buy_protection(
         "ZERO_HAZARD",
         Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
         100.0,
@@ -420,13 +420,13 @@ fn test_metrics_with_zero_notional() {
     let (disc, _) = build_curves(as_of);
 
     let source = MarketContext::new().insert(disc);
-    let hazard = crate::test_support::credit::calibrated_hazard_curve(
+    let hazard = crate::instruments::test_support::credit::calibrated_hazard_curve(
         &source, as_of, "CORP", "CORP", "USD_OIS",
     )
     .expect("hazard calibration should succeed");
     let market = source.insert(hazard);
 
-    let cds = crate::test_support::credit::cds_buy_protection(
+    let cds = crate::instruments::test_support::credit::cds_buy_protection(
         "ZERO_METRICS",
         Money::new(0.0, Currency::USD).expect("valid money fixture"),
         100.0,
@@ -447,7 +447,7 @@ fn test_metrics_with_zero_notional() {
                 MetricId::ExpectedLoss,
                 MetricId::JumpToDefault,
             ],
-            crate::test_support::credit::pricing_options(),
+            crate::instruments::test_support::credit::pricing_options(),
         )
         .unwrap();
 
@@ -488,7 +488,7 @@ fn test_par_spread_with_mismatched_curves_errors() {
                 .unwrap(),
         );
 
-    let cds = crate::test_support::credit::cds_buy_protection(
+    let cds = crate::instruments::test_support::credit::cds_buy_protection(
         "MISMATCH_TEST",
         Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
         100.0,
@@ -521,7 +521,7 @@ fn test_numerical_stability_with_extreme_dates() {
 
     let market = MarketContext::new().insert(disc).insert(hazard);
 
-    let cds = crate::test_support::credit::cds_buy_protection(
+    let cds = crate::instruments::test_support::credit::cds_buy_protection(
         "LONG_DATED",
         Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
         100.0,
@@ -547,7 +547,7 @@ fn test_very_small_notional() {
 
     let market = MarketContext::new().insert(disc).insert(hazard);
 
-    let cds = crate::test_support::credit::cds_buy_protection(
+    let cds = crate::instruments::test_support::credit::cds_buy_protection(
         "TINY_NOTIONAL",
         Money::new(0.01, Currency::USD).expect("valid money fixture"), // 1 cent
         100.0,
@@ -581,7 +581,7 @@ fn test_missing_discount_curve_error() {
 
     let market = MarketContext::new().insert(hazard);
 
-    let cds = crate::test_support::credit::cds_buy_protection(
+    let cds = crate::instruments::test_support::credit::cds_buy_protection(
         "MISSING_DISC",
         Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
         100.0,
@@ -611,7 +611,7 @@ fn test_missing_hazard_curve_error() {
 
     let market = MarketContext::new().insert(disc);
 
-    let cds = crate::test_support::credit::cds_buy_protection(
+    let cds = crate::instruments::test_support::credit::cds_buy_protection(
         "MISSING_HAZARD",
         Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
         100.0,
@@ -634,7 +634,7 @@ fn test_settlement_delay_zero_is_valid() {
 
     let market = MarketContext::new().insert(disc).insert(hazard);
 
-    let mut cds = crate::test_support::credit::cds_buy_protection(
+    let mut cds = crate::instruments::test_support::credit::cds_buy_protection(
         "ZERO_DELAY",
         Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
         100.0,
@@ -661,7 +661,7 @@ fn test_recovery_rate_bounds_not_enforced() {
     let market = MarketContext::new().insert(disc).insert(hazard);
 
     // Test with negative recovery (invalid)
-    let mut cds = crate::test_support::credit::cds_buy_protection(
+    let mut cds = crate::instruments::test_support::credit::cds_buy_protection(
         "NEG_RECOVERY",
         Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
         100.0,

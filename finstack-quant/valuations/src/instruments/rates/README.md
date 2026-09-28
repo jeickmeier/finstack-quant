@@ -154,11 +154,11 @@ checks for the Bermudan engines.
 
 ```bash
 # whole target
-cargo nextest run -p finstack-quant-valuations --test instruments
+cargo nextest run -p finstack-quant-valuations --test valuations instruments
 
 # one leaf (filter is a substring match on the test name)
-cargo nextest run -p finstack-quant-valuations --test instruments swaption::
-cargo nextest run -p finstack-quant-valuations --test instruments irs::
+cargo nextest run -p finstack-quant-valuations --test valuations instruments::swaption::
+cargo nextest run -p finstack-quant-valuations --test valuations instruments::irs::
 
 # colocated unit tests
 cargo nextest run -p finstack-quant-valuations --lib rates::hw1f

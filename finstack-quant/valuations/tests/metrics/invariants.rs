@@ -475,7 +475,7 @@ mod cds_invariants {
             // recovery-consistency guard (same R in both legs) is satisfied.
             let (disc, hazard) = build_test_curves(0.04, hazard_rate, recovery);
 
-            let cds = crate::credit_support::cds_buy_protection(
+            let cds = crate::metrics::credit_support::cds_buy_protection(
                 "PROP_PAR_TEST",
                 Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
                 spread_bp,
@@ -512,7 +512,7 @@ mod cds_invariants {
             let as_of = date!(2025 - 01 - 01);
             let maturity = as_of.add_months(60);
 
-            let cds_low_recovery = crate::credit_support::cds_buy_protection(
+            let cds_low_recovery = crate::metrics::credit_support::cds_buy_protection(
                 "PROP_RECOVERY_LOW",
                 Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
                 100.0,
@@ -587,7 +587,7 @@ mod cs01_invariants {
 
         let source = MarketContext::new().insert(disc);
         let spread_bp = hazard_rate * 0.6 * 10_000.0;
-        let hazard = crate::credit_support::calibrated_hazard_curve_with_pillars(
+        let hazard = crate::metrics::credit_support::calibrated_hazard_curve_with_pillars(
             &source,
             as_of,
             "TEST-CREDIT",
@@ -620,7 +620,7 @@ mod cs01_invariants {
             let as_of = date!(2025 - 01 - 01);
             let maturity = as_of.add_months(60);
 
-            let cds = crate::credit_support::cds_buy_protection(
+            let cds = crate::metrics::credit_support::cds_buy_protection(
                 "PROP_CS01_TEST",
                 Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
                 spread_bp,
@@ -635,7 +635,7 @@ mod cs01_invariants {
                 &market,
                 as_of,
                 &[MetricId::Cs01],
-                crate::credit_support::pricing_options(),
+                crate::metrics::credit_support::pricing_options(),
             ).expect("Metrics should compute");
             let cs01 = results.measures
                 .get(&MetricId::Cs01)
@@ -736,7 +736,7 @@ mod cs_gamma_consistency {
         let as_of = date!(2025 - 01 - 01);
         let maturity = as_of.add_months(60); // 5Y CDS
 
-        let cds = crate::credit_support::cds_buy_protection(
+        let cds = crate::metrics::credit_support::cds_buy_protection(
             "CS_GAMMA_CONSISTENCY",
             Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
             200.0,
@@ -759,7 +759,7 @@ mod cs_gamma_consistency {
         let as_of = date!(2025 - 01 - 01);
         let maturity = as_of.add_months(60); // 5Y CDS
 
-        let cds = crate::credit_support::cds_buy_protection(
+        let cds = crate::metrics::credit_support::cds_buy_protection(
             "CS_GAMMA_FALLBACK",
             Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
             200.0,
@@ -834,7 +834,7 @@ mod bucketed_cs01_invariants {
 
         let source = MarketContext::new().insert(disc);
         let spread_bp = hazard_rate * 0.6 * 10_000.0;
-        let hazard = crate::credit_support::calibrated_hazard_curve_with_pillars(
+        let hazard = crate::metrics::credit_support::calibrated_hazard_curve_with_pillars(
             &source,
             as_of,
             "TEST-CREDIT",
@@ -862,7 +862,7 @@ mod bucketed_cs01_invariants {
         let as_of = date!(2025 - 01 - 01);
         let maturity = as_of.add_months(60); // 5Y CDS
 
-        let cds = crate::credit_support::cds_buy_protection(
+        let cds = crate::metrics::credit_support::cds_buy_protection(
             "CS01_BUCKET_TEST",
             Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
             100.0,
@@ -879,7 +879,7 @@ mod bucketed_cs01_invariants {
                 &market,
                 as_of,
                 &[MetricId::Cs01, MetricId::BucketedCs01],
-                crate::credit_support::pricing_options(),
+                crate::metrics::credit_support::pricing_options(),
             )
             .expect("Metrics should compute");
         let parallel_cs01 = results

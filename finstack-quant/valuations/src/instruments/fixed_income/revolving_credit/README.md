@@ -462,7 +462,7 @@ and, for pools of facilities tranched into notes,
 
 ```bash
 # Revolving-credit unit + integration tests (incl. deterministic/MC parity)
-cargo nextest run -p finstack-quant-valuations --test instruments revolving_credit::
+cargo nextest run -p finstack-quant-valuations --test valuations instruments::revolving_credit::
 
 # Whole workspace (never `cargo test` — it runs doctests)
 mise run rust-test

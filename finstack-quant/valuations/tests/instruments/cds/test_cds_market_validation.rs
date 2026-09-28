@@ -8,7 +8,7 @@
 //! - Hull, "Options, Futures, and Other Derivatives" (Credit Risk chapter)
 //! - O'Kane, "Modelling Single-name and Multi-name Credit Derivatives"
 
-use crate::test_support::credit as test_utils;
+use crate::instruments::test_support::credit as test_utils;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DayCount};
 use finstack_quant_core::market_data::context::MarketContext;
@@ -130,7 +130,7 @@ fn test_par_spread_approximation() {
             &market,
             as_of,
             &[MetricId::ParSpread],
-            crate::test_support::credit::pricing_options(),
+            crate::instruments::test_support::credit::pricing_options(),
         )
         .unwrap();
 
@@ -195,7 +195,7 @@ fn test_clean_upfront_adjustment_changes_npv_not_leg_pvs() {
             &market,
             as_of,
             &[MetricId::ProtectionLegPv, MetricId::PremiumLegPv],
-            crate::test_support::credit::pricing_options(),
+            crate::instruments::test_support::credit::pricing_options(),
         )
         .expect("base cds metrics");
     let base_npv = base.value;
@@ -208,7 +208,7 @@ fn test_clean_upfront_adjustment_changes_npv_not_leg_pvs() {
             &market,
             as_of,
             &[MetricId::ProtectionLegPv, MetricId::PremiumLegPv],
-            crate::test_support::credit::pricing_options(),
+            crate::instruments::test_support::credit::pricing_options(),
         )
         .expect("dirty cds metrics");
 
@@ -262,7 +262,7 @@ fn test_risky_pv01_market_standard() {
             &market,
             as_of,
             &[MetricId::RiskyPv01],
-            crate::test_support::credit::pricing_options(),
+            crate::instruments::test_support::credit::pricing_options(),
         )
         .unwrap();
 
@@ -310,7 +310,7 @@ fn test_cs01_positive_for_protection_buyer() {
             &market,
             as_of,
             &[MetricId::Cs01],
-            crate::test_support::credit::pricing_options(),
+            crate::instruments::test_support::credit::pricing_options(),
         )
         .unwrap();
 
@@ -461,7 +461,7 @@ fn test_expected_loss_formula_validation() {
             &market,
             as_of,
             &[MetricId::ExpectedLoss],
-            crate::test_support::credit::pricing_options(),
+            crate::instruments::test_support::credit::pricing_options(),
         )
         .unwrap();
 
@@ -529,7 +529,7 @@ fn test_jump_to_default_equals_lgd_times_notional() {
             &market,
             as_of,
             &[MetricId::JumpToDefault],
-            crate::test_support::credit::pricing_options(),
+            crate::instruments::test_support::credit::pricing_options(),
         )
         .unwrap();
 
@@ -575,7 +575,7 @@ fn test_survival_probability_decreases_over_time() {
             &market,
             start,
             &[MetricId::RiskyPv01],
-            crate::test_support::credit::pricing_options(),
+            crate::instruments::test_support::credit::pricing_options(),
         )
         .unwrap();
 
@@ -632,7 +632,7 @@ fn test_standard_tenors_reasonable_par_spreads() {
                 &market,
                 as_of,
                 &[MetricId::ParSpread],
-                crate::test_support::credit::pricing_options(),
+                crate::instruments::test_support::credit::pricing_options(),
             )
             .unwrap();
 
@@ -682,7 +682,7 @@ fn test_term_structure_upward_sloping_spreads() {
                 &market,
                 as_of,
                 &[MetricId::ParSpread],
-                crate::test_support::credit::pricing_options(),
+                crate::instruments::test_support::credit::pricing_options(),
             )
             .unwrap();
 

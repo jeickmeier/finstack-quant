@@ -14,7 +14,7 @@
 //! - `FACTOR_TOLERANCE` (1e-12): For year fractions
 //! - `financial_tolerance(notional)`: For money amounts
 
-use crate::helpers::financial_tolerance;
+use crate::cashflows::helpers::financial_tolerance;
 use finstack_quant_cashflows::builder::specs::{
     CouponType, FeeSpec, FixedCouponSpec, FloatingCouponSpec, FloatingRateFallback,
     FloatingRateSpec, OvernightIndexConstraintApplication,

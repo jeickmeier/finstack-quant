@@ -107,7 +107,7 @@ fn test_metrics_registry_all_greeks() {
             &market,
             as_of,
             &metrics,
-            crate::test_support::credit::pricing_options(),
+            crate::instruments::test_support::credit::pricing_options(),
         )
         .unwrap();
 
@@ -143,7 +143,7 @@ fn test_cds_option_dv01_bumps_swap_curve_quotes_and_matches_cds_convention() {
             &market,
             as_of,
             &[MetricId::Dv01],
-            crate::test_support::credit::pricing_options(),
+            crate::instruments::test_support::credit::pricing_options(),
         )
         .unwrap();
     let dv01 = *result.measures.get("dv01").unwrap();
@@ -189,7 +189,7 @@ fn test_cds_option_dv01_falls_back_to_direct_bump_without_calibration() {
             &market,
             as_of,
             &[MetricId::Dv01],
-            crate::test_support::credit::pricing_options(),
+            crate::instruments::test_support::credit::pricing_options(),
         )
         .expect("CDS option DV01 should fall back to a direct discount-factor bump");
     let dv01 = *result.measures.get("dv01").expect("dv01 present");
@@ -305,7 +305,7 @@ fn test_bucketed_cs01_requires_replay_recipe() {
             &market,
             as_of,
             &[MetricId::Cs01, MetricId::BucketedCs01],
-            crate::test_support::credit::pricing_options(),
+            crate::instruments::test_support::credit::pricing_options(),
         )
         .expect_err("standard CDS option CS01 metrics require quote-space replay");
     assert!(error.to_string().contains("calibration recipe"));
@@ -355,7 +355,7 @@ fn test_spread_dv01_requires_replay_recipe() {
             &market,
             as_of,
             &[MetricId::SpreadDv01],
-            crate::test_support::credit::pricing_options(),
+            crate::instruments::test_support::credit::pricing_options(),
         )
         .expect_err("standard spread DV01 requires quote-space replay");
     assert!(error.to_string().contains("calibration recipe"));

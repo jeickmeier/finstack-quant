@@ -251,7 +251,7 @@ the shared JSON-example and serde-contract suites
 cargo nextest run -p finstack-quant-valuations --lib range_accrual
 
 # Serde and JSON-example contracts
-cargo nextest run -p finstack-quant-valuations --test instruments range_accrual
+cargo nextest run -p finstack-quant-valuations --test valuations range_accrual
 
 # Whole workspace (never `cargo test` — it runs doctests)
 mise run rust-test

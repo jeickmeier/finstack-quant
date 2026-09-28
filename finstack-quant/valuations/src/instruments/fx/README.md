@@ -112,7 +112,7 @@ Keep the key and the comment together if either moves.
 ## Tests and benches
 
 Integration tests live in `../../../tests/instruments/<leaf>/`, compiled into
-the single `instruments` target. Dedicated directories exist for `fx_spot`,
+the single `valuations` target as the `instruments` module. Dedicated directories exist for `fx_spot`,
 `fx_forward`, `fx_swap`, `ndf`, `fx_option`, `fx_barrier_option`,
 `fx_variance_swap` and `quanto_option`. `fx_digital_option` and
 `fx_touch_option` are covered by colocated `#[cfg(test)]` modules plus the
@@ -120,11 +120,11 @@ cross-cutting registry, serde and `fx_dependency_completeness` contract tests.
 
 ```bash
 # whole integration target
-mise run rust-test-integration -- finstack-quant-valuations instruments
+mise run rust-test-integration -- finstack-quant-valuations valuations
 
 # focused leaf tests
-mise run rust-test-filter -- finstack-quant-valuations fx_option --integration instruments
-mise run rust-test-filter -- finstack-quant-valuations fx_dependency_completeness --integration instruments
+mise run rust-test-filter -- finstack-quant-valuations fx_option --integration valuations
+mise run rust-test-filter -- finstack-quant-valuations fx_dependency_completeness --integration valuations
 
 # crate unit and integration tests
 mise run rust-test-crate -- finstack-quant-valuations

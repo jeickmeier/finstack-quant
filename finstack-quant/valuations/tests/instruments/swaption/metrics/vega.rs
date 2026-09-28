@@ -1,6 +1,6 @@
 //! Vega tests with finite difference validation
 
-use crate::swaption::common::*;
+use crate::instruments::swaption::common::*;
 use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::instruments::InstrumentPricingOverrides;
 use finstack_quant_valuations::metrics::MetricId;

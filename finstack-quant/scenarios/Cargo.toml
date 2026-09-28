@@ -8,6 +8,7 @@ repository.workspace = true
 authors.workspace = true
 description = "Deterministic scenario DSL for Finstack Quant with preview, composition, and phase-ordered apply across market/statements/valuations"
 autobenches = false
+autotests = false
 
 [dependencies]
 finstack-quant-cashflows = { path = "../cashflows", version = "0.9.0", default-features = false }
@@ -60,3 +61,8 @@ harness = false
 
 [lints]
 workspace = true
+
+# Consolidated integration tests
+[[test]]
+name = "scenarios"
+path = "tests/main.rs"

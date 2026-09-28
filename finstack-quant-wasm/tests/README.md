@@ -11,7 +11,8 @@ them, and only one layer sees each seam.
 
 ```
 tests/
-  wasm_*.rs              wasm-bindgen-test suites (run on wasm32 under Node)
+  wasm.rs                one integration target linking the suites below
+  wasm_*.rs              wasm-bindgen-test modules (run on wasm32 under Node)
   dts_contract.rs        host test: index.d.ts matches the facade surface
   return_shapes.rs       host test: declared return shapes, mirror of the Python file
   facade/*.test.mjs      Node tests against the built package via the JS facade
@@ -21,8 +22,9 @@ tests/
 
 ## Layer 1 — `wasm_*.rs` (wasm-bindgen-test, wasm32)
 
-Fifteen suites, one per binding domain, each gated with
-`#![cfg(target_arch = "wasm32")]` and written with `#[wasm_bindgen_test]`. They
+Fifteen suites, one per binding domain, compiled as modules of `tests/wasm.rs`.
+Each is gated with `#![cfg(target_arch = "wasm32")]` and written with
+`#[wasm_bindgen_test]`. They
 call the Rust binding types directly (`finstack_quant_wasm::api::…`) and inspect
 the returned `JsValue` with `js_sys`, which is the only place the `JsValue`
 contract can be exercised at all.
@@ -90,7 +92,7 @@ Run:
 cargo nextest run -p finstack-quant-wasm --test dts_contract
 
 # return_shapes is not selected by any mise task; run it explicitly
-cargo nextest run -p finstack-quant-wasm --test return_shapes
+cargo nextest run -p finstack-quant-wasm --test wasm return_shapes
 ```
 
 ## Layer 3 — `facade/` (Node, built package)

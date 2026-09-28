@@ -1,9 +1,9 @@
 //! Pricing tests for commodity options.
 
-use crate::test_support::commodity_curves::flat_price_curve;
-use crate::test_support::date::date;
-use crate::test_support::discount_forward_curves::flat_discount_with_tenor;
-use crate::test_support::volatility::flat_vol_surface;
+use crate::instruments::test_support::commodity_curves::flat_price_curve;
+use crate::instruments::test_support::date::date;
+use crate::instruments::test_support::discount_forward_curves::flat_discount_with_tenor;
+use crate::instruments::test_support::volatility::flat_vol_surface;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{DayCount, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;

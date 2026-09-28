@@ -1,6 +1,6 @@
 //! DV01 (nominal interest rate sensitivity) metric tests for InflationSwap.
 
-use crate::inflation_swap::fixtures::*;
+use crate::instruments::inflation_swap::fixtures::*;
 use finstack_quant_core::dates::{Date, DayCount};
 use finstack_quant_core::market_data::bumps::{BumpSpec, MarketBump};
 use rust_decimal::Decimal;

@@ -10,7 +10,7 @@
 //! - Kahan, W. (1965). "Further Remarks on Reducing Truncation Errors."
 //! - ISDA stress testing guidelines
 
-use crate::test_support::rates as test_utils;
+use crate::instruments::test_support::rates as test_utils;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{BusinessDayConvention, Date, DayCount, StubKind, Tenor};
 use finstack_quant_core::market_data::context::MarketContext;

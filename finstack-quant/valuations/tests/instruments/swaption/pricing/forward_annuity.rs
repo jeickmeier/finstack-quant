@@ -1,6 +1,6 @@
 //! Forward swap rate and annuity calculation tests
 
-use crate::swaption::common::*;
+use crate::instruments::swaption::common::*;
 use finstack_quant_core::dates::{
     BusinessDayConvention, DayCount, DayCountContext, StubKind, Tenor,
 };

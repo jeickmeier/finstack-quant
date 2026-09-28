@@ -236,7 +236,7 @@ mise run rust-check-schemas
 ```bash
 mise run rust-test                                        # whole workspace, cargo-nextest
 cargo nextest run -p finstack-quant-portfolio             # this crate only
-cargo nextest run -p finstack-quant-portfolio --test selective_repricing
+cargo nextest run -p finstack-quant-portfolio --test portfolio selective_repricing
 cargo run -p finstack-quant-portfolio --example portfolio_optimization
 mise run rust-lint
 ```

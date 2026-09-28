@@ -278,7 +278,7 @@ mod irs_contract {
         let start = d(2025, 1, 15);
         let end = d(2030, 1, 15);
 
-        let swap = crate::cashflows::rates_support::usd_irs_swap(
+        let swap = crate::cashflows::cashflows::rates_support::usd_irs_swap(
             "TEST-IRS-PAY",
             Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
             0.04,
@@ -297,7 +297,7 @@ mod irs_contract {
         let start = d(2025, 1, 15);
         let end = d(2030, 1, 15);
 
-        let swap = crate::cashflows::rates_support::usd_irs_swap(
+        let swap = crate::cashflows::cashflows::rates_support::usd_irs_swap(
             "TEST-IRS-REC",
             Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
             0.04,

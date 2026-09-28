@@ -10,7 +10,7 @@ use finstack_quant_core::money::Money;
 use finstack_quant_valuations::instruments::rates::repo::CollateralSpec;
 
 // Re-export the canonical date helper from shared test utilities.
-pub use crate::test_support::date::date;
+pub use crate::instruments::test_support::date::date;
 pub use finstack_quant_test_utils::assert::approx_eq;
 
 /// Standard test base date (2025-01-01).

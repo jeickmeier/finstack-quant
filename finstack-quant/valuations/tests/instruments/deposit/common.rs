@@ -21,7 +21,7 @@ pub const RATE_TOLERANCE: f64 = 1e-12;
 pub const DF_TOLERANCE: f64 = 1e-12;
 
 // Re-export the canonical date helper from shared test utilities.
-pub use crate::test_support::date::date;
+pub use crate::instruments::test_support::date::date;
 
 /// Creates a market context with a flat discount curve.
 ///

@@ -68,7 +68,7 @@ fn test_recovery01_at_lower_boundary() {
     // Recovery rate at lower boundary: 0.005 (0.5%)
     // With RECOVERY_BUMP = 0.01, bumped_down = 0.0, so we can only bump up
     let recovery = 0.005;
-    let cds = crate::test_support::credit::cds_buy_protection(
+    let cds = crate::instruments::test_support::credit::cds_buy_protection(
         "CDS-LOW-RECOVERY",
         Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
         200.0, // 200bp
@@ -120,7 +120,7 @@ fn test_recovery01_at_upper_boundary() {
     // Recovery rate near the upper boundary: 0.95 (95%). Recovery01 finite
     // differences must stay strictly below 1.0 after bumping.
     let recovery = 0.95;
-    let cds = crate::test_support::credit::cds_buy_protection(
+    let cds = crate::instruments::test_support::credit::cds_buy_protection(
         "CDS-HIGH-RECOVERY",
         Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
         50.0, // 50bp (tight spread for high recovery)
@@ -166,7 +166,7 @@ fn test_recovery01_symmetry() {
 
     // Standard recovery rate (40%)
     let recovery = 0.40;
-    let cds = crate::test_support::credit::cds_buy_protection(
+    let cds = crate::instruments::test_support::credit::cds_buy_protection(
         "CDS-STANDARD",
         Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
         150.0,
@@ -212,7 +212,7 @@ fn test_expected_loss_distressed_credit() {
     let maturity = Date::from_calendar_date(2030, Month::March, 20).unwrap();
 
     let recovery = 0.25; // Lower recovery for distressed
-    let cds = crate::test_support::credit::cds_buy_protection(
+    let cds = crate::instruments::test_support::credit::cds_buy_protection(
         "CDS-DISTRESSED",
         Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
         2500.0, // 2500bp = 25% (deeply distressed)
@@ -274,7 +274,7 @@ fn test_par_spread_npv_consistency() {
     let recovery = 0.40;
     let initial_spread = 150.0;
 
-    let cds = crate::test_support::credit::cds_buy_protection(
+    let cds = crate::instruments::test_support::credit::cds_buy_protection(
         "CDS-CONSISTENCY",
         Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
         initial_spread,
@@ -335,7 +335,7 @@ fn test_jtd_recovery_sensitivity() {
     let recovery_rates = [0.05, 0.25, 0.40, 0.60, 0.80, 0.95];
 
     for &recovery in &recovery_rates {
-        let cds = crate::test_support::credit::cds_buy_protection(
+        let cds = crate::instruments::test_support::credit::cds_buy_protection(
             format!("CDS-JTD-{}", (recovery * 100.0) as i32),
             Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
             200.0,
@@ -406,7 +406,7 @@ fn test_recovery01_ignores_unreplayable_par_spread_sidecar() {
     };
     let hazard = make_hazard(recovery);
 
-    let cds = crate::test_support::credit::cds_buy_protection(
+    let cds = crate::instruments::test_support::credit::cds_buy_protection(
         "CDS-RECALIB",
         Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
         300.0,

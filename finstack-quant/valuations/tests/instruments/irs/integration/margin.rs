@@ -22,7 +22,7 @@ fn create_test_swap() -> InterestRateSwap {
     let start = Date::from_calendar_date(2024, Month::June, 15).expect("valid date");
     let end = Date::from_calendar_date(2029, Month::June, 15).expect("valid date");
 
-    crate::test_support::rates::usd_irs_swap(
+    crate::instruments::test_support::rates::usd_irs_swap(
         InstrumentId::new("TEST_IRS"),
         Money::new(100_000_000.0, Currency::USD).expect("valid money fixture"), // 100MM notional
         0.035,                                                                  // 3.5% fixed rate

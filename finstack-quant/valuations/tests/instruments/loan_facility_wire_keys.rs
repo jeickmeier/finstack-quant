@@ -335,7 +335,9 @@ fn checks() -> Vec<Check> {
                     json!({"anti_dilution": "none", "dilution_events": [], "dividend_adjustment": "none", "policy": "voluntary", "price": 1.0, "ratio": null}),
                 ),
             ],
-            "1119.083135256322",
+            // Last-digit move from the Tsiveriotis-Zhang terminal-split
+            // smoothing (481dd75f3); the rename itself is still bit-exact.
+            "1119.083135256321",
         ),
         (
             "cb_zero_cp",

@@ -8,6 +8,7 @@ repository.workspace = true
 authors.workspace = true
 description = "Risk metrics and portfolio analytics for Finstack Quant: Sharpe, drawdown, correlation matrices, and nearest-correlation repair"
 autobenches = false
+autotests = false
 
 [dependencies]
 finstack-quant-core = { path = "../core", version = "0.9.0", default-features = false }
@@ -29,3 +30,8 @@ harness = false
 
 [lints]
 workspace = true
+
+# Consolidated integration tests
+[[test]]
+name = "analytics"
+path = "tests/main.rs"

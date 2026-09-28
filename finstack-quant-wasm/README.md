@@ -176,7 +176,7 @@ through `crate::utils::to_js_value`, never `serde_wasm_bindgen::to_value`, whose
 `Map` output `JSON.stringify` silently drops. The facade itself never calls
 `JSON.parse`. `mise run wasm-lint` enforces the serializer rule; the allowlisted
 shapes are pinned by `tests/return_shapes.rs`, which no `mise` task selects — run it
-explicitly with `cargo nextest run -p finstack-quant-wasm --test return_shapes`.
+explicitly with `cargo nextest run -p finstack-quant-wasm --test wasm return_shapes`.
 
 For LSMC valuations, `standard_error` measures pricing-path sampling uncertainty
 under the frozen fitted exercise policy and excludes regression approximation,

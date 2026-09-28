@@ -479,7 +479,7 @@ fn test_build_instrument_from_spec_swap_variant() {
     let start = Date::from_calendar_date(2025, Month::January, 1).unwrap();
     let maturity = Date::from_calendar_date(2030, Month::January, 1).unwrap();
 
-    let swap = crate::rates_support::usd_irs_swap(
+    let swap = super::rates_support::usd_irs_swap(
         InstrumentId::new("SWAP-002"),
         Money::new(3_000_000.0, Currency::USD).expect("valid money fixture"),
         0.045,

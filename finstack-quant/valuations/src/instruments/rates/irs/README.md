@@ -243,7 +243,7 @@ Reachable from Python and WASM through the JSON envelope
 
 ```bash
 # IRS construction, cashflows, pricing, compounding, metrics and validation
-cargo nextest run -p finstack-quant-valuations --test instruments irs::
+cargo nextest run -p finstack-quant-valuations --test valuations instruments::irs::
 
 # Whole workspace (never `cargo test` — it runs doctests)
 mise run rust-test

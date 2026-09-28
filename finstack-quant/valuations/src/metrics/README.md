@@ -124,7 +124,7 @@ public item from `finite_difference.rs` is `bump_surface_vol_absolute`.
 ## Verification
 
 ```bash
-cargo nextest run -p finstack-quant-valuations --test metrics
+cargo nextest run -p finstack-quant-valuations --test valuations metrics
 cargo bench -p finstack-quant-valuations --bench metrics
 cargo bench -p finstack-quant-valuations --bench bucketed_risk
 ```

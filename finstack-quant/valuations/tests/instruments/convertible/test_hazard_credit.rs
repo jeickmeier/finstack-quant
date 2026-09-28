@@ -58,15 +58,21 @@ fn credit_bond(recovery: f64) -> ConvertibleBond {
     bond
 }
 
-/// Prices and CS01s captured on the pre-change commit (ed2d9f2f3), where
-/// `USD-CREDIT` was the log-linear risky discount curve `exp(-(r + λ) t)` on
-/// the same knots. Entries: (spot, recovery, PV bits, CS01 bits).
+/// Prices and CS01s pinned under hazard-curve credit semantics. They were
+/// first captured on the pre-change commit (ed2d9f2f3), where `USD-CREDIT`
+/// was the log-linear risky discount curve `exp(-(r + λ) t)` on the same
+/// knots, and matched these hazard-curve prices to ~1e-14 relative.
+/// Re-pinned when the Tsiveriotis-Zhang terminal cash/equity split was
+/// smoothed over each node's log-spot cell (481dd75f3, PV continuity at the
+/// conversion price): credit-risky entries moved by ~4e-4 relative, while the
+/// full-recovery rows (no credit spread, so the split has no effect) are
+/// bit-identical. Entries: (spot, recovery, PV bits, CS01 bits).
 const RISKY_DISCOUNT_PINS: [(f64, f64, u64, u64); 6] = [
-    (150.0, 0.0, 0x409961bfaa1a0fa9, 0xbfc5fb00f0e04000),
-    (150.0, 0.4, 0x409999b765dfd3ad, 0xbfbb565c4ab16000),
+    (150.0, 0.0, 0x40996477a6ce4ad5, 0xbfc5911fb0fe4000),
+    (150.0, 0.4, 0x40999b614b6d837c, 0xbfbad226304d8000),
     (150.0, 1.0, 0x4099f18e9684bc08, 0x0000000000000000),
-    (50.0, 0.0, 0x408ffea224ea8184, 0xbfdaf1a67f862c00),
-    (50.0, 0.4, 0x409088b0e581080c, 0xbfd0ca86b880a800),
+    (50.0, 0.0, 0x40900254c2e36d20, 0xbfdab6f3c36ea000),
+    (50.0, 0.4, 0x40908a890d3ebcc8, 0xbfd0a5e226994800),
     (50.0, 1.0, 0x409160c62350f9e5, 0x0000000000000000),
 ];
 

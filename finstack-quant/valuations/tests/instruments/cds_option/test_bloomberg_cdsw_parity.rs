@@ -82,8 +82,8 @@ fn cdx_ig_46_curves(as_of: Date) -> MarketContext {
         (date!(2033 - 06 - 20), 72.64),
         (date!(2036 - 06 - 20), 92.35),
     ];
-    let hazard = crate::test_support::credit::calibrated_hazard_curve_from_spec(
-        crate::test_support::credit::CalibratedHazardSpec {
+    let hazard = crate::instruments::test_support::credit::calibrated_hazard_curve_from_spec(
+        crate::instruments::test_support::credit::CalibratedHazardSpec {
             source_market: &source,
             base_date: as_of,
             curve_id: "CDX-NA-IG-46-CBBT",
@@ -102,7 +102,7 @@ fn cdx_ig_46_curves(as_of: Date) -> MarketContext {
 fn build_spot_cds(_as_of: Date) -> CreditDefaultSwap {
     // Bloomberg CDSW underlying: 100bp running coupon, accrual start at
     // the prior IMM (2026-03-20). Built via the public test helper.
-    let mut cds = crate::test_support::credit::cds_buy_protection(
+    let mut cds = crate::instruments::test_support::credit::cds_buy_protection(
         "CDX-NA-IG-46-SPOT",
         Money::new(100_000_000.0, Currency::USD).expect("valid money fixture"),
         100.0, // 100 bp standard CDX coupon
@@ -295,7 +295,7 @@ fn diag_cdx_ig_46_spot_cds_reconciliation() {
     // Reprice the 5Y par CDS with the same public valuations constructor as
     // the spot CDS above. The bootstrap targets NPV ≈ 0 at this coupon, so
     // a residual beyond the integration floor is a pricer/convention gap.
-    let mut par_cds = crate::test_support::credit::cds_buy_protection(
+    let mut par_cds = crate::instruments::test_support::credit::cds_buy_protection(
         "CDX-NA-IG-46-PAR-CHECK-5Y",
         Money::new(100_000_000.0, Currency::USD).expect("valid money fixture"),
         53.6264,

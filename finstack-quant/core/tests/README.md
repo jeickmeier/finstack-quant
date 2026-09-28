@@ -58,7 +58,7 @@ with the amount rather than fixing an absolute epsilon.
 mise run rust-test-crate -- finstack-quant-core
 
 # One target
-mise run rust-test-integration -- finstack-quant-core cashflow
+mise run rust-test-integration -- finstack-quant-core core
 
 # One test, by substring
 mise run rust-test-filter -- finstack-quant-core npv_100_cashflows

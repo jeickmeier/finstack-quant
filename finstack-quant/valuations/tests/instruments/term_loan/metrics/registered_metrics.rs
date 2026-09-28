@@ -8,7 +8,7 @@
 //!   negative for a callable loan and exactly zero when there is no call
 //!   schedule.
 
-use crate::common::test_helpers::flat_discount_curve;
+use crate::instruments::common::test_helpers::flat_discount_curve;
 use finstack_quant_cashflows::builder::specs::CouponType;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{BusinessDayConvention, DayCount, StubKind, Tenor};

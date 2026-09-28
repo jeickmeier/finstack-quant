@@ -1,8 +1,6 @@
 //! Serialization tests for portfolio.
 
-mod common;
-
-use common::*;
+use crate::common::*;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::money::Money;
 use finstack_quant_portfolio::book::{Book, BookId};

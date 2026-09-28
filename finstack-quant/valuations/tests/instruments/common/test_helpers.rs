@@ -10,7 +10,7 @@
 //! # Usage
 //!
 //! ```rust,ignore
-//! use crate::common::test_helpers::*;
+//! use crate::instruments::common::test_helpers::*;
 //!
 //! // Use standard test dates
 //! let as_of = dates::TODAY;
@@ -55,7 +55,7 @@ use time::Month;
 /// # Examples
 ///
 /// ```rust,ignore
-/// use crate::common::test_helpers::tolerances;
+/// use crate::instruments::common::test_helpers::tolerances;
 ///
 /// // Use appropriate tolerance for test type
 /// assert!((actual - expected).abs() < tolerances::NUMERICAL);
@@ -114,7 +114,7 @@ pub mod tolerances {
 /// # Examples
 ///
 /// ```rust,ignore
-/// use crate::common::test_helpers::dates;
+/// use crate::instruments::common::test_helpers::dates;
 ///
 /// let as_of = dates::TODAY;
 /// let maturity = dates::five_years_hence();

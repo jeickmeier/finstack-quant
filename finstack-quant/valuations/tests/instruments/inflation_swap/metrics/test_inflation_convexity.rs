@@ -2,7 +2,7 @@
 //!
 //! Tests the second-order sensitivity to inflation rate changes.
 
-use crate::inflation_swap::fixtures::*;
+use crate::instruments::inflation_swap::fixtures::*;
 use finstack_quant_core::dates::{Date, DayCount};
 use finstack_quant_valuations::instruments::rates::inflation_swap::InflationSwapBuilder;
 use finstack_quant_valuations::instruments::Instrument;

@@ -1,6 +1,6 @@
 //! End-to-end workflow tests
 
-use crate::swaption::common::*;
+use crate::instruments::swaption::common::*;
 use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::metrics::MetricId;
 

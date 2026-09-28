@@ -1870,7 +1870,7 @@ fn stabilize_canonical_bytes(model: &CreditFactorModel) -> Vec<u8> {
 
 /// Generate (or regenerate) the factor-model-owned canonical artifact and hash.
 /// Run manually with:
-/// `FQ_UPDATE_CANONICAL_GOLDENS=1 cargo test -p finstack-quant-valuations --test credit_calibration generate_golden_artifact -- --nocapture`
+/// `FQ_UPDATE_CANONICAL_GOLDENS=1 cargo test -p finstack-quant-valuations --test valuations generate_golden_artifact -- --nocapture`
 #[test]
 fn generate_golden_artifact() {
     if std::env::var_os(REGEN_CREDIT_FACTOR_MODEL_GOLDEN_ENV).is_none() {
@@ -1924,7 +1924,7 @@ fn golden_credit_factor_model_matches_checked_in_json() {
             "Golden file not found at {golden_path}: {e}\n\
              Bootstrap it by running:\n  \
              {REGEN_CREDIT_FACTOR_MODEL_GOLDEN_ENV}=1 cargo nextest run -p finstack-quant-models \
-             --test factor_canonical_contract credit_factor_model_has_exact_canonical_bytes_and_hash"
+             --test models credit_factor_model_has_exact_canonical_bytes_and_hash"
         )
     });
 

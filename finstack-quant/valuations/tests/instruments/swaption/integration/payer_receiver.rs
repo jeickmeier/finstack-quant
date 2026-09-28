@@ -1,6 +1,6 @@
 //! Payer vs Receiver swaption tests
 
-use crate::swaption::common::*;
+use crate::instruments::swaption::common::*;
 use finstack_quant_core::dates::{BusinessDayConvention, DayCount, StubKind, Tenor};
 use finstack_quant_core::market_data::surfaces::{
     VolGridOpts, VolInterpolationMode, VolSurface, VolSurfaceAxis,

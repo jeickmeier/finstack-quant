@@ -36,7 +36,7 @@ fn metric_value(
             market,
             as_of,
             std::slice::from_ref(&metric),
-            crate::test_support::credit::pricing_options(),
+            crate::instruments::test_support::credit::pricing_options(),
         )
         .expect("metric should compute");
     result.measures[&metric]
@@ -432,7 +432,7 @@ fn test_constituents_detailed_additive_metrics() {
     let mut ctx = multi_constituent_market_context(as_of, 5);
     for index in 1..=5 {
         let hazard_id = format!("HZ{index}");
-        let hazard = crate::test_support::credit::calibrated_hazard_curve(
+        let hazard = crate::instruments::test_support::credit::calibrated_hazard_curve(
             &ctx,
             as_of,
             hazard_id.as_str(),

@@ -1,6 +1,6 @@
 //! Tests for inflation index lag policies.
 
-use crate::inflation_swap::fixtures::*;
+use crate::instruments::inflation_swap::fixtures::*;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DayCount};
 use finstack_quant_core::market_data::context::MarketContext;

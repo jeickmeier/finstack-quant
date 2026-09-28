@@ -66,7 +66,7 @@ fn market() -> MarketContext {
 
 fn replayable_market() -> MarketContext {
     let source = MarketContext::new().insert(discount_curve());
-    let hazard = crate::test_support::credit::calibrated_hazard_curve(
+    let hazard = crate::instruments::test_support::credit::calibrated_hazard_curve(
         &source,
         as_of(),
         "USD-HAZ",
@@ -397,7 +397,7 @@ fn risk_metrics_share_the_resolved_model_inputs() {
                 MetricId::Cs01,
                 MetricId::EmbeddedOptionValue,
             ],
-            crate::test_support::credit::pricing_options(),
+            crate::instruments::test_support::credit::pricing_options(),
         )
         .expect("credit-risky callable must produce risk metrics");
 

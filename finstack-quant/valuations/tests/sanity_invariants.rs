@@ -4,12 +4,11 @@
 //! They assert internal properties: par-rate self-consistency, pay/receive symmetry,
 //! DV01 magnitude bands. For external-reference parity, see `tests/golden/`.
 
-#[path = "support/credit.rs"]
-#[allow(dead_code, unused_imports)]
-mod credit_support;
-#[path = "support/rates.rs"]
-#[allow(dead_code, unused_imports)]
-mod rates_support;
+// Loaded once by `instruments::test_support`.
+#[allow(unused_imports)]
+pub(crate) use crate::instruments::test_support::credit as credit_support;
+#[allow(unused_imports)]
+pub(crate) use crate::instruments::test_support::rates as rates_support;
 
 #[path = "sanity_invariants/mod.rs"]
 mod sanity_invariants_tests;

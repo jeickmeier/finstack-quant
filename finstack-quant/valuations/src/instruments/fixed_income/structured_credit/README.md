@@ -855,7 +855,7 @@ stay dict / JSON sub-fields in Python and everything stays JSON in WASM.
 
 ```bash
 # Structured-credit unit, feature, waterfall-golden and simulation tests
-cargo nextest run -p finstack-quant-valuations --test instruments structured_credit::
+cargo nextest run -p finstack-quant-valuations --test valuations instruments::structured_credit::
 
 # Whole workspace (never `cargo test` — it runs doctests)
 mise run rust-test
@@ -877,7 +877,6 @@ registry — it does not validate this file's contents.
 - [`../../../metrics/README.md`](../../../metrics/README.md) — metric ids and calculators
 - [`INVARIANTS.md`](../../../../../../INVARIANTS.md) — Decimal/f64, determinism and serde invariants
 - [`docs/REFERENCES.md`](../../../../../../docs/REFERENCES.md) — bibliography
-
 
 ### Collection accounts and current-state inputs
 

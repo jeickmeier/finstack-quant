@@ -15,7 +15,7 @@ use finstack_quant_valuations::instruments::fixed_income::revolving_credit::{
 };
 use time::macros::date;
 
-use crate::common::test_helpers::flat_discount_curve;
+use crate::instruments::common::test_helpers::flat_discount_curve;
 
 #[test]
 fn test_interest_on_drawn_amounts() {

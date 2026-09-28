@@ -1,6 +1,6 @@
 //! Shared pricing runner helpers for instrument-level golden fixtures.
 
-use crate::golden::schema::{GoldenFixture, Market};
+use crate::golden::golden::schema::{GoldenFixture, Market};
 use finstack_quant_calibration::api::engine;
 use finstack_quant_calibration::api::schema::CalibrationEnvelope;
 use finstack_quant_calibration::recalibration::CachedRecalibrationProvider;
@@ -123,7 +123,7 @@ pub(crate) fn run_pricing_fixture(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::golden::schema::SCHEMA;
+    use crate::golden::golden::schema::SCHEMA;
     use finstack_quant_core::market_data::bumps::{BumpSpec, MarketBump};
     use finstack_quant_core::types::CurveId;
     use finstack_quant_valuations::instruments::{Instrument, InstrumentEnvelope, InstrumentJson};

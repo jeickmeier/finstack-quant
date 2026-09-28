@@ -4,7 +4,7 @@
 //! When the same pricing path is used (price → implied vol → price), inversion
 //! should be very precise. Market standard tolerance is 1bp of vol (0.01% relative).
 
-use crate::swaption::common::*;
+use crate::instruments::swaption::common::*;
 use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::metrics::MetricId;
 

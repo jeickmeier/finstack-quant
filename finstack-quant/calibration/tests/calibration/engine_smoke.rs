@@ -3,7 +3,7 @@
 //! Not a parity test against external references. See `tests/golden/calibration/`
 //! for external-reference goldens.
 
-use crate::calibration_support as cal_utils;
+use crate::calibration::calibration_support as cal_utils;
 use finstack_quant_calibration::api::engine;
 use finstack_quant_calibration::api::market_datum::MarketDatum;
 use finstack_quant_calibration::api::schema::{

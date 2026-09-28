@@ -272,7 +272,7 @@ mise run rust-check-schemas
 ```bash
 mise run rust-test                                    # whole workspace, cargo-nextest
 cargo nextest run -p finstack-quant-scenarios         # this crate only
-cargo nextest run -p finstack-quant-scenarios --test spec_validation_test
+cargo nextest run -p finstack-quant-scenarios --test scenarios spec_validation_test
 mise run rust-lint
 ```
 

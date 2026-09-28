@@ -10,7 +10,7 @@
 //! - ISDA documentation
 //! - Market practice for USD swaps
 
-use crate::test_support::rates as test_utils;
+use crate::instruments::test_support::rates as test_utils;
 use finstack_quant_cashflows::builder::periods::{build_periods, BuildPeriodsParams};
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{

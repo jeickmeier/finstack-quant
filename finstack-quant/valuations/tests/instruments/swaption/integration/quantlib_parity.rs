@@ -37,7 +37,7 @@
 //! - Greeks: 1e-3 relative for normalized values
 //! - Implied Vol: 1e-4 absolute
 
-use crate::swaption::common::*;
+use crate::instruments::swaption::common::*;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::dates::DayCountContext;
 use finstack_quant_core::market_data::traits::Discounting;

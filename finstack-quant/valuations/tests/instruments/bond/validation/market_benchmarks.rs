@@ -21,7 +21,7 @@ use finstack_quant_valuations::instruments::{Bond, InstrumentPricingOverrides};
 use finstack_quant_valuations::metrics::MetricId;
 use time::macros::date;
 
-use crate::common::test_helpers::tolerances;
+use crate::instruments::common::test_helpers::tolerances;
 
 /// Helper to build a standard flat yield curve for testing
 fn build_flat_curve(rate: f64, base_date: Date, curve_id: &str) -> DiscountCurve {

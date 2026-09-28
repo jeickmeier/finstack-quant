@@ -4,7 +4,7 @@
 
 use finstack_quant_valuations::instruments::OptionType;
 
-use crate::swaption::common::*;
+use crate::instruments::swaption::common::*;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::money::Money;
 use finstack_quant_models::rates::hull_white::HullWhiteCalibrationParams;

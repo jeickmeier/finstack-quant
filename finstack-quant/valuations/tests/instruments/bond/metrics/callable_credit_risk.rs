@@ -57,7 +57,7 @@ fn build_market(as_of: time::Date) -> MarketContext {
         .build()
         .expect("discount curve should build");
     let source = MarketContext::new().insert(disc);
-    let hazard = crate::test_support::credit::calibrated_hazard_curve(
+    let hazard = crate::instruments::test_support::credit::calibrated_hazard_curve(
         &source,
         as_of,
         "USD-CREDIT",
@@ -83,7 +83,7 @@ fn test_quoted_callable_credit_bond_risk_nonzero_and_call_aware() {
             &market,
             as_of,
             &[MetricId::Cs01, MetricId::CleanPrice],
-            crate::test_support::credit::pricing_options(),
+            crate::instruments::test_support::credit::pricing_options(),
         )
         .expect("unquoted callable-credit bond should price");
     let base_cs01 = *base.measures.get("cs01").unwrap();
@@ -109,7 +109,7 @@ fn test_quoted_callable_credit_bond_risk_nonzero_and_call_aware() {
                 MetricId::BucketedDv01,
                 MetricId::EmbeddedOptionValue,
             ],
-            crate::test_support::credit::pricing_options(),
+            crate::instruments::test_support::credit::pricing_options(),
         )
         .expect("quoted callable-credit bond should price");
 
@@ -173,7 +173,8 @@ fn test_unquoted_callable_explicit_models_skip_quote_spread_dependencies() {
                 MetricId::BucketedCs01,
                 MetricId::BucketedDv01,
             ],
-            crate::test_support::credit::pricing_options().with_model(ModelKey::RatesCredit),
+            crate::instruments::test_support::credit::pricing_options()
+                .with_model(ModelKey::RatesCredit),
         )
         .expect("unquoted callable RatesCredit risk should not require Z-spread");
     for metric in ["cs01", "bucketed_cs01", "bucketed_dv01"] {

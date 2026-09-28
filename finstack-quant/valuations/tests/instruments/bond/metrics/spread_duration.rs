@@ -51,7 +51,7 @@ fn bullet_5y(credit: bool) -> (Bond, MarketContext) {
 
     if credit {
         bond.credit_curve_id = Some(CurveId::new("USD-CREDIT"));
-        let hazard = crate::test_support::credit::calibrated_hazard_curve(
+        let hazard = crate::instruments::test_support::credit::calibrated_hazard_curve(
             &market,
             as_of,
             "USD-CREDIT",
@@ -85,7 +85,7 @@ fn priced(credit: bool) -> SpreadMetrics {
                 credit_risk_metric.clone(),
                 MetricId::SpreadDuration,
             ],
-            crate::test_support::credit::pricing_options(),
+            crate::instruments::test_support::credit::pricing_options(),
         )
         .expect("bond must emit spread_duration");
     let duration_mod = *result

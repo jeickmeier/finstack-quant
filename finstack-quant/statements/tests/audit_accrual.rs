@@ -33,8 +33,7 @@ use indexmap::IndexMap;
 use std::sync::Arc;
 use time::Month;
 
-#[path = "support/period_flows.rs"]
-mod support;
+use crate::dsl_all::support;
 
 /// Verify accrued interest accumulation and reset for a semi-annual bond.
 ///

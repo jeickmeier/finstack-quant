@@ -15,7 +15,7 @@
 //!   CDR by month 120, constant thereafter
 //! - MDR (Monthly Default Rate) follows similar conversion to SMM
 
-use crate::helpers::{FACTOR_TOLERANCE, RATE_TOLERANCE};
+use crate::cashflows::helpers::{FACTOR_TOLERANCE, RATE_TOLERANCE};
 
 // PSA Golden Values
 

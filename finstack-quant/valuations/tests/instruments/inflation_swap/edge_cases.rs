@@ -1,6 +1,6 @@
 //! Edge case and boundary condition tests for InflationSwap.
 
-use crate::inflation_swap::fixtures::*;
+use crate::instruments::inflation_swap::fixtures::*;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DayCount};
 use finstack_quant_core::money::Money;

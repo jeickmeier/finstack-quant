@@ -1,6 +1,6 @@
 //! Carry decomposition under a calibrated `CreditFactorModel`.
 
-use crate::attribution_support::calibrated_hazard_curve;
+use crate::attribution::attribution_support::calibrated_hazard_curve;
 use finstack_quant_attribution::{
     AttributionConfig, AttributionEnvelope, AttributionMethod, AttributionSpec,
     CreditFactorDetailOptions, PnlAttribution,

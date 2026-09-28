@@ -33,11 +33,11 @@ mise run goldens-test
 mise run goldens-test-strict
 
 # Rust layer only
-cargo nextest run -p finstack-quant-valuations --test golden --run-ignored all
+cargo nextest run -p finstack-quant-valuations --test valuations golden --run-ignored all
 
 # One fixture or one subtree
 GOLDEN_FIXTURE_FILTER=usd_sofr_5y \
-  cargo nextest run -p finstack-quant-valuations --test golden --run-ignored all
+  cargo nextest run -p finstack-quant-valuations --test valuations golden --run-ignored all
 ```
 
 `GOLDEN_FIXTURE_FILTER` is a plain substring match against each fixture's path.

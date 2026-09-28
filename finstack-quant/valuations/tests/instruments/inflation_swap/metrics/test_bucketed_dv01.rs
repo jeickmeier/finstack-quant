@@ -1,6 +1,6 @@
 //! Bucketed DV01 metric tests for InflationSwap.
 
-use crate::inflation_swap::fixtures::*;
+use crate::instruments::inflation_swap::fixtures::*;
 use finstack_quant_core::dates::{Date, DayCount};
 use finstack_quant_valuations::instruments::rates::inflation_swap::InflationSwapBuilder;
 use finstack_quant_valuations::instruments::Instrument;

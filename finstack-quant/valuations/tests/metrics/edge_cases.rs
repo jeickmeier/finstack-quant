@@ -7,8 +7,8 @@
 //! - Zero notional
 //! - Extreme moneyness (deep ITM/OTM)
 
-use crate::common::{simple_option_market, test_option, tolerances};
-use crate::credit_support as test_utils;
+use crate::metrics::common::{simple_option_market, test_option, tolerances};
+use crate::metrics::credit_support as test_utils;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DayCount};
 use finstack_quant_core::market_data::context::MarketContext;
