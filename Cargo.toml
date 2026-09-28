@@ -77,7 +77,9 @@ arrow = { version = "57", default-features = false }
 [profile.dev]
 # Standard development profile (cargo-llvm-cov will override these for coverage runs)
 incremental = true
-opt-level = 0
+# opt-level 1 keeps the Python cdylib's __eh_frame under the 16 MB compact-unwind
+# limit (ld warns at opt-level 0).
+opt-level = 1
 debug = 1
 
 [profile.test]
