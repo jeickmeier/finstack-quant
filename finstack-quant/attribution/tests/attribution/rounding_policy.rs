@@ -1,6 +1,6 @@
 //! Tests for rounding policy stamping and display in attribution.
 
-use crate::attribution_support::TestInstrument;
+use crate::attribution::attribution_support::TestInstrument;
 use finstack_quant_attribution::{
     attribute_pnl, AttributionMethod, AttributionRequest, ExecutionPolicy, PnlAttribution,
 };
