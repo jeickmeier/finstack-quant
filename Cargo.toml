@@ -83,8 +83,10 @@ debug = 1
 [profile.test]
 # Standard test profile
 # Reduced debug level for faster compilation (line info only, no full debug symbols)
+# opt-level 1 keeps clean `rust-test` in the same band as opt-level 0 and cuts a
+# warm rerun from about 136s to 37s on this workspace.
 incremental = true
-opt-level = 0
+opt-level = 1
 debug = 1
 
 [profile.release]
