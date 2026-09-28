@@ -100,14 +100,14 @@ that justifies it. Full external-reference fixtures belong in
 
 ```bash
 # Everything in the instruments binary, including this module
-cargo nextest run -p finstack-quant-valuations --test instruments
+cargo nextest run -p finstack-quant-valuations --test valuations instruments
 
 # Just this module
-cargo nextest run -p finstack-quant-valuations --test instruments common::
+cargo nextest run -p finstack-quant-valuations --test valuations instruments::common::
 
 # One area
-cargo nextest run -p finstack-quant-valuations --test instruments common::pricer::
-cargo nextest run -p finstack-quant-valuations --test instruments common::test_rates_credit_tree::
+cargo nextest run -p finstack-quant-valuations --test valuations instruments::common::pricer::
+cargo nextest run -p finstack-quant-valuations --test valuations instruments::common::test_rates_credit_tree::
 ```
 
 Nothing in this module is `#[ignore]`d; it all runs on the default path.

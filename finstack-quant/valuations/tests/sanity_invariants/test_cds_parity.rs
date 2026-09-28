@@ -10,7 +10,7 @@
 //! 2. CS01 ≈ risky_annuity × 1bp
 //! 3. Buy protection + sell protection = 0 (at same spread)
 
-use crate::credit_support;
+use crate::sanity_invariants::credit_support;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;

@@ -9,6 +9,8 @@ authors.workspace = true
 description = "Instrument pricing, cashflows, and risk for Finstack Quant: fixed income, derivatives, structured credit, Monte Carlo, and PDE/tree methods"
 autobenches = false
 
+autotests = false
+
 [dependencies]
 finstack-quant-core = { path = "../core", version = "0.9.0", default-features = false }
 finstack-quant-cashflows = { path = "../cashflows", version = "0.9.0", default-features = false }
@@ -201,3 +203,8 @@ required-features = ["json-schema"]
 
 [lints]
 workspace = true
+
+# Consolidated integration tests
+[[test]]
+name = "valuations"
+path = "tests/main.rs"

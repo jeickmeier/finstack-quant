@@ -21,7 +21,7 @@ pub const DEFAULT_NOTIONAL: f64 = 1_000_000.0;
 pub const DEFAULT_STRIKE_VAR: f64 = 0.04; // 20% vol => 0.04 variance
 
 // Re-export the canonical date helper from shared test utilities.
-pub use crate::test_support::date::date;
+pub use crate::instruments::test_support::date::date;
 
 /// Default start and end dates for test swaps.
 pub fn default_dates() -> (Date, Date) {

@@ -14,7 +14,7 @@ use finstack_quant_valuations::instruments::{Instrument, InstrumentPricingOverri
 use finstack_quant_valuations::metrics::MetricId;
 use time::macros::date;
 
-use crate::common::test_helpers::flat_discount_curve;
+use crate::instruments::common::test_helpers::flat_discount_curve;
 
 #[test]
 fn test_ytw_is_minimum_of_ytm_and_ytc() {

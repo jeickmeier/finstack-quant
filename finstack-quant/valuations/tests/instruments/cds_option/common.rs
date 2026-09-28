@@ -94,8 +94,8 @@ pub fn replayable_standard_market(as_of: Date) -> MarketContext {
         (as_of.add_months(60), 500.0),
         (as_of.add_months(120), 500.0),
     ];
-    let hazard = crate::test_support::credit::calibrated_hazard_curve_from_spec(
-        crate::test_support::credit::CalibratedHazardSpec {
+    let hazard = crate::instruments::test_support::credit::calibrated_hazard_curve_from_spec(
+        crate::instruments::test_support::credit::CalibratedHazardSpec {
             source_market: &source,
             base_date: as_of,
             curve_id: "HZ-SN",

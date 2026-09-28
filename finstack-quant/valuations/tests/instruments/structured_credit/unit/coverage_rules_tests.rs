@@ -24,7 +24,7 @@ use time::macros::date;
 use time::Month;
 
 use super::instrument_pool_tests::{deal_with, DealSpec};
-use crate::common::test_helpers::flat_discount_curve;
+use crate::instruments::common::test_helpers::flat_discount_curve;
 
 fn d(y: i32, m: u8, day: u8) -> Date {
     Date::from_calendar_date(y, Month::try_from(m).expect("month"), day).expect("date")

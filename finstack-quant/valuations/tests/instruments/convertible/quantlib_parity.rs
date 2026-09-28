@@ -16,7 +16,7 @@
 //! Note: QuantLib uses tree-based pricing engines (Binomial or Trinomial) for convertibles
 //! to properly capture the embedded equity option and early exercise features.
 
-use crate::parity::ParityConfig;
+use crate::instruments::parity::ParityConfig;
 use finstack_quant_cashflows::builder::specs::{CouponType, FixedCouponSpec};
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{BusinessDayConvention, Date, DayCount, StubKind, Tenor};

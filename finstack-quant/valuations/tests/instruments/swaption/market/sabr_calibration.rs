@@ -1,6 +1,6 @@
 //! SABR calibration and smile tests
 
-use crate::swaption::common::*;
+use crate::instruments::swaption::common::*;
 use finstack_quant_models::volatility::SabrParameters;
 use finstack_quant_valuations::instruments::Instrument;
 

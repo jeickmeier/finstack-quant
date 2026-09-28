@@ -43,7 +43,7 @@ fn calibrated_cds_market(as_of: Date) -> MarketContext {
         .build()
         .unwrap();
     let source = MarketContext::new().insert(disc_curve);
-    let hazard = crate::credit_support::calibrated_hazard_curve(
+    let hazard = crate::metrics::credit_support::calibrated_hazard_curve(
         &source,
         as_of,
         "HAZARD",
@@ -504,7 +504,7 @@ fn test_cds_cs01_protection_buyer_positive() {
     // This is the market-standard directional sign convention.
     let as_of = date!(2025 - 01 - 01);
 
-    let cds = crate::credit_support::cds_buy_protection(
+    let cds = crate::metrics::credit_support::cds_buy_protection(
         "CS01_BUY_TEST",
         Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         200.0, // 200bp spread
@@ -522,7 +522,7 @@ fn test_cds_cs01_protection_buyer_positive() {
             &market,
             as_of,
             &[MetricId::Cs01],
-            crate::credit_support::pricing_options(),
+            crate::metrics::credit_support::pricing_options(),
         )
         .unwrap();
     let cs01 = result.measures[MetricId::Cs01.as_str()];
@@ -542,7 +542,7 @@ fn test_cds_cs01_protection_seller_negative() {
     // This validates that CS01 sign correctly reflects position direction.
     let as_of = date!(2025 - 01 - 01);
 
-    let cds = crate::credit_support::cds_sell_protection(
+    let cds = crate::metrics::credit_support::cds_sell_protection(
         "CS01_SELL_TEST",
         Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         200.0, // 200bp spread
@@ -560,7 +560,7 @@ fn test_cds_cs01_protection_seller_negative() {
             &market,
             as_of,
             &[MetricId::Cs01],
-            crate::credit_support::pricing_options(),
+            crate::metrics::credit_support::pricing_options(),
         )
         .unwrap();
     let cs01 = result.measures[MetricId::Cs01.as_str()];
@@ -579,7 +579,7 @@ fn test_cds_cs01_opposite_signs() {
     // This is a fundamental property: they are opposite positions.
     let as_of = date!(2025 - 01 - 01);
 
-    let cds_buy = crate::credit_support::cds_buy_protection(
+    let cds_buy = crate::metrics::credit_support::cds_buy_protection(
         "CS01_BUY",
         Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         200.0,
@@ -590,7 +590,7 @@ fn test_cds_cs01_opposite_signs() {
     )
     .expect("CDS construction should succeed");
 
-    let cds_sell = crate::credit_support::cds_sell_protection(
+    let cds_sell = crate::metrics::credit_support::cds_sell_protection(
         "CS01_SELL",
         Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         200.0,
@@ -609,7 +609,7 @@ fn test_cds_cs01_opposite_signs() {
             &market,
             as_of,
             &[MetricId::Cs01],
-            crate::credit_support::pricing_options(),
+            crate::metrics::credit_support::pricing_options(),
         )
         .unwrap();
     let cs01_buy = results_buy.measures[MetricId::Cs01.as_str()];
@@ -620,7 +620,7 @@ fn test_cds_cs01_opposite_signs() {
             &market,
             as_of,
             &[MetricId::Cs01],
-            crate::credit_support::pricing_options(),
+            crate::metrics::credit_support::pricing_options(),
         )
         .unwrap();
     let cs01_sell = results_sell.measures[MetricId::Cs01.as_str()];

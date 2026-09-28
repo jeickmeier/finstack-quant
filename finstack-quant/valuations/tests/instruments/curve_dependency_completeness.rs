@@ -8,7 +8,7 @@
 //! This helps prevent silent failures where an instrument accesses curves
 //! that weren't declared as dependencies.
 
-use crate::test_support::credit as test_utils;
+use crate::instruments::test_support::credit as test_utils;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{DateExt, DayCount, Tenor};
 use finstack_quant_core::market_data::context::MarketContext;

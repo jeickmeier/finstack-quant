@@ -30,7 +30,7 @@ fn test_risky_pv01_positive() {
             &ctx,
             as_of,
             &[MetricId::RiskyPv01],
-            crate::test_support::credit::pricing_options(),
+            crate::instruments::test_support::credit::pricing_options(),
         )
         .unwrap();
     let rpv01 = *result.measures.get("risky_pv01").unwrap();
@@ -54,7 +54,7 @@ fn test_cs01_positive() {
             &ctx,
             as_of,
             &[MetricId::Cs01],
-            crate::test_support::credit::pricing_options(),
+            crate::instruments::test_support::credit::pricing_options(),
         )
         .unwrap();
     let cs01 = *result.measures.get("cs01").unwrap();
@@ -77,7 +77,7 @@ fn test_dv01_calculation() {
             &ctx,
             as_of,
             &[MetricId::Dv01],
-            crate::test_support::credit::pricing_options(),
+            crate::instruments::test_support::credit::pricing_options(),
         )
         .unwrap();
     let dv01 = *result.measures.get("dv01").unwrap();
@@ -102,7 +102,7 @@ fn test_dv01_scales_with_notional() {
             &ctx,
             as_of,
             &[MetricId::Dv01],
-            crate::test_support::credit::pricing_options(),
+            crate::instruments::test_support::credit::pricing_options(),
         )
         .unwrap();
     let result_20mm = idx_20mm
@@ -110,7 +110,7 @@ fn test_dv01_scales_with_notional() {
             &ctx,
             as_of,
             &[MetricId::Dv01],
-            crate::test_support::credit::pricing_options(),
+            crate::instruments::test_support::credit::pricing_options(),
         )
         .unwrap();
 
@@ -142,7 +142,7 @@ fn test_cs01_increases_with_maturity() {
             &ctx,
             as_of,
             &[MetricId::Cs01],
-            crate::test_support::credit::pricing_options(),
+            crate::instruments::test_support::credit::pricing_options(),
         )
         .unwrap();
     let result_5y = idx_5y
@@ -150,7 +150,7 @@ fn test_cs01_increases_with_maturity() {
             &ctx,
             as_of,
             &[MetricId::Cs01],
-            crate::test_support::credit::pricing_options(),
+            crate::instruments::test_support::credit::pricing_options(),
         )
         .unwrap();
 
@@ -208,7 +208,7 @@ fn test_risky_pv01_single_vs_constituents() {
             &ctx,
             as_of,
             &[MetricId::RiskyPv01],
-            crate::test_support::credit::pricing_options(),
+            crate::instruments::test_support::credit::pricing_options(),
         )
         .unwrap();
     let result_const = idx_const
@@ -216,7 +216,7 @@ fn test_risky_pv01_single_vs_constituents() {
             &ctx,
             as_of,
             &[MetricId::RiskyPv01],
-            crate::test_support::credit::pricing_options(),
+            crate::instruments::test_support::credit::pricing_options(),
         )
         .unwrap();
 
@@ -248,7 +248,7 @@ fn test_cs01_single_vs_constituents() {
             &ctx,
             as_of,
             &[MetricId::Cs01],
-            crate::test_support::credit::pricing_options(),
+            crate::instruments::test_support::credit::pricing_options(),
         )
         .unwrap();
     let result_const = idx_const
@@ -256,7 +256,7 @@ fn test_cs01_single_vs_constituents() {
             &ctx,
             as_of,
             &[MetricId::Cs01],
-            crate::test_support::credit::pricing_options(),
+            crate::instruments::test_support::credit::pricing_options(),
         )
         .unwrap();
 
@@ -282,7 +282,7 @@ fn test_bucketed_cs01_requires_replay_recipe() {
             &ctx,
             as_of,
             &[MetricId::Cs01, MetricId::BucketedCs01],
-            crate::test_support::credit::pricing_options(),
+            crate::instruments::test_support::credit::pricing_options(),
         )
         .expect_err("standard CDS index CS01 requires quote-space replay");
     assert!(error.to_string().contains("calibration recipe"));
@@ -294,7 +294,7 @@ fn bucketed_cs01_quote_single_curve_uses_each_off_grid_replay_quote_once() {
     let as_of = date!(2025 - 01 - 01);
     let end = date!(2030 - 01 - 01);
     let source = MarketContext::new().insert(flat_discount_curve("USD-OIS", as_of, 0.03));
-    let hazard = crate::test_support::credit::calibrated_hazard_curve_with_pillars(
+    let hazard = crate::instruments::test_support::credit::calibrated_hazard_curve_with_pillars(
         &source,
         as_of,
         "HZ-INDEX",
@@ -322,7 +322,7 @@ fn bucketed_cs01_quote_single_curve_uses_each_off_grid_replay_quote_once() {
             &market,
             as_of,
             &[MetricId::Cs01, MetricId::BucketedCs01],
-            crate::test_support::credit::pricing_options(),
+            crate::instruments::test_support::credit::pricing_options(),
         )
         .expect("single-curve quote-space bucketed CS01");
     let prefix = "bucketed_cs01::HZ-INDEX::";
@@ -358,7 +358,7 @@ fn bucketed_cs01_quote_constituents_use_each_off_grid_replay_quote_once() {
     let as_of = date!(2025 - 01 - 01);
     let end = date!(2030 - 01 - 01);
     let source = MarketContext::new().insert(flat_discount_curve("USD-OIS", as_of, 0.03));
-    let hz1 = crate::test_support::credit::calibrated_hazard_curve_with_pillars(
+    let hz1 = crate::instruments::test_support::credit::calibrated_hazard_curve_with_pillars(
         &source,
         as_of,
         "HZ1",
@@ -373,7 +373,7 @@ fn bucketed_cs01_quote_constituents_use_each_off_grid_replay_quote_once() {
         ],
     )
     .expect("first off-grid constituent hazard calibration");
-    let hz2 = crate::test_support::credit::calibrated_hazard_curve_with_pillars(
+    let hz2 = crate::instruments::test_support::credit::calibrated_hazard_curve_with_pillars(
         &source,
         as_of,
         "HZ2",
@@ -406,7 +406,7 @@ fn bucketed_cs01_quote_constituents_use_each_off_grid_replay_quote_once() {
             &market,
             as_of,
             &[MetricId::Cs01, MetricId::BucketedCs01],
-            crate::test_support::credit::pricing_options(),
+            crate::instruments::test_support::credit::pricing_options(),
         )
         .expect("constituent quote-space bucketed CS01");
     let curve_buckets = |curve_id: &str| {
@@ -459,7 +459,7 @@ fn test_bucketed_cs01_reconciles_to_parallel_constituents() {
             &ctx,
             as_of,
             &[MetricId::Cs01, MetricId::BucketedCs01],
-            crate::test_support::credit::pricing_options(),
+            crate::instruments::test_support::credit::pricing_options(),
         )
         .unwrap();
 
@@ -510,7 +510,7 @@ fn test_all_risk_metrics_together() {
             &ctx,
             as_of,
             &metrics,
-            crate::test_support::credit::pricing_options(),
+            crate::instruments::test_support::credit::pricing_options(),
         )
         .unwrap();
 
@@ -534,7 +534,7 @@ fn test_dv01_reasonable_magnitude() {
             &ctx,
             as_of,
             &[MetricId::Dv01],
-            crate::test_support::credit::pricing_options(),
+            crate::instruments::test_support::credit::pricing_options(),
         )
         .unwrap();
     let dv01 = *result.measures.get("dv01").unwrap();
@@ -565,7 +565,7 @@ fn test_risk_metrics_finite() {
             &ctx,
             as_of,
             &metrics,
-            crate::test_support::credit::pricing_options(),
+            crate::instruments::test_support::credit::pricing_options(),
         )
         .unwrap();
 
@@ -596,7 +596,7 @@ fn test_recovery01_finite_and_nonzero() {
             &ctx,
             as_of,
             &[MetricId::Recovery01],
-            crate::test_support::credit::pricing_options(),
+            crate::instruments::test_support::credit::pricing_options(),
         )
         .unwrap();
     let recovery01 = *result.measures.get("recovery_01").unwrap();
@@ -628,7 +628,7 @@ fn test_recovery01_scales_with_notional() {
             &ctx,
             as_of,
             &[MetricId::Recovery01],
-            crate::test_support::credit::pricing_options(),
+            crate::instruments::test_support::credit::pricing_options(),
         )
         .unwrap()
         .measures
@@ -639,7 +639,7 @@ fn test_recovery01_scales_with_notional() {
             &ctx,
             as_of,
             &[MetricId::Recovery01],
-            crate::test_support::credit::pricing_options(),
+            crate::instruments::test_support::credit::pricing_options(),
         )
         .unwrap()
         .measures

@@ -30,7 +30,7 @@
   - `mise run rust-fix-crate -- <package>` — clippy --fix for one crate
   - `mise run rust-fix` — clippy --fix for the workspace
   - `mise run rust-test-crate -- <package>` — lib + integration tests for one crate
-  - `mise run rust-test-integration -- <package> <test>` — one integration binary (e.g. `instruments`)
+  - `mise run rust-test-integration -- <package> <test>` — one integration binary (e.g. `valuations`)
   - `mise run rust-test-filter -- <package> <filter>` — tests matching a name
   - `mise run rust-bench-crate -- <package> <bench>` — one Criterion target
   - Path → package mapping lives in `.agents/rules/selective-test-running.mdc`

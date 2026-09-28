@@ -146,19 +146,19 @@ target.
 
 ```bash
 # Whole instruments target
-cargo nextest run -p finstack-quant-valuations --test instruments
+cargo nextest run -p finstack-quant-valuations --test valuations instruments
 
 # One instrument
-cargo nextest run -p finstack-quant-valuations --test instruments bond::
-cargo nextest run -p finstack-quant-valuations --test instruments irs::
-cargo nextest run -p finstack-quant-valuations --test instruments structured_credit::
+cargo nextest run -p finstack-quant-valuations --test valuations instruments::bond::
+cargo nextest run -p finstack-quant-valuations --test valuations instruments::irs::
+cargo nextest run -p finstack-quant-valuations --test valuations instruments::structured_credit::
 
 # One file or one metric
-cargo nextest run -p finstack-quant-valuations --test instruments bond::pricing::
-cargo nextest run -p finstack-quant-valuations --test instruments bond::metrics::ytm::
+cargo nextest run -p finstack-quant-valuations --test valuations instruments::bond::pricing::
+cargo nextest run -p finstack-quant-valuations --test valuations instruments::bond::metrics::ytm::
 
 # Contract tests only
-cargo nextest run -p finstack-quant-valuations --test instruments registry_coverage::
+cargo nextest run -p finstack-quant-valuations --test valuations instruments::registry_coverage::
 ```
 
 ### Slow tests
@@ -173,7 +173,7 @@ round-trip.
 
 ```bash
 mise run rust-test-slow   # workspace-wide, ignored tests only
-cargo nextest run -p finstack-quant-valuations --test instruments --run-ignored only
+cargo nextest run -p finstack-quant-valuations --test valuations instruments --run-ignored only
 ```
 
 ## Contributing

@@ -855,7 +855,7 @@ stay dict / JSON sub-fields in Python and everything stays JSON in WASM.
 
 ```bash
 # Structured-credit unit, feature, waterfall-golden and simulation tests
-cargo nextest run -p finstack-quant-valuations --test instruments structured_credit::
+cargo nextest run -p finstack-quant-valuations --test valuations instruments::structured_credit::
 
 # Whole workspace (never `cargo test` — it runs doctests)
 mise run rust-test

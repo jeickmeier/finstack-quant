@@ -16,8 +16,8 @@ use finstack_quant_valuations::instruments::{Instrument, PricingOptions};
 use finstack_quant_valuations::metrics::MetricId;
 use time::macros::date;
 
-use crate::common::test_helpers::{flat_discount_curve, flat_forward_curve};
-use crate::revolving_credit::draw_option_cost::floating_spec;
+use crate::instruments::common::test_helpers::{flat_discount_curve, flat_forward_curve};
+use crate::instruments::revolving_credit::draw_option_cost::floating_spec;
 
 const AS_OF: Date = date!(2024 - 01 - 15);
 

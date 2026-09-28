@@ -45,7 +45,7 @@ fn build_market(as_of: time::Date) -> MarketContext {
         .build()
         .expect("discount curve should build");
     let source = MarketContext::new().insert(disc);
-    let hazard = crate::test_support::credit::calibrated_hazard_curve(
+    let hazard = crate::instruments::test_support::credit::calibrated_hazard_curve(
         &source,
         as_of,
         "USD-CREDIT",
@@ -68,7 +68,7 @@ fn test_quoted_credit_bond_cs01_nonzero_and_matches_unquoted() {
             &market,
             as_of,
             &[MetricId::Cs01, MetricId::CleanPrice],
-            crate::test_support::credit::pricing_options(),
+            crate::instruments::test_support::credit::pricing_options(),
         )
         .expect("unquoted credit bond should price");
     let base_cs01 = *base.measures.get("cs01").unwrap();
@@ -87,7 +87,7 @@ fn test_quoted_credit_bond_cs01_nonzero_and_matches_unquoted() {
             &market,
             as_of,
             &[MetricId::Cs01, MetricId::BucketedCs01],
-            crate::test_support::credit::pricing_options(),
+            crate::instruments::test_support::credit::pricing_options(),
         )
         .expect("quoted credit bond should price");
 
@@ -140,7 +140,7 @@ fn test_quoted_credit_bond_offmodel_changes_cs01() {
                 &market,
                 as_of,
                 &[MetricId::Cs01],
-                crate::test_support::credit::pricing_options(),
+                crate::instruments::test_support::credit::pricing_options(),
             )
             .unwrap();
         *r.measures.get("cs01").unwrap()
@@ -181,7 +181,7 @@ fn test_quoted_credit_bond_quote_space_cs01_preserves_hazard_replay() {
             &market,
             as_of,
             &[MetricId::Cs01, MetricId::BucketedCs01],
-            crate::test_support::credit::pricing_options(),
+            crate::instruments::test_support::credit::pricing_options(),
         )
         .expect("quote-space CS01 should replay the calibrated hazard curve");
 

@@ -39,7 +39,7 @@ use finstack_quant_valuations::instruments::PayReceive;
 use time::Month;
 
 use super::instrument_pool_tests::market_with_curves;
-use crate::test_support::rates::usd_irs_swap;
+use crate::instruments::test_support::rates::usd_irs_swap;
 
 fn ymd(y: i32, m: u8, day: u8) -> Date {
     Date::from_calendar_date(y, Month::try_from(m).expect("month"), day).expect("date")

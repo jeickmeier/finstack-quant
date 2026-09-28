@@ -1,7 +1,7 @@
 //! Fixture execution and comparison reporting.
 
-use crate::golden::schema::GoldenFixture;
-use crate::golden::tolerance::{compare, ComparisonResult};
+use crate::golden::golden::schema::GoldenFixture;
+use crate::golden::golden::tolerance::{compare, ComparisonResult};
 use std::fs::OpenOptions;
 use std::io::ErrorKind;
 use std::path::{Path, PathBuf};
@@ -52,7 +52,7 @@ fn is_pricing_domain(domain: &str) -> bool {
 pub fn run_fixture(fixture: &GoldenFixture) -> Result<Vec<ComparisonResult>, String> {
     let domain = fixture.metadata.domain.as_str();
     let actuals = if is_pricing_domain(domain) {
-        crate::golden::pricing_common::run_pricing_fixture(fixture)?
+        crate::golden::golden::pricing_common::run_pricing_fixture(fixture)?
     } else {
         return Err(format!("no runner registered for domain '{domain}'"));
     };
@@ -75,7 +75,7 @@ pub fn run_fixture(fixture: &GoldenFixture) -> Result<Vec<ComparisonResult>, Str
 
 /// Run one golden fixture from disk, write a CSV comparison report, and return failures.
 pub fn run_golden_at_path(path: &Path) -> Result<Vec<ComparisonResult>, String> {
-    crate::golden::walk::validate_fixture(path)
+    crate::golden::golden::walk::validate_fixture(path)
         .map_err(|err| format!("validate fixture {path:?}: {err}"))?;
     let raw =
         std::fs::read_to_string(path).map_err(|err| format!("read fixture {path:?}: {err}"))?;

@@ -19,7 +19,7 @@ mod serde_skip_guard;
 
 #[path = "support/mod.rs"]
 #[allow(dead_code, unused_imports)]
-mod test_support;
+pub(crate) mod test_support;
 
 // Re-export parity helpers for explicit imports and macro expansion.
 pub use common::parity;

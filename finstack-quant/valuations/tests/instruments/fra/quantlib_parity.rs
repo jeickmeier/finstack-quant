@@ -27,7 +27,7 @@
 //! 4. **testFRAconsistency**: Consistency across different strikes
 //! 5. **testFRAbuySell**: Buy/sell symmetry
 
-use crate::parity::ParityConfig;
+use crate::instruments::parity::ParityConfig;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DateExt, DayCount, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;

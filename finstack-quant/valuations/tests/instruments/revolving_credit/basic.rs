@@ -212,7 +212,7 @@ fn test_revolving_credit_standard_metrics() {
     let disc_curve = build_flat_discount_curve(0.04, val_date, "USD-OIS");
 
     let source = MarketContext::new().insert(disc_curve);
-    let hazard_curve = crate::test_support::credit::calibrated_hazard_curve(
+    let hazard_curve = crate::instruments::test_support::credit::calibrated_hazard_curve(
         &source,
         val_date,
         "BORROWER-A",
@@ -233,7 +233,7 @@ fn test_revolving_credit_standard_metrics() {
                 MetricId::BucketedCs01,
                 MetricId::Theta,
             ],
-            crate::test_support::credit::pricing_options(),
+            crate::instruments::test_support::credit::pricing_options(),
         )
         .unwrap();
 

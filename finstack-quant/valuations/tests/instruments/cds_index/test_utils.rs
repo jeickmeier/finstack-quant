@@ -56,7 +56,7 @@ pub fn standard_market_context(base: Date) -> MarketContext {
 /// Create a standard single-curve market with replayable CDS par quotes.
 pub fn replayable_standard_market_context(base: Date) -> MarketContext {
     let source = MarketContext::new().insert(flat_discount_curve("USD-OIS", base, 0.03));
-    let hazard = crate::test_support::credit::calibrated_hazard_curve(
+    let hazard = crate::instruments::test_support::credit::calibrated_hazard_curve(
         &source, base, "HZ-INDEX", "INDEX", "USD-OIS",
     )
     .expect("index hazard calibration should succeed");
@@ -96,7 +96,7 @@ pub fn replayable_multi_constituent_market_context(
     for index in 1..=num_constituents {
         let hazard_id = format!("HZ{index}");
         let entity = format!("NAME{index}");
-        let hazard = crate::test_support::credit::calibrated_hazard_curve(
+        let hazard = crate::instruments::test_support::credit::calibrated_hazard_curve(
             &market,
             base,
             hazard_id.as_str(),
@@ -107,7 +107,7 @@ pub fn replayable_multi_constituent_market_context(
         market = market.insert(hazard);
     }
 
-    let index_hazard = crate::test_support::credit::calibrated_hazard_curve(
+    let index_hazard = crate::instruments::test_support::credit::calibrated_hazard_curve(
         &market, base, "HZ-INDEX", "INDEX", "USD-OIS",
     )
     .expect("index hazard calibration should succeed");

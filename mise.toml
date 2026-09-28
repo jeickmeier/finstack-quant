@@ -67,7 +67,7 @@ run = [
 [tasks.goldens-test]
 description = "Run golden tests (Rust + Python layers)"
 run = """
-cargo test -p finstack-quant-valuations --test golden -- --include-ignored &&
+cargo test -p finstack-quant-valuations --test valuations golden -- --include-ignored &&
 mise run python-build &&
 uv run --no-sync pytest finstack-quant-py/tests/golden -v
 """
@@ -76,7 +76,7 @@ uv run --no-sync pytest finstack-quant-py/tests/golden -v
 description = "Run golden tests ignoring known_non_executable.json (surface every failure)"
 env = { GOLDEN_IGNORE_NON_EXECUTABLE = "1" }
 run = """
-cargo test -p finstack-quant-valuations --test golden -- --include-ignored &&
+cargo test -p finstack-quant-valuations --test valuations golden -- --include-ignored &&
 mise run python-build &&
 uv run --no-sync pytest finstack-quant-py/tests/golden -v
 """
@@ -174,7 +174,7 @@ fi
 description = "Run one integration test binary in a crate"
 usage = '''
 arg "<package>" help="Cargo package (e.g. finstack-quant-valuations)"
-arg "<test>" help="Integration test name without .rs (e.g. instruments, golden)"
+arg "<test>" help="Integration test binary (e.g. valuations, portfolio)"
 flag "--slow" help="Include ignored/slow tests"
 '''
 run = '''
@@ -742,9 +742,9 @@ run = [
   "cargo test -p finstack-quant-statements --test schema_contract --no-fail-fast",
   "cargo test -p finstack-quant-scenarios --test schema_contract --no-fail-fast",
   "cargo test -p finstack-quant-models --test factor_schema_contract --no-fail-fast",
-  "cargo test -p finstack-quant-valuations --test integration schema_parity --no-fail-fast",
+  "cargo test -p finstack-quant-valuations --test valuations schema_parity --no-fail-fast",
   "cargo test -p finstack-quant-valuations --lib test_instrument_schema_union_parity --no-fail-fast",
-  "cargo test -p finstack-quant-valuations --test schema_audit --no-fail-fast",
+  "cargo test -p finstack-quant-valuations --test valuations schema_audit --no-fail-fast",
 ]
 
 [tasks.rust-gen-schemas]

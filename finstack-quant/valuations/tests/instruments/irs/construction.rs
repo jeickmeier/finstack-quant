@@ -6,7 +6,7 @@
 //! - Convention-based construction
 //! - Edge cases and error handling
 
-use crate::test_support::rates as test_utils;
+use crate::instruments::test_support::rates as test_utils;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{BusinessDayConvention, DayCount, StubKind, Tenor};
 use finstack_quant_core::money::Money;

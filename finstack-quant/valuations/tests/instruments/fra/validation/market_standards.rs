@@ -6,7 +6,7 @@
 //! - Sign conventions (receive fixed vs pay fixed)
 //! - Forward rate calculation matching curve interpolation
 
-use crate::fra::common::*;
+use crate::instruments::fra::common::*;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::DayCount;
 use finstack_quant_core::prelude::MarketContext;

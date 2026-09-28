@@ -15,7 +15,7 @@ use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
 use time::macros::date;
 
 use super::instrument_pool_tests::{deal_with, DealSpec};
-use crate::revolving_credit::draw_option_cost::{
+use crate::instruments::revolving_credit::draw_option_cost::{
     market, revolver, widening_hazard_curve, HAZARD_ID,
 };
 

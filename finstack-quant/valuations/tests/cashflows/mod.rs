@@ -6,9 +6,9 @@
 
 pub(crate) mod helpers;
 
-#[path = "../support/rates.rs"]
-#[allow(dead_code, unused_imports)]
-pub(crate) mod rates_support;
+// Loaded once by `instruments::test_support`.
+#[allow(unused_imports)]
+pub(crate) use crate::instruments::test_support::rates as rates_support;
 
 mod bridge_smoke;
 mod instrument_bridge;

@@ -113,7 +113,7 @@ fn test_cs01_metric_via_price_with_metrics() {
         &market,
         as_of,
         &[MetricId::Cs01],
-        crate::test_support::credit::pricing_options(),
+        crate::instruments::test_support::credit::pricing_options(),
     );
 
     // Assert
@@ -142,7 +142,7 @@ fn test_parallel_cs01_reconciles_with_bucketed_cs01() {
             &market,
             as_of,
             &[MetricId::Cs01, MetricId::BucketedCs01],
-            crate::test_support::credit::pricing_options(),
+            crate::instruments::test_support::credit::pricing_options(),
         )
         .unwrap();
 
@@ -340,7 +340,7 @@ fn test_calculate_multiple_metrics_simultaneously() {
         &market,
         as_of,
         &metrics,
-        crate::test_support::credit::pricing_options(),
+        crate::instruments::test_support::credit::pricing_options(),
     );
 
     // Assert
@@ -390,7 +390,7 @@ fn test_all_standard_metrics_calculable() {
         &market,
         as_of,
         &all_metrics,
-        crate::test_support::credit::pricing_options(),
+        crate::instruments::test_support::credit::pricing_options(),
     );
 
     // Assert
@@ -471,7 +471,7 @@ fn test_metrics_order_independence() {
             &market,
             as_of,
             &metrics_order_1,
-            crate::test_support::credit::pricing_options(),
+            crate::instruments::test_support::credit::pricing_options(),
         )
         .unwrap();
     let result_2 = tranche
@@ -479,7 +479,7 @@ fn test_metrics_order_independence() {
             &market,
             as_of,
             &metrics_order_2,
-            crate::test_support::credit::pricing_options(),
+            crate::instruments::test_support::credit::pricing_options(),
         )
         .unwrap();
 
@@ -519,7 +519,7 @@ fn test_price_with_metrics_returns_pv_and_metrics() {
         &market,
         as_of,
         &metrics,
-        crate::test_support::credit::pricing_options(),
+        crate::instruments::test_support::credit::pricing_options(),
     );
 
     // Assert
@@ -712,7 +712,7 @@ mod production_credit_audit {
         let mut issuers = BTreeMap::new();
         for (id, spread) in [("ISSUER-A", 150.0), ("ISSUER-B", 500.0)] {
             let hazard = Arc::new(
-                crate::test_support::credit::calibrated_hazard_curve_with_pillars(
+                crate::instruments::test_support::credit::calibrated_hazard_curve_with_pillars(
                     &market,
                     base_date(),
                     id,
@@ -762,7 +762,7 @@ mod production_credit_audit {
                 &market,
                 base_date(),
                 &[MetricId::Cs01, MetricId::BucketedCs01],
-                crate::test_support::credit::pricing_options(),
+                crate::instruments::test_support::credit::pricing_options(),
             )
             .expect("metrics");
         let cs01 = *result.measures.get("cs01").expect("CS01");

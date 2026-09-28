@@ -3,7 +3,7 @@
 //! Theta measures the time decay of the FRA value - how much the
 //! PV changes as one day passes with all else held constant.
 
-use crate::fra::common::*;
+use crate::instruments::fra::common::*;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::metrics::MetricId;

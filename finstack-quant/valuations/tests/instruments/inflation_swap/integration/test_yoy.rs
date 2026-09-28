@@ -6,7 +6,7 @@
 //! mirror, notional linearity, the par-rate roundtrip (par fixed rate ⇒ zero
 //! PV), and the Inflation01 sensitivity.
 
-use crate::inflation_swap::fixtures::*;
+use crate::instruments::inflation_swap::fixtures::*;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{BusinessDayConvention, Date, DayCount, Tenor};
 use finstack_quant_core::market_data::context::MarketContext;

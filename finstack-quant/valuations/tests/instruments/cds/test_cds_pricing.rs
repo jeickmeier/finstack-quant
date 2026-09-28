@@ -3,7 +3,7 @@
 //! Tests core pricing logic including protection leg, premium leg,
 //! NPV calculations, par spreads, and schedule generation.
 
-use crate::test_support::credit as test_utils;
+use crate::instruments::test_support::credit as test_utils;
 use finstack_quant_cashflows::CashflowProvider;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DayCount};

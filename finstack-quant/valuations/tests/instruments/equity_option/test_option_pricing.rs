@@ -5,8 +5,8 @@
 //! against market standards (put-call parity, Greeks bounds).
 
 #[allow(unused_imports)]
-use crate::common::test_helpers::tolerances;
-use crate::test_support::equity_fx_options as test_utils;
+use crate::instruments::common::test_helpers::tolerances;
+use crate::instruments::test_support::equity_fx_options as test_utils;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;

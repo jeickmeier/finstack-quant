@@ -4,8 +4,8 @@
 //! multiple runs with the same inputs, and validates correctness against
 //! market standards.
 
-use crate::common::test_helpers::tolerances;
-use crate::test_support::rates as test_utils;
+use crate::instruments::common::test_helpers::tolerances;
+use crate::instruments::test_support::rates as test_utils;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;

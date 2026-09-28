@@ -75,7 +75,7 @@ mod cds_market_edge {
         let hazard = build_hazard_curve(0.02, 0.40, as_of, "CORP");
         let market = MarketContext::new().insert(disc).insert(hazard);
 
-        let mut buyer = crate::test_support::credit::cds_buy_protection(
+        let mut buyer = crate::instruments::test_support::credit::cds_buy_protection(
             "BUYER",
             Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
             100.0,
@@ -86,7 +86,7 @@ mod cds_market_edge {
         )
         .expect("CDS construction should succeed");
 
-        let mut seller = crate::test_support::credit::cds_sell_protection(
+        let mut seller = crate::instruments::test_support::credit::cds_sell_protection(
             "SELLER",
             Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
             100.0,
@@ -159,7 +159,7 @@ mod cds_market_edge {
             let hazard = build_hazard_curve(h, 0.40, as_of, "CORP");
             let market = MarketContext::new().insert(disc.clone()).insert(hazard);
 
-            let cds = crate::test_support::credit::cds_buy_protection(
+            let cds = crate::instruments::test_support::credit::cds_buy_protection(
                 "AOD_TEST",
                 Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
                 100.0,

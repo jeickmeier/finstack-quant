@@ -4,7 +4,7 @@
 
 use finstack_quant_valuations::instruments::OptionType;
 
-use crate::swaption::common::*;
+use crate::instruments::swaption::common::*;
 use finstack_quant_core::dates::DayCountContext;
 use finstack_quant_core::dates::{Tenor, TenorUnit};
 use finstack_quant_models::volatility::SabrParameters;

@@ -53,7 +53,7 @@ fn test_cs01_sell_protection_typically_positive() {
             &market,
             as_of,
             &[MetricId::Cs01],
-            crate::test_support::credit::pricing_options(),
+            crate::instruments::test_support::credit::pricing_options(),
         )
         .unwrap();
     let cs01 = *result.measures.get("cs01").unwrap();
@@ -79,7 +79,7 @@ fn test_cs01_buy_sell_opposite_sign() {
             &market,
             as_of,
             &[MetricId::Cs01],
-            crate::test_support::credit::pricing_options(),
+            crate::instruments::test_support::credit::pricing_options(),
         )
         .unwrap()
         .measures
@@ -91,7 +91,7 @@ fn test_cs01_buy_sell_opposite_sign() {
             &market,
             as_of,
             &[MetricId::Cs01],
-            crate::test_support::credit::pricing_options(),
+            crate::instruments::test_support::credit::pricing_options(),
         )
         .unwrap()
         .measures

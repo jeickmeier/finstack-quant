@@ -1,7 +1,9 @@
 //! Pricing tests for inflation caps/floors.
 
-use crate::inflation_swap::fixtures::{flat_discount, flat_inflation_curve, simple_index};
-use crate::test_support::volatility::flat_vol_surface;
+use crate::instruments::inflation_swap::fixtures::{
+    flat_discount, flat_inflation_curve, simple_index,
+};
+use crate::instruments::test_support::volatility::flat_vol_surface;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{
     BusinessDayConvention, Date, DayCount, DayCountContext, StubKind, Tenor, TenorUnit,
