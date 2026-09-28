@@ -37,7 +37,7 @@ impl MetricCalculator for IrConvexityCalculator {
         let as_of = context.as_of;
         let bump_bp = sens_config::from_context_or_default(
             context.get_config(),
-            context.get_metric_overrides(),
+            context.get_metric_pricing_overrides(),
         )?
         .rate_bump_bp;
 
@@ -119,7 +119,7 @@ impl MetricCalculator for CrossGammaCalculator {
         let as_of = context.as_of;
         let bump_bp = sens_config::from_context_or_default(
             context.get_config(),
-            context.get_metric_overrides(),
+            context.get_metric_pricing_overrides(),
         )?
         .rate_bump_bp;
 

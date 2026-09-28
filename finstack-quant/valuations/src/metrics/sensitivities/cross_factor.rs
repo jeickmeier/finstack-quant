@@ -316,8 +316,10 @@ pub(crate) fn make_rates_bumper(context: &MetricContext) -> Result<Option<Box<dy
         return Ok(None);
     }
 
-    let defaults =
-        sens_config::from_context_or_default(context.get_config(), context.get_metric_overrides())?;
+    let defaults = sens_config::from_context_or_default(
+        context.get_config(),
+        context.get_metric_pricing_overrides(),
+    )?;
     Ok(Some(Box::new(ParallelCurveBumper {
         curve_ids,
         bump_bp: defaults.rate_bump_bp,
@@ -332,8 +334,10 @@ pub(crate) fn make_credit_bumper(context: &MetricContext) -> Result<Option<Box<d
         return Ok(None);
     }
 
-    let defaults =
-        sens_config::from_context_or_default(context.get_config(), context.get_metric_overrides())?;
+    let defaults = sens_config::from_context_or_default(
+        context.get_config(),
+        context.get_metric_pricing_overrides(),
+    )?;
     Ok(Some(Box::new(ParallelCurveBumper {
         curve_ids: deps.curves.credit_curves.to_vec(),
         bump_bp: defaults.credit_spread_bump_bp,
@@ -365,8 +369,10 @@ pub(crate) fn make_vol_bumper(context: &MetricContext) -> Result<Option<Box<dyn 
         return Ok(None);
     }
 
-    let defaults =
-        sens_config::from_context_or_default(context.get_config(), context.get_metric_overrides())?;
+    let defaults = sens_config::from_context_or_default(
+        context.get_config(),
+        context.get_metric_pricing_overrides(),
+    )?;
     Ok(Some(Box::new(VolParallelBumper {
         vol_surface_ids,
         vol_scalar_ids,
@@ -382,8 +388,10 @@ pub(crate) fn make_spot_bumper(context: &MetricContext) -> Result<Option<Box<dyn
         return Ok(None);
     };
 
-    let defaults =
-        sens_config::from_context_or_default(context.get_config(), context.get_metric_overrides())?;
+    let defaults = sens_config::from_context_or_default(
+        context.get_config(),
+        context.get_metric_pricing_overrides(),
+    )?;
     Ok(Some(Box::new(SpotBumper {
         price_id: price_id.clone(),
         bump_pct: defaults.spot_bump_decimal,
@@ -397,8 +405,10 @@ pub(crate) fn make_fx_bumper(context: &MetricContext) -> Result<Option<Box<dyn F
         return Ok(None);
     }
 
-    let defaults =
-        sens_config::from_context_or_default(context.get_config(), context.get_metric_overrides())?;
+    let defaults = sens_config::from_context_or_default(
+        context.get_config(),
+        context.get_metric_pricing_overrides(),
+    )?;
     Ok(Some(Box::new(FxBumper {
         pairs: deps.fx_pairs,
         bump_pct: defaults.spot_bump_decimal,

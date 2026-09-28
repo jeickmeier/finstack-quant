@@ -82,7 +82,7 @@ impl MetricCalculator for CdsIndexBucketedCs01Calculator {
 
         let defaults = sens_config::from_context_or_default(
             context.get_config(),
-            context.get_metric_overrides(),
+            context.get_metric_pricing_overrides(),
         )?;
         let bump_bp = defaults.credit_spread_bump_bp;
 

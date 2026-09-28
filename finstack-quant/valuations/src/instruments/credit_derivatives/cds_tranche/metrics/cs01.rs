@@ -16,7 +16,7 @@ impl MetricCalculator for CdsTrancheCs01Calculator {
         let hazards = active_hazards(&index, true);
         let bump = sens_config::from_context_or_default(
             context.get_config(),
-            context.get_metric_overrides(),
+            context.get_metric_pricing_overrides(),
         )?
         .credit_spread_bump_bp;
         let provider = context.recalibration_provider("cs01")?;
@@ -69,7 +69,7 @@ impl MetricCalculator for CdsTrancheBucketedCs01Calculator {
         let hazards = active_hazards(&index, true);
         let bump = sens_config::from_context_or_default(
             context.get_config(),
-            context.get_metric_overrides(),
+            context.get_metric_pricing_overrides(),
         )?
         .credit_spread_bump_bp;
         let request = Cs01Request::generic(bump, tranche.discount_curve_id.clone());

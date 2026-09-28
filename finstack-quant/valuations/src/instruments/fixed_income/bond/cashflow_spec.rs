@@ -25,7 +25,7 @@
 //!
 //! // Floating-rate note: SOFR + 200bps, quarterly payments
 //! let floating = CashflowSpec::floating_bp(
-//!     "USD-SOFR-3M".into(),
+//!     "USD-SOFR-3M",
 //!     Bps::new(200),  // margin in basis points
 //!     Tenor::quarterly(),
 //!     DayCount::Act360,

@@ -148,7 +148,7 @@ pub struct MetricPricingInputs {
     /// Base present value.
     pub base_value: Money,
     /// Metric-only risk overrides.
-    metric_overrides: Option<crate::instruments::MetricPricingOverrides>,
+    metric_pricing_overrides: Option<crate::instruments::MetricPricingOverrides>,
     /// Shared numerical and reporting configuration.
     finstack_config: Arc<FinstackConfig>,
 }
@@ -283,7 +283,7 @@ impl MetricContext {
                 pricing_dispatch: PricingDispatch::InstrumentDefault,
                 as_of,
                 base_value,
-                metric_overrides: None,
+                metric_pricing_overrides: None,
                 finstack_config,
             },
             market_scratch: None,
@@ -351,10 +351,10 @@ impl MetricContext {
 
     /// Returns the metric-only overrides, if any.
     #[inline]
-    pub(crate) fn get_metric_overrides(
+    pub(crate) fn get_metric_pricing_overrides(
         &self,
     ) -> Option<&crate::instruments::MetricPricingOverrides> {
-        self.metric_overrides.as_ref()
+        self.metric_pricing_overrides.as_ref()
     }
 
     /// Returns a reference to the market history, if set.
@@ -502,11 +502,11 @@ impl MetricContext {
     }
 
     /// Set metric-only overrides used by downstream calculators.
-    pub fn set_metric_overrides(
+    pub fn set_metric_pricing_overrides(
         &mut self,
         overrides: Option<crate::instruments::MetricPricingOverrides>,
     ) {
-        self.inputs.metric_overrides = overrides;
+        self.inputs.metric_pricing_overrides = overrides;
     }
 
     /// Temporarily replace the instrument view during a scoped metric calculation.

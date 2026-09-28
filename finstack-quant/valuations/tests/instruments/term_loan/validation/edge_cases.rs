@@ -286,7 +286,7 @@ fn test_zero_oid_bp_accepted() {
 
 #[test]
 fn test_ddtl_commitment_step_fee_rejected() {
-    // Term-loan DDTL steps carry no reduction fee; a non-zero fee_bp would be inert.
+    // Term-loan DDTL steps carry no reduction fee; a non-zero reduction_fee_bp would be inert.
     let result = build_ddtl_loan(DdtlSpec {
         commitment: Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
         availability_start: date!(2025 - 01 - 01),

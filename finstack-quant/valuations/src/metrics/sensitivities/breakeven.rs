@@ -21,7 +21,7 @@ pub(crate) struct BreakevenCalculator;
 impl MetricCalculator for BreakevenCalculator {
     fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
         let config = context
-            .get_metric_overrides()
+            .get_metric_pricing_overrides()
             .and_then(|o| o.breakeven_config)
             .ok_or_else(|| finstack_quant_core::InputError::NotFound {
                 id: "breakeven_config: set BreakevenConfig on MetricPricingOverrides".into(),
@@ -92,7 +92,7 @@ impl MetricCalculator for BreakevenCalculator {
     /// `[Breakeven, Cs01]` and a bare `[Breakeven]` both failed.
     fn dynamic_dependencies<'a>(&'a self, context: &MetricContext) -> Cow<'a, [MetricId]> {
         let Some(config) = context
-            .get_metric_overrides()
+            .get_metric_pricing_overrides()
             .and_then(|o| o.breakeven_config)
         else {
             // No config: `calculate` will raise the descriptive error. Fall
@@ -340,7 +340,7 @@ mod tests {
 
         let overrides = crate::instruments::MetricPricingOverrides::default()
             .with_breakeven_config(BreakevenConfig { target, mode });
-        ctx.set_metric_overrides(Some(overrides));
+        ctx.set_metric_pricing_overrides(Some(overrides));
         ctx
     }
 
@@ -410,7 +410,7 @@ mod tests {
                 target: BreakevenTarget::ZSpread,
                 mode: BreakevenMode::Linear,
             });
-        ctx.set_metric_overrides(Some(overrides));
+        ctx.set_metric_pricing_overrides(Some(overrides));
 
         let result = BreakevenCalculator.calculate(&mut ctx);
         assert!(result.is_err(), "missing sensitivity should error");

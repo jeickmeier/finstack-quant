@@ -49,7 +49,6 @@
 //! use finstack_quant_valuations::instruments::OptionType;
 //! use finstack_quant_core::currency::Currency;
 //! use finstack_quant_core::dates::DayCount;
-//! use finstack_quant_core::money::Money;
 //! use finstack_quant_core::types::{CurveId, InstrumentId};
 //! use time::macros::date;
 //!
@@ -67,7 +66,8 @@
 //!     .averaging_method(AveragingMethod::Arithmetic)
 //!     .expiry(date!(2025-06-30))
 //!     .fixing_dates(fixing_dates)
-//!     .notional(Money::from((100_000_i64, Currency::USD)))
+//!     .quantity(100_000.0)
+//!     .currency(Currency::USD)
 //!     .day_count(DayCount::Act365F)
 //!     .discount_curve_id(CurveId::new("USD-OIS"))
 //!     .spot_id("SPX-SPOT".to_string().into())

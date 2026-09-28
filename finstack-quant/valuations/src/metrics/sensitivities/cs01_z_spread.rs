@@ -338,7 +338,7 @@ where
 
         let bump_bp = sens_config::from_context_or_default(
             context.get_config(),
-            context.get_metric_overrides(),
+            context.get_metric_pricing_overrides(),
         )?
         .credit_spread_bump_bp;
 
@@ -425,7 +425,7 @@ where
 
         let defaults = sens_config::from_context_or_default(
             context.get_config(),
-            context.get_metric_overrides(),
+            context.get_metric_pricing_overrides(),
         )?;
         let buckets = defaults.cs01_buckets_years;
         let bump_bp = defaults.credit_spread_bump_bp;

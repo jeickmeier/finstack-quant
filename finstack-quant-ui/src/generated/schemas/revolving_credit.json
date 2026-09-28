@@ -954,7 +954,7 @@
         },
         "commitment_steps": {
           "default": [],
-          "description": "Scheduled commitment changes (amortizing commitments, availability\nexpiries, accordions), each in force from its date until the next.\nDates must be strictly increasing, after `issue_date` and on or\nbefore `maturity`; the drawn balance plus outstanding letters of\ncredit must never exceed the commitment in force. A step down pays its\n`fee_bp` on the reduced amount. Empty by default.",
+          "description": "Scheduled commitment changes (amortizing commitments, availability\nexpiries, accordions), each in force from its date until the next.\nDates must be strictly increasing, after `issue_date` and on or\nbefore `maturity`; the drawn balance plus outstanding letters of\ncredit must never exceed the commitment in force. A step down pays its\n`reduction_fee_bp` on the reduced amount. Empty by default.",
           "items": {
             "$ref": "#/$defs/d_ba391d15759d4194c067"
           },

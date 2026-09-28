@@ -418,7 +418,8 @@ impl EquityOption {
     /// * `expiry` - Option expiry date.
     /// * `quantity` - Number of underlying units; PV scales linearly with it.
     /// * `currency` - Currency of the strike, premium and present value.
-    /// * `option_type` - Call or put.
+    /// * `option_type` - Whether the option pays on the underlying finishing above the
+    ///   strike (`OptionType::Call`) or below it (`OptionType::Put`).
     pub fn european(
         id: impl Into<InstrumentId>,
         ticker: impl Into<String>,

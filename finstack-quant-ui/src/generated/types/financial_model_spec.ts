@@ -5074,7 +5074,7 @@ export interface D_756Aabf913F51B821A96 {
    * Dates must be strictly increasing, after `issue_date` and on or
    * before `maturity`; the drawn balance plus outstanding letters of
    * credit must never exceed the commitment in force. A step down pays its
-   * `fee_bp` on the reduced amount. Empty by default.
+   * `reduction_fee_bp` on the reduced amount. Empty by default.
    */
   commitment_steps?: DCdcefb52Fec44Ed9Ad4D[];
   /**

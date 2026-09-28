@@ -101,7 +101,7 @@ where
         };
         let bump_bp = sens_config::from_context_or_default(
             context.get_config(),
-            context.get_metric_overrides(),
+            context.get_metric_pricing_overrides(),
         )?
         .credit_spread_bump_bp;
         let hazard = context.curves.get_hazard(hazard_id.as_str())?;
@@ -130,7 +130,7 @@ where
         };
         let bump_bp = sens_config::from_context_or_default(
             context.get_config(),
-            context.get_metric_overrides(),
+            context.get_metric_pricing_overrides(),
         )?
         .credit_spread_bump_bp;
         let hazard = context.curves.get_hazard(hazard_id.as_str())?;

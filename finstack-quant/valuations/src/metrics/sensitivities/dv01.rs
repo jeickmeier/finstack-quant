@@ -234,7 +234,7 @@ where
         // Resolve bump size from config, then layer instrument overrides.
         let defaults = sens_config::from_context_or_default(
             context.get_config(),
-            context.get_metric_overrides(),
+            context.get_metric_pricing_overrides(),
         )?;
         let bump_bp = defaults.rate_bump_bp;
 

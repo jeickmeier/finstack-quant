@@ -72,7 +72,7 @@ impl MetricCalculator for CsGammaCalculator {
         // expansion ΔPV ≈ CS01·Δb + ½·CS-Gamma·Δs² uses consistent shocks.
         let bump_bp = sens_config::from_context_or_default(
             context.get_config(),
-            context.get_metric_overrides(),
+            context.get_metric_pricing_overrides(),
         )?
         .credit_spread_bump_bp;
 

@@ -207,7 +207,7 @@ pub fn compute_quotes(
     }
     ctx.set_recalibration_provider(options.recalibration_provider.clone());
     ctx.set_pricer_dispatch(pricing_dispatch);
-    ctx.set_metric_overrides(bond_for_metrics.get_metric_pricing_overrides().cloned());
+    ctx.set_metric_pricing_overrides(bond_for_metrics.get_metric_pricing_overrides().cloned());
     bond_for_metrics.seed_metric_context(&mut ctx, market, as_of);
     ctx.notional = Some(bond_for_metrics.notional);
 

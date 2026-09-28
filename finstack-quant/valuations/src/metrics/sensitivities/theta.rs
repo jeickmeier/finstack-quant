@@ -46,7 +46,7 @@ use finstack_quant_core::Result;
 /// else one day.
 pub(crate) fn theta_period(context: &crate::metrics::MetricContext) -> Tenor {
     context
-        .get_metric_overrides()
+        .get_metric_pricing_overrides()
         .and_then(|po| po.theta_period)
         .unwrap_or_else(Tenor::daily)
 }

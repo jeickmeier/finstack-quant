@@ -102,7 +102,7 @@ pub(crate) fn bond_risk_basis(
     context: &crate::metrics::MetricContext,
 ) -> crate::instruments::BondRiskBasis {
     context
-        .get_metric_overrides()
+        .get_metric_pricing_overrides()
         .map_or_else(crate::instruments::BondRiskBasis::default, |overrides| {
             overrides.bond_risk_basis_or_default()
         })

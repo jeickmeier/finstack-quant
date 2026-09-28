@@ -19,7 +19,7 @@ impl MetricCalculator for QuoteRateCalculator {
             .fixed_rate
             .ok_or_else(|| {
                 finstack_quant_core::Error::from(finstack_quant_core::InputError::NotFound {
-                    id: "QuoteRate (deposit has no fixed_rate set)".to_string(),
+                    id: "fixed_rate (deposit has no fixed_rate set)".to_string(),
                 })
             })?
             .to_f64()

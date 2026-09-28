@@ -118,7 +118,7 @@ impl MetricCalculator for BondVegaCalculator {
 
         let defaults = sens_config::from_context_or_default(
             context.get_config(),
-            context.get_metric_overrides(),
+            context.get_metric_pricing_overrides(),
         )?;
         let bump = defaults.vol_bump_decimal;
         let (channel, base_vol) = short_rate_sigma(bond, context, model)?;

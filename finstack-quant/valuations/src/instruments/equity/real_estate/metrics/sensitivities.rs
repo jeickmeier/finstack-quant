@@ -71,7 +71,7 @@ impl MetricCalculator for CapRate01Calculator {
     fn calculate(&self, context: &mut MetricContext) -> finstack_quant_core::Result<f64> {
         let bump_bp = sens_config::from_context_or_default(
             context.get_config(),
-            context.get_metric_overrides(),
+            context.get_metric_pricing_overrides(),
         )?
         .rate_bump_bp;
         let bump = bump_bp / 10_000.0;

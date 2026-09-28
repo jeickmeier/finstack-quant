@@ -2,7 +2,7 @@
 //! facilities and structured-credit notes.
 //!
 //! These are the contractual terms a credit agreement carries: the coupon
-//! ([`RateSpec`]), commitment changes, draws, margin and fee steps, letters of
+//! ([`RateSpec`](crate::instruments::fixed_income::loan_terms::RateSpec)), commitment changes, draws, margin and fee steps, letters of
 //! credit, upfront economics and the effective-interest-rate reporting switch.
 //! `TermLoan`, `RevolvingCredit` and `AssetBackedFacility` compose them so an
 //! analyst enters a term sheet the same way for any facility.

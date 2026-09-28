@@ -282,7 +282,7 @@ mod tests {
         );
         let overrides =
             crate::instruments::MetricPricingOverrides::default().with_theta_period(theta_period);
-        context.set_metric_overrides(Some(overrides));
+        context.set_metric_pricing_overrides(Some(overrides));
         if let Some(ytm) = ytm {
             context.computed.insert(MetricId::Ytm, ytm);
         }

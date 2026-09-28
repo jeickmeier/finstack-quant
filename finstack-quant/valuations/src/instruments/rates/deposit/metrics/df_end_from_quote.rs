@@ -29,7 +29,7 @@ impl MetricCalculator for DfEndFromQuoteCalculator {
 
         let r = deposit.fixed_rate.ok_or_else(|| {
             finstack_quant_core::Error::from(finstack_quant_core::InputError::NotFound {
-                id: "QuoteRate (required for implied DF calculation)".to_string(),
+                id: "fixed_rate (required for implied DF calculation)".to_string(),
             })
         })?;
         let r = r

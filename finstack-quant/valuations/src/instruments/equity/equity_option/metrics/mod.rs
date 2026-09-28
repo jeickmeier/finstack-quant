@@ -28,7 +28,7 @@ fn spot_bump_decimal(
     spot: f64,
 ) -> finstack_quant_core::Result<f64> {
     let resolved = sens_config::resolve(context)?.spot_bump_decimal;
-    let adaptive = context.get_metric_overrides().is_some_and(|po| {
+    let adaptive = context.get_metric_pricing_overrides().is_some_and(|po| {
         po.bump_config.adaptive_bumps && po.bump_config.spot_bump_decimal.is_none()
     });
     if adaptive {

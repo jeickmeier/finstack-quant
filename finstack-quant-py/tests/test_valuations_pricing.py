@@ -496,7 +496,7 @@ def test_validate_instrument_json_rejects_invalid_override_ownership(
     overrides: dict[str, object],
 ) -> None:
     instrument = json.loads(_structured_credit_json())
-    instrument["instrument"]["spec"]["pricing_overrides"] = overrides
+    instrument["instrument"]["spec"]["pricing_overrides"] = overrides  # schema-rejection-test: pricing_overrides
 
     with pytest.raises(ValueError, match="unknown field"):
         validate_instrument_json(json.dumps(instrument))

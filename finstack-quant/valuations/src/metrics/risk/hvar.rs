@@ -18,7 +18,7 @@ fn calculate_var_result(
         finstack_quant_core::Error::Validation(missing_history_message.to_string())
     })?;
     let config = context
-        .get_metric_overrides()
+        .get_metric_pricing_overrides()
         .and_then(|overrides| overrides.var_config.clone())
         .unwrap_or_else(|| default_config.clone());
     let dispatch = context.clone_pricer_dispatch();

@@ -125,7 +125,7 @@ impl From<&SensitivitiesConfig> for crate::instruments::GreekBumps {
 pub(crate) fn resolve(
     context: &crate::metrics::MetricContext,
 ) -> finstack_quant_core::Result<SensitivitiesConfig> {
-    from_context_or_default(context.get_config(), context.get_metric_overrides())
+    from_context_or_default(context.get_config(), context.get_metric_pricing_overrides())
 }
 
 /// Optional-override form of [`SensitivitiesConfig`], deserialized from the

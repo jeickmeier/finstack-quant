@@ -50,7 +50,7 @@ pub struct RevolvingCredit {
     /// Dates must be strictly increasing, after `issue_date` and on or
     /// before `maturity`; the drawn balance plus outstanding letters of
     /// credit must never exceed the commitment in force. A step down pays its
-    /// `fee_bp` on the reduced amount. Empty by default.
+    /// `reduction_fee_bp` on the reduced amount. Empty by default.
     #[builder(default)]
     #[serde(default)]
     pub commitment_steps: Vec<CommitmentStep>,
@@ -1162,7 +1162,7 @@ impl RevolvingCredit {
     }
 
     /// Reduction fees payable on commitment step-downs dated after `as_of`:
-    /// `(previous commitment − new commitment) × fee_bp`, one entry per step
+    /// `(previous commitment − new commitment) × reduction_fee_bp`, one entry per step
     /// that lowers the commitment and carries a positive fee.
     ///
     /// # Arguments

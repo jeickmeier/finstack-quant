@@ -7717,7 +7717,7 @@ export default [
     "path": "#/$defs/d_bef55fa450b231d7b330/properties/commitment_steps",
     "source": "https://finstack_quant.dev/schemas/instrument/1/equity/levered_real_estate_equity.schema.json#/$defs/RevolvingCredit/properties/commitment_steps",
     "default": [],
-    "description": "Scheduled commitment changes (amortizing commitments, availability\nexpiries, accordions), each in force from its date until the next.\nDates must be strictly increasing, after `issue_date` and on or\nbefore `maturity`; the drawn balance plus outstanding letters of\ncredit must never exceed the commitment in force. A step down pays its\n`fee_bp` on the reduced amount. Empty by default."
+    "description": "Scheduled commitment changes (amortizing commitments, availability\nexpiries, accordions), each in force from its date until the next.\nDates must be strictly increasing, after `issue_date` and on or\nbefore `maturity`; the drawn balance plus outstanding letters of\ncredit must never exceed the commitment in force. A step down pays its\n`reduction_fee_bp` on the reduced amount. Empty by default."
   },
   {
     "path": "#/$defs/d_bef55fa450b231d7b330/properties/commitment_steps/items",

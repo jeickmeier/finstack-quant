@@ -38,7 +38,7 @@
 //!
 //! # History
 //!
-//! [`history()`] and [`history_from_spec`] walk strictly increasing dated market snapshots.
+//! [`history()`](crate::instruments::composite::history) and [`history_from_spec`](crate::instruments::composite::history_from_spec) walk strictly increasing dated market snapshots.
 //! Warmup observations are visible to dynamic weighting but are not emitted.
 //! Each output row values the state held *into* that close. A scheduled
 //! rebalance is close-effective: the row still reports pre-trade P&L, then the
@@ -82,7 +82,7 @@
 //!
 //! - [`CompositeSpec`] for the unresolved definition and weighting policy
 //! - [`CompositeInstrument`] for the priceable resolved state
-//! - [`history()`] / [`history_from_spec`] for dated total-return and rebalance history
+//! - [`history()`](crate::instruments::composite::history) / [`history_from_spec`](crate::instruments::composite::history_from_spec) for dated total-return and rebalance history
 //! - [`crate::instruments::Instrument`] for generic pricing and metric dispatch
 //!
 //! # References

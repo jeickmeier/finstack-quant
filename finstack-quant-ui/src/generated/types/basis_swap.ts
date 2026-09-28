@@ -353,6 +353,7 @@ export interface D_4F077E8Bfdae2A5Fc362 {
  * ```rust
  * use finstack_quant_core::{dates::*, money::Money, currency::Currency, types::CurveId};
  * use finstack_quant_valuations::instruments::rates::basis_swap::BasisSwap;
+ * use finstack_quant_valuations::instruments::FloatLegSpec;
  * use time::Month;
  *
  * let start = Date::from_calendar_date(2024, Month::January, 3).expect("valid date");
@@ -367,6 +368,8 @@ export interface D_4F077E8Bfdae2A5Fc362 {
  *     day_count: DayCount::Act360,
  *     business_day_convention: BusinessDayConvention::ModifiedFollowing,
  *     calendar_id: None,
+ *     fixing_calendar_id: None,
+ *     end_of_month: false,
  *     stub: StubKind::ShortFront,
  *     spread_bp: rust_decimal::Decimal::from(5),
  *     payment_lag_days: 0,
@@ -383,6 +386,8 @@ export interface D_4F077E8Bfdae2A5Fc362 {
  *     day_count: DayCount::Act360,
  *     business_day_convention: BusinessDayConvention::ModifiedFollowing,
  *     calendar_id: None,
+ *     fixing_calendar_id: None,
+ *     end_of_month: false,
  *     stub: StubKind::ShortFront,
  *     spread_bp: rust_decimal::Decimal::ZERO,
  *     payment_lag_days: 0,

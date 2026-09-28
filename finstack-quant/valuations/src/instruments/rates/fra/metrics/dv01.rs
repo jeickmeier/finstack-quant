@@ -44,7 +44,7 @@ impl MetricCalculator for FraRateCurveDv01Calculator {
 
         let bump_bp = sens_config::from_context_or_default(
             context.get_config(),
-            context.get_metric_overrides(),
+            context.get_metric_pricing_overrides(),
         )?
         .rate_bump_bp;
 

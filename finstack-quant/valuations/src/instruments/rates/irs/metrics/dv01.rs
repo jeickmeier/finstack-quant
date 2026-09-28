@@ -31,7 +31,7 @@ impl MetricCalculator for IrsDv01Calculator {
         let fixed_rate = decimal_to_f64(irs.fixed_leg.rate, "fixed leg rate")?;
         let bump_bp = crate::metrics::sensitivities::config::from_context_or_default(
             context.get_config(),
-            context.get_metric_overrides(),
+            context.get_metric_pricing_overrides(),
         )?
         .rate_bump_bp;
 

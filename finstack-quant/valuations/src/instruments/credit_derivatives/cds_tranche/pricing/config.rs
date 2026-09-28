@@ -394,7 +394,7 @@ pub enum HeteroMethod {
 /// convergence budgets. Student-t uses the copula's product Gauss rule
 /// unless adaptive integration is enabled.
 ///
-/// Configuration is validated by [`CdsTranchePricer::with_params`] and remains
+/// Configuration is validated by [`CdsTranchePricer::with_config`] and remains
 /// immutable for the pricer's lifetime. The cached copula
 /// therefore cannot drift from the settings used by uncached calculations.
 pub struct CdsTranchePricer {

@@ -1139,7 +1139,7 @@ mod tests {
         );
         let amount = amount_from_result(&parsed);
         assert!(amount > 0.0);
-        assert_eq!(parsed["measures"]["mc_num_paths"], 32.0);
+        assert_eq!(parsed["measures"]["mc_num_paths"], 64.0);
     }
 
     #[test]
@@ -1174,7 +1174,7 @@ mod tests {
             "monte_carlo_hull_white_1f",
         );
         assert!(amount_from_result(&parsed) > 0.0);
-        assert_eq!(parsed["measures"]["mc_num_paths"], 32.0);
+        assert_eq!(parsed["measures"]["mc_num_paths"], 64.0);
     }
 
     #[test]
@@ -1197,7 +1197,7 @@ mod tests {
             "monte_carlo_hull_white_1f",
         );
         assert!(amount_from_result(&parsed) > 0.0);
-        assert_eq!(parsed["measures"]["mc_num_paths"], 8.0);
+        assert_eq!(parsed["measures"]["mc_num_paths"], 16.0);
     }
 
     #[test]
@@ -1258,6 +1258,11 @@ mod tests {
             "settlement_days": 0,
             "ex_coupon_days": 0,
             "attributes": {},
+            // The rates tree needs explicit HW1F inputs; sigma = 0 selects
+            // deterministic rates for this smoke test.
+            "instrument_pricing_overrides": {
+                "model_config": { "hw1f_mean_reversion": 0.03, "hw1f_sigma": 0.0 }
+            },
             "return_floor": return_floor
         });
         let bond = serde_json::from_value(spec).expect("valid return-floor bond fixture");

@@ -522,7 +522,7 @@ where
 
         let bump_bp = sens_config::from_context_or_default(
             context.get_config(),
-            context.get_metric_overrides(),
+            context.get_metric_pricing_overrides(),
         )?
         .credit_spread_bump_bp;
 
@@ -569,7 +569,7 @@ where
 
         let defaults = sens_config::from_context_or_default(
             context.get_config(),
-            context.get_metric_overrides(),
+            context.get_metric_pricing_overrides(),
         )?;
         let bump_bp = defaults.credit_spread_bump_bp;
 
@@ -745,7 +745,7 @@ where
         with_prepared_cds_risk_context::<I>(context, None, "CS01", |context, prepared| {
             let bump_bp = sens_config::from_context_or_default(
                 context.get_config(),
-                context.get_metric_overrides(),
+                context.get_metric_pricing_overrides(),
             )?
             .credit_spread_bump_bp;
             let reval = cs01_reval(context);
@@ -789,7 +789,7 @@ where
         with_prepared_cds_risk_context::<I>(context, None, "bucketed CS01", |context, prepared| {
             let defaults = sens_config::from_context_or_default(
                 context.get_config(),
-                context.get_metric_overrides(),
+                context.get_metric_pricing_overrides(),
             )?;
             let bump_bp = defaults.credit_spread_bump_bp;
             let series_id =

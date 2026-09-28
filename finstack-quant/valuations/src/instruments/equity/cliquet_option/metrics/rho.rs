@@ -142,7 +142,7 @@ mod tests {
             pv,
             MetricContext::default_config(),
         );
-        ctx.set_metric_overrides(Some(option.metric_pricing_overrides.clone()));
+        ctx.set_metric_pricing_overrides(Some(option.metric_pricing_overrides.clone()));
         let res = standard_registry()
             .compute(&[MetricId::Rho], &mut ctx)
             .expect("rho");

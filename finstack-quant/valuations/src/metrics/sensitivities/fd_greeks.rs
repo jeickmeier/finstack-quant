@@ -377,7 +377,7 @@ where
         let as_of = context.as_of;
         let defaults = sens_config::from_context_or_default(
             context.get_config(),
-            context.get_metric_overrides(),
+            context.get_metric_pricing_overrides(),
         )?;
 
         let dependencies = instrument.market_dependencies()?;
@@ -459,7 +459,7 @@ where
         let as_of = context.as_of;
         let defaults = sens_config::from_context_or_default(
             context.get_config(),
-            context.get_metric_overrides(),
+            context.get_metric_pricing_overrides(),
         )?;
 
         let dependencies = instrument.market_dependencies()?;
@@ -540,7 +540,7 @@ where
         let as_of = context.as_of;
         let defaults = sens_config::from_context_or_default(
             context.get_config(),
-            context.get_metric_overrides(),
+            context.get_metric_pricing_overrides(),
         )?;
 
         let dependencies = instrument.market_dependencies()?;
@@ -659,7 +659,7 @@ where
         let as_of = context.as_of;
         let defaults = sens_config::from_context_or_default(
             context.get_config(),
-            context.get_metric_overrides(),
+            context.get_metric_pricing_overrides(),
         )?;
 
         // If expired, volga is zero — mirror vanna's guard. On an expired
@@ -749,7 +749,7 @@ where
         let as_of = context.as_of;
         let defaults = sens_config::from_context_or_default(
             context.get_config(),
-            context.get_metric_overrides(),
+            context.get_metric_pricing_overrides(),
         )?;
 
         // If expired, vanna is zero (avoid bumping / repricing beyond expiry).
