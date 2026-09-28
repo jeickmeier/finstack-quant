@@ -100,8 +100,7 @@ jobs:
           # sccache + workspace fat LTO OOMs rustc (exit 2, no diagnostic).
           sccache: ${{ runner.os != 'Windows' && matrix.os != 'linux-arm64' }}
         env:
-          # mise.toml defaults CARGO_INCREMENTAL=1 for local/dev builds; sccache
-          # refuses to wrap rustc when incremental compilation is enabled.
+          # sccache refuses to wrap rustc when incremental compilation is enabled.
           CARGO_INCREMENTAL: "0"
           CARGO_PROFILE_RELEASE_LTO: ${{ matrix.lto }}
           CARGO_PROFILE_RELEASE_CODEGEN_UNITS: ${{ matrix.codegen_units }}

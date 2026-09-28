@@ -8,7 +8,7 @@ with non-``self`` inputs. Each must provide a ``# Arguments`` section containing
 a non-trivial Markdown-list entry for every input.
 
 ``cargo public-api`` requires a nightly Rust toolchain (rustdoc JSON is still
-nightly-only). ``mise.toml`` provisions ``nightly`` alongside the active 1.91.1
+nightly-only). ``mise.toml`` provisions ``nightly`` alongside the active 1.97.1
 toolchain; install with ``mise install`` or
 ``rustup toolchain install nightly --profile minimal``.
 
@@ -156,7 +156,7 @@ def workspace_libraries(metadata: dict[str, Any], requested: list[str] | None) -
 def build_rustdoc_json(package: str) -> None:
     """Generate current public rustdoc metadata for one package."""
     # cargo-public-api must be free to select nightly for rustdoc JSON. A pinned
-    # RUSTUP_TOOLCHAIN (mise sets 1.91.1 as the default build toolchain) can block
+    # RUSTUP_TOOLCHAIN (mise sets 1.97.1 as the default build toolchain) can block
     # that switch on some rustup versions, so drop it for this invocation only.
     env = {key: value for key, value in os.environ.items() if key != "RUSTUP_TOOLCHAIN"}
     subprocess.run(  # noqa: S603 -- package is constrained to Cargo workspace metadata.

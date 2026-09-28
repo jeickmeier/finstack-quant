@@ -15,7 +15,8 @@ Checks (raw `cargo semver-checks` against `origin/master`).
 
 | File | Triggers | What it runs |
 | --- | --- | --- |
-| `workflows/build.yml` | push to `master`; PR opened/synchronize/reopened | The PR gate. Lint, tests on all three surfaces, MSRV, release build, supply chain, publish checks, semver. |
+| `workflows/build.yml` | push to `master`; PR opened/synchronize/reopened | The PR gate. Lint, tests on all three surfaces, release build, supply chain, publish checks, semver, and four representative benchmarks. |
+| `workflows/benchmarks.yml` | Wednesdays 06:00 UTC; manual | Full Rust Criterion suite and report. |
 | `workflows/docs.yml` | push to `master`; Mondays 06:00 UTC; manual | Documentation gates, kept out of `build.yml` so a slow rustdoc build never blocks a PR. |
 | `workflows/slow-rust-tests.yml` | Sundays 06:00 UTC; manual | `mise run rust-test-slow` — the `#[ignore]`d suite, 120-minute budget. |
 | `workflows/release.yml` | successful `Build` run on `master`; manual with `publish: true` | Builds wheels, sdist, and WASM packages, then cuts a GitHub Release. |
@@ -30,19 +31,19 @@ races on the shared `mise.toml`-derived key. Jobs then fan out in parallel:
 | --- | --- | --- |
 | Lint | `mise run pre-commit-run`, then `mise run gen-check` | `SKIP: cargo-deny` — the supply-chain job owns it. Clippy covers lib/bins/tests/examples (`--all-features`), not Criterion benches. |
 | Test Rust | `mise run rust-test` | cargo-nextest, lib + integration targets. |
-| Rust MSRV (1.90) | `mise run rust-msrv` | `cargo +1.90 check --locked --workspace --all-features --lib --bins --examples`. Production targets only — tests and benches are not MSRV-checked. |
 | Rust release build | `mise run rust-build-prod` | Release compile without debug info. |
 | Test Python | `mise run python-test-all` | maturin dev build, then the full pytest suite. |
 | Test WASM | `mise run wasm-test` | wasm-bindgen tests plus the Node facade suite. |
 | Supply-chain Security | `mise run rust-audit` | `cargo deny check` — advisories, licenses, bans. |
 | Rust Publish Checks | `mise run rust-publish-checks` | Publish order and first-crate dry run. |
 | OSV-Scanner | reusable workflow | PR-diff scan on pull requests, full scan on push. Covers `Cargo.lock`, `uv.lock`, and `finstack-quant-wasm/package-lock.json`. |
-| Semver Checks | `cargo semver-checks check-release` | PRs only, gated behind lint and all three test jobs. Checks `finstack-quant-core`, `finstack-quant-valuations`, `finstack-quant-portfolio` against `origin/master`. |
+| Semver Checks | `cargo semver-checks check-release` | PRs only; starts after `prime-cache` alongside lint and tests. Checks `finstack-quant-core`, `finstack-quant-valuations`, `finstack-quant-portfolio` against `origin/master`. |
+| Rust Benchmark Regression | `scripts/pr_benchmarks.py` | PRs only; compares four exact cases on base and head with Rust 1.97.1 and thin LTO, and rejects missing or stale outputs. The weekly full suite retains fat LTO. |
 
 Two details worth knowing before editing:
 
-- The cargo-heavy jobs — Lint, Test Rust, Rust MSRV, Rust release build, Test
-  Python, Test WASM, Semver Checks — add 10 GB of swap
+- The cargo-heavy jobs — Lint, Test Rust, Rust release build, Test
+  Python, Test WASM, Semver Checks, Rust Benchmark Regression — add 10 GB of swap
   (`pierotofy/set-swap-space`); the workspace has OOM'd linking without it. The
   light jobs (`prime-cache`, Supply-chain Security, Rust Publish Checks) do not.
 - The semver job compares against `origin/master`, not against the released
@@ -94,9 +95,11 @@ The local mirrors are partial, so know what they do and do not cover:
 
 - `mise run all-ci` regenerates derived artifacts first, then covers the Lint,
   Test Rust, Test Python, Test WASM, Supply-chain Security, and Rust Publish
-  Checks jobs of `build.yml`. It does **not** run Rust MSRV, Rust release
-  build, OSV-Scanner, or Semver Checks. GitHub CI still uses `gen-check` as a
+  Checks jobs of `build.yml`. It does **not** run the Rust release build,
+  OSV-Scanner, Semver Checks, or PR benchmark comparison. GitHub CI still uses `gen-check` as a
   non-mutating drift gate so uncommitted generated files fail the Lint job.
 - `mise run all-doc` mirrors `docs.yml`.
 - `slow-rust-tests.yml` is `mise run rust-test-slow`; `release.yml` has no local
   equivalent.
+- `benchmarks.yml` runs the complete benchmark suite weekly; local scoped
+  benchmark tasks remain available for focused measurements.

@@ -25,15 +25,18 @@
 - `uv` is the Python package manager; use `uv run` when running Python functions
 - Tasks are defined in `mise.toml`; invoke them with `mise run <task>` (or `mise r <task>`). List everything with `mise tasks`. Common ones: `mise run all-fmt`, `mise run all-lint`, `mise run all-test`, `mise run python-build` (dev profile, fast compile), `mise run python-build -- --release` (release; faster runtime).
 - **Scoped Rust iteration (preferred while implementing):**
-  - `mise run rust-lint-crate -- <package>` — fmt check + clippy for one crate (lib/bins/tests/examples; skips benches)
-  - `mise run rust-fmt-crate -- <package>` — format + clippy --fix for one crate
+  - `mise run rust-lint-crate -- <package>` — fmt check + clippy for one crate (lib/bins/tests/examples; skips benches). Add `--lib` to skip integration-test binaries.
+  - `mise run rust-fmt` — `cargo fmt --all` only
+  - `mise run rust-fix-crate -- <package>` — clippy --fix for one crate
+  - `mise run rust-fix` — clippy --fix for the workspace
   - `mise run rust-test-crate -- <package>` — lib + integration tests for one crate
   - `mise run rust-test-integration -- <package> <test>` — one integration binary (e.g. `instruments`)
   - `mise run rust-test-filter -- <package> <filter>` — tests matching a name
   - `mise run rust-bench-crate -- <package> <bench>` — one Criterion target
   - Path → package mapping lives in `.agents/rules/selective-test-running.mdc`
-- **Full-workspace gates (plan end / pre-commit / CI):** `mise run rust-lint`, `mise run rust-test`, `mise run rust-bench`, `mise run all-lint`, `mise run all-test`
-- Python test tasks rebuild the extension with the fast dev profile before running pytest. Use `mise run python-build -- --release` only for release validation, performance-sensitive runs, or when explicitly requested. Use `mise run python-sync` first (or whenever Python deps change) to refresh the `uv` virtualenv.
+- **Full-workspace gates (plan end / pre-commit / CI):** `mise run rust-lint`, `mise run rust-test`, `mise run rust-bench`, `mise run all-lint`, `mise run all-test`. `mise run all` runs tests and lint; use `mise run all-build` when an explicit build pass is needed.
+- Full Python test tasks rebuild the extension with the fast dev profile before running pytest. For repeated focused tests after one explicit `mise run python-build`, use `mise run python-test-file -- <file-or-node-id>`; it does not rebuild. Use `mise run python-build -- --release` only for release validation, performance-sensitive runs, or when explicitly requested. Use `mise run python-sync` first (or whenever Python deps change) to refresh the `uv` virtualenv.
+- After `mise run wasm-test` or `mise run wasm-pkg`, use `mise run wasm-test-built` to rerun Node facade tests without rebuilding the WASM package. Run `mise run wasm-test` after binding changes for the complete Rust, web, and Node validation gate.
 - Pre-commit runs `cargo clippy` and `cargo deny check` (Rust supply-chain: advisories + licenses + bans)
 - CI additionally runs OSV-Scanner across `Cargo.lock`, `uv.lock`, and `package-lock.json` for cross-ecosystem CVE coverage
 - Clippy runs with `-D warnings`; all warnings are treated as errors

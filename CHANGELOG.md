@@ -1816,6 +1816,11 @@ pinned by `tests/metrics/bump_config_routing.rs`.
   vanna/volga against Black-Scholes and FxOption volga against Garman-Kohlhagen
   at 5e-3).
 
+### Changed
+
+- The next library release is 0.9.0 and requires Rust 1.97.1 across the Rust,
+  Python, and WASM crates.
+
 ### Fixed income: senior-review remediation (2026-09-23)
 
 Numbers change for the instruments listed under **Fixed**; each change is

@@ -3,7 +3,7 @@
 # `mise.toml` pins rust to 1.97.1 for commands run through mise, but a plain
 # `cargo build` outside a mise shim — a contributor's shell, or any raw
 # `cargo`/`rustup` step in CI — previously fell back to the machine's rustup
-# default. `Cargo.toml`'s `rust-version = "1.90"` is MSRV metadata, not a pin.
+# default. `Cargo.toml` also declares 1.97.1 as the minimum Rust version.
 #
 # Keep the version in sync with the `rust` entry in mise.toml.
 [toolchain]

@@ -374,7 +374,7 @@
               "version": 1
             },
             "fx_policy_applied": null,
-            "version": "0.8.0"
+            "version": "0.9.0"
           },
           "worst_quote_id": "USD-OIS:USD-OIS-SWAP-5Y:tolerance_ratio",
           "worst_quote_residual": 0.00007395574357360601
@@ -423,7 +423,7 @@
                 "version": 1
               },
               "fx_policy_applied": null,
-              "version": "0.8.0"
+              "version": "0.9.0"
             },
             "model_version": "Multi-curve OIS discounting v1.0",
             "worst_quote_id": "USD-OIS-SWAP-5Y",
@@ -444,7 +444,7 @@
             "version": 1
           },
           "fx_policy_applied": null,
-          "version": "0.8.0"
+          "version": "0.9.0"
         }
       }
     }
@@ -1020,7 +1020,7 @@
               "version": 1
             },
             "fx_policy_applied": null,
-            "version": "0.8.0"
+            "version": "0.9.0"
           },
           "worst_quote_id": "USD-OIS:USD-OIS-SWAP-5Y:tolerance_ratio",
           "worst_quote_residual": 0.00007395574357360601
@@ -1069,7 +1069,7 @@
                 "version": 1
               },
               "fx_policy_applied": null,
-              "version": "0.8.0"
+              "version": "0.9.0"
             },
             "model_version": "Multi-curve OIS discounting v1.0",
             "worst_quote_id": "USD-OIS-SWAP-5Y",
@@ -1131,7 +1131,7 @@
                 "version": 1
               },
               "fx_policy_applied": null,
-              "version": "0.8.0"
+              "version": "0.9.0"
             },
             "worst_quote_id": "FRA-SOFR-3M-12X18",
             "worst_quote_residual": -3.249075683670217e-18,
@@ -1151,7 +1151,7 @@
             "version": 1
           },
           "fx_policy_applied": null,
-          "version": "0.8.0"
+          "version": "0.9.0"
         }
       }
     }
@@ -1981,7 +1981,7 @@
               "version": 1
             },
             "fx_policy_applied": null,
-            "version": "0.8.0"
+            "version": "0.9.0"
           },
           "worst_quote_id": "ISSUER-A-CDS:ISSUER-A-CDS-1Y:tolerance_ratio",
           "worst_quote_residual": 0.024568277078550194
@@ -2029,7 +2029,7 @@
                 "version": 1
               },
               "fx_policy_applied": null,
-              "version": "0.8.0"
+              "version": "0.9.0"
             },
             "model_version": "ISDA Standard Model v1.8.2",
             "worst_quote_id": "ISSUER-A-CDS-1Y",
@@ -2079,7 +2079,7 @@
                 "version": 1
               },
               "fx_policy_applied": null,
-              "version": "0.8.0"
+              "version": "0.9.0"
             },
             "model_version": "Multi-curve OIS discounting v1.0",
             "worst_quote_id": "USD-OIS-SWAP-5Y",
@@ -2100,7 +2100,7 @@
             "version": 1
           },
           "fx_policy_applied": null,
-          "version": "0.8.0"
+          "version": "0.9.0"
         }
       }
     }
@@ -2930,7 +2930,7 @@
               "version": 1
             },
             "fx_policy_applied": null,
-            "version": "0.8.0"
+            "version": "0.9.0"
           },
           "worst_quote_id": "CDX-NA-IG-46:CDX-IG-46-1Y:tolerance_ratio",
           "worst_quote_residual": 0.01273734536897872
@@ -2978,7 +2978,7 @@
                 "version": 1
               },
               "fx_policy_applied": null,
-              "version": "0.8.0"
+              "version": "0.9.0"
             },
             "model_version": "ISDA Standard Model v1.8.2",
             "worst_quote_id": "CDX-IG-46-1Y",
@@ -3028,7 +3028,7 @@
                 "version": 1
               },
               "fx_policy_applied": null,
-              "version": "0.8.0"
+              "version": "0.9.0"
             },
             "model_version": "Multi-curve OIS discounting v1.0",
             "worst_quote_id": "USD-OIS-SWAP-5Y",
@@ -3049,7 +3049,7 @@
             "version": 1
           },
           "fx_policy_applied": null,
-          "version": "0.8.0"
+          "version": "0.9.0"
         }
       }
     }
@@ -4043,7 +4043,7 @@
               "version": 1
             },
             "fx_policy_applied": null,
-            "version": "0.8.0"
+            "version": "0.9.0"
           },
           "worst_quote_id": "CDX-NA-IG-46:CDX-IG-46-1Y:tolerance_ratio",
           "worst_quote_residual": 0.01273734536897872
@@ -4091,7 +4091,7 @@
                 "version": 1
               },
               "fx_policy_applied": null,
-              "version": "0.8.0"
+              "version": "0.9.0"
             },
             "model_version": "ISDA Standard Model v1.8.2",
             "worst_quote_id": "CDX-IG-46-1Y",
@@ -4137,7 +4137,7 @@
                 "version": 1
               },
               "fx_policy_applied": null,
-              "version": "0.8.0"
+              "version": "0.9.0"
             },
             "worst_quote_id": "CDX-IG-46-3-7",
             "worst_quote_residual": 8.769495546401274e-13,
@@ -4186,7 +4186,7 @@
                 "version": 1
               },
               "fx_policy_applied": null,
-              "version": "0.8.0"
+              "version": "0.9.0"
             },
             "model_version": "Multi-curve OIS discounting v1.0",
             "worst_quote_id": "USD-OIS-SWAP-5Y",
@@ -4207,7 +4207,7 @@
             "version": 1
           },
           "fx_policy_applied": null,
-          "version": "0.8.0"
+          "version": "0.9.0"
         }
       }
     }
@@ -5190,7 +5190,7 @@
               "version": 1
             },
             "fx_policy_applied": null,
-            "version": "0.8.0"
+            "version": "0.9.0"
           },
           "worst_quote_id": "CDX-NA-IG-46:CDX-IG-46-1Y:tolerance_ratio",
           "worst_quote_residual": 0.01273734536897872
@@ -5238,7 +5238,7 @@
                 "version": 1
               },
               "fx_policy_applied": null,
-              "version": "0.8.0"
+              "version": "0.9.0"
             },
             "model_version": "ISDA Standard Model v1.8.2",
             "worst_quote_id": "CDX-IG-46-1Y",
@@ -5295,7 +5295,7 @@
                 "version": 1
               },
               "fx_policy_applied": null,
-              "version": "0.8.0"
+              "version": "0.9.0"
             },
             "explanation": {
               "type": "vol_surface",
@@ -5354,7 +5354,7 @@
                 "version": 1
               },
               "fx_policy_applied": null,
-              "version": "0.8.0"
+              "version": "0.9.0"
             },
             "model_version": "Multi-curve OIS discounting v1.0",
             "worst_quote_id": "USD-OIS-SWAP-5Y",
@@ -5375,7 +5375,7 @@
             "version": 1
           },
           "fx_policy_applied": null,
-          "version": "0.8.0"
+          "version": "0.9.0"
         }
       }
     }
@@ -6420,7 +6420,7 @@
               "version": 1
             },
             "fx_policy_applied": null,
-            "version": "0.8.0"
+            "version": "0.9.0"
           },
           "worst_quote_id": "USD-SWAPTION-NORMAL-VOL-STEP:swpt_10000_100000_1:tolerance_ratio",
           "worst_quote_residual": 0.32158057778780613
@@ -6469,7 +6469,7 @@
                 "version": 1
               },
               "fx_policy_applied": null,
-              "version": "0.8.0"
+              "version": "0.9.0"
             },
             "model_version": "Multi-curve OIS discounting v1.0",
             "worst_quote_id": "USD-OIS-SWAP-5Y",
@@ -6531,7 +6531,7 @@
                 "version": 1
               },
               "fx_policy_applied": null,
-              "version": "0.8.0"
+              "version": "0.9.0"
             },
             "worst_quote_id": "FRA-SOFR-3M-12X18",
             "worst_quote_residual": -3.2490970532854975e-18,
@@ -6608,7 +6608,7 @@
                 "version": 1
               },
               "fx_policy_applied": null,
-              "version": "0.8.0"
+              "version": "0.9.0"
             },
             "worst_quote_id": "swpt_10000_100000_1",
             "worst_quote_residual": 0.00048237086668170923,
@@ -6628,7 +6628,7 @@
             "version": 1
           },
           "fx_policy_applied": null,
-          "version": "0.8.0"
+          "version": "0.9.0"
         }
       }
     }
@@ -7264,7 +7264,7 @@
               "version": 1
             },
             "fx_policy_applied": null,
-            "version": "0.8.0"
+            "version": "0.9.0"
           },
           "worst_quote_id": "AAPL-EQUITY-VOL-STEP:AAPL-VOL-20261108-175.0:tolerance_ratio",
           "worst_quote_residual": 0.6446118982580684
@@ -7320,7 +7320,7 @@
                 "version": 1
               },
               "fx_policy_applied": null,
-              "version": "0.8.0"
+              "version": "0.9.0"
             },
             "explanation": {
               "type": "vol_surface",
@@ -7379,7 +7379,7 @@
                 "version": 1
               },
               "fx_policy_applied": null,
-              "version": "0.8.0"
+              "version": "0.9.0"
             },
             "model_version": "Multi-curve OIS discounting v1.0",
             "worst_quote_id": "USD-OIS-SWAP-5Y",
@@ -7400,7 +7400,7 @@
             "version": 1
           },
           "fx_policy_applied": null,
-          "version": "0.8.0"
+          "version": "0.9.0"
         }
       }
     }
@@ -7586,7 +7586,7 @@
               "version": 1
             },
             "fx_policy_applied": null,
-            "version": "0.8.0"
+            "version": "0.9.0"
           }
         },
         "step_reports": {},
@@ -7603,7 +7603,7 @@
             "version": 1
           },
           "fx_policy_applied": null,
-          "version": "0.8.0"
+          "version": "0.9.0"
         }
       }
     }
@@ -7804,7 +7804,7 @@
               "version": 1
             },
             "fx_policy_applied": null,
-            "version": "0.8.0"
+            "version": "0.9.0"
           }
         },
         "step_reports": {},
@@ -7821,7 +7821,7 @@
             "version": 1
           },
           "fx_policy_applied": null,
-          "version": "0.8.0"
+          "version": "0.9.0"
         }
       }
     }
@@ -8096,7 +8096,7 @@
               "version": 1
             },
             "fx_policy_applied": null,
-            "version": "0.8.0"
+            "version": "0.9.0"
           }
         },
         "step_reports": {},
@@ -8113,7 +8113,7 @@
             "version": 1
           },
           "fx_policy_applied": null,
-          "version": "0.8.0"
+          "version": "0.9.0"
         }
       }
     }
@@ -9141,7 +9141,7 @@
               "version": 1
             },
             "fx_policy_applied": null,
-            "version": "0.8.0"
+            "version": "0.9.0"
           },
           "worst_quote_id": "CDX-NA-IG-46-BASE-CORR-STEP:CDX-IG-46-15-30:tolerance_ratio",
           "worst_quote_residual": 0.009012109760570507
@@ -9189,7 +9189,7 @@
                 "version": 1
               },
               "fx_policy_applied": null,
-              "version": "0.8.0"
+              "version": "0.9.0"
             },
             "model_version": "ISDA Standard Model v1.8.2",
             "worst_quote_id": "CDX-IG-46-3Y",
@@ -9236,7 +9236,7 @@
                 "version": 1
               },
               "fx_policy_applied": null,
-              "version": "0.8.0"
+              "version": "0.9.0"
             },
             "worst_quote_id": "CDX-IG-46-15-30",
             "worst_quote_residual": -0.000009012109760570507,
@@ -9285,7 +9285,7 @@
                 "version": 1
               },
               "fx_policy_applied": null,
-              "version": "0.8.0"
+              "version": "0.9.0"
             },
             "model_version": "Multi-curve OIS discounting v1.0",
             "worst_quote_id": "USD-OIS-SWAP-5Y",
@@ -9306,7 +9306,7 @@
             "version": 1
           },
           "fx_policy_applied": null,
-          "version": "0.8.0"
+          "version": "0.9.0"
         }
       }
     }
@@ -9687,7 +9687,7 @@
               "version": 1
             },
             "fx_policy_applied": null,
-            "version": "0.8.0"
+            "version": "0.9.0"
           },
           "worst_quote_id": "USD-OIS:USD-OIS-SWAP-5Y:tolerance_ratio",
           "worst_quote_residual": 0.00007395574357360601
@@ -9736,7 +9736,7 @@
                 "version": 1
               },
               "fx_policy_applied": null,
-              "version": "0.8.0"
+              "version": "0.9.0"
             },
             "model_version": "Multi-curve OIS discounting v1.0",
             "diagnostics": {
@@ -9805,7 +9805,7 @@
             "version": 1
           },
           "fx_policy_applied": null,
-          "version": "0.8.0"
+          "version": "0.9.0"
         }
       }
     }

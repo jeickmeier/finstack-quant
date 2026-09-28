@@ -44,6 +44,7 @@ CONTRACT_EXCLUDED_PARTS = {
 }
 EXCLUDED_PREFIXES = (
     Path("docs/superpowers/plans"),
+    Path("docs/superpowers/mockups"),
     Path("scripts/tests/fixtures"),
     Path("scripts/check_schema_residue.py"),
 )

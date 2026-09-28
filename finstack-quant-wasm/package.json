@@ -1,6 +1,6 @@
 {
   "name": "finstack-quant-wasm",
-  "version": "0.8.0",
+  "version": "0.9.0",
   "type": "module",
   "description": "WebAssembly bindings for Finstack Quant - high-performance financial computation library for bonds, derivatives, and portfolio analytics",
   "main": "./index.js",
