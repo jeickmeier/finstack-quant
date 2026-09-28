@@ -9,7 +9,7 @@ import {
   itemMetadata,
   metadataInputs,
 } from "../../scripts/registry-metadata.mjs";
-it("derives canonical IDs and versions from the owned installed contracts", async () => {
+it("derives canonical IDs and published registry versions", async () => {
   const cwd = fileURLToPath(new URL("../../", import.meta.url));
   const { items } = await loadRegistry({ cwd });
   const graph = checkGraph(items),
@@ -45,7 +45,7 @@ it("derives canonical IDs and versions from the owned installed contracts", asyn
     schemaIds: ["https://example.test/canonical-bond"],
   });
 });
-it("reads the installed facade version without generated WASM package manifests", async () => {
+it("keeps the published registry pin independent of the local WASM package", async () => {
   const directory = await mkdtemp(
     path.join(tmpdir(), "finstack-registry-metadata-"),
   );
@@ -60,7 +60,11 @@ it("reads the installed facade version without generated WASM package manifests"
     const files = [
       [
         path.join(cwd, "package.json"),
-        { name: "registry-test", version: "1.2.3" },
+        {
+          name: "registry-test",
+          version: "1.2.3",
+          registryWasmVersion: "0.8.0",
+        },
       ],
       [
         path.join(packageDirectory, "package.json"),
@@ -78,7 +82,7 @@ it("reads the installed facade version without generated WASM package manifests"
     );
     await expect(metadataInputs(cwd)).resolves.toEqual({
       version: "1.2.3",
-      wasmVersion: "4.5.6",
+      wasmVersion: "0.8.0",
       roots: [],
       provenance: { entries: [] },
     });

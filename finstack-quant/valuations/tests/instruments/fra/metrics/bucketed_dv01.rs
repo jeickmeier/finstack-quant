@@ -4,7 +4,7 @@
 //! tenor bucket (e.g., 3M, 6M, 1Y). For FRAs, risk is concentrated
 //! in the forward tenor bucket.
 
-use crate::fra::common::*;
+use crate::instruments::fra::common::*;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::metrics::MetricId;

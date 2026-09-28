@@ -21,7 +21,7 @@ use serde::Deserialize;
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use crate::rates_support;
+use crate::sanity_invariants::rates_support;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DayCount};
 use finstack_quant_core::market_data::context::MarketContext;

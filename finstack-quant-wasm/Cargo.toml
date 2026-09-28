@@ -8,24 +8,26 @@ license.workspace = true
 repository.workspace = true
 description = "WebAssembly bindings for Finstack Quant - high-performance financial computation library"
 
+autotests = false
+
 [lib]
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-finstack-quant-analytics = { path = "../finstack-quant/analytics", version = "0.8.0" }
-finstack-quant-attribution = { path = "../finstack-quant/attribution", version = "0.8.0", default-features = false }
-finstack-quant-cashflows = { path = "../finstack-quant/cashflows", version = "0.8.0", default-features = false }
-finstack-quant-covenants = { path = "../finstack-quant/covenants", version = "0.8.0", default-features = false }
-finstack-quant-core = { path = "../finstack-quant/core", version = "0.8.0", default-features = false }
-finstack-quant-features = { path = "../finstack-quant/features", version = "0.8.0", default-features = false }
-finstack-quant-margin = { path = "../finstack-quant/margin", version = "0.8.0", default-features = false }
-finstack-quant-statements = { path = "../finstack-quant/statements", version = "0.8.0", default-features = false }
-finstack-quant-statements-analytics = { path = "../finstack-quant/statements-analytics", version = "0.8.0" }
-finstack-quant-valuations = { path = "../finstack-quant/valuations", version = "0.8.0", default-features = false }
-finstack-quant-calibration = { path = "../finstack-quant/calibration", version = "0.8.0", default-features = false }
-finstack-quant-models = { path = "../finstack-quant/models", version = "0.8.0", default-features = false }
-finstack-quant-scenarios = { path = "../finstack-quant/scenarios", version = "0.8.0", default-features = false }
-finstack-quant-portfolio = { path = "../finstack-quant/portfolio", version = "0.8.0", default-features = false }
+finstack-quant-analytics = { path = "../finstack-quant/analytics", version = "0.9.0" }
+finstack-quant-attribution = { path = "../finstack-quant/attribution", version = "0.9.0", default-features = false }
+finstack-quant-cashflows = { path = "../finstack-quant/cashflows", version = "0.9.0", default-features = false }
+finstack-quant-covenants = { path = "../finstack-quant/covenants", version = "0.9.0", default-features = false }
+finstack-quant-core = { path = "../finstack-quant/core", version = "0.9.0", default-features = false }
+finstack-quant-features = { path = "../finstack-quant/features", version = "0.9.0", default-features = false }
+finstack-quant-margin = { path = "../finstack-quant/margin", version = "0.9.0", default-features = false }
+finstack-quant-statements = { path = "../finstack-quant/statements", version = "0.9.0", default-features = false }
+finstack-quant-statements-analytics = { path = "../finstack-quant/statements-analytics", version = "0.9.0" }
+finstack-quant-valuations = { path = "../finstack-quant/valuations", version = "0.9.0", default-features = false }
+finstack-quant-calibration = { path = "../finstack-quant/calibration", version = "0.9.0", default-features = false }
+finstack-quant-models = { path = "../finstack-quant/models", version = "0.9.0", default-features = false }
+finstack-quant-scenarios = { path = "../finstack-quant/scenarios", version = "0.9.0", default-features = false }
+finstack-quant-portfolio = { path = "../finstack-quant/portfolio", version = "0.9.0", default-features = false }
 wasm-bindgen = "0.2.114"
 js-sys = "0.3"
 serde = { workspace = true }
@@ -57,7 +59,7 @@ required-features = ["contract-generation"]
 
 [package.metadata.wasm-pack.profile.release]
 # Keep this feature allowlist in sync with the wasm features emitted by the
-# pinned Rust toolchain; Rust 1.91+ emits SIMD in the optimized module.
+# pinned Rust 1.97.1 toolchain, which emits SIMD in the optimized module.
 wasm-opt = ["-O", "--enable-bulk-memory", "--enable-nontrapping-float-to-int", "--enable-sign-ext", "--enable-mutable-globals", "--enable-simd"]
 
 [package.metadata.wasm-pack.profile.dev]
@@ -65,3 +67,12 @@ wasm-opt = ["-O", "--enable-bulk-memory", "--enable-nontrapping-float-to-int", "
 
 [lints]
 workspace = true
+
+# Consolidated integration tests
+[[test]]
+name = "wasm"
+path = "tests/wasm.rs"
+
+[[test]]
+name = "dts_contract"
+path = "tests/dts_contract.rs"

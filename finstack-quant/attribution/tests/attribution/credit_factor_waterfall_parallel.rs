@@ -1,6 +1,6 @@
 //! Credit-factor hierarchy detail for waterfall and parallel attribution.
 
-use crate::attribution_support::calibrated_hazard_curve;
+use crate::attribution::attribution_support::calibrated_hazard_curve;
 use finstack_quant_attribution::{
     default_waterfall_order, AttributionEnvelope, AttributionMethod, AttributionSpec,
     CreditFactorDetailOptions,

@@ -1,8 +1,6 @@
 //! Integration tests for the dependency index and selective repricing API.
 
-mod common;
-
-use common::*;
+use crate::common::*;
 use finstack_quant_core::config::FinstackConfig;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;

@@ -16,7 +16,7 @@ use finstack_quant_valuations::metrics::MetricId;
 use rust_decimal::Decimal;
 use time::macros::date;
 
-use crate::common::test_helpers::flat_discount_curve;
+use crate::instruments::common::test_helpers::flat_discount_curve;
 
 fn build_flat_discount_curve(
     rate: f64,

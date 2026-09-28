@@ -38,7 +38,7 @@ fn metric_value(
             market,
             as_of,
             std::slice::from_ref(&metric),
-            crate::test_support::credit::pricing_options(),
+            crate::instruments::test_support::credit::pricing_options(),
         )
         .expect("metric should compute");
     result.measures[&metric]

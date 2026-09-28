@@ -121,7 +121,7 @@ the metric so PV and risk stay consistent. The only public item from it is
 ## Verification
 
 ```bash
-cargo nextest run -p finstack-quant-valuations --test metrics
+cargo nextest run -p finstack-quant-valuations --test valuations metrics
 cargo bench -p finstack-quant-valuations --bench metrics
 cargo bench -p finstack-quant-valuations --bench bucketed_risk
 ```

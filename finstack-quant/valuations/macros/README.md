@@ -25,8 +25,8 @@ under their default names.
 ```toml
 # finstack-quant/valuations/Cargo.toml
 [dependencies]
-finstack-quant-valuations-macros = { path = "macros", version = "0.8.0" }
-finstack-quant-core = { path = "../core", version = "0.8.0" }
+finstack-quant-valuations-macros = { path = "macros", version = "0.9.0" }
+finstack-quant-core = { path = "../core", version = "0.9.0" }
 time = { workspace = true }
 ```
 
@@ -203,8 +203,8 @@ instruments that use it.
 
 ```bash
 cargo clippy -p finstack-quant-valuations-macros --lib --bins --tests --examples --all-features -- -D warnings
-cargo nextest run -p finstack-quant-valuations --test instruments
-cargo nextest run -p finstack-quant-valuations --test default_attribute_consistency
+cargo nextest run -p finstack-quant-valuations --test valuations instruments
+cargo nextest run -p finstack-quant-valuations --test valuations default_attribute_consistency
 ```
 
 Or the whole Rust layer: `mise run rust-test` and `mise run rust-lint`.

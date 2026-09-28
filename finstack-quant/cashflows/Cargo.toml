@@ -8,9 +8,10 @@ repository.workspace = true
 authors.workspace = true
 description = "Cashflow schedule construction, projection, and aggregation for structured finance"
 autobenches = false
+autotests = false
 
 [dependencies]
-finstack-quant-core = { path = "../core", version = "0.8.0", default-features = false }
+finstack-quant-core = { path = "../core", version = "0.9.0", default-features = false }
 indexmap = { workspace = true, features = ["serde"] }
 jsonschema = { version = "0.28", default-features = false, optional = true }
 rust_decimal = { workspace = true }
@@ -46,3 +47,8 @@ harness = false
 
 [lints]
 workspace = true
+
+# Consolidated integration tests
+[[test]]
+name = "cashflows"
+path = "tests/main.rs"

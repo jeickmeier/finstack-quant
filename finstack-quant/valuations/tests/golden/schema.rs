@@ -6,7 +6,7 @@
 //! `tolerances` (one entry per expected metric).
 //!
 //! Unknown-field rejection at the top level and inside each body is enforced
-//! by [`crate::golden::walk`] (serde cannot `deny_unknown_fields` together with
+//! by [`crate::golden::golden::walk`] (serde cannot `deny_unknown_fields` together with
 //! `#[serde(flatten)]` or internally tagged enums).
 
 use serde::{Deserialize, Serialize};

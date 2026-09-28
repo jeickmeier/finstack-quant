@@ -22,22 +22,22 @@ default = []
 extension-module = ["pyo3/extension-module"]
 
 [dependencies]
-finstack-quant-attribution = { path = "../finstack-quant/attribution", version = "0.8.0" }
-finstack-quant-core = { path = "../finstack-quant/core", version = "0.8.0" }
-finstack-quant-analytics = { path = "../finstack-quant/analytics", version = "0.8.0" }
-finstack-quant-cashflows = { path = "../finstack-quant/cashflows", version = "0.8.0" }
-finstack-quant-covenants = { path = "../finstack-quant/covenants", version = "0.8.0" }
-finstack-quant-margin = { path = "../finstack-quant/margin", version = "0.8.0" }
-finstack-quant-models = { path = "../finstack-quant/models", version = "0.8.0" }
-finstack-quant-valuations = { path = "../finstack-quant/valuations", version = "0.8.0" }
-finstack-quant-calibration = { path = "../finstack-quant/calibration", version = "0.8.0" }
-finstack_quant = { package = "finstack-quant", path = "../finstack-quant", version = "0.8.0", features = ["jsonschema-validate"] }
-finstack-quant-features = { path = "../finstack-quant/features", version = "0.8.0" }
-finstack-quant-statements = { path = "../finstack-quant/statements", version = "0.8.0" }
-finstack-quant-statements-analytics = { path = "../finstack-quant/statements-analytics", version = "0.8.0" }
-finstack-quant-scenarios = { path = "../finstack-quant/scenarios", version = "0.8.0" }
-finstack-quant-portfolio = { path = "../finstack-quant/portfolio", version = "0.8.0" }
-finstack-quant-arrow = { path = "../finstack-quant/arrow-interchange", version = "0.8.0" }
+finstack-quant-attribution = { path = "../finstack-quant/attribution", version = "0.9.0" }
+finstack-quant-core = { path = "../finstack-quant/core", version = "0.9.0" }
+finstack-quant-analytics = { path = "../finstack-quant/analytics", version = "0.9.0" }
+finstack-quant-cashflows = { path = "../finstack-quant/cashflows", version = "0.9.0" }
+finstack-quant-covenants = { path = "../finstack-quant/covenants", version = "0.9.0" }
+finstack-quant-margin = { path = "../finstack-quant/margin", version = "0.9.0" }
+finstack-quant-models = { path = "../finstack-quant/models", version = "0.9.0" }
+finstack-quant-valuations = { path = "../finstack-quant/valuations", version = "0.9.0" }
+finstack-quant-calibration = { path = "../finstack-quant/calibration", version = "0.9.0" }
+finstack_quant = { package = "finstack-quant", path = "../finstack-quant", version = "0.9.0", features = ["jsonschema-validate"] }
+finstack-quant-features = { path = "../finstack-quant/features", version = "0.9.0" }
+finstack-quant-statements = { path = "../finstack-quant/statements", version = "0.9.0" }
+finstack-quant-statements-analytics = { path = "../finstack-quant/statements-analytics", version = "0.9.0" }
+finstack-quant-scenarios = { path = "../finstack-quant/scenarios", version = "0.9.0" }
+finstack-quant-portfolio = { path = "../finstack-quant/portfolio", version = "0.9.0" }
+finstack-quant-arrow = { path = "../finstack-quant/arrow-interchange", version = "0.9.0" }
 arrow = { workspace = true, features = ["ffi", "ipc"] }
 nalgebra = { version = "0.34", default-features = false, features = ["std"] }
 numpy = "0.29"

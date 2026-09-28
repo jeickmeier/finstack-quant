@@ -15,7 +15,7 @@ use finstack_quant_core::types::IndexId;
 use finstack_quant_core::HashMap;
 use time::Month;
 
-use crate::calibration_support as cal_utils;
+use crate::calibration::calibration_support as cal_utils;
 
 /// Builds a set of deposit quotes with rates drawn from a known Nelson-Siegel curve.
 ///

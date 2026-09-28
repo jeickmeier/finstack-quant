@@ -1,8 +1,6 @@
 //! Basic integration tests for portfolio optimization.
 
-mod common;
-
-use common::{base_date, market_with_usd};
+use crate::common::{base_date, market_with_usd};
 use finstack_quant_core::config::FinstackConfig;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;

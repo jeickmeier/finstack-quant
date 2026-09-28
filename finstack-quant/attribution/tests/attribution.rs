@@ -10,12 +10,13 @@
 //!
 //! Run all attribution tests:
 //! ```bash
-//! cargo test --test attribution
+//! cargo nextest run -p finstack-quant-attribution --test attribution
 //! ```
 
 #[allow(dead_code)]
 #[path = "support/attribution_test_utils.rs"]
-mod attribution_support;
+pub(crate) mod attribution_support;
 
 #[path = "attribution/mod.rs"]
+#[allow(clippy::module_inception)]
 mod attribution;

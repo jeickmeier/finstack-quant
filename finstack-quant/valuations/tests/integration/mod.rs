@@ -31,13 +31,13 @@
 //!
 //! ```bash
 //! # Run all integration tests
-//! cargo test --test integration
+//! cargo nextest run -p finstack-quant-valuations --test valuations integration::
 //!
 //! # Run specific category
-//! cargo test --test integration e2e::
-//! cargo test --test integration metrics::
-//! cargo test --test integration serialization::
-//! cargo test --test integration schema::
+//! cargo nextest run -p finstack-quant-valuations --test valuations integration::e2e::
+//! cargo nextest run -p finstack-quant-valuations --test valuations integration::metrics::
+//! cargo nextest run -p finstack-quant-valuations --test valuations integration::serialization::
+//! cargo nextest run -p finstack-quant-valuations --test valuations integration::schema::
 //! ```
 
 // End-to-end workflow tests

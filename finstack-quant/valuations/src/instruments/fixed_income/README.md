@@ -115,11 +115,11 @@ serde and dependency-completeness contract tests.
 
 ```bash
 # whole target
-cargo nextest run -p finstack-quant-valuations --test instruments
+cargo nextest run -p finstack-quant-valuations --test valuations instruments
 
 # one leaf (filter is a substring match on the test name)
-cargo nextest run -p finstack-quant-valuations --test instruments bond::
-cargo nextest run -p finstack-quant-valuations --test instruments structured_credit::
+cargo nextest run -p finstack-quant-valuations --test valuations instruments::bond::
+cargo nextest run -p finstack-quant-valuations --test valuations instruments::structured_credit::
 
 # colocated unit tests for a leaf without a test directory
 cargo nextest run -p finstack-quant-valuations --lib fixed_income::mbs_passthrough

@@ -9,10 +9,11 @@ authors.workspace = true
 description = "Financial-statements modeling for Finstack Quant with deterministic Value > Forecast > Formula precedence and corkscrew schedules"
 autobenches = false
 
+autotests = false
 [dependencies]
-finstack-quant-core = { path = "../core", version = "0.8.0", default-features = false }
-finstack-quant-cashflows = { path = "../cashflows", version = "0.8.0", default-features = false }
-finstack-quant-valuations = { path = "../valuations", version = "0.8.0", default-features = false }
+finstack-quant-core = { path = "../core", version = "0.9.0", default-features = false }
+finstack-quant-cashflows = { path = "../cashflows", version = "0.9.0", default-features = false }
+finstack-quant-valuations = { path = "../valuations", version = "0.9.0", default-features = false }
 serde = { workspace = true }
 serde_json = { workspace = true }
 indexmap = { workspace = true, features = ["serde"] }
@@ -58,3 +59,8 @@ harness = false
 
 [lints]
 workspace = true
+
+# Consolidated integration tests
+[[test]]
+name = "statements"
+path = "tests/main.rs"

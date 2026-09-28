@@ -1,6 +1,6 @@
 //! Cashflow generation and validation tests.
 
-use crate::deposit::common::*;
+use crate::instruments::deposit::common::*;
 use finstack_quant_cashflows::CashflowProvider;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::money::Money;

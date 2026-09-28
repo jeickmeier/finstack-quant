@@ -12,7 +12,7 @@ use finstack_quant_valuations::instruments::fixed_income::revolving_credit::{
 use finstack_quant_valuations::instruments::Instrument;
 use time::macros::date;
 
-use crate::common::test_helpers::flat_discount_curve;
+use crate::instruments::common::test_helpers::flat_discount_curve;
 
 fn build_flat_discount_curve(
     rate: f64,

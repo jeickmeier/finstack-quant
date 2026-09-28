@@ -46,7 +46,7 @@ fn price_delta(option: &CDSOption, market: &MarketContext, as_of: Date) -> f64 {
             market,
             as_of,
             &[MetricId::Delta],
-            crate::test_support::credit::pricing_options(),
+            crate::instruments::test_support::credit::pricing_options(),
         )
         .expect("provider-backed price-strike delta")
         .measures[&MetricId::Delta]
@@ -135,7 +135,7 @@ fn price_delta_requires_replay_recipe() {
             &market,
             as_of,
             &[MetricId::Delta],
-            crate::test_support::credit::pricing_options(),
+            crate::instruments::test_support::credit::pricing_options(),
         )
         .expect_err("standard price delta requires quote-space replay");
     assert!(error.to_string().contains("calibration recipe"));
@@ -153,7 +153,7 @@ fn price_gamma_requires_replay_recipe() {
                 &market,
                 as_of,
                 &[MetricId::Gamma],
-                crate::test_support::credit::pricing_options(),
+                crate::instruments::test_support::credit::pricing_options(),
             )
             .expect_err("standard price gamma requires quote-space replay");
         assert!(error.to_string().contains("calibration recipe"));

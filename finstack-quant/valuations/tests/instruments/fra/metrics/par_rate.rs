@@ -4,7 +4,7 @@
 //! current market curves. For standard FRAs, this equals the forward
 //! rate over the period.
 
-use crate::fra::common::*;
+use crate::instruments::fra::common::*;
 use finstack_quant_core::dates::DayCount;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_valuations::instruments::Instrument;

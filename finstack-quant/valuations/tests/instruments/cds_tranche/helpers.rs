@@ -103,7 +103,7 @@ pub fn replayable_market_context() -> MarketContext {
     let source = MarketContext::new()
         .insert(discount)
         .insert(correlation.clone());
-    let hazard = crate::test_support::credit::calibrated_hazard_curve(
+    let hazard = crate::instruments::test_support::credit::calibrated_hazard_curve(
         &source,
         base_date(),
         "CDX.NA.IG.42",

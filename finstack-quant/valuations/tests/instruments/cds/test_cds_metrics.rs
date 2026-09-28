@@ -122,7 +122,7 @@ fn create_test_market(as_of: Date) -> MarketContext {
 
 fn create_replayable_test_market(as_of: Date) -> MarketContext {
     let source = MarketContext::new().insert(build_test_discount(0.05, as_of, "USD_OIS"));
-    let hazard = crate::test_support::credit::calibrated_hazard_curve(
+    let hazard = crate::instruments::test_support::credit::calibrated_hazard_curve(
         &source, as_of, "CORP", "CORP", "USD_OIS",
     )
     .expect("hazard calibration should succeed");
@@ -130,7 +130,7 @@ fn create_replayable_test_market(as_of: Date) -> MarketContext {
 }
 
 fn create_test_cds(as_of: Date, maturity: Date) -> CreditDefaultSwap {
-    crate::test_support::credit::cds_buy_protection(
+    crate::instruments::test_support::credit::cds_buy_protection(
         "METRICS_TEST",
         Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
         100.0,
@@ -155,7 +155,7 @@ fn test_cs01_positive_for_buyer() {
             &market,
             as_of,
             &[MetricId::Cs01],
-            crate::test_support::credit::pricing_options(),
+            crate::instruments::test_support::credit::pricing_options(),
         )
         .unwrap();
 
@@ -176,7 +176,7 @@ fn standard_cs01_without_deal_quote_matches_direct_up_down_replay() {
     let as_of = date!(2024 - 01 - 01);
     let maturity = date!(2029 - 01 - 01);
     let source = MarketContext::new().insert(build_test_discount(0.05, as_of, "USD_OIS"));
-    let hazard = crate::test_support::credit::calibrated_hazard_curve(
+    let hazard = crate::instruments::test_support::credit::calibrated_hazard_curve(
         &source, as_of, "CORP", "CORP", "USD_OIS",
     )
     .expect("hazard calibration should succeed");
@@ -188,7 +188,7 @@ fn standard_cs01_without_deal_quote_matches_direct_up_down_replay() {
             &market,
             as_of,
             &[MetricId::Cs01],
-            crate::test_support::credit::pricing_options(),
+            crate::instruments::test_support::credit::pricing_options(),
         )
         .expect("standard CS01 should compute");
     let standard = result.measures[MetricId::Cs01.as_str()];
@@ -234,7 +234,7 @@ fn deal_quote_override_is_shared_by_cs01_and_cs_gamma() {
     let as_of = date!(2024 - 01 - 01);
     let maturity = date!(2029 - 01 - 01);
     let source = MarketContext::new().insert(build_test_discount(0.05, as_of, "USD_OIS"));
-    let hazard = crate::test_support::credit::calibrated_hazard_curve(
+    let hazard = crate::instruments::test_support::credit::calibrated_hazard_curve(
         &source, as_of, "CORP", "CORP", "USD_OIS",
     )
     .expect("hazard calibration should succeed");
@@ -249,7 +249,7 @@ fn deal_quote_override_is_shared_by_cs01_and_cs_gamma() {
                 &market,
                 as_of,
                 &[MetricId::Cs01, MetricId::CsGamma],
-                crate::test_support::credit::pricing_options(),
+                crate::instruments::test_support::credit::pricing_options(),
             )
             .expect("deal-quote spread risk should compute");
         (
@@ -288,7 +288,7 @@ fn risky_pv01_with_deal_quote_does_not_require_replayable_hazard() {
             &market,
             as_of,
             &[MetricId::RiskyPv01],
-            crate::test_support::credit::pricing_options(),
+            crate::instruments::test_support::credit::pricing_options(),
         )
         .expect("risky PV01 should compute from a manual hazard curve");
     let expected = base_result.measures[MetricId::RiskyPv01.as_str()];
@@ -304,7 +304,7 @@ fn risky_pv01_with_deal_quote_does_not_require_replayable_hazard() {
             &market,
             as_of,
             &[MetricId::RiskyPv01],
-            crate::test_support::credit::pricing_options(),
+            crate::instruments::test_support::credit::pricing_options(),
         )
         .expect("risky PV01 must not depend on standard CS01 replay");
 
@@ -321,7 +321,7 @@ fn deal_quote_cs_gamma_is_centered_on_override_quote_set() {
     let maturity = date!(2029 - 03 - 20);
     let discount_id = CurveId::new("USD_OIS");
     let source = MarketContext::new().insert(build_test_discount(0.05, as_of, "USD_OIS"));
-    let hazard = crate::test_support::credit::calibrated_hazard_curve(
+    let hazard = crate::instruments::test_support::credit::calibrated_hazard_curve(
         &source, as_of, "CORP", "CORP", "USD_OIS",
     )
     .expect("hazard calibration should succeed");
@@ -397,7 +397,7 @@ fn deal_quote_cs_gamma_is_centered_on_override_quote_set() {
             &market,
             as_of,
             &[MetricId::CsGamma],
-            crate::test_support::credit::pricing_options(),
+            crate::instruments::test_support::credit::pricing_options(),
         )
         .expect("deal-quote CS-Gamma should compute");
     let actual_gamma = result.measures[MetricId::CsGamma.as_str()];
@@ -420,7 +420,7 @@ fn bucketed_cs01_quote_uses_each_off_grid_replay_pillar_once() {
     let as_of = date!(2024 - 01 - 01);
     let maturity = date!(2030 - 01 - 01);
     let source = MarketContext::new().insert(build_test_discount(0.05, as_of, "USD_OIS"));
-    let hazard = crate::test_support::credit::calibrated_hazard_curve_with_pillars(
+    let hazard = crate::instruments::test_support::credit::calibrated_hazard_curve_with_pillars(
         &source,
         as_of,
         "CORP",
@@ -447,7 +447,7 @@ fn bucketed_cs01_quote_uses_each_off_grid_replay_pillar_once() {
             &market,
             as_of,
             &[MetricId::Cs01, MetricId::BucketedCs01],
-            crate::test_support::credit::pricing_options(),
+            crate::instruments::test_support::credit::pricing_options(),
         )
         .expect("off-grid quote-space CS01 should compute");
     let prefix = "bucketed_cs01::CORP::";
@@ -487,7 +487,7 @@ fn deal_quote_override_rejects_non_matching_replay_maturity() {
     let as_of = date!(2024 - 01 - 01);
     let maturity = date!(2034 - 01 - 01);
     let source = MarketContext::new().insert(build_test_discount(0.05, as_of, "USD_OIS"));
-    let hazard = crate::test_support::credit::calibrated_hazard_curve_with_pillars(
+    let hazard = crate::instruments::test_support::credit::calibrated_hazard_curve_with_pillars(
         &source,
         as_of,
         "CORP",
@@ -505,7 +505,7 @@ fn deal_quote_override_rejects_non_matching_replay_maturity() {
             &market,
             as_of,
             &[MetricId::Cs01],
-            crate::test_support::credit::pricing_options(),
+            crate::instruments::test_support::credit::pricing_options(),
         )
         .expect_err("a 10Y deal quote must not overwrite the nearest 5Y replay pillar");
     let message = error.to_string();
@@ -529,7 +529,7 @@ fn test_bucketed_cs01_reconciles_with_parallel_under_cds_convention() {
 
     let discount = build_test_discount(0.035, as_of, discount_id.as_str());
     let source = MarketContext::new().insert(discount);
-    let hazard = crate::test_support::credit::calibrated_hazard_curve_with_pillars(
+    let hazard = crate::instruments::test_support::credit::calibrated_hazard_curve_with_pillars(
         &source,
         as_of,
         hazard_id.as_str(),
@@ -550,7 +550,7 @@ fn test_bucketed_cs01_reconciles_with_parallel_under_cds_convention() {
             &market,
             as_of,
             &[MetricId::Cs01, MetricId::BucketedCs01],
-            crate::test_support::credit::pricing_options(),
+            crate::instruments::test_support::credit::pricing_options(),
         )
         .unwrap();
     let parallel = *result.measures.get("cs01").unwrap();
@@ -584,7 +584,7 @@ fn test_risky_pv01_positive() {
             &market,
             as_of,
             &[MetricId::RiskyPv01],
-            crate::test_support::credit::pricing_options(),
+            crate::instruments::test_support::credit::pricing_options(),
         )
         .unwrap();
 
@@ -613,7 +613,7 @@ fn test_par_spread_metric() {
             &market,
             as_of,
             &[MetricId::ParSpread],
-            crate::test_support::credit::pricing_options(),
+            crate::instruments::test_support::credit::pricing_options(),
         )
         .unwrap();
 
@@ -648,7 +648,7 @@ fn test_cds_par_spread_metric_does_not_return_quoted_spread_override() {
             &market,
             as_of,
             &[MetricId::ParSpread],
-            crate::test_support::credit::pricing_options(),
+            crate::instruments::test_support::credit::pricing_options(),
         )
         .unwrap();
     let quoted = quoted_cds
@@ -656,7 +656,7 @@ fn test_cds_par_spread_metric_does_not_return_quoted_spread_override() {
             &market,
             as_of,
             &[MetricId::ParSpread],
-            crate::test_support::credit::pricing_options(),
+            crate::instruments::test_support::credit::pricing_options(),
         )
         .unwrap();
 
@@ -677,7 +677,7 @@ fn test_recovery01_uses_deal_quote_replay_inputs() {
     let as_of = date!(2024 - 01 - 01);
     let maturity = date!(2029 - 01 - 01);
     let source = MarketContext::new().insert(build_test_discount(0.05, as_of, "USD_OIS"));
-    let hazard = crate::test_support::credit::calibrated_hazard_curve(
+    let hazard = crate::instruments::test_support::credit::calibrated_hazard_curve(
         &source, as_of, "CORP", "CORP", "USD_OIS",
     )
     .expect("hazard calibration should succeed");
@@ -692,7 +692,7 @@ fn test_recovery01_uses_deal_quote_replay_inputs() {
                 &market,
                 as_of,
                 &[MetricId::Recovery01],
-                crate::test_support::credit::pricing_options(),
+                crate::instruments::test_support::credit::pricing_options(),
             )
             .expect("deal-quote Recovery01 should compute");
         result.measures[MetricId::Recovery01.as_str()]
@@ -719,7 +719,7 @@ fn test_protection_leg_pv_metric() {
             &market,
             as_of,
             &[MetricId::ProtectionLegPv],
-            crate::test_support::credit::pricing_options(),
+            crate::instruments::test_support::credit::pricing_options(),
         )
         .unwrap();
 
@@ -741,7 +741,7 @@ fn test_premium_leg_pv_metric() {
             &market,
             as_of,
             &[MetricId::PremiumLegPv],
-            crate::test_support::credit::pricing_options(),
+            crate::instruments::test_support::credit::pricing_options(),
         )
         .unwrap();
 
@@ -766,7 +766,7 @@ fn test_expected_loss_positive() {
             &market,
             as_of,
             &[MetricId::ExpectedLoss],
-            crate::test_support::credit::pricing_options(),
+            crate::instruments::test_support::credit::pricing_options(),
         )
         .unwrap();
 
@@ -803,7 +803,7 @@ fn test_expected_loss_formula() {
             &market,
             as_of,
             &[MetricId::ExpectedLoss],
-            crate::test_support::credit::pricing_options(),
+            crate::instruments::test_support::credit::pricing_options(),
         )
         .unwrap();
 
@@ -843,7 +843,7 @@ fn test_expected_loss_conditions_on_as_of() {
             &market,
             as_of,
             &[MetricId::ExpectedLoss],
-            crate::test_support::credit::pricing_options(),
+            crate::instruments::test_support::credit::pricing_options(),
         )
         .unwrap();
     let expected_loss = *result.measures.get("expected_loss").unwrap();
@@ -883,7 +883,7 @@ fn test_jump_to_default_positive_for_buyer() {
             &market,
             as_of,
             &[MetricId::JumpToDefault],
-            crate::test_support::credit::pricing_options(),
+            crate::instruments::test_support::credit::pricing_options(),
         )
         .unwrap();
 
@@ -898,7 +898,7 @@ fn test_jump_to_default_negative_for_seller() {
     let as_of = date!(2024 - 01 - 01);
     let maturity = date!(2029 - 01 - 01);
 
-    let cds = crate::test_support::credit::cds_sell_protection(
+    let cds = crate::instruments::test_support::credit::cds_sell_protection(
         "JTD_SELLER",
         Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
         100.0,
@@ -916,7 +916,7 @@ fn test_jump_to_default_negative_for_seller() {
             &market,
             as_of,
             &[MetricId::JumpToDefault],
-            crate::test_support::credit::pricing_options(),
+            crate::instruments::test_support::credit::pricing_options(),
         )
         .unwrap();
 
@@ -941,7 +941,7 @@ fn test_jump_to_default_magnitude() {
             &market,
             as_of,
             &[MetricId::JumpToDefault],
-            crate::test_support::credit::pricing_options(),
+            crate::instruments::test_support::credit::pricing_options(),
         )
         .unwrap();
 
@@ -963,7 +963,7 @@ fn test_jump_to_default_uses_adjusted_coupon_schedule_for_accrued() {
     let maturity = date!(2031 - 12 - 20);
 
     let notional = Money::new(10_000_000.0, Currency::USD).expect("valid money fixture");
-    let mut cds = crate::test_support::credit::cds_buy_protection(
+    let mut cds = crate::instruments::test_support::credit::cds_buy_protection(
         "JTD_SCHEDULE_ADJ",
         notional,
         100.0,
@@ -983,7 +983,7 @@ fn test_jump_to_default_uses_adjusted_coupon_schedule_for_accrued() {
             &market,
             as_of,
             &[MetricId::JumpToDefault],
-            crate::test_support::credit::pricing_options(),
+            crate::instruments::test_support::credit::pricing_options(),
         )
         .unwrap();
     let jtd = *result.measures.get("jump_to_default").unwrap();
@@ -1032,7 +1032,7 @@ fn test_dv01_metric() {
             &market,
             as_of,
             &[MetricId::Dv01],
-            crate::test_support::credit::pricing_options(),
+            crate::instruments::test_support::credit::pricing_options(),
         )
         .unwrap();
 
@@ -1073,7 +1073,7 @@ fn test_cds_dv01_keeps_unreplayable_hazard_curve_frozen() {
             &market,
             as_of,
             &[MetricId::Dv01],
-            crate::test_support::credit::pricing_options(),
+            crate::instruments::test_support::credit::pricing_options(),
         )
         .unwrap();
     let dv01 = *result.measures.get("dv01").unwrap();
@@ -1112,7 +1112,7 @@ fn test_cds_dv01_uses_discount_quote_bump_when_calibration_exists() {
             &market,
             as_of,
             &[MetricId::Dv01],
-            crate::test_support::credit::pricing_options(),
+            crate::instruments::test_support::credit::pricing_options(),
         )
         .unwrap();
     let dv01 = *result.measures.get("dv01").unwrap();
@@ -1145,7 +1145,7 @@ fn test_cds_dv01_recalibrates_hazard_on_bumped_discount_market() {
     let cds = create_test_cds(as_of, maturity);
     let discount = build_quote_calibrated_discount(0.04, as_of, discount_id.as_str());
     let source = MarketContext::new().insert(discount);
-    let hazard = crate::test_support::credit::calibrated_hazard_curve(
+    let hazard = crate::instruments::test_support::credit::calibrated_hazard_curve(
         &source,
         as_of,
         hazard_id.as_str(),
@@ -1160,7 +1160,7 @@ fn test_cds_dv01_recalibrates_hazard_on_bumped_discount_market() {
             &market,
             as_of,
             &[MetricId::Dv01],
-            crate::test_support::credit::pricing_options(),
+            crate::instruments::test_support::credit::pricing_options(),
         )
         .expect("DV01 should recalibrate hazard against each bumped discount curve");
 
@@ -1257,7 +1257,7 @@ fn test_cdsw_par_spread_metric_uses_full_premium_denominator_when_requested() {
             &market,
             as_of,
             &[MetricId::ParSpread],
-            crate::test_support::credit::pricing_options(),
+            crate::instruments::test_support::credit::pricing_options(),
         )
         .unwrap();
     let cdsw = cdsw_cds
@@ -1265,7 +1265,7 @@ fn test_cdsw_par_spread_metric_uses_full_premium_denominator_when_requested() {
             &market,
             as_of,
             &[MetricId::ParSpread],
-            crate::test_support::credit::pricing_options(),
+            crate::instruments::test_support::credit::pricing_options(),
         )
         .unwrap();
 
@@ -1290,7 +1290,7 @@ fn test_theta_metric() {
             &market,
             as_of,
             &[MetricId::Theta],
-            crate::test_support::credit::pricing_options(),
+            crate::instruments::test_support::credit::pricing_options(),
         )
         .unwrap();
 
@@ -1324,7 +1324,7 @@ fn test_multiple_metrics_simultaneously() {
             &market,
             as_of,
             &metrics,
-            crate::test_support::credit::pricing_options(),
+            crate::instruments::test_support::credit::pricing_options(),
         )
         .unwrap();
 
@@ -1353,7 +1353,7 @@ fn test_risky_pv01_computable() {
             &market,
             as_of,
             &[MetricId::RiskyPv01],
-            crate::test_support::credit::pricing_options(),
+            crate::instruments::test_support::credit::pricing_options(),
         )
         .unwrap();
 
@@ -1366,7 +1366,7 @@ fn test_metrics_scale_with_notional() {
     let as_of = date!(2024 - 01 - 01);
     let maturity = date!(2029 - 01 - 01);
 
-    let cds_small = crate::test_support::credit::cds_buy_protection(
+    let cds_small = crate::instruments::test_support::credit::cds_buy_protection(
         "SMALL",
         Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         100.0,
@@ -1377,7 +1377,7 @@ fn test_metrics_scale_with_notional() {
     )
     .expect("CDS construction should succeed");
 
-    let cds_large = crate::test_support::credit::cds_buy_protection(
+    let cds_large = crate::instruments::test_support::credit::cds_buy_protection(
         "LARGE",
         Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
         100.0,
@@ -1401,7 +1401,7 @@ fn test_metrics_scale_with_notional() {
             &market,
             as_of,
             &metrics,
-            crate::test_support::credit::pricing_options(),
+            crate::instruments::test_support::credit::pricing_options(),
         )
         .unwrap();
     let result_large = cds_large
@@ -1409,7 +1409,7 @@ fn test_metrics_scale_with_notional() {
             &market,
             as_of,
             &metrics,
-            crate::test_support::credit::pricing_options(),
+            crate::instruments::test_support::credit::pricing_options(),
         )
         .unwrap();
 
@@ -1443,7 +1443,7 @@ fn test_cs01_increases_with_tenor() {
                 &market,
                 as_of,
                 &[MetricId::Cs01],
-                crate::test_support::credit::pricing_options(),
+                crate::instruments::test_support::credit::pricing_options(),
             )
             .unwrap();
 
@@ -1480,7 +1480,7 @@ fn test_expected_loss_increases_with_tenor() {
                 &market,
                 as_of,
                 &[MetricId::ExpectedLoss],
-                crate::test_support::credit::pricing_options(),
+                crate::instruments::test_support::credit::pricing_options(),
             )
             .unwrap();
 
@@ -1510,7 +1510,7 @@ fn test_bucketed_dv01_metric() {
             &market,
             as_of,
             &[MetricId::BucketedDv01, MetricId::Dv01],
-            crate::test_support::credit::pricing_options(),
+            crate::instruments::test_support::credit::pricing_options(),
         )
         .unwrap();
 

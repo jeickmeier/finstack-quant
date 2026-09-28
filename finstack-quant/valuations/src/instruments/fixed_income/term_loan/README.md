@@ -193,7 +193,7 @@ envelope; unknown fields are rejected on deserialize.
 
 ```bash
 # Term-loan unit + integration tests
-cargo nextest run -p finstack-quant-valuations --test instruments term_loan::
+cargo nextest run -p finstack-quant-valuations --test valuations instruments::term_loan::
 
 # Whole workspace (never `cargo test` — it runs doctests)
 mise run rust-test

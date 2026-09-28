@@ -11,8 +11,9 @@
 //!
 //! Run all integration tests:
 //! ```bash
-//! cargo test --test integration
+//! cargo nextest run -p finstack-quant-valuations --test valuations integration::
 //! ```
 
 #[path = "integration/mod.rs"]
+#[allow(clippy::module_inception)]
 mod integration;

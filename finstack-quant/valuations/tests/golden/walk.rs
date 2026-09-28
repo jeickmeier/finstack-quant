@@ -1,7 +1,7 @@
 //! Walk-test for validating every committed golden fixture.
 
-use crate::golden::pricing_common::requested_metrics;
-use crate::golden::schema::{Body, GoldenFixture, Market, SCHEMA};
+use crate::golden::golden::pricing_common::requested_metrics;
+use crate::golden::golden::schema::{Body, GoldenFixture, Market, SCHEMA};
 use finstack_quant_calibration::api::schema::CalibrationEnvelope;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_valuations::metrics::MetricId;
@@ -569,7 +569,7 @@ mod tests {
         fixture.expected.insert("dv01".to_string(), 0.0);
         fixture.tolerances.insert(
             "dv01".to_string(),
-            crate::golden::schema::ToleranceEntry {
+            crate::golden::golden::schema::ToleranceEntry {
                 abs: Some(1e-9),
                 rel: None,
                 tolerance_reason: None,

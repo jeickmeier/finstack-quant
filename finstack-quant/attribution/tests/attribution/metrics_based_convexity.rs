@@ -5,7 +5,7 @@
 //! - First-order only (DV01, Theta): < 10%
 //! - With second-order (Convexity, Gamma): < 5%
 
-use crate::attribution_support::TestInstrument;
+use crate::attribution::attribution_support::TestInstrument;
 use finstack_quant_attribution::attribute_pnl_metrics_based;
 use finstack_quant_core::config::{results_meta, FinstackConfig};
 use finstack_quant_core::currency::Currency;

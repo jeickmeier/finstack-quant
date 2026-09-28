@@ -209,7 +209,8 @@ Crate API docs: `cargo doc -p finstack-quant-valuations --open`.
 ## Verification
 
 ```bash
-mise run rust-fmt                      # cargo fmt + clippy --fix (mutating)
+mise run rust-fmt                      # cargo fmt
+mise run rust-fix                      # clippy --fix (mutating; separate from fmt)
 mise run rust-lint                     # fmt --check + clippy -D warnings
 mise run rust-test                     # workspace nextest run
 

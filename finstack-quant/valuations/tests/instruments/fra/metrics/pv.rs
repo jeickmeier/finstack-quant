@@ -3,7 +3,7 @@
 //! The PV is returned in ValuationResult.value (not in measures).
 //! These tests verify it's consistent with direct value() calls.
 
-use crate::fra::common::*;
+use crate::instruments::fra::common::*;
 use finstack_quant_valuations::instruments::Instrument;
 
 #[test]

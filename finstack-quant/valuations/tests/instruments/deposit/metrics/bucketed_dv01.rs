@@ -1,6 +1,6 @@
 //! Bucketed DV01 metric tests.
 
-use crate::deposit::common::*;
+use crate::instruments::deposit::common::*;
 use finstack_quant_valuations::metrics::MetricId;
 
 #[test]

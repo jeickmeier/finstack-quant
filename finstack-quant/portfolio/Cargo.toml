@@ -8,16 +8,17 @@ repository.workspace = true
 authors.workspace = true
 description = "Portfolio aggregation for Finstack Quant: positions, books, and deterministic base-currency rollups with explicit FX policy"
 autobenches = false
+autotests = false
 
 [dependencies]
-finstack-quant-core = { path = "../core", version = "0.8.0", default-features = false }
-finstack-quant-attribution = { path = "../attribution", version = "0.8.0", default-features = false }
-finstack-quant-calibration = { path = "../calibration", version = "0.8.0", default-features = false }
-finstack-quant-cashflows = { path = "../cashflows", version = "0.8.0", default-features = false }
-finstack-quant-margin = { path = "../margin", version = "0.8.0", default-features = false }
-finstack-quant-models = { path = "../models", version = "0.8.0", default-features = false }
-finstack-quant-valuations = { path = "../valuations", version = "0.8.0", default-features = false }
-finstack-quant-scenarios = { path = "../scenarios", version = "0.8.0", default-features = false }
+finstack-quant-core = { path = "../core", version = "0.9.0", default-features = false }
+finstack-quant-attribution = { path = "../attribution", version = "0.9.0", default-features = false }
+finstack-quant-calibration = { path = "../calibration", version = "0.9.0", default-features = false }
+finstack-quant-cashflows = { path = "../cashflows", version = "0.9.0", default-features = false }
+finstack-quant-margin = { path = "../margin", version = "0.9.0", default-features = false }
+finstack-quant-models = { path = "../models", version = "0.9.0", default-features = false }
+finstack-quant-valuations = { path = "../valuations", version = "0.9.0", default-features = false }
+finstack-quant-scenarios = { path = "../scenarios", version = "0.9.0", default-features = false }
 thiserror = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
@@ -109,3 +110,14 @@ rayon = "1.11"
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 js-sys = "0.3.103"
 wasm-bindgen = "0.2.126"
+
+# Consolidated integration tests
+[[test]]
+name = "portfolio"
+path = "tests/main.rs"
+
+# Gated by `#![cfg(feature = "ts_export")]` in the file. A required-features
+# entry would make `--test '*'` fail whenever that feature is off.
+[[test]]
+name = "ts_export"
+path = "tests/ts_export.rs"

@@ -86,7 +86,7 @@ Portfolio-scale benches live in [`../../portfolio/benches/`](../../portfolio/ben
 ## Notes
 
 - Benches use release builds (`--profile bench`).
-- Bench targets are skipped by `mise run rust-fmt` and `mise run rust-lint`.
+- Bench targets are not compiled by `mise run rust-lint` or `mise run rust-fix`.
   Compile and measure them with `mise run rust-bench`; they are not executed by
   `mise run rust-test`.
 - Latency tables in older docs are indicative only; re-measure on your hardware

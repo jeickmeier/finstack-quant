@@ -1,7 +1,7 @@
 [workspace.package]
-version = "0.8.0"
+version = "0.9.0"
 edition = "2021"
-rust-version = "1.90"
+rust-version = "1.97.1"
 authors = ["Jon Eickmeier (me@jeickmeier.com)"]
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/jeickmeier/finstack-quant"
@@ -83,8 +83,10 @@ debug = 1
 [profile.test]
 # Standard test profile
 # Reduced debug level for faster compilation (line info only, no full debug symbols)
+# opt-level 1 keeps clean `rust-test` in the same band as opt-level 0 and cuts a
+# warm rerun from about 136s to 37s on this workspace.
 incremental = true
-opt-level = 0
+opt-level = 1
 debug = 1
 
 [profile.release]
@@ -104,6 +106,17 @@ opt-level = "z"         # Optimize for size
 lto = true              # Full link-time optimization
 codegen-units = 1       # Maximum optimization (slower compile, smaller output)
 strip = true            # Strip all symbols
+
+[profile.wasm-test]
+# Facade tests need a real wasm module, not the fat-LTO release profile.
+# `mise run wasm-pkg` and `wasm-build` stay on release / release-size.
+inherits = "release"
+opt-level = 1
+lto = false
+codegen-units = 256
+incremental = true
+debug = 0
+strip = "none"
 
 [profile.bench]
 # Optimized profile for benchmarking

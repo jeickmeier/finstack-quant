@@ -16,7 +16,7 @@ fn test_delta_call_positive() {
             &market,
             as_of,
             &[MetricId::Delta],
-            crate::test_support::credit::pricing_options(),
+            crate::instruments::test_support::credit::pricing_options(),
         )
         .unwrap();
     let delta = *result.measures.get("delta").unwrap();
@@ -36,7 +36,7 @@ fn test_gamma_positive() {
             &market,
             as_of,
             &[MetricId::Gamma],
-            crate::test_support::credit::pricing_options(),
+            crate::instruments::test_support::credit::pricing_options(),
         )
         .unwrap();
     let gamma = *result.measures.get("gamma").unwrap();
@@ -56,7 +56,7 @@ fn test_vega_positive() {
             &market,
             as_of,
             &[MetricId::Vega],
-            crate::test_support::credit::pricing_options(),
+            crate::instruments::test_support::credit::pricing_options(),
         )
         .unwrap();
     let vega = *result.measures.get("vega").unwrap();
@@ -76,7 +76,7 @@ fn test_theta_exists() {
             &market,
             as_of,
             &[MetricId::Theta],
-            crate::test_support::credit::pricing_options(),
+            crate::instruments::test_support::credit::pricing_options(),
         )
         .unwrap();
     let theta = *result.measures.get("theta").unwrap();
@@ -89,7 +89,7 @@ fn test_theta_exists() {
 fn test_cs01_call_positive() {
     let as_of = date!(2025 - 01 - 01);
     let source = standard_market(as_of);
-    let hazard = crate::test_support::credit::calibrated_hazard_curve(
+    let hazard = crate::instruments::test_support::credit::calibrated_hazard_curve(
         &source,
         as_of,
         "HZ-SN",
@@ -105,7 +105,7 @@ fn test_cs01_call_positive() {
             &market,
             as_of,
             &[MetricId::Cs01],
-            crate::test_support::credit::pricing_options(),
+            crate::instruments::test_support::credit::pricing_options(),
         )
         .unwrap();
     let cs01 = *result.measures.get("cs01").unwrap();
@@ -125,7 +125,7 @@ fn test_dv01_positive() {
             &market,
             as_of,
             &[MetricId::Dv01],
-            crate::test_support::credit::pricing_options(),
+            crate::instruments::test_support::credit::pricing_options(),
         )
         .unwrap();
     let dv01 = *result.measures.get("dv01").unwrap();
@@ -148,7 +148,7 @@ fn test_delta_moneyness_effect() {
                 &market,
                 as_of,
                 &[MetricId::Delta],
-                crate::test_support::credit::pricing_options(),
+                crate::instruments::test_support::credit::pricing_options(),
             )
             .unwrap();
         let delta = *result.measures.get("delta").unwrap();
@@ -173,7 +173,7 @@ fn test_gamma_peaks_atm() {
                 &market,
                 as_of,
                 &[MetricId::Gamma],
-                crate::test_support::credit::pricing_options(),
+                crate::instruments::test_support::credit::pricing_options(),
             )
             .unwrap();
         let gamma = *result.measures.get("gamma").unwrap();
@@ -201,7 +201,7 @@ fn test_vega_time_decay() {
                 &market,
                 as_of,
                 &[MetricId::Vega],
-                crate::test_support::credit::pricing_options(),
+                crate::instruments::test_support::credit::pricing_options(),
             )
             .unwrap();
         let vega = *result.measures.get("vega").unwrap();

@@ -8,21 +8,23 @@ repository.workspace = true
 authors.workspace = true
 description = "Finstack Quant umbrella crate: deterministic, cross-platform financial computation with currency-safe monetary types"
 
+autotests = false
+
 [dependencies]
-finstack_quant_core = { package = "finstack-quant-core", path = "core", version = "0.8.0", default-features = false }
-finstack_quant_analytics = { package = "finstack-quant-analytics", path = "analytics", version = "0.8.0" }
-finstack_quant_attribution = { package = "finstack-quant-attribution", path = "attribution", version = "0.8.0", default-features = false }
-finstack_quant_calibration = { package = "finstack-quant-calibration", path = "calibration", version = "0.8.0", default-features = false }
-finstack_quant_cashflows = { package = "finstack-quant-cashflows", path = "cashflows", version = "0.8.0", default-features = false }
-finstack_quant_covenants = { package = "finstack-quant-covenants", path = "covenants", version = "0.8.0", default-features = false }
-finstack_quant_features = { package = "finstack-quant-features", path = "features", version = "0.8.0", default-features = false }
-finstack_quant_margin = { package = "finstack-quant-margin", path = "margin", version = "0.8.0", default-features = false }
-finstack_quant_statements = { package = "finstack-quant-statements", path = "statements", version = "0.8.0", default-features = false }
-finstack_quant_statements_analytics = { package = "finstack-quant-statements-analytics", path = "statements-analytics", version = "0.8.0" }
-finstack_quant_valuations = { package = "finstack-quant-valuations", path = "valuations", version = "0.8.0", default-features = false }
-finstack_quant_portfolio = { package = "finstack-quant-portfolio", path = "portfolio", version = "0.8.0", default-features = false }
-finstack_quant_scenarios = { package = "finstack-quant-scenarios", path = "scenarios", version = "0.8.0", default-features = false }
-finstack_quant_models = { package = "finstack-quant-models", path = "models", version = "0.8.0", default-features = false }
+finstack_quant_core = { package = "finstack-quant-core", path = "core", version = "0.9.0", default-features = false }
+finstack_quant_analytics = { package = "finstack-quant-analytics", path = "analytics", version = "0.9.0" }
+finstack_quant_attribution = { package = "finstack-quant-attribution", path = "attribution", version = "0.9.0", default-features = false }
+finstack_quant_calibration = { package = "finstack-quant-calibration", path = "calibration", version = "0.9.0", default-features = false }
+finstack_quant_cashflows = { package = "finstack-quant-cashflows", path = "cashflows", version = "0.9.0", default-features = false }
+finstack_quant_covenants = { package = "finstack-quant-covenants", path = "covenants", version = "0.9.0", default-features = false }
+finstack_quant_features = { package = "finstack-quant-features", path = "features", version = "0.9.0", default-features = false }
+finstack_quant_margin = { package = "finstack-quant-margin", path = "margin", version = "0.9.0", default-features = false }
+finstack_quant_statements = { package = "finstack-quant-statements", path = "statements", version = "0.9.0", default-features = false }
+finstack_quant_statements_analytics = { package = "finstack-quant-statements-analytics", path = "statements-analytics", version = "0.9.0" }
+finstack_quant_valuations = { package = "finstack-quant-valuations", path = "valuations", version = "0.9.0", default-features = false }
+finstack_quant_portfolio = { package = "finstack-quant-portfolio", path = "portfolio", version = "0.9.0", default-features = false }
+finstack_quant_scenarios = { package = "finstack-quant-scenarios", path = "scenarios", version = "0.9.0", default-features = false }
+finstack_quant_models = { package = "finstack-quant-models", path = "models", version = "0.9.0", default-features = false }
 serde_json = { workspace = true }
 jsonschema = { version = "0.28", default-features = false, optional = true }
 
@@ -51,3 +53,8 @@ jsonschema-validate = [
 
 [lints]
 workspace = true
+
+# Consolidated integration tests
+[[test]]
+name = "umbrella"
+path = "tests/main.rs"

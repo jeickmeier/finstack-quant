@@ -4,7 +4,7 @@
 //! - DV01(Pay) = -DV01(Receive)
 //! - PV(Pay) + PV(Receive) ≈ 0 (at par rate)
 
-use crate::test_support::rates as test_utils;
+use crate::instruments::test_support::rates as test_utils;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;

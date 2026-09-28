@@ -3,7 +3,7 @@
 //! A metric with both absolute and relative tolerances passes when either
 //! tolerance is satisfied, matching the fixture schema contract.
 
-use crate::golden::schema::ToleranceEntry;
+use crate::golden::golden::schema::ToleranceEntry;
 
 const REL_DENOM_MIN: f64 = 1e-12;
 /// Result of comparing one actual metric against its reference value.

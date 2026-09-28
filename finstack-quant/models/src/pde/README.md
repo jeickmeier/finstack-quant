@@ -410,7 +410,7 @@ cargo nextest run -p finstack-quant-valuations --lib -E 'test(/pde::bridge2d/)'
 mise run rust-test-slow
 
 # Instrument-level tests for both model keys.
-cargo nextest run -p finstack-quant-valuations --test instruments \
+cargo nextest run -p finstack-quant-valuations --test valuations instruments \
   -E 'test(/equity_option::test_alt_models/)'
 
 mise run rust-test

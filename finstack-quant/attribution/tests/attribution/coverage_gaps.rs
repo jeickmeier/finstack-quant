@@ -2,7 +2,7 @@
 //! the attribution window, negative-rate regimes, discount-vs-forward basis
 //! moves, and vol smile/skew changes.
 
-use crate::attribution_support::TestInstrument;
+use crate::attribution::attribution_support::TestInstrument;
 use finstack_quant_attribution::{
     attribute_pnl, attribute_pnl_metrics_based, AttributionMethod, AttributionRequest,
     ExecutionPolicy,

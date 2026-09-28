@@ -1,6 +1,6 @@
 //! Delta tests with analytical and numerical validation
 
-use crate::swaption::common::*;
+use crate::instruments::swaption::common::*;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::metrics::MetricId;

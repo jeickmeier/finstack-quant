@@ -215,11 +215,11 @@ target).
 
 ```bash
 # whole integration target
-cargo nextest run -p finstack-quant-valuations --test instruments
+cargo nextest run -p finstack-quant-valuations --test valuations instruments
 
 # the contract tests this layer is judged by
-cargo nextest run -p finstack-quant-valuations --test instruments dependency_completeness
-cargo nextest run -p finstack-quant-valuations --test cashflow_export_schema
+cargo nextest run -p finstack-quant-valuations --test valuations dependency_completeness
+cargo nextest run -p finstack-quant-valuations --test valuations cashflow_export_schema
 
 # unit tests colocated under src/
 cargo nextest run -p finstack-quant-valuations --lib instruments::common_impl

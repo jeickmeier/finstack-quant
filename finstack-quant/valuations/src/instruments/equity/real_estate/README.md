@@ -193,7 +193,7 @@ There is no typed real-estate class in either binding.
 
 ```bash
 # Real estate pricing and metric tests
-cargo nextest run -p finstack-quant-valuations --test instruments real_estate::
+cargo nextest run -p finstack-quant-valuations --test valuations instruments::real_estate::
 
 # Whole workspace (never `cargo test` — it runs doctests)
 mise run rust-test

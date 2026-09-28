@@ -23,20 +23,21 @@
 //!
 //! Run all calibration tests:
 //! ```bash
-//! cargo test --test calibration
+//! cargo nextest run -p finstack-quant-calibration --test calibration
 //! ```
 
 // Shared Test Utilities
 
 /// Common test utilities: fixtures, tolerances, assertions, builders
 #[path = "../../valuations/tests/common/mod.rs"]
-mod common;
+pub(crate) mod common;
 
 #[path = "support/calibration.rs"]
 #[allow(dead_code, unused_imports)]
-mod calibration_support;
+pub(crate) mod calibration_support;
 
 // Calibration Tests
 
 #[path = "calibration/mod.rs"]
+#[allow(clippy::module_inception)]
 mod calibration;

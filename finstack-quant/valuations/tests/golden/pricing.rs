@@ -1,9 +1,9 @@
 //! Pricing-domain golden tests.
 
-use crate::golden::runner::run_golden_at_path;
-use crate::golden::schema::GoldenFixture;
-use crate::golden::tolerance::ComparisonResult;
-use crate::golden::walk::collect_fixture_paths_under;
+use crate::golden::golden::runner::run_golden_at_path;
+use crate::golden::golden::schema::GoldenFixture;
+use crate::golden::golden::tolerance::ComparisonResult;
+use crate::golden::golden::walk::collect_fixture_paths_under;
 use serde::Deserialize;
 use std::collections::HashSet;
 use std::ffi::OsStr;
@@ -86,7 +86,7 @@ fn known_non_executable() -> Result<Vec<NonExecutableEntry>, String> {
                 fixture_entry.path
             ));
         }
-        crate::golden::walk::validate_fixture(&fixture_path)
+        crate::golden::golden::walk::validate_fixture(&fixture_path)
             .map_err(|err| format!("validate unresolved fixture {fixture_path:?}: {err}"))?;
         let fixture_raw = std::fs::read_to_string(&fixture_path)
             .map_err(|err| format!("read unresolved fixture {fixture_path:?}: {err}"))?;
@@ -241,8 +241,8 @@ fn golden_pricing_fixtures_from_existing_json_files() {
 #[cfg(test)]
 mod unresolved_metric_tests {
     use super::*;
-    use crate::golden::schema::ToleranceEntry;
-    use crate::golden::tolerance::compare;
+    use crate::golden::golden::schema::ToleranceEntry;
+    use crate::golden::golden::tolerance::compare;
 
     fn unresolved(metric: &str) -> UnresolvedMetricEntry {
         UnresolvedMetricEntry {
@@ -252,7 +252,7 @@ mod unresolved_metric_tests {
         }
     }
 
-    fn passed(metric: &str) -> crate::golden::tolerance::ComparisonResult {
+    fn passed(metric: &str) -> crate::golden::golden::tolerance::ComparisonResult {
         compare(
             metric,
             1.0,
@@ -265,7 +265,7 @@ mod unresolved_metric_tests {
         )
     }
 
-    fn failed(metric: &str) -> crate::golden::tolerance::ComparisonResult {
+    fn failed(metric: &str) -> crate::golden::golden::tolerance::ComparisonResult {
         compare(
             metric,
             2.0,

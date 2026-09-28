@@ -158,18 +158,18 @@ mise run rust-test
 cargo nextest run -p finstack-quant-valuations
 
 # One target
-cargo nextest run -p finstack-quant-valuations --test instruments
+cargo nextest run -p finstack-quant-valuations --test valuations instruments
 cargo nextest run -p finstack-quant-valuations --test calibration
-cargo nextest run -p finstack-quant-valuations --test metrics
+cargo nextest run -p finstack-quant-valuations --test valuations metrics
 
 # A subtree within a target (filter is a substring match on the test name)
-cargo nextest run -p finstack-quant-valuations --test instruments bond::
+cargo nextest run -p finstack-quant-valuations --test valuations instruments::bond::
 cargo nextest run -p finstack-quant-valuations --test calibration term_structures::
-cargo nextest run -p finstack-quant-valuations --test metrics sign_conventions::
+cargo nextest run -p finstack-quant-valuations --test valuations metrics::metrics::sign_conventions::
 
 # Ignored (slow) tests
 mise run rust-test-slow
-cargo nextest run -p finstack-quant-valuations --test instruments --run-ignored only
+cargo nextest run -p finstack-quant-valuations --test valuations instruments --run-ignored only
 
 # Golden layers (Rust + Python)
 mise run goldens-test

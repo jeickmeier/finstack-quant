@@ -13,7 +13,7 @@ mod capital_structure_dsl_tests;
 mod proptest_dsl;
 
 #[path = "support/rates.rs"]
-mod rates_support;
+pub(crate) mod rates_support;
 
 #[path = "support/period_flows.rs"]
-mod support;
+pub(crate) mod support;

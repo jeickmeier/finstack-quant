@@ -12,11 +12,8 @@ use finstack_quant_statements::types::{DebtInstrumentSpec, FinancialStatementIns
 use finstack_quant_valuations::instruments::{fixed_income::bond::Bond, PayReceive};
 use time::Month;
 
-#[path = "support/period_flows.rs"]
-mod support;
-
-#[path = "support/rates.rs"]
-mod rates_support;
+use crate::dsl_all::rates_support;
+use crate::dsl_all::support;
 
 use rates_support::usd_irs_swap;
 

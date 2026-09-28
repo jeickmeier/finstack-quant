@@ -1,6 +1,6 @@
 //! Model-aware term-loan credit-spread sensitivity regressions.
 
-use crate::common::test_helpers::flat_discount_curve;
+use crate::instruments::common::test_helpers::flat_discount_curve;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::types::CurveId;
 use finstack_quant_valuations::instruments::fixed_income::term_loan::TermLoan;
@@ -15,7 +15,7 @@ fn credit_loan_and_market() -> (TermLoan, MarketContext) {
     loan.credit_curve_id = Some(CurveId::new("USD-CREDIT"));
     let discount = flat_discount_curve(0.04, as_of, "USD-OIS");
     let source = MarketContext::new().insert(discount);
-    let hazard = crate::test_support::credit::calibrated_hazard_curve(
+    let hazard = crate::instruments::test_support::credit::calibrated_hazard_curve(
         &source,
         as_of,
         "USD-CREDIT",
@@ -38,7 +38,7 @@ fn cs01_follows_the_selected_pricing_model() {
             &market,
             as_of,
             &[MetricId::Cs01, MetricId::BucketedCs01],
-            crate::test_support::credit::pricing_options(),
+            crate::instruments::test_support::credit::pricing_options(),
         )
         .expect("credit-tree metrics");
     let tree_cs01 = *tree.measures.get("cs01").expect("cs01");

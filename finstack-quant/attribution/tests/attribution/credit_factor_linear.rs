@@ -5,7 +5,7 @@
 //!  2. `taylor_credit_detail_reconciles_to_credit_curves_pnl`
 //!  3. `twisted_hazard_curve_does_not_omit_or_explode_credit_detail`
 
-use crate::attribution_support::calibrated_hazard_curve;
+use crate::attribution::attribution_support::calibrated_hazard_curve;
 use finstack_quant_attribution::{
     AttributionEnvelope, AttributionMethod, AttributionSpec, CreditFactorDetailOptions,
     PnlAttribution,

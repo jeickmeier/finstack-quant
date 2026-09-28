@@ -10,7 +10,7 @@
 //! 2. DV01 ≈ notional × duration × 0.0001
 //! 3. Par rate sensible range
 
-use crate::rates_support;
+use crate::sanity_invariants::rates_support;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;

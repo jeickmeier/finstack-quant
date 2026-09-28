@@ -138,10 +138,10 @@ Rosenbaum (2019).
 ## Running
 
 ```bash
-cargo nextest run -p finstack-quant-core --test golden_tests
+cargo nextest run -p finstack-quant-core --test core golden_tests
 
 # one suite
-cargo nextest run -p finstack-quant-core --test golden_tests vol_models
+cargo nextest run -p finstack-quant-core --test core vol_models
 ```
 
 These are part of `mise run rust-test`. The workspace `mise run goldens-*` tasks

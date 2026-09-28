@@ -1,7 +1,7 @@
 //! Black model pricing tests with manual formula validation
 
-use crate::common::test_helpers::tolerances;
-use crate::swaption::common::*;
+use crate::instruments::common::test_helpers::tolerances;
+use crate::instruments::swaption::common::*;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::DayCountContext;
 use finstack_quant_core::market_data::context::MarketContext;

@@ -7,14 +7,14 @@
 # Naming convention: <domain>-<action>  (domains: rust, python, wasm, ui, all)
 #   - `rust-*`, `python-*`, `wasm-*`, `ui-*`  — single-language tasks
 #   - `all-*`                          — aggregates that fan out to rust/python/wasm
-#   - `*-fmt`                          — reformats AND applies auto-fixes (mutating)
+#   - `*-fmt`                          — reformats (Rust) or reformats and auto-fixes (Python, WASM)
+#   - `rust-fix`                       — clippy --fix (mutating; separate from fmt so it does not
+#                                        invalidate the plain clippy cache)
 #   - `*-lint`                         — check-only (CI-safe, no mutation)
 
 [tools]
-# Pin the active toolchain to an exact rustup name (1.91.1), not the bare
-# channel (1.91). mise resolves `1.91` → installs `1.91.1`, while
-# RUSTUP_TOOLCHAIN=1.91 would then make parallel `cargo:*` installs each
-# race to fetch the `1.91` channel (rustup download rename / os error 2).
+# Pin the active toolchain to an exact rustup name. A bare channel can make
+# parallel `cargo:*` installs race to fetch and rename the same download.
 # Nightly is also installed because cargo-public-api (used by
 # `mise run rust-doc`) can only build rustdoc JSON with nightly; see
 # scripts/check_public_api_input_docs.py.
@@ -30,18 +30,18 @@ node = "24"
 "cargo:cargo-nextest" = "0.9.143"
 "cargo:cargo-llvm-cov" = "0.9.0"
 "cargo:cargo-deny" = "0.20.2"
+"github:obi1kenobi/cargo-semver-checks" = "0.50.0"
 "cargo:cargo-public-api" = "0.52.0"
 "cargo:flamegraph" = "latest"    # local profiling only, never gates CI
 "cargo:maturin" = "1.14.1"
 "aqua:google/osv-scanner" = "2.3.5"
 
 [env]
-CARGO_INCREMENTAL = "{{ env.CARGO_INCREMENTAL | default(value='1') }}"
 CARGO_HOME = "{{ env.CARGO_HOME | default(value=env.HOME ~ '/.cargo') }}"
 RUSTUP_HOME = "{{ env.RUSTUP_HOME | default(value=env.HOME ~ '/.rustup') }}"
 # Keep builds on the pinned stable toolchain when mise also provisions
 # nightly for rustdoc JSON. Must match the rust tool version name above.
-RUSTUP_TOOLCHAIN = "{{ env.RUSTUP_TOOLCHAIN | default(value='1.91.1') }}"
+RUSTUP_TOOLCHAIN = "1.97.1"
 UV_PYTHON_DOWNLOADS = "{{ env.UV_PYTHON_DOWNLOADS | default(value='never') }}"
 
 # ─────────────────────────────────────────────────────────────────
@@ -49,8 +49,8 @@ UV_PYTHON_DOWNLOADS = "{{ env.UV_PYTHON_DOWNLOADS | default(value='never') }}"
 # ─────────────────────────────────────────────────────────────────
 
 [tasks.all]
-description = "Build, test, and lint everything (rust + python + wasm)"
-run = [{ task = "all-build" }, { task = "all-test" }, { task = "all-lint" }]
+description = "Test and lint everything (rust + python + wasm); use all-build for explicit build verification"
+run = [{ task = "all-test" }, { task = "all-lint" }]
 
 [tasks.all-build]
 description = "Build Rust workspace, Python bindings, and WASM package"
@@ -67,18 +67,18 @@ run = [
 [tasks.goldens-test]
 description = "Run golden tests (Rust + Python layers)"
 run = """
-cargo test -p finstack-quant-valuations --test golden -- --include-ignored &&
+cargo test -p finstack-quant-valuations --test valuations golden -- --include-ignored &&
 mise run python-build &&
-uv run pytest finstack-quant-py/tests/golden -v
+uv run --no-sync pytest finstack-quant-py/tests/golden -v
 """
 
 [tasks.goldens-test-strict]
 description = "Run golden tests ignoring known_non_executable.json (surface every failure)"
 env = { GOLDEN_IGNORE_NON_EXECUTABLE = "1" }
 run = """
-cargo test -p finstack-quant-valuations --test golden -- --include-ignored &&
+cargo test -p finstack-quant-valuations --test valuations golden -- --include-ignored &&
 mise run python-build &&
-uv run pytest finstack-quant-py/tests/golden -v
+uv run --no-sync pytest finstack-quant-py/tests/golden -v
 """
 
 [tasks.goldens-quantlib-generate]
@@ -98,7 +98,7 @@ description = "Check QuantLib attribution parity fixtures for generator drift"
 run = "uv run python -m scripts.golden.quantlib.generate --family attribution --product all --check"
 
 [tasks.all-fmt]
-description = "Format + auto-fix Rust, Python, and WASM code (mutating)"
+description = "Format Rust, Python, and WASM; auto-fix Python and WASM (mutating)"
 depends = ["rust-fmt", "python-fmt", "wasm-fmt"]
 
 [tasks.all-lint]
@@ -151,12 +151,8 @@ run = "cargo build --workspace --exclude finstack-quant-py --exclude finstack-qu
 
 [tasks.rust-build-prod]
 description = "Release build without debug info"
-env = { RUSTFLAGS = "-C debuginfo=0" }
+env = { RUSTFLAGS = "-C debuginfo=0", CARGO_INCREMENTAL = "0" }
 run = "cargo build --workspace --exclude finstack-quant-py --exclude finstack-quant-wasm --release"
-
-[tasks.rust-msrv]
-description = "Check all production Rust targets with the declared Rust 1.90 MSRV"
-run = "cargo +1.90 check --locked --workspace --all-features --lib --bins --examples"
 
 [tasks.rust-test-crate]
 description = "Run lib + integration tests for one crate (preferred during iteration)"
@@ -178,7 +174,7 @@ fi
 description = "Run one integration test binary in a crate"
 usage = '''
 arg "<package>" help="Cargo package (e.g. finstack-quant-valuations)"
-arg "<test>" help="Integration test name without .rs (e.g. instruments, golden)"
+arg "<test>" help="Integration test binary (e.g. valuations, portfolio)"
 flag "--slow" help="Include ignored/slow tests"
 '''
 run = '''
@@ -240,7 +236,7 @@ run = '''
 set -e
 pkg="${usage_package?}"
 if [ "${usage_release:-false}" = "true" ]; then
-  cargo build -p "$pkg" --release
+  CARGO_INCREMENTAL=0 cargo build -p "$pkg" --release
 else
   cargo build -p "$pkg"
 fi
@@ -304,24 +300,29 @@ echo "HTML report: target/llvm-cov/html/index.html"
 """
 
 [tasks.rust-lint-crate]
-description = "Lint one crate: fmt check + clippy on lib/tests/bins/examples (preferred during iteration)"
+description = "Lint one crate: fmt check + clippy (preferred during iteration; --lib skips integration tests)"
 usage = '''
 arg "<package>" help="Cargo package (e.g. finstack-quant-valuations, finstack-quant-py)"
 flag "--all-features" help="Enable all crate features for clippy"
+flag "--lib" help="Clippy the library target only"
 '''
 run = '''
 set -e
 pkg="${usage_package?}"
 cargo fmt --all -- --check
+features=""
+targets="--lib --tests --bins --examples"
 if [ "${usage_all_features:-false}" = "true" ]; then
-  cargo clippy -p "$pkg" --lib --tests --bins --examples --all-features -- -D warnings
-else
-  cargo clippy -p "$pkg" --lib --tests --bins --examples -- -D warnings
+  features="--all-features"
 fi
+if [ "${usage_lib:-false}" = "true" ]; then
+  targets="--lib"
+fi
+cargo clippy -p "$pkg" $targets $features -- -D warnings
 '''
 
-[tasks.rust-fmt-crate]
-description = "Format + clippy --fix for one crate (mutating; skips workspace benches)"
+[tasks.rust-fix-crate]
+description = "Apply clippy --fix for one crate (mutating; skips workspace benches)"
 usage = '''
 arg "<package>" help="Cargo package (e.g. finstack-quant-scenarios)"
 flag "--all-features" help="Enable all crate features for clippy"
@@ -329,7 +330,6 @@ flag "--all-features" help="Enable all crate features for clippy"
 run = '''
 set -e
 pkg="${usage_package?}"
-cargo fmt --all
 if [ "${usage_all_features:-false}" = "true" ]; then
   cargo clippy -p "$pkg" --lib --tests --bins --examples --all-features --fix --allow-dirty -- -D warnings
 else
@@ -338,15 +338,17 @@ fi
 '''
 
 [tasks.rust-fmt]
-# `--workspace` keeps the mutating pass in step with `rust-lint`'s check-only pass;
-# without it, auto-fixes would skip the binding crates that rust-lint now gates on.
+description = "Format the full workspace with cargo fmt"
+run = "cargo fmt --all"
+
+[tasks.rust-fix]
+# `--workspace` keeps auto-fixes in step with `rust-lint`.
 # Clippy covers lib/bins/tests/examples only — Criterion benches are compiled by
-# `rust-bench`, not by fmt or lint.
-description = "Format + auto-fix full workspace (use rust-fmt-crate while iterating; skips benches)"
-run = [
-  "cargo fmt --all",
-  "cargo clippy --workspace --lib --bins --tests --examples --all-features --fix --allow-dirty -- -D warnings",
-]
+# `rust-bench`, not by fix or lint. `clippy --fix` rebuilds workspace crates
+# with a different fingerprint than plain clippy, so run it on demand rather
+# than on every format.
+description = "Apply clippy --fix across the workspace (mutating; skips benches)"
+run = "cargo clippy --workspace --lib --bins --tests --examples --all-features --fix --allow-dirty -- -D warnings"
 
 [tasks.rust-lint]
 # Full-workspace pass — matches CI pre-commit (.pre-commit-config.yaml).
@@ -399,17 +401,18 @@ description = "Build Python bindings in-place (pass --release for optimized buil
 usage = '''
 flag "--release" help="Build with release profile (slower compile, faster runtime)"
 '''
-run = 'uv run --no-sync maturin develop{% if usage.release %} --release{% endif %}'
+run = '{% if usage.release %}CARGO_INCREMENTAL=0 {% endif %}uv run --no-sync maturin develop{% if usage.release %} --release{% endif %}'
 
 [tasks.materialization-benchmark-fixtures]
 description = "Generate deterministic portfolio materialization benchmark fixtures"
+env = { CARGO_INCREMENTAL = "0" }
 run = "cargo run --release --quiet -p finstack-quant-portfolio --example materialization_fixtures -- target/materialization-benchmarks"
 
 [tasks.python-bench]
 description = "Manually benchmark all Python bindings with an optimized extension"
 run = """
 mise run python-build -- --release
-uv run pytest finstack-quant-py/benchmarks/bench_bindings.py -m perf --benchmark-only
+uv run --no-sync pytest finstack-quant-py/benchmarks/bench_bindings.py -m perf --benchmark-only
 """
 
 [tasks.python-bench-portfolio]
@@ -417,12 +420,13 @@ description = "Benchmark portfolio Python bindings with an optimized extension"
 run = """
 mise run materialization-benchmark-fixtures
 mise run python-build -- --release
-uv run pytest finstack-quant-py/benchmarks/bench_bindings.py \
+uv run --no-sync pytest finstack-quant-py/benchmarks/bench_bindings.py \
   -m perf --benchmark-only -k Portfolio
 """
 
 [tasks.wasm-bench-materialization]
 description = "Regenerate fixtures, release-build WASM, and benchmark materialization"
+env = { CARGO_INCREMENTAL = "0" }
 run = """
 mise run materialization-benchmark-fixtures
 npm --prefix finstack-quant-wasm run build:node
@@ -492,28 +496,33 @@ uv run python scripts/check_python_materialization_regressions.py compare \
 description = "Build dev Python bindings, then run fast Python tests"
 run = """
 mise run python-build
-uv run pytest -v -m 'not slow'
+uv run --no-sync pytest -v -m 'not slow'
 """
+
+[tasks.python-test-file]
+description = "Run one Python test file or node ID against the already built extension"
+usage = 'arg "<test>" help="Pytest file path or node ID; run python-build after binding changes"'
+run = 'uv run --no-sync pytest -q "${usage_test?}"'
 
 [tasks.python-test-slow]
 description = "Build dev Python bindings, then run slow Python tests"
 run = """
 mise run python-build
-uv run pytest -v -m slow
+uv run --no-sync pytest -v -m slow
 """
 
 [tasks.python-test-all]
 description = "Build dev Python bindings, then run the full Python test suite"
 run = """
 mise run python-build
-uv run pytest -v
+uv run --no-sync pytest -v
 """
 
 [tasks.python-test-cov]
 description = "Build dev Python bindings, then run Python tests with HTML coverage report"
 run = """
 mise run python-build
-uv run pytest -v --cov=finstack-quant-py/finstack_quant --cov-report=term-missing --cov-report=html:target/python-cov
+uv run --no-sync pytest -v --cov=finstack-quant-py/finstack_quant --cov-report=term-missing --cov-report=html:target/python-cov
 """
 
 [tasks.python-fmt]
@@ -553,7 +562,7 @@ run = "uv run --no-sync ty check finstack-quant-py/finstack_quant"
 
 [tasks.python-audit]
 description = "Audit Python dependencies via bandit"
-run = "uv run bandit -r finstack-quant-py -c pyproject.toml"
+run = "uv run --no-sync bandit -r finstack-quant-py -c pyproject.toml"
 
 [tasks.python-update]
 description = "Update Python dependencies"
@@ -573,16 +582,23 @@ run = "python3 scripts/clean_workspace.py --wasm"
 
 [tasks.wasm-build]
 description = "Build WASM package (web target)"
+env = { CARGO_INCREMENTAL = "0" }
 run = "wasm-pack build finstack-quant-wasm --target web"
 
 [tasks.wasm-test]
 description = "Run WASM package tests (wasm-bindgen + Node facade)"
+# Facade builds use profile.wasm-test (opt-level 1, no LTO). Published packages
+# stay on wasm-build / wasm-pkg.
 run = [
   "npm --prefix finstack-quant-wasm run test",
-  "npm --prefix finstack-quant-wasm run build",
-  "npm --prefix finstack-quant-wasm run build:node",
+  "wasm-pack build finstack-quant-wasm --target web --profile wasm-test --no-opt --out-dir pkg",
+  "wasm-pack build finstack-quant-wasm --target nodejs --profile wasm-test --no-opt --out-dir pkg-node",
   "npm --prefix finstack-quant-wasm run test:facade",
 ]
+
+[tasks.wasm-test-built]
+description = "Run Node facade tests against the already built web and Node WASM packages"
+run = "npm --prefix finstack-quant-wasm run test:facade"
 
 [tasks.wasm-test-cov]
 description = "Run WASM binding tests with HTML coverage report"
@@ -640,10 +656,11 @@ run = [
 
 [tasks.wasm-pkg]
 description = "Build WASM package (web + node targets)"
+env = { CARGO_INCREMENTAL = "0" }
 run = [
   "node finstack-quant-wasm/scripts/build-web.mjs",
   "wasm-pack build finstack-quant-wasm --target nodejs --release --out-dir pkg-node",
-  '''uv run python -c "from pathlib import Path; [Path(p).touch() for p in ('finstack-quant-wasm/pkg/.npmignore', 'finstack-quant-wasm/pkg-node/.npmignore')]"''',
+  "touch finstack-quant-wasm/pkg/.npmignore finstack-quant-wasm/pkg-node/.npmignore",
 ]
 
 [tasks.wasm-gen-contracts]
@@ -683,11 +700,11 @@ run = [
 
 [tasks.wheel-local]
 description = "Build wheel for current platform + Python"
-run = "uv run maturin build --release -o target/wheels"
+run = "CARGO_INCREMENTAL=0 uv run maturin build --release -o target/wheels"
 
 [tasks.wheel-all]
 description = "Build wheels for all locally-available Python versions"
-run = "uv run maturin build --release --find-interpreter -o target/wheels"
+run = "CARGO_INCREMENTAL=0 uv run maturin build --release --find-interpreter -o target/wheels"
 
 # ─────────────────────────────────────────────────────────────────
 # Schemas
@@ -696,8 +713,8 @@ run = "uv run maturin build --release --find-interpreter -o target/wheels"
 [tasks.rust-serde-audit]
 description = "Audit public Rust contract types for serde and JsonSchema coverage"
 run = [
-  "uv run pytest scripts/tests/test_serde_audit.py -q",
-  "uv run python -m scripts.serde_audit --check",
+  "uv run --no-sync pytest scripts/tests/test_serde_audit.py -q",
+  "uv run --no-sync python -m scripts.serde_audit --check",
 ]
 
 [tasks.rust-check-schemas]
@@ -706,44 +723,83 @@ run = [
   "mise run rust-serde-audit",
   "uv run --no-sync pytest scripts/tests/test_check_schema_residue.py -q",
   "uv run --no-sync python scripts/check_schema_residue.py",
-  "cargo run -p finstack-quant-core --bin gen_core_schemas -- --check",
-  "cargo run -p finstack-quant-attribution --bin gen_attribution_schemas -- --check",
-  "cargo run -p finstack-quant-calibration --bin gen_calibration_schemas -- --check",
-  "cargo run -p finstack-quant-cashflows --bin gen_cashflow_schemas -- --check",
-  "cargo run -p finstack-quant-models --bin gen_factor_model_schemas -- --check",
-  "cargo run -p finstack-quant-margin --bin gen_margin_schema -- --check",
-  "cargo run -p finstack-quant-scenarios --bin gen_scenario_schemas -- --check",
-  "cargo run -p finstack-quant-statements --bin gen_statement_schemas -- --check",
-  "cargo run -p finstack-quant-valuations --bin gen_schemas -- --check",
-  "cargo run -p finstack-quant-portfolio --bin gen_materialization_schemas -- --check",
+  """
+  set -eu
+  cargo build \
+    -p finstack-quant-core --bin gen_core_schemas \
+    -p finstack-quant-attribution --bin gen_attribution_schemas \
+    -p finstack-quant-calibration --bin gen_calibration_schemas \
+    -p finstack-quant-cashflows --bin gen_cashflow_schemas \
+    -p finstack-quant-models --bin gen_factor_model_schemas \
+    -p finstack-quant-margin --bin gen_margin_schema \
+    -p finstack-quant-scenarios --bin gen_scenario_schemas \
+    -p finstack-quant-statements --bin gen_statement_schemas \
+    -p finstack-quant-valuations --bin gen_schemas \
+    -p finstack-quant-portfolio --bin gen_materialization_schemas
+  target_dir="${CARGO_TARGET_DIR:-target}"
+  for bin in \
+    gen_core_schemas \
+    gen_attribution_schemas \
+    gen_calibration_schemas \
+    gen_cashflow_schemas \
+    gen_factor_model_schemas \
+    gen_margin_schema \
+    gen_scenario_schemas \
+    gen_statement_schemas \
+    gen_schemas \
+    gen_materialization_schemas
+  do
+    "${target_dir}/debug/${bin}" --check
+  done
+  """,
   "uv run --no-sync python scripts/check_schema_generation.py",
-  "cargo test -p finstack-quant-cashflows --test cashflows schema_roundtrip:: --no-fail-fast",
-  "cargo test -p finstack-quant-portfolio --test materialization_schema --no-fail-fast",
-  "cargo test -p finstack-quant-margin --test schema_parity --no-fail-fast",
-  "cargo test -p finstack-quant-attribution --test attribution attribution::schema_contract:: --no-fail-fast",
-  "cargo test -p finstack-quant-calibration --test calibration schema_parity --no-fail-fast",
-  "cargo test -p finstack-quant-statements --test schema_contract --no-fail-fast",
-  "cargo test -p finstack-quant-scenarios --test schema_contract --no-fail-fast",
-  "cargo test -p finstack-quant-models --test factor_schema_contract --no-fail-fast",
-  "cargo test -p finstack-quant-valuations --test integration schema_parity --no-fail-fast",
-  "cargo test -p finstack-quant-valuations --lib test_instrument_schema_union_parity --no-fail-fast",
-  "cargo test -p finstack-quant-valuations --test schema_audit --no-fail-fast",
+  """
+  cargo nextest run --no-fail-fast -E '\
+    (binary_id(finstack-quant-cashflows::cashflows) & test(/schema_roundtrip::/)) | \
+    (binary_id(finstack-quant-portfolio::portfolio) & test(/materialization_schema/)) | \
+    (binary_id(finstack-quant-margin::margin) & test(/schema_parity/)) | \
+    (binary_id(finstack-quant-attribution::attribution) & test(/attribution::schema_contract::/)) | \
+    (binary_id(finstack-quant-calibration::calibration) & test(/schema_parity/)) | \
+    (binary_id(finstack-quant-statements::statements) & test(/schema_contract/)) | \
+    (binary_id(finstack-quant-scenarios::scenarios) & test(/schema_contract/)) | \
+    (binary_id(finstack-quant-models::models) & test(/factor_schema_contract/)) | \
+    (binary_id(finstack-quant-valuations::valuations) & test(/schema_parity/)) | \
+    (package(finstack-quant-valuations) & kind(lib) & test(/test_instrument_schema_union_parity/)) | \
+    (binary_id(finstack-quant-valuations::valuations) & test(/schema_audit/))'
+  """,
 ]
 
 [tasks.rust-gen-schemas]
 description = "Regenerate typed JSON schemas from Rust types"
-run = [
-  "cargo run -p finstack-quant-core --bin gen_core_schemas -- --write",
-  "cargo run -p finstack-quant-attribution --bin gen_attribution_schemas -- --write",
-  "cargo run -p finstack-quant-calibration --bin gen_calibration_schemas -- --write",
-  "cargo run -p finstack-quant-cashflows --bin gen_cashflow_schemas -- --write",
-  "cargo run -p finstack-quant-models --bin gen_factor_model_schemas -- --write",
-  "cargo run -p finstack-quant-margin --bin gen_margin_schema -- --write",
-  "cargo run -p finstack-quant-scenarios --bin gen_scenario_schemas -- --write",
-  "cargo run -p finstack-quant-statements --bin gen_statement_schemas -- --write",
-  "cargo run -p finstack-quant-valuations --bin gen_schemas -- --write",
-  "cargo run -p finstack-quant-portfolio --bin gen_materialization_schemas -- --write",
-]
+run = '''
+set -eu
+cargo build \
+  -p finstack-quant-core --bin gen_core_schemas \
+  -p finstack-quant-attribution --bin gen_attribution_schemas \
+  -p finstack-quant-calibration --bin gen_calibration_schemas \
+  -p finstack-quant-cashflows --bin gen_cashflow_schemas \
+  -p finstack-quant-models --bin gen_factor_model_schemas \
+  -p finstack-quant-margin --bin gen_margin_schema \
+  -p finstack-quant-scenarios --bin gen_scenario_schemas \
+  -p finstack-quant-statements --bin gen_statement_schemas \
+  -p finstack-quant-valuations --bin gen_schemas \
+  -p finstack-quant-portfolio --bin gen_materialization_schemas
+target_dir="${CARGO_TARGET_DIR:-target}"
+for bin in \
+  gen_core_schemas \
+  gen_attribution_schemas \
+  gen_calibration_schemas \
+  gen_cashflow_schemas \
+  gen_factor_model_schemas \
+  gen_margin_schema \
+  gen_scenario_schemas \
+  gen_statement_schemas \
+  gen_schemas \
+  gen_materialization_schemas
+do
+  "${target_dir}/debug/${bin}" --write
+done
+'''
 
 [tasks.core-gen-data]
 description = "Generate core currency and lunar reference tables from maintained CSV data"
@@ -818,16 +874,18 @@ osv-scanner \
 [tasks.check-loc]
 description = "List source files exceeding the LOC limit (default 1000); -- --ci to exit 1 on violations"
 run = [
-  "uv run pytest scripts/tests/test_check_loc.py -q",
-  "uv run python scripts/check_loc.py",
+  "uv run --no-sync pytest scripts/tests/test_check_loc.py -q",
+  "uv run --no-sync python scripts/check_loc.py",
 ]
 
 [tasks.rust-flamegraph]
 description = "Generate a CPU flamegraph using the bench profile (keeps symbols; pass cargo-flamegraph args after --). Example: mise run rust-flamegraph -- -p finstack-quant-portfolio --bench materialization --open"
+env = { CARGO_INCREMENTAL = "0" }
 run = "cargo flamegraph --profile bench"
 
 [tasks.rust-bench-crate]
 description = "Run one Criterion bench in one crate (preferred during iteration)"
+env = { CARGO_INCREMENTAL = "0" }
 usage = '''
 arg "<package>" help="Cargo package (e.g. finstack-quant-valuations, finstack-quant-portfolio)"
 arg "<bench>" help="Bench target name (e.g. bond_pricing, materialization)"
@@ -844,19 +902,19 @@ cargo bench -p "${usage_package?}" --profile bench --bench "${usage_bench?}" -- 
 
 [tasks.rust-bench]
 description = "Run all workspace Rust benchmarks (use rust-bench-crate while iterating)"
+env = { CARGO_INCREMENTAL = "0" }
 run = "cargo bench --profile bench --bench '*' -- --sample-size ${FQ_BENCH_SAMPLE_SIZE:-10} --warm-up-time ${FQ_BENCH_WARM_UP_TIME:-1} --measurement-time ${FQ_BENCH_MEASUREMENT_TIME:-1} --nresamples ${FQ_BENCH_NRESAMPLES:-1000} --noplot"
 
-[tasks.rust-bench-baseline]
-description = "Save benchmark baseline as 'main'"
-run = "cargo bench --bench '*' -- --save-baseline main --sample-size ${FQ_BENCH_SAMPLE_SIZE:-10} --warm-up-time ${FQ_BENCH_WARM_UP_TIME:-1} --measurement-time ${FQ_BENCH_MEASUREMENT_TIME:-1} --nresamples ${FQ_BENCH_NRESAMPLES:-1000} --noplot"
+[tasks.rust-bench-pr-baseline]
+description = "Measure four PR benchmark cases on the base commit"
+run = "python3 -m scripts.pr_benchmarks baseline"
 
-[tasks.rust-bench-compare]
-description = "Compare current benchmarks against 'main' and fail above 10% median regression"
-run = """
-uv run --no-sync pytest scripts/tests/test_check_criterion_regressions.py -q
-cargo bench --bench '*' -- --baseline main --sample-size ${FQ_BENCH_SAMPLE_SIZE:-10} --warm-up-time ${FQ_BENCH_WARM_UP_TIME:-1} --measurement-time ${FQ_BENCH_MEASUREMENT_TIME:-1} --nresamples ${FQ_BENCH_NRESAMPLES:-1000} --noplot
-uv run python scripts/check_criterion_regressions.py --threshold 0.10
-"""
+[tasks.rust-bench-pr-compare]
+description = "Compare four fresh PR benchmark cases against the base commit"
+run = [
+  "uv run --no-sync pytest scripts/tests/test_pr_benchmarks.py -q",
+  "python3 -m scripts.pr_benchmarks compare",
+]
 
 [tasks.materialization-benchmark-doc-check]
 description = "Verify tracked benchmark digests, baselines, and toolchains"

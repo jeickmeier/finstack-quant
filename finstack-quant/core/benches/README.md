@@ -61,7 +61,7 @@ mise run rust-bench-baseline   # saves the baseline named "main"
 mise run rust-bench-compare    # fails above a 10% median regression
 ```
 
-`mise run rust-fmt` and `mise run rust-lint` skip Criterion targets. Compile
+`mise run rust-lint` and `mise run rust-fix` do not compile Criterion targets. Compile
 them with `mise run rust-bench` or `cargo bench`.
 
 ## Reading results

@@ -103,10 +103,10 @@ contract tests.
 
 ```bash
 # whole target
-cargo nextest run -p finstack-quant-valuations --test instruments
+cargo nextest run -p finstack-quant-valuations --test valuations instruments
 
 # this family (filter is a substring match on the test name)
-cargo nextest run -p finstack-quant-valuations --test instruments commodity
+cargo nextest run -p finstack-quant-valuations --test valuations instruments::commodity
 
 # colocated unit tests
 cargo nextest run -p finstack-quant-valuations --lib commodity::

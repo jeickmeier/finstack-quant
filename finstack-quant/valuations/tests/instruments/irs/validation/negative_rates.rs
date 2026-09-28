@@ -10,7 +10,7 @@
 //!
 //! **Market Standards Review (Week 3 Edge Cases)**
 
-use crate::test_support::rates as test_utils;
+use crate::instruments::test_support::rates as test_utils;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DayCount};
 use finstack_quant_core::market_data::context::MarketContext;

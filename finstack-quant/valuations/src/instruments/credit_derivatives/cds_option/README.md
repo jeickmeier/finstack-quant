@@ -228,7 +228,7 @@ covers `CreditDefaultSwap`, `CDSIndex` and `CDSTranche`.
 
 ```bash
 # CDS-option pricing, Greeks, implied vol, moneyness, knockout and golden regressions
-cargo nextest run -p finstack-quant-valuations --test instruments cds_option::
+cargo nextest run -p finstack-quant-valuations --test valuations instruments::cds_option::
 
 # Whole workspace (never `cargo test` — it runs doctests)
 mise run rust-test

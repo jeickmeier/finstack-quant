@@ -263,12 +263,10 @@ fn validate_params(op: TimeSeriesOp, params: Option<&Value>) -> Result<()> {
         TimeSeriesOp::RollingSharpe => {
             f64_param(params, "risk_free", 0.0)?;
         }
-        TimeSeriesOp::HampelFilter => {
-            if f64_param(params, "threshold", 3.0)? < 0.0 {
-                return Err(Error::Validation(
-                    "hampel_filter requires threshold >= 0".into(),
-                ));
-            }
+        TimeSeriesOp::HampelFilter if f64_param(params, "threshold", 3.0)? < 0.0 => {
+            return Err(Error::Validation(
+                "hampel_filter requires threshold >= 0".into(),
+            ));
         }
         _ => {}
     }
