@@ -7,6 +7,18 @@
 - The next library release is 0.9.0 and requires Rust 1.97.1 across the Rust,
   Python, and WASM crates.
 
+### Fixed
+
+- **Convertible tree PV is continuous at the conversion price.** With an even
+  step count (the default 200) and spot at the conversion price, the centre
+  terminal node sat on the conversion boundary and its Tsiveriotis-Zhang
+  cash/equity split flipped from all-cash (risky discounting) to all-equity
+  (risk-free), so PV jumped as spot crossed it and the 1% central-difference
+  delta exceeded the conversion ratio (10,139 shares on a 10,000-ratio bond).
+  The terminal split is now smoothed over each node's log-spot cell; nodes away
+  from the boundary are unchanged. Credit-risky convertible prices near the
+  money move by up to half the former jump; no stored goldens changed.
+
 ### Fixed income: senior-review remediation (2026-09-23)
 
 Numbers change for the instruments listed under **Fixed**; each change is
