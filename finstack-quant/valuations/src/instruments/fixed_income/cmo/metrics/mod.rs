@@ -24,7 +24,8 @@ impl MetricCalculator for ZSpreadCalculator {
             .quoted_clean_price_pct
             .ok_or_else(|| {
                 finstack_quant_core::Error::from(finstack_quant_core::InputError::NotFound {
-                    id: "cmo.pricing_overrides.quoted_clean_price_pct".to_string(),
+                    id: "cmo.instrument_pricing_overrides.market_quotes.quoted_clean_price_pct"
+                        .to_string(),
                 })
             })?;
         // Non-convergence propagates as an error (no silent zero spread).

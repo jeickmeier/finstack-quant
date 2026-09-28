@@ -298,7 +298,7 @@ impl Pricer for BermudanSwaptionLmmPricer {
                 PricingError::model_failure_with_context(
                     format!(
                         "Bermudan swaption '{}' requires positive finite \
-                         pricing_overrides.model_config.lmm_base_vol; calibrate it upstream",
+                         instrument_pricing_overrides.model_config.lmm_base_vol; calibrate it upstream",
                         swaption.id
                     ),
                     PricingErrorContext::default(),

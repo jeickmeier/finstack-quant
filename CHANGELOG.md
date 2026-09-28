@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+### Message and doc pass (2026-09-24)
+
+#### Fixed
+
+- Error messages and docs that cited the removed top-level `pricing_overrides` key now quote the full wire path: the MC path-cap error (`instrument_pricing_overrides.model_config.mc_paths`), the Bermudan swaption LMM error (`instrument_pricing_overrides.model_config.lmm_base_vol`), the CDS option vol doc (`instrument_pricing_overrides.market_quotes.implied_volatility`), the bond quote engine doc (`instrument_pricing_overrides.market_quotes.quoted_clean_price_pct`) and the HW1F cap/floor and swaption test docs. Rust message text only; no wire, type or number change.
+
 ### Remaining binding fixes (2026-09-24)
 
 #### Changed (BREAKING)

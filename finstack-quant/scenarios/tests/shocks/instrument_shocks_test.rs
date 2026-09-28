@@ -106,7 +106,7 @@ fn test_instrument_type_price_shock_matching() {
         if let Some(overrides) = instrument.get_scenario_pricing_overrides() {
             assert!(
                 overrides.scenario_price_shock_decimal.is_some(),
-                "scenario_price_shock_decimal should be set in pricing_overrides"
+                "scenario_price_shock_decimal should be set in scenario_pricing_overrides"
             );
             let shock = overrides.scenario_price_shock_decimal.unwrap();
             assert!(

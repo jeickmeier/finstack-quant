@@ -31,7 +31,7 @@ pub(crate) fn clear_price_driving_overrides(bond: &mut Bond) {
 /// The engine:
 /// - Normalizes the chosen `quote_input` into a **canonical dirty price in currency**.
 /// - Derives the corresponding clean price (% of par) and stamps it into
-///   `pricing_overrides.quoted_clean_price_pct` on an internal bond clone.
+///   `instrument_pricing_overrides.market_quotes.quoted_clean_price_pct` on an internal bond clone.
 /// - Uses the selected pricing and metric registries to compute the remaining
 ///   metrics.
 ///
@@ -170,7 +170,7 @@ pub fn compute_quotes(
     let clean_price_currency = dirty_price_currency - accrued_currency;
     let clean_price_pct = clean_price_currency / notional * 100.0;
 
-    // Stamp the canonical clean price quote into pricing_overrides so that all
+    // Stamp the canonical clean price quote into instrument_pricing_overrides.market_quotes so that all
     // existing metric calculators interpret this as the market price.
     // (Replaces the specific quote field with the clean-price normalization
     // expected by the downstream metric calculators.)

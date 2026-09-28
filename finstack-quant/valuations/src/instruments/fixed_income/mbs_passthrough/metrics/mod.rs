@@ -107,7 +107,8 @@ impl MetricCalculator for OasCalculator {
             .quoted_clean_price_pct
             .ok_or_else(|| {
                 finstack_quant_core::Error::from(finstack_quant_core::InputError::NotFound {
-                    id: "mbs.pricing_overrides.quoted_clean_price_pct".to_string(),
+                    id: "mbs.instrument_pricing_overrides.market_quotes.quoted_clean_price_pct"
+                        .to_string(),
                 })
             })?;
         // True option-adjusted spread from the Monte Carlo model.

@@ -507,7 +507,7 @@ mod tests {
         );
     }
 
-    /// Explicit `pricing_overrides` κ/σ win over calibrated market scalars.
+    /// Explicit `instrument_pricing_overrides.model_config` κ/σ win over calibrated market scalars.
     #[test]
     fn hw_swaption_overrides_win_over_market_scalars() {
         use finstack_quant_core::market_data::scalars::MarketScalar;

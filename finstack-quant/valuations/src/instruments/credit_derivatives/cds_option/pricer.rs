@@ -179,7 +179,7 @@ pub(crate) fn implied_vol(
 /// the strict CDS-option volatility contract:
 ///
 /// 1. The instrument-level
-///    `pricing_overrides.market_quotes.implied_volatility` override has
+///    `instrument_pricing_overrides.market_quotes.implied_volatility` override has
 ///    highest precedence and needs no surface.
 /// 2. Otherwise the `VolSurface` under `vol_surface_id` is evaluated with
 ///    `models::volatility::get_surface_vol(t_expiry, native_strike_coordinate)` — the decimal

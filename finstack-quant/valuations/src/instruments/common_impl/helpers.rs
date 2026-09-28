@@ -385,7 +385,7 @@ pub mod mc_defaults {
 
     /// Hard ceiling on the number of MC paths a single pricer call is
     /// allowed to allocate. Enforced by [`resolve_mc_paths`](super::resolve_mc_paths) to prevent a
-    /// malformed `pricing_overrides.model_config.mc_paths` (or a typo) from
+    /// malformed `instrument_pricing_overrides.model_config.mc_paths` (or a typo) from
     /// taking down a pricing service via OOM.
     /// The cap is set conservatively for multi-tenant pricing hosts.
     pub const MAX_MC_PATHS: usize = 5_000_000;
@@ -400,7 +400,7 @@ pub mod mc_defaults {
 /// - If `override_paths` is `Some(0)` or `None`, returns `default`.
 ///
 /// This is the single entry point all MC pricers should use to honour the
-/// per-instrument `pricing_overrides.model_config.mc_paths` knob.
+/// per-instrument `instrument_pricing_overrides.model_config.mc_paths` knob.
 ///
 /// # Errors
 ///
@@ -417,7 +417,7 @@ pub fn resolve_mc_paths(
     if n > mc_defaults::MAX_MC_PATHS {
         return Err(finstack_quant_core::Error::Validation(format!(
             "Monte Carlo path count {} exceeds workspace cap MAX_MC_PATHS = {}; \
-             reduce `pricing_overrides.model_config.mc_paths` or raise the cap.",
+             reduce `instrument_pricing_overrides.model_config.mc_paths` or raise the cap.",
             n,
             mc_defaults::MAX_MC_PATHS
         )));
