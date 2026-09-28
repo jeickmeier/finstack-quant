@@ -197,7 +197,7 @@ mise run wasm-lint     # prettier + eslint + the to_js_value serializer check
 mise run wasm-doc      # @param completeness on every JS-facing callable
 mise run wasm-test     # wasm-pack test --node, then build web+node, then the facade tests
 cargo nextest run -p finstack-quant-wasm --lib --test dts_contract
-cargo nextest run -p finstack-quant-wasm --test return_shapes   # no mise task selects this
+cargo nextest run -p finstack-quant-wasm --test wasm # no mise task selects this
 ```
 
 `mise run rust-test` runs only the `--lib` and `dts_contract` targets for this

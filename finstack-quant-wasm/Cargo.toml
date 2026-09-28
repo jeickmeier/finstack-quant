@@ -8,6 +8,8 @@ license.workspace = true
 repository.workspace = true
 description = "WebAssembly bindings for Finstack Quant - high-performance financial computation library"
 
+autotests = false
+
 [lib]
 crate-type = ["cdylib", "rlib"]
 
@@ -65,3 +67,12 @@ wasm-opt = ["-O", "--enable-bulk-memory", "--enable-nontrapping-float-to-int", "
 
 [lints]
 workspace = true
+
+# Consolidated integration tests
+[[test]]
+name = "wasm"
+path = "tests/wasm.rs"
+
+[[test]]
+name = "dts_contract"
+path = "tests/dts_contract.rs"
