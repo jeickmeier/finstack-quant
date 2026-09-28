@@ -8,6 +8,8 @@ repository.workspace = true
 authors.workspace = true
 description = "Finstack Quant umbrella crate: deterministic, cross-platform financial computation with currency-safe monetary types"
 
+autotests = false
+
 [dependencies]
 finstack_quant_core = { package = "finstack-quant-core", path = "core", version = "0.9.0", default-features = false }
 finstack_quant_analytics = { package = "finstack-quant-analytics", path = "analytics", version = "0.9.0" }
@@ -51,3 +53,8 @@ jsonschema-validate = [
 
 [lints]
 workspace = true
+
+# Consolidated integration tests
+[[test]]
+name = "umbrella"
+path = "tests/main.rs"
