@@ -871,7 +871,7 @@ fn seasoned_fi_trs(
     let trs = FiIndexTotalReturnSwap::builder()
         .id("SEASONED-FI-TRS".into())
         .notional(Money::new(10_000_000.0, USD).expect("money"))
-        .underlying(IndexUnderlyingParams::new("HY-INDEX", USD).with_yield("HY-INDEX-YIELD"))
+        .underlying(IndexUnderlyingParams::new("HY-INDEX", USD).with_yield_id("HY-INDEX-YIELD"))
         .financing_leg(FinancingLegSpec::new(
             "USD-FLAT",
             "USD-SOFR-3M",

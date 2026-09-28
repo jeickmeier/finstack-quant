@@ -574,7 +574,7 @@ pub fn create_institutional_portfolio(num_positions: usize) -> Portfolio {
         let equity_id = format!("EQUITY_{}", i);
         let equity = Equity::new(equity_id.clone(), "AAPL", Currency::USD)
             .with_spot_id("AAPL")
-            .with_dividend_yield_id("AAPL-DIVYIELD");
+            .with_div_yield_id("AAPL-DIVYIELD");
         let entity_id = format!("FUND_{}", (i % 5) + 1);
         builder = builder.position(
             Position::new(
@@ -604,14 +604,14 @@ pub fn create_institutional_portfolio(num_positions: usize) -> Portfolio {
         .with_exercise_style(ExerciseStyle::European)
         .with_settlement(SettlementType::Cash);
         let underlying_params = EquityUnderlyingParams::new("AAPL", "EQUITY-SPOT", Currency::USD)
-            .with_dividend_yield("EQUITY-DIVYIELD")
+            .with_div_yield_id("EQUITY-DIVYIELD")
             .with_contract_size(contract_size);
         let option = EquityOption::new(
             option_id.clone(),
             &option_params,
             &underlying_params,
-            "USD-OIS".into(),
-            "EQUITY-VOL".into(),
+            "USD-OIS",
+            "EQUITY-VOL",
         );
         let entity_id = format!("FUND_{}", (i % 5) + 1);
         builder = builder.position(
@@ -658,8 +658,8 @@ pub fn create_institutional_portfolio(num_positions: usize) -> Portfolio {
                 PayReceive::Receive
             },
             convention,
-            premium,
-            protection,
+            premium_leg: premium,
+            protection_leg: protection,
             upfront: None,
             doc_clause: None,
             protection_effective_date: None,
@@ -693,7 +693,7 @@ pub fn create_institutional_portfolio(num_positions: usize) -> Portfolio {
             1 => (Currency::GBP, Currency::USD),
             _ => (Currency::USD, Currency::JPY),
         };
-        let fx_spot = FxSpot::new(fx_id.clone().into(), base_currency, quote_currency);
+        let fx_spot = FxSpot::new(fx_id.clone(), base_currency, quote_currency);
         let entity_id = format!("FUND_{}", (i % 5) + 1);
         builder = builder.position(
             Position::new(
@@ -714,7 +714,7 @@ pub fn create_institutional_portfolio(num_positions: usize) -> Portfolio {
         let repo_id = format!("REPO_{}", i);
         let collateral = CollateralSpec {
             collateral_type: CollateralType::General,
-            instrument_id: format!("BOND_{}", i),
+            instrument_id: format!("BOND_{}", i).into(),
             quantity: 1_000_000.0,
             market_value_id: format!("BOND_{}_PRICE", i).into(),
         };
@@ -878,7 +878,7 @@ pub fn create_institutional_portfolio(num_positions: usize) -> Portfolio {
             .day_count(DayCount::Act365F)
             .instrument_pricing_overrides(
                 finstack_quant_valuations::instruments::InstrumentPricingOverrides::default()
-                    .with_implied_vol(0.25),
+                    .with_implied_volatility(0.25),
             )
             .attributes(Attributes::default())
             .build()
@@ -1038,7 +1038,7 @@ pub fn create_institutional_portfolio(num_positions: usize) -> Portfolio {
             maturity_5y(),
             "USD-OIS",
         )
-        .with_calendar("nyse");
+        .with_calendar_id("nyse");
         // Spread metrics require an external quote; using model dirty price
         // as its own Z-spread target would force a circular zero spread.
         sc.instrument_pricing_overrides

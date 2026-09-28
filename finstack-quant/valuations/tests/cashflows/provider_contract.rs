@@ -326,7 +326,7 @@ mod repo_contract {
     #[test]
     fn repo_preserves_signed_flows_and_contractual_tag() {
         let as_of = d(2024, 1, 1);
-        let repo = Repo::example();
+        let repo = Repo::example().expect("example");
 
         verify_provider_contract(&repo, &minimal_market(), as_of);
 
@@ -365,7 +365,7 @@ mod empty_schedule_contract {
         let market = MarketContext::new();
 
         verify_empty_schedule_surface(
-            &Equity::example(),
+            &Equity::example().expect("example"),
             &market,
             as_of,
             CashflowRepresentation::NoResidual,
@@ -420,7 +420,7 @@ mod empty_schedule_contract {
             CashflowRepresentation::Placeholder,
         );
         verify_empty_schedule_surface(
-            &FxVarianceSwap::example(),
+            &FxVarianceSwap::example().expect("example"),
             &market,
             as_of,
             CashflowRepresentation::Placeholder,

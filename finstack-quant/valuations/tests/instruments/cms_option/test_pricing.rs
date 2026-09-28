@@ -73,7 +73,7 @@ fn test_cms_cap_pricing() {
     let as_of = Date::from_calendar_date(2025, Month::January, 1).unwrap();
     let market = standard_market(as_of);
 
-    let inst = CmsOption::example();
+    let inst = CmsOption::example().expect("example");
 
     // Price
     let pv = inst.value(&market, as_of).expect("Pricing failed");
@@ -90,7 +90,7 @@ fn test_convexity_value() {
     let as_of = Date::from_calendar_date(2025, Month::January, 1).unwrap();
     let market = standard_market(as_of);
 
-    let inst = CmsOption::example();
+    let inst = CmsOption::example().expect("example");
 
     // Calculate Convexity Adjustment Risk
     let result = inst
@@ -160,7 +160,7 @@ fn test_vanna_computable() {
     let as_of = Date::from_calendar_date(2025, Month::January, 1).unwrap();
     let market = standard_market(as_of);
 
-    let inst = CmsOption::example();
+    let inst = CmsOption::example().expect("example");
 
     // Get analytical vanna and vega
     let result = inst
@@ -263,7 +263,7 @@ fn rho_matches_manual_one_bp_discount_reprice() {
 
     let as_of = Date::from_calendar_date(2025, Month::January, 1).unwrap();
     let market = standard_market(as_of);
-    let inst = CmsOption::example();
+    let inst = CmsOption::example().expect("example");
 
     let base_pv = inst.value(&market, as_of).unwrap().amount();
     let bumped = market
@@ -522,7 +522,7 @@ fn convexity_adjustment_uses_atm_vol_not_strike_vol() {
     let as_of = Date::from_calendar_date(2025, Month::January, 1).unwrap();
 
     // Deep-ITM caplet: strike well below the ~3.5% forward.
-    let mut inst = CmsOption::example();
+    let mut inst = CmsOption::example().expect("example");
     inst.strike = Decimal::try_from(0.015).expect("valid decimal");
 
     // Skewed surface: σ(F)=20% at the forward, σ(K)=80% at the strike.

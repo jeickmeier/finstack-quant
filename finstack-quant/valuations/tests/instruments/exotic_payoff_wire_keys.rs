@@ -91,20 +91,24 @@ fn fx_touch_option_retired_keys_are_rejected() {
 #[test]
 // schema-rejection-test: FxBarrierOption `rebate` as a per-unit number
 fn fx_barrier_option_per_unit_rebate_is_rejected() {
-    let option = FxBarrierOption::example();
+    let option = FxBarrierOption::example().expect("example");
     assert_shape_rejected(&option, "rebate", serde_json::json!(0.02));
 }
 
 #[test]
 // schema-rejection-test: Ndf `fixing_rate`
 fn ndf_retired_fixing_rate_is_rejected() {
-    assert_rejects(&Ndf::example(), "fixing_rate", serde_json::json!(7.3));
+    assert_rejects(
+        &Ndf::example().expect("example"),
+        "fixing_rate",
+        serde_json::json!(7.3),
+    );
 }
 
 #[test]
 // schema-rejection-test: CmsSpreadOption `spread_correlation`
 fn cms_spread_option_retired_spread_correlation_is_rejected() {
-    let option = CmsSpreadOption::example();
+    let option = CmsSpreadOption::example().expect("example");
     assert_rejects(&option, "spread_correlation", serde_json::json!(0.85));
     // `correlation` is a bounded correlation on the wire.
     assert_shape_rejected(&option, "correlation", serde_json::json!(1.5));
@@ -114,12 +118,12 @@ fn cms_spread_option_retired_spread_correlation_is_rejected() {
 // schema-rejection-test: CommodityAsianOption, CommoditySwap and CommodityFuture `realized_fixings`
 fn commodity_retired_realized_fixings_are_rejected() {
     assert_rejects(
-        &CommodityAsianOption::example(),
+        &CommodityAsianOption::example().expect("example"),
         "realized_fixings",
         serde_json::json!([]),
     );
     assert_rejects(
-        &CommoditySwap::example(),
+        &CommoditySwap::example().expect("example"),
         "realized_fixings",
         serde_json::json!([]),
     );
@@ -136,7 +140,7 @@ fn commodity_retired_realized_fixings_are_rejected() {
 // schema-rejection-test: RangeAccrual `past_fixings_in_range`
 fn range_accrual_retired_past_fixings_in_range_is_rejected() {
     assert_rejects(
-        &RangeAccrual::example(),
+        &RangeAccrual::example().expect("example"),
         "past_fixings_in_range",
         serde_json::json!(1),
     );
@@ -156,7 +160,7 @@ fn autocallable_retired_participation_keys_are_rejected() {
 
 #[test]
 fn fx_barrier_rebate_is_a_quote_currency_total() {
-    let mut option = FxBarrierOption::example();
+    let mut option = FxBarrierOption::example().expect("example");
     option.rebate = Some(Money::from((20_000_i64, Currency::USD)));
     option.validate().expect("quote-currency rebate is valid");
 

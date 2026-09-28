@@ -222,7 +222,7 @@ fn bench_ndf_pv(c: &mut Criterion) {
     let market = create_market();
     let as_of = base_date();
 
-    let ndf = Ndf::example();
+    let ndf = Ndf::example().expect("example");
 
     group.bench_function("cnyusd", |b| {
         b.iter(|| ndf.value(black_box(&market), black_box(as_of)));

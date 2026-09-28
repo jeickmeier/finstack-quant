@@ -55,7 +55,7 @@ pub fn sample_swap(side: PayReceive) -> VarianceSwap {
         .unwrap()
 }
 /// Apply the instrument's explicit flat implied-volatility pricing override.
-pub fn with_implied_vol(mut swap: VarianceSwap, volatility: f64) -> VarianceSwap {
+pub fn with_implied_volatility(mut swap: VarianceSwap, volatility: f64) -> VarianceSwap {
     swap.instrument_pricing_overrides
         .market_quotes
         .implied_volatility = Some(volatility);

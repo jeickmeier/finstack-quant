@@ -212,7 +212,7 @@ impl TestEquityTrsBuilder {
             EquityUnderlyingParams::new("TEST-EQ", self.spot_id, self.notional.currency())
                 .with_contract_size(self.contract_size);
         if let Some(div_id) = self.div_yield_id {
-            underlying = underlying.with_dividend_yield(div_id);
+            underlying = underlying.with_div_yield_id(div_id);
         }
 
         let financing = FinancingLegSpec::new(
@@ -326,10 +326,10 @@ impl TestFIIndexTrsBuilder {
             IndexUnderlyingParams::new(self.index_id.clone(), self.notional.currency());
 
         if let Some(y_id) = self.yield_id {
-            underlying = underlying.with_yield(y_id);
+            underlying = underlying.with_yield_id(y_id);
         }
         if let Some(d_id) = self.duration_id {
-            underlying = underlying.with_duration(d_id);
+            underlying = underlying.with_duration_id(d_id);
         }
 
         let financing = FinancingLegSpec::new(

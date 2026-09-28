@@ -127,7 +127,7 @@ fn clo_registry_profile_is_the_single_source_of_clo_defaults() {
 
 #[test]
 fn test_example_has_expected_defaults() {
-    let sc = StructuredCredit::example();
+    let sc = StructuredCredit::example().expect("example");
     let waterfall = sc
         .create_waterfall()
         .expect("valid create_waterfall fixture");

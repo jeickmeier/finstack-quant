@@ -142,7 +142,7 @@ impl BondEngine {
     /// # Arguments
     ///
     /// * `bond` - The bond to price
-    /// * `context` - Market context containing the discount curve
+    /// * `market` - Market context containing the discount curve
     /// * `as_of` - Valuation date
     /// * `explain` - Explanation options controlling trace generation
     ///
@@ -162,7 +162,7 @@ impl BondEngine {
     /// - Calendar adjustment fails (if settlement days and calendar are specified)
     pub fn price_with_explanation(
         bond: &Bond,
-        context: &MarketContext,
+        market: &MarketContext,
         as_of: Date,
         explain: ExplainOpts,
     ) -> Result<(Money, Option<ExplanationTrace>)> {
@@ -172,8 +172,8 @@ impl BondEngine {
                 bond.id
             )));
         }
-        let flows = bond.pricing_dated_cashflows(context, as_of)?;
-        let disc = context.get_discount(bond.discount_curve_id.as_str())?;
+        let flows = bond.pricing_dated_cashflows(market, as_of)?;
+        let disc = market.get_discount(bond.discount_curve_id.as_str())?;
         if flows.is_empty() {
             return Ok((
                 Money::from((0_i64, bond.notional.currency())),

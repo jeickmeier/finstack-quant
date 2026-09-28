@@ -149,10 +149,10 @@ impl PrivateMarketsFund {
             spec,
             events,
         )
-        .with_discount_curve("USD-OIS"))
+        .with_discount_curve_id("USD-OIS"))
     }
     /// Set the discount curve for NAV present-value calculations.
-    pub fn with_discount_curve(mut self, discount_curve_id: impl Into<CurveId>) -> Self {
+    pub fn with_discount_curve_id(mut self, discount_curve_id: impl Into<CurveId>) -> Self {
         self.discount_curve_id = Some(discount_curve_id.into());
         self
     }

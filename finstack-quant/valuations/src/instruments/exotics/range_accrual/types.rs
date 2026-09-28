@@ -6,7 +6,7 @@ use crate::instruments::common_impl::traits::Attributes;
 use crate::instruments::common_impl::validation;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::money::Money;
-use finstack_quant_core::types::{CurveId, IndexId, InstrumentId, PriceId, Rate};
+use finstack_quant_core::types::{CurveId, IndexId, InstrumentId, PriceId};
 
 /// Specifies how the range bounds are interpreted.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
@@ -215,24 +215,22 @@ impl RangeAccrual {
     ///
     /// This example uses relative bounds (95%-105% of initial spot) which is
     /// typical for equity-linked range accruals.
-    #[allow(clippy::expect_used)] // Example uses hardcoded valid values
-    pub fn example() -> Self {
+    pub fn example() -> finstack_quant_core::Result<Self> {
         use finstack_quant_core::currency::Currency;
         use finstack_quant_core::dates::DayCount;
-        use time::Month;
         let observation_dates = vec![
-            Date::from_calendar_date(2024, Month::January, 31).expect("Valid example date"),
-            Date::from_calendar_date(2024, Month::February, 29).expect("Valid example date"),
-            Date::from_calendar_date(2024, Month::March, 31).expect("Valid example date"),
-            Date::from_calendar_date(2024, Month::April, 30).expect("Valid example date"),
-            Date::from_calendar_date(2024, Month::May, 31).expect("Valid example date"),
-            Date::from_calendar_date(2024, Month::June, 30).expect("Valid example date"),
-            Date::from_calendar_date(2024, Month::July, 31).expect("Valid example date"),
-            Date::from_calendar_date(2024, Month::August, 31).expect("Valid example date"),
-            Date::from_calendar_date(2024, Month::September, 30).expect("Valid example date"),
-            Date::from_calendar_date(2024, Month::October, 31).expect("Valid example date"),
-            Date::from_calendar_date(2024, Month::November, 30).expect("Valid example date"),
-            Date::from_calendar_date(2024, Month::December, 31).expect("Valid example date"),
+            time::macros::date!(2024 - 01 - 31),
+            time::macros::date!(2024 - 02 - 29),
+            time::macros::date!(2024 - 03 - 31),
+            time::macros::date!(2024 - 04 - 30),
+            time::macros::date!(2024 - 05 - 31),
+            time::macros::date!(2024 - 06 - 30),
+            time::macros::date!(2024 - 07 - 31),
+            time::macros::date!(2024 - 08 - 31),
+            time::macros::date!(2024 - 09 - 30),
+            time::macros::date!(2024 - 10 - 31),
+            time::macros::date!(2024 - 11 - 30),
+            time::macros::date!(2024 - 12 - 31),
         ];
         RangeAccrual::builder()
             .id(InstrumentId::new("RANGE-SPX-1Y"))
@@ -240,10 +238,7 @@ impl RangeAccrual {
                 RangeAccrualTerms::builder()
                     .underlying_ticker("SPX".to_string())
                     .observation_dates(observation_dates)
-                    .start_date(
-                        Date::from_calendar_date(2023, Month::December, 31)
-                            .expect("Valid example date"),
-                    )
+                    .start_date(time::macros::date!(2023 - 12 - 31))
                     .lower_bound(0.95) // 95% of initial spot
                     .upper_bound(1.05) // 105% of initial spot
                     .bounds_type(BoundsType::RelativeToInitialSpot)
@@ -257,24 +252,20 @@ impl RangeAccrual {
                     .payment_date_opt(None)
                     .past_observations_in_range_opt(None)
                     .total_past_observations_opt(None)
-                    .build()
-                    .expect("Example RangeAccrual terms should build"),
+                    .build()?,
             )
             .attributes(Attributes::new())
             .build()
-            .expect("Example RangeAccrual construction should not fail")
     }
 
     /// Create an example with absolute bounds (typical for rate-linked range accruals).
-    #[allow(clippy::expect_used)] // Example uses hardcoded valid values
-    pub fn example_absolute_bounds() -> Self {
+    pub fn example_absolute_bounds() -> finstack_quant_core::Result<Self> {
         use finstack_quant_core::currency::Currency;
         use finstack_quant_core::dates::DayCount;
-        use time::Month;
         let observation_dates = vec![
-            Date::from_calendar_date(2024, Month::January, 31).expect("Valid example date"),
-            Date::from_calendar_date(2024, Month::February, 29).expect("Valid example date"),
-            Date::from_calendar_date(2024, Month::March, 31).expect("Valid example date"),
+            time::macros::date!(2024 - 01 - 31),
+            time::macros::date!(2024 - 02 - 29),
+            time::macros::date!(2024 - 03 - 31),
         ];
         RangeAccrual::builder()
             .id(InstrumentId::new("RANGE-SOFR-3M"))
@@ -282,10 +273,7 @@ impl RangeAccrual {
                 RangeAccrualTerms::builder()
                     .underlying_ticker("SOFR".to_string())
                     .observation_dates(observation_dates)
-                    .start_date(
-                        Date::from_calendar_date(2023, Month::December, 31)
-                            .expect("Valid example date"),
-                    )
+                    .start_date(time::macros::date!(2023 - 12 - 31))
                     .lower_bound(0.04) // 4% lower bound
                     .upper_bound(0.06) // 6% upper bound
                     .bounds_type(BoundsType::Absolute)
@@ -299,12 +287,10 @@ impl RangeAccrual {
                     .payment_date_opt(None)
                     .past_observations_in_range_opt(None)
                     .total_past_observations_opt(None)
-                    .build()
-                    .expect("Example RangeAccrual terms should build"),
+                    .build()?,
             )
             .attributes(Attributes::new())
             .build()
-            .expect("Example RangeAccrual construction should not fail")
     }
 
     /// Validate the range accrual parameters.
@@ -520,19 +506,6 @@ impl RangeAccrualTerms {
     }
 }
 
-impl RangeAccrualTermsBuilder {
-    /// Set the coupon rate using a typed rate.
-    ///
-    /// # Arguments
-    ///
-    /// * `rate` - Annual coupon earned while in range; stored as a decimal
-    ///   (0.05 = 5%).
-    pub fn coupon_rate_rate(mut self, rate: Rate) -> Self {
-        self.coupon_rate = Some(rate.as_decimal());
-        self
-    }
-}
-
 impl crate::instruments::common_impl::traits::Instrument for RangeAccrual {
     impl_instrument_base!(crate::pricer::InstrumentType::RangeAccrual);
 
@@ -595,7 +568,7 @@ mod audit_regression_tests {
 
     #[test]
     fn accrual_factor_uses_explicit_contractual_period() {
-        let mut range = RangeAccrual::example().terms;
+        let mut range = RangeAccrual::example().expect("example").terms;
         range.day_count = finstack_quant_core::dates::DayCount::Act360;
         range.start_date = date!(2024 - 01 - 01);
         range.observation_dates = vec![date!(2024 - 01 - 31), date!(2024 - 04 - 01)];
@@ -607,7 +580,7 @@ mod audit_regression_tests {
 
     #[test]
     fn rate_contract_fields_are_all_or_none() {
-        let mut range = RangeAccrual::example().terms;
+        let mut range = RangeAccrual::example().expect("example").terms;
         range.index_id = Some(IndexId::new("SOFR"));
         let err = range.validate().expect_err("partial rate spec must fail");
         assert!(err.to_string().contains("must be supplied together"));
@@ -615,7 +588,7 @@ mod audit_regression_tests {
 
     #[test]
     fn payment_cannot_precede_final_observation() {
-        let mut range = RangeAccrual::example().terms;
+        let mut range = RangeAccrual::example().expect("example").terms;
         range.payment_date = Some(date!(2024 - 06 - 01));
         let err = range.validate().expect_err("early payment must fail");
         assert!(err.to_string().contains("final observation"));
@@ -623,7 +596,7 @@ mod audit_regression_tests {
 
     #[test]
     fn canonical_dependencies_keep_both_range_strikes() {
-        let range = RangeAccrual::example();
+        let range = RangeAccrual::example().expect("example");
         let deps =
             crate::instruments::Instrument::market_dependencies(&range).expect("dependencies");
 
@@ -653,7 +626,7 @@ mod audit_regression_tests {
 
     #[test]
     fn flattened_terms_keep_flat_wire_shape_and_reject_unknown_keys() {
-        let range = RangeAccrual::example();
+        let range = RangeAccrual::example().expect("example");
         let value = serde_json::to_value(&range).expect("serialize");
         assert_eq!(value["id"], "RANGE-SPX-1Y");
         assert_eq!(value["underlying_ticker"], "SPX");

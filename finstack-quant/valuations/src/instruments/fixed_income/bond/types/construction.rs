@@ -749,9 +749,9 @@ impl Bond {
     /// # let schedule = CashFlowSchedule::builder()
     /// #     .principal(Money::from((1_000_000_i64, Currency::USD)), Date::from_calendar_date(2024, time::Month::January, 1).unwrap(), Date::from_calendar_date(2034, time::Month::January, 1).unwrap())
     /// #     .build(None).unwrap();
-    /// let bond_with_custom = bond.with_cashflows(schedule);
+    /// let bond_with_custom = bond.with_custom_cashflows(schedule);
     /// ```
-    pub fn with_cashflows(mut self, schedule: CashFlowSchedule) -> Self {
+    pub fn with_custom_cashflows(mut self, schedule: CashFlowSchedule) -> Self {
         self.custom_cashflows = Some(schedule);
         self
     }

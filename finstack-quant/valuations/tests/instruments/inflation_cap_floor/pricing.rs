@@ -260,7 +260,8 @@ fn test_yoy_caplet_applies_convexity_adjustment() {
 
 #[test]
 fn inflation_cap_floor_uses_rate_option_type_key() {
-    let json = serde_json::to_value(InflationCapFloor::example()).expect("serialize");
+    let json =
+        serde_json::to_value(InflationCapFloor::example().expect("example")).expect("serialize");
     assert_eq!(json["rate_option_type"], "cap");
 
     let mut retired = json;

@@ -52,7 +52,7 @@ fn fx01_follows_active_spot_and_forward_overrides() {
     forward.notional = Money::from((100_i64, Currency::EUR));
     forward.contract_rate = Some(1.0);
     forward.quoted_spot = Some(1.1);
-    let mut spot = FxSpot::new("SPOT".into(), Currency::EUR, Currency::USD)
+    let mut spot = FxSpot::new("SPOT", Currency::EUR, Currency::USD)
         .with_quoted_spot(1.1)
         .expect("spot")
         .with_settlement_date(maturity);
@@ -146,7 +146,9 @@ fn equity_scalar_volatility_risk_is_separate_from_source_nodes() {
     let reference = option
         .price_with_metrics(&quoted, as_of, &metrics, PricingOptions::default())
         .expect("surface risk");
-    option.instrument_pricing_overrides = option.instrument_pricing_overrides.with_implied_vol(0.2);
+    option.instrument_pricing_overrides = option
+        .instrument_pricing_overrides
+        .with_implied_volatility(0.2);
     for market in [&quoted, &bare] {
         let actual = option
             .price_with_metrics(market, as_of, &metrics, PricingOptions::default())
@@ -183,16 +185,22 @@ fn touch_vega_follows_the_active_scalar_quote() {
         .expect("surface risk")
         .measures["vega"];
     assert!(expected.abs() > 1e-6);
-    option.instrument_pricing_overrides = option.instrument_pricing_overrides.with_implied_vol(0.2);
+    option.instrument_pricing_overrides = option
+        .instrument_pricing_overrides
+        .with_implied_volatility(0.2);
     let actual = option
         .price_with_metrics(&market, as_of, &[MetricId::Vega], PricingOptions::default())
         .expect("scalar risk")
         .measures["vega"];
     assert!((actual - expected).abs() < 1e-8, "{actual} vs {expected}");
-    option.instrument_pricing_overrides = option.instrument_pricing_overrides.with_implied_vol(0.0);
+    option.instrument_pricing_overrides = option
+        .instrument_pricing_overrides
+        .with_implied_volatility(0.0);
     let base = option.value(&market, as_of).expect("zero-vol PV").amount();
     let mut up = option.clone();
-    up.instrument_pricing_overrides = up.instrument_pricing_overrides.with_implied_vol(0.01);
+    up.instrument_pricing_overrides = up
+        .instrument_pricing_overrides
+        .with_implied_volatility(0.01);
     let expected = up.value(&market, as_of).expect("one-vol-point PV").amount() - base;
     let actual = option
         .price_with_metrics(&market, as_of, &[MetricId::Vega], PricingOptions::default())
@@ -230,7 +238,9 @@ fn analytical_barrier_price_and_risk_use_the_active_quote() {
     let reference = option
         .price_with_metrics(&quoted, as_of, &metrics, options.clone())
         .expect("surface risk");
-    option.instrument_pricing_overrides = option.instrument_pricing_overrides.with_implied_vol(0.2);
+    option.instrument_pricing_overrides = option
+        .instrument_pricing_overrides
+        .with_implied_volatility(0.2);
     let actual = option
         .price_with_metrics(&market, as_of, &metrics, options)
         .expect("override requires no surface");
@@ -248,9 +258,13 @@ fn fx_vanna_volga_shift_effective_volatility_at_off_grid_quotes() {
     option.expiry = date!(2026 - 01 - 01);
     option.strike = 1.2;
     let mut up = option.clone();
-    up.instrument_pricing_overrides = up.instrument_pricing_overrides.with_implied_vol(0.21);
+    up.instrument_pricing_overrides = up
+        .instrument_pricing_overrides
+        .with_implied_volatility(0.21);
     let mut down = option.clone();
-    down.instrument_pricing_overrides = down.instrument_pricing_overrides.with_implied_vol(0.19);
+    down.instrument_pricing_overrides = down
+        .instrument_pricing_overrides
+        .with_implied_volatility(0.19);
     let up_risk = up
         .price_with_metrics(
             &market,
@@ -271,8 +285,9 @@ fn fx_vanna_volga_shift_effective_volatility_at_off_grid_quotes() {
     let expected_volga = (up_risk.measures["vega"] - down_risk.measures["vega"]) / 2.0;
     for use_override in [false, true] {
         if use_override {
-            option.instrument_pricing_overrides =
-                option.instrument_pricing_overrides.with_implied_vol(0.2);
+            option.instrument_pricing_overrides = option
+                .instrument_pricing_overrides
+                .with_implied_volatility(0.2);
         }
         let base = option.value(&market, as_of).expect("PV").amount();
         let vanna = option

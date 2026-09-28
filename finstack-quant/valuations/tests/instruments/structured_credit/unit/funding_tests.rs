@@ -111,7 +111,7 @@ fn clo(pool_rate: f64, a_coupon: f64, covers: Option<bool>) -> (StructuredCredit
     .expect("structure");
     let mut deal =
         StructuredCredit::new_clo("CLO-FUNDING", pool, tranches, close, maturity, "USD-OIS")
-            .with_calendar("nyse");
+            .with_calendar_id("nyse");
     deal.principal_covers_senior_interest = covers;
     deal.credit_model.prepayment_spec = PrepaymentModelSpec::constant_cpr(0.20);
     deal.credit_model.default_spec = DefaultModelSpec::constant_cdr(0.0);

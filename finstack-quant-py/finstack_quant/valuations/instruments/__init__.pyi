@@ -5054,7 +5054,7 @@ class InterestRateSwap:
     conventions resolved from the rate-index registry, the preferred way
     to build standard swaps), :meth:`InterestRateSwap.builder` with explicit
     :class:`FixedLegSpec` / :class:`FloatLegSpec` legs,
-    :meth:`InterestRateSwap.example_standard` or
+    :meth:`InterestRateSwap.example` or
     :meth:`InterestRateSwap.from_json`. Every public Rust field is readable
     as a property; :meth:`InterestRateSwap.price` /
     :meth:`InterestRateSwap.metric` run the same pricer as
@@ -5181,10 +5181,10 @@ class InterestRateSwap:
         """
         ...
     @staticmethod
-    def example_standard() -> InterestRateSwap:
+    def example() -> InterestRateSwap:
         """
         Canonical 5-year USD pay-fixed swap (mirrors Rust
-        ``InterestRateSwap::example_standard``): semi-annual 30/360 fixed vs
+        ``InterestRateSwap::example``): semi-annual 30/360 fixed vs
         quarterly ACT/360 ``USD-SOFR-3M``, T-2 reset lag, ``usny`` calendar.
 
         Returns
@@ -5200,7 +5200,7 @@ class InterestRateSwap:
         Examples
         --------
         >>> from finstack_quant.valuations.instruments import InterestRateSwap
-        >>> InterestRateSwap.example_standard().float_leg.reset_lag_days
+        >>> InterestRateSwap.example().float_leg.reset_lag_days
         2
         """
         ...
@@ -5230,7 +5230,7 @@ class InterestRateSwap:
         Examples
         --------
         >>> from finstack_quant.valuations.instruments import InterestRateSwap
-        >>> swap = InterestRateSwap.example_standard()
+        >>> swap = InterestRateSwap.example()
         >>> InterestRateSwap.from_json(swap.to_json()).id == swap.id
         True
         """
@@ -5784,9 +5784,10 @@ class Swaption:
         Swaption
             The example swaption.
 
-        Notes
-        -----
-        This factory does not raise; the example is built from constants.
+        Raises
+        ------
+        ValueError
+            If the example instrument fails validation.
 
         Examples
         --------
@@ -5806,9 +5807,10 @@ class Swaption:
         Swaption
             The example swaption with ``exercise_style == "bermudan"``.
 
-        Notes
-        -----
-        This factory does not raise; the example is built from constants.
+        Raises
+        ------
+        ValueError
+            If the example instrument fails validation.
 
         Examples
         --------
@@ -8022,9 +8024,10 @@ class CreditDefaultSwap:
         CreditDefaultSwap
             The example CDS.
 
-        Notes
-        -----
-        This factory does not raise; the example is built from constants.
+        Raises
+        ------
+        ValueError
+            If the example instrument fails validation.
 
         Examples
         --------
@@ -8881,9 +8884,10 @@ class CdsIndex:
         CdsIndex
             The example index trade.
 
-        Notes
-        -----
-        This factory does not raise; the example is built from constants.
+        Raises
+        ------
+        ValueError
+            If the example instrument fails validation.
 
         Examples
         --------
@@ -9976,9 +9980,10 @@ class CdsTranche:
         CdsTranche
             The example tranche.
 
-        Notes
-        -----
-        This factory does not raise; the example is built from constants.
+        Raises
+        ------
+        ValueError
+            If the example instrument fails validation.
 
         Examples
         --------
@@ -14140,7 +14145,7 @@ class EquityOption:
     continuous ``div_yield_id`` are both supported.
 
     Construct via :meth:`EquityOption.builder`,
-    :meth:`EquityOption.european_call`, :meth:`EquityOption.example` or
+    :meth:`EquityOption.european`, :meth:`EquityOption.example` or
     :meth:`EquityOption.from_json`. Every public Rust field is readable as a
     property; ``greeks`` / ``delta`` / ``gamma`` / ``vega`` / ``theta`` /
     ``rho`` / ``implied_vol`` mirror the Rust accessors and
@@ -14411,13 +14416,14 @@ class EquityOption:
         """
         ...
     @staticmethod
-    def european_call(
+    def european(
         id: str,
         ticker: str,
         strike: float,
         expiry: datetime.date | datetime.datetime | pd.Timestamp | str,
         quantity: float,
         currency: Currency | str,
+        option_type: str,
         *,
         discount_curve_id: str = "USD-OIS",
         spot_id: str = "EQUITY-SPOT",
@@ -14425,8 +14431,8 @@ class EquityOption:
         div_yield_id: str | None = "EQUITY-DIVYIELD",
     ) -> EquityOption:
         """
-        Build a cash-settled European call (mirrors Rust
-        ``EquityOption::european_call`` / ``european_call_with_market_data``).
+        Build a cash-settled European call or put (mirrors Rust
+        ``EquityOption::european`` / ``european_with_market_data``).
         The market-data identifiers default to the same generic ids the Rust
         constructor uses; pass your own to bind the option to real market
         objects.
@@ -14445,6 +14451,8 @@ class EquityOption:
             Number of underlying units; PV and Greeks scale linearly with it.
         currency : Currency | str
             Currency of the strike, premium and present value (e.g. ``"USD"``).
+        option_type : str
+            ``"call"`` or ``"put"``.
         discount_curve_id : str, default "USD-OIS"
             Discount curve identifier.
         spot_id : str, default "EQUITY-SPOT"
@@ -14463,12 +14471,13 @@ class EquityOption:
         ------
         ValueError
             If ``strike`` is not positive, ``quantity`` is zero, ``currency``
-            is not a recognized code, or ``expiry`` cannot be interpreted.
+            is not a recognized code, ``option_type`` is not ``"call"`` or
+            ``"put"``, or ``expiry`` cannot be interpreted.
 
         Examples
         --------
         >>> from finstack_quant.valuations.instruments import EquityOption
-        >>> opt = EquityOption.european_call("AAPL-C-200", "AAPL", 200.0, "2025-06-20", 100.0, "USD", spot_id="AAPL")
+        >>> opt = EquityOption.european("AAPL-C-200", "AAPL", 200.0, "2025-06-20", 100.0, "USD", "call", spot_id="AAPL")
         >>> (opt.option_type, opt.settlement, opt.spot_id)
         ('call', 'cash', 'AAPL')
         """
@@ -20850,7 +20859,7 @@ class HedgeSwap:
     Examples
     --------
     >>> from finstack_quant.valuations.instruments import HedgeSwap, InterestRateSwap
-    >>> swap = InterestRateSwap.example_standard()
+    >>> swap = InterestRateSwap.example()
     >>> hedge = HedgeSwap(swap, notional="pool_par", priority="senior_fee")
     >>> hedge.priority, hedge.notional
     ('senior_fee', 'pool_par')

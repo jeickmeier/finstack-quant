@@ -170,7 +170,7 @@ fn focused_overrides_use_canonical_wire_shape() {
         "autocallable",
     );
 
-    let mut swaption = CommoditySwaption::example();
+    let mut swaption = CommoditySwaption::example().expect("example");
     swaption
         .instrument_pricing_overrides
         .market_quotes

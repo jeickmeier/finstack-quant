@@ -447,7 +447,7 @@ fn test_commodity_forward_delta_analytical() {
 
 #[test]
 fn test_commodity_forward_serialization() {
-    let forward = CommodityForward::example();
+    let forward = CommodityForward::example().expect("example");
 
     let json = serde_json::to_string_pretty(&forward).expect("serialize");
     let parsed: CommodityForward = serde_json::from_str(&json).expect("deserialize");

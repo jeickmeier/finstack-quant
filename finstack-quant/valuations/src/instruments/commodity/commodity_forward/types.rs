@@ -283,8 +283,7 @@ impl CommodityForward {
     /// Create a canonical example commodity forward for testing and documentation.
     ///
     /// Returns a WTI crude oil forward with realistic parameters.
-    #[allow(clippy::expect_used)] // Example uses hardcoded valid values
-    pub fn example() -> Self {
+    pub fn example() -> finstack_quant_core::Result<Self> {
         Self::builder()
             .id(InstrumentId::new("WTI-FWD-2025M03"))
             .underlying(CommodityUnderlyingParams::new(
@@ -295,9 +294,7 @@ impl CommodityForward {
             ))
             .quantity(1000.0)
             .multiplier(1.0)
-            .maturity(
-                Date::from_calendar_date(2025, time::Month::March, 15).expect("Valid example date"),
-            )
+            .maturity(time::macros::date!(2025 - 03 - 15))
             .settlement(SettlementType::Cash)
             .position(Position::Long)
             .forward_curve_id(CurveId::new("WTI-FORWARD"))
@@ -311,7 +308,6 @@ impl CommodityForward {
                     .with_meta("sector", "crude"),
             )
             .build()
-            .expect("Example commodity forward construction should not fail")
     }
 
     /// Calculate the net present value of this commodity forward.
@@ -569,7 +565,7 @@ mod tests {
 
     #[test]
     fn validation_rejects_non_finite_or_degenerate_contract_scalars() {
-        let mut forward = CommodityForward::example();
+        let mut forward = CommodityForward::example().expect("example");
         forward.quantity = f64::NAN;
         assert!(forward.validate_for_pricing().is_err());
 
@@ -584,7 +580,7 @@ mod tests {
 
     #[test]
     fn test_commodity_forward_example() {
-        let forward = CommodityForward::example();
+        let forward = CommodityForward::example().expect("example");
         assert_eq!(forward.id.as_str(), "WTI-FWD-2025M03");
         assert_eq!(forward.underlying.commodity_type, "Energy");
         assert_eq!(forward.underlying.underlying_ticker, "CL");
@@ -770,7 +766,7 @@ mod tests {
     fn test_commodity_forward_instrument_trait() {
         use crate::instruments::common_impl::traits::Instrument;
 
-        let forward = CommodityForward::example();
+        let forward = CommodityForward::example().expect("example");
 
         assert_eq!(forward.id(), "WTI-FWD-2025M03");
         assert_eq!(
@@ -782,7 +778,7 @@ mod tests {
 
     #[test]
     fn test_commodity_forward_market_dependencies() {
-        let forward = CommodityForward::example();
+        let forward = CommodityForward::example().expect("example");
         let deps = forward
             .market_dependencies()
             .expect("market_dependencies")
@@ -918,7 +914,7 @@ mod tests {
 
     #[test]
     fn test_commodity_forward_serde_roundtrip() {
-        let forward = CommodityForward::example();
+        let forward = CommodityForward::example().expect("example");
         let json = serde_json::to_string(&forward).expect("serialize");
         let deserialized: CommodityForward = serde_json::from_str(&json).expect("deserialize");
 

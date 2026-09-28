@@ -270,7 +270,7 @@ impl InterestRateSwap {
 /// # use time::Month;
 ///
 /// # fn example() -> finstack_quant_core::Result<()> {
-/// let irs = InterestRateSwap::example_standard()?;
+/// let irs = InterestRateSwap::example()?;
 /// // Build market context with required curves
 /// let mut context = MarketContext::new();
 /// // ... add USD-OIS and USD-SOFR-3M curves ...
@@ -348,8 +348,7 @@ mod tests {
     #[test]
     fn is_single_curve_ois_classification() {
         // Start from the example vanilla IRS (term-rate style)
-        let mut irs =
-            InterestRateSwap::example_standard().expect("Example should construct successfully");
+        let mut irs = InterestRateSwap::example().expect("Example should construct successfully");
         assert!(
             !irs.is_single_curve_ois(),
             "Vanilla term-rate IRS with Simple compounding must not be OIS"

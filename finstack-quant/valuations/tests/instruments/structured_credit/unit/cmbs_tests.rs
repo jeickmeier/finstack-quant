@@ -101,7 +101,7 @@ fn cmbs(loans: Vec<PoolAsset>) -> StructuredCredit {
     .expect("structure");
     let mut deal =
         StructuredCredit::new_cmbs("CMBS-T14", pool, tranches, close(), maturity(), "USD-OIS")
-            .with_calendar("nyse");
+            .with_calendar_id("nyse");
     deal.fees = None;
     deal.credit_model.prepayment_spec = PrepaymentModelSpec::constant_cpr(0.0);
     deal.credit_model.default_spec = DefaultModelSpec::constant_cdr(0.0);

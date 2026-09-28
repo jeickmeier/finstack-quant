@@ -360,7 +360,7 @@ fn test_equity_trs_with_past_start_date() {
     let end = d(2026, 1, 1);
 
     let underlying =
-        EquityUnderlyingParams::new("SPX", "SPX-SPOT", USD).with_dividend_yield("SPX-DIV-YIELD");
+        EquityUnderlyingParams::new("SPX", "SPX-SPOT", USD).with_div_yield_id("SPX-DIV-YIELD");
 
     let trs = EquityTotalReturnSwap::builder()
         .id("TRS-PAST-START".into())
@@ -401,7 +401,7 @@ fn test_equity_trs_with_very_short_tenor_1_day() {
     let end = start + time::Duration::days(1);
 
     let underlying =
-        EquityUnderlyingParams::new("SPX", "SPX-SPOT", USD).with_dividend_yield("SPX-DIV-YIELD");
+        EquityUnderlyingParams::new("SPX", "SPX-SPOT", USD).with_div_yield_id("SPX-DIV-YIELD");
 
     let trs = EquityTotalReturnSwap::builder()
         .id("TRS-1DAY".into())
@@ -441,8 +441,8 @@ fn test_fi_index_trs_maturity_equals_valuation_date() {
     let end = as_of; // Maturity = valuation date
 
     let underlying = IndexUnderlyingParams::new("HY-INDEX", USD)
-        .with_yield("HY-INDEX-YIELD")
-        .with_duration("HY-INDEX-DURATION");
+        .with_yield_id("HY-INDEX-YIELD")
+        .with_duration_id("HY-INDEX-DURATION");
 
     let trs = FiIndexTotalReturnSwap::builder()
         .id("TRS-MATURE".into())
@@ -523,7 +523,7 @@ fn test_equity_trs_with_zero_contract_size() {
     // Arrange - Zero contract size should result in zero PV
     let market = create_market_context();
     let mut underlying =
-        EquityUnderlyingParams::new("SPX", "SPX-SPOT", USD).with_dividend_yield("SPX-DIV-YIELD");
+        EquityUnderlyingParams::new("SPX", "SPX-SPOT", USD).with_div_yield_id("SPX-DIV-YIELD");
     underlying = underlying.with_contract_size(0.0);
 
     let trs = EquityTotalReturnSwap::builder()
@@ -569,7 +569,7 @@ fn test_equity_trs_with_fractional_contract_size() {
     // Arrange
     let market = create_market_context();
     let mut underlying =
-        EquityUnderlyingParams::new("SPX", "SPX-SPOT", USD).with_dividend_yield("SPX-DIV-YIELD");
+        EquityUnderlyingParams::new("SPX", "SPX-SPOT", USD).with_div_yield_id("SPX-DIV-YIELD");
     underlying = underlying.with_contract_size(0.1); // Mini contract
 
     let trs = EquityTotalReturnSwap::builder()

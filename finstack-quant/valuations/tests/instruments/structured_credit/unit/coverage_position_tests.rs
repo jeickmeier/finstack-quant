@@ -116,7 +116,7 @@ fn clo(tests: Vec<CoverageTestSpec>) -> (StructuredCredit, Date) {
         maturity,
         "USD-OIS",
     )
-    .with_calendar("nyse")
+    .with_calendar_id("nyse")
     .with_coverage_triggers(tests)
     .expect("coverage tests");
     deal.credit_model.prepayment_spec = PrepaymentModelSpec::constant_cpr(0.0);

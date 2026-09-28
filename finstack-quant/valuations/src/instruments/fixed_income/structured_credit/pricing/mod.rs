@@ -34,24 +34,24 @@ use finstack_quant_core::Result;
 ///
 /// * `instrument` - Validated structured-credit deal containing asset pool,
 ///   tranche structure, waterfall, and deterministic credit/prepayment model.
-/// * `context` - Market context used for rate resets, discounting, and other
+/// * `market` - Market context used for rate resets, discounting, and other
 ///   projection dependencies.
 /// * `as_of` - Requested valuation date; lifecycle policy may resolve an
 ///   effective date from the market context.
 pub fn run_simulation(
     instrument: &StructuredCredit,
-    context: &MarketContext,
+    market: &MarketContext,
     as_of: Date,
 ) -> Result<HashMap<String, TrancheCashflows>> {
     let lifecycle =
         crate::instruments::common_impl::helpers::ValidatedPricingLifecycle::new(instrument)?;
-    let effective_as_of = lifecycle.effective_as_of(context, as_of);
+    let effective_as_of = lifecycle.effective_as_of(market, as_of);
     if instrument.pool.instruments.is_some() {
-        return simulation_engine::simulate_instrument_pool(instrument, context, effective_as_of)
+        return simulation_engine::simulate_instrument_pool(instrument, market, effective_as_of)
             .map(|run| run.tranches);
     }
     let mut source = DeterministicPoolFlowSource;
-    simulation_engine::run_simulation_with_source(instrument, context, effective_as_of, &mut source)
+    simulation_engine::run_simulation_with_source(instrument, market, effective_as_of, &mut source)
 }
 
 /// Run the deterministic cashflow simulation and return the tranche results
@@ -62,7 +62,7 @@ pub fn run_simulation(
 ///
 /// * `instrument` - Validated structured-credit deal containing asset pool,
 ///   tranche structure, waterfall, and deterministic credit/prepayment model.
-/// * `context` - Market context used for rate resets, discounting, and other
+/// * `market` - Market context used for rate resets, discounting, and other
 ///   projection dependencies.
 /// * `as_of` - Requested valuation date; lifecycle policy may resolve an
 ///   effective date from the market context.
@@ -73,17 +73,17 @@ pub fn run_simulation(
 /// simulation engine.
 pub fn run_simulation_with_diagnostics(
     instrument: &StructuredCredit,
-    context: &MarketContext,
+    market: &MarketContext,
     as_of: Date,
 ) -> Result<simulation_engine::SimulationRun> {
     let lifecycle =
         crate::instruments::common_impl::helpers::ValidatedPricingLifecycle::new(instrument)?;
-    let effective_as_of = lifecycle.effective_as_of(context, as_of);
+    let effective_as_of = lifecycle.effective_as_of(market, as_of);
     if instrument.pool.instruments.is_some() {
-        return simulation_engine::simulate_instrument_pool(instrument, context, effective_as_of);
+        return simulation_engine::simulate_instrument_pool(instrument, market, effective_as_of);
     }
     let mut source = DeterministicPoolFlowSource;
-    simulation_engine::simulate_with_source(instrument, context, effective_as_of, &mut source)
+    simulation_engine::simulate_with_source(instrument, market, effective_as_of, &mut source)
 }
 
 /// Generate aggregated deterministic cashflows for all tranches.
@@ -92,15 +92,15 @@ pub fn run_simulation_with_diagnostics(
 ///
 /// * `instrument` - Validated structured-credit deal to project through its
 ///   deterministic pool and waterfall model.
-/// * `context` - Market context used for rate resets and projection inputs.
+/// * `market` - Market context used for rate resets and projection inputs.
 /// * `as_of` - Requested valuation date used to select known versus projected
 ///   cashflows.
 pub fn generate_cashflows(
     instrument: &StructuredCredit,
-    context: &MarketContext,
+    market: &MarketContext,
     as_of: Date,
 ) -> Result<DatedFlows> {
-    let full_results = run_simulation(instrument, context, as_of)?;
+    let full_results = run_simulation(instrument, market, as_of)?;
     simulation_engine::aggregate_tranche_cashflows(&full_results)
 }
 
@@ -111,15 +111,15 @@ pub fn generate_cashflows(
 /// * `instrument` - Validated structured-credit deal to project through its
 ///   deterministic pool and waterfall model.
 /// * `tranche_id` - Identifier of the requested tranche within `instrument`.
-/// * `context` - Market context used for rate resets and projection inputs.
+/// * `market` - Market context used for rate resets and projection inputs.
 /// * `as_of` - Requested valuation date used to select known versus projected
 ///   cashflows.
 pub fn generate_tranche_cashflows(
     instrument: &StructuredCredit,
     tranche_id: &str,
-    context: &MarketContext,
+    market: &MarketContext,
     as_of: Date,
 ) -> Result<TrancheCashflows> {
-    let mut full_results = run_simulation(instrument, context, as_of)?;
+    let mut full_results = run_simulation(instrument, market, as_of)?;
     simulation_engine::take_tranche_cashflows(&mut full_results, tranche_id)
 }

@@ -86,7 +86,7 @@ impl EquityUnderlyingParams {
     }
 
     /// Set dividend yield identifier
-    pub fn with_dividend_yield(mut self, div_yield_id: impl Into<PriceId>) -> Self {
+    pub fn with_div_yield_id(mut self, div_yield_id: impl Into<PriceId>) -> Self {
         self.div_yield_id = Some(div_yield_id.into());
         self
     }
@@ -228,7 +228,7 @@ impl IndexUnderlyingParams {
     ///
     /// * `yield_id` - `MarketContext::get_price` id of a unitless decimal
     ///   yield scalar (0.05 = 5% per annum).
-    pub fn with_yield(mut self, yield_id: impl Into<PriceId>) -> Self {
+    pub fn with_yield_id(mut self, yield_id: impl Into<PriceId>) -> Self {
         self.yield_id = Some(yield_id.into());
         self
     }
@@ -239,7 +239,7 @@ impl IndexUnderlyingParams {
     ///
     /// * `duration_id` - `MarketContext::get_price` id of a unitless, finite
     ///   signed index duration in years.
-    pub fn with_duration(mut self, duration_id: impl Into<PriceId>) -> Self {
+    pub fn with_duration_id(mut self, duration_id: impl Into<PriceId>) -> Self {
         self.duration_id = Some(duration_id.into());
         self
     }

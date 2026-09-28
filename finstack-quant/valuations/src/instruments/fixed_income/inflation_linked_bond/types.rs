@@ -328,9 +328,9 @@ impl InflationLinkedBond {
     /// - **Deflation Protection**: Maturity only (principal floor at par)
     /// - **Discounting**: Nominal curve ("USD-OIS"); cashflows are
     ///   inflation-projected nominal amounts
-    pub fn example() -> Self {
+    pub fn example() -> finstack_quant_core::Result<Self> {
         use time::macros::date;
-        Self {
+        Ok(Self {
             id: InstrumentId::new("TIPS-10Y"),
             notional: Money::from((1_000_000_i64, Currency::USD)),
             real_coupon: Decimal::new(25, 3),
@@ -352,7 +352,7 @@ impl InflationLinkedBond {
             metric_pricing_overrides: Default::default(),
             scenario_pricing_overrides: Default::default(),
             attributes: Attributes::new(),
-        }
+        })
     }
 
     /// Create a new US TIPS bond using parameter structs
@@ -965,8 +965,8 @@ mod tests {
 
     #[test]
     fn rejects_retired_top_level_quoted_clean_key() {
-        let mut value =
-            serde_json::to_value(InflationLinkedBond::example()).expect("serialize linker");
+        let mut value = serde_json::to_value(InflationLinkedBond::example().expect("example"))
+            .expect("serialize linker");
         // schema-rejection-test
         value["quoted_clean"] = serde_json::json!(100.0);
         let error = serde_json::from_value::<InflationLinkedBond>(value)
@@ -1091,7 +1091,7 @@ mod tests {
     /// tests only passed by overriding `day_count` to `Thirty360`.
     #[test]
     fn act_act_isma_real_schedule_and_accrual_need_no_day_count_override() {
-        let bond = InflationLinkedBond::example();
+        let bond = InflationLinkedBond::example().expect("example");
         assert_eq!(bond.day_count, DayCount::ActActIsma);
 
         let as_of = d(2026, Month::April, 10); // mid-life, between coupons

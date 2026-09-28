@@ -278,7 +278,7 @@ impl BondValuator {
     /// # Arguments
     ///
     /// * `bond` - The bond to value
-    /// * `market_context` - Market data including curves
+    /// * `market` - Market data including curves
     /// * `as_of` - Valuation date (time origin for the tree)
     /// * `time_to_maturity` - Time from `as_of` to maturity in years
     /// * `tree_steps` - Number of tree steps
@@ -301,14 +301,14 @@ impl BondValuator {
     /// curve's day-count convention to ensure consistency with tree calibration.
     pub fn new(
         bond: Bond,
-        market_context: &MarketContext,
+        market: &MarketContext,
         as_of: Date,
         time_to_maturity: f64,
         tree_steps: usize,
     ) -> Result<Self> {
         let dt = time_to_maturity / tree_steps as f64;
         let time_steps: Vec<f64> = (0..=tree_steps).map(|i| i as f64 * dt).collect();
-        Self::new_with_time_steps(bond, market_context, as_of, time_steps)
+        Self::new_with_time_steps(bond, market, as_of, time_steps)
     }
 
     /// Create a bond valuator on an explicit (possibly non-uniform) time
@@ -326,20 +326,12 @@ impl BondValuator {
     /// schedule/day-count computation fails.
     pub fn new_with_time_steps(
         bond: Bond,
-        market_context: &MarketContext,
+        market: &MarketContext,
         as_of: Date,
         time_steps: Vec<f64>,
     ) -> Result<Self> {
-        let grid_day_count = market_context
-            .get_discount(&bond.discount_curve_id)?
-            .day_count();
-        Self::new_with_time_steps_and_day_count(
-            bond,
-            market_context,
-            as_of,
-            time_steps,
-            grid_day_count,
-        )
+        let grid_day_count = market.get_discount(&bond.discount_curve_id)?.day_count();
+        Self::new_with_time_steps_and_day_count(bond, market, as_of, time_steps, grid_day_count)
     }
 
     /// Create a bond valuator on an explicit time grid and model day-count

@@ -144,13 +144,13 @@ fn spot_value(market: &MarketContext, id: &str) -> f64 {
 fn overrides(spot: Option<f64>, vol: Option<f64>, rate: Option<f64>) -> MetricPricingOverrides {
     let mut po = MetricPricingOverrides::default();
     if let Some(v) = spot {
-        po = po.with_spot_bump(v);
+        po = po.with_spot_bump_decimal(v);
     }
     if let Some(v) = vol {
-        po = po.with_vol_bump(v);
+        po = po.with_vol_bump_decimal(v);
     }
     if let Some(v) = rate {
-        po = po.with_rate_bump(v);
+        po = po.with_rate_bump_bp(v);
     }
     po
 }

@@ -67,7 +67,7 @@ impl EquityOptionParams {
         }
     }
 
-    /// Create European call option parameters
+    /// Create European call option parameters.
     ///
     /// # Arguments
     ///
@@ -75,7 +75,7 @@ impl EquityOptionParams {
     /// * `expiry` - Option expiry date
     /// * `quantity` - Number of underlying units; PV scales linearly with it
     /// * `currency` - Currency of the strike, premium and present value
-    pub fn european_call(strike: f64, expiry: Date, quantity: f64, currency: Currency) -> Self {
+    pub fn call(strike: f64, expiry: Date, quantity: f64, currency: Currency) -> Self {
         Self::new(strike, expiry, OptionType::Call, quantity, currency)
     }
 
@@ -87,7 +87,7 @@ impl EquityOptionParams {
     /// * `expiry` - Option expiry date
     /// * `quantity` - Number of underlying units; PV scales linearly with it
     /// * `currency` - Currency of the strike, premium and present value
-    pub fn european_put(strike: f64, expiry: Date, quantity: f64, currency: Currency) -> Self {
+    pub fn put(strike: f64, expiry: Date, quantity: f64, currency: Currency) -> Self {
         Self::new(strike, expiry, OptionType::Put, quantity, currency)
     }
 
@@ -120,7 +120,7 @@ impl EquityOptionMarketData {
     }
 
     /// Attach a continuous dividend-yield scalar identifier.
-    pub fn with_dividend_yield(mut self, div_yield_id: impl Into<PriceId>) -> Self {
+    pub fn with_div_yield_id(mut self, div_yield_id: impl Into<PriceId>) -> Self {
         self.div_yield_id = Some(div_yield_id.into());
         self
     }

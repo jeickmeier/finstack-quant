@@ -66,8 +66,8 @@ use rust_decimal::Decimal;
 ///     .notional(Money::from((10_000_000_i64, Currency::USD)))
 ///     .underlying(
 ///         IndexUnderlyingParams::new("US-CORP", Currency::USD)
-///             .with_yield("US-CORP-YIELD")
-///             .with_duration("US-CORP-DURATION"),
+///             .with_yield_id("US-CORP-YIELD")
+///             .with_duration_id("US-CORP-DURATION"),
 ///     )
 ///     .financing_leg(FinancingLegSpec::new(
 ///         "USD-OIS", "USD-SOFR-3M", Decimal::from(35), DayCount::Act360,
@@ -206,8 +206,8 @@ impl FiIndexTotalReturnSwap {
     pub fn example() -> finstack_quant_core::Result<Self> {
         use time::macros::date;
         let underlying = IndexUnderlyingParams::new("US-CORP-INDEX", Currency::USD)
-            .with_yield("US-CORP-YIELD")
-            .with_duration("US-CORP-DURATION");
+            .with_yield_id("US-CORP-YIELD")
+            .with_duration_id("US-CORP-DURATION");
         let financing = FinancingLegSpec::new(
             "USD-OIS",
             "USD-SOFR-3M",
@@ -267,10 +267,10 @@ impl FiIndexTotalReturnSwap {
     ) -> Result<Self> {
         let mut underlying = IndexUnderlyingParams::new(etf_ticker, notional.currency());
         if let Some(y) = yield_id {
-            underlying = underlying.with_yield(y);
+            underlying = underlying.with_yield_id(y);
         }
         if let Some(d) = duration_id {
-            underlying = underlying.with_duration(d);
+            underlying = underlying.with_duration_id(d);
         }
 
         Self::builder()
@@ -288,32 +288,32 @@ impl FiIndexTotalReturnSwap {
     /// Calculates the present value of the total return leg.
     ///
     /// # Arguments
-    /// * `curves` — Market context containing curves and market data
+    /// * `market` — Market context containing curves and market data
     /// * `as_of` — Date that selects remaining return periods and anchors discounting
     ///
     /// # Returns
     /// Present value of the total return leg in the instrument's currency.
-    pub fn pv_total_return_leg(&self, curves: &MarketContext, as_of: Date) -> Result<Money> {
+    pub fn pv_total_return_leg(&self, market: &MarketContext, as_of: Date) -> Result<Money> {
         self.validate()?;
-        crate::instruments::fixed_income::fi_trs::pricer::pv_total_return_leg(self, curves, as_of)
+        crate::instruments::fixed_income::fi_trs::pricer::pv_total_return_leg(self, market, as_of)
     }
 
     /// Calculates the present value of the financing leg.
     ///
     /// # Arguments
-    /// * `curves` — Market context containing curves and market data
+    /// * `market` — Market context containing curves and market data
     /// * `as_of` — Date that selects remaining financing periods and anchors discounting
     ///
     /// # Returns
     /// Present value of the financing leg in the instrument's currency.
-    pub fn pv_financing_leg(&self, curves: &MarketContext, as_of: Date) -> Result<Money> {
+    pub fn pv_financing_leg(&self, market: &MarketContext, as_of: Date) -> Result<Money> {
         self.validate()?;
         use crate::instruments::common_impl::pricing::TrsEngine;
         TrsEngine::pv_financing_leg(
             &self.financing_leg,
             &self.schedule,
             self.notional,
-            curves,
+            market,
             as_of,
         )
     }
@@ -321,19 +321,19 @@ impl FiIndexTotalReturnSwap {
     /// Calculates the financing annuity for par spread calculation.
     ///
     /// # Arguments
-    /// * `curves` — Market context containing curves and market data
+    /// * `market` — Market context containing curves and market data
     /// * `as_of` — Date that selects remaining financing periods and anchors discounting
     ///
     /// # Returns
     /// Financing annuity (sum of discounted year fractions × notional).
-    pub fn financing_annuity(&self, curves: &MarketContext, as_of: Date) -> Result<f64> {
+    pub fn financing_annuity(&self, market: &MarketContext, as_of: Date) -> Result<f64> {
         self.validate()?;
         use crate::instruments::common_impl::pricing::TrsEngine;
         TrsEngine::financing_annuity(
             &self.financing_leg,
             &self.schedule,
             self.notional,
-            curves,
+            market,
             as_of,
         )
     }

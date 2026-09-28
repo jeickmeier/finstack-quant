@@ -113,7 +113,7 @@ let clo = StructuredCredit::new_clo(
 );
 
 // Or start from the canonical example.
-let deal = StructuredCredit::example();
+let deal = StructuredCredit::example().expect("example");
 ```
 
 For full control use `StructuredCredit::builder()` and set `deal_type`, `pool`,

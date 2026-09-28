@@ -206,7 +206,7 @@ fn test_bond_with_cashflows_method() {
         .expect("CashFlowSchedule builder should succeed with valid test data");
 
     // Apply custom cashflows
-    bond = bond.with_cashflows(custom_schedule);
+    bond = bond.with_custom_cashflows(custom_schedule);
 
     assert!(bond.custom_cashflows.is_some());
     // The original cashflow_spec is preserved but custom_cashflows takes precedence
@@ -260,7 +260,7 @@ fn test_custom_cashflows_override_regular_generation() {
         .build(None)
         .expect("CashFlowSchedule builder should succeed with valid test data");
 
-    let custom_bond = regular_bond.clone().with_cashflows(custom_schedule);
+    let custom_bond = regular_bond.clone().with_custom_cashflows(custom_schedule);
 
     // Create curves
     let disc_curve = DiscountCurve::builder("USD-OIS")

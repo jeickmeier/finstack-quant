@@ -475,7 +475,9 @@ mod tests {
         swap.discount_curve_id = "USD-OIS".into();
         swap.start_date = date!(2025 - 01 - 06);
         swap.maturity = date!(2025 - 01 - 13);
-        swap.instrument_pricing_overrides = swap.instrument_pricing_overrides.with_implied_vol(0.2);
+        swap.instrument_pricing_overrides = swap
+            .instrument_pricing_overrides
+            .with_implied_volatility(0.2);
         let dates = observation_dates(&swap).expect("dates");
         let final_date = *dates.last().expect("final observation");
         let prices: Vec<_> = dates

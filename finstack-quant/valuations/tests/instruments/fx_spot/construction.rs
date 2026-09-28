@@ -102,7 +102,7 @@ fn test_construction_full_builder() {
 #[test]
 fn test_effective_notional_default() {
     let fx = sample_eurusd();
-    let notional = fx.get_effective_notional();
+    let notional = fx.notional;
 
     assert_eq!(notional.amount(), 1.0);
     assert_eq!(notional.currency(), Currency::EUR);
@@ -113,7 +113,7 @@ fn test_effective_notional_with_explicit_value() {
     let fx = sample_eurusd()
         .with_notional(Money::new(2_500_000.0, Currency::EUR).expect("valid money fixture"))
         .unwrap();
-    let notional = fx.get_effective_notional();
+    let notional = fx.notional;
 
     assert_eq!(notional.amount(), 2_500_000.0);
     assert_eq!(notional.currency(), Currency::EUR);
@@ -155,7 +155,7 @@ fn test_construction_with_large_notional() {
         .with_notional(Money::new(1_000_000_000.0, Currency::EUR).expect("valid money fixture"))
         .unwrap();
 
-    assert_eq!(fx.get_effective_notional().amount(), 1_000_000_000.0);
+    assert_eq!(fx.notional.amount(), 1_000_000_000.0);
 }
 
 #[test]
@@ -164,12 +164,7 @@ fn test_construction_with_small_notional() {
         .with_notional(Money::new(0.01, Currency::EUR).expect("valid money fixture"))
         .unwrap();
 
-    approx_eq(
-        fx.get_effective_notional().amount(),
-        0.01,
-        EPSILON,
-        "Small notional",
-    );
+    approx_eq(fx.notional.amount(), 0.01, EPSILON, "Small notional");
 }
 
 #[test]
@@ -207,5 +202,5 @@ fn test_with_notional_valid_currency() {
         .with_notional(Money::new(1_000_000.0, Currency::EUR).expect("valid money fixture"))
         .unwrap();
 
-    assert_eq!(fx.get_effective_notional().amount(), 1_000_000.0);
+    assert_eq!(fx.notional.amount(), 1_000_000.0);
 }

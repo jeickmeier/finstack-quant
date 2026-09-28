@@ -167,7 +167,9 @@ impl BasisSwap {
     /// # Errors
     /// Returns an error if:
     /// - Either leg has `start >= end` (invalid swap tenor)
-    /// - Both legs reference the same forward curve (use `new_allowing_same_curve` to override)
+    /// - Both legs reference the same forward curve (build with
+    ///   `BasisSwap::builder().allow_same_curve(true)` or set the JSON field `allow_same_curve`
+    ///   for an intentional same-index spread trade)
     /// - Any lag is negative
     ///
     /// # Arguments
@@ -176,14 +178,16 @@ impl BasisSwap {
     /// * `notional` - Swap notional in the shared leg currency; must be finite and strictly positive.
     /// * `primary_leg` - Spread-receiving floating leg (dates, index, discount curve, and spread).
     /// * `reference_leg` - Flat floating leg paid against the primary. Must use a different
-    ///   forward curve unless constructed with `new_allowing_same_curve`.
+    ///   forward curve; same-curve trades are built with `BasisSwap::builder()` and
+    ///   `allow_same_curve(true)`.
     pub fn new(
-        id: impl Into<String>,
+        id: impl Into<InstrumentId>,
         notional: Money,
         primary_leg: FloatLegSpec,
         reference_leg: FloatLegSpec,
     ) -> Result<Self> {
-        let id_str = id.into();
+        let id: InstrumentId = id.into();
+        let id_str = id.as_str().to_string();
         validation::validate_money_finite(notional, "BasisSwap notional")?;
         validation::validate_money_gt(notional, 0.0, "BasisSwap notional")?;
 
@@ -207,7 +211,8 @@ impl BasisSwap {
             return Err(finstack_quant_core::Error::Validation(format!(
                 "BasisSwap '{}' has identical forward curves on both legs ({}). \
                  A same-index basis swap has NPV = spread × annuity by construction. \
-                 If this is intentional, use .with_allow_same_curve(true).",
+                 If this is intentional, build it with BasisSwap::builder().allow_same_curve(true) \
+                 or set the JSON field `allow_same_curve: true`.",
                 id_str,
                 primary_leg.forward_curve_id.as_str()
             )));
@@ -217,7 +222,7 @@ impl BasisSwap {
         Self::validate_leg_lags(&id_str, "reference", &reference_leg)?;
 
         Ok(Self {
-            id: InstrumentId::new(id_str),
+            id,
             notional,
             primary_leg,
             reference_leg,
@@ -233,12 +238,6 @@ impl BasisSwap {
     /// Allow (or disallow) calendar-day fallback when the calendar cannot be resolved.
     pub fn with_allow_calendar_fallback(mut self, allow: bool) -> Self {
         self.allow_calendar_fallback = allow;
-        self
-    }
-
-    /// Allow (or disallow) same forward curve on both legs.
-    pub fn with_allow_same_curve(mut self, allow: bool) -> Self {
-        self.allow_same_curve = allow;
         self
     }
 
@@ -283,61 +282,6 @@ impl BasisSwap {
             &self.reference_leg.compounding,
         )?;
         Ok(())
-    }
-
-    /// Creates a basis swap without curve uniqueness validation.
-    ///
-    /// Use this constructor when you intentionally want both legs to reference the
-    /// same forward curve (e.g., for testing or same-index spread trades).
-    pub fn new_allowing_same_curve(
-        id: impl Into<String>,
-        notional: Money,
-        primary_leg: FloatLegSpec,
-        reference_leg: FloatLegSpec,
-    ) -> Result<Self> {
-        let id_str = id.into();
-        validation::validate_money_finite(notional, "BasisSwap notional")?;
-        validation::validate_money_gt(notional, 0.0, "BasisSwap notional")?;
-
-        if primary_leg.start >= primary_leg.end {
-            return Err(finstack_quant_core::Error::Validation(format!(
-                "BasisSwap '{}' primary leg has start ({}) >= end ({}); \
-                 leg must have positive tenor",
-                id_str, primary_leg.start, primary_leg.end
-            )));
-        }
-        if reference_leg.start >= reference_leg.end {
-            return Err(finstack_quant_core::Error::Validation(format!(
-                "BasisSwap '{}' reference leg has start ({}) >= end ({}); \
-                 leg must have positive tenor",
-                id_str, reference_leg.start, reference_leg.end
-            )));
-        }
-
-        if primary_leg.forward_curve_id == reference_leg.forward_curve_id {
-            tracing::warn!(
-                instrument_id = %id_str,
-                forward_curve_id = %primary_leg.forward_curve_id.as_str(),
-                "BasisSwap created with same forward curve on both legs; \
-                 NPV will equal spread × annuity by construction"
-            );
-        }
-
-        Self::validate_leg_lags(&id_str, "primary", &primary_leg)?;
-        Self::validate_leg_lags(&id_str, "reference", &reference_leg)?;
-
-        Ok(Self {
-            id: InstrumentId::new(id_str),
-            notional,
-            primary_leg,
-            reference_leg,
-            allow_calendar_fallback: false,
-            allow_same_curve: true,
-            instrument_pricing_overrides: Default::default(),
-            metric_pricing_overrides: Default::default(),
-            scenario_pricing_overrides: Default::default(),
-            attributes: crate::instruments::common_impl::traits::Attributes::default(),
-        })
     }
 
     /// Create a canonical example USD 3M SOFR vs 1M SOFR basis swap (5Y, $10M notional).
@@ -448,8 +392,8 @@ impl BasisSwap {
     pub fn pv_float_leg(
         &self,
         leg: &FloatLegSpec,
-        context: &MarketContext,
-        valuation_date: Date,
+        market: &MarketContext,
+        as_of: Date,
     ) -> Result<Money> {
         if leg.payment_lag_days < 0 || leg.reset_lag_days < 0 {
             return Err(finstack_quant_core::Error::Validation(
@@ -479,29 +423,29 @@ impl BasisSwap {
             );
         }
 
-        let disc = context.get_discount(&leg.discount_curve_id)?;
+        let disc = market.get_discount(&leg.discount_curve_id)?;
         let currency = self.notional.currency();
         if !matches!(
             leg.compounding,
             crate::instruments::rates::irs::FloatingLegCompounding::Simple
         ) {
-            let schedule = self.floating_leg_schedule(leg, context, valuation_date)?;
+            let schedule = self.floating_leg_schedule(leg, market, as_of)?;
             let mut acc = finstack_quant_core::math::NeumaierAccumulator::new();
             for flow in schedule.get_flows() {
-                if flow.date <= valuation_date {
+                if flow.date <= as_of {
                     continue;
                 }
                 let df =
                     crate::instruments::common_impl::pricing::time::relative_df_discount_curve(
                         disc.as_ref(),
-                        valuation_date,
+                        as_of,
                         flow.date,
                     )?;
                 acc.add(flow.amount.amount() * df);
             }
             return Money::new(acc.total(), currency);
         }
-        let fwd = context.get_forward(&leg.forward_curve_id)?;
+        let fwd = market.get_forward(&leg.forward_curve_id)?;
 
         let periods = crate::cashflow::builder::periods::build_periods(
             crate::cashflow::builder::periods::BuildPeriodsParams {
@@ -526,7 +470,7 @@ impl BasisSwap {
 
         let leg_periods: Vec<LegPeriod> = periods
             .into_iter()
-            .filter(|period| period.payment_date > valuation_date)
+            .filter(|period| period.payment_date > as_of)
             .map(|period| LegPeriod {
                 accrual_start: period.accrual_start,
                 accrual_end: period.accrual_end,
@@ -548,7 +492,7 @@ impl BasisSwap {
         );
 
         let fixings = finstack_quant_core::market_data::fixings::get_fixing_series(
-            context,
+            market,
             leg.forward_curve_id.as_str(),
         )
         .ok();
@@ -559,7 +503,7 @@ impl BasisSwap {
             &params,
             disc.as_ref(),
             fwd.as_ref(),
-            valuation_date,
+            as_of,
             fixings,
         )?;
 
@@ -570,7 +514,7 @@ impl BasisSwap {
     pub fn annuity_for_leg(
         &self,
         leg: &FloatLegSpec,
-        curves: &MarketContext,
+        market: &MarketContext,
         as_of: Date,
     ) -> Result<f64> {
         if leg.payment_lag_days < 0 {
@@ -579,7 +523,7 @@ impl BasisSwap {
             ));
         }
 
-        let disc = curves.get_discount(&leg.discount_curve_id)?;
+        let disc = market.get_discount(&leg.discount_curve_id)?;
 
         let periods = crate::cashflow::builder::periods::build_periods(
             crate::cashflow::builder::periods::BuildPeriodsParams {
@@ -620,13 +564,13 @@ impl BasisSwap {
             None
         };
         let overnight_fwd = if overnight {
-            Some(curves.get_forward(&leg.forward_curve_id)?)
+            Some(market.get_forward(&leg.forward_curve_id)?)
         } else {
             None
         };
         let overnight_fixings = if overnight {
             finstack_quant_core::market_data::fixings::get_fixing_series(
-                curves,
+                market,
                 leg.forward_curve_id.as_str(),
             )
             .ok()
@@ -1357,17 +1301,19 @@ mod tests {
             compounding: Default::default(),
         };
 
-        // Use the explicit same-curve constructor
-        let swap = BasisSwap::new_allowing_same_curve(
-            "SAME_CURVE_OK",
-            Money::from((1_000_000_i64, Currency::USD)),
-            leg.clone(),
-            FloatLegSpec {
+        // Same-curve trades opt in through the builder's `allow_same_curve` flag.
+        let swap = BasisSwap::builder()
+            .id(InstrumentId::new("SAME_CURVE_OK"))
+            .notional(Money::from((1_000_000_i64, Currency::USD)))
+            .primary_leg(leg.clone())
+            .reference_leg(FloatLegSpec {
                 spread_bp: Decimal::ZERO,
                 ..leg
-            },
-        )
-        .expect("should succeed with explicit allow");
+            })
+            .allow_same_curve(true)
+            .attributes(Default::default())
+            .build()
+            .expect("should succeed with explicit allow");
 
         // Should price successfully
         let pv = swap.value(&context, base_date).expect("should succeed");

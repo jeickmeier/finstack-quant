@@ -31,7 +31,7 @@ mod tests {
         )
         .with_rating(CreditRating::BB)
         .with_industry("Technology")
-        .with_obligor("OBLIGOR001");
+        .with_obligor_id("OBLIGOR001");
 
         let loan2 = PoolAsset::floating_rate_loan(
             "LOAN002",
@@ -43,7 +43,7 @@ mod tests {
         )
         .with_rating(CreditRating::B)
         .with_industry("Healthcare")
-        .with_obligor("OBLIGOR002");
+        .with_obligor_id("OBLIGOR002");
 
         // Create fixed rate bond (no separate spread)
         let bond1 = PoolAsset::fixed_rate_bond(
@@ -235,7 +235,7 @@ mod tests {
             )
             .with_rating(CreditRating::BB)
             .with_industry("Technology")
-            .with_obligor("TECH_CORP_A"),
+            .with_obligor_id("TECH_CORP_A"),
         );
 
         pool.assets.push(
@@ -249,7 +249,7 @@ mod tests {
             )
             .with_rating(CreditRating::B)
             .with_industry("Healthcare")
-            .with_obligor("HEALTH_CORP_B"),
+            .with_obligor_id("HEALTH_CORP_B"),
         );
 
         pool.assets.push(
@@ -263,7 +263,7 @@ mod tests {
             )
             .with_rating(CreditRating::B)
             .with_industry("Consumer")
-            .with_obligor("CONSUMER_CORP_C"),
+            .with_obligor_id("CONSUMER_CORP_C"),
         );
 
         // 3. Calculate pool metrics using market-standard methods

@@ -84,34 +84,32 @@ impl CallableRangeAccrual {
     }
 
     /// Create a canonical example callable range accrual for testing.
-    #[allow(clippy::expect_used)]
-    pub fn example() -> Self {
+    pub fn example() -> finstack_quant_core::Result<Self> {
         use finstack_quant_core::currency::Currency;
         use time::macros::date;
-        use time::Month;
 
         let observation_dates = vec![
-            Date::from_calendar_date(2026, Month::January, 31).expect("valid"),
-            Date::from_calendar_date(2026, Month::February, 28).expect("valid"),
-            Date::from_calendar_date(2026, Month::March, 31).expect("valid"),
-            Date::from_calendar_date(2026, Month::April, 30).expect("valid"),
-            Date::from_calendar_date(2026, Month::May, 31).expect("valid"),
-            Date::from_calendar_date(2026, Month::June, 30).expect("valid"),
-            Date::from_calendar_date(2026, Month::July, 31).expect("valid"),
-            Date::from_calendar_date(2026, Month::August, 31).expect("valid"),
-            Date::from_calendar_date(2026, Month::September, 30).expect("valid"),
-            Date::from_calendar_date(2026, Month::October, 31).expect("valid"),
-            Date::from_calendar_date(2026, Month::November, 30).expect("valid"),
-            Date::from_calendar_date(2026, Month::December, 31).expect("valid"),
+            time::macros::date!(2026 - 01 - 31),
+            time::macros::date!(2026 - 02 - 28),
+            time::macros::date!(2026 - 03 - 31),
+            time::macros::date!(2026 - 04 - 30),
+            time::macros::date!(2026 - 05 - 31),
+            time::macros::date!(2026 - 06 - 30),
+            time::macros::date!(2026 - 07 - 31),
+            time::macros::date!(2026 - 08 - 31),
+            time::macros::date!(2026 - 09 - 30),
+            time::macros::date!(2026 - 10 - 31),
+            time::macros::date!(2026 - 11 - 30),
+            time::macros::date!(2026 - 12 - 31),
         ];
 
         let call_dates = vec![
-            Date::from_calendar_date(2026, Month::June, 30).expect("valid"),
-            Date::from_calendar_date(2026, Month::September, 30).expect("valid"),
-            Date::from_calendar_date(2026, Month::December, 31).expect("valid"),
+            time::macros::date!(2026 - 06 - 30),
+            time::macros::date!(2026 - 09 - 30),
+            time::macros::date!(2026 - 12 - 31),
         ];
 
-        CallableRangeAccrual {
+        Ok(CallableRangeAccrual {
             id: InstrumentId::new("CALLABLE-RA-SOFR-1Y"),
             range_accrual: RangeAccrualTerms::builder()
                 .underlying_ticker("SOFR".to_string())
@@ -133,18 +131,17 @@ impl CallableRangeAccrual {
                 .payment_date_opt(None)
                 .past_observations_in_range_opt(None)
                 .total_past_observations_opt(None)
-                .build()
-                .expect("example range accrual terms should build"),
+                .build()?,
             call_provision: BermudanCallProvision::new(
                 call_dates,
                 100.0,
-                Some(Date::from_calendar_date(2026, Month::January, 31).expect("valid")),
+                Some(time::macros::date!(2026 - 01 - 31)),
             ),
             instrument_pricing_overrides: Default::default(),
             metric_pricing_overrides: Default::default(),
             scenario_pricing_overrides: Default::default(),
             attributes: Attributes::new(),
-        }
+        })
     }
 }
 
@@ -198,13 +195,13 @@ mod tests {
 
     #[test]
     fn example_validates() {
-        let cra = CallableRangeAccrual::example();
+        let cra = CallableRangeAccrual::example().expect("example");
         assert!(cra.validate().is_ok());
     }
 
     #[test]
     fn invalid_range_fails() {
-        let mut cra = CallableRangeAccrual::example();
+        let mut cra = CallableRangeAccrual::example().expect("example");
         cra.range_accrual.lower_bound = 0.06;
         cra.range_accrual.upper_bound = 0.04;
         assert!(cra.validate().is_err());
@@ -212,7 +209,7 @@ mod tests {
 
     #[test]
     fn invalid_call_provision_fails() {
-        let mut cra = CallableRangeAccrual::example();
+        let mut cra = CallableRangeAccrual::example().expect("example");
         cra.call_provision.call_dates = vec![];
         assert!(cra.validate().is_err());
     }
@@ -220,7 +217,7 @@ mod tests {
     #[test]
     fn instrument_trait() {
         use crate::instruments::common_impl::traits::Instrument;
-        let cra = CallableRangeAccrual::example();
+        let cra = CallableRangeAccrual::example().expect("example");
         assert_eq!(cra.id(), "CALLABLE-RA-SOFR-1Y");
         assert_eq!(
             cra.key(),
@@ -230,7 +227,7 @@ mod tests {
 
     #[test]
     fn serde_roundtrip() {
-        let cra = CallableRangeAccrual::example();
+        let cra = CallableRangeAccrual::example().expect("example");
         let json = serde_json::to_string(&cra).expect("serialize");
         let deser: CallableRangeAccrual = serde_json::from_str(&json).expect("deserialize");
         assert_eq!(deser.id, cra.id);
@@ -260,8 +257,8 @@ mod tests {
                 serde_json::json!({"scenario_price_shock_decimal": 0.01}),
             ),
         ] {
-            let mut value =
-                serde_json::to_value(CallableRangeAccrual::example()).expect("serialize");
+            let mut value = serde_json::to_value(CallableRangeAccrual::example().expect("example"))
+                .expect("serialize");
             value["range_accrual"][key] = retired;
             let error = serde_json::from_value::<CallableRangeAccrual>(value)
                 .expect_err("retired range_accrual envelope key must be rejected");
@@ -280,7 +277,7 @@ mod tests {
         use finstack_quant_core::market_data::context::MarketContext;
         use time::macros::date;
 
-        let cra = CallableRangeAccrual::example();
+        let cra = CallableRangeAccrual::example().expect("example");
         let market = MarketContext::default();
         let as_of = date!(2025 - 01 - 01);
         let err = cra

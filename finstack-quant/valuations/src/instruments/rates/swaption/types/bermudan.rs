@@ -48,7 +48,7 @@ use crate::instruments::{ExerciseStyle, SettlementType, VolatilityModel};
 /// use finstack_quant_valuations::instruments::SettlementType;
 ///
 /// // Create a 10NC2 (10-year swap, callable after 2 years)
-/// let swaption = BermudanSwaption::example();
+/// let swaption = BermudanSwaption::example().expect("example");
 /// ```
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
@@ -169,15 +169,13 @@ impl BermudanSwaption {
     /// Create a canonical example Bermudan swaption for testing.
     ///
     /// Returns a 10NC2 payer swaption (10-year swap, callable quarterly after 2 years).
-    #[allow(clippy::expect_used)] // Example uses hardcoded valid values
-    pub fn example() -> Self {
-        let swap_start =
-            Date::from_calendar_date(2027, time::Month::January, 17).expect("Valid example date");
-        let swap_end =
-            Date::from_calendar_date(2037, time::Month::January, 17).expect("Valid example date");
-        let first_exercise =
-            Date::from_calendar_date(2029, time::Month::January, 17).expect("Valid example date");
-        let strike = Decimal::try_from(0.03).expect("valid decimal");
+    pub fn example() -> finstack_quant_core::Result<Self> {
+        let swap_start = time::macros::date!(2027 - 01 - 17);
+        let swap_end = time::macros::date!(2037 - 01 - 17);
+        let first_exercise = time::macros::date!(2029 - 01 - 17);
+        let strike = Decimal::try_from(0.03).map_err(|e: rust_decimal::Error| {
+            finstack_quant_core::Error::Validation(e.to_string())
+        })?;
         let (underlying_fixed_leg, underlying_float_leg) =
             vanilla_underlier(VanillaSwaptionUnderlier::standard(
                 strike,
@@ -187,7 +185,7 @@ impl BermudanSwaption {
                 CurveId::new("USD-OIS"),
             ));
 
-        Self {
+        Ok(Self {
             id: InstrumentId::new("BERM-10NC2-USD"),
             option_type: OptionType::Call,
             notional: Money::from((10_000_000_i64, Currency::USD)),
@@ -197,8 +195,7 @@ impl BermudanSwaption {
                 first_exercise,
                 swap_end,
                 Tenor::semi_annual(),
-            )
-            .expect("valid Bermudan schedule"),
+            )?,
             bermudan_type: BermudanType::CoTerminal,
             underlying_fixed_leg,
             underlying_float_leg,
@@ -206,7 +203,7 @@ impl BermudanSwaption {
             metric_pricing_overrides: Default::default(),
             scenario_pricing_overrides: Default::default(),
             attributes: Attributes::new(),
-        }
+        })
     }
 
     /// Create a co-terminal Bermudan swaption with USD-standard leg conventions
@@ -509,11 +506,11 @@ impl BermudanSwaption {
     /// - Forward rates use the forward curve's own base_date/day_count
     pub fn forward_swap_rate(
         &self,
-        curves: &MarketContext,
+        market: &MarketContext,
         as_of: Date,
         exercise_date: Date,
     ) -> Result<f64> {
-        let disc = curves.get_discount(self.get_discount_curve_id().as_ref())?;
+        let disc = market.get_discount(self.get_discount_curve_id().as_ref())?;
         let annuity = self.remaining_annuity(disc.as_ref(), as_of, exercise_date)?;
 
         if annuity.abs() < 1e-10 {
@@ -522,7 +519,7 @@ impl BermudanSwaption {
 
         let underlier = self.underlying_irs_at(exercise_date)?;
         let pv_float =
-            crate::instruments::rates::irs::pricer::compute_pv_raw(&underlier, curves, as_of)?;
+            crate::instruments::rates::irs::pricer::compute_pv_raw(&underlier, market, as_of)?;
         Ok(pv_float / (self.notional.amount() * annuity))
     }
 
@@ -646,7 +643,7 @@ mod tests {
 
     #[test]
     fn default_model_is_hull_white_tree() {
-        let swaption = BermudanSwaption::example();
+        let swaption = BermudanSwaption::example().expect("example");
         assert_eq!(swaption.default_model(), ModelKey::HullWhite1F);
     }
 
@@ -655,7 +652,7 @@ mod tests {
         use finstack_quant_core::market_data::context::MarketContext;
         use time::macros::date;
 
-        let swaption = BermudanSwaption::example();
+        let swaption = BermudanSwaption::example().expect("example");
         let market = MarketContext::default();
         let as_of = date!(2025 - 01 - 01);
         let err = swaption

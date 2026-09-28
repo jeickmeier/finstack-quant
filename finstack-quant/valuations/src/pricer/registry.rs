@@ -1387,7 +1387,8 @@ mod tests {
 
         let as_of = date!(2025 - 01 - 15);
         let swaption =
-            crate::instruments::commodity::commodity_swaption::CommoditySwaption::example();
+            crate::instruments::commodity::commodity_swaption::CommoditySwaption::example()
+                .expect("example");
         let market = commodity_swaption_market(as_of, 3.75, 0.30, 0.05);
         let registry = super::super::standard_pricer_registry();
 
@@ -1638,7 +1639,8 @@ mod tests {
         use time::macros::date;
 
         let as_of: Date = date!(2025 - 01 - 15);
-        let clo = crate::instruments::fixed_income::structured_credit::StructuredCredit::example();
+        let clo = crate::instruments::fixed_income::structured_credit::StructuredCredit::example()
+            .expect("example");
         let disc = multi_knot_discount_curve("USD-OIS", as_of);
         let market = MarketContext::new().insert(disc);
         let registry = super::super::standard_pricer_registry();

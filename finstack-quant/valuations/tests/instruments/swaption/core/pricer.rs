@@ -26,7 +26,7 @@ fn test_simple_swaption_normal_pricer_uses_bachelier_formula() {
     swaption.instrument_pricing_overrides = swaption
         .instrument_pricing_overrides
         .clone()
-        .with_implied_vol(0.25);
+        .with_implied_volatility(0.25);
 
     let market = create_flat_market(as_of, 0.03, 0.2);
     let expected_normal = swaption.price_normal(&market, 0.25, as_of).unwrap();
@@ -49,7 +49,7 @@ fn test_simple_swaption_pricers_reject_volatility_model_mismatch() {
     swaption.instrument_pricing_overrides = swaption
         .instrument_pricing_overrides
         .clone()
-        .with_implied_vol(0.35);
+        .with_implied_volatility(0.35);
 
     let market = create_flat_market(as_of, 0.03, 0.2);
     let black_error = SimpleSwaptionBlackPricer
@@ -74,8 +74,8 @@ fn test_simple_swaption_black_pricer_uses_sabr_dispatch_when_present() {
         nu: 0.4,
         shift: None,
     };
-    let swaption =
-        create_standard_payer_swaption(expiry, swap_start, swap_end, 0.05).with_sabr(sabr_params);
+    let swaption = create_standard_payer_swaption(expiry, swap_start, swap_end, 0.05)
+        .with_sabr_params(sabr_params);
     let market = create_flat_market(as_of, 0.05, 0.30);
 
     let expected = swaption.price_sabr(&market, as_of).unwrap();

@@ -220,7 +220,7 @@ fn test_remaining_forward_variance_requires_market_volatility() {
 #[test]
 fn test_remaining_forward_variance_uses_implied_vol_when_present() {
     // Arrange
-    let swap = with_implied_vol(sample_swap(PayReceive::Receive), 0.22);
+    let swap = with_implied_volatility(sample_swap(PayReceive::Receive), 0.22);
     let ctx = base_context_without_vol();
 
     // Act

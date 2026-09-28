@@ -94,7 +94,7 @@
 //!
 //! # fn main() -> finstack_quant_core::Result<()> {
 //! let as_of = date!(2025-01-01);
-//! let swap = InterestRateSwap::example_standard()?;
+//! let swap = InterestRateSwap::example()?;
 //!
 //! // A seasoned swap needs a discount curve, a projection curve for the
 //! // floating leg, and the historical fixings its past resets already consumed.
@@ -136,7 +136,7 @@
 //! ## Example 3: Computing Theta (Time Decay) for an Option
 //!
 //! ```
-//! use finstack_quant_valuations::instruments::{EquityOption, Instrument, PricingOptions};
+//! use finstack_quant_valuations::instruments::{EquityOption, Instrument, OptionType, PricingOptions};
 //! use finstack_quant_valuations::metrics::MetricId;
 //! use finstack_quant_core::currency::Currency;
 //! use finstack_quant_core::dates::create_date;
@@ -151,16 +151,17 @@
 //! let as_of = create_date(2024, Month::January, 1)?;
 //! let expiry = create_date(2024, Month::July, 1)?; // 6-month option
 //!
-//! let option = EquityOption::european_call(
+//! let option = EquityOption::european(
 //!     "OPT-001",
 //!     "SPX",
 //!     4500.0,
 //!     expiry,
 //!     100.0,
 //!     Currency::USD,
+//!     OptionType::Call,
 //! )?;
 //!
-//! // `european_call` binds the standard ids: USD-OIS, EQUITY-SPOT,
+//! // `european` binds the standard ids: USD-OIS, EQUITY-SPOT,
 //! // EQUITY-VOL, and EQUITY-DIVYIELD.
 //! let market = MarketContext::new()
 //!     .insert(
@@ -198,7 +199,7 @@
 //! ## Example 4: Computing Multiple Greeks for an Option
 //!
 //! ```
-//! use finstack_quant_valuations::instruments::{EquityOption, Instrument, PricingOptions};
+//! use finstack_quant_valuations::instruments::{EquityOption, Instrument, OptionType, PricingOptions};
 //! use finstack_quant_valuations::metrics::MetricId;
 //! use finstack_quant_core::currency::Currency;
 //! use finstack_quant_core::dates::create_date;
@@ -211,13 +212,14 @@
 //!
 //! # fn main() -> finstack_quant_core::Result<()> {
 //! let as_of = create_date(2024, Month::January, 1)?;
-//! let option = EquityOption::european_call(
+//! let option = EquityOption::european(
 //!     "OPT-001",
 //!     "SPX",
 //!     4500.0,
 //!     create_date(2024, Month::July, 1)?,
 //!     100.0,
 //!     Currency::USD,
+//!     OptionType::Call,
 //! )?;
 //! let market = MarketContext::new()
 //!     .insert(

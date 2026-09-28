@@ -4,7 +4,7 @@ use crate::instruments::fixed_income::bond::Bond;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DateExt, DayCount};
 use finstack_quant_core::money::Money;
-use finstack_quant_core::types::InstrumentId;
+use finstack_quant_core::types::{CurveId, InstrumentId};
 use rust_decimal::prelude::ToPrimitive;
 
 use finstack_quant_core::HashMap;
@@ -282,7 +282,7 @@ impl PoolAsset {
     pub fn floating_rate_loan(
         id: impl Into<InstrumentId>,
         balance: Money,
-        forward_curve_id: impl Into<String>,
+        forward_curve_id: impl Into<CurveId>,
         spread_bp: f64,
         maturity: Date,
         day_count: DayCount,
@@ -293,7 +293,7 @@ impl PoolAsset {
             balance,
             rate: spread_bp / BASIS_POINTS_DIVISOR, // Initialize with spread only
             spread_bp: Some(spread_bp),
-            forward_curve_id: Some(forward_curve_id.into()),
+            forward_curve_id: Some(forward_curve_id.into().as_str().to_string()),
             maturity,
             index_floor_bp: None,
             rating: None,
@@ -382,7 +382,7 @@ impl PoolAsset {
     }
 
     /// Set obligor identifier
-    pub fn with_obligor(mut self, obligor_id: impl Into<String>) -> Self {
+    pub fn with_obligor_id(mut self, obligor_id: impl Into<String>) -> Self {
         self.obligor_id = Some(obligor_id.into());
         self
     }

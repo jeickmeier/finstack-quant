@@ -1,7 +1,7 @@
 //! Common leg specification types for interest rate and credit instruments.
 
 use finstack_quant_core::dates::{BusinessDayConvention, Date, DayCount, StubKind, Tenor};
-use finstack_quant_core::types::{CurveId, Percentage};
+use finstack_quant_core::types::CurveId;
 use rust_decimal::Decimal;
 
 use serde::{Deserialize, Serialize};
@@ -401,29 +401,6 @@ impl ProtectionLegSpec {
         })
     }
 
-    /// Create a new protection leg specification using typed percentage recovery.
-    ///
-    /// # Arguments
-    /// * `credit_curve_id` - Identifier for the hazard/credit curve
-    /// * `recovery_rate` - Recovery rate as a percentage (e.g., 40.0 = 40%)
-    /// * `settlement_delay` - Settlement delay in business days
-    ///
-    /// # Errors
-    /// Returns an error if `recovery_rate` is outside [0.0, 1.0] in decimal terms.
-    pub fn new_pct(
-        credit_curve_id: impl Into<CurveId>,
-        recovery_rate: Percentage,
-        settlement_delay: u16,
-    ) -> finstack_quant_core::Result<Self> {
-        let recovery_rate_decimal = recovery_rate.as_decimal();
-        Self::validate_recovery_rate(recovery_rate_decimal)?;
-        Ok(Self {
-            credit_curve_id: credit_curve_id.into(),
-            recovery_rate: recovery_rate_decimal,
-            settlement_delay,
-        })
-    }
-
     /// Validate that recovery rate is within valid bounds [0, 1].
     ///
     /// Delegates to the shared internal recovery-rate validator.
@@ -484,12 +461,12 @@ impl FinancingLegSpec {
     /// * `spread_bp` - Contractual financing spread in basis points.
     /// * `day_count` - Accrual day-count for the financing coupon.
     pub fn new(
-        discount_curve_id: impl Into<String>,
-        forward_curve_id: impl Into<String>,
+        discount_curve_id: impl Into<CurveId>,
+        forward_curve_id: impl Into<CurveId>,
         spread_bp: Decimal,
         day_count: DayCount,
     ) -> Self {
-        let forward_curve_id = CurveId::new(forward_curve_id);
+        let forward_curve_id: CurveId = forward_curve_id.into();
         let compounding = match crate::instruments::common_impl::pricing::overnight_conventions::compounding_from_index_id(
             forward_curve_id.as_str(),
         ) {
@@ -497,7 +474,7 @@ impl FinancingLegSpec {
             Ok(None) | Err(_) => crate::instruments::rates::irs::FloatingLegCompounding::Simple,
         };
         Self {
-            discount_curve_id: CurveId::new(discount_curve_id),
+            discount_curve_id: discount_curve_id.into(),
             forward_curve_id,
             spread_bp,
             day_count,

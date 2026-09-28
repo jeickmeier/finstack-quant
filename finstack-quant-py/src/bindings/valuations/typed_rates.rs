@@ -51,7 +51,7 @@ fn decimal_f64(value: rust_decimal::Decimal) -> f64 {
 /// Construct via ``InterestRateSwap.from_conventions`` (market conventions
 /// resolved from the rate-index registry), ``InterestRateSwap.builder()``
 /// with explicit ``FixedLegSpec`` / ``FloatLegSpec`` legs,
-/// ``InterestRateSwap.example_standard()`` or ``InterestRateSwap.from_json``.
+/// ``InterestRateSwap.example()`` or ``InterestRateSwap.from_json``.
 /// Every public Rust field is readable as a property; ``price`` / ``metric``
 /// run the same pricer as ``price_instrument``.
 #[pyclass(
@@ -191,7 +191,7 @@ impl PyInterestRateSwap {
     }
 
     /// Canonical 5-year USD pay-fixed swap (mirrors Rust
-    /// ``InterestRateSwap::example_standard``).
+    /// ``InterestRateSwap::example``).
     ///
     /// Returns
     /// -------
@@ -207,12 +207,12 @@ impl PyInterestRateSwap {
     /// Examples
     /// --------
     /// >>> from finstack_quant.valuations.instruments import InterestRateSwap
-    /// >>> InterestRateSwap.example_standard().side
+    /// >>> InterestRateSwap.example().side
     /// 'pay'
     #[staticmethod]
     #[pyo3(text_signature = "()")]
-    fn example_standard() -> PyResult<Self> {
-        finstack_quant_valuations::instruments::InterestRateSwap::example_standard()
+    fn example() -> PyResult<Self> {
+        finstack_quant_valuations::instruments::InterestRateSwap::example()
             .map(|inner| Self { inner })
             .map_err(core_to_py)
     }
@@ -761,6 +761,11 @@ impl PySwaption {
     ///     Cash-settled Black-vol swaption on a 3% 5-year swap, vol surface
     ///     ``USD-SWPNVOL``.
     ///
+    /// Raises
+    /// ------
+    /// ValueError
+    ///     If the example instrument fails validation.
+    ///
     /// Examples
     /// --------
     /// >>> from finstack_quant.valuations.instruments import Swaption
@@ -768,10 +773,11 @@ impl PySwaption {
     /// 0.03
     #[staticmethod]
     #[pyo3(text_signature = "()")]
-    fn example() -> Self {
-        Self {
-            inner: finstack_quant_valuations::instruments::Swaption::example(),
-        }
+    fn example() -> PyResult<Self> {
+        Ok(Self {
+            inner: finstack_quant_valuations::instruments::Swaption::example()
+                .map_err(core_to_py)?,
+        })
     }
 
     /// Bermudan-exercise variant of the example (mirrors Rust
@@ -782,6 +788,11 @@ impl PySwaption {
     /// Swaption
     ///     The example swaption with ``exercise_style == "bermudan"``.
     ///
+    /// Raises
+    /// ------
+    /// ValueError
+    ///     If the example instrument fails validation.
+    ///
     /// Examples
     /// --------
     /// >>> from finstack_quant.valuations.instruments import Swaption
@@ -789,10 +800,11 @@ impl PySwaption {
     /// 'bermudan'
     #[staticmethod]
     #[pyo3(text_signature = "()")]
-    fn example_bermudan() -> Self {
-        Self {
-            inner: finstack_quant_valuations::instruments::Swaption::example_bermudan(),
-        }
+    fn example_bermudan() -> PyResult<Self> {
+        Ok(Self {
+            inner: finstack_quant_valuations::instruments::Swaption::example_bermudan()
+                .map_err(core_to_py)?,
+        })
     }
 
     /// Support `pickle` (and therefore `multiprocessing`, `joblib`, `dask`).

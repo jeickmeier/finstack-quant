@@ -194,7 +194,7 @@ mod scenario_guard_tests {
     /// Oversized scenario grids are rejected before allocation / repricing.
     #[test]
     fn oversized_scenario_grid_is_rejected() {
-        let deal = StructuredCredit::example();
+        let deal = StructuredCredit::example().expect("example");
         let market = MarketContext::new();
         let as_of = deal.closing_date;
 

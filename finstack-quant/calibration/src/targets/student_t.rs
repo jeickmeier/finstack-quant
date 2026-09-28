@@ -233,7 +233,7 @@ impl StudentTTarget {
             let Ok(config) = template.clone().with_student_t_copula(df) else {
                 return f64::INFINITY;
             };
-            let Ok(pricer) = CdsTranchePricer::with_params(config) else {
+            let Ok(pricer) = CdsTranchePricer::with_config(config) else {
                 return f64::INFINITY;
             };
             match pricer.calculate_model_upfront(tranche, &self.base_context, as_of) {

@@ -493,13 +493,13 @@ impl VarianceSwap {
     }
 
     /// Get historical prices aligned to observation dates when available.
-    pub fn get_historical_prices(&self, context: &MarketContext, as_of: Date) -> Result<Vec<f64>> {
-        pricer::get_historical_prices(self, context, as_of)
+    pub fn get_historical_prices(&self, market: &MarketContext, as_of: Date) -> Result<Vec<f64>> {
+        pricer::get_historical_prices(self, market, as_of)
     }
 
     /// Calculate partial realized variance for the elapsed period.
-    pub fn partial_realized_variance(&self, context: &MarketContext, as_of: Date) -> Result<f64> {
-        pricer::partial_realized_variance(self, context, as_of)
+    pub fn partial_realized_variance(&self, market: &MarketContext, as_of: Date) -> Result<f64> {
+        pricer::partial_realized_variance(self, market, as_of)
     }
 
     /// Calculate implied forward variance for the remaining period.
@@ -518,8 +518,8 @@ impl VarianceSwap {
     /// References: Carr, P. & Madan, D. (1998). "Towards a Theory of Volatility Trading";
     /// Demeterfi, Derman, Kamal & Zou (1999). "More Than You Ever Wanted to Know About
     /// Volatility Swaps."
-    pub fn remaining_forward_variance(&self, context: &MarketContext, _as_of: Date) -> Result<f64> {
-        pricer::remaining_forward_variance(self, context, _as_of)
+    pub fn remaining_forward_variance(&self, market: &MarketContext, _as_of: Date) -> Result<f64> {
+        pricer::remaining_forward_variance(self, market, _as_of)
     }
 
     /// Seasoned mark-to-market expected variance: the day-count time-weighted
@@ -528,8 +528,8 @@ impl VarianceSwap {
     /// This is exactly the expected variance the pricer feeds into the payoff for
     /// a partially-observed swap (`start_date <= as_of < maturity`), so the
     /// `ExpectedVariance` metric and the swap's PV stay consistent (W-33).
-    pub fn seasoned_expected_variance(&self, context: &MarketContext, as_of: Date) -> Result<f64> {
-        pricer::seasoned_expected_variance(self, context, as_of)
+    pub fn seasoned_expected_variance(&self, market: &MarketContext, as_of: Date) -> Result<f64> {
+        pricer::seasoned_expected_variance(self, market, as_of)
     }
 }
 

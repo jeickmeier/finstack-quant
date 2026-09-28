@@ -187,14 +187,10 @@ impl VolatilityIndexFuture {
     ///
     /// # Arguments
     ///
-    /// * `context` - Market context containing the volatility index curve.
+    /// * `market` - Market context containing the volatility index curve.
     /// * `as_of` - Valuation date controlling live versus final-settlement state.
-    pub fn npv_raw(
-        &self,
-        context: &MarketContext,
-        as_of: Date,
-    ) -> finstack_quant_core::Result<f64> {
-        pricer::compute_pv_raw(self, context, as_of)
+    pub fn npv_raw(&self, market: &MarketContext, as_of: Date) -> finstack_quant_core::Result<f64> {
+        pricer::compute_pv_raw(self, market, as_of)
     }
 
     /// Model futures level in index points: the volatility index curve read at
@@ -202,16 +198,16 @@ impl VolatilityIndexFuture {
     ///
     /// # Arguments
     ///
-    /// * `context` - Market context containing the volatility index curve.
+    /// * `market` - Market context containing the volatility index curve.
     /// * `as_of` - Valuation date. The curve's own base date anchors the time
     ///   axis, so the level does not depend on `as_of`; the argument keeps the
     ///   signature of the other listed futures' `fair_price`.
     pub fn fair_price(
         &self,
-        context: &MarketContext,
+        market: &MarketContext,
         as_of: Date,
     ) -> finstack_quant_core::Result<f64> {
-        pricer::fair_price(self, context, as_of)
+        pricer::fair_price(self, market, as_of)
     }
 
     /// Resolve the live quote, model level, or official final settlement price.
@@ -221,14 +217,14 @@ impl VolatilityIndexFuture {
     ///
     /// # Arguments
     ///
-    /// * `context` - Market context containing the volatility index curve.
+    /// * `market` - Market context containing the volatility index curve.
     /// * `as_of` - Valuation date controlling live versus final-settlement state.
     pub fn mark_price(
         &self,
-        context: &MarketContext,
+        market: &MarketContext,
         as_of: Date,
     ) -> finstack_quant_core::Result<f64> {
-        pricer::mark_price(self, context, as_of)
+        pricer::mark_price(self, market, as_of)
     }
 
     /// P&L change for a 1-point increase in the vol index level

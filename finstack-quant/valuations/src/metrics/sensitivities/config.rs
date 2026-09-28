@@ -290,10 +290,10 @@ mod tests {
             theta_day_basis: None,
             var_config: None,
         }
-        .with_rate_bump(2.0)
-        .with_credit_spread_bump(3.0)
-        .with_spot_bump(0.02)
-        .with_vol_bump(0.03);
+        .with_rate_bump_bp(2.0)
+        .with_credit_spread_bump_bp(3.0)
+        .with_spot_bump_decimal(0.02)
+        .with_vol_bump_decimal(0.03);
 
         let resolved = apply_pricing_overrides(base, Some(&po)).expect("valid overrides");
         assert_eq!(resolved.rate_bump_bp, 2.0);
@@ -306,7 +306,7 @@ mod tests {
     fn apply_pricing_overrides_carries_ytm_bump_only_when_set() {
         let base = SensitivitiesConfig::default();
         assert_eq!(base.ytm_bump_bp, None);
-        let po = crate::instruments::MetricPricingOverrides::default().with_ytm_bump(2.5);
+        let po = crate::instruments::MetricPricingOverrides::default().with_ytm_bump_bp(2.5);
         let resolved = apply_pricing_overrides(base, Some(&po)).expect("valid overrides");
         assert_eq!(resolved.ytm_bump_bp, Some(2.5));
     }
@@ -323,7 +323,7 @@ mod tests {
     #[test]
     fn apply_pricing_overrides_rejects_non_positive_values() {
         let base = SensitivitiesConfig::default();
-        let po = crate::instruments::MetricPricingOverrides::default().with_rate_bump(0.0);
+        let po = crate::instruments::MetricPricingOverrides::default().with_rate_bump_bp(0.0);
 
         let err = apply_pricing_overrides(base, Some(&po)).expect_err("must fail");
         assert!(
@@ -452,8 +452,8 @@ mod tests {
             )
             .expect("valid extension key");
         let pricing_overrides = crate::instruments::MetricPricingOverrides::default()
-            .with_rate_bump(4.0)
-            .with_vol_bump(0.05);
+            .with_rate_bump_bp(4.0)
+            .with_vol_bump_decimal(0.05);
 
         let resolved = from_context_or_default(&cfg, Some(&pricing_overrides))
             .expect("layered config should parse");

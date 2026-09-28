@@ -115,7 +115,7 @@ mod tests {
     }
 
     fn sample_cap() -> InflationCapFloor {
-        let mut cap = InflationCapFloor::example();
+        let mut cap = InflationCapFloor::example().expect("example");
         cap.discount_curve_id = CurveId::new("USD-OIS");
         cap.inflation_index_id = CurveId::new("US-CPI");
         cap.vol_surface_id = CurveId::new("USD-INFL-VOL");

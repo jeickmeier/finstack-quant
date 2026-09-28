@@ -24,7 +24,7 @@
 //! use finstack_quant_valuations::instruments::commodity::commodity_swaption::CommoditySwaption;
 //! use finstack_quant_core::currency::Currency;
 //!
-//! let swaption = CommoditySwaption::example();
+//! let swaption = CommoditySwaption::example().expect("example");
 //! assert_eq!(swaption.underlying.underlying_ticker, "NG");
 //! ```
 

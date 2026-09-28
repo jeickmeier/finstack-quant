@@ -115,7 +115,7 @@ fn test_equity_dividend_yield_default() {
 
 #[test]
 fn test_equity_dividend_yield_from_market() {
-    let equity = Equity::new("AAPL", "AAPL", Currency::USD).with_dividend_yield_id("AAPL-DIVYIELD");
+    let equity = Equity::new("AAPL", "AAPL", Currency::USD).with_div_yield_id("AAPL-DIVYIELD");
     let market = MarketContext::new().insert_price("AAPL-DIVYIELD", MarketScalar::Unitless(0.025)); // 2.5% dividend yield
 
     let pricer = EquityPricer;
@@ -126,7 +126,7 @@ fn test_equity_dividend_yield_from_market() {
 #[test]
 fn test_equity_dividend_yield_with_custom_id() {
     let equity =
-        Equity::new("EQUITY1", "AAPL", Currency::USD).with_dividend_yield_id("CUSTOM_DIV_YIELD");
+        Equity::new("EQUITY1", "AAPL", Currency::USD).with_div_yield_id("CUSTOM_DIV_YIELD");
 
     let market =
         MarketContext::new().insert_price("CUSTOM_DIV_YIELD", MarketScalar::Unitless(0.03)); // 3% dividend yield
@@ -140,7 +140,7 @@ fn test_equity_dividend_yield_with_custom_id() {
 fn test_equity_forward_price() {
     let equity = Equity::new("AAPL", "AAPL", Currency::USD)
         .with_quoted_spot(100.0)
-        .with_dividend_yield_id("AAPL-DIVYIELD");
+        .with_div_yield_id("AAPL-DIVYIELD");
 
     // Add discount curve (5% interest rate)
     let base_date = Date::from_calendar_date(2024, time::Month::January, 1).unwrap();
@@ -319,7 +319,7 @@ fn test_equity_forward_price_zero_rates() {
 fn test_equity_forward_price_high_dividend() {
     let equity = Equity::new("AAPL", "AAPL", Currency::USD)
         .with_quoted_spot(100.0)
-        .with_dividend_yield_id("AAPL-DIVYIELD");
+        .with_div_yield_id("AAPL-DIVYIELD");
 
     let base_date = Date::from_calendar_date(2024, time::Month::January, 1).unwrap();
     let curve = build_flat_curve(0.05, base_date, "USD");

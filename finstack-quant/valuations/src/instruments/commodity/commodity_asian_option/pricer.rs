@@ -1074,7 +1074,7 @@ mod tests {
 
     #[test]
     fn post_expiry_option_is_zero_without_market_data() {
-        let option = CommodityAsianOption::example();
+        let option = CommodityAsianOption::example().expect("example");
         let as_of = option.expiry + time::Duration::days(1);
         let pv = compute_pv(&option, &MarketContext::new(), as_of)
             .expect("settled Asian option must be zero");

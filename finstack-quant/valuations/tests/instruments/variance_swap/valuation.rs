@@ -13,7 +13,7 @@ use time::macros::date;
 #[test]
 fn test_npv_before_start_uses_forward_variance_and_discounting() {
     // Arrange
-    let swap = with_implied_vol(sample_swap(PayReceive::Receive), 0.22);
+    let swap = with_implied_volatility(sample_swap(PayReceive::Receive), 0.22);
     let ctx = base_context_without_vol();
     let as_of = date(2024, 12, 1);
 
@@ -41,7 +41,7 @@ fn test_npv_before_start_uses_forward_variance_and_discounting() {
 fn test_npv_before_start_at_the_money_forward_is_near_zero() {
     // Arrange
     let strike_vol = sample_swap(PayReceive::Receive).strike_variance.sqrt();
-    let swap = with_implied_vol(sample_swap(PayReceive::Receive), strike_vol);
+    let swap = with_implied_volatility(sample_swap(PayReceive::Receive), strike_vol);
     let ctx = base_context_without_vol();
     let as_of = date(2024, 12, 1);
 

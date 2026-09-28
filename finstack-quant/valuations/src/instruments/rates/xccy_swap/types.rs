@@ -259,13 +259,13 @@ impl XccySwap {
     ///
     /// Dates and stub conventions are now owned by each leg.
     pub fn new(
-        id: impl Into<String>,
+        id: impl Into<InstrumentId>,
         leg1: XccySwapLeg,
         leg2: XccySwapLeg,
         reporting_currency: Currency,
     ) -> Self {
         Self {
-            id: InstrumentId::new(id.into()),
+            id: id.into(),
             leg1,
             leg2,
             notional_exchange: NotionalExchange::InitialAndFinal,
@@ -282,12 +282,9 @@ impl XccySwap {
     ///
     /// Returns a 5-year XCCY swap with quarterly SOFR on the USD leg
     /// and quarterly EURIBOR on the EUR leg, with initial and final notional exchange.
-    #[allow(clippy::expect_used)] // Example uses hardcoded valid values
-    pub fn example() -> Self {
-        use time::Month;
-
-        let start = Date::from_calendar_date(2024, Month::January, 3).expect("Valid example date");
-        let end = Date::from_calendar_date(2029, Month::January, 3).expect("Valid example date");
+    pub fn example() -> finstack_quant_core::Result<Self> {
+        let start = time::macros::date!(2024 - 01 - 03);
+        let end = time::macros::date!(2029 - 01 - 03);
 
         let usd_leg = XccySwapLeg {
             notional: Money::from((10_000_000_i64, Currency::USD)),
@@ -335,7 +332,7 @@ impl XccySwap {
 
         let mut swap = Self::new("XCCY-USDEUR-5Y", usd_leg, eur_leg, Currency::USD);
         swap.allow_calendar_fallback = true;
-        swap
+        Ok(swap)
     }
 
     /// Set notional exchange convention.
@@ -1098,7 +1095,7 @@ mod tests {
     use time::Month;
 
     fn no_fallback_swap() -> XccySwap {
-        let mut swap = XccySwap::example();
+        let mut swap = XccySwap::example().expect("example");
         swap.allow_calendar_fallback = false;
         swap
     }
@@ -1311,7 +1308,7 @@ mod tests {
     #[test]
     // schema-rejection-test: leg-level allow_calendar_fallback moved to XccySwap.
     fn xccy_leg_rejects_leg_level_allow_calendar_fallback() {
-        let swap = XccySwap::example();
+        let swap = XccySwap::example().expect("example");
         let mut json = serde_json::to_value(&swap.leg1).expect("serialize leg");
         json["allow_calendar_fallback"] = serde_json::Value::Bool(true);
         let err = serde_json::from_value::<XccySwapLeg>(json)
@@ -1346,9 +1343,11 @@ mod tests {
 
     #[test]
     fn partition_legs_returns_constant_then_resetting() {
-        let swap = XccySwap::example().with_notional_exchange(NotionalExchange::MtmResetting {
-            resetting_side: ResettingSide::Leg2, // EUR leg resets
-        });
+        let swap = XccySwap::example()
+            .expect("example")
+            .with_notional_exchange(NotionalExchange::MtmResetting {
+                resetting_side: ResettingSide::Leg2, // EUR leg resets
+            });
         let (constant, resetting) = swap
             .partition_legs(ResettingSide::Leg2)
             .expect("partition succeeds");
@@ -1369,7 +1368,7 @@ mod tests {
         // `partition_legs`. `validate()` should also reject this shape, but this test
         // pins the guard at the helper level since `partition_legs` is the primary
         // contract used by Task 7's PV path.
-        let mut swap = XccySwap::example();
+        let mut swap = XccySwap::example().expect("example");
         swap.leg2.notional = finstack_quant_core::money::Money::from((1_i64, Currency::USD));
 
         let err = swap
@@ -1485,9 +1484,11 @@ mod tests {
     fn validate_accepts_well_formed_mtm_resetting_swap() {
         // The canonical example swap has aligned schedules, matching frequencies, and
         // different currencies. Wrapping it in MtmResetting must pass `validate()`.
-        let swap = XccySwap::example().with_notional_exchange(NotionalExchange::MtmResetting {
-            resetting_side: ResettingSide::Leg2,
-        });
+        let swap = XccySwap::example()
+            .expect("example")
+            .with_notional_exchange(NotionalExchange::MtmResetting {
+                resetting_side: ResettingSide::Leg2,
+            });
         swap.validate()
             .expect("well-formed MtmResetting swap should pass validate");
     }
@@ -1524,7 +1525,7 @@ mod tests {
             .insert(forward("EUR-EURIBOR-3M", 0.01))
             .insert_fx(FxMatrix::new(provider));
 
-        let swap = XccySwap::example();
+        let swap = XccySwap::example().expect("example");
         let unshocked = swap.value(&market, base).expect("unshocked value");
         let mut shocked_swap = swap.clone();
         shocked_swap
@@ -1563,7 +1564,7 @@ mod tests {
 
         let base = Date::from_calendar_date(2024, Month::January, 3).expect("base date");
 
-        // Build minimal curves matching the IDs used by XccySwap::example().
+        // Build minimal curves matching the IDs used by XccySwap::example().expect("example").
         let usd_disc = DiscountCurve::builder(CurveId::new("USD-OIS"))
             .base_date(base)
             .knots(vec![(0.0, 1.0), (5.0, (-0.02_f64 * 5.0).exp())])
@@ -1598,9 +1599,11 @@ mod tests {
             .insert(eur_fwd)
             .insert_fx(fx);
 
-        let swap = XccySwap::example().with_notional_exchange(NotionalExchange::MtmResetting {
-            resetting_side: ResettingSide::Leg2,
-        });
+        let swap = XccySwap::example()
+            .expect("example")
+            .with_notional_exchange(NotionalExchange::MtmResetting {
+                resetting_side: ResettingSide::Leg2,
+            });
 
         // The PV should be a finite number; we are not asserting the exact value here.
         // Task 9 will do CIP-invariance.
@@ -1783,7 +1786,7 @@ mod tests {
 
     #[test]
     fn validate_rejects_simple_compounding_on_overnight_index() {
-        let mut swap = XccySwap::example();
+        let mut swap = XccySwap::example().expect("example");
         swap.leg1.leg.forward_curve_id = CurveId::new("USD-SOFR-OIS");
         swap.leg1.leg.compounding = crate::instruments::rates::irs::FloatingLegCompounding::Simple;
         let err = swap

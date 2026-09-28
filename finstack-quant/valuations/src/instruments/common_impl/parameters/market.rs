@@ -1,6 +1,6 @@
 //! Market parameter types for instrument pricing.
 
-use finstack_quant_core::types::{CurveId, Percentage};
+use finstack_quant_core::types::CurveId;
 pub use finstack_quant_models::types::{ExerciseStyle, OptionType};
 use serde::{Deserialize, Serialize};
 
@@ -65,19 +65,6 @@ impl CreditParams {
         Self {
             reference_entity: reference_entity.into(),
             recovery_rate,
-            credit_curve_id: credit_curve_id.into(),
-        }
-    }
-
-    /// Create new credit parameters using typed percentage recovery.
-    pub fn new_pct(
-        reference_entity: impl Into<String>,
-        recovery_rate: Percentage,
-        credit_curve_id: impl Into<CurveId>,
-    ) -> Self {
-        Self {
-            reference_entity: reference_entity.into(),
-            recovery_rate: recovery_rate.as_decimal(),
             credit_curve_id: credit_curve_id.into(),
         }
     }
@@ -148,15 +135,6 @@ mod tests {
 
     #[test]
     fn credit_typed_constructors_preserve_typed_inputs() {
-        let credit = CreditParams::new_pct(
-            "ACME",
-            Percentage::new(35.0).expect("finite percentage"),
-            "ACME-CDS",
-        );
-        assert_eq!(credit.reference_entity, "ACME");
-        assert!((credit.recovery_rate - 0.35).abs() < 1e-12);
-        assert_eq!(credit.credit_curve_id.as_str(), "ACME-CDS");
-
         let corp = CreditParams::corporate_standard("CORP", "CORP-CDS");
         let sov = CreditParams::sovereign_standard("UST", "UST-CDS");
         assert!((corp.recovery_rate - 0.40).abs() < 1e-12);

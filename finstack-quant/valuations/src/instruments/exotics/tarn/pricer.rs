@@ -229,7 +229,12 @@ impl TarnPricer {
         }
     }
 
-    /// Create a TARN pricer with explicit MC configuration.
+    /// Set the Monte Carlo configuration (paths, seed, antithetic flag, time
+    /// steps) used by this pricer; instrument overrides still apply on top.
+    ///
+    /// # Arguments
+    ///
+    /// * `config` - Base Hull-White Monte Carlo configuration.
     pub fn with_config(mut self, config: RateExoticMcConfig) -> Self {
         self.config = config;
         self

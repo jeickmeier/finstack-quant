@@ -31,7 +31,7 @@ use super::instruments::serialize_typed_instrument_json;
 #[pyo3(text_signature = "()")]
 fn credit_default_swap_example_json() -> PyResult<String> {
     serialize_typed_instrument_json(
-        InstrumentJson::CreditDefaultSwap(CreditDefaultSwap::example()),
+        InstrumentJson::CreditDefaultSwap(CreditDefaultSwap::example().map_err(core_to_py)?),
         "CreditDefaultSwap example",
     )
 }
@@ -47,7 +47,7 @@ fn credit_default_swap_example_json() -> PyResult<String> {
 #[pyo3(text_signature = "()")]
 fn cds_index_example_json() -> PyResult<String> {
     serialize_typed_instrument_json(
-        InstrumentJson::CdsIndex(CdsIndex::example()),
+        InstrumentJson::CdsIndex(CdsIndex::example().map_err(core_to_py)?),
         "CdsIndex example",
     )
 }
@@ -63,7 +63,7 @@ fn cds_index_example_json() -> PyResult<String> {
 #[pyo3(text_signature = "()")]
 fn cds_tranche_example_json() -> PyResult<String> {
     serialize_typed_instrument_json(
-        InstrumentJson::CdsTranche(CdsTranche::example()),
+        InstrumentJson::CdsTranche(CdsTranche::example().map_err(core_to_py)?),
         "CdsTranche example",
     )
 }

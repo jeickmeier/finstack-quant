@@ -429,7 +429,7 @@ def test_tranche_metrics_report_the_to_call_twins() -> None:
 
 
 def test_hedge_swaps_and_call_assumptions_are_typed_and_round_trip() -> None:
-    swap = InterestRateSwap.example_standard()
+    swap = InterestRateSwap.example()
     hedge = HedgeSwap(swap, notional={"tranche_par": "A"}, priority="junior_fee")
     assert hedge.swap.id == swap.id
     assert hedge.notional == {"tranche_par": "A"}

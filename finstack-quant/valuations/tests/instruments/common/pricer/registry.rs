@@ -283,8 +283,8 @@ fn removed_option_discounting_aliases_return_unknown_pricer() {
     use finstack_quant_valuations::instruments::rates::swaption::Swaption;
 
     let equity_option = EquityOption::example().expect("equity option example");
-    let swaption = Swaption::example();
-    let commodity_option = CommodityOption::example();
+    let swaption = Swaption::example().expect("example");
+    let commodity_option = CommodityOption::example().expect("example");
     let registry = standard_pricer_registry();
     let market = MarketContext::new();
     let as_of = date!(2025 - 01 - 01);

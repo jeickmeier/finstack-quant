@@ -197,21 +197,19 @@ impl Snowball {
     }
 
     /// Create a canonical example snowball for testing.
-    #[allow(clippy::expect_used)]
-    pub fn example_snowball() -> Self {
+    pub fn example() -> finstack_quant_core::Result<Self> {
         use finstack_quant_core::currency::Currency;
-        use time::Month;
 
-        let start_date = Date::from_calendar_date(2026, Month::June, 30).expect("valid");
+        let start_date = time::macros::date!(2026 - 06 - 30);
         let payment_dates = vec![
-            Date::from_calendar_date(2026, Month::December, 31).expect("valid"),
-            Date::from_calendar_date(2027, Month::June, 30).expect("valid"),
-            Date::from_calendar_date(2027, Month::December, 31).expect("valid"),
-            Date::from_calendar_date(2028, Month::June, 30).expect("valid"),
-            Date::from_calendar_date(2028, Month::December, 31).expect("valid"),
+            time::macros::date!(2026 - 12 - 31),
+            time::macros::date!(2027 - 06 - 30),
+            time::macros::date!(2027 - 12 - 31),
+            time::macros::date!(2028 - 06 - 30),
+            time::macros::date!(2028 - 12 - 31),
         ];
 
-        Snowball {
+        Ok(Snowball {
             id: InstrumentId::new("SNOWBALL-USD-3Y"),
             variant: SnowballVariant::Snowball,
             initial_coupon: 0.03,
@@ -232,23 +230,21 @@ impl Snowball {
             metric_pricing_overrides: Default::default(),
             scenario_pricing_overrides: Default::default(),
             attributes: Attributes::new(),
-        }
+        })
     }
 
     /// Create a canonical example inverse floater for testing.
-    #[allow(clippy::expect_used)]
-    pub fn example_inverse_floater() -> Self {
+    pub fn example_inverse_floater() -> finstack_quant_core::Result<Self> {
         use finstack_quant_core::currency::Currency;
-        use time::Month;
 
-        let start_date = Date::from_calendar_date(2026, Month::March, 31).expect("valid");
+        let start_date = time::macros::date!(2026 - 03 - 31);
         let payment_dates = vec![
-            Date::from_calendar_date(2026, Month::June, 30).expect("valid"),
-            Date::from_calendar_date(2026, Month::September, 30).expect("valid"),
-            Date::from_calendar_date(2026, Month::December, 31).expect("valid"),
+            time::macros::date!(2026 - 06 - 30),
+            time::macros::date!(2026 - 09 - 30),
+            time::macros::date!(2026 - 12 - 31),
         ];
 
-        Snowball {
+        Ok(Snowball {
             id: InstrumentId::new("INV-FLOATER-USD-1Y"),
             variant: SnowballVariant::InverseFloater,
             initial_coupon: 0.0, // ignored for inverse floater
@@ -269,7 +265,7 @@ impl Snowball {
             metric_pricing_overrides: Default::default(),
             scenario_pricing_overrides: Default::default(),
             attributes: Attributes::new(),
-        }
+        })
     }
 
     /// Coupon period boundaries: `start_date` followed by every payment date.
@@ -387,14 +383,14 @@ mod tests {
 
     #[test]
     fn example_snowball_validates() {
-        let s = Snowball::example_snowball();
+        let s = Snowball::example().expect("example");
         assert!(s.validate().is_ok());
     }
 
     #[test]
     // schema-rejection-test
     fn retired_callable_key_is_rejected() {
-        let mut json = serde_json::to_value(Snowball::example_snowball()).expect("json");
+        let mut json = serde_json::to_value(Snowball::example().expect("example")).expect("json");
         let obj = json.as_object_mut().expect("object");
         let provision = obj.remove("call_provision").expect("call_provision");
         obj.insert("callable".to_string(), provision);
@@ -404,13 +400,13 @@ mod tests {
 
     #[test]
     fn example_inverse_floater_validates() {
-        let s = Snowball::example_inverse_floater();
+        let s = Snowball::example_inverse_floater().expect("example");
         assert!(s.validate().is_ok());
     }
 
     #[test]
     fn snowball_coupon_accumulation() {
-        let s = Snowball::example_snowball();
+        let s = Snowball::example().expect("example");
         // c_0 = 0.03, fixed = 0.05, floating = 0.02
         // c_1 = max(0.03 + 0.05 - 0.02, 0) = 0.06
         let c1 = s.compute_coupon(0.02, 0.03);
@@ -432,7 +428,7 @@ mod tests {
         // A floored/capped inverse floater carries floorlet/caplet optionality,
         // so the default model must be the HW1F MC pricer (which prices the
         // floor's time value), not the intrinsic-only Discounting pricer.
-        let inv = Snowball::example_inverse_floater();
+        let inv = Snowball::example_inverse_floater().expect("example");
         assert_eq!(inv.coupon_floor, 0.0);
         assert!(inv.coupon_cap.is_some());
         assert_eq!(inv.default_model(), ModelKey::MonteCarloHullWhite1F);
@@ -440,7 +436,7 @@ mod tests {
 
     #[test]
     fn snowball_coupon_floors_at_zero() {
-        let s = Snowball::example_snowball();
+        let s = Snowball::example().expect("example");
         // c_prev = 0.01, fixed = 0.05, floating = 0.20
         // raw = 0.01 + 0.05 - 0.20 = -0.14 => floor at 0
         let c = s.compute_coupon(0.20, 0.01);
@@ -449,7 +445,7 @@ mod tests {
 
     #[test]
     fn inverse_floater_coupon() {
-        let s = Snowball::example_inverse_floater();
+        let s = Snowball::example_inverse_floater().expect("example");
         // fixed = 0.08, gearing = 1.5, floating = 0.03
         // c = max(0.08 - 1.5 * 0.03, 0) = max(0.035, 0) = 0.035
         let c = s.compute_coupon(0.03, 0.0);
@@ -458,7 +454,7 @@ mod tests {
 
     #[test]
     fn inverse_floater_coupon_with_cap() {
-        let s = Snowball::example_inverse_floater();
+        let s = Snowball::example_inverse_floater().expect("example");
         // fixed = 0.08, gearing = 1.5, floating = 0.0
         // c = max(0.08 - 0.0, 0) = 0.08, but cap = 0.10 => 0.08
         let c = s.compute_coupon(0.0, 0.0);
@@ -467,7 +463,7 @@ mod tests {
 
     #[test]
     fn inverse_floater_floors_at_zero() {
-        let s = Snowball::example_inverse_floater();
+        let s = Snowball::example_inverse_floater().expect("example");
         // fixed = 0.08, gearing = 1.5, floating = 0.10
         // c = max(0.08 - 0.15, 0) = max(-0.07, 0) = 0
         let c = s.compute_coupon(0.10, 0.0);
@@ -476,14 +472,14 @@ mod tests {
 
     #[test]
     fn snowball_negative_initial_coupon_fails() {
-        let mut s = Snowball::example_snowball();
+        let mut s = Snowball::example().expect("example");
         s.initial_coupon = -0.01;
         assert!(s.validate().is_err());
     }
 
     #[test]
     fn snowball_cap_below_floor_fails() {
-        let mut s = Snowball::example_snowball();
+        let mut s = Snowball::example().expect("example");
         s.coupon_cap = Some(0.0);
         s.coupon_floor = 0.01;
         assert!(s.validate().is_err());
@@ -492,14 +488,14 @@ mod tests {
     #[test]
     fn snowball_instrument_trait() {
         use crate::instruments::common_impl::traits::Instrument;
-        let s = Snowball::example_snowball();
+        let s = Snowball::example().expect("example");
         assert_eq!(s.id(), "SNOWBALL-USD-3Y");
         assert_eq!(s.key(), crate::pricer::InstrumentType::Snowball);
     }
 
     #[test]
     fn snowball_serde_roundtrip() {
-        let s = Snowball::example_snowball();
+        let s = Snowball::example().expect("example");
         let json = serde_json::to_string(&s).expect("serialize");
         let deser: Snowball = serde_json::from_str(&json).expect("deserialize");
         assert_eq!(deser.id, s.id);
@@ -512,7 +508,7 @@ mod tests {
         use finstack_quant_core::market_data::context::MarketContext;
         use time::macros::date;
 
-        let snowball = Snowball::example_snowball();
+        let snowball = Snowball::example().expect("example");
         let market = MarketContext::default();
         let as_of = date!(2025 - 01 - 01);
         let err = snowball

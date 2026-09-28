@@ -241,7 +241,7 @@ impl CdsTranchePricer {
         date: Date,
     ) -> Result<f64> {
         let diff = el_to_detach - el_to_attach;
-        let error_budget = 2.0 * self.params.integration_tolerance
+        let error_budget = 2.0 * self.config.integration_tolerance
             + 16.0 * f64::EPSILON * (el_to_detach.abs() + el_to_attach.abs());
         if !diff.is_finite() {
             return Err(Error::Validation(
@@ -402,7 +402,7 @@ impl CdsTranchePricer {
         exposure: PoolExposure,
     ) -> Result<f64> {
         // Heterogeneous path if enabled and issuer curves present
-        if self.params.use_issuer_curves && index_data.has_issuer_curves() {
+        if self.config.use_issuer_curves && index_data.has_issuer_curves() {
             self.calculate_equity_tranche_capped_hetero(
                 cap_pct,
                 correlation,
@@ -434,7 +434,7 @@ impl CdsTranchePricer {
         exposure: PoolExposure,
     ) -> Result<f64> {
         let recovery_model: Option<Box<dyn RecoveryModel>> = self
-            .params
+            .config
             .stochastic_recovery_spec
             .as_ref()
             .map(|spec| spec.build());
@@ -449,7 +449,7 @@ impl CdsTranchePricer {
         };
         let threshold = self.default_threshold_for_copula(default_prob);
         let conditional_p = |factors: &[f64]| {
-            if self.params.copula_spec.is_gaussian() {
+            if self.config.copula_spec.is_gaussian() {
                 self.conditional_default_probability_enhanced(threshold, correlation, factors[0])
             } else {
                 self.conditional_default_prob_copula(self.copula(), threshold, factors, correlation)
@@ -492,10 +492,10 @@ impl CdsTranchePricer {
         date: Date,
     ) -> Result<(f64, f64)> {
         let stochastic = matches!(
-            self.params.stochastic_recovery_spec,
+            self.config.stochastic_recovery_spec,
             Some(RecoverySpec::MarketCorrelated { .. })
         );
-        if stochastic || (self.params.use_issuer_curves && index_data.has_issuer_curves()) {
+        if stochastic || (self.config.use_issuer_curves && index_data.has_issuer_curves()) {
             return Ok((
                 self.calculate_equity_tranche_loss(loss_cap_pct, correlation, index_data, date)?,
                 self.calculate_equity_tranche_recovery(
@@ -529,7 +529,7 @@ impl CdsTranchePricer {
     ) -> Result<(f64, f64)> {
         let threshold = self.default_threshold_for_copula(default_prob);
         let conditional_p = |factors: &[f64]| {
-            if self.params.copula_spec.is_gaussian() {
+            if self.config.copula_spec.is_gaussian() {
                 self.conditional_default_probability_enhanced(threshold, correlation, factors[0])
             } else {
                 self.conditional_default_prob_copula(self.copula(), threshold, factors, correlation)
@@ -583,7 +583,7 @@ mod production_credit_audit {
     fn base_correlation_clamps_only_configured_numerical_budget() {
         let date = Date::from_calendar_date(2030, Month::January, 1).expect("date");
         for tolerance in [1e-8, 1e-10, 1e-12] {
-            let pricer = CdsTranchePricer::with_params(
+            let pricer = CdsTranchePricer::with_config(
                 CdsTranchePricerConfig::default().with_integration_tolerance(tolerance),
             )
             .expect("pricer");

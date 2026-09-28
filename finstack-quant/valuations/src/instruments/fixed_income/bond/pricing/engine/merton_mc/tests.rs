@@ -970,7 +970,7 @@ fn merton_mc_config_roundtrips_via_pricing_overrides_json() {
         .pik_schedule(PikSchedule::Uniform(PikMode::Cash))
         .steps_per_year(24);
     let mut ov = InstrumentPricingOverrides::default();
-    ov = ov.with_merton_mc(cfg);
+    ov = ov.with_merton_mc_config(cfg);
     let json = serde_json::to_string(&ov).expect("ser");
     let back: InstrumentPricingOverrides = serde_json::from_str(&json).expect("de");
     let restored = &back

@@ -16,7 +16,7 @@
 //! use finstack_quant_models::rates::hull_white::HullWhiteCalibrationParams;
 //! use finstack_quant_valuations::instruments::rates::swaption::{BermudanSwaption, PreparedHullWhiteModel, pricing::BermudanSwaptionTreeValuator};
 //!
-//! let swaption = BermudanSwaption::example();
+//! let swaption = BermudanSwaption::example().expect("example");
 //! # let discount_curve: &finstack_quant_core::market_data::term_structures::DiscountCurve = todo!();
 //! # let as_of = finstack_quant_core::dates::Date::from_calendar_date(2025, time::Month::January, 1).unwrap();
 //!

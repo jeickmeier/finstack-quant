@@ -3,7 +3,6 @@
 use crate::cashflow::primitives::CashFlow;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::term_structures::CreditIndexData;
-use finstack_quant_core::types::Percentage;
 use finstack_quant_core::{Error as CoreError, Result as CoreResult};
 use finstack_quant_models::correlation::copula::{Copula, CopulaSpec};
 use finstack_quant_models::correlation::recovery::RecoverySpec;
@@ -272,12 +271,6 @@ impl CdsTranchePricerConfig {
         self
     }
 
-    /// Create configuration with Random Factor Loading copula using typed volatility.
-    pub fn with_rfl_copula_pct(mut self, loading_vol: Percentage) -> Self {
-        self.copula_spec = CopulaSpec::random_factor_loading(loading_vol.as_decimal());
-        self
-    }
-
     /// Create configuration with the global-plus-sector two-factor copula.
     #[must_use]
     pub fn with_multi_factor_copula(mut self) -> Self {
@@ -311,33 +304,10 @@ impl CdsTranchePricerConfig {
         self
     }
 
-    /// Enable stochastic recovery with custom parameters using typed percentages.
-    pub fn with_custom_stochastic_recovery_pct(
-        mut self,
-        mean: Percentage,
-        vol: Percentage,
-        corr: f64,
-    ) -> Self {
-        self.stochastic_recovery_spec = Some(RecoverySpec::MarketCorrelated {
-            mean_recovery: mean.as_decimal().clamp(0.0, 1.0),
-            recovery_volatility: vol.as_decimal().clamp(0.0, 0.5),
-            factor_correlation: corr.clamp(-1.0, 1.0),
-        });
-        self
-    }
-
     /// Set constant recovery rate (overriding index recovery).
     pub fn with_constant_recovery(mut self, rate: f64) -> Self {
         self.stochastic_recovery_spec = Some(RecoverySpec::Constant {
             rate: rate.clamp(0.0, 1.0),
-        });
-        self
-    }
-
-    /// Set constant recovery rate using a typed percentage.
-    pub fn with_constant_recovery_pct(mut self, rate: Percentage) -> Self {
-        self.stochastic_recovery_spec = Some(RecoverySpec::Constant {
-            rate: rate.as_decimal().clamp(0.0, 1.0),
         });
         self
     }
@@ -428,7 +398,7 @@ pub enum HeteroMethod {
 /// immutable for the pricer's lifetime. The cached copula
 /// therefore cannot drift from the settings used by uncached calculations.
 pub struct CdsTranchePricer {
-    pub(super) params: CdsTranchePricerConfig,
+    pub(super) config: CdsTranchePricerConfig,
     pub(super) copula_cache: OnceLock<Box<dyn Copula + Send + Sync>>,
 }
 
@@ -514,6 +484,6 @@ impl Default for CdsTranchePricer {
 impl CdsTranchePricer {
     /// Get the current configuration.
     pub fn get_config(&self) -> &CdsTranchePricerConfig {
-        &self.params
+        &self.config
     }
 }

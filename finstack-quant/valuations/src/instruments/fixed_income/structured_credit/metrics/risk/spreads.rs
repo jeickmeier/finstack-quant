@@ -733,7 +733,7 @@ mod zspread_quote_tests {
     fn context_without_quote() -> MetricContext {
         let as_of = Date::from_calendar_date(2025, Month::January, 1).expect("valid date");
         let payment_date = Date::from_calendar_date(2026, Month::January, 1).expect("valid date");
-        let deal = StructuredCredit::example();
+        let deal = StructuredCredit::example().expect("example");
         let discount_curve_id = deal.discount_curve_id.clone();
         let market = MarketContext::new().insert(
             DiscountCurve::builder(discount_curve_id.as_str())

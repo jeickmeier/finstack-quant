@@ -270,14 +270,34 @@ pub struct EquityOption {
 
 // Declare canonical market dependencies for the DV01 calculator.
 impl EquityOption {
-    fn build_vanilla_with_market_data(
-        id: impl Into<String>,
+    /// Create a vanilla equity option from a parameter bundle and explicit
+    /// market-data identifiers.
+    ///
+    /// Use this constructor when the option must bind to specific discount,
+    /// spot, volatility and dividend-yield objects; [`Self::european`] uses the
+    /// generic default ids instead.
+    ///
+    /// # Arguments
+    ///
+    /// * `id` - Trade identifier stored on the option and used in results and serialization.
+    /// * `ticker` - Underlying equity label (not used for market lookups).
+    /// * `option_params` - Strike (in `currency` per underlying unit), expiry, call/put,
+    ///   exercise style, settlement type, quantity and currency; build it with
+    ///   [`EquityOptionParams::call`] or [`EquityOptionParams::put`].
+    /// * `market_data` - Discount curve, spot, volatility surface and optional
+    ///   dividend-yield ids resolved from the `MarketContext` at pricing time.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the builder fails validation.
+    pub fn european_with_market_data(
+        id: impl Into<InstrumentId>,
         ticker: impl Into<String>,
         option_params: EquityOptionParams,
         market_data: EquityOptionMarketData,
     ) -> finstack_quant_core::Result<Self> {
         Self::builder()
-            .id(InstrumentId::new(id.into()))
+            .id(id.into())
             .underlying_ticker(ticker.into())
             .strike(option_params.strike)
             .option_type(option_params.option_type)
@@ -369,20 +389,22 @@ impl EquityOption {
     /// Returns an at-the-money SPX call option with 6 months to expiry.
     pub fn example() -> finstack_quant_core::Result<Self> {
         let market_data = EquityOptionMarketData::new("USD-OIS", "EQUITY-SPOT", "EQUITY-VOL")
-            .with_dividend_yield("EQUITY-DIVYIELD");
+            .with_div_yield_id("EQUITY-DIVYIELD");
 
-        Self::european_call_with_market_data(
+        Self::european_with_market_data(
             "SPX-CALL-4500",
             "SPX",
-            4500.0,
-            date!(2024 - 06 - 21),
-            100.0,
-            Currency::USD,
+            EquityOptionParams::call(4500.0, date!(2024 - 06 - 21), 100.0, Currency::USD)
+                .with_settlement(SettlementType::Cash),
             market_data,
         )
     }
 
-    /// Create a European call option with standard conventions.
+    /// Create a cash-settled European option with the generic default market-data ids.
+    ///
+    /// The option binds to `USD-OIS` (discount), `EQUITY-SPOT` (spot),
+    /// `EQUITY-VOL` (volatility surface) and `EQUITY-DIVYIELD` (continuous
+    /// dividend yield). Use [`Self::european_with_market_data`] to bind other ids.
     ///
     /// # Errors
     ///
@@ -391,70 +413,43 @@ impl EquityOption {
     /// # Arguments
     ///
     /// * `id` - Trade identifier stored on the option and used in results and serialization.
-    /// * `ticker` - Underlying equity identifier used to look up spot, vol, and dividend market data.
-    /// * `strike` - Option strike in the surface's quote units (absolute or relative)
-    /// * `expiry` - Option expiry date or year-fraction used to locate the volatility point
-    /// * `quantity` - Number of underlying units; PV scales linearly with it
-    /// * `currency` - Currency of the strike, premium and present value
-    pub fn european_call(
-        id: impl Into<String>,
+    /// * `ticker` - Underlying equity label (not used for market lookups).
+    /// * `strike` - Option strike in `currency` per underlying unit.
+    /// * `expiry` - Option expiry date.
+    /// * `quantity` - Number of underlying units; PV scales linearly with it.
+    /// * `currency` - Currency of the strike, premium and present value.
+    /// * `option_type` - Call or put.
+    pub fn european(
+        id: impl Into<InstrumentId>,
         ticker: impl Into<String>,
         strike: f64,
         expiry: Date,
         quantity: f64,
         currency: Currency,
+        option_type: OptionType,
     ) -> finstack_quant_core::Result<Self> {
-        Self::european_call_with_market_data(
+        let option_params =
+            EquityOptionParams::new(strike, expiry, option_type, quantity, currency)
+                .with_settlement(SettlementType::Cash);
+        Self::european_with_market_data(
             id,
             ticker,
-            strike,
-            expiry,
-            quantity,
-            currency,
+            option_params,
             EquityOptionMarketData::new("USD-OIS", "EQUITY-SPOT", "EQUITY-VOL")
-                .with_dividend_yield("EQUITY-DIVYIELD"),
+                .with_div_yield_id("EQUITY-DIVYIELD"),
         )
-    }
-
-    /// Create a European call option with explicit market-data identifiers.
-    ///
-    /// Use this constructor when you want the concise API of [`Self::european_call`]
-    /// without hard-coding the discount curve, spot id, volatility surface, or
-    /// dividend-yield source.
-    ///
-    /// # Arguments
-    ///
-    /// * `id` - Trade identifier stored on the option
-    /// * `ticker` - Underlying equity label (not used for market lookups)
-    /// * `strike` - Option strike in `currency` per underlying unit
-    /// * `expiry` - Option expiry date
-    /// * `quantity` - Number of underlying units; PV scales linearly with it
-    /// * `currency` - Currency of the strike, premium and present value
-    /// * `market_data` - Discount curve, spot, vol surface and dividend-yield ids
-    pub fn european_call_with_market_data(
-        id: impl Into<String>,
-        ticker: impl Into<String>,
-        strike: f64,
-        expiry: Date,
-        quantity: f64,
-        currency: Currency,
-        market_data: EquityOptionMarketData,
-    ) -> finstack_quant_core::Result<Self> {
-        let option_params = EquityOptionParams::european_call(strike, expiry, quantity, currency)
-            .with_settlement(SettlementType::Cash);
-        Self::build_vanilla_with_market_data(id, ticker, option_params, market_data)
     }
 
     /// Create a new equity option using parameter structs
     pub fn new(
-        id: impl Into<String>,
+        id: impl Into<InstrumentId>,
         option_params: &EquityOptionParams,
         underlying_params: &EquityUnderlyingParams,
-        discount_curve_id: CurveId,
-        vol_surface_id: CurveId,
+        discount_curve_id: impl Into<CurveId>,
+        vol_surface_id: impl Into<CurveId>,
     ) -> Self {
         Self {
-            id: InstrumentId::new(id.into()),
+            id: id.into(),
             underlying_ticker: underlying_params.ticker.clone(),
             strike: option_params.strike,
             option_type: option_params.option_type,
@@ -465,9 +460,9 @@ impl EquityOption {
             day_count: finstack_quant_core::dates::DayCount::Act365F,
             settlement: option_params.settlement,
             exercise: None,
-            discount_curve_id,
+            discount_curve_id: discount_curve_id.into(),
             spot_id: underlying_params.spot_id.clone(),
-            vol_surface_id,
+            vol_surface_id: vol_surface_id.into(),
             div_yield_id: underlying_params.div_yield_id.clone(),
             discrete_dividends: Vec::new(),
             exercise_dates: None,
@@ -481,52 +476,52 @@ impl EquityOption {
     /// Calculate Greeks for this equity option
     pub fn greeks(
         &self,
-        curves: &finstack_quant_core::market_data::context::MarketContext,
+        market: &finstack_quant_core::market_data::context::MarketContext,
         as_of: finstack_quant_core::dates::Date,
     ) -> finstack_quant_core::Result<
         crate::instruments::equity::equity_option::pricing::EquityOptionGreeks,
     > {
         use crate::instruments::equity::equity_option::pricing;
-        pricing::compute_greeks(self, curves, as_of)
+        pricing::compute_greeks(self, market, as_of)
     }
 
     /// Calculate delta of this equity option
     pub fn delta(
         &self,
-        curves: &finstack_quant_core::market_data::context::MarketContext,
+        market: &finstack_quant_core::market_data::context::MarketContext,
         as_of: finstack_quant_core::dates::Date,
     ) -> finstack_quant_core::Result<f64> {
-        let greeks = self.greeks(curves, as_of)?;
+        let greeks = self.greeks(market, as_of)?;
         Ok(greeks.delta)
     }
 
     /// Calculate gamma of this equity option
     pub fn gamma(
         &self,
-        curves: &finstack_quant_core::market_data::context::MarketContext,
+        market: &finstack_quant_core::market_data::context::MarketContext,
         as_of: finstack_quant_core::dates::Date,
     ) -> finstack_quant_core::Result<f64> {
-        let greeks = self.greeks(curves, as_of)?;
+        let greeks = self.greeks(market, as_of)?;
         Ok(greeks.gamma)
     }
 
     /// Calculate vega of this equity option
     pub fn vega(
         &self,
-        curves: &finstack_quant_core::market_data::context::MarketContext,
+        market: &finstack_quant_core::market_data::context::MarketContext,
         as_of: finstack_quant_core::dates::Date,
     ) -> finstack_quant_core::Result<f64> {
-        let greeks = self.greeks(curves, as_of)?;
+        let greeks = self.greeks(market, as_of)?;
         Ok(greeks.vega)
     }
 
     /// Calculate theta of this equity option
     pub fn theta(
         &self,
-        curves: &finstack_quant_core::market_data::context::MarketContext,
+        market: &finstack_quant_core::market_data::context::MarketContext,
         as_of: finstack_quant_core::dates::Date,
     ) -> finstack_quant_core::Result<f64> {
-        let greeks = self.greeks(curves, as_of)?;
+        let greeks = self.greeks(market, as_of)?;
         Ok(greeks.theta)
     }
 
@@ -535,7 +530,7 @@ impl EquityOption {
     ///
     /// # Arguments
     ///
-    /// * `curves` - Market data holding the discount curve, spot, dividend
+    /// * `market` - Market data holding the discount curve, spot, dividend
     ///   yield and volatility surface named by the option.
     /// * `as_of` - Valuation date; time to expiry is measured from it.
     ///
@@ -544,10 +539,10 @@ impl EquityOption {
     /// Returns an error when a required market input is missing or pricing fails.
     pub fn rho(
         &self,
-        curves: &finstack_quant_core::market_data::context::MarketContext,
+        market: &finstack_quant_core::market_data::context::MarketContext,
         as_of: finstack_quant_core::dates::Date,
     ) -> finstack_quant_core::Result<f64> {
-        let greeks = self.greeks(curves, as_of)?;
+        let greeks = self.greeks(market, as_of)?;
         Ok(greeks.rho)
     }
 
@@ -555,7 +550,7 @@ impl EquityOption {
     ///
     /// # Arguments
     ///
-    /// * `curves` - Spot, dividend and discount inputs; trial volatility replaces any surface or scalar volatility override.
+    /// * `market` - Spot, dividend and discount inputs; trial volatility replaces any surface or scalar volatility override.
     /// * `as_of` - Valuation date, strictly before expiry and any observed exercise.
     /// * `target_price` - Observed option premium: finite non-negative total trade PV in the notional currency, including the contract multiplier.
     ///
@@ -563,7 +558,7 @@ impl EquityOption {
     /// Returns a validation error for non-positive quantity, settled exercise, invalid prices or an unidentifiable deterministic limit; propagates market, pricing and convergence errors.
     pub fn implied_vol(
         &self,
-        curves: &finstack_quant_core::market_data::context::MarketContext,
+        market: &finstack_quant_core::market_data::context::MarketContext,
         as_of: finstack_quant_core::dates::Date,
         target_price: f64,
     ) -> finstack_quant_core::Result<f64> {
@@ -585,9 +580,10 @@ impl EquityOption {
         }
         let price = |sigma: f64| {
             let mut trial = self.clone();
-            trial.instrument_pricing_overrides =
-                trial.instrument_pricing_overrides.with_implied_vol(sigma);
-            super::pricing::compute_pv(&trial, curves, as_of).map(|pv| pv.amount() / quantity)
+            trial.instrument_pricing_overrides = trial
+                .instrument_pricing_overrides
+                .with_implied_volatility(sigma);
+            super::pricing::compute_pv(&trial, market, as_of).map(|pv| pv.amount() / quantity)
         };
         let target = target_price / quantity;
         let lower = 1e-8;
@@ -1023,15 +1019,13 @@ mod tests {
         let expiry = date(2025, 12, 31);
         let market_data =
             EquityOptionMarketData::new(CurveId::new(DISC_ID), SPOT_ID, CurveId::new(VOL_ID))
-                .with_dividend_yield(PriceId::new(DIV_ID));
+                .with_div_yield_id(PriceId::new(DIV_ID));
 
-        let option = EquityOption::european_call_with_market_data(
+        let option = EquityOption::european_with_market_data(
             "SPX-CALL-CUSTOM",
             "SPX",
-            100.0,
-            expiry,
-            100.0,
-            Currency::USD,
+            EquityOptionParams::call(100.0, expiry, 100.0, Currency::USD)
+                .with_settlement(SettlementType::Cash),
             market_data,
         )
         .expect("custom market-data constructor should succeed");
@@ -1210,7 +1204,7 @@ mod tests {
             option.exercise_dates = Some(vec![date(2025, 7, 3), expiry]);
             option.discrete_dividends = vec![(date(2025, 4, 3), 2.0)];
             option.instrument_pricing_overrides =
-                InstrumentPricingOverrides::default().with_implied_vol(0.45);
+                InstrumentPricingOverrides::default().with_implied_volatility(0.45);
             let pv = option.value(&curves, as_of).expect("price");
             let iv = option
                 .implied_vol(&curves, as_of, pv.amount())
@@ -1245,7 +1239,7 @@ mod tests {
         approx_eq(implied, 0.30, 1e-5);
 
         let mut override_option = base_option(expiry);
-        let overrides = InstrumentPricingOverrides::default().with_implied_vol(0.45);
+        let overrides = InstrumentPricingOverrides::default().with_implied_volatility(0.45);
         override_option.instrument_pricing_overrides = overrides;
         let override_price = override_option
             .value(&curves, as_of)

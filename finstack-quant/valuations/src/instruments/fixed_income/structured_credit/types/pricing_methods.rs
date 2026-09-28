@@ -58,13 +58,13 @@ impl StructuredCredit {
     /// without going through the registry envelope.
     pub fn price_stochastic(
         &self,
-        context: &MarketContext,
+        market: &MarketContext,
         as_of: Date,
     ) -> finstack_quant_core::Result<StochasticPricingResult> {
         let lifecycle =
             crate::instruments::common_impl::helpers::ValidatedPricingLifecycle::new(self)?;
-        let effective_as_of = lifecycle.effective_as_of(context, as_of);
-        let result = self.price_stochastic_base(context, effective_as_of)?;
+        let effective_as_of = lifecycle.effective_as_of(market, as_of);
+        let result = self.price_stochastic_base(market, effective_as_of)?;
         self.apply_stochastic_price_scenario(result)
     }
 
@@ -97,15 +97,14 @@ impl StructuredCredit {
     /// [`StructuredCreditPricingMode`] without going through `price_with_metrics`.
     pub fn price_stochastic_with_mode(
         &self,
-        context: &MarketContext,
+        market: &MarketContext,
         as_of: Date,
         pricing_mode: StructuredCreditPricingMode,
     ) -> finstack_quant_core::Result<StochasticPricingResult> {
         let lifecycle =
             crate::instruments::common_impl::helpers::ValidatedPricingLifecycle::new(self)?;
-        let effective_as_of = lifecycle.effective_as_of(context, as_of);
-        let result =
-            self.price_stochastic_base_with_mode(context, effective_as_of, pricing_mode)?;
+        let effective_as_of = lifecycle.effective_as_of(market, as_of);
+        let result = self.price_stochastic_base_with_mode(market, effective_as_of, pricing_mode)?;
         self.apply_stochastic_price_scenario(result)
     }
 
@@ -382,12 +381,12 @@ impl StructuredCredit {
     pub fn value_tranche(
         &self,
         tranche_id: &str,
-        context: &MarketContext,
+        market: &MarketContext,
         as_of: Date,
     ) -> finstack_quant_core::Result<Money> {
-        let cashflows = generate_tranche_cashflows(self, tranche_id, context, as_of)?;
-        let effective_as_of = self.resolve_pricing_as_of(context, as_of);
-        self.value_tranche_cashflows(&cashflows, context, effective_as_of)
+        let cashflows = generate_tranche_cashflows(self, tranche_id, market, as_of)?;
+        let effective_as_of = self.resolve_pricing_as_of(market, as_of);
+        self.value_tranche_cashflows(&cashflows, market, effective_as_of)
     }
 
     fn value_tranche_cashflows(
@@ -415,7 +414,7 @@ impl StructuredCredit {
     /// # Arguments
     ///
     /// * `tranche_id` - Exact note identifier within this deal's capital structure.
-    /// * `context` - Discount curves, forward curves and fixings used by projection.
+    /// * `market` - Discount curves, forward curves and fixings used by projection.
     /// * `as_of` - Valuation date of the current collateral and note balances.
     /// * `metrics` - Additional registered metrics, computed for THIS note:
     ///   every registry reprice (DV01, theta, the Default01 / Prepayment01 /
@@ -434,13 +433,13 @@ impl StructuredCredit {
     pub fn value_tranche_with_metrics(
         &self,
         tranche_id: &str,
-        context: &MarketContext,
+        market: &MarketContext,
         as_of: Date,
         metrics: &[MetricId],
     ) -> finstack_quant_core::Result<TrancheValuation> {
         let lifecycle =
             crate::instruments::common_impl::helpers::ValidatedPricingLifecycle::new(self)?;
-        let effective_as_of = lifecycle.effective_as_of(context, as_of);
+        let effective_as_of = lifecycle.effective_as_of(market, as_of);
         let tranche = self
             .tranches
             .tranches
@@ -451,8 +450,8 @@ impl StructuredCredit {
                     id: format!("tranche:{tranche_id}"),
                 })
             })?;
-        let cashflow_result = generate_tranche_cashflows(self, tranche_id, context, as_of)?;
-        let pv = self.value_tranche_cashflows(&cashflow_result, context, effective_as_of)?;
+        let cashflow_result = generate_tranche_cashflows(self, tranche_id, market, as_of)?;
+        let pv = self.value_tranche_cashflows(&cashflow_result, market, effective_as_of)?;
         // Prices are per CURRENT face (the factor-adjusted quote basis).
         let quote = super::super::metrics::quote::SettlementQuote::for_tranche(
             self,
@@ -465,7 +464,7 @@ impl StructuredCredit {
         } else {
             0.0
         };
-        let disc = context.get_discount(&self.discount_curve_id)?;
+        let disc = market.get_discount(&self.discount_curve_id)?;
         let model_dirty = quote.model_dirty(&cashflow_result.cashflows, &disc)?;
         // An impaired note — no current face or no positive settlement value
         // (fully written down in the projection) — prices at zero and carries
@@ -485,7 +484,7 @@ impl StructuredCredit {
                 self.clone(),
                 tranche_id,
             )),
-            std::sync::Arc::new(context.clone()),
+            std::sync::Arc::new(market.clone()),
             effective_as_of,
             pv,
             MetricContext::default_config(),
@@ -582,7 +581,7 @@ mod production_structured_assumptions {
 
     #[test]
     fn production_structured_stochastic_uses_credit_model() {
-        let mut deal = StructuredCredit::example();
+        let mut deal = StructuredCredit::example().expect("example");
         deal.credit_model.prepayment_spec = PrepaymentModelSpec::constant_cpr(0.23);
         deal.credit_model.default_spec = DefaultModelSpec::constant_cdr(0.12);
         deal.credit_model.recovery_spec.rate = 0.71;
@@ -612,7 +611,7 @@ mod production_structured_assumptions {
 
     #[test]
     fn production_structured_stochastic_includes_collateral_seasoning() {
-        let mut deal = StructuredCredit::example();
+        let mut deal = StructuredCredit::example().expect("example");
         deal.pool.assets[0].acquisition_date = Some(date!(2022 - 01 - 01));
         let config = deal
             .build_scenario_tree_config(date!(2024 - 07 - 01))

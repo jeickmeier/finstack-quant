@@ -172,22 +172,18 @@ impl InflationCapFloor {
     ///
     /// Returns a 5-year YoY inflation cap with annual frequency, 3-month CPI lag,
     /// and lognormal vol convention.
-    #[allow(clippy::expect_used)] // Example uses hardcoded valid values
-    pub fn example() -> Self {
+    pub fn example() -> finstack_quant_core::Result<Self> {
         use finstack_quant_core::currency::Currency;
-        use time::Month;
 
         InflationCapFloor::builder()
             .id(InstrumentId::new("INFLCAP-USD-5Y"))
             .rate_option_type(RateOptionType::Cap)
             .notional(Money::from((1_000_000_i64, Currency::USD)))
-            .strike(Decimal::try_from(0.03).expect("valid decimal"))
-            .start_date(
-                Date::from_calendar_date(2024, Month::January, 15).expect("Valid example date"),
-            )
-            .maturity(
-                Date::from_calendar_date(2029, Month::January, 15).expect("Valid example date"),
-            )
+            .strike(Decimal::try_from(0.03).map_err(|e: rust_decimal::Error| {
+                finstack_quant_core::Error::Validation(e.to_string())
+            })?)
+            .start_date(time::macros::date!(2024 - 01 - 15))
+            .maturity(time::macros::date!(2029 - 01 - 15))
             .frequency(Tenor::annual())
             .day_count(DayCount::Act365F)
             .stub(StubKind::ShortFront)
@@ -198,7 +194,6 @@ impl InflationCapFloor {
             .lag(InflationLag::Months(3))
             .attributes(Attributes::new())
             .build()
-            .expect("Example InflationCapFloor construction should not fail")
     }
 
     /// Validate structural invariants.
@@ -348,11 +343,11 @@ impl InflationCapFloor {
     /// - **Normal (Bachelier)**: Use when deflation is possible or strike is at/below zero.
     pub fn npv_with_model(
         &self,
-        curves: &MarketContext,
+        market: &MarketContext,
         as_of: Date,
         model: ModelKey,
     ) -> finstack_quant_core::Result<Money> {
-        let pv = self.npv_raw_with_model(curves, as_of, model)?;
+        let pv = self.npv_raw_with_model(market, as_of, model)?;
         Money::new(pv, self.notional.currency())
     }
 
@@ -361,7 +356,7 @@ impl InflationCapFloor {
     /// sizes.
     pub fn npv_raw_with_model(
         &self,
-        curves: &MarketContext,
+        market: &MarketContext,
         as_of: Date,
         model: ModelKey,
     ) -> finstack_quant_core::Result<f64> {
@@ -375,7 +370,7 @@ impl InflationCapFloor {
             }
         };
         let strike = self.strike_f64()?;
-        let disc = curves.get_discount(self.discount_curve_id.as_str())?;
+        let disc = market.get_discount(self.discount_curve_id.as_str())?;
 
         let mut total_pv = 0.0_f64;
 
@@ -390,8 +385,8 @@ impl InflationCapFloor {
             validation::validate_f64_positive(accrual, "YoY inflation accrual year fraction")?;
 
             // CPI values are validated inside cpi_value()
-            let cpi_start = self.cpi_value(curves, as_of, start)?;
-            let cpi_end = self.cpi_value(curves, as_of, end)?;
+            let cpi_start = self.cpi_value(market, as_of, start)?;
+            let cpi_end = self.cpi_value(market, as_of, end)?;
 
             // Deterministic forward YoY ratio from the CPI curve. The YoY
             // *rate* over the period is `ratio − 1`, and the rate the option is
@@ -400,7 +395,7 @@ impl InflationCapFloor {
             let deterministic_rate = (deterministic_ratio - 1.0) / accrual;
 
             // Use consolidated lag method for fixing date
-            let fixing_date = self.lagged_fixing_date(curves, end);
+            let fixing_date = self.lagged_fixing_date(market, end);
 
             // Time-to-fixing uses ACT/365F (standard option market convention)
             // regardless of the instrument's accrual day count. A failed
@@ -426,7 +421,7 @@ impl InflationCapFloor {
             let resolve = |strike| {
                 resolve_volatility(
                     &self.instrument_pricing_overrides.market_quotes,
-                    curves,
+                    market,
                     self.vol_surface_id.as_str(),
                     VolatilityRequest {
                         expiry: t_fix,

@@ -45,14 +45,15 @@ fn expired_swaption_direct_and_registry_are_zero_without_market_data() {
 fn at_expiry_direct_sabr_and_registry_models_share_intrinsic_without_volatility() {
     let expiry = time::macros::date!(2024 - 01 - 01);
     let swap_end = time::macros::date!(2029 - 01 - 01);
-    let swaption =
-        create_standard_payer_swaption(expiry, expiry, swap_end, 0.03).with_sabr(SabrParameters {
+    let swaption = create_standard_payer_swaption(expiry, expiry, swap_end, 0.03).with_sabr_params(
+        SabrParameters {
             alpha: 0.20,
             beta: 0.5,
             rho: -0.3,
             nu: 0.4,
             shift: None,
-        });
+        },
+    );
     assert_ne!(
         swaption.get_discount_curve_id(),
         swaption.get_forward_curve_id(),

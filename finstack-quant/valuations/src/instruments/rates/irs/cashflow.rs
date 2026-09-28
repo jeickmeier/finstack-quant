@@ -527,7 +527,7 @@ mod tests {
 
     #[test]
     fn irs_leg_schedules_do_not_emit_notional_flows() {
-        let irs = InterestRateSwap::example_standard().expect("example IRS");
+        let irs = InterestRateSwap::example().expect("example IRS");
         let fixed = fixed_leg_schedule(&irs).expect("fixed schedule");
         assert!(
             fixed
@@ -550,7 +550,7 @@ mod tests {
     #[test]
     fn compounded_irs_spread_uses_holiday_adjusted_accrual_fraction() {
         let as_of = date!(2024 - 12 - 02);
-        let mut irs = InterestRateSwap::example_standard().expect("example IRS");
+        let mut irs = InterestRateSwap::example().expect("example IRS");
         irs.notional = Money::from((1_000_000_i64, irs.notional.currency()));
         irs.float_leg.start = date!(2025 - 01 - 02);
         irs.float_leg.end = date!(2025 - 07 - 04);

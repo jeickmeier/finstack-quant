@@ -96,10 +96,10 @@ rather than treating a rate as an equity spot.
 use finstack_quant_valuations::instruments::exotics::range_accrual::{BoundsType, RangeAccrual};
 
 // Equity-linked, 95%–105% of initial spot, monthly observations.
-let equity_range = RangeAccrual::example();
+let equity_range = RangeAccrual::example().expect("example");
 
 // Rate-linked bounds (4%–6%), absolute.
-let rate_range = RangeAccrual::example_absolute_bounds();
+let rate_range = RangeAccrual::example_absolute_bounds().expect("example");
 ```
 
 Building one explicitly — the entry points are `RangeAccrual::builder()` for the

@@ -1133,7 +1133,7 @@ mod tests {
 
     #[test]
     fn hazard_cache_identity_distinguishes_deal_quote_replay_inputs() {
-        let mut low_deal = CreditDefaultSwap::example();
+        let mut low_deal = CreditDefaultSwap::example().expect("example");
         low_deal
             .instrument_pricing_overrides
             .market_quotes

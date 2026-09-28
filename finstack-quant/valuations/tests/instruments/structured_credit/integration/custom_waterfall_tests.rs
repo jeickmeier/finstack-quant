@@ -138,7 +138,7 @@ fn create_test_deal() -> StructuredCredit {
         maturity_date(),
         "USD_OIS",
     )
-    .with_calendar("nyse")
+    .with_calendar_id("nyse")
 }
 
 /// A by-class waterfall interleaves interest and principal tiers. Each tier

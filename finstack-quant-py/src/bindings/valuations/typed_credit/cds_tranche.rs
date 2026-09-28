@@ -369,12 +369,18 @@ impl PyCdsTranche {
     /// -------
     /// CdsTranche
     ///     The example tranche.
+    ///
+    /// Raises
+    /// ------
+    /// ValueError
+    ///     If the example instrument fails validation.
     #[staticmethod]
     #[pyo3(text_signature = "()")]
-    fn example() -> Self {
-        Self {
-            inner: finstack_quant_valuations::instruments::CdsTranche::example(),
-        }
+    fn example() -> PyResult<Self> {
+        Ok(Self {
+            inner: finstack_quant_valuations::instruments::CdsTranche::example()
+                .map_err(core_to_py)?,
+        })
     }
 
     /// Build a tranche on the standard schedule.

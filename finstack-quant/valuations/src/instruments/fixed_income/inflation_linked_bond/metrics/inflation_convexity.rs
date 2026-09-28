@@ -86,7 +86,7 @@ mod tests {
     }
 
     fn sample_bond() -> InflationLinkedBond {
-        let mut bond = InflationLinkedBond::example();
+        let mut bond = InflationLinkedBond::example().expect("example");
         // `example()` uses ActActIsma which needs an explicit period frequency;
         // use a self-contained day count for the metric test.
         bond.day_count = finstack_quant_core::dates::DayCount::Thirty360;

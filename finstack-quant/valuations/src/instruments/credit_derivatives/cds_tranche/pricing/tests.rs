@@ -172,10 +172,10 @@ fn sample_tranche() -> CdsTranche {
 fn test_model_creation() {
     let model = CdsTranchePricer::new();
     assert_eq!(
-        model.params.integration_tolerance,
+        model.config.integration_tolerance,
         DEFAULT_INTEGRATION_TOLERANCE
     );
-    assert!(model.params.use_issuer_curves);
+    assert!(model.config.use_issuer_curves);
 }
 
 #[test]
@@ -409,10 +409,10 @@ fn test_hetero_spa_matches_homogeneous_when_issuers_equal() {
     let ctx = ctx_base.insert_credit_index("CDX.NA.IG.42", hetero_index);
 
     let mut homo = CdsTranchePricer::new();
-    homo.params.use_issuer_curves = false;
+    homo.config.use_issuer_curves = false;
     let mut hetero = CdsTranchePricer::new();
-    hetero.params.use_issuer_curves = true;
-    hetero.params.hetero_method = HeteroMethod::NormalApprox;
+    hetero.config.use_issuer_curves = true;
+    hetero.config.hetero_method = HeteroMethod::NormalApprox;
 
     let pv_homo = homo
         .price_tranche(&tranche, &ctx, as_of)
@@ -450,12 +450,12 @@ fn test_hetero_spa_vs_exact_convolution_small_pool() {
     .expect("Valid tranche parameters");
 
     let mut spa = CdsTranchePricer::new();
-    spa.params.use_issuer_curves = true;
-    spa.params.hetero_method = HeteroMethod::NormalApprox;
+    spa.config.use_issuer_curves = true;
+    spa.config.hetero_method = HeteroMethod::NormalApprox;
     let mut exact = CdsTranchePricer::new();
-    exact.params.use_issuer_curves = true;
-    exact.params.hetero_method = HeteroMethod::ExactConvolution;
-    exact.params.grid_step = 0.002;
+    exact.config.use_issuer_curves = true;
+    exact.config.hetero_method = HeteroMethod::ExactConvolution;
+    exact.config.grid_step = 0.002;
 
     let pv_spa = spa
         .price_tranche(&tranche, &ctx, as_of)
@@ -497,7 +497,7 @@ fn price_hetero_tranche(
     )
     .expect("Valid tranche parameters");
     let mut pricer = CdsTranchePricer::new();
-    pricer.params.use_issuer_curves = true;
+    pricer.config.use_issuer_curves = true;
     configure(&mut pricer);
     pricer
         .price_tranche(&tranche, ctx, as_of)
@@ -521,7 +521,7 @@ fn test_hetero_default_routes_small_pools_to_exact_convolution() {
         // hetero_method deliberately left at its default.
         let pv_default = price_hetero_tranche(&ctx, as_of, attach, detach, |_| {});
         let pv_exact = price_hetero_tranche(&ctx, as_of, attach, detach, |p| {
-            p.params.hetero_method = HeteroMethod::ExactConvolution;
+            p.config.hetero_method = HeteroMethod::ExactConvolution;
         });
 
         // Same method, same grid → agreement to numerical noise. The old
@@ -546,10 +546,10 @@ fn test_hetero_normal_approx_bias_bound_large_pool() {
     let as_of = Date::from_calendar_date(2025, Month::January, 1).expect("Valid test date");
 
     let pv_normal = price_hetero_tranche(&ctx, as_of, 3.0, 7.0, |p| {
-        p.params.hetero_method = HeteroMethod::NormalApprox;
+        p.config.hetero_method = HeteroMethod::NormalApprox;
     });
     let pv_exact = price_hetero_tranche(&ctx, as_of, 3.0, 7.0, |p| {
-        p.params.hetero_method = HeteroMethod::ExactConvolution;
+        p.config.hetero_method = HeteroMethod::ExactConvolution;
     });
 
     let rel = (pv_normal - pv_exact).abs() / pv_exact.abs().max(1.0);
@@ -657,8 +657,8 @@ fn homogeneity_detection_uses_consistent_tolerance() {
     .expect("Valid tranche parameters");
 
     let mut pricer = CdsTranchePricer::new();
-    pricer.params.use_issuer_curves = true;
-    pricer.params.hetero_method = HeteroMethod::NormalApprox;
+    pricer.config.use_issuer_curves = true;
+    pricer.config.hetero_method = HeteroMethod::NormalApprox;
 
     // Exactly homogeneous (shift 0): all PD/LGD/weight identical.
     let pv_exact_homo = pricer
@@ -707,13 +707,13 @@ fn test_grid_step_refines_exact_convolution() {
     .expect("Valid tranche parameters");
 
     let mut exact_coarse = CdsTranchePricer::new();
-    exact_coarse.params.use_issuer_curves = true;
-    exact_coarse.params.hetero_method = HeteroMethod::ExactConvolution;
-    exact_coarse.params.grid_step = 0.005;
+    exact_coarse.config.use_issuer_curves = true;
+    exact_coarse.config.hetero_method = HeteroMethod::ExactConvolution;
+    exact_coarse.config.grid_step = 0.005;
 
     let mut exact_fine = CdsTranchePricer::new();
-    exact_fine.params = exact_coarse.params.clone();
-    exact_fine.params.grid_step = 0.001;
+    exact_fine.config = exact_coarse.config.clone();
+    exact_fine.config.grid_step = 0.001;
 
     let p_coarse = exact_coarse
         .price_tranche(&tranche, &ctx, as_of)
@@ -1762,7 +1762,7 @@ fn test_stochastic_recovery_impacts_equity_tranche() {
 
     // Stochastic recovery (market-correlated)
     let pricer_stoch =
-        CdsTranchePricer::with_params(CdsTranchePricerConfig::default().with_stochastic_recovery())
+        CdsTranchePricer::with_config(CdsTranchePricerConfig::default().with_stochastic_recovery())
             .expect("valid tranche pricer config");
     let pv_stoch = pricer_stoch
         .price_tranche(&tranche, &market_ctx, as_of)
@@ -2031,7 +2031,7 @@ fn homogeneous_path_boundary_default_prob_does_not_panic() {
     // Drive the homogeneous Gaussian branch directly (disable issuer-curve path).
     let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
         let mut p = CdsTranchePricer::new();
-        p.params.use_issuer_curves = false;
+        p.config.use_issuer_curves = false;
         p.calculate_equity_tranche_loss(7.0, 0.30, &index_data, maturity)
     }));
 
@@ -2240,9 +2240,9 @@ fn aod_enabled_premium_exceeds_disabled_premium() {
     let tranche = sample_tranche(); // sell protection, 500bp coupon
 
     let mut enabled = CdsTranchePricer::new();
-    enabled.params.include_accrual_on_default = true;
+    enabled.config.include_accrual_on_default = true;
     let mut disabled = CdsTranchePricer::new();
-    disabled.params.include_accrual_on_default = false;
+    disabled.config.include_accrual_on_default = false;
 
     let pv_enabled = premium_leg_pv(&enabled, &tranche, &market_ctx);
     let pv_disabled = premium_leg_pv(&disabled, &tranche, &market_ctx);
@@ -2311,7 +2311,7 @@ fn rising_hazard_lowers_premium_leg_pv() {
 
     for aod_enabled in [true, false] {
         let mut pricer = CdsTranchePricer::new();
-        pricer.params.include_accrual_on_default = aod_enabled;
+        pricer.config.include_accrual_on_default = aod_enabled;
 
         let pv_low = premium_leg_pv(&pricer, &tranche, &build_ctx(1.0));
         let pv_high = premium_leg_pv(&pricer, &tranche, &build_ctx(3.0));
@@ -2524,9 +2524,9 @@ fn mid_period_protection_uses_survival_weighted_timing() {
     tranche.coupon_bp = 0.0;
 
     let mut with_mid = CdsTranchePricer::new();
-    with_mid.params.mid_period_protection = true;
+    with_mid.config.mid_period_protection = true;
     let mut without_mid = CdsTranchePricer::new();
-    without_mid.params.mid_period_protection = false;
+    without_mid.config.mid_period_protection = false;
 
     let pv_mid = with_mid
         .price_tranche(&tranche, &market_ctx, as_of)
@@ -2594,7 +2594,7 @@ fn seasoned_first_period_default_timing_starts_at_valuation_date() {
 
 #[test]
 fn student_t_recovery_driver_uses_scaled_market_factor() {
-    let student_t = CdsTranchePricer::with_params(
+    let student_t = CdsTranchePricer::with_config(
         CdsTranchePricerConfig::default()
             .with_student_t_copula(5.0)
             .expect("valid Student-t copula"),
@@ -2603,7 +2603,7 @@ fn student_t_recovery_driver_uses_scaled_market_factor() {
     let gaussian = CdsTranchePricer::new();
 
     assert_eq!(
-        student_t.params.copula_spec,
+        student_t.config.copula_spec,
         CopulaSpec::student_t(5.0).expect("valid")
     );
     assert!(
@@ -2631,7 +2631,7 @@ fn test_stochastic_recovery_full_pool_el_matches_index() {
     let maturity = Date::from_calendar_date(2030, Month::January, 1).expect("date");
 
     let pricer_stoch =
-        CdsTranchePricer::with_params(CdsTranchePricerConfig::default().with_stochastic_recovery())
+        CdsTranchePricer::with_config(CdsTranchePricerConfig::default().with_stochastic_recovery())
             .expect("valid tranche pricer config");
 
     // Index-implied expected loss with the flat bootstrapped recovery.
@@ -2686,7 +2686,7 @@ mod production_credit_audit {
         .expect("reference");
         let base = Date::from_calendar_date(2025, Month::January, 1).expect("date");
         let maturity = Date::from_calendar_date(2026, Month::January, 1).expect("date");
-        let pricer = CdsTranchePricer::with_params(CdsTranchePricerConfig {
+        let pricer = CdsTranchePricer::with_config(CdsTranchePricerConfig {
             min_correlation: 0.0001,
             max_correlation: 0.9999,
             corr_boundary_width: 0.00001,
@@ -2739,7 +2739,7 @@ mod production_credit_audit {
         let market = sample_market_context_with_issuers(3);
         let index = market.get_credit_index("CDX.NA.IG.42").expect("index");
         let maturity = Date::from_calendar_date(2030, Month::January, 1).expect("date");
-        let pricer = CdsTranchePricer::with_params(
+        let pricer = CdsTranchePricer::with_config(
             CdsTranchePricerConfig::default().with_constant_recovery(1.0),
         )
         .expect("pricer");
@@ -2777,7 +2777,7 @@ mod production_credit_audit {
             })
             .sum();
         for tolerance in [1e-8, 1e-10] {
-            let pricer = CdsTranchePricer::with_params(
+            let pricer = CdsTranchePricer::with_config(
                 CdsTranchePricerConfig::default()
                     .with_custom_stochastic_recovery(0.4, 0.1, 0.3)
                     .with_integration_tolerance(tolerance),

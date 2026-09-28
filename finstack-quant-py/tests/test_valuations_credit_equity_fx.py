@@ -476,19 +476,22 @@ class TestEquityOption:
         with pytest.raises(ValueError, match="live, unexercised"):
             option.implied_vol(market, "2024-06-21", price)
 
-    def test_european_call_defaults_match_rust(self) -> None:
-        option = EquityOption.european_call("AAPL-C", "AAPL", 200.0, "2025-06-20", 100.0, "USD")
+    def test_european_defaults_match_rust(self) -> None:
+        option = EquityOption.european("AAPL-C", "AAPL", 200.0, "2025-06-20", 100.0, "USD", "call")
         assert option.option_type == "call"
         assert option.exercise_style == "european"
         assert option.spot_id == "EQUITY-SPOT"
         assert option.vol_surface_id == "EQUITY-VOL"
         assert option.quantity == 100.0
         assert option.currency == "USD"
-        custom = EquityOption.european_call(
-            "AAPL-C2", "AAPL", 200.0, "2025-06-20", 100.0, USD, spot_id="AAPL", div_yield_id=None
+        custom = EquityOption.european(
+            "AAPL-C2", "AAPL", 200.0, "2025-06-20", 100.0, USD, "call", spot_id="AAPL", div_yield_id=None
         )
         assert custom.spot_id == "AAPL"
         assert custom.div_yield_id is None
+        put = EquityOption.european("AAPL-P", "AAPL", 180.0, "2025-06-20", 100.0, "USD", "put")
+        assert put.option_type == "put"
+        assert put.settlement == "cash"
 
     def test_builder_day_count_and_repr(self) -> None:
         builder = (

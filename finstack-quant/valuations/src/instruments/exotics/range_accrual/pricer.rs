@@ -422,7 +422,7 @@ pub(crate) fn compute_pv(
 /// - Uses effective bounds based on `BoundsType` (absolute or relative to initial spot)
 /// - Projects in asset currency with quanto drift and discounts in payoff currency
 /// - Includes historical fixings in the accrual calculation for mid-life valuations
-pub fn npv_analytic(inst: &RangeAccrual, curves: &MarketContext, as_of: Date) -> Result<Money> {
+pub fn npv_analytic(inst: &RangeAccrual, market: &MarketContext, as_of: Date) -> Result<Money> {
     use finstack_quant_core::math::special_functions::norm_cdf;
     use finstack_quant_models::volatility::black::d1_d2_black76;
 
@@ -454,16 +454,16 @@ pub fn npv_analytic(inst: &RangeAccrual, curves: &MarketContext, as_of: Date) ->
                 )
             })?;
     if !has_future_observations {
-        return compute_known_value(inst, curves, as_of, final_date);
+        return compute_known_value(inst, market, as_of, final_date);
     }
 
-    let initial_spot = asset_spot(inst, curves)?;
+    let initial_spot = asset_spot(inst, market)?;
 
     // Compute effective bounds based on BoundsType
     let effective_lower = inst.terms.effective_lower_bound(initial_spot);
     let effective_upper = inst.terms.effective_upper_bound(initial_spot);
 
-    let disc_curve = curves.get_discount(inst.terms.discount_curve_id.as_str())?;
+    let disc_curve = market.get_discount(inst.terms.discount_curve_id.as_str())?;
     let discount_factor = disc_curve.df_between_dates(as_of, final_date)?;
 
     // Count observations and track past/future split
@@ -490,12 +490,12 @@ pub fn npv_analytic(inst: &RangeAccrual, curves: &MarketContext, as_of: Date) ->
         future_obs_count += 1;
         let sigma = resolve_sigma_at(
             &inst.instrument_pricing_overrides.market_quotes,
-            curves,
+            market,
             inst.terms.vol_surface_id.as_str(),
             t_obs,
             initial_spot,
         )?;
-        let forward = initial_spot * asset_growth(inst, curves, as_of, date, sigma)?;
+        let forward = initial_spot * asset_growth(inst, market, as_of, date, sigma)?;
 
         // Digital Call Probability P(S_t > K) via finite-width call spread.
         //
@@ -520,7 +520,7 @@ pub fn npv_analytic(inst: &RangeAccrual, curves: &MarketContext, as_of: Date) ->
         let black_call = |k: f64| -> Result<f64> {
             let vol = resolve_sigma_at(
                 &inst.instrument_pricing_overrides.market_quotes,
-                curves,
+                market,
                 inst.terms.vol_surface_id.as_str(),
                 t_obs,
                 k,
@@ -628,7 +628,7 @@ mod tests {
     fn analytic_range_accrual_returns_zero_when_all_observations_are_past_and_no_history_is_supplied(
     ) {
         let as_of = date(2024, 4, 30);
-        let mut inst = RangeAccrual::example();
+        let mut inst = RangeAccrual::example().expect("example");
         inst.terms.start_date = date(2023, 12, 31);
         inst.terms.observation_dates = vec![as_of];
         inst.terms.payment_date = Some(as_of);
@@ -642,7 +642,7 @@ mod tests {
     #[test]
     fn analytic_range_accrual_payment_date_changes_discounting_only() {
         let as_of = date(2024, 1, 1);
-        let base = RangeAccrual::example();
+        let base = RangeAccrual::example().expect("example");
         let mut delayed = base.clone();
         delayed.terms.payment_date = Some(date(2025, 12, 31));
 
@@ -659,7 +659,7 @@ mod tests {
     fn fully_observed_unpaid_range_accrual_is_discounted() {
         let as_of = date(2024, 6, 30);
         let payment_date = date(2025, 6, 30);
-        let mut inst = RangeAccrual::example();
+        let mut inst = RangeAccrual::example().expect("example");
         inst.terms.observation_dates = vec![date(2024, 1, 31), date(2024, 2, 29)];
         inst.terms.payment_date = Some(payment_date);
         inst.terms.past_observations_in_range = Some(1);
@@ -683,7 +683,7 @@ mod tests {
     #[test]
     fn paid_range_accrual_has_zero_value_without_live_market_inputs() {
         let as_of = date(2025, 7, 1);
-        let mut inst = RangeAccrual::example();
+        let mut inst = RangeAccrual::example().expect("example");
         inst.terms.observation_dates = vec![date(2024, 1, 31)];
         inst.terms.payment_date = Some(date(2025, 6, 30));
         inst.terms.past_observations_in_range = Some(1);
@@ -696,7 +696,7 @@ mod tests {
     #[test]
     fn configured_dividend_yield_must_exist_and_be_unitless() {
         let as_of = date(2024, 1, 1);
-        let inst = RangeAccrual::example();
+        let inst = RangeAccrual::example().expect("example");
         let base_market = market(as_of);
         let no_div_market = MarketContext::new()
             .insert(
@@ -737,7 +737,7 @@ mod tests {
     fn registry_model_selection_is_independent_of_mc_seed_override() {
         let as_of = date(2024, 1, 1);
         let curves = market(as_of);
-        let mut without_seed = RangeAccrual::example();
+        let mut without_seed = RangeAccrual::example().expect("example");
         without_seed.terms.observation_dates = vec![date(2024, 6, 30), date(2024, 12, 31)];
         without_seed.terms.payment_date = Some(date(2025, 1, 2));
         let mut with_seed = without_seed.clone();
@@ -817,7 +817,7 @@ mod tests {
     #[test]
     fn default_registry_and_direct_paths_share_static_kernel() {
         let as_of = date(2024, 1, 1);
-        let mut rate_linked = RangeAccrual::example();
+        let mut rate_linked = RangeAccrual::example().expect("example");
         rate_linked.terms.index_id = Some(finstack_quant_core::types::IndexId::new("SOFR"));
         rate_linked.terms.forward_curve_id =
             Some(finstack_quant_core::types::CurveId::new("SOFR-3M"));

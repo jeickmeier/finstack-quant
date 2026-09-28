@@ -307,8 +307,8 @@ impl InflationLinkedBond {
     }
 
     /// Calculate index ratio sourcing inflation data from the market context
-    pub fn index_ratio_from_market(&self, date: Date, curves: &MarketContext) -> Result<f64> {
-        let source = self.inflation_source(curves)?;
+    pub fn index_ratio_from_market(&self, date: Date, market: &MarketContext) -> Result<f64> {
+        let source = self.inflation_source(market)?;
         source.ratio(self, date)
     }
 }

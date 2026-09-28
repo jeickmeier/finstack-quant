@@ -65,7 +65,7 @@ fn deal(index_floor_bp: Option<f64>) -> StructuredCredit {
     .expect("structure");
     let mut deal =
         StructuredCredit::new_clo("CLO-FLOOR", pool, tranches, close(), maturity, "USD-OIS")
-            .with_calendar("nyse");
+            .with_calendar_id("nyse");
     deal.credit_model.prepayment_spec = PrepaymentModelSpec::constant_cpr(0.0);
     deal.credit_model.default_spec = DefaultModelSpec::constant_cdr(0.0);
     deal.credit_model.recovery_spec = RecoveryModelSpec::with_lag(0.4, 0);

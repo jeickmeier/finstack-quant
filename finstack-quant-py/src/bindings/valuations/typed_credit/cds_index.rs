@@ -529,12 +529,18 @@ impl PyCdsIndex {
     /// -------
     /// CdsIndex
     ///     The example index trade.
+    ///
+    /// Raises
+    /// ------
+    /// ValueError
+    ///     If the example instrument fails validation.
     #[staticmethod]
     #[pyo3(text_signature = "()")]
-    fn example() -> Self {
-        Self {
-            inner: finstack_quant_valuations::instruments::CdsIndex::example(),
-        }
+    fn example() -> PyResult<Self> {
+        Ok(Self {
+            inner: finstack_quant_valuations::instruments::CdsIndex::example()
+                .map_err(core_to_py)?,
+        })
     }
 
     /// Build an index trade from a standardized preset.

@@ -105,7 +105,7 @@ fn fx_future_retired_quote_currency_is_rejected() {
 #[test]
 // schema-rejection-test: CommodityForward `quoted_price`
 fn commodity_forward_retired_quoted_price_is_rejected() {
-    let mut forward = CommodityForward::example();
+    let mut forward = CommodityForward::example().expect("example");
     forward.quoted_forward = Some(75.0);
     let mut json = serde_json::to_value(&forward).expect("serialize");
     let map = json.as_object_mut().expect("object");

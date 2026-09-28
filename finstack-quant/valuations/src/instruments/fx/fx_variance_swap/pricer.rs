@@ -485,7 +485,7 @@ mod tests {
     #[test]
     fn fx_variance_swap_pricer_compute_pv_matches_instrument_value() {
         use finstack_quant_core::market_data::scalars::ScalarTimeSeries;
-        let swap = FxVarianceSwap::example();
+        let swap = FxVarianceSwap::example().expect("example");
         let as_of = date!(2025 - 01 - 02);
         let observations = observation_dates(&swap)
             .expect("observation schedule")
@@ -505,7 +505,7 @@ mod tests {
     fn multi_day_tenor_steps_in_business_observations() {
         use finstack_quant_core::dates::{Tenor, TenorUnit};
 
-        let mut swap = FxVarianceSwap::example();
+        let mut swap = FxVarianceSwap::example().expect("example");
         swap.start_date = date!(2025 - 01 - 03); // Friday
         swap.maturity = date!(2025 - 01 - 15);
         swap.observation_frequency = Tenor::new(2, TenorUnit::Days).expect("valid tenor fixture");

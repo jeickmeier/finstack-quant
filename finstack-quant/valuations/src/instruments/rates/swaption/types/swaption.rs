@@ -290,13 +290,12 @@ impl Swaption {
     /// Create a canonical example swaption for testing and documentation.
     ///
     /// Returns a 1Y x 5Y payer swaption (1 year to expiry, 5 year swap tenor).
-    #[allow(clippy::expect_used)] // Example uses hardcoded valid values
-    pub fn example() -> Self {
-        let strike = Decimal::try_from(0.03).expect("valid decimal");
-        let swap_start =
-            Date::from_calendar_date(2027, time::Month::January, 17).expect("Valid example date");
-        let swap_end =
-            Date::from_calendar_date(2032, time::Month::January, 17).expect("Valid example date");
+    pub fn example() -> finstack_quant_core::Result<Self> {
+        let strike = Decimal::try_from(0.03).map_err(|e: rust_decimal::Error| {
+            finstack_quant_core::Error::Validation(e.to_string())
+        })?;
+        let swap_start = time::macros::date!(2027 - 01 - 17);
+        let swap_end = time::macros::date!(2032 - 01 - 17);
         let discount_curve_id = CurveId::new("USD-OIS");
         let (underlying_fixed_leg, underlying_float_leg) =
             vanilla_underlier(VanillaSwaptionUnderlier::standard(
@@ -306,12 +305,11 @@ impl Swaption {
                 discount_curve_id,
                 CurveId::new("USD-OIS"),
             ));
-        Self {
+        Ok(Self {
             id: InstrumentId::new("SWPN-1Yx5Y-USD"),
             option_type: OptionType::Call,
             notional: Money::from((10_000_000_i64, Currency::USD)),
-            expiry: Date::from_calendar_date(2027, time::Month::January, 15)
-                .expect("Valid example date"),
+            expiry: time::macros::date!(2027 - 01 - 15),
             exercise_style: ExerciseStyle::European,
             settlement: SettlementType::Cash,
             cash_settlement_method: CashSettlementMethod::default(),
@@ -324,7 +322,7 @@ impl Swaption {
             scenario_pricing_overrides: Default::default(),
             sabr_params: None,
             attributes: Attributes::new(),
-        }
+        })
     }
 
     /// Create a Bermudan-style swaption example for testing and documentation.
@@ -332,16 +330,14 @@ impl Swaption {
     /// Returns a 5NC1 payer swaption (5-year swap, Bermudan exercise after 1 year)
     /// with physical settlement, Normal vol model, and SABR parameters populated.
     /// Exercise dates are semi-annual, aligned with swap coupon dates.
-    #[allow(clippy::expect_used)] // Example uses hardcoded valid values
-    pub fn example_bermudan() -> Self {
-        let swap_start =
-            Date::from_calendar_date(2027, time::Month::January, 17).expect("Valid example date");
-        let swap_end =
-            Date::from_calendar_date(2032, time::Month::January, 17).expect("Valid example date");
+    pub fn example_bermudan() -> finstack_quant_core::Result<Self> {
+        let swap_start = time::macros::date!(2027 - 01 - 17);
+        let swap_end = time::macros::date!(2032 - 01 - 17);
         // First exercise 1 year after swap start
-        let first_exercise =
-            Date::from_calendar_date(2028, time::Month::January, 17).expect("Valid example date");
-        let strike = Decimal::try_from(0.035).expect("valid decimal");
+        let first_exercise = time::macros::date!(2028 - 01 - 17);
+        let strike = Decimal::try_from(0.035).map_err(|e: rust_decimal::Error| {
+            finstack_quant_core::Error::Validation(e.to_string())
+        })?;
         let (underlying_fixed_leg, underlying_float_leg) =
             vanilla_underlier(VanillaSwaptionUnderlier {
                 fixed_day_count: DayCount::Act360,
@@ -353,7 +349,7 @@ impl Swaption {
                     CurveId::new("USD-OIS"),
                 )
             });
-        Self {
+        Ok(Self {
             id: InstrumentId::new("SWPN-5NC1-BERM-USD"),
             option_type: OptionType::Call,
             notional: Money::from((10_000_000_i64, Currency::USD)),
@@ -376,7 +372,7 @@ impl Swaption {
                 shift: None,
             }),
             attributes: Attributes::new(),
-        }
+        })
     }
 
     /// Create a European swaption from a [`SwaptionParams`] specification.
@@ -440,7 +436,7 @@ impl Swaption {
     }
 
     /// Attach SABR parameters to enable SABR-implied volatility pricing.
-    pub fn with_sabr(mut self, params: SabrParameters) -> Self {
+    pub fn with_sabr_params(mut self, params: SabrParameters) -> Self {
         self.sabr_params = Some(params);
         self
     }
@@ -522,7 +518,7 @@ impl Swaption {
     /// use finstack_quant_valuations::instruments::rates::swaption::{Swaption, CashSettlementMethod};
     ///
     /// // Create a cash-settled swaption with ISDA Par-Par settlement
-    /// let swaption = Swaption::example()
+    /// let swaption = Swaption::example().expect("example")
     ///     .with_cash_settlement_method(CashSettlementMethod::IsdaParPar);
     /// ```
     pub fn with_cash_settlement_method(mut self, method: CashSettlementMethod) -> Self {
@@ -634,7 +630,7 @@ impl Swaption {
     ///
     /// # Arguments
     ///
-    /// * `curves` - Projection and discount curves; a present SABR cube supplies its model displacement.
+    /// * `market` - Projection and discount curves; a present SABR cube supplies its model displacement.
     /// * `volatility` - Finite non-negative relative volatility as a decimal per square-root year.
     /// * `as_of` - Valuation date; past expiry has no remaining option value.
     ///
@@ -643,7 +639,7 @@ impl Swaption {
     /// Returns an error for missing curves, invalid volatility, or non-positive shifted forward/strike.
     pub fn price_black(
         &self,
-        curves: &MarketContext,
+        market: &MarketContext,
         volatility: f64,
         as_of: Date,
     ) -> Result<Money> {
@@ -658,7 +654,7 @@ impl Swaption {
             });
         let quote = resolve_volatility(
             &overrides,
-            curves,
+            market,
             self.vol_surface_id.as_str(),
             VolatilityRequest {
                 expiry: self.time_to_expiry(as_of)?,
@@ -668,7 +664,7 @@ impl Swaption {
                 clamp: true,
             },
         )?;
-        self.price_resolved_quote(curves, quote, as_of)
+        self.price_resolved_quote(market, quote, as_of)
     }
 
     fn price_resolved_quote(
@@ -703,7 +699,7 @@ impl Swaption {
     ///
     /// # Arguments
     ///
-    /// * `curves` - Curves used to project the underlying swap and discount its annuity.
+    /// * `market` - Curves used to project the underlying swap and discount its annuity.
     /// * `volatility` - Finite non-negative normal volatility in decimal rate units per square-root year.
     /// * `as_of` - Valuation date; past expiry has no remaining option value.
     ///
@@ -712,12 +708,12 @@ impl Swaption {
     /// Returns an error for missing curves, invalid volatility, or invalid contractual cashflows.
     pub fn price_normal(
         &self,
-        curves: &MarketContext,
+        market: &MarketContext,
         volatility: f64,
         as_of: Date,
     ) -> Result<Money> {
         self.price_resolved_quote(
-            curves,
+            market,
             ResolvedVolatility {
                 sigma: validate_sigma(volatility)?,
                 convention: VolatilityConvention::Normal,
@@ -733,23 +729,23 @@ impl Swaption {
     ///
     /// # Arguments
     ///
-    /// * `curves` - Projection and discount curves for the underlying swap.
+    /// * `market` - Projection and discount curves for the underlying swap.
     /// * `as_of` - Valuation date used for remaining option time and cashflow entitlement.
     ///
     /// # Errors
     ///
     /// Returns an error for missing model inputs, incompatible Black/normal-SABR
     /// configuration, or an undefined expansion.
-    pub fn price_sabr(&self, curves: &MarketContext, as_of: Date) -> Result<Money> {
-        if let Some(value) = self.terminal_value(curves, as_of)? {
+    pub fn price_sabr(&self, market: &MarketContext, as_of: Date) -> Result<Money> {
+        if let Some(value) = self.terminal_value(market, as_of)? {
             return Ok(value);
         }
         let quote = self.resolve_volatility_quote(
-            curves,
-            self.forward_swap_rate(curves, as_of)?,
+            market,
+            self.forward_swap_rate(market, as_of)?,
             self.time_to_expiry(as_of)?,
         )?;
-        self.price_resolved_quote(curves, quote, as_of)
+        self.price_resolved_quote(market, quote, as_of)
     }
 
     /// Calculate annuity based on settlement type and cash settlement method.
@@ -927,8 +923,8 @@ impl Swaption {
     /// The single-curve telescoping shortcut is used only when both underlying
     /// schedules and coupon conventions are identical. Otherwise this method
     /// prices the actual floating leg through the IRS engine.
-    pub fn forward_swap_rate(&self, curves: &MarketContext, as_of: Date) -> Result<f64> {
-        let disc = curves.get_discount(self.get_discount_curve_id().as_ref())?;
+    pub fn forward_swap_rate(&self, market: &MarketContext, as_of: Date) -> Result<f64> {
+        let disc = market.get_discount(self.get_discount_curve_id().as_ref())?;
         if self.can_use_single_curve_forward_shortcut(as_of) {
             return self.single_curve_forward_from_fixed_schedule(disc.as_ref(), as_of);
         }
@@ -941,13 +937,13 @@ impl Swaption {
         if as_of <= float.start
             && float.forward_curve_id == self.underlying_fixed_leg.discount_curve_id
             && matches!(float.compounding, FloatingLegCompounding::Simple)
-            && curves.get_forward(float.forward_curve_id.as_ref()).is_err()
+            && market.get_forward(float.forward_curve_id.as_ref()).is_err()
         {
             return self.single_curve_forward_from_float_schedule(disc.as_ref(), as_of, annuity);
         }
 
         let underlier = self.underlying_irs(0.0, PayReceive::Receive)?;
-        let pv_float = underlier.pv_float_leg(curves, as_of)?;
+        let pv_float = underlier.pv_float_leg(market, as_of)?;
         Ok(pv_float / (self.notional.amount() * annuity))
     }
 
@@ -1003,7 +999,7 @@ impl Swaption {
     ///
     /// # Arguments
     ///
-    /// * `curves` - Market context containing the configured volatility source.
+    /// * `market` - Market context containing the configured volatility source.
     /// * `forward` - Unshifted forward swap rate as a decimal.
     /// * `time_to_expiry` - Finite positive remaining option expiry in years.
     ///
@@ -1012,12 +1008,12 @@ impl Swaption {
     /// Returns an error for missing inputs, incompatible quote conventions, or invalid volatility.
     pub fn resolve_volatility(
         &self,
-        curves: &MarketContext,
+        market: &MarketContext,
         forward: f64,
         time_to_expiry: f64,
     ) -> Result<f64> {
         Ok(self
-            .resolve_volatility_quote(curves, forward, time_to_expiry)?
+            .resolve_volatility_quote(market, forward, time_to_expiry)?
             .sigma)
     }
 
@@ -1097,26 +1093,26 @@ impl Swaption {
     /// This consolidates the setup logic shared across delta, gamma, vega, and rho calculators.
     ///
     /// # Arguments
-    /// * `curves` - Market context containing curves and surfaces
+    /// * `market` - Market context containing curves and surfaces
     /// * `as_of` - Valuation date
     ///
     /// # Returns
     /// `Some(GreekInputs)` containing forward, annuity, sigma, and time to expiry,
     /// or `None` if the option has expired.
-    pub fn greek_inputs(&self, curves: &MarketContext, as_of: Date) -> Result<Option<GreekInputs>> {
+    pub fn greek_inputs(&self, market: &MarketContext, as_of: Date) -> Result<Option<GreekInputs>> {
         if as_of >= self.expiry {
             return Ok(None);
         }
-        let disc = curves.get_discount(self.get_discount_curve_id().as_ref())?;
+        let disc = market.get_discount(self.get_discount_curve_id().as_ref())?;
         let t = self.time_to_expiry(as_of)?;
 
         if t <= 0.0 {
             return Ok(None);
         }
 
-        let forward = self.forward_swap_rate(curves, as_of)?;
+        let forward = self.forward_swap_rate(market, as_of)?;
         let annuity = self.annuity(disc.as_ref(), as_of, forward)?;
-        let quote = self.resolve_volatility_quote(curves, forward, t)?;
+        let quote = self.resolve_volatility_quote(market, forward, t)?;
 
         Ok(Some(GreekInputs {
             forward,

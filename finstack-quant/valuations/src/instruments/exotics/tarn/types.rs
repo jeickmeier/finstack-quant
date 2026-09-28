@@ -161,25 +161,23 @@ impl Tarn {
     }
 
     /// Create a canonical example TARN for testing.
-    #[allow(clippy::expect_used)]
-    pub fn example() -> Self {
+    pub fn example() -> finstack_quant_core::Result<Self> {
         use finstack_quant_core::currency::Currency;
-        use time::Month;
 
-        let start_date = Date::from_calendar_date(2026, Month::June, 30).expect("valid");
+        let start_date = time::macros::date!(2026 - 06 - 30);
         let payment_dates = vec![
-            Date::from_calendar_date(2026, Month::December, 31).expect("valid"),
-            Date::from_calendar_date(2027, Month::June, 30).expect("valid"),
-            Date::from_calendar_date(2027, Month::December, 31).expect("valid"),
-            Date::from_calendar_date(2028, Month::June, 30).expect("valid"),
-            Date::from_calendar_date(2028, Month::December, 31).expect("valid"),
-            Date::from_calendar_date(2029, Month::June, 30).expect("valid"),
-            Date::from_calendar_date(2029, Month::December, 31).expect("valid"),
-            Date::from_calendar_date(2030, Month::June, 30).expect("valid"),
-            Date::from_calendar_date(2030, Month::December, 31).expect("valid"),
+            time::macros::date!(2026 - 12 - 31),
+            time::macros::date!(2027 - 06 - 30),
+            time::macros::date!(2027 - 12 - 31),
+            time::macros::date!(2028 - 06 - 30),
+            time::macros::date!(2028 - 12 - 31),
+            time::macros::date!(2029 - 06 - 30),
+            time::macros::date!(2029 - 12 - 31),
+            time::macros::date!(2030 - 06 - 30),
+            time::macros::date!(2030 - 12 - 31),
         ];
 
-        Tarn {
+        Ok(Tarn {
             id: InstrumentId::new("TARN-USD-5Y"),
             fixed_rate: Decimal::new(6, 2),
             coupon_floor: 0.0,
@@ -196,7 +194,7 @@ impl Tarn {
             metric_pricing_overrides: Default::default(),
             scenario_pricing_overrides: Default::default(),
             attributes: Attributes::new(),
-        }
+        })
     }
 }
 
@@ -262,7 +260,7 @@ mod tests {
 
     #[test]
     fn example_tarn_validates() {
-        let tarn = Tarn::example();
+        let tarn = Tarn::example().expect("example");
         assert!(tarn.validate().is_ok());
     }
 
@@ -294,14 +292,14 @@ mod tests {
 
     #[test]
     fn tarn_negative_target_fails() {
-        let mut tarn = Tarn::example();
+        let mut tarn = Tarn::example().expect("example");
         tarn.target_coupon = -0.01;
         assert!(tarn.validate().is_err());
     }
 
     #[test]
     fn tarn_negative_floor_fails() {
-        let mut tarn = Tarn::example();
+        let mut tarn = Tarn::example().expect("example");
         tarn.coupon_floor = -0.01;
         assert!(tarn.validate().is_err());
     }
@@ -309,14 +307,14 @@ mod tests {
     #[test]
     fn tarn_instrument_trait() {
         use crate::instruments::common_impl::traits::Instrument;
-        let tarn = Tarn::example();
+        let tarn = Tarn::example().expect("example");
         assert_eq!(tarn.id(), "TARN-USD-5Y");
         assert_eq!(tarn.key(), crate::pricer::InstrumentType::Tarn);
     }
 
     #[test]
     fn tarn_serde_roundtrip() {
-        let tarn = Tarn::example();
+        let tarn = Tarn::example().expect("example");
         let json = serde_json::to_string(&tarn).expect("serialize");
         let deser: Tarn = serde_json::from_str(&json).expect("deserialize");
         assert_eq!(deser.id, tarn.id);
@@ -330,7 +328,7 @@ mod tests {
         use finstack_quant_core::market_data::context::MarketContext;
         use time::macros::date;
 
-        let tarn = Tarn::example();
+        let tarn = Tarn::example().expect("example");
         let market = MarketContext::default();
         let as_of = date!(2025 - 01 - 01);
         let err = tarn

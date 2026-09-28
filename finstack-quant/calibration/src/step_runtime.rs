@@ -821,7 +821,7 @@ mod tests {
             .as_any()
             .downcast_ref::<CdsTranche>()
             .expect("CdsTranche");
-        let pricer = CdsTranchePricer::with_params(
+        let pricer = CdsTranchePricer::with_config(
             CdsTranchePricerConfig::default()
                 .with_student_t_copula(6.0)
                 .expect("valid fixture df"),

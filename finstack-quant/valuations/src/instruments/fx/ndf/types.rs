@@ -501,18 +501,13 @@ impl Ndf {
     /// Create a canonical example NDF for testing and documentation.
     ///
     /// Returns a 3-month USD/CNY NDF with realistic parameters.
-    #[allow(clippy::expect_used)] // Example uses hardcoded valid values
-    pub fn example() -> Self {
+    pub fn example() -> finstack_quant_core::Result<Self> {
         Self::builder()
             .id(InstrumentId::new("USDCNY-NDF-3M"))
             .base_currency(Currency::CNY)
             .settlement_currency(Currency::USD)
-            .fixing_date(
-                Date::from_calendar_date(2025, time::Month::March, 13).expect("Valid example date"),
-            )
-            .maturity(
-                Date::from_calendar_date(2025, time::Month::March, 15).expect("Valid example date"),
-            )
+            .fixing_date(time::macros::date!(2025 - 03 - 13))
+            .maturity(time::macros::date!(2025 - 03 - 15))
             .notional(Money::from((10_000_000_i64, Currency::CNY)))
             .contract_rate(7.25)
             .domestic_discount_curve_id(CurveId::new("USD-OIS"))
@@ -525,7 +520,6 @@ impl Ndf {
                     .with_meta("pair", "USDCNY"),
             )
             .build()
-            .expect("Example NDF construction should not fail")
     }
 
     /// Validate that the fixing source is appropriate for the base currency.
@@ -1012,11 +1006,13 @@ mod tests {
     #[test]
     fn test_ndf_with_fixing_rate_rejects_non_positive() {
         let err = Ndf::example()
+            .expect("example")
             .with_observed_fixing(0.0)
             .expect_err("zero rate should fail");
         assert!(err.to_string().contains("observed_fixing"));
 
         let err = Ndf::example()
+            .expect("example")
             .with_observed_fixing(f64::NAN)
             .expect_err("NaN rate should fail");
         assert!(err.to_string().contains("observed_fixing"));
@@ -1024,7 +1020,7 @@ mod tests {
 
     #[test]
     fn test_ndf_serde_rejects_invalid_contract_rate() {
-        let ndf = Ndf::example();
+        let ndf = Ndf::example().expect("example");
         let mut json = serde_json::to_value(&ndf).expect("serialize");
         json["contract_rate"] = serde_json::json!(0.0);
 
@@ -1058,7 +1054,9 @@ mod tests {
 
     #[test]
     fn test_ndf_with_quote_convention() {
-        let ndf = Ndf::example().with_quote_convention(NdfQuoteConvention::SettlementPerBase);
+        let ndf = Ndf::example()
+            .expect("example")
+            .with_quote_convention(NdfQuoteConvention::SettlementPerBase);
         assert_eq!(ndf.quote_convention, NdfQuoteConvention::SettlementPerBase);
     }
 
@@ -1088,7 +1086,7 @@ mod tests {
 
     #[test]
     fn test_ndf_base_per_settlement_settlement_formula() {
-        let mut ndf = Ndf::example();
+        let mut ndf = Ndf::example().expect("example");
         ndf.contract_rate = Some(7.25);
         ndf.observed_fixing = Some(7.30);
         // Long 10m CNY loses USD value on the five-cent depreciation.
@@ -1103,7 +1101,7 @@ mod tests {
     fn test_ndf_without_contract_rate_settles_at_market() {
         // At-market: the contract rate equals the market forward, so the
         // settlement amount is exactly zero whatever the fixing.
-        let mut ndf = Ndf::example();
+        let mut ndf = Ndf::example().expect("example");
         ndf.contract_rate = None;
         ndf.observed_fixing = Some(7.30);
         let settlement = ndf
@@ -1114,7 +1112,7 @@ mod tests {
 
     #[test]
     fn test_ndf_settlement_per_base_settlement_formula() {
-        let mut ndf = Ndf::example();
+        let mut ndf = Ndf::example().expect("example");
         ndf.quote_convention = NdfQuoteConvention::SettlementPerBase;
         ndf.contract_rate = Some(0.138);
         ndf.observed_fixing = Some(0.140);
@@ -1454,6 +1452,7 @@ mod tests {
                 .expect("curve should build");
         let market = MarketContext::new().insert(curve);
         let schedule = Ndf::example()
+            .expect("example")
             .cashflow_schedule(&market, as_of)
             .expect("ndf schedule");
 

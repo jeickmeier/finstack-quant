@@ -80,7 +80,7 @@
 //! use finstack_quant_core::currency::Currency;
 //!
 //! // Create a USD/CNY NDF with BasePerSettlement convention
-//! let ndf = Ndf::example();
+//! let ndf = Ndf::example().expect("example");
 //! assert_eq!(ndf.base_currency, Currency::CNY);
 //! assert_eq!(ndf.settlement_currency, Currency::USD);
 //! assert_eq!(ndf.quote_convention, NdfQuoteConvention::BasePerSettlement);

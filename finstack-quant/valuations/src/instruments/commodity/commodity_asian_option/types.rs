@@ -213,8 +213,7 @@ impl CommodityAsianOption {
     /// Create a canonical example commodity Asian option for testing.
     ///
     /// Returns a WTI arithmetic average call option with monthly fixings.
-    #[allow(clippy::expect_used)]
-    pub fn example() -> Self {
+    pub fn example() -> finstack_quant_core::Result<Self> {
         use time::macros::date;
         let fixing_dates = vec![
             date!(2025 - 01 - 31),
@@ -244,7 +243,6 @@ impl CommodityAsianOption {
             .day_count(DayCount::Act365F)
             .attributes(Attributes::new())
             .build()
-            .expect("Example CommodityAsianOption with valid constants should never fail")
     }
 
     /// Validate the realized-fixing history against the fixing schedule.
@@ -426,7 +424,7 @@ mod tests {
             Date::from_calendar_date(2025, Month::March, 31).expect("valid date"),
         ];
 
-        let mut asian = CommodityAsianOption::example();
+        let mut asian = CommodityAsianOption::example().expect("example");
         asian.fixing_dates = fixings.clone();
 
         // No history
@@ -452,7 +450,7 @@ mod tests {
     fn validation_rejects_invalid_fixing_schedule_and_scalars() {
         use crate::instruments::common_impl::traits::Instrument;
 
-        let mut option = CommodityAsianOption::example();
+        let mut option = CommodityAsianOption::example().expect("example");
         option.quantity = f64::NAN;
         assert!(option.validate_for_pricing().is_err());
 
@@ -467,7 +465,7 @@ mod tests {
 
     #[test]
     fn test_example_construction() {
-        let asian = CommodityAsianOption::example();
+        let asian = CommodityAsianOption::example().expect("example");
         assert_eq!(asian.fixing_dates.len(), 6);
         assert_eq!(asian.strike, 75.0);
         assert_eq!(asian.quantity, 1000.0);

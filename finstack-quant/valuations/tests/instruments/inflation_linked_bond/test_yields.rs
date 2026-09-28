@@ -40,7 +40,7 @@ fn test_real_yield_act_act_isma_example() {
     use finstack_quant_core::dates::DayCount;
     use finstack_quant_valuations::instruments::fixed_income::inflation_linked_bond::InflationLinkedBond;
 
-    let ilb = InflationLinkedBond::example();
+    let ilb = InflationLinkedBond::example().expect("example");
     assert_eq!(ilb.day_count, DayCount::ActActIsma);
 
     let as_of = ilb.issue_date;

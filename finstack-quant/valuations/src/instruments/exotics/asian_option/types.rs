@@ -227,12 +227,12 @@ impl AsianOption {
     /// Calculate the net present value of this Asian option using Monte Carlo.
     pub fn npv_mc(
         &self,
-        curves: &finstack_quant_core::market_data::context::MarketContext,
+        market: &finstack_quant_core::market_data::context::MarketContext,
         as_of: finstack_quant_core::dates::Date,
     ) -> finstack_quant_core::Result<finstack_quant_core::money::Money> {
         crate::instruments::common_impl::traits::Instrument::validate_for_pricing(self)?;
         use crate::instruments::exotics::asian_option::pricer;
-        pricer::compute_pv(self, curves, as_of)
+        pricer::compute_pv(self, market, as_of)
     }
 
     /// Get the accumulated state (sum, log_sum_product, count) for seasoned options.

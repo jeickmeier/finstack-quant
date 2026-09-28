@@ -26,7 +26,7 @@ fn b17_fixed_inflation_leg_compounds_one_per_annual_period() {
             .build()
             .expect("discount"),
     );
-    let mut swap = InflationSwap::example();
+    let mut swap = InflationSwap::example().expect("example");
     swap.day_count = ConventionRegistry::try_global()
         .expect("registry")
         .require_inflation_swap(&InflationSwapConventionId::new("USD-CPI"))
@@ -48,7 +48,7 @@ fn b17_fixed_inflation_leg_compounds_one_per_annual_period() {
 
 #[test]
 fn b17_month_end_cpi_has_the_same_reference_month_in_index_and_hybrid_sources() {
-    let mut bond = InflationLinkedBond::example();
+    let mut bond = InflationLinkedBond::example().expect("example");
     bond.base_cpi = 300.0;
     bond.lag = InflationLag::Months(3);
     let index = InflationIndex::new(
@@ -99,7 +99,7 @@ fn m20_historical_inflation_requires_an_observation() {
                 .build()
                 .expect("projection"),
         );
-    let swap = InflationSwap::example();
+    let swap = InflationSwap::example().expect("example");
     assert!(
         swap.pv_inflation_leg(&market, as_of).is_err(),
         "a past start fixing must not be replaced with the curve's base CPI"
@@ -108,7 +108,7 @@ fn m20_historical_inflation_requires_an_observation() {
 
 #[test]
 fn m19_real_duration_requires_the_same_clean_quote_as_real_yield() {
-    let mut bond = InflationLinkedBond::example();
+    let mut bond = InflationLinkedBond::example().expect("example");
     bond.instrument_pricing_overrides
         .market_quotes
         .quoted_clean_price_pct = None;
@@ -246,7 +246,7 @@ fn b17_projected_inflation_uses_contract_month_interpolation_weights() {
             .with_interpolation(InflationInterpolation::Linear)
             .with_lag(InflationLag::Months(3)),
         );
-    let mut swap = InflationSwap::example();
+    let mut swap = InflationSwap::example().expect("example");
     swap.start_date = as_of;
     swap.maturity = date!(2026 - 02 - 16);
     swap.base_cpi = Some(300.0);

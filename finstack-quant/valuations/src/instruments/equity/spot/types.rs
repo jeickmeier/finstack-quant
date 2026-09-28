@@ -127,19 +127,19 @@ impl Equity {
     /// Create a canonical example equity for testing and documentation.
     ///
     /// Returns a 100-share position in AAPL with realistic market data IDs.
-    pub fn example() -> Self {
-        Self::new("EQUITY-AAPL", "AAPL", Currency::USD)
+    pub fn example() -> finstack_quant_core::Result<Self> {
+        Ok(Self::new("EQUITY-AAPL", "AAPL", Currency::USD)
             .with_quantity(100.0)
             .with_spot_id("AAPL-SPOT")
-            .with_dividend_yield_id("AAPL-DIV")
+            .with_div_yield_id("AAPL-DIV"))
     }
 
     /// Create a new equity instrument with default 1 share
-    pub fn new(id: impl Into<String>, ticker: impl Into<String>, currency: Currency) -> Self {
+    pub fn new(id: impl Into<InstrumentId>, ticker: impl Into<String>, currency: Currency) -> Self {
         let discount_curve_id = CurveId::from(currency.to_string());
 
         Self {
-            id: InstrumentId::new(id.into()),
+            id: id.into(),
             ticker: ticker.into(),
             currency,
             quantity: None,
@@ -186,7 +186,7 @@ impl Equity {
     }
 
     /// Override the scalar identifier used to resolve the dividend yield.
-    pub fn with_dividend_yield_id(mut self, div_id: impl Into<PriceId>) -> Self {
+    pub fn with_div_yield_id(mut self, div_id: impl Into<PriceId>) -> Self {
         self.div_yield_id = Some(div_id.into());
         self
     }
@@ -271,12 +271,12 @@ impl Equity {
     ///
     /// # Arguments
     ///
-    /// * `curves` - Market context holding the `spot_id` scalar (and the FX
+    /// * `market` - Market context holding the `spot_id` scalar (and the FX
     ///   matrix when the scalar is a price in another currency).
     /// * `as_of` - Valuation date used for any FX conversion.
     pub fn price_per_share(
         &self,
-        curves: &MarketContext,
+        market: &MarketContext,
         as_of: finstack_quant_core::dates::Date,
     ) -> finstack_quant_core::Result<Money> {
         self.validate()?;
@@ -289,13 +289,13 @@ impl Equity {
                 self.id
             ))
         })?;
-        self.money_from_scalar(curves.get_price(spot_id)?, curves, as_of)
+        self.money_from_scalar(market.get_price(spot_id)?, market, as_of)
     }
 
     /// Resolve dividend yield (annualized, decimal) for the equity
-    pub fn dividend_yield(&self, curves: &MarketContext) -> finstack_quant_core::Result<f64> {
+    pub fn dividend_yield(&self, market: &MarketContext) -> finstack_quant_core::Result<f64> {
         if let Some(explicit_id) = self.div_yield_id.as_deref() {
-            return match curves.get_price(explicit_id)? {
+            return match market.get_price(explicit_id)? {
                 MarketScalar::Unitless(value) if value.is_finite() => Ok(*value),
                 MarketScalar::Unitless(value) => {
                     Err(finstack_quant_core::Error::Validation(format!(
@@ -373,11 +373,11 @@ impl Equity {
     /// Calculate forward total value for the position
     pub fn forward_value(
         &self,
-        curves: &MarketContext,
+        market: &MarketContext,
         as_of: finstack_quant_core::dates::Date,
         t: f64,
     ) -> finstack_quant_core::Result<Money> {
-        let per_share = self.forward_price_per_share(curves, as_of, t)?;
+        let per_share = self.forward_price_per_share(market, as_of, t)?;
         Money::new(
             per_share.amount() * self.effective_quantity(),
             self.currency,
@@ -473,7 +473,7 @@ mod tests {
 
     #[test]
     fn explicit_market_dependencies_exclude_fallback_candidates() {
-        let equity = Equity::example();
+        let equity = Equity::example().expect("example");
         let deps =
             crate::instruments::Instrument::market_dependencies(&equity).expect("dependencies");
 

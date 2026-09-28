@@ -342,7 +342,7 @@ mod tests {
     /// The example deal with an equity tranche so residual cash (repaid draws,
     /// reserve interest) has a recipient, and no prepayment or default noise.
     fn quiet_example(reserve: f64, rate: f64) -> StructuredCredit {
-        let mut deal = StructuredCredit::example();
+        let mut deal = StructuredCredit::example().expect("example");
         deal.tranches = TrancheStructure::new(vec![
             Tranche::new(
                 "A",

@@ -18,7 +18,7 @@ use super::super::instruments::enum_from_str;
 /// Examples
 /// --------
 /// >>> from finstack_quant.valuations.instruments import HedgeSwap, InterestRateSwap
-/// >>> swap = InterestRateSwap.example_standard()
+/// >>> swap = InterestRateSwap.example()
 /// >>> hedge = HedgeSwap(swap, notional="pool_par", priority="senior_fee")
 /// >>> hedge.priority, hedge.notional
 /// ('senior_fee', 'pool_par')

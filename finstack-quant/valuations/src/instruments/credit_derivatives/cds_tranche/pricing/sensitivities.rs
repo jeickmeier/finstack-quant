@@ -30,9 +30,9 @@ impl CdsTranchePricer {
     /// spurious jump (the previous tanh patches were discontinuous at both
     /// seams by ≈ 0.12·w).
     pub(super) fn smooth_correlation_boundary(&self, correlation: f64) -> f64 {
-        let min_corr = self.params.min_correlation;
-        let max_corr = self.params.max_correlation;
-        let width = self.params.corr_boundary_width;
+        let min_corr = self.config.min_correlation;
+        let max_corr = self.config.max_correlation;
+        let width = self.config.corr_boundary_width;
 
         if correlation < min_corr + width {
             // Lower wing: u = (ρ − min)/w ≤ 1; g = min + w·e^{u−1}.
@@ -416,10 +416,10 @@ impl CdsTranchePricer {
     pub fn calculate_model_upfront(
         &self,
         tranche: &CdsTranche,
-        market_ctx: &MarketContext,
+        market: &MarketContext,
         as_of: Date,
     ) -> Result<f64> {
-        let pv = self.price_tranche(tranche, market_ctx, as_of)?;
+        let pv = self.price_tranche(tranche, market, as_of)?;
         Ok(pv.amount())
     }
 
@@ -429,7 +429,7 @@ impl CdsTranchePricer {
     pub fn calculate_spread_dv01(
         &self,
         tranche: &CdsTranche,
-        market_ctx: &MarketContext,
+        market: &MarketContext,
         as_of: Date,
     ) -> Result<f64> {
         // Central difference: (PV(c+1bp) - PV(c-1bp)) / 2
@@ -439,10 +439,8 @@ impl CdsTranchePricer {
         let mut tranche_down = tranche.clone();
         tranche_down.coupon_bp -= 1.0;
 
-        let pv_up = self.price_tranche(&tranche_up, market_ctx, as_of)?.amount();
-        let pv_down = self
-            .price_tranche(&tranche_down, market_ctx, as_of)?
-            .amount();
+        let pv_up = self.price_tranche(&tranche_up, market, as_of)?.amount();
+        let pv_down = self.price_tranche(&tranche_down, market, as_of)?.amount();
 
         Ok((pv_up - pv_down) / 2.0)
     }
@@ -467,11 +465,11 @@ impl CdsTranchePricer {
     pub fn calculate_par_spread(
         &self,
         tranche: &CdsTranche,
-        market_ctx: &MarketContext,
+        market: &MarketContext,
         as_of: Date,
     ) -> Result<f64> {
         tranche.validate()?;
-        let discount_curve = market_ctx.get_discount(&tranche.discount_curve_id)?;
+        let discount_curve = market.get_discount(&tranche.discount_curve_id)?;
 
         // Initial guess: unsigned magnitude of protection PV divided by premium per bp.
         // Both quantities are signed by project_discountable_rows (opposite polarities for
@@ -479,8 +477,7 @@ impl CdsTranchePricer {
         // positive seed for both protection sides.
         let mut unit_tranche = tranche.clone();
         unit_tranche.coupon_bp = 1.0;
-        let premium_per_bp_rows =
-            self.project_discountable_rows(&unit_tranche, market_ctx, as_of)?;
+        let premium_per_bp_rows = self.project_discountable_rows(&unit_tranche, market, as_of)?;
         let premium_per_bp = self.discount_projected_rows(
             &premium_per_bp_rows
                 .iter()
@@ -495,7 +492,7 @@ impl CdsTranchePricer {
             return Ok(0.0);
         }
 
-        let protection_rows = self.project_discountable_rows(tranche, market_ctx, as_of)?;
+        let protection_rows = self.project_discountable_rows(tranche, market, as_of)?;
         let protection_pv = self.discount_projected_rows(
             &protection_rows
                 .iter()
@@ -529,9 +526,7 @@ impl CdsTranchePricer {
             test_tranche.coupon_bp = spread;
 
             // Calculate NPV at current spread
-            let npv = self
-                .price_tranche(&test_tranche, market_ctx, as_of)?
-                .amount();
+            let npv = self.price_tranche(&test_tranche, market, as_of)?.amount();
             last_npv = npv;
 
             // Check convergence (NPV close to zero)
@@ -540,7 +535,7 @@ impl CdsTranchePricer {
             }
 
             // Calculate Spread DV01 for Newton step
-            let spread_dv01 = self.calculate_spread_dv01(&test_tranche, market_ctx, as_of)?;
+            let spread_dv01 = self.calculate_spread_dv01(&test_tranche, market, as_of)?;
 
             if spread_dv01.abs() < NUMERICAL_TOLERANCE {
                 // Degenerate Jacobian: the Newton step is undefined, so the
@@ -576,10 +571,10 @@ impl CdsTranchePricer {
     pub fn calculate_expected_loss(
         &self,
         tranche: &CdsTranche,
-        market_ctx: &MarketContext,
+        market: &MarketContext,
     ) -> Result<f64> {
         tranche.validate()?;
-        let index_data_arc = market_ctx.get_credit_index(&tranche.credit_index_id)?;
+        let index_data_arc = market.get_credit_index(&tranche.credit_index_id)?;
         self.calculate_expected_tranche_loss(tranche, index_data_arc.as_ref(), tranche.maturity)
     }
 
@@ -602,7 +597,7 @@ impl CdsTranchePricer {
     /// # Arguments
     ///
     /// * `tranche` - Contractual tranche, notional currency and credit-index identifier.
-    /// * `market_ctx` - Base market containing the index, its complete issuer pool
+    /// * `market` - Base market containing the index, its complete issuer pool
     ///   when configured, discount curve and hazard calibration dependencies.
     /// * `as_of` - Valuation date used identically for both bumped prices.
     /// * `provider` - Exact quote-rebootstrap service; every active hazard curve
@@ -616,7 +611,7 @@ impl CdsTranchePricer {
     pub fn calculate_cs01(
         &self,
         tranche: &CdsTranche,
-        market_ctx: &MarketContext,
+        market: &MarketContext,
         as_of: Date,
         provider: &dyn crate::recalibration::RecalibrationProvider,
         credit_spread_bump_bp: f64,
@@ -628,12 +623,12 @@ impl CdsTranchePricer {
             )));
         }
 
-        let index = market_ctx.get_credit_index(&tranche.credit_index_id)?;
+        let index = market.get_credit_index(&tranche.credit_index_id)?;
         let hazards =
-            super::super::credit_risk::active_hazards(&index, self.params.use_issuer_curves);
+            super::super::credit_risk::active_hazards(&index, self.config.use_issuer_curves);
         super::super::credit_risk::parallel_cs01(
             provider,
-            market_ctx,
+            market,
             tranche.credit_index_id.as_str(),
             &tranche.discount_curve_id,
             &hazards,
@@ -658,12 +653,12 @@ impl CdsTranchePricer {
     pub fn calculate_correlation_delta(
         &self,
         tranche: &CdsTranche,
-        market_ctx: &MarketContext,
+        market: &MarketContext,
         as_of: Date,
     ) -> Result<f64> {
         tranche.validate()?;
         let bump_abs = crate::metrics::CORRELATION_BUMP;
-        let original_index_arc = market_ctx.get_credit_index(&tranche.credit_index_id)?;
+        let original_index_arc = market.get_credit_index(&tranche.credit_index_id)?;
 
         // Central difference: (PV_up - PV_down) / (2 * bump) for O(h²) accuracy
         let bumped_corr_curve_up =
@@ -685,10 +680,10 @@ impl CdsTranchePricer {
             std::sync::Arc::new(bumped_corr_curve_down),
         )?;
 
-        let ctx_up = market_ctx
+        let ctx_up = market
             .clone()
             .insert_credit_index(&tranche.credit_index_id, bumped_index_up);
-        let ctx_down = market_ctx
+        let ctx_down = market
             .clone()
             .insert_credit_index(&tranche.credit_index_id, bumped_index_down);
 
@@ -711,10 +706,10 @@ impl CdsTranchePricer {
     pub fn calculate_jump_to_default(
         &self,
         tranche: &CdsTranche,
-        market_ctx: &MarketContext,
+        market: &MarketContext,
         _as_of: Date,
     ) -> Result<f64> {
-        let detail = self.calculate_jump_to_default_detail(tranche, market_ctx)?;
+        let detail = self.calculate_jump_to_default_detail(tranche, market)?;
         Ok(detail.average)
     }
 
@@ -733,10 +728,10 @@ impl CdsTranchePricer {
     pub fn calculate_jump_to_default_detail(
         &self,
         tranche: &CdsTranche,
-        market_ctx: &MarketContext,
+        market: &MarketContext,
     ) -> Result<JumpToDefaultResult> {
         tranche.validate()?;
-        let index_data = market_ctx.get_credit_index(&tranche.credit_index_id)?;
+        let index_data = market.get_credit_index(&tranche.credit_index_id)?;
 
         let attach_frac = tranche.attach_pct / 100.0;
         let detach_frac = tranche.detach_pct / 100.0;
@@ -851,7 +846,7 @@ impl CdsTranchePricer {
     pub fn calculate_accrued_premium(
         &self,
         tranche: &CdsTranche,
-        market_ctx: &MarketContext,
+        market: &MarketContext,
         as_of: Date,
     ) -> Result<f64> {
         tranche.validate()?;
@@ -863,7 +858,7 @@ impl CdsTranchePricer {
         })?;
 
         // Get credit index data for loss calculations
-        let index_data = market_ctx
+        let index_data = market
             .get_credit_index(&tranche.credit_index_id)
             .map_err(|_| {
                 finstack_quant_core::Error::Input(finstack_quant_core::InputError::NotFound {
@@ -931,11 +926,11 @@ impl CdsTranchePricer {
     pub fn get_expected_loss_curve(
         &self,
         tranche: &CdsTranche,
-        market_ctx: &MarketContext,
+        market: &MarketContext,
         as_of: Date,
     ) -> Result<Vec<(Date, f64)>> {
         tranche.validate()?;
-        let index_data = market_ctx.get_credit_index(&tranche.credit_index_id)?;
+        let index_data = market.get_credit_index(&tranche.credit_index_id)?;
         let payment_dates = self.generate_payment_schedule(tranche, as_of)?;
         self.build_el_curve(tranche, index_data.as_ref(), &payment_dates)
     }

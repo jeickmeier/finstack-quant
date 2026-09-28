@@ -341,7 +341,7 @@ fn test_adaptive_integration_config() {
     };
     for tolerance in [1e-6, 1e-8, 1e-10, 1e-12] {
         let config = CdsTranchePricerConfig::default().with_integration_tolerance(tolerance);
-        CdsTranchePricer::with_params(config).expect("supported global integration budget");
+        CdsTranchePricer::with_config(config).expect("supported global integration budget");
     }
     assert_eq!(
         CdsTranchePricerConfig::default().integration_tolerance,
@@ -435,7 +435,7 @@ fn test_homogeneous_pool_assumption() {
     config.use_issuer_curves = false;
 
     let pricer =
-        finstack_quant_valuations::instruments::credit_derivatives::cds_tranche::CdsTranchePricer::with_params(
+        finstack_quant_valuations::instruments::credit_derivatives::cds_tranche::CdsTranchePricer::with_config(
             config,
         )
         .expect("valid tranche pricer config");
@@ -456,7 +456,7 @@ fn test_heterogeneous_pool_extension() {
     config.use_issuer_curves = true;
 
     let pricer =
-        finstack_quant_valuations::instruments::credit_derivatives::cds_tranche::CdsTranchePricer::with_params(
+        finstack_quant_valuations::instruments::credit_derivatives::cds_tranche::CdsTranchePricer::with_config(
             config,
         )
         .expect("valid tranche pricer config");

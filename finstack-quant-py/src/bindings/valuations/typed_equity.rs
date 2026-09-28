@@ -8,7 +8,9 @@ use crate::bindings::date_utils::{date_to_py, extract_date};
 use crate::bindings::extract::extract_market;
 use crate::errors::core_to_py;
 use finstack_quant_core::types::{CurveId, InstrumentId, PriceId};
-use finstack_quant_valuations::instruments::equity::equity_option::EquityOptionMarketData;
+use finstack_quant_valuations::instruments::equity::equity_option::{
+    EquityOptionMarketData, EquityOptionParams,
+};
 use finstack_quant_valuations::instruments::InstrumentJson;
 
 use super::convert::{
@@ -32,7 +34,7 @@ type EquityOptionBuilderInner =
 /// value scales by, and ``currency`` is the premium/PV currency; discrete dividends and a continuous ``div_yield_id`` are both
 /// supported.
 ///
-/// Build with ``EquityOption.builder()`` or ``EquityOption.european_call(...)``;
+/// Build with ``EquityOption.builder()`` or ``EquityOption.european(...)``;
 /// start from ``EquityOption.example()``. Instances are accepted directly by
 /// ``price_instrument`` and expose ``price`` / ``metric`` / ``greeks`` /
 /// ``implied_vol`` themselves.
@@ -99,10 +101,10 @@ impl PyEquityOption {
             .map_err(core_to_py)
     }
 
-    /// Build a cash-settled European call.
+    /// Build a cash-settled European call or put.
     ///
-    /// Mirrors Rust ``EquityOption::european_call`` /
-    /// ``european_call_with_market_data``: the market-data identifiers default
+    /// Mirrors Rust ``EquityOption::european`` /
+    /// ``european_with_market_data``: the market-data identifiers default
     /// to the same generic ids the Rust constructor uses (``"USD-OIS"``,
     /// ``"EQUITY-SPOT"``, ``"EQUITY-VOL"``, ``"EQUITY-DIVYIELD"``); pass your
     /// own to bind the option to real market objects.
@@ -121,6 +123,8 @@ impl PyEquityOption {
     ///     Number of underlying units; PV and Greeks scale linearly with it.
     /// currency : Currency | str
     ///     Currency of the strike, premium and present value (``"USD"``).
+    /// option_type : str
+    ///     ``"call"`` or ``"put"``.
     /// discount_curve_id : str
     ///     Discount curve identifier.
     /// spot_id : str
@@ -138,24 +142,26 @@ impl PyEquityOption {
     /// Raises
     /// ------
     /// ValueError
-    ///     If ``strike`` is not positive or ``quantity`` is zero, or ``currency`` is not a recognized code.
+    ///     If ``strike`` is not positive or ``quantity`` is zero, ``currency`` is not a recognized
+    ///     code, or ``option_type`` is not ``"call"`` or ``"put"``.
     #[staticmethod]
-    #[pyo3(signature = (id, ticker, strike, expiry, quantity, currency, *, discount_curve_id="USD-OIS",
+    #[pyo3(signature = (id, ticker, strike, expiry, quantity, currency, option_type, *, discount_curve_id="USD-OIS",
                         spot_id="EQUITY-SPOT", vol_surface_id="EQUITY-VOL",
                         div_yield_id="EQUITY-DIVYIELD"))]
     #[pyo3(
-        text_signature = "(id, ticker, strike, expiry, quantity, currency, *, discount_curve_id='USD-OIS', \
+        text_signature = "(id, ticker, strike, expiry, quantity, currency, option_type, *, discount_curve_id='USD-OIS', \
 spot_id='EQUITY-SPOT', vol_surface_id='EQUITY-VOL', div_yield_id='EQUITY-DIVYIELD')"
     )]
     // PyO3 binding: the argument list mirrors the Python keyword-argument API.
     #[allow(clippy::too_many_arguments)]
-    fn european_call(
+    fn european(
         id: &str,
         ticker: &str,
         strike: f64,
         expiry: &Bound<'_, PyAny>,
         quantity: f64,
         currency: &Bound<'_, PyAny>,
+        option_type: &str,
         discount_curve_id: &str,
         spot_id: &str,
         vol_surface_id: &str,
@@ -164,16 +170,21 @@ spot_id='EQUITY-SPOT', vol_surface_id='EQUITY-VOL', div_yield_id='EQUITY-DIVYIEL
         let mut market_data =
             EquityOptionMarketData::new(discount_curve_id, spot_id, vol_surface_id);
         if let Some(div) = div_yield_id {
-            market_data = market_data.with_dividend_yield(div);
+            market_data = market_data.with_div_yield_id(div);
         }
+        let option_params = EquityOptionParams::new(
+            strike,
+            extract_date(expiry)?,
+            enum_from_str(option_type, "option_type")?,
+            quantity,
+            currency_from_py(currency, "currency")?,
+        )
+        .with_settlement(finstack_quant_valuations::instruments::SettlementType::Cash);
         let inner =
-            finstack_quant_valuations::instruments::EquityOption::european_call_with_market_data(
+            finstack_quant_valuations::instruments::EquityOption::european_with_market_data(
                 id,
                 ticker,
-                strike,
-                extract_date(expiry)?,
-                quantity,
-                currency_from_py(currency, "currency")?,
+                option_params,
                 market_data,
             )
             .map_err(core_to_py)?;

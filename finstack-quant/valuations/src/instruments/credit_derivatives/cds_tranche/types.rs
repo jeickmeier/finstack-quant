@@ -210,8 +210,7 @@ impl CdsTranche {
     }
 
     /// Create a canonical example CDS tranche (CDX.NA.IG 0-3% equity tranche).
-    #[allow(clippy::expect_used)] // Example uses hardcoded valid values
-    pub fn example() -> Self {
+    pub fn example() -> finstack_quant_core::Result<Self> {
         use finstack_quant_core::currency::Currency;
         use time::macros::date;
         let params = super::parameters::CdsTrancheParams::equity_tranche(
@@ -228,7 +227,6 @@ impl CdsTranche {
             CurveId::new("CDX.NA.IG.HAZARD"),
             PayReceive::Pay,
         )
-        .expect("Valid tranche parameters")
     }
     /// Create a new CDS tranche using parameter structs.
     ///
@@ -383,7 +381,7 @@ impl CdsTranche {
     ///
     /// # Arguments
     ///
-    /// * `curves` - Market context holding the discount curve and the credit
+    /// * `market` - Market context holding the discount curve and the credit
     ///   index data named by the tranche.
     /// * `as_of` - Valuation date.
     ///
@@ -397,58 +395,58 @@ impl CdsTranche {
     /// is missing.
     pub fn model_upfront(
         &self,
-        curves: &MarketContext,
+        market: &MarketContext,
         as_of: Date,
     ) -> finstack_quant_core::Result<f64> {
         let pricer = pricing::CdsTranchePricer::new();
-        pricer.calculate_model_upfront(self, curves, as_of)
+        pricer.calculate_model_upfront(self, market, as_of)
     }
 
     /// Calculate spread DV01 (sensitivity to 1bp change in running coupon)
     pub fn spread_dv01(
         &self,
-        curves: &MarketContext,
+        market: &MarketContext,
         as_of: Date,
     ) -> finstack_quant_core::Result<f64> {
         let pricer = pricing::CdsTranchePricer::new();
-        pricer.calculate_spread_dv01(self, curves, as_of)
+        pricer.calculate_spread_dv01(self, market, as_of)
     }
 
     /// Calculate the par spread (running coupon in basis points).
     pub fn par_spread(
         &self,
-        curves: &MarketContext,
+        market: &MarketContext,
         as_of: Date,
     ) -> finstack_quant_core::Result<f64> {
         let pricer = pricing::CdsTranchePricer::new();
-        pricer.calculate_par_spread(self, curves, as_of)
+        pricer.calculate_par_spread(self, market, as_of)
     }
 
     /// Calculate expected loss metric
-    pub fn expected_loss(&self, curves: &MarketContext) -> finstack_quant_core::Result<f64> {
+    pub fn expected_loss(&self, market: &MarketContext) -> finstack_quant_core::Result<f64> {
         let pricer = pricing::CdsTranchePricer::new();
-        pricer.calculate_expected_loss(self, curves)
+        pricer.calculate_expected_loss(self, market)
     }
 
     /// Calculate jump-to-default metric
     pub fn jump_to_default(
         &self,
-        curves: &MarketContext,
+        market: &MarketContext,
         as_of: Date,
     ) -> finstack_quant_core::Result<f64> {
         let pricer = pricing::CdsTranchePricer::new();
-        pricer.calculate_jump_to_default(self, curves, as_of)
+        pricer.calculate_jump_to_default(self, market, as_of)
     }
 
     /// Calculate correlation delta (Correlation01): PV change per **1%
     /// (0.01 absolute)** base-correlation shift, matching `Recovery01` units.
     pub fn correlation_delta(
         &self,
-        curves: &MarketContext,
+        market: &MarketContext,
         as_of: Date,
     ) -> finstack_quant_core::Result<f64> {
         let pricer = pricing::CdsTranchePricer::new();
-        pricer.calculate_correlation_delta(self, curves, as_of)
+        pricer.calculate_correlation_delta(self, market, as_of)
     }
 
     /// Calculate accrued premium on the tranche.
@@ -469,11 +467,11 @@ impl CdsTranche {
     /// - Mark-to-market accounting
     pub fn accrued_premium(
         &self,
-        curves: &MarketContext,
+        market: &MarketContext,
         as_of: Date,
     ) -> finstack_quant_core::Result<f64> {
         let pricer = pricing::CdsTranchePricer::new();
-        pricer.calculate_accrued_premium(self, curves, as_of)
+        pricer.calculate_accrued_premium(self, market, as_of)
     }
 
     /// Calculate detailed jump-to-default metrics including min, max, and average.
@@ -481,10 +479,10 @@ impl CdsTranche {
     /// For heterogeneous portfolios, provides the full distribution of JTD impacts.
     pub fn jump_to_default_detail(
         &self,
-        curves: &MarketContext,
+        market: &MarketContext,
     ) -> finstack_quant_core::Result<pricing::JumpToDefaultResult> {
         let pricer = pricing::CdsTranchePricer::new();
-        pricer.calculate_jump_to_default_detail(self, curves)
+        pricer.calculate_jump_to_default_detail(self, market)
     }
 
     /// Get the expected loss curve for diagnostic purposes.
@@ -492,11 +490,11 @@ impl CdsTranche {
     /// Returns (Date, EL_fraction) pairs showing cumulative expected loss over time.
     pub fn expected_loss_curve(
         &self,
-        curves: &MarketContext,
+        market: &MarketContext,
         as_of: Date,
     ) -> finstack_quant_core::Result<Vec<(Date, f64)>> {
         let pricer = pricing::CdsTranchePricer::new();
-        pricer.get_expected_loss_curve(self, curves, as_of)
+        pricer.get_expected_loss_curve(self, market, as_of)
     }
 
     // Builder now provided by derive
@@ -569,7 +567,7 @@ mod tests {
 
     #[test]
     fn market_dependencies_preserve_credit_index_identity() {
-        let tranche = CdsTranche::example();
+        let tranche = CdsTranche::example().expect("example");
         let dependencies = tranche.market_dependencies().expect("tranche dependencies");
 
         assert_eq!(dependencies.credit_index_ids, vec![tranche.credit_index_id]);

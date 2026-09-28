@@ -103,12 +103,18 @@ impl PyCreditDefaultSwap {
     /// -------
     /// CreditDefaultSwap
     ///     The validated example CDS.
+    ///
+    /// Raises
+    /// ------
+    /// ValueError
+    ///     If the example instrument fails validation.
     #[staticmethod]
     #[pyo3(text_signature = "()")]
-    fn example() -> Self {
-        Self {
-            inner: finstack_quant_valuations::instruments::CreditDefaultSwap::example(),
-        }
+    fn example() -> PyResult<Self> {
+        Ok(Self {
+            inner: finstack_quant_valuations::instruments::CreditDefaultSwap::example()
+                .map_err(core_to_py)?,
+        })
     }
 
     /// Par spread implied by the market, in basis points.

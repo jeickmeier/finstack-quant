@@ -77,12 +77,12 @@ const DISTRESSED_FORWARD_SPREAD_LIMIT: f64 = 0.10;
 pub fn npv(
     option: &CdsOption,
     cds: &CreditDefaultSwap,
-    curves: &MarketContext,
+    market: &MarketContext,
     sigma: f64,
     as_of: Date,
 ) -> Result<Money> {
-    let disc = curves.get_discount(&option.discount_curve_id)?;
-    let surv = curves.get_hazard(&option.credit_curve_id)?;
+    let disc = market.get_discount(&option.discount_curve_id)?;
+    let surv = market.get_hazard(&option.credit_curve_id)?;
 
     let ctx = ForwardCdsContext::build(option, disc.as_ref(), surv.as_ref(), cds, as_of, sigma)?;
 
@@ -102,12 +102,12 @@ pub fn npv(
 pub fn theta(
     option: &CdsOption,
     cds: &CreditDefaultSwap,
-    curves: &MarketContext,
+    market: &MarketContext,
     sigma: f64,
     as_of: Date,
 ) -> Result<f64> {
-    let disc = curves.get_discount(&option.discount_curve_id)?;
-    let surv = curves.get_hazard(&option.credit_curve_id)?;
+    let disc = market.get_discount(&option.discount_curve_id)?;
+    let surv = market.get_hazard(&option.credit_curve_id)?;
     let ctx = ForwardCdsContext::build(option, disc.as_ref(), surv.as_ref(), cds, as_of, sigma)?;
     if ctx.t_expiry <= 0.0 {
         return Ok(0.0);
@@ -124,11 +124,11 @@ pub fn theta(
 pub fn forward_par_at_expiry_bp(
     option: &CdsOption,
     cds: &CreditDefaultSwap,
-    curves: &MarketContext,
+    market: &MarketContext,
     as_of: Date,
 ) -> Result<f64> {
-    let disc = curves.get_discount(&option.discount_curve_id)?;
-    let surv = curves.get_hazard(&option.credit_curve_id)?;
+    let disc = market.get_discount(&option.discount_curve_id)?;
+    let surv = market.get_hazard(&option.credit_curve_id)?;
     let ctx = ForwardCdsContext::build(option, disc.as_ref(), surv.as_ref(), cds, as_of, 0.0)?;
     Ok(ctx.forward_par_spread * BASIS_POINTS_PER_UNIT)
 }

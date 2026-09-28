@@ -122,7 +122,7 @@ mod tests {
     }
 
     fn sample_bond() -> InflationLinkedBond {
-        let mut bond = InflationLinkedBond::example();
+        let mut bond = InflationLinkedBond::example().expect("example");
         bond.day_count = finstack_quant_core::dates::DayCount::Thirty360;
         bond.discount_curve_id = CurveId::new("US-CPI-DISC");
         bond.inflation_index_id = CurveId::new("US-CPI");

@@ -239,7 +239,7 @@ fn clo_standard_rules_are_populated_and_valid() {
         80.0
     );
 
-    let mut deal = StructuredCredit::example();
+    let mut deal = StructuredCredit::example().expect("example");
     deal.coverage_rules = Some(rules);
     deal.validate_for_pricing()
         .expect("standard rules validate");
@@ -248,7 +248,7 @@ fn clo_standard_rules_are_populated_and_valid() {
 /// Percent fields outside `[0, 100]` are rejected at validation.
 #[test]
 fn out_of_range_rules_are_rejected() {
-    let mut deal = StructuredCredit::example();
+    let mut deal = StructuredCredit::example().expect("example");
     deal.coverage_rules = Some(CoverageRules {
         ccc_bucket: Some(CccBucketRule {
             threshold_pct: 150.0,
@@ -263,7 +263,7 @@ fn out_of_range_rules_are_rejected() {
 /// Deal-level rules are attached to the waterfall the constructors generate.
 #[test]
 fn deal_rules_reach_the_generated_waterfall() {
-    let mut deal = StructuredCredit::example();
+    let mut deal = StructuredCredit::example().expect("example");
     assert!(deal
         .create_waterfall()
         .expect("waterfall")
@@ -349,7 +349,7 @@ fn clo_with_closing_default(valuation: DefaultedValuation) -> (StructuredCredit,
         maturity(),
         "USD-OIS",
     )
-    .with_calendar("nyse")
+    .with_calendar_id("nyse")
     .with_coverage_triggers(vec![CoverageTestSpec::oc("A", 1.54)])
     .expect("coverage test");
     deal.credit_model.prepayment_spec = PrepaymentModelSpec::constant_cpr(0.0);

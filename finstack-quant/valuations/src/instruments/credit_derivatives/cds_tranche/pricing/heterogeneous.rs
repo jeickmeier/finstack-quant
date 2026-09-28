@@ -75,7 +75,7 @@ impl CdsTranchePricer {
             .map(|p| self.default_threshold_for_copula(*p))
             .collect();
         let conditional_p = |i: usize, factors: &[f64]| {
-            if self.params.copula_spec.is_gaussian() {
+            if self.config.copula_spec.is_gaussian() {
                 self.conditional_default_probability_enhanced(
                     thresholds[i],
                     correlation,
@@ -95,7 +95,7 @@ impl CdsTranchePricer {
             PoolExposure::Recovery => recovery,
         };
         let recovery_model: Option<Box<dyn RecoveryModel>> = self
-            .params
+            .config
             .stochastic_recovery_spec
             .as_ref()
             .map(|spec| spec.build());
@@ -131,7 +131,7 @@ impl CdsTranchePricer {
                     }
             })
             .sum();
-        let grid_step = self.params.grid_step.max(GRID_STEP_MIN);
+        let grid_step = self.config.grid_step.max(GRID_STEP_MIN);
         if !max_exposure.is_finite() {
             return Err(Error::Validation(
                 "non-finite heterogeneous pool exposure".to_owned(),
@@ -139,7 +139,7 @@ impl CdsTranchePricer {
         }
         let max_points = ((max_exposure / grid_step).ceil() as usize).saturating_add(2);
         let exact = (count <= credit::SMALL_POOL_THRESHOLD
-            || self.params.hetero_method == HeteroMethod::ExactConvolution)
+            || self.config.hetero_method == HeteroMethod::ExactConvolution)
             && max_points <= MAX_GRID_POINTS;
         if !exact {
             tracing::warn!(count, max_points, "CDS tranche uses moment-matched normal approximation; conditional-loss approximation error is separate from quadrature tolerance");

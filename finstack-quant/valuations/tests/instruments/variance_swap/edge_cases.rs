@@ -71,7 +71,7 @@ fn test_valuation_with_extreme_price_moves() {
 #[test]
 fn test_valuation_with_negative_rates() {
     // Arrange
-    let swap = with_implied_vol(sample_swap(PayReceive::Receive), 0.20);
+    let swap = with_implied_volatility(sample_swap(PayReceive::Receive), 0.20);
     // Use earlier base date to allow pre-start valuation
     let curve_base = date(2024, 12, 1);
     let disc_curve =

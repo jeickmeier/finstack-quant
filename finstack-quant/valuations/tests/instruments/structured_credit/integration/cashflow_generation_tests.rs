@@ -165,7 +165,7 @@ fn test_clo_generates_cashflows() {
         maturity_date(),
         "USD_OIS",
     )
-    .with_calendar("nyse");
+    .with_calendar_id("nyse");
 
     let market = create_test_market();
 
@@ -199,7 +199,7 @@ fn test_abs_generates_cashflows() {
         maturity_date(),
         "USD_OIS",
     )
-    .with_calendar("nyse");
+    .with_calendar_id("nyse");
 
     let market = create_test_market();
 
@@ -223,7 +223,7 @@ fn test_rmbs_generates_cashflows() {
         maturity_date(),
         "USD_OIS",
     )
-    .with_calendar("nyse");
+    .with_calendar_id("nyse");
 
     let market = create_test_market();
 
@@ -247,7 +247,7 @@ fn test_cmbs_generates_cashflows() {
         maturity_date(),
         "USD_OIS",
     )
-    .with_calendar("nyse");
+    .with_calendar_id("nyse");
 
     let market = create_test_market();
 
@@ -271,7 +271,7 @@ fn test_cashflow_dates_respect_payment_frequency() {
         maturity_date(),
         "USD_OIS",
     )
-    .with_calendar("nyse");
+    .with_calendar_id("nyse");
 
     let market = create_test_market();
 
@@ -309,7 +309,7 @@ fn test_cashflow_amounts_are_positive() {
         maturity_date(),
         "USD_OIS",
     )
-    .with_calendar("nyse");
+    .with_calendar_id("nyse");
 
     let market = create_test_market();
 

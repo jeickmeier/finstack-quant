@@ -86,7 +86,7 @@ macro_rules! check_wrapper {
             let mut option = example.clone();
             option.terms = european_terms(&example.terms, model);
             option.instrument_pricing_overrides =
-                InstrumentPricingOverrides::default().with_implied_vol(sigma);
+                InstrumentPricingOverrides::default().with_implied_volatility(sigma);
             let pv = option.value(&market, as_of()).expect("pv").amount();
             let expected = closed_form(&option.terms, &market, sigma);
             assert!(

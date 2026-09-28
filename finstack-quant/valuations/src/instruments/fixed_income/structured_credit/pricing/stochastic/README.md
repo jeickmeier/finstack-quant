@@ -27,7 +27,7 @@ use finstack_quant_models::credit::pool::{
 };
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::StructuredCredit;
 
-let mut clo = StructuredCredit::example();
+let mut clo = StructuredCredit::example().expect("example");
 
 // Applies valuation-owned, registry-backed presets for the deal type.
 clo.enable_stochastic().expect("valid built-in stochastic defaults");

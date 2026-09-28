@@ -10,7 +10,6 @@
 
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::money::Money;
-use finstack_quant_core::types::Percentage;
 use finstack_quant_valuations::instruments::credit_derivatives::cds_tranche::{
     CdsTrancheParams, CdsTranchePricer, CdsTranchePricerConfig, CopulaSpec, HeteroMethod,
 };
@@ -122,21 +121,12 @@ fn test_pricer_config_builder_methods_wire_copula_and_numerical_settings() {
         } if (loading_volatility - 0.15).abs() < 1e-12
     ));
 
-    let rfl_pct = CdsTranchePricerConfig::default()
-        .with_rfl_copula_pct(Percentage::new(12.5).expect("finite percentage"));
-    assert!(matches!(
-        rfl_pct.copula_spec,
-        CopulaSpec::RandomFactorLoading {
-            loading_volatility
-        } if (loading_volatility - 0.125).abs() < 1e-12
-    ));
-
     let multi_factor = CdsTranchePricerConfig::default().with_multi_factor_copula();
     assert!(matches!(multi_factor.copula_spec, CopulaSpec::MultiFactor));
 
     let config = CdsTranchePricerConfig::default().with_integration_tolerance(1e-8);
     let pricer =
-        CdsTranchePricer::with_params(config.clone()).expect("valid tranche pricer config");
+        CdsTranchePricer::with_config(config.clone()).expect("valid tranche pricer config");
     assert_eq!(config.integration_tolerance, 1e-8);
     assert_eq!(pricer.get_config().integration_tolerance, 1e-8);
 
@@ -148,7 +138,7 @@ fn test_pricer_config_builder_methods_wire_copula_and_numerical_settings() {
 #[test]
 fn pricer_rejects_unsupported_integration_tolerance() {
     let config = CdsTranchePricerConfig::default().with_integration_tolerance(0.0);
-    let error = CdsTranchePricer::with_params(config)
+    let error = CdsTranchePricer::with_config(config)
         .err()
         .expect("unsupported integration tolerance must fail");
     assert!(error.to_string().contains("integration_tolerance"));
@@ -162,7 +152,7 @@ fn pricer_rejects_invalid_direct_student_t_spec() {
         },
         ..Default::default()
     };
-    let error = CdsTranchePricer::with_params(config)
+    let error = CdsTranchePricer::with_config(config)
         .err()
         .expect("invalid Student-t df must fail");
     assert!(error.to_string().contains("degrees of freedom"));
@@ -181,26 +171,10 @@ fn test_pricer_config_recovery_builders_populate_recovery_spec() {
     assert!(custom_debug.contains("0.2"));
     assert!(custom_debug.contains("-0.4"));
 
-    let custom_pct = CdsTranchePricerConfig::default().with_custom_stochastic_recovery_pct(
-        Percentage::new(45.0).expect("finite percentage"),
-        Percentage::new(25.0).expect("finite percentage"),
-        -0.3,
-    );
-    let custom_pct_debug = format!("{:?}", custom_pct.stochastic_recovery_spec);
-    assert!(custom_pct.stochastic_recovery_spec.is_some());
-    assert!(custom_pct_debug.contains("0.45"));
-    assert!(custom_pct_debug.contains("0.25"));
-
     let constant = CdsTranchePricerConfig::default().with_constant_recovery(0.42);
     let constant_debug = format!("{:?}", constant.stochastic_recovery_spec);
     assert!(constant.stochastic_recovery_spec.is_some());
     assert!(constant_debug.contains("0.42"));
-
-    let constant_pct = CdsTranchePricerConfig::default()
-        .with_constant_recovery_pct(Percentage::new(38.0).expect("finite percentage"));
-    let constant_pct_debug = format!("{:?}", constant_pct.stochastic_recovery_spec);
-    assert!(constant_pct.stochastic_recovery_spec.is_some());
-    assert!(constant_pct_debug.contains("0.38"));
 }
 
 // ==================== Configuration Clone Tests ====================

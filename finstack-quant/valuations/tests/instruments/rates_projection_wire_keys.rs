@@ -60,15 +60,30 @@ fn cms_retired_convention_keys_are_rejected() {
         ("swap_convention", serde_json::json!("usd_sofr")),
         ("swap_day_count", serde_json::json!("act_360")),
     ] {
-        assert_rejects_at(&CmsSwap::example(), "", retired, value.clone());
-        assert_rejects_at(&CmsOption::example(), "", retired, value.clone());
-        assert_rejects_at(&CmsSpreadOption::example(), "", retired, value);
+        assert_rejects_at(
+            &CmsSwap::example().expect("example"),
+            "",
+            retired,
+            value.clone(),
+        );
+        assert_rejects_at(
+            &CmsOption::example().expect("example"),
+            "",
+            retired,
+            value.clone(),
+        );
+        assert_rejects_at(
+            &CmsSpreadOption::example().expect("example"),
+            "",
+            retired,
+            value,
+        );
     }
 }
 
 #[test]
 fn cms_index_id_is_a_registry_key_string() {
-    let json = serde_json::to_value(CmsSwap::example()).expect("serialize");
+    let json = serde_json::to_value(CmsSwap::example().expect("example")).expect("serialize");
     assert_eq!(json["index_id"], serde_json::json!("USD-SOFR-OIS"));
     let mut unknown = json;
     unknown["index_id"] = serde_json::json!("XXX-NOT-AN-INDEX");
@@ -84,30 +99,35 @@ fn cms_index_id_is_a_registry_key_string() {
 fn snowball_and_tarn_retired_index_keys_are_rejected() {
     let tenor = serde_json::json!({"count": 6, "unit": "months"});
     assert_rejects_at(
-        &Snowball::example_snowball(),
+        &Snowball::example().expect("example"),
         "",
         "floating_index_id",
         serde_json::json!("USD-SOFR-6M"),
     );
     assert_rejects_at(
-        &Snowball::example_snowball(),
+        &Snowball::example().expect("example"),
         "",
         "floating_tenor",
         tenor.clone(),
     );
     assert_rejects_at(
-        &Tarn::example(),
+        &Tarn::example().expect("example"),
         "",
         "floating_index_id",
         serde_json::json!("USD-SOFR-6M"),
     );
-    assert_rejects_at(&Tarn::example(), "", "floating_tenor", tenor);
+    assert_rejects_at(
+        &Tarn::example().expect("example"),
+        "",
+        "floating_tenor",
+        tenor,
+    );
 }
 
 #[test]
 // schema-rejection-test: RangeAccrual `rate_index_id`, `projection_curve_id`, `reference_tenor`
 fn range_accrual_retired_rate_keys_are_rejected() {
-    let range = RangeAccrual::example();
+    let range = RangeAccrual::example().expect("example");
     assert_rejects_at(&range, "", "rate_index_id", serde_json::json!("SOFR"));
     assert_rejects_at(
         &range,
@@ -141,7 +161,7 @@ fn commodity_retired_price_curve_keys_are_rejected() {
     let future = CommodityFuture::example().expect("example");
     assert_rejects_at(&future, "", "price_curve_id", serde_json::json!("WTI-FWD"));
     assert_rejects_at(
-        &CommoditySwap::example(),
+        &CommoditySwap::example().expect("example"),
         "",
         "floating_index_id",
         serde_json::json!("NG-SPOT-AVG"),

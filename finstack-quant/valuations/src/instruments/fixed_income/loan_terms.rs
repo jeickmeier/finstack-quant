@@ -99,7 +99,7 @@ impl RateSpec {
     /// # Arguments
     ///
     /// * `date` - Accrual start the rate is projected for.
-    /// * `context` - Market holding the forward curve and fixings named by
+    /// * `market` - Market holding the forward curve and fixings named by
     ///   the floating spec's `forward_curve_id`.
     ///
     /// # Errors
@@ -109,15 +109,15 @@ impl RateSpec {
     pub fn try_current_rate_with_index(
         &self,
         date: Date,
-        context: &finstack_quant_core::market_data::context::MarketContext,
+        market: &finstack_quant_core::market_data::context::MarketContext,
     ) -> finstack_quant_core::Result<f64> {
         let as_of = match self {
             Self::Fixed { .. } => date,
-            Self::Floating(spec) => context
+            Self::Floating(spec) => market
                 .get_forward(spec.forward_curve_id.as_str())?
                 .base_date(),
         };
-        self.try_rate_for_period(date, as_of, context)
+        self.try_rate_for_period(date, as_of, market)
     }
 
     /// Contractual rate for an explicit accrual period, as a decimal.
@@ -130,7 +130,7 @@ impl RateSpec {
     ///
     /// * `accrual_start` - Start of the accrual period.
     /// * `as_of` - Valuation date separating observed fixings from projections.
-    /// * `context` - Market holding the forward curve and fixings.
+    /// * `market` - Market holding the forward curve and fixings.
     ///
     /// # Errors
     ///
@@ -141,12 +141,12 @@ impl RateSpec {
         &self,
         accrual_start: Date,
         as_of: Date,
-        context: &finstack_quant_core::market_data::context::MarketContext,
+        market: &finstack_quant_core::market_data::context::MarketContext,
     ) -> finstack_quant_core::Result<f64> {
         match self {
             Self::Fixed { rate } => Ok(*rate),
             Self::Floating(spec) => {
-                let fwd = context.get_forward(spec.forward_curve_id.as_str())?;
+                let fwd = market.get_forward(spec.forward_curve_id.as_str())?;
                 let params = crate::cashflow::builder::FloatingRateParams::try_from(spec)?;
                 let calendar_id = spec
                     .fixing_calendar_id
@@ -172,7 +172,7 @@ impl RateSpec {
                         ));
                     }
                     let fixings = finstack_quant_core::market_data::fixings::get_fixing_series(
-                        context,
+                        market,
                         spec.forward_curve_id.as_str(),
                     )?;
                     let raw =

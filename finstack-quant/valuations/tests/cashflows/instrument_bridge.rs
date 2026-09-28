@@ -42,14 +42,14 @@ fn revolving_credit_exposes_cashflow_provider_bridge() {
 
 #[test]
 fn cds_exposes_cashflow_provider_bridge() {
-    let cds = CreditDefaultSwap::example();
+    let cds = CreditDefaultSwap::example().expect("example");
 
     assert_provider(&cds);
 }
 
 #[test]
 fn commodity_forward_exposes_cashflow_provider_bridge() {
-    let forward = CommodityForward::example();
+    let forward = CommodityForward::example().expect("example");
 
     assert_provider(&forward);
 }
@@ -63,7 +63,7 @@ fn fx_forward_exposes_cashflow_provider_bridge() {
 
 #[test]
 fn ndf_exposes_cashflow_provider_bridge() {
-    let ndf = Ndf::example();
+    let ndf = Ndf::example().expect("example");
 
     assert_provider(&ndf);
 }
@@ -123,7 +123,7 @@ fn convertible_bond_exposes_cashflow_provider_bridge() {
 
 #[test]
 fn inflation_swap_exposes_cashflow_provider_bridge() {
-    let swap = InflationSwap::example();
+    let swap = InflationSwap::example().expect("example");
 
     assert_provider(&swap);
 }
@@ -232,7 +232,7 @@ fn xccy_swap_exposes_cashflow_provider_bridge() {
 
 #[test]
 fn cms_swap_exposes_cashflow_provider_bridge() {
-    let swap = CmsSwap::example();
+    let swap = CmsSwap::example().expect("example");
     assert_provider(&swap);
 }
 
@@ -270,13 +270,13 @@ fn yoy_inflation_swap_exposes_cashflow_provider_bridge() {
 
 #[test]
 fn commodity_swap_exposes_cashflow_provider_bridge() {
-    let swap = CommoditySwap::example();
+    let swap = CommoditySwap::example().expect("example");
     assert_provider(&swap);
 }
 
 #[test]
 fn fx_swap_exposes_cashflow_provider_bridge() {
-    let swap = FxSwap::example();
+    let swap = FxSwap::example().expect("example");
     assert_provider(&swap);
 }
 
@@ -300,12 +300,12 @@ fn agency_cmo_exposes_cashflow_provider_bridge() {
 
 #[test]
 fn cds_index_exposes_cashflow_provider_bridge() {
-    let index = CdsIndex::example();
+    let index = CdsIndex::example().expect("example");
     assert_provider(&index);
 }
 
 #[test]
 fn cds_tranche_exposes_cashflow_provider_bridge() {
-    let tranche = CdsTranche::example();
+    let tranche = CdsTranche::example().expect("example");
     assert_provider(&tranche);
 }

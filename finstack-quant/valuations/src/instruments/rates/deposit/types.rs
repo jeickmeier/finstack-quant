@@ -244,12 +244,12 @@ impl Deposit {
     /// cashflows remain excluded.
     pub fn npv_raw(
         &self,
-        context: &finstack_quant_core::market_data::context::MarketContext,
+        market: &finstack_quant_core::market_data::context::MarketContext,
         as_of: finstack_quant_core::dates::Date,
     ) -> finstack_quant_core::Result<f64> {
         crate::instruments::common_impl::helpers::schedule_trade_pv_raw(
             self,
-            context,
+            market,
             as_of,
             &self.discount_curve_id,
         )

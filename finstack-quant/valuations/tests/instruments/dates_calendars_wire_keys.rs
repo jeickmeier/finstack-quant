@@ -59,13 +59,13 @@ fn assert_rejects<T: DeserializeOwned>(json: Value, retired: &str) {
 // schema-rejection-test: RangeAccrual `accrual_start_date`, CdsTranche `effective_date`
 fn retired_contract_start_keys_are_rejected() {
     assert_rejects_at(
-        &CallableRangeAccrual::example(),
+        &CallableRangeAccrual::example().expect("example"),
         "/range_accrual",
         "accrual_start_date",
         json!("2025-12-31"),
     );
     assert_rejects_at(
-        &CdsTranche::example(),
+        &CdsTranche::example().expect("example"),
         "",
         "effective_date",
         json!("2025-03-20"),
@@ -75,7 +75,7 @@ fn retired_contract_start_keys_are_rejected() {
 #[test]
 // schema-rejection-test: CommoditySwaption `swap_start`, `swap_end`; CdsOption `underlying_effective_date`, `cds_maturity`
 fn retired_underlying_date_keys_are_rejected() {
-    let swaption = CommoditySwaption::example();
+    let swaption = CommoditySwaption::example().expect("example");
     assert_rejects_at(&swaption, "", "swap_start", json!("2025-07-01"));
     assert_rejects_at(&swaption, "", "swap_end", json!("2026-06-30"));
     let option = CdsOption::example().expect("cds option");
@@ -92,7 +92,7 @@ fn retired_underlying_date_keys_are_rejected() {
 // schema-rejection-test: CmsSpreadOption `expiry_date`
 fn retired_option_expiry_date_key_is_rejected() {
     assert_rejects_at(
-        &CmsSpreadOption::example(),
+        &CmsSpreadOption::example().expect("example"),
         "",
         "expiry_date",
         json!("2027-03-29"),
@@ -102,13 +102,13 @@ fn retired_option_expiry_date_key_is_rejected() {
 #[test]
 // schema-rejection-test: BermudanSwaption `bermudan_schedule`, EquityOption and CommodityOption `exercise_schedule`
 fn retired_bermudan_exercise_keys_are_rejected() {
-    let schedule = serde_json::to_value(BermudanSwaption::example())
+    let schedule = serde_json::to_value(BermudanSwaption::example().expect("example"))
         .expect("serialize")
         .get("exercise_schedule")
         .cloned()
         .expect("exercise_schedule");
     assert_rejects_at(
-        &BermudanSwaption::example(),
+        &BermudanSwaption::example().expect("example"),
         "",
         "bermudan_schedule",
         schedule,
@@ -120,7 +120,7 @@ fn retired_bermudan_exercise_keys_are_rejected() {
         json!(["2025-06-20"]),
     );
     assert_rejects_at(
-        &CommodityOption::example(),
+        &CommodityOption::example().expect("example"),
         "",
         "exercise_schedule",
         json!(["2025-06-20"]),
@@ -155,7 +155,7 @@ fn retired_window_bound_keys_are_rejected() {
 #[test]
 // schema-rejection-test: StructuredCredit `payment_calendar_id`, `payment_business_day_convention`; AssetBackedFacility `payment_calendar_id`; RevolvingCredit `commitment_date`
 fn retired_deal_calendar_and_issue_keys_are_rejected() {
-    let deal = StructuredCredit::example();
+    let deal = StructuredCredit::example().expect("example");
     assert_rejects_at(&deal, "", "payment_calendar_id", json!("nyse"));
     assert_rejects_at(
         &deal,
@@ -179,8 +179,12 @@ fn retired_deal_calendar_and_issue_keys_are_rejected() {
 
 #[test]
 fn canonical_date_and_calendar_keys_round_trip() {
-    let deal =
-        serde_json::to_value(StructuredCredit::example().with_calendar("nyse")).expect("serialize");
+    let deal = serde_json::to_value(
+        StructuredCredit::example()
+            .expect("example")
+            .with_calendar_id("nyse"),
+    )
+    .expect("serialize");
     assert_eq!(deal["calendar_id"], json!("nyse"));
     let revolver =
         serde_json::to_value(RevolvingCredit::example().expect("revolver")).expect("serialize");

@@ -262,8 +262,7 @@ impl CommodityOption {
     /// Create a canonical example commodity option for testing and documentation.
     ///
     /// Returns a WTI European call option.
-    #[allow(clippy::expect_used)] // Example uses hardcoded valid values
-    pub fn example() -> Self {
+    pub fn example() -> finstack_quant_core::Result<Self> {
         Self::builder()
             .id(InstrumentId::new("WTI-OPT-2025M06"))
             .underlying(CommodityUnderlyingParams::new(
@@ -275,9 +274,7 @@ impl CommodityOption {
             .strike(75.0)
             .option_type(OptionType::Call)
             .exercise_style(ExerciseStyle::European)
-            .expiry(
-                Date::from_calendar_date(2025, time::Month::June, 15).expect("valid example date"),
-            )
+            .expiry(time::macros::date!(2025 - 06 - 15))
             .quantity(1000.0)
             .multiplier(1.0)
             .settlement(SettlementType::Cash)
@@ -287,7 +284,6 @@ impl CommodityOption {
             .day_count(DayCount::Act365F)
             .attributes(Attributes::new())
             .build()
-            .expect("Example commodity option construction should not fail")
     }
 
     fn intrinsic_value(&self, underlying: f64) -> f64 {
@@ -1180,7 +1176,7 @@ mod tests {
 
     #[test]
     fn lognormal_option_rejects_signed_forward_override() {
-        let mut option = CommodityOption::example();
+        let mut option = CommodityOption::example().expect("example");
         option.quoted_forward = Some(-5.0);
         let market = MarketContext::new();
         let as_of = option.expiry - time::Duration::days(30);
@@ -1189,7 +1185,8 @@ mod tests {
 
     #[test]
     fn test_serde_defaults_settlement_to_cash_when_omitted() {
-        let mut value = serde_json::to_value(CommodityOption::example()).expect("serialize");
+        let mut value =
+            serde_json::to_value(CommodityOption::example().expect("example")).expect("serialize");
         let obj = value
             .as_object_mut()
             .expect("CommodityOption should serialize to an object");
@@ -1200,7 +1197,7 @@ mod tests {
 
     #[test]
     fn canonical_dependencies_preserve_surface_pairing_and_strike() {
-        let mut option = CommodityOption::example();
+        let mut option = CommodityOption::example().expect("example");
         option.spot_id = Some("WTI-SPOT".into());
 
         let deps = option.market_dependencies().expect("dependencies");
@@ -1225,7 +1222,7 @@ mod tests {
 
     #[test]
     fn commodity_option_default_equals_black76_for_pv_and_raw() {
-        let option = CommodityOption::example();
+        let option = CommodityOption::example().expect("example");
         let as_of = Date::from_calendar_date(2025, time::Month::January, 15).expect("valid date");
         let market = MarketContext::new()
             .insert(
@@ -1286,7 +1283,7 @@ mod tests {
 
     #[test]
     fn bermudan_exercise_requires_schedule() {
-        let mut option = CommodityOption::example();
+        let mut option = CommodityOption::example().expect("example");
         option.exercise_style = ExerciseStyle::Bermudan;
         let as_of = Date::from_calendar_date(2025, time::Month::January, 15).expect("valid");
         let market = finstack_quant_core::market_data::context::MarketContext::new()

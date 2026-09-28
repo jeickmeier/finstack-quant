@@ -382,7 +382,7 @@ fn price_convertible_bond_with_inputs(
 ///
 /// * `bond` - Convertible bond contract with cashflows, conversion terms, and
 ///   required market-data identifiers.
-/// * `market_context` - Market context supplying discount curve, equity spot,
+/// * `market` - Market context supplying discount curve, equity spot,
 ///   volatility, credit, and other pricing inputs.
 /// * `tree_type` - Lattice kind (binomial or trinomial); the step count is
 ///   `bond.instrument_pricing_overrides.model_config.tree_steps` (default
@@ -391,7 +391,7 @@ fn price_convertible_bond_with_inputs(
 ///   notional currency.
 pub fn price_convertible_bond(
     bond: &ConvertibleBond,
-    market_context: &MarketContext,
+    market: &MarketContext,
     tree_type: ConvertibleTreeType,
     as_of: Date,
 ) -> Result<Money> {
@@ -400,8 +400,8 @@ pub fn price_convertible_bond(
     if as_of > bond.maturity {
         return Ok(Money::from((0_i64, bond.notional.currency())));
     }
-    let inputs = prepare_for_pricing(bond, market_context, as_of)?;
-    price_convertible_bond_with_inputs(bond, market_context, &inputs, tree_type, as_of)
+    let inputs = prepare_for_pricing(bond, market, as_of)?;
+    price_convertible_bond_with_inputs(bond, market, &inputs, tree_type, as_of)
 }
 
 /// Value the straight cash component on the canonical convertible tree grid.
@@ -464,7 +464,7 @@ pub(crate) fn price_bond_floor(
 ///
 /// * `bond` - Convertible bond contract with cashflows, conversion terms, and
 ///   required market-data identifiers.
-/// * `market_context` - Market context supplying baseline curves, equity spot,
+/// * `market` - Market context supplying baseline curves, equity spot,
 ///   volatility, and credit data for full repricing.
 /// * `tree_type` - Lattice kind used consistently for every bumped valuation;
 ///   the step count is `model_config.tree_steps` (default
@@ -476,7 +476,7 @@ pub(crate) fn price_bond_floor(
 /// * `as_of` - Valuation date from which the one-day theta roll is measured.
 pub fn calculate_convertible_greeks(
     bond: &ConvertibleBond,
-    market_context: &MarketContext,
+    market: &MarketContext,
     tree_type: ConvertibleTreeType,
     bumps: GreekBumps,
     as_of: Date,
@@ -499,9 +499,8 @@ pub fn calculate_convertible_greeks(
     // Resolve market data and compute base price in one pass.
     // The base price is computed inline to avoid a second prepare_for_pricing call
     // (which would duplicate cashflow schedule build and market data resolution).
-    let inputs = prepare_for_pricing(bond, market_context, as_of)?;
-    let base_price =
-        price_convertible_bond_with_inputs(bond, market_context, &inputs, tree_type, as_of)?;
+    let inputs = prepare_for_pricing(bond, market, as_of)?;
+    let base_price = price_convertible_bond_with_inputs(bond, market, &inputs, tree_type, as_of)?;
 
     let mut greeks = TreeGreeks {
         price: base_price.amount(),
@@ -525,11 +524,11 @@ pub fn calculate_convertible_greeks(
             })
         };
 
-        let market_up = market_context.clone().insert_price(
+        let market_up = market.clone().insert_price(
             inputs.resolved_ids.spot_id.as_str(),
             bump_scalar(inputs.spot + h_spot)?,
         );
-        let market_down = market_context.clone().insert_price(
+        let market_down = market.clone().insert_price(
             inputs.resolved_ids.spot_id.as_str(),
             bump_scalar(inputs.spot - h_spot)?,
         );
@@ -557,19 +556,17 @@ pub fn calculate_convertible_greeks(
             .instrument_pricing_overrides
             .market_quotes
             .implied_volatility = Some(vol_down);
-        let price_vol_up =
-            price_convertible_bond(&bond_up, market_context, tree_type, as_of)?.amount();
-        let price_vol_down =
-            match price_convertible_bond(&bond_down, market_context, tree_type, as_of) {
-                Ok(price) => price.amount(),
-                Err(Error::Validation(_)) => {
-                    // All other inputs already priced successfully. A lower quote
-                    // can violate the lattice's drift/probability constraint.
-                    vol_down = inputs.volatility;
-                    base_price.amount()
-                }
-                Err(error) => return Err(error),
-            };
+        let price_vol_up = price_convertible_bond(&bond_up, market, tree_type, as_of)?.amount();
+        let price_vol_down = match price_convertible_bond(&bond_down, market, tree_type, as_of) {
+            Ok(price) => price.amount(),
+            Err(Error::Validation(_)) => {
+                // All other inputs already priced successfully. A lower quote
+                // can violate the lattice's drift/probability constraint.
+                vol_down = inputs.volatility;
+                base_price.amount()
+            }
+            Err(error) => return Err(error),
+        };
         let actual_width = vol_up - vol_down;
 
         // Vega per 1% vol move: central difference with actual bump width.
@@ -583,10 +580,9 @@ pub fn calculate_convertible_greeks(
     // ---- Rho: bump discount curve (B2: central differences) ----
     {
         let h_rate = bumps.rate_bump_bp; // bp-count units (BumpSpec::parallel_bp convention)
-        let market_rate_up =
-            bump_discount_curve_parallel(market_context, &bond.discount_curve_id, h_rate)?;
+        let market_rate_up = bump_discount_curve_parallel(market, &bond.discount_curve_id, h_rate)?;
         let market_rate_down =
-            bump_discount_curve_parallel(market_context, &bond.discount_curve_id, -h_rate)?;
+            bump_discount_curve_parallel(market, &bond.discount_curve_id, -h_rate)?;
 
         let price_rate_up =
             price_convertible_bond(bond, &market_rate_up, tree_type, as_of)?.amount();
@@ -611,7 +607,7 @@ pub fn calculate_convertible_greeks(
                 // A roll fails when a curve is too sparse to retain ≥ 2 knots
                 // after the shift; that error propagates rather than
                 // repricing on a market still anchored at `t`.
-                let rolled_market = market_context.roll_forward(1)?;
+                let rolled_market = market.roll_forward(1)?;
                 let fwd_price = price_convertible_bond(bond, &rolled_market, tree_type, next_day)?;
                 // Theta = P(t+1d) - P(t), reported as change per calendar day.
                 greeks.theta = fwd_price.amount() - greeks.price;
@@ -703,19 +699,19 @@ pub fn settlement_date(bond: &ConvertibleBond, as_of: Date) -> Result<Date> {
 ///
 /// * `bond` - Convertible bond whose coupon schedule and settlement lag define
 ///   the accrued-interest period.
-/// * `market_context` - Forward curves and realized index fixings used to
+/// * `market` - Forward curves and realized index fixings used to
 ///   determine floating coupon amounts; unused for fixed coupons.
 /// * `as_of` - Trade or valuation date from which the bond settlement date is
 ///   calculated.
 pub fn calculate_accrued_interest(
     bond: &ConvertibleBond,
-    market_context: &MarketContext,
+    market: &MarketContext,
     as_of: Date,
 ) -> Result<f64> {
     bond.validate_for_pricing()?;
     let settle = settlement_date(bond, as_of)?;
 
-    let schedule = build_convertible_schedule(bond, market_context)?;
+    let schedule = build_convertible_schedule(bond, market)?;
     accrual_index(bond, &schedule)?.accrued_at(settle)
 }
 

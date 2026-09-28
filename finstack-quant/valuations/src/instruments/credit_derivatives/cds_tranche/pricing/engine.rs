@@ -23,12 +23,12 @@ use finstack_quant_models::correlation::copula::{
 impl CdsTranchePricer {
     /// Return the cached copula instance, building it on first call.
     ///
-    /// The copula is determined entirely by `self.params.copula_spec` at
+    /// The copula is determined entirely by `self.config.copula_spec` at
     /// pricer-construction time, so a single instance can be reused across
     /// every EL/integrand evaluation for the lifetime of this pricer.
     pub(super) fn copula(&self) -> &dyn Copula {
         self.copula_cache
-            .get_or_init(|| match &self.params.copula_spec {
+            .get_or_init(|| match &self.config.copula_spec {
                 CopulaSpec::Gaussian => Box::new(GaussianCopula::new()),
                 CopulaSpec::StudentT { degrees_of_freedom } => {
                     Box::new(StudentTCopula::new(*degrees_of_freedom))
@@ -44,7 +44,7 @@ impl CdsTranchePricer {
     pub(super) fn default_threshold_for_copula(&self, default_prob: f64) -> f64 {
         let eps = PROBABILITY_CLIP;
         let p = default_prob.max(eps).min(1.0 - eps);
-        match &self.params.copula_spec {
+        match &self.config.copula_spec {
             CopulaSpec::StudentT { degrees_of_freedom } => {
                 student_t_inv_cdf(p, *degrees_of_freedom).unwrap_or(f64::NAN)
             }
@@ -60,7 +60,7 @@ impl CdsTranchePricer {
     /// is the chi-square scale mixture, so the actual market factor is
     /// `Z / sqrt(W)`.
     pub(super) fn recovery_driver_for_factors(&self, factors: &[f64]) -> f64 {
-        match self.params.copula_spec {
+        match self.config.copula_spec {
             CopulaSpec::StudentT { .. } if factors.len() >= 2 => {
                 let z = factors[0];
                 let w = factors[1];
@@ -88,7 +88,7 @@ impl CdsTranchePricer {
     /// Create a new Gaussian Copula model with default parameters.
     pub fn new() -> Self {
         Self {
-            params: CdsTranchePricerConfig::default(),
+            config: CdsTranchePricerConfig::default(),
             copula_cache: std::sync::OnceLock::new(),
         }
     }
@@ -97,7 +97,7 @@ impl CdsTranchePricer {
     ///
     /// # Arguments
     ///
-    /// * `params` - Copula, recovery, numerical integration, sensitivity, and
+    /// * `config` - Copula, recovery, numerical integration, sensitivity, and
     ///   settlement settings for every valuation performed by the pricer.
     ///
     /// # Returns
@@ -108,10 +108,10 @@ impl CdsTranchePricer {
     ///
     /// Returns an error when the copula, recovery, quadrature, bump, correlation,
     /// settlement, or convolution settings violate their documented ranges.
-    pub fn with_params(params: CdsTranchePricerConfig) -> Result<Self> {
-        params.validate()?;
+    pub fn with_config(config: CdsTranchePricerConfig) -> Result<Self> {
+        config.validate()?;
         Ok(Self {
-            params,
+            config,
             copula_cache: std::sync::OnceLock::new(),
         })
     }
@@ -120,7 +120,7 @@ impl CdsTranchePricer {
     ///
     /// # Arguments
     /// * `tranche` - The CDS tranche to price
-    /// * `market_ctx` - Market data context containing curves and credit index data
+    /// * `market` - Market data context containing curves and credit index data
     /// * `as_of` - Valuation date
     ///
     /// # Returns
@@ -135,11 +135,11 @@ impl CdsTranchePricer {
     pub fn price_tranche(
         &self,
         tranche: &CdsTranche,
-        market_ctx: &MarketContext,
+        market: &MarketContext,
         as_of: Date,
     ) -> Result<Money> {
         tranche.validate()?;
-        let discount_curve = market_ctx.get_discount(tranche.discount_curve_id.as_ref())?;
+        let discount_curve = market.get_discount(tranche.discount_curve_id.as_ref())?;
         let wiped_out = tranche.realized_loss >= tranche.detach_pct / 100.0;
         let net_pv = if wiped_out {
             // A wiped-out tranche has no remaining premium/protection legs, but
@@ -154,7 +154,7 @@ impl CdsTranchePricer {
                 0.0
             }
         } else {
-            let rows = self.project_discountable_rows(tranche, market_ctx, as_of)?;
+            let rows = self.project_discountable_rows(tranche, market, as_of)?;
             self.discount_projected_rows(&rows, discount_curve.as_ref(), as_of)?
         };
 
@@ -165,7 +165,7 @@ impl CdsTranchePricer {
     pub fn build_projected_schedule(
         &self,
         tranche: &CdsTranche,
-        market_ctx: &MarketContext,
+        market: &MarketContext,
         as_of: Date,
     ) -> Result<CashFlowSchedule> {
         tranche.validate()?;
@@ -190,10 +190,9 @@ impl CdsTranchePricer {
                 },
             ));
         }
-        let (_, valuation_date, _, _) =
-            self.prepare_projection_inputs(tranche, market_ctx, as_of)?;
+        let (_, valuation_date, _, _) = self.prepare_projection_inputs(tranche, market, as_of)?;
         let flows = self
-            .project_discountable_rows(tranche, market_ctx, as_of)?
+            .project_discountable_rows(tranche, market, as_of)?
             .into_iter()
             .map(|row| row.cashflow)
             .collect();
@@ -334,7 +333,7 @@ impl CdsTranchePricer {
             // writedown increment (top-down) occur at default time, so they
             // receive the same treatment.
             let delta_erosion = delta_el_fraction + delta_wd_fraction;
-            let aod_adjustment = if self.params.include_accrual_on_default {
+            let aod_adjustment = if self.config.include_accrual_on_default {
                 (1.0 - default_fraction) * tranche_notional * delta_erosion
             } else {
                 tranche_notional * delta_erosion
@@ -383,7 +382,7 @@ impl CdsTranchePricer {
                     // fraction is measured on the hazard axis (a survival
                     // quantity); the DF lookup itself happens on the
                     // discount curve's axis in `discount_projected_rows`.
-                    discount_at: if self.params.mid_period_protection {
+                    discount_at: if self.config.mid_period_protection {
                         DiscountAt::WithinPeriod {
                             start: period_start,
                             fraction: default_fraction,
@@ -513,9 +512,9 @@ impl CdsTranchePricer {
             || tranche.index_name.starts_with("iTraxx")
             || tranche.index_name.starts_with("ITRAXX");
         let settlement_lag = if is_standard_index {
-            self.params.index_settlement_days
+            self.config.index_settlement_days
         } else {
-            self.params.bespoke_settlement_days
+            self.config.bespoke_settlement_days
         };
 
         // Use calendar if available, otherwise fall back to weekday-only adjustment

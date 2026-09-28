@@ -281,7 +281,12 @@ fn retired_margin_keys_are_rejected() {
         "spread",
         json!("0.001"),
     );
-    assert_rejects_at(&CmsSwap::example(), "", "cms_spread", json!(0.001));
+    assert_rejects_at(
+        &CmsSwap::example().expect("example"),
+        "",
+        "cms_spread",
+        json!(0.001),
+    );
     assert_rejects_at(
         &AssetBackedFacility::example().expect("facility"),
         "",
@@ -295,7 +300,7 @@ fn retired_margin_keys_are_rejected() {
 fn retired_cms_funding_spread_is_rejected() {
     use finstack_quant_valuations::instruments::CmsSwap;
     use serde_json::json;
-    let mut json = serde_json::to_value(CmsSwap::example()).expect("serialize");
+    let mut json = serde_json::to_value(CmsSwap::example().expect("example")).expect("serialize");
     let leg = json["funding_leg"].as_object_mut().expect("funding leg");
     leg.insert("type".into(), json!("floating"));
     leg.remove("rate");
@@ -317,7 +322,7 @@ fn retired_cms_schedule_prefix_is_rejected() {
         ("cms_accrual_fractions", json!([0.25])),
         ("cms_day_count", json!("act_365f")),
     ] {
-        assert_rejects_at(&CmsSwap::example(), "", retired, value);
+        assert_rejects_at(&CmsSwap::example().expect("example"), "", retired, value);
     }
 }
 
@@ -346,14 +351,24 @@ fn retired_structured_note_keys_are_rejected() {
     use finstack_quant_valuations::instruments::{Snowball, Tarn};
     use serde_json::json;
     let dates = json!(["2026-06-30", "2026-12-31"]);
-    assert_rejects_at(&Snowball::example_snowball(), "", "leverage", json!(1.0));
     assert_rejects_at(
-        &Snowball::example_snowball(),
+        &Snowball::example().expect("example"),
+        "",
+        "leverage",
+        json!(1.0),
+    );
+    assert_rejects_at(
+        &Snowball::example().expect("example"),
         "",
         "coupon_dates",
         dates.clone(),
     );
-    assert_rejects_at(&Tarn::example(), "", "coupon_dates", dates);
+    assert_rejects_at(
+        &Tarn::example().expect("example"),
+        "",
+        "coupon_dates",
+        dates,
+    );
 }
 
 #[test]
@@ -402,13 +417,13 @@ fn retired_strike_and_base_index_keys_are_rejected() {
     use finstack_quant_valuations::instruments::{InflationLinkedBond, QuantoOption};
     use serde_json::json;
     assert_rejects_at(
-        &QuantoOption::example(),
+        &QuantoOption::example().expect("example"),
         "",
         "equity_strike",
         json!({"amount": "35000", "currency": "JPY"}),
     );
     assert_rejects_at(
-        &InflationLinkedBond::example(),
+        &InflationLinkedBond::example().expect("example"),
         "",
         "base_index",
         json!(100.0),
@@ -426,9 +441,24 @@ fn retired_inflation_override_keys_are_rejected() {
         ("lag_override", json!({"months": 3})),
         ("interpolation_override", json!("linear")),
     ] {
-        assert_rejects_at(&InflationSwap::example(), "", retired, value.clone());
-        assert_rejects_at(&YoYInflationSwap::example(), "", retired, value.clone());
-        assert_rejects_at(&InflationCapFloor::example(), "", retired, value);
+        assert_rejects_at(
+            &InflationSwap::example().expect("example"),
+            "",
+            retired,
+            value.clone(),
+        );
+        assert_rejects_at(
+            &YoYInflationSwap::example().expect("example"),
+            "",
+            retired,
+            value.clone(),
+        );
+        assert_rejects_at(
+            &InflationCapFloor::example().expect("example"),
+            "",
+            retired,
+            value,
+        );
     }
 }
 
@@ -438,7 +468,7 @@ fn retired_inflation_override_keys_are_rejected() {
 fn cms_tenor_must_be_month_based() {
     use finstack_quant_core::dates::{Tenor, TenorUnit};
     use finstack_quant_valuations::instruments::CmsSwap;
-    let mut swap = CmsSwap::example();
+    let mut swap = CmsSwap::example().expect("example");
     swap.cms_tenor = Tenor::new(2, TenorUnit::Weeks).expect("tenor");
     let err = swap.validate().expect_err("week tenor is rejected");
     assert!(err.to_string().contains("CmsSwap cms_tenor"), "{err}");

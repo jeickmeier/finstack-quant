@@ -759,7 +759,7 @@ impl InstrumentPricingOverrides {
     }
 
     /// Set quoted dirty price in the instrument currency.
-    pub fn with_quoted_dirty_price(mut self, price_currency: f64) -> Self {
+    pub fn with_quoted_dirty_price_currency(mut self, price_currency: f64) -> Self {
         self.market_quotes.quoted_dirty_price_currency = Some(price_currency);
         self
     }
@@ -823,7 +823,7 @@ impl InstrumentPricingOverrides {
     /// * `vol` - option-implied volatility as a decimal (e.g. `0.35`); this
     ///   is an option-quote channel, not a short-rate σ — the bond lattices
     ///   read [`Self::with_hw1f_sigma`] or [`Self::with_bdt_sigma`] instead
-    pub fn with_implied_vol(mut self, vol: f64) -> Self {
+    pub fn with_implied_volatility(mut self, vol: f64) -> Self {
         self.market_quotes.implied_volatility = Some(vol);
         self
     }
@@ -831,7 +831,7 @@ impl InstrumentPricingOverrides {
     /// Set the Hull-White short-rate volatility σ (annualised, absolute).
     ///
     /// This is the Hull-White short-rate volatility read by the bond
-    /// lattices; [`Self::with_implied_vol`] sets an option implied
+    /// lattices; [`Self::with_implied_volatility`] sets an option implied
     /// volatility, which no short-rate model reads.
     ///
     /// # Arguments
@@ -924,7 +924,7 @@ impl InstrumentPricingOverrides {
     }
 
     /// Set the Merton Monte Carlo configuration.
-    pub fn with_merton_mc(
+    pub fn with_merton_mc_config(
         mut self,
         config: crate::instruments::fixed_income::bond::pricing::engine::merton_mc::MertonMcConfig,
     ) -> Self {
@@ -1230,25 +1230,25 @@ impl MetricPricingOverrides {
     }
 
     /// Set custom spot bump size (decimal fraction of spot, e.g., 0.01 for 1%).
-    pub fn with_spot_bump(mut self, bump: f64) -> Self {
+    pub fn with_spot_bump_decimal(mut self, bump: f64) -> Self {
         self.bump_config.spot_bump_decimal = Some(bump);
         self
     }
 
     /// Set custom volatility bump size (as absolute vol, e.g., 0.01 for 1% vol).
-    pub fn with_vol_bump(mut self, bump: f64) -> Self {
+    pub fn with_vol_bump_decimal(mut self, bump: f64) -> Self {
         self.bump_config.vol_bump_decimal = Some(bump);
         self
     }
 
     /// Set custom rate bump size (in basis points, e.g., 1.0 for 1bp).
-    pub fn with_rate_bump(mut self, bump_bp: f64) -> Self {
+    pub fn with_rate_bump_bp(mut self, bump_bp: f64) -> Self {
         self.bump_config.rate_bump_bp = Some(bump_bp);
         self
     }
 
     /// Set custom credit spread bump size (in basis points, e.g., 1.0 for 1bp).
-    pub fn with_credit_spread_bump(mut self, bump_bp: f64) -> Self {
+    pub fn with_credit_spread_bump_bp(mut self, bump_bp: f64) -> Self {
         self.bump_config.credit_spread_bump_bp = Some(bump_bp);
         self
     }
@@ -1259,7 +1259,7 @@ impl MetricPricingOverrides {
     ///
     /// * `bump_bp` - Yield shock in basis points (1.0 = 1bp); must be finite and
     ///   positive at metric time.
-    pub fn with_ytm_bump(mut self, bump_bp: f64) -> Self {
+    pub fn with_ytm_bump_bp(mut self, bump_bp: f64) -> Self {
         self.bump_config.ytm_bump_bp = Some(bump_bp);
         self
     }
@@ -1358,7 +1358,7 @@ impl ScenarioPricingOverrides {
     }
 
     /// Apply a scenario spread shock in basis points.
-    pub fn with_spread_shock_bp(mut self, shock_bp: f64) -> Self {
+    pub fn with_scenario_spread_shock_bp(mut self, shock_bp: f64) -> Self {
         self.scenario_spread_shock_bp = Some(shock_bp);
         self
     }
@@ -1585,17 +1585,17 @@ mod tests {
     fn focused_categories_validate_independently() {
         let instrument = InstrumentPricingOverrides::default().with_quoted_clean_price_pct(100.0);
         let metrics = MetricPricingOverrides::default()
-            .with_ytm_bump(1.0)
-            .with_spot_bump(0.01)
-            .with_vol_bump(0.01)
-            .with_rate_bump(1.0);
+            .with_ytm_bump_bp(1.0)
+            .with_spot_bump_decimal(0.01)
+            .with_vol_bump_decimal(0.01)
+            .with_rate_bump_bp(1.0);
         let scenario = ScenarioPricingOverrides::default().with_scenario_price_shock_decimal(-0.05);
 
         assert!(instrument.validate().is_ok());
         assert!(metrics.validate().is_ok());
         assert!(scenario.validate().is_ok());
         assert!(MetricPricingOverrides::default()
-            .with_vol_bump(-0.01)
+            .with_vol_bump_decimal(-0.01)
             .validate()
             .is_err());
     }

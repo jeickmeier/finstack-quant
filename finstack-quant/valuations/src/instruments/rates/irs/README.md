@@ -12,7 +12,7 @@ Import path: `finstack_quant_valuations::instruments::rates::irs`
 
 | Item | Purpose |
 |------|---------|
-| `InterestRateSwap` | The instrument. `builder()`, `validate()`, `example_standard()`, `from_conventions(..)`. |
+| `InterestRateSwap` | The instrument. `builder()`, `validate()`, `example()`, `from_conventions(..)`. |
 | `InterestRateSwapBuilder` | Fluent builder produced by `InterestRateSwap::builder()`. |
 | `PayReceive` | `Pay` (pay fixed) or `Receive` (receive fixed). |
 | `FixedLegSpec`, `FloatLegSpec` | Leg schedules, day counts, calendars, spreads, reset/payment lags. |
@@ -163,7 +163,7 @@ let swap = InterestRateSwap::builder()
 swap.validate()?;
 ```
 
-`InterestRateSwap::example_standard()` returns exactly this swap. To resolve
+`InterestRateSwap::example()` returns exactly this swap. To resolve
 conventions from a rate index instead of spelling out both legs, use
 `InterestRateSwap::from_conventions(ConventionSwapParams { .. })`, which reads
 `IrsLegConventions::from_rate_index(index_id)` out of the global

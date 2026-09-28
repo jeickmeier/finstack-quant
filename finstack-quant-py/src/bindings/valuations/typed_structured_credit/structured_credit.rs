@@ -181,7 +181,7 @@ impl PyStructuredCredit {
             discount_curve_id,
         );
         if let Some(calendar_id) = calendar_id {
-            inner = inner.with_calendar(calendar_id);
+            inner = inner.with_calendar_id(calendar_id);
         }
         inner.validate_for_pricing().map_err(core_to_py)?;
         Ok(Self { inner })
@@ -216,7 +216,7 @@ impl PyStructuredCredit {
             discount_curve_id,
         );
         if let Some(calendar_id) = calendar_id {
-            inner = inner.with_calendar(calendar_id);
+            inner = inner.with_calendar_id(calendar_id);
         }
         inner.validate_for_pricing().map_err(core_to_py)?;
         Ok(Self { inner })
@@ -251,7 +251,7 @@ impl PyStructuredCredit {
             discount_curve_id,
         );
         if let Some(calendar_id) = calendar_id {
-            inner = inner.with_calendar(calendar_id);
+            inner = inner.with_calendar_id(calendar_id);
         }
         inner.validate_for_pricing().map_err(core_to_py)?;
         Ok(Self { inner })
@@ -286,7 +286,7 @@ impl PyStructuredCredit {
             discount_curve_id,
         );
         if let Some(calendar_id) = calendar_id {
-            inner = inner.with_calendar(calendar_id);
+            inner = inner.with_calendar_id(calendar_id);
         }
         inner.validate_for_pricing().map_err(core_to_py)?;
         Ok(Self { inner })

@@ -6,7 +6,7 @@ use crate::instruments::fx::fx_spot::FxSpot;
 use crate::metrics::{MetricCalculator, MetricContext};
 
 fn base_amount(fx: &FxSpot) -> f64 {
-    fx.get_effective_notional().amount()
+    fx.notional.amount()
 }
 
 /// Returns the base amount (notional) in base currency units.

@@ -23,7 +23,7 @@
 //! use finstack_quant_core::currency::Currency;
 //!
 //! // Create a natural gas swap
-//! let swap = CommoditySwap::example();
+//! let swap = CommoditySwap::example().expect("example");
 //! assert_eq!(swap.underlying.underlying_ticker, "NG");
 //! ```
 

@@ -803,7 +803,7 @@ mod period_timeline_tests {
     fn receive_swap_in_capital_structure_is_rejected() {
         use finstack_quant_valuations::instruments::PayReceive;
 
-        let mut swap = InterestRateSwap::example_standard().expect("example swap");
+        let mut swap = InterestRateSwap::example().expect("example swap");
         swap.side = PayReceive::Receive;
         let mut model = model_with_periods(vec![period(
             PeriodId::quarter(2024, 1).expect("valid period fixture"),
@@ -885,7 +885,7 @@ mod period_timeline_tests {
     /// The supported `Pay` side must continue to pass validation.
     #[test]
     fn pay_swap_in_capital_structure_is_accepted() {
-        let swap = InterestRateSwap::example_standard().expect("example swap");
+        let swap = InterestRateSwap::example().expect("example swap");
         let mut model = model_with_periods(vec![period(
             PeriodId::quarter(2024, 1).expect("valid period fixture"),
             true,
@@ -907,8 +907,9 @@ mod period_timeline_tests {
 
     #[test]
     fn financial_statement_instrument_conversion_rejects_unsupported_types() {
-        let unsupported =
-            InstrumentJson::Equity(finstack_quant_valuations::instruments::Equity::example());
+        let unsupported = InstrumentJson::Equity(
+            finstack_quant_valuations::instruments::Equity::example().expect("example"),
+        );
         let error = FinancialStatementInstrument::try_from(unsupported)
             .expect_err("equity is not a capital-structure debt instrument");
         assert!(error.to_string().contains("equity"));

@@ -56,15 +56,18 @@ impl EquityFutureOption {
     ///
     /// * `id` - Stable instrument identifier.
     /// * `terms` - Complete futures-option economics; no exchange root or contract definition is implied.
-    pub fn new(id: InstrumentId, terms: FutureOptionTerms) -> finstack_quant_core::Result<Self> {
-        Self::builder().id(id).terms(terms).build()
+    pub fn new(
+        id: impl Into<InstrumentId>,
+        terms: FutureOptionTerms,
+    ) -> finstack_quant_core::Result<Self> {
+        Self::builder().id(id.into()).terms(terms).build()
     }
 
     /// Create a neutral schema and serialization example.
     pub fn example() -> finstack_quant_core::Result<Self> {
         Ok(Self {
             instrument_pricing_overrides: crate::instruments::InstrumentPricingOverrides::default()
-                .with_implied_vol(0.20),
+                .with_implied_volatility(0.20),
             ..Self::new(
                 InstrumentId::new("EQUITY-FUTURE-OPTION-EXAMPLE"),
                 FutureOptionTerms::example()?,

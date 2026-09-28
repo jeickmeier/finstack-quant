@@ -1941,7 +1941,7 @@ mod tests {
         let mut overridden = option.clone();
         overridden.instrument_pricing_overrides = overridden
             .instrument_pricing_overrides
-            .with_implied_vol(0.2);
+            .with_implied_volatility(0.2);
         let calculators: Vec<Box<dyn MetricCalculator>> = vec![
             Box::new(GenericFdVega::<EquityOption>::default()),
             Box::new(GenericFdVolga::<EquityOption>::default()),

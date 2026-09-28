@@ -321,7 +321,7 @@ impl TrsEngine {
     ///
     /// # Arguments
     /// * `params` — Parameters for the total return leg calculation
-    /// * `context` — Market context containing curves and market data
+    /// * `market` — Market context containing curves and market data
     /// * `as_of` — Valuation date; total-return cashflows on or before this
     ///   date are excluded from the present value
     /// * `model` — Model implementing TrsReturnModel for underlying-specific logic
@@ -330,11 +330,11 @@ impl TrsEngine {
     /// Present value of the total return leg in the instrument's currency.
     pub fn pv_total_return_leg_with_model(
         params: TotalReturnLegParams,
-        context: &MarketContext,
+        market: &MarketContext,
         as_of: Date,
         model: &impl TrsReturnModel,
     ) -> finstack_quant_core::Result<Money> {
-        let disc = context.get_discount(params.discount_curve_id)?;
+        let disc = market.get_discount(params.discount_curve_id)?;
         let period_schedule = params.schedule.period_schedule()?;
 
         let mut total_pv = NeumaierAccumulator::new();
@@ -362,7 +362,7 @@ impl TrsEngine {
                     t_end,
                     initial_level: params.initial_level.unwrap_or(1.0),
                 },
-                context,
+                market,
             )?;
 
             if !total_return.is_finite() {
@@ -390,7 +390,7 @@ impl TrsEngine {
     /// * `financing` — Financing leg specification
     /// * `schedule` — Schedule specification for payment periods
     /// * `notional` — Notional amount for the leg
-    /// * `context` — Market context containing curves and market data
+    /// * `market` — Market context containing curves and market data
     /// * `as_of` — Valuation date; financing cashflows on or before this date
     ///   are excluded from the present value
     ///
@@ -400,11 +400,11 @@ impl TrsEngine {
         financing: &FinancingLegSpec,
         schedule: &TrsScheduleSpec,
         notional: Money,
-        context: &MarketContext,
+        market: &MarketContext,
         as_of: Date,
     ) -> finstack_quant_core::Result<Money> {
-        let disc = context.get_discount(financing.discount_curve_id.as_str())?;
-        let fwd = context.get_forward(financing.forward_curve_id.as_str())?;
+        let disc = market.get_discount(financing.discount_curve_id.as_str())?;
+        let fwd = market.get_forward(financing.forward_curve_id.as_str())?;
         // For compounded legs, realized fixings for in-progress periods
         // are sourced from MarketContext using the canonical `FIXING:{forward_curve_id}`
         // key.  The same pattern is used by `basis_swap` / `pv_floating_leg`.
@@ -412,7 +412,7 @@ impl TrsEngine {
         // error is deferred to `financing_period_rate` when a fixing is actually
         // required for an in-progress period.
         let fixings = finstack_quant_core::market_data::fixings::get_fixing_series(
-            context,
+            market,
             financing.forward_curve_id.as_str(),
         )
         .ok();
@@ -480,7 +480,7 @@ impl TrsEngine {
     /// * `schedule` — Payment dates, calendar, and lag used to discount each
     ///   period's accrual fraction.
     /// * `notional` — Scale of the annuity (currency amount, not percent of par).
-    /// * `context` — Must contain `financing.discount_curve_id` and
+    /// * `market` — Must contain `financing.discount_curve_id` and
     ///   `financing.forward_curve_id` (overnight legs also read fixings).
     /// * `as_of` — Valuation date; periods ending on or before this date are
     ///   excluded.
@@ -501,13 +501,13 @@ impl TrsEngine {
         financing: &FinancingLegSpec,
         schedule: &TrsScheduleSpec,
         notional: Money,
-        context: &MarketContext,
+        market: &MarketContext,
         as_of: Date,
     ) -> finstack_quant_core::Result<f64> {
-        let disc = context.get_discount(financing.discount_curve_id.as_str())?;
-        let fwd = context.get_forward(financing.forward_curve_id.as_str())?;
+        let disc = market.get_discount(financing.discount_curve_id.as_str())?;
+        let fwd = market.get_forward(financing.forward_curve_id.as_str())?;
         let fixings = finstack_quant_core::market_data::fixings::get_fixing_series(
-            context,
+            market,
             financing.forward_curve_id.as_str(),
         )
         .ok();
@@ -575,13 +575,13 @@ impl TrsEngine {
         financing: &FinancingLegSpec,
         schedule: &TrsScheduleSpec,
         notional: Money,
-        context: &MarketContext,
+        market: &MarketContext,
         as_of: Date,
     ) -> finstack_quant_core::Result<f64> {
-        let disc = context.get_discount(financing.discount_curve_id.as_str())?;
-        let fwd = context.get_forward(financing.forward_curve_id.as_str())?;
+        let disc = market.get_discount(financing.discount_curve_id.as_str())?;
+        let fwd = market.get_forward(financing.forward_curve_id.as_str())?;
         let fixings = finstack_quant_core::market_data::fixings::get_fixing_series(
-            context,
+            market,
             financing.forward_curve_id.as_str(),
         )
         .ok();

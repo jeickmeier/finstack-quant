@@ -403,7 +403,7 @@ fn production_convertible_bond_floor_uses_the_pricing_recovery_blend() {
     bond.maturity = as_of + time::Duration::days(200);
     bond.credit_curve_id = Some("CREDIT".into());
     bond.recovery_rate = Some(0.4);
-    bond.metric_pricing_overrides = bond.metric_pricing_overrides.with_rate_bump(1.0);
+    bond.metric_pricing_overrides = bond.metric_pricing_overrides.with_rate_bump_bp(1.0);
     // 5% hazard over the 3% risk-free curve: the zero-recovery risky rate is 8%.
     let ctx = market(as_of, 0.03, 0.001, 0.2)
         .insert(HazardCurve::flat("CREDIT", as_of, 0.05, 0.0).expect("issuer hazard"));

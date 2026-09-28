@@ -232,7 +232,7 @@ impl AssetBackedFacility {
         use finstack_quant_core::currency::Currency;
         use time::macros::date;
 
-        let deal = StructuredCredit::example();
+        let deal = StructuredCredit::example()?;
         let closing = date!(2024 - 01 - 15);
         let mut facility = Self::builder()
             .id(InstrumentId::new("ABF-EXAMPLE".to_string()))

@@ -636,7 +636,7 @@ mod tests {
 
     #[test]
     fn analytical_barrier_error_preserves_category_and_context() {
-        let mut inst = FxBarrierOption::example();
+        let mut inst = FxBarrierOption::example().expect("example");
         let start = inst.monitoring_start_date.expect("example start");
         inst.monitoring = Monitoring::Discrete {
             observation_dates: vec![start, inst.expiry],
@@ -662,7 +662,7 @@ mod tests {
 
     #[test]
     fn analytical_barrier_rejects_future_monitoring_before_market_lookup() {
-        let mut inst = FxBarrierOption::example();
+        let mut inst = FxBarrierOption::example().expect("example");
         let as_of = inst.monitoring_start_date.expect("example start");
         inst.monitoring_start_date = Some(inst.expiry);
         let error = FxBarrierOptionAnalyticalPricer::new()
@@ -684,7 +684,7 @@ mod tests {
 
     #[test]
     fn mc_expiry_only_down_out_call_matches_vanilla() {
-        let mut inst = FxBarrierOption::example();
+        let mut inst = FxBarrierOption::example().expect("example");
         let as_of = inst.monitoring_start_date.expect("example start");
         inst.expiry = as_of + finstack_quant_core::dates::Duration::days(365);
         inst.monitoring_start_date = Some(inst.expiry);
@@ -733,7 +733,7 @@ mod tests {
 
     #[test]
     fn expired_up_and_in_call_returns_intrinsic_when_hit() {
-        let mut inst = FxBarrierOption::example();
+        let mut inst = FxBarrierOption::example().expect("example");
         inst.option_type = OptionType::Call;
         inst.barrier_type = BarrierType::UpAndIn;
         inst.strike = 1.10;
@@ -747,7 +747,7 @@ mod tests {
 
     #[test]
     fn expired_down_and_out_put_returns_intrinsic_when_not_hit() {
-        let mut inst = FxBarrierOption::example();
+        let mut inst = FxBarrierOption::example().expect("example");
         inst.option_type = OptionType::Put;
         inst.barrier_type = BarrierType::DownAndOut;
         inst.strike = 1.10;
@@ -762,7 +762,7 @@ mod tests {
 
     #[test]
     fn expired_up_and_out_with_hit_pays_rebate_only() {
-        let mut inst = FxBarrierOption::example();
+        let mut inst = FxBarrierOption::example().expect("example");
         inst.option_type = OptionType::Call;
         inst.barrier_type = BarrierType::UpAndOut;
         inst.strike = 1.10;
@@ -778,7 +778,7 @@ mod tests {
 
     #[test]
     fn expired_up_and_in_with_no_hit_pays_rebate_only() {
-        let mut inst = FxBarrierOption::example();
+        let mut inst = FxBarrierOption::example().expect("example");
         inst.option_type = OptionType::Call;
         inst.barrier_type = BarrierType::UpAndIn;
         inst.strike = 1.10;
@@ -793,7 +793,7 @@ mod tests {
 
     #[test]
     fn expired_fx_barrier_requires_observed_state() {
-        let mut inst = FxBarrierOption::example();
+        let mut inst = FxBarrierOption::example().expect("example");
         inst.observed_barrier_breached = None;
 
         let err = expired_barrier_value_per_unit(&inst, 1.25).expect_err("missing observed state");
@@ -805,7 +805,7 @@ mod tests {
 
     #[test]
     fn validation_allows_barrier_equal_to_strike() {
-        let mut inst = FxBarrierOption::example();
+        let mut inst = FxBarrierOption::example().expect("example");
         inst.strike = 1.10;
         inst.barrier = 1.10;
 
@@ -817,7 +817,7 @@ mod tests {
     fn expired_analytical_value_only_requires_observed_state_and_spot() {
         let as_of = Date::from_calendar_date(2025, Month::January, 1).expect("valid date");
 
-        let mut option = FxBarrierOption::example();
+        let mut option = FxBarrierOption::example().expect("example");
         option.expiry = as_of;
         option.monitoring = Monitoring::Continuous;
         option.option_type = OptionType::Call;
@@ -1026,12 +1026,12 @@ mod tests {
 
     #[test]
     fn validation_rejects_currency_mismatch_and_invalid_numeric_fields() {
-        let mut mismatched = FxBarrierOption::example();
+        let mut mismatched = FxBarrierOption::example().expect("example");
         mismatched.notional = Money::from((1_000_000_i64, Currency::USD));
         let err = mismatched.validate().expect_err("currency mismatch");
         assert!(err.to_string().contains("Currency mismatch"));
 
-        let mut bad_strike = FxBarrierOption::example();
+        let mut bad_strike = FxBarrierOption::example().expect("example");
         bad_strike.strike = 0.0;
         assert!(bad_strike
             .validate()
@@ -1039,7 +1039,7 @@ mod tests {
             .to_string()
             .contains("strike"));
 
-        let mut bad_barrier = FxBarrierOption::example();
+        let mut bad_barrier = FxBarrierOption::example().expect("example");
         bad_barrier.barrier = f64::NAN;
         assert!(bad_barrier
             .validate()
@@ -1047,7 +1047,7 @@ mod tests {
             .to_string()
             .contains("barrier"));
 
-        let mut bad_notional = FxBarrierOption::example();
+        let mut bad_notional = FxBarrierOption::example().expect("example");
         bad_notional.notional = Money::from((0_i64, Currency::EUR));
         assert!(bad_notional
             .validate()
@@ -1059,7 +1059,7 @@ mod tests {
     #[test]
     fn resolve_fx_spot_uses_fx_matrix_when_spot_id_is_absent() {
         let as_of = Date::from_calendar_date(2025, Month::January, 1).expect("valid date");
-        let mut inst = FxBarrierOption::example();
+        let mut inst = FxBarrierOption::example().expect("example");
         inst.fx_spot_id = None;
 
         let provider = Arc::new(SimpleFxProvider::new());
@@ -1075,13 +1075,13 @@ mod tests {
     #[test]
     fn resolve_fx_spot_requires_valid_spot_source() {
         let as_of = Date::from_calendar_date(2025, Month::January, 1).expect("valid date");
-        let mut no_matrix = FxBarrierOption::example();
+        let mut no_matrix = FxBarrierOption::example().expect("example");
         no_matrix.fx_spot_id = None;
         let err =
             resolve_fx_spot(&no_matrix, &MarketContext::new(), as_of).expect_err("missing matrix");
         assert!(err.to_string().contains("fx_matrix"));
 
-        let mut price_scalar = FxBarrierOption::example();
+        let mut price_scalar = FxBarrierOption::example().expect("example");
         price_scalar.fx_spot_id = Some("EURUSD-SPOT".into());
         let price_market = MarketContext::new().insert_price(
             "EURUSD-SPOT",

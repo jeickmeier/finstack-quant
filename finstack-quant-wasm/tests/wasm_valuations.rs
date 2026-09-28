@@ -105,7 +105,7 @@ fn structured_credit_instrument_json() -> String {
     .unwrap();
     let mut sc =
         StructuredCredit::new_abs("ABS-STOCH-PV", pool, tranches, closing, maturity, "USD-OIS")
-            .with_calendar("nyse");
+            .with_calendar_id("nyse");
     sc.credit_model.prepayment_spec = PrepaymentModelSpec::constant_cpr(0.0);
     sc.credit_model.default_spec = DefaultModelSpec::constant_cdr(0.0);
     sc.credit_model.recovery_spec = RecoveryModelSpec::with_lag(0.40, 0);

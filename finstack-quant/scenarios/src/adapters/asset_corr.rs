@@ -77,7 +77,7 @@ mod tests {
     }
 
     fn sample_instrument() -> StructuredCredit {
-        let mut inst = StructuredCredit::example();
+        let mut inst = StructuredCredit::example().expect("example");
         inst.credit_model.correlation_structure =
             Some(CorrelationStructure::flat(0.20, -0.30).expect("valid correlation"));
         inst

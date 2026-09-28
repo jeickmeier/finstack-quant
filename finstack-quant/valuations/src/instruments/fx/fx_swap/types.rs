@@ -220,19 +220,13 @@ impl FxSwap {
     /// Create a canonical example FX swap for testing and documentation.
     ///
     /// Returns a 6-month EUR/USD swap with realistic forward points.
-    #[allow(clippy::expect_used)] // Example uses hardcoded valid values
-    pub fn example() -> Self {
+    pub fn example() -> finstack_quant_core::Result<Self> {
         Self::builder()
             .id(InstrumentId::new("FXSWAP-EURUSD-6M"))
             .base_currency(Currency::EUR)
             .quote_currency(Currency::USD)
-            .near_date(
-                Date::from_calendar_date(2024, time::Month::January, 5)
-                    .expect("Valid example date"),
-            )
-            .far_date(
-                Date::from_calendar_date(2024, time::Month::July, 5).expect("Valid example date"),
-            )
+            .near_date(time::macros::date!(2024 - 01 - 05))
+            .far_date(time::macros::date!(2024 - 07 - 05))
             .notional(Money::from((1_000_000_i64, Currency::EUR)))
             .domestic_discount_curve_id(CurveId::new("USD-OIS"))
             .foreign_discount_curve_id(CurveId::new("EUR-OIS"))
@@ -240,7 +234,6 @@ impl FxSwap {
             .far_rate_opt(Some(1.12))
             .attributes(Attributes::new())
             .build()
-            .expect("Example FX swap construction should not fail")
     }
 
     /// Construct an FX swap from trade date and a standard calendar tenor.
@@ -544,7 +537,7 @@ mod tests {
 
     #[test]
     fn test_fx_swap_example_creation() {
-        let swap = FxSwap::example();
+        let swap = FxSwap::example().expect("example");
         assert_eq!(swap.id.as_str(), "FXSWAP-EURUSD-6M");
         assert_eq!(swap.base_currency, Currency::EUR);
         assert_eq!(swap.quote_currency, Currency::USD);
@@ -552,7 +545,7 @@ mod tests {
 
     #[test]
     fn test_fx_swap_market_dependencies() {
-        let swap = FxSwap::example();
+        let swap = FxSwap::example().expect("example");
         let deps = swap
             .market_dependencies()
             .expect("market_dependencies")
@@ -590,7 +583,7 @@ mod tests {
 
     #[test]
     fn test_fx_swap_serde_rejects_invalid_date_ordering() {
-        let swap = FxSwap::example();
+        let swap = FxSwap::example().expect("example");
         let mut json = serde_json::to_value(&swap).expect("serialize");
         json["near_date"] = serde_json::json!("2024-07-05");
         json["far_date"] = serde_json::json!("2024-01-05");
@@ -608,7 +601,7 @@ mod tests {
     fn test_fx_swap_returns_zero_when_fully_settled() {
         let as_of = date(2024, Month::August, 1); // After far_date
         let market = base_market(as_of);
-        let swap = FxSwap::example(); // far_date is 2024-07-05
+        let swap = FxSwap::example().expect("example"); // far_date is 2024-07-05
 
         let pv = swap.value(&market, as_of).expect("should price");
         assert_eq!(pv.amount(), 0.0, "Fully settled swap should have zero PV");
@@ -619,7 +612,7 @@ mod tests {
         // as_of is between near_date and far_date
         let as_of = date(2024, Month::March, 1);
         let market = base_market(as_of);
-        let swap = FxSwap::example();
+        let swap = FxSwap::example().expect("example");
         // Example has near_date=2024-01-05, far_date=2024-07-05
 
         // Should only include far leg since near has settled
@@ -642,7 +635,7 @@ mod tests {
     fn test_fx_swap_cashflow_provider_emits_four_settlement_flows() {
         let as_of = date(2024, Month::January, 3);
         let market = base_market(as_of);
-        let swap = FxSwap::example();
+        let swap = FxSwap::example().expect("example");
 
         let flows = swap
             .dated_cashflows(&market, as_of)

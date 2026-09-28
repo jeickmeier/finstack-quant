@@ -276,11 +276,11 @@ fn pv_coupon_from_custom_schedule(
 ///
 /// * `bond` - Bond whose future fixed cashflows and contractual discount-curve
 ///   identifier define the asset-swap fixed leg.
-/// * `curves` - Market context providing the bond's discount curve and the
+/// * `market` - Market context providing the bond's discount curve and the
 ///   named forward curve.
 /// * `as_of` - Valuation date used to select future bond cashflows and build
 ///   the mirrored fixed-leg schedule.
-/// * `fwd_curve_id` - Market-context identifier of the floating-leg forward
+/// * `forward_curve_id` - Market-context identifier of the floating-leg forward
 ///   curve.
 /// * `float_spread_bp` - Floating-leg contractual spread in basis points,
 ///   added to projected forward coupons.
@@ -288,14 +288,14 @@ fn pv_coupon_from_custom_schedule(
 ///   the annuity. `None` uses the bond's coupon day count.
 pub fn asw_par_with_forward(
     bond: &Bond,
-    curves: &finstack_quant_core::market_data::context::MarketContext,
+    market: &finstack_quant_core::market_data::context::MarketContext,
     as_of: finstack_quant_core::dates::Date,
-    fwd_curve_id: &str,
+    forward_curve_id: &str,
     float_spread_bp: f64,
     fixed_leg_day_count: Option<DayCount>,
 ) -> finstack_quant_core::Result<f64> {
-    let disc = curves.get_discount(&bond.discount_curve_id)?;
-    let fwd = curves.get_forward(fwd_curve_id)?;
+    let disc = market.get_discount(&bond.discount_curve_id)?;
+    let fwd = market.get_forward(forward_curve_id)?;
 
     // Trivial: zero-notional instruments have zero ASW by definition.
     // Return early to avoid validating schedule construction on a degenerate notionals.
@@ -304,7 +304,7 @@ pub fn asw_par_with_forward(
     }
 
     // Mirror the bond schedule via holder flows
-    let flows = bond.pricing_dated_cashflows(curves, as_of)?;
+    let flows = bond.pricing_dated_cashflows(market, as_of)?;
     let sched = build_future_dates_from_flows(&flows, as_of);
     if sched.len() < 2 {
         return Err(finstack_quant_core::Error::Validation(
@@ -361,11 +361,11 @@ pub fn asw_par_with_forward(
 ///
 /// * `bond` - Bond whose future fixed cashflows and contractual discount-curve
 ///   identifier define the asset-swap fixed leg.
-/// * `curves` - Market context providing the bond's discount curve and the
+/// * `market` - Market context providing the bond's discount curve and the
 ///   named forward curve.
 /// * `as_of` - Valuation date used to select future bond cashflows and build
 ///   the mirrored fixed-leg schedule.
-/// * `fwd_curve_id` - Market-context identifier of the floating-leg forward
+/// * `forward_curve_id` - Market-context identifier of the floating-leg forward
 ///   curve.
 /// * `float_spread_bp` - Floating-leg contractual spread in basis points,
 ///   added to projected forward coupons.
@@ -375,15 +375,15 @@ pub fn asw_par_with_forward(
 ///   the annuity. `None` uses the bond's coupon day count.
 pub fn asw_market_with_forward(
     bond: &Bond,
-    curves: &finstack_quant_core::market_data::context::MarketContext,
+    market: &finstack_quant_core::market_data::context::MarketContext,
     as_of: finstack_quant_core::dates::Date,
-    fwd_curve_id: &str,
+    forward_curve_id: &str,
     float_spread_bp: f64,
     dirty_price_currency: Option<f64>,
     fixed_leg_day_count: Option<DayCount>,
 ) -> finstack_quant_core::Result<f64> {
-    let disc = curves.get_discount(&bond.discount_curve_id)?;
-    let flows = bond.pricing_dated_cashflows(curves, as_of)?;
+    let disc = market.get_discount(&bond.discount_curve_id)?;
+    let flows = bond.pricing_dated_cashflows(market, as_of)?;
     let sched = build_future_dates_from_flows(&flows, as_of);
     if sched.len() < 2 {
         return Err(finstack_quant_core::Error::Validation(
@@ -404,7 +404,7 @@ pub fn asw_market_with_forward(
         return Ok(0.0);
     }
 
-    let fwd = curves.get_forward(fwd_curve_id)?;
+    let fwd = market.get_forward(forward_curve_id)?;
     let (float_pv, fixed_ann, float_ann) = asset_swap_forward_components(
         disc.as_ref(),
         fwd.as_ref(),

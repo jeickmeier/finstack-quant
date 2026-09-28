@@ -246,7 +246,7 @@ fn build_full_feature_structured_credit() -> StructuredCredit {
     )
     .with_rating(CreditRating::BB)
     .with_industry("Technology")
-    .with_obligor("OBLIGOR-1");
+    .with_obligor_id("OBLIGOR-1");
     loan.smm_override = Some(0.0123);
     loan.mdr_override = Some(0.0042);
 
@@ -259,7 +259,7 @@ fn build_full_feature_structured_credit() -> StructuredCredit {
     )
     .with_rating(CreditRating::A)
     .with_industry("Healthcare")
-    .with_obligor("OBLIGOR-2");
+    .with_obligor_id("OBLIGOR-2");
     bond.defaulted = true;
     bond.recovery_amount =
         Some(Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"));
@@ -590,7 +590,7 @@ fn waterfall_rules_round_trip_and_price_through_json() {
     ])
     .unwrap();
     let mut sc = StructuredCredit::new_abs("ABS-WF", pool, tranches, closing, mat, "USD-OIS")
-        .with_calendar("nyse");
+        .with_calendar_id("nyse");
     sc.waterfall_rules = Some(WaterfallRules {
         afc: Some(AfcSpec {
             capped_tranches: vec!["SR".to_string()],

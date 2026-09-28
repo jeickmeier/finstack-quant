@@ -997,7 +997,7 @@ pub(crate) fn solve_ytw_from_flows(
 ///
 /// * `bond` - Callable or puttable bond whose cashflow schedule and exercise
 ///   candidates define the yield-to-worst paths.
-/// * `curves` - Market context supplying schedule inputs and any make-whole
+/// * `market` - Market context supplying schedule inputs and any make-whole
 ///   reference curves.
 /// * `as_of` - Valuation or trade date; settlement and coupon entitlement are
 ///   derived from the bond's quote convention.
@@ -1014,7 +1014,7 @@ pub(crate) fn solve_ytw_from_flows(
 /// the bond's Street yield convention.
 pub fn price_from_ytw(
     bond: &Bond,
-    curves: &MarketContext,
+    market: &MarketContext,
     as_of: Date,
     ytw: f64,
 ) -> finstack_quant_core::Result<f64> {
@@ -1024,13 +1024,13 @@ pub fn price_from_ytw(
         )));
     }
 
-    let effective_bond = bond.effective_for_pricing(curves, as_of)?;
-    let quote_ctx = QuoteDateContext::new(&effective_bond, curves, as_of)?;
-    let flows = quote_ctx.entitled_flows(&effective_bond, curves, as_of)?;
-    let schedule = effective_bond.full_cashflow_schedule(curves)?;
+    let effective_bond = bond.effective_for_pricing(market, as_of)?;
+    let quote_ctx = QuoteDateContext::new(&effective_bond, market, as_of)?;
+    let flows = quote_ctx.entitled_flows(&effective_bond, market, as_of)?;
+    let schedule = effective_bond.full_cashflow_schedule(market)?;
     let paths = workout_cashflow_paths(
         &effective_bond,
-        curves,
+        market,
         &flows,
         quote_ctx.quote_date,
         &schedule,

@@ -9,7 +9,7 @@ fn b8_cached_hw_risk_rebuilds_the_active_grid() {
     };
     use finstack_quant_valuations::pricer::{ModelKey, PricerRegistry};
     let as_of = date!(2025 - 01 - 01);
-    let mut swaption = BermudanSwaption::example();
+    let mut swaption = BermudanSwaption::example().expect("example");
     swaption.underlying_float_leg.forward_curve_id = swaption.get_discount_curve_id().clone();
     let make_curve = |rate: f64| {
         DiscountCurve::builder(swaption.get_discount_curve_id().clone())
@@ -94,7 +94,7 @@ fn m2_lsmc_partial_coupon_and_spread_match_cashflows() {
     use rust_decimal::Decimal;
     let as_of = date!(2025 - 01 - 01);
     let exercise = date!(2026 - 04 - 01);
-    let mut swaption = BermudanSwaption::example();
+    let mut swaption = BermudanSwaption::example().expect("example");
     swaption.exercise_schedule.exercise_dates = vec![exercise];
     let fixed = &mut swaption.underlying_fixed_leg;
     fixed.start = date!(2026 - 01 - 01);
@@ -714,7 +714,7 @@ fn m4_inflation_zero_strike_requires_normal_quotes_without_fabricated_conversion
     use finstack_quant_valuations::instruments::RateOptionType;
     use finstack_quant_valuations::pricer::ModelKey;
     let as_of = date!(2024 - 01 - 15);
-    let mut option = InflationCapFloor::example();
+    let mut option = InflationCapFloor::example().expect("example");
     option.rate_option_type = RateOptionType::Floorlet;
     option.start_date = date!(2025 - 01 - 15);
     option.maturity = date!(2026 - 01 - 15);
@@ -776,7 +776,7 @@ fn m3_prepared_hw_model_rejects_stale_curve_and_date() {
         BermudanSwaption, PreparedHullWhiteModel,
     };
     let as_of = date!(2025 - 01 - 01);
-    let mut swaption = BermudanSwaption::example();
+    let mut swaption = BermudanSwaption::example().expect("example");
     swaption.underlying_float_leg.forward_curve_id = swaption.get_discount_curve_id().clone();
     let curve = |rate: f64| {
         DiscountCurve::builder(swaption.get_discount_curve_id().clone())
@@ -839,7 +839,7 @@ fn m11_hw_greeks_use_the_active_parameters_and_tree_grid() {
     use finstack_quant_core::market_data::bumps::{BumpSpec, MarketBump};
     use finstack_quant_valuations::instruments::rates::swaption::BermudanSwaption;
     let as_of = date!(2025 - 01 - 01);
-    let mut swaption = BermudanSwaption::example();
+    let mut swaption = BermudanSwaption::example().expect("example");
     swaption.underlying_float_leg.forward_curve_id = swaption.get_discount_curve_id().clone();
     swaption
         .instrument_pricing_overrides
@@ -929,7 +929,7 @@ fn bermudan_hw_sigma_vega_uses_absolute_bump() {
     use finstack_quant_valuations::instruments::rates::swaption::BermudanSwaption;
     let as_of = date!(2025 - 01 - 01);
     let sigma = 0.008;
-    let mut swaption = BermudanSwaption::example();
+    let mut swaption = BermudanSwaption::example().expect("example");
     swaption.underlying_float_leg.forward_curve_id = swaption.get_discount_curve_id().clone();
     let config = &mut swaption.instrument_pricing_overrides.model_config;
     config.hw1f_mean_reversion = Some(0.05);

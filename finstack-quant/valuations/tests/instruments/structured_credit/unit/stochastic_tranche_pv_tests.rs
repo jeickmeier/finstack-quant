@@ -119,7 +119,7 @@ fn structured_credit(floating_senior: bool) -> StructuredCredit {
         legal_maturity(),
         "USD-OIS",
     )
-    .with_calendar("nyse");
+    .with_calendar_id("nyse");
     sc.credit_model.prepayment_spec = PrepaymentModelSpec::constant_cpr(0.0);
     sc.credit_model.default_spec = DefaultModelSpec::constant_cdr(0.0);
     sc.credit_model.recovery_spec = RecoveryModelSpec::with_lag(0.40, 0);

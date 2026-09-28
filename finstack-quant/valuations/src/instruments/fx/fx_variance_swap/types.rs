@@ -199,9 +199,7 @@ impl FxVarianceSwap {
     }
 
     /// Create a canonical example FX variance swap (EUR/USD, 1Y).
-    #[allow(clippy::expect_used)] // Example uses hardcoded valid values
-    pub fn example() -> Self {
-        use time::Month;
+    pub fn example() -> finstack_quant_core::Result<Self> {
         FxVarianceSwap::builder()
             .id(InstrumentId::new("FXVAR-EURUSD-1Y"))
             .base_currency(Currency::EUR)
@@ -209,12 +207,8 @@ impl FxVarianceSwap {
             .spot_id(PriceId::new("EURUSD"))
             .notional(Money::from((1_000_000_i64, Currency::USD)))
             .strike_variance(0.04)
-            .start_date(
-                Date::from_calendar_date(2024, Month::January, 2).expect("Valid example date"),
-            )
-            .maturity(
-                Date::from_calendar_date(2025, Month::January, 2).expect("Valid example date"),
-            )
+            .start_date(time::macros::date!(2024 - 01 - 02))
+            .maturity(time::macros::date!(2025 - 01 - 02))
             .observation_frequency(Tenor::daily())
             .base_calendar_id("TARGET2".into())
             .quote_calendar_id("USNY".into())
@@ -228,7 +222,6 @@ impl FxVarianceSwap {
             .day_count(DayCount::Act365F)
             .attributes(Attributes::new())
             .build()
-            .expect("Example FxVarianceSwap construction should not fail")
     }
 
     pub(crate) fn validate_as_of(&self, context: &MarketContext, as_of: Date) -> Result<()> {
@@ -360,18 +353,18 @@ impl FxVarianceSwap {
     }
 
     /// Get historical prices aligned to observation dates when available.
-    pub fn get_historical_prices(&self, context: &MarketContext, as_of: Date) -> Result<Vec<f64>> {
-        pricer::get_historical_prices(self, context, as_of)
+    pub fn get_historical_prices(&self, market: &MarketContext, as_of: Date) -> Result<Vec<f64>> {
+        pricer::get_historical_prices(self, market, as_of)
     }
 
     /// Calculate partial realized variance for the elapsed period.
-    pub fn partial_realized_variance(&self, context: &MarketContext, as_of: Date) -> Result<f64> {
-        pricer::partial_realized_variance(self, context, as_of)
+    pub fn partial_realized_variance(&self, market: &MarketContext, as_of: Date) -> Result<f64> {
+        pricer::partial_realized_variance(self, market, as_of)
     }
 
     /// Calculate implied forward variance for the remaining period.
-    pub fn remaining_forward_variance(&self, context: &MarketContext, as_of: Date) -> Result<f64> {
-        pricer::remaining_forward_variance(self, context, as_of)
+    pub fn remaining_forward_variance(&self, market: &MarketContext, as_of: Date) -> Result<f64> {
+        pricer::remaining_forward_variance(self, market, as_of)
     }
 }
 
@@ -472,7 +465,7 @@ mod tests {
 
     #[test]
     fn test_fx_variance_swap_curve_dependencies_includes_both_curves() {
-        let swap = FxVarianceSwap::example();
+        let swap = FxVarianceSwap::example().expect("example");
         let deps = swap
             .market_dependencies()
             .expect("market_dependencies")
@@ -614,7 +607,7 @@ mod tests {
 
     #[test]
     fn test_fx_variance_swap_realized_fraction_monotonic() {
-        let swap = FxVarianceSwap::example();
+        let swap = FxVarianceSwap::example().expect("example");
 
         let start_frac = swap
             .realized_fraction_by_observations(swap.start_date)

@@ -42,7 +42,7 @@ fn market(as_of: Date) -> MarketContext {
 fn production_barrier_ndf_reciprocal_quotes_keep_long_base_payoff() {
     let as_of = date!(2024 - 01 - 02);
     let market = market(as_of);
-    let mut inverse = Ndf::example();
+    let mut inverse = Ndf::example().expect("example");
     inverse.base_currency = Currency::CNY;
     inverse.settlement_currency = Currency::USD;
     inverse.notional = Money::from((7_000_000_i64, Currency::CNY));
@@ -145,7 +145,7 @@ fn production_barrier_ndf_quanto_uses_asset_financing_and_payoff_discounting() {
                 .build()
                 .expect("FX volatility"),
         );
-    let mut note = RangeAccrual::example();
+    let mut note = RangeAccrual::example().expect("example");
     note.terms.observation_dates = vec![expiry];
     note.terms.start_date = as_of;
     note.terms.day_count = DayCount::Act365F;

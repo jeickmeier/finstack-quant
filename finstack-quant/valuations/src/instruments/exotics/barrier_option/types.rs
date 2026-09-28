@@ -173,7 +173,7 @@ impl BarrierOption {
     ///
     /// # Arguments
     ///
-    /// - `curves`: Market context containing the instrument's spot, volatility,
+    /// - `market`: Market context containing the instrument's spot, volatility,
     ///   discount curve and optional dividend-yield inputs. Volatilities and
     ///   yields are decimal annualized values; spot is in the payoff currency.
     /// - `as_of`: Valuation date defining the start of the remaining simulation.
@@ -189,11 +189,11 @@ impl BarrierOption {
     /// observed barrier state for monitoring dates before `as_of`.
     pub fn npv_mc(
         &self,
-        curves: &finstack_quant_core::market_data::context::MarketContext,
+        market: &finstack_quant_core::market_data::context::MarketContext,
         as_of: finstack_quant_core::dates::Date,
     ) -> finstack_quant_core::Result<finstack_quant_core::money::Money> {
         use crate::instruments::exotics::barrier_option::pricer;
-        pricer::compute_pv(self, curves, as_of)
+        pricer::compute_pv(self, market, as_of)
     }
 }
 

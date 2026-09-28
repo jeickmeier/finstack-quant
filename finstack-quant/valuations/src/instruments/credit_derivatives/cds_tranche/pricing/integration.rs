@@ -81,11 +81,11 @@ impl CdsTranchePricer {
     /// `integration_tolerance`. Conditional-name approximation or convolution
     /// discretization error is separate from this quadrature budget.
     pub(super) fn integrate_factors(&self, f: &dyn Fn(&[f64]) -> Result<f64>) -> Result<f64> {
-        let tolerance = self.params.integration_tolerance;
-        let depth = self.params.integration_max_depth;
-        match self.params.copula_spec {
+        let tolerance = self.config.integration_tolerance;
+        let depth = self.config.integration_max_depth;
+        match self.config.copula_spec {
             CopulaSpec::Gaussian => integrate_normal(&|z| f(&[z]), tolerance * 0.5, depth),
-            CopulaSpec::StudentT { .. } if !self.params.adaptive_student_t_integration => {
+            CopulaSpec::StudentT { .. } if !self.config.adaptive_student_t_integration => {
                 self.copula().try_integrate_fn(f)
             }
             CopulaSpec::StudentT { degrees_of_freedom } => {
@@ -131,8 +131,8 @@ impl CdsTranchePricer {
     /// node sweep. Adaptive and Gaussian paths evaluate each component
     /// separately.
     pub(super) fn integrate_factors_pair(&self, f: &FactorPairIntegrand<'_>) -> Result<(f64, f64)> {
-        match self.params.copula_spec {
-            CopulaSpec::StudentT { .. } if !self.params.adaptive_student_t_integration => {
+        match self.config.copula_spec {
+            CopulaSpec::StudentT { .. } if !self.config.adaptive_student_t_integration => {
                 self.copula().try_integrate_pair(f)
             }
             _ => Ok((
@@ -150,7 +150,7 @@ mod tests {
 
     #[test]
     fn production_credit_audit_unconverged_integrals_fail() {
-        let pricer = CdsTranchePricer::with_params(CdsTranchePricerConfig {
+        let pricer = CdsTranchePricer::with_config(CdsTranchePricerConfig {
             integration_max_depth: 0,
             ..Default::default()
         })
@@ -173,7 +173,7 @@ mod tests {
             },
             CopulaSpec::MultiFactor,
         ] {
-            let pricer = CdsTranchePricer::with_params(CdsTranchePricerConfig {
+            let pricer = CdsTranchePricer::with_config(CdsTranchePricerConfig {
                 copula_spec: spec.clone(),
                 integration_tolerance: 1e-8,
                 ..Default::default()
@@ -186,7 +186,7 @@ mod tests {
 
     #[test]
     fn student_t_default_uses_product_gauss_node_count() {
-        let pricer = CdsTranchePricer::with_params(
+        let pricer = CdsTranchePricer::with_config(
             CdsTranchePricerConfig::default()
                 .with_student_t_copula(6.0)
                 .expect("valid df"),
@@ -209,7 +209,7 @@ mod tests {
 
     #[test]
     fn student_t_product_gauss_ignores_adaptive_depth() {
-        let pricer = CdsTranchePricer::with_params(CdsTranchePricerConfig {
+        let pricer = CdsTranchePricer::with_config(CdsTranchePricerConfig {
             copula_spec: CopulaSpec::student_t(6.0).expect("valid df"),
             integration_max_depth: 0,
             ..Default::default()
@@ -221,7 +221,7 @@ mod tests {
 
     #[test]
     fn student_t_pair_matches_two_scalar_integrals() {
-        let pricer = CdsTranchePricer::with_params(
+        let pricer = CdsTranchePricer::with_config(
             CdsTranchePricerConfig::default()
                 .with_student_t_copula(6.0)
                 .expect("valid df"),

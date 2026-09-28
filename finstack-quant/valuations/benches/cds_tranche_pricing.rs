@@ -321,7 +321,7 @@ fn bench_cds_tranche_student_t_npv(c: &mut Criterion) {
     let market = create_market();
     let as_of = Date::from_calendar_date(2025, Month::January, 1).unwrap();
     let tranche = create_tranche(3.0, 7.0, 5);
-    let pricer = CdsTranchePricer::with_params(
+    let pricer = CdsTranchePricer::with_config(
         CdsTranchePricerConfig::default()
             .with_student_t_copula(6.0)
             .unwrap(),

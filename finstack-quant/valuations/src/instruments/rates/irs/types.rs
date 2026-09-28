@@ -379,7 +379,7 @@ impl InterestRateSwap {
     /// ```
     /// use finstack_quant_valuations::instruments::rates::irs::InterestRateSwap;
     ///
-    /// let swap = InterestRateSwap::example_standard()?;
+    /// let swap = InterestRateSwap::example()?;
     /// swap.validate()?; // Passes for valid swap
     /// # Ok::<(), finstack_quant_core::Error>(())
     /// ```
@@ -498,7 +498,7 @@ impl InterestRateSwap {
         Ok(())
     }
 
-    /// Create a legacy term-index USD 5Y IRS for testing and documentation.
+    /// Create a canonical USD 5Y IRS for testing and documentation.
     ///
     /// Returns a 5-year pay-fixed USD swap with conventional historical
     /// term-index terms:
@@ -507,7 +507,7 @@ impl InterestRateSwap {
     /// - **Reset lag:** T-2
     /// - **Calendar:** USNY
     #[allow(clippy::expect_used)]
-    pub fn example_standard() -> finstack_quant_core::Result<Self> {
+    pub fn example() -> finstack_quant_core::Result<Self> {
         use finstack_quant_core::dates::{BusinessDayConvention, DayCount, StubKind, Tenor};
 
         let start = Date::from_calendar_date(2024, time::Month::January, 2).map_err(|e| {
@@ -676,7 +676,7 @@ mod tests {
     fn builder_names_missing_required_field_and_builder() {
         // Failure mode: a bare "Invalid input data" told the caller neither
         // which builder nor which field was missing.
-        let example = InterestRateSwap::example_standard().expect("example swap");
+        let example = InterestRateSwap::example().expect("example swap");
         let err = InterestRateSwap::builder()
             .id(InstrumentId::new("IRS-MISSING-FLOAT"))
             .notional(example.notional)
@@ -704,14 +704,14 @@ mod tests {
     fn validate_accepts_extreme_but_valid_rate() {
         // Decimal doesn't have NaN/Infinity, so we just test that validation works
         // for extreme but valid values
-        let swap = InterestRateSwap::example_standard().expect("example swap");
+        let swap = InterestRateSwap::example().expect("example swap");
         // Should pass validation
         assert!(swap.validate().is_ok(), "Valid swap should pass validation");
     }
 
     #[test]
     fn canonical_dependencies_preserve_curve_roles_and_fixings() {
-        let swap = InterestRateSwap::example_standard().expect("example swap");
+        let swap = InterestRateSwap::example().expect("example swap");
         let deps =
             crate::instruments::Instrument::market_dependencies(&swap).expect("dependencies");
 
@@ -736,7 +736,7 @@ mod tests {
 
     #[test]
     fn validate_rejects_extreme_fixed_rate_without_silent_default() {
-        let mut swap = InterestRateSwap::example_standard().expect("example swap");
+        let mut swap = InterestRateSwap::example().expect("example swap");
         swap.fixed_leg.rate = Decimal::MAX;
 
         let err = swap
@@ -751,7 +751,7 @@ mod tests {
 
     #[test]
     fn builder_rejects_invalid_swap_economics() {
-        let mut swap = InterestRateSwap::example_standard().expect("example swap");
+        let mut swap = InterestRateSwap::example().expect("example swap");
         swap.fixed_leg.rate = Decimal::MAX;
 
         let error = InterestRateSwap::builder()
@@ -770,7 +770,7 @@ mod tests {
     #[test]
     fn validate_allows_small_negative_as_convention_sentinel() {
         // Small negative values (like -1) are allowed as sentinels for "use convention default"
-        let mut swap = InterestRateSwap::example_standard().expect("example swap");
+        let mut swap = InterestRateSwap::example().expect("example swap");
         swap.fixed_leg.payment_lag_days = -1;
         assert!(
             swap.validate().is_ok(),
@@ -781,7 +781,7 @@ mod tests {
     #[test]
     fn validate_rejects_large_negative_payment_delay() {
         // Large negative values are rejected as likely unit mistakes
-        let mut swap = InterestRateSwap::example_standard().expect("example swap");
+        let mut swap = InterestRateSwap::example().expect("example swap");
         swap.fixed_leg.payment_lag_days = -100;
         assert!(
             swap.validate().is_err(),
@@ -834,7 +834,7 @@ mod tests {
 
     #[test]
     fn validate_rejects_simple_compounding_on_overnight_index() {
-        let mut swap = InterestRateSwap::example_standard().expect("example swap");
+        let mut swap = InterestRateSwap::example().expect("example swap");
         swap.float_leg.forward_curve_id = CurveId::new("USD-SOFR-OIS");
         swap.float_leg.compounding = FloatingLegCompounding::Simple;
         let err = swap

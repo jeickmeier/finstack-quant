@@ -341,7 +341,7 @@ mod tests {
             )
             .discount_curve_id("USD-OIS".into())
             .instrument_pricing_overrides(overrides)
-            .metric_pricing_overrides(MetricPricingOverrides::default().with_ytm_bump(1.0))
+            .metric_pricing_overrides(MetricPricingOverrides::default().with_ytm_bump_bp(1.0))
             .attributes(Attributes::new())
             .build()
             .expect("should succeed");
@@ -880,7 +880,8 @@ mod tests {
 
     #[test]
     fn bond_value_honors_quoted_dirty_price_override() {
-        let overrides = InstrumentPricingOverrides::default().with_quoted_dirty_price(987_654.32);
+        let overrides =
+            InstrumentPricingOverrides::default().with_quoted_dirty_price_currency(987_654.32);
         let bond = build_test_bond(overrides);
         let market = flat_discount_market(0.03);
         let pv = bond.value(&market, date!(2025 - 01 - 01)).expect("value");
@@ -891,7 +892,7 @@ mod tests {
     fn quoted_dirty_value_is_carried_back_to_as_of() {
         let dirty_at_quote = 987_654.32;
         let overrides =
-            InstrumentPricingOverrides::default().with_quoted_dirty_price(dirty_at_quote);
+            InstrumentPricingOverrides::default().with_quoted_dirty_price_currency(dirty_at_quote);
         let mut bond = build_test_bond(overrides);
         bond.settlement_convention = Some(BondSettlementConvention {
             settlement_days: 2,
@@ -957,7 +958,7 @@ mod tests {
             .amount();
         let mut shocked_bond = build_test_bond(InstrumentPricingOverrides::default());
         shocked_bond.scenario_pricing_overrides =
-            ScenarioPricingOverrides::default().with_spread_shock_bp(100.0);
+            ScenarioPricingOverrides::default().with_scenario_spread_shock_bp(100.0);
         let shocked_pv = shocked_bond
             .value(&market, as_of)
             .expect("shocked")
@@ -987,7 +988,7 @@ mod tests {
         let mut combined =
             build_test_bond(InstrumentPricingOverrides::default().with_quoted_z_spread(0.0050));
         combined.scenario_pricing_overrides =
-            ScenarioPricingOverrides::default().with_spread_shock_bp(50.0);
+            ScenarioPricingOverrides::default().with_scenario_spread_shock_bp(50.0);
         let combined_pv = combined.value(&market, as_of).expect("combined").amount();
         let equivalent_pv =
             build_test_bond(InstrumentPricingOverrides::default().with_quoted_z_spread(0.01))
@@ -1008,7 +1009,7 @@ mod tests {
             InstrumentPricingOverrides::default().with_quoted_clean_price_pct(98.5),
         );
         bond.scenario_pricing_overrides =
-            ScenarioPricingOverrides::default().with_spread_shock_bp(50.0);
+            ScenarioPricingOverrides::default().with_scenario_spread_shock_bp(50.0);
         let err = bond
             .value(&market, date!(2025 - 01 - 01))
             .expect_err("spread shock with a price-pinning quote must error, not silently no-op");
@@ -1047,7 +1048,7 @@ mod tests {
     fn market_quote_overrides_accept_single_price_driver() {
         for overrides in [
             InstrumentPricingOverrides::default().with_quoted_clean_price_pct(98.5),
-            InstrumentPricingOverrides::default().with_quoted_dirty_price(987_654.32),
+            InstrumentPricingOverrides::default().with_quoted_dirty_price_currency(987_654.32),
             InstrumentPricingOverrides::default().with_quoted_ytm(0.05),
             InstrumentPricingOverrides::default().with_quoted_ytw(0.05),
             InstrumentPricingOverrides::default().with_quoted_z_spread(0.0125),

@@ -49,11 +49,11 @@ fn test_vega_finite_difference() {
     let h = 0.01; // 1% vol shift
 
     swaption.instrument_pricing_overrides =
-        InstrumentPricingOverrides::default().with_implied_vol(base_vol + h);
+        InstrumentPricingOverrides::default().with_implied_volatility(base_vol + h);
     let pv_up = swaption.value(&market, as_of).unwrap().amount();
 
     swaption.instrument_pricing_overrides =
-        InstrumentPricingOverrides::default().with_implied_vol(base_vol - h);
+        InstrumentPricingOverrides::default().with_implied_volatility(base_vol - h);
     let pv_down = swaption.value(&market, as_of).unwrap().amount();
 
     let vega_fd = (pv_up - pv_down) / 2.0; // Per 1% change

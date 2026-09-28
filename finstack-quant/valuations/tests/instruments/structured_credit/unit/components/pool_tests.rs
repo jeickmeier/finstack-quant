@@ -81,7 +81,7 @@ fn test_pool_asset_builder_methods() {
     )
     .with_rating(CreditRating::BB)
     .with_industry("Technology")
-    .with_obligor("OBLIGOR001");
+    .with_obligor_id("OBLIGOR001");
 
     // Assert
     assert_eq!(asset.rating, Some(CreditRating::BB));
@@ -510,7 +510,7 @@ fn test_pool_diversity_score_single_obligor() {
             maturity_date(),
             finstack_quant_core::dates::DayCount::Act360,
         )
-        .with_obligor("OB1"),
+        .with_obligor_id("OB1"),
     );
     pool.assets.push(
         PoolAsset::floating_rate_loan(
@@ -521,7 +521,7 @@ fn test_pool_diversity_score_single_obligor() {
             maturity_date(),
             finstack_quant_core::dates::DayCount::Act360,
         )
-        .with_obligor("OB1"),
+        .with_obligor_id("OB1"),
     );
 
     // Act
@@ -544,7 +544,7 @@ fn test_pool_diversity_score_multiple_obligors() {
             maturity_date(),
             finstack_quant_core::dates::DayCount::Act360,
         )
-        .with_obligor("OB1"),
+        .with_obligor_id("OB1"),
     );
     pool.assets.push(
         PoolAsset::floating_rate_loan(
@@ -555,7 +555,7 @@ fn test_pool_diversity_score_multiple_obligors() {
             maturity_date(),
             finstack_quant_core::dates::DayCount::Act360,
         )
-        .with_obligor("OB2"),
+        .with_obligor_id("OB2"),
     );
 
     // Act
@@ -641,7 +641,7 @@ fn test_pool_assets_by_obligor() {
             maturity_date(),
             finstack_quant_core::dates::DayCount::Act360,
         )
-        .with_obligor("OB1"),
+        .with_obligor_id("OB1"),
     );
     pool.assets.push(
         PoolAsset::floating_rate_loan(
@@ -652,7 +652,7 @@ fn test_pool_assets_by_obligor() {
             maturity_date(),
             finstack_quant_core::dates::DayCount::Act360,
         )
-        .with_obligor("OB1"),
+        .with_obligor_id("OB1"),
     );
 
     // Act
@@ -681,7 +681,7 @@ fn test_calculate_pool_stats_comprehensive() {
         )
         .with_rating(CreditRating::BB)
         .with_industry("Technology")
-        .with_obligor("OB1"),
+        .with_obligor_id("OB1"),
     );
 
     pool.assets.push(
@@ -694,7 +694,7 @@ fn test_calculate_pool_stats_comprehensive() {
         )
         .with_rating(CreditRating::B)
         .with_industry("Healthcare")
-        .with_obligor("OB2"),
+        .with_obligor_id("OB2"),
     );
 
     // Act

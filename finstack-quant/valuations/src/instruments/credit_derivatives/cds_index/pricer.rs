@@ -984,7 +984,7 @@ mod tests {
 
     #[test]
     fn constituent_positions_skip_defaulted_names_and_renormalize_live_weights() {
-        let mut index = CdsIndex::example();
+        let mut index = CdsIndex::example().expect("example");
         index.pricing = IndexPricing::Constituents;
         index.index_factor = 0.6;
         index.constituents = vec![
@@ -1026,16 +1026,16 @@ mod tests {
         let upfront = Money::from((125_000_i64, Currency::USD));
 
         // Paid on the valuation date, so the discount factor is exactly 1.
-        let mut pay = CdsIndex::example();
+        let mut pay = CdsIndex::example().expect("example");
         pay.upfront = Some((as_of, upfront));
         let pay_base = pricer
-            .npv(&CdsIndex::example(), &market, as_of)
+            .npv(&CdsIndex::example().expect("example"), &market, as_of)
             .expect("base pay npv");
         let pay_with_upfront = pricer
             .npv(&pay, &market, as_of)
             .expect("pay npv with upfront");
 
-        let mut receive = CdsIndex::example();
+        let mut receive = CdsIndex::example().expect("example");
         receive.side = crate::instruments::credit_derivatives::cds::PayReceive::Receive;
         let mut receive_with_upfront = receive.clone();
         receive_with_upfront.upfront = Some((as_of, upfront));
@@ -1055,7 +1055,7 @@ mod tests {
         let as_of = date(2024, 1, 1);
         let market = sample_market(as_of);
         let schedule = CdsIndexPricer::new()
-            .build_projected_schedule(&CdsIndex::example(), &market, as_of)
+            .build_projected_schedule(&CdsIndex::example().expect("example"), &market, as_of)
             .expect("projected schedule should build");
 
         assert!(schedule
@@ -1076,7 +1076,7 @@ mod tests {
         // for benign curves but are not numerically identical.
         let as_of = date(2024, 1, 1);
         let market = sample_market(as_of);
-        let index = CdsIndex::example();
+        let index = CdsIndex::example().expect("example");
         let pricer = CdsIndexPricer::new();
         let schedule = pricer
             .build_projected_schedule(&index, &market, as_of)
@@ -1116,7 +1116,7 @@ mod tests {
         let as_of = date(2024, 1, 1);
         let market = sample_market(as_of);
         let pricer = CdsIndexPricer::new();
-        let index = CdsIndex::example(); // Pay by default
+        let index = CdsIndex::example().expect("example"); // Pay by default
 
         let npv = pricer.npv(&index, &market, as_of).expect("npv");
         let pv_prot = pricer
@@ -1163,7 +1163,7 @@ mod tests {
                 .expect("hazard B"),
         );
 
-        let mut index = CdsIndex::example();
+        let mut index = CdsIndex::example().expect("example");
         index.pricing = IndexPricing::Constituents;
         index.constituents = vec![
             CdsIndexConstituent {
@@ -1200,7 +1200,7 @@ mod tests {
 
     #[test]
     fn rejects_index_factor_inconsistent_with_defaulted_weights() {
-        let mut index = CdsIndex::example();
+        let mut index = CdsIndex::example().expect("example");
         index.pricing = IndexPricing::Constituents;
         // No defaults but index_factor > 1 should be rejected.
         index.index_factor = 1.2;
@@ -1222,7 +1222,7 @@ mod tests {
         // consistency check is two-sided — an index_factor strictly below
         // `1 − sum_defaulted_weights` would silently shrink the surviving
         // notional further than the declared defaults justify.
-        let mut index = CdsIndex::example();
+        let mut index = CdsIndex::example().expect("example");
         index.pricing = IndexPricing::Constituents;
         // 20% declared default → factor should be 0.8; we set 0.5 to
         // simulate the bug.
@@ -1252,7 +1252,7 @@ mod tests {
         // no constituents are flagged as defaulted (e.g. SingleCurve mode
         // or external default tracking). This must NOT be rejected by the
         // Q4 lower-bound check.
-        let mut index = CdsIndex::example();
+        let mut index = CdsIndex::example().expect("example");
         index.pricing = IndexPricing::Constituents;
         index.index_factor = 0.8;
         index.constituents = vec![CdsIndexConstituent {
@@ -1272,7 +1272,7 @@ mod tests {
         // numerator / denominator must reproduce the reported total.
         let as_of = date(2024, 5, 15);
         let market = sample_market(as_of);
-        let index = CdsIndex::example();
+        let index = CdsIndex::example().expect("example");
         assert_eq!(index.pricing, IndexPricing::SingleCurve);
 
         let r = CdsIndexPricer::new()
@@ -1294,7 +1294,7 @@ mod tests {
 
     #[test]
     fn rejects_negative_constituent_weight() {
-        let mut index = CdsIndex::example();
+        let mut index = CdsIndex::example().expect("example");
         index.pricing = IndexPricing::Constituents;
         index.constituents = vec![
             CdsIndexConstituent {

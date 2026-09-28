@@ -169,7 +169,7 @@ fn build_clo(cpr: f64, cdr: f64, recovery: f64, recovery_lag: u32) -> Structured
         maturity(),
         "USD_OIS",
     )
-    .with_calendar("nyse");
+    .with_calendar_id("nyse");
 
     clo.credit_model.prepayment_spec = PrepaymentModelSpec::constant_cpr(cpr);
     clo.credit_model.default_spec = DefaultModelSpec::constant_cdr(cdr);

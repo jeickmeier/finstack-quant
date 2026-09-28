@@ -85,7 +85,7 @@ fn test_equity_with_price_id() {
 
 #[test]
 fn test_equity_with_dividend_yield_id() {
-    let equity = Equity::new("AAPL", "AAPL", Currency::USD).with_dividend_yield_id("CUSTOM_DIV");
+    let equity = Equity::new("AAPL", "AAPL", Currency::USD).with_div_yield_id("CUSTOM_DIV");
 
     assert_eq!(
         equity.div_yield_id,
@@ -99,7 +99,7 @@ fn test_equity_builder_chaining() {
         .with_quantity(100.0)
         .with_quoted_spot(150.0)
         .with_spot_id("CUSTOM_PRICE")
-        .with_dividend_yield_id("CUSTOM_DIV");
+        .with_div_yield_id("CUSTOM_DIV");
 
     assert_eq!(equity.quantity, Some(100.0));
     assert_eq!(equity.quoted_spot, Some(150.0));
@@ -186,7 +186,7 @@ fn test_equity_dividend_yield_ignores_ticker_suffix() {
 
 #[test]
 fn test_equity_dividend_yield_from_custom_id() {
-    let equity = Equity::new("AAPL", "AAPL", Currency::USD).with_dividend_yield_id("MY_DIV_YIELD");
+    let equity = Equity::new("AAPL", "AAPL", Currency::USD).with_div_yield_id("MY_DIV_YIELD");
 
     let market = MarketContext::new().insert_price("MY_DIV_YIELD", MarketScalar::Unitless(0.035));
 

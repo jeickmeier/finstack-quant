@@ -444,12 +444,12 @@ impl ForwardRateAgreement {
     /// The inferred date is then adjusted according to `fixing_business_day_convention` (defaults to ModifiedFollowing).
     pub fn npv_raw(
         &self,
-        context: &finstack_quant_core::market_data::context::MarketContext,
+        market: &finstack_quant_core::market_data::context::MarketContext,
         as_of: finstack_quant_core::dates::Date,
     ) -> finstack_quant_core::Result<f64> {
         self.validate()?;
-        let disc = context.get_discount(&self.discount_curve_id)?;
-        let flows = self.dated_cashflows(context, as_of)?;
+        let disc = market.get_discount(&self.discount_curve_id)?;
+        let flows = self.dated_cashflows(market, as_of)?;
 
         if flows.is_empty() {
             return Ok(0.0);

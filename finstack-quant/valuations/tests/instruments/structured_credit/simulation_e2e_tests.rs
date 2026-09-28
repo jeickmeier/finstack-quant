@@ -156,7 +156,7 @@ fn build_simple_clo(
         pool_maturity,
         "USD_OIS",
     )
-    .with_calendar("nyse");
+    .with_calendar_id("nyse");
 
     clo.credit_model.prepayment_spec = PrepaymentModelSpec::constant_cpr(cpr);
     clo.credit_model.default_spec = DefaultModelSpec::constant_cdr(cdr);
@@ -969,7 +969,7 @@ fn e2e_multi_asset_pool_aggregates_correctly() {
         maturity_5y(),
         "USD_OIS",
     )
-    .with_calendar("nyse");
+    .with_calendar_id("nyse");
 
     clo.credit_model.prepayment_spec = PrepaymentModelSpec::constant_cpr(0.0);
     clo.credit_model.default_spec = DefaultModelSpec::constant_cdr(0.0);

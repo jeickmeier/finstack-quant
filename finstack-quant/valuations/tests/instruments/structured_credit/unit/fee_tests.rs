@@ -105,7 +105,7 @@ fn clo(adjust: impl FnOnce(&mut DealFees)) -> StructuredCredit {
     .expect("structure");
     let mut deal =
         StructuredCredit::new_clo("CLO-FEES", pool, tranches, close, maturity, "USD-OIS")
-            .with_calendar("nyse")
+            .with_calendar_id("nyse")
             .with_standard_fees();
     let mut fees = deal.fees.take().expect("standard fees");
     adjust(&mut fees);

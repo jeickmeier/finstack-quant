@@ -820,8 +820,8 @@ mod tests {
         );
 
         let equity_option = EquityOption::example().expect("equity option");
-        let swaption = Swaption::example();
-        let commodity_option = CommodityOption::example();
+        let swaption = Swaption::example().expect("example");
+        let commodity_option = CommodityOption::example().expect("example");
         for instrument in [
             &equity_option as &dyn Instrument,
             &swaption as &dyn Instrument,
@@ -833,7 +833,7 @@ mod tests {
             );
         }
 
-        let mut normal_swaption = Swaption::example();
+        let mut normal_swaption = Swaption::example().expect("example");
         normal_swaption.vol_model = crate::instruments::VolatilityModel::Normal;
         assert_eq!(
             resolve_model_key(&normal_swaption, "default").expect("model"),
@@ -1096,7 +1096,7 @@ mod tests {
 
     #[test]
     fn validate_instrument_json_rejects_invalid_cleanup_call_threshold() {
-        let mut deal = StructuredCredit::example();
+        let mut deal = StructuredCredit::example().expect("example");
         deal.cleanup_call_decimal = Some(-0.5);
         let json = envelope_json(InstrumentJson::StructuredCredit(Box::new(deal)));
 

@@ -223,8 +223,7 @@ impl TryFrom<QuantoOptionUnchecked> for QuantoOption {
 impl QuantoOption {
     /// Create a canonical example quanto equity option (Nikkei in USD)
     /// expiring on the project-wide stable example epoch.
-    #[allow(clippy::expect_used)] // Example uses hardcoded valid values
-    pub fn example() -> Self {
+    pub fn example() -> finstack_quant_core::Result<Self> {
         use finstack_quant_core::dates::DayCount;
         QuantoOption::builder()
             .id(InstrumentId::new("QUANTO-NKY-USD-CALL"))
@@ -248,7 +247,6 @@ impl QuantoOption {
             .fx_vol_surface_id_opt(Some(CurveId::new("JPYUSD-VOL")))
             .attributes(Attributes::new())
             .build()
-            .expect("Example QuantoOption construction should not fail")
     }
 
     /// Validate quanto option economics at construction boundaries.
@@ -718,7 +716,7 @@ mod tests {
 
     #[test]
     fn test_quanto_option_example_creation() {
-        let option = QuantoOption::example();
+        let option = QuantoOption::example().expect("example");
         assert_eq!(option.id.as_str(), "QUANTO-NKY-USD-CALL");
         assert_eq!(option.quote_currency, Currency::USD);
         assert_eq!(option.base_currency, Currency::JPY);
@@ -729,7 +727,7 @@ mod tests {
 
     #[test]
     fn test_quanto_option_market_dependencies() {
-        let option = QuantoOption::example();
+        let option = QuantoOption::example().expect("example");
         let deps = option
             .market_dependencies()
             .expect("market_dependencies")
@@ -743,7 +741,7 @@ mod tests {
 
     #[test]
     fn canonical_dependencies_keep_equity_and_fx_volatility_contexts() {
-        let option = QuantoOption::example();
+        let option = QuantoOption::example().expect("example");
         let deps =
             crate::instruments::Instrument::market_dependencies(&option).expect("dependencies");
 
@@ -781,7 +779,7 @@ mod tests {
 
     #[test]
     fn test_quanto_option_serde_rejects_inconsistent_notional() {
-        let option = QuantoOption::example();
+        let option = QuantoOption::example().expect("example");
         let mut json = serde_json::to_value(&option).expect("serialize");
         json["notional"]["amount"] = serde_json::json!("2000000");
 

@@ -264,9 +264,13 @@ impl FxSpot {
     /// Create a new FX spot instrument.
     ///
     /// Default business day convention is `ModifiedFollowing` per ISDA standard.
-    pub fn new(id: InstrumentId, base_currency: Currency, quote_currency: Currency) -> Self {
+    pub fn new(
+        id: impl Into<InstrumentId>,
+        base_currency: Currency,
+        quote_currency: Currency,
+    ) -> Self {
         Self {
-            id,
+            id: id.into(),
             base_currency,
             quote_currency,
             settlement_date: None,
@@ -473,11 +477,6 @@ impl FxSpot {
         self
     }
 
-    /// Get the configured notional amount.
-    pub fn get_effective_notional(&self) -> Money {
-        self.notional
-    }
-
     fn validate_economics(&self) -> finstack_quant_core::Result<()> {
         crate::instruments::common_impl::validation::validate_distinct_currencies(
             self.base_currency,
@@ -543,7 +542,11 @@ impl FxSpot {
     ///     Currency::CAD,
     /// );
     /// ```
-    pub fn new_t1(id: InstrumentId, base_currency: Currency, quote_currency: Currency) -> Self {
+    pub fn new_t1(
+        id: impl Into<InstrumentId>,
+        base_currency: Currency,
+        quote_currency: Currency,
+    ) -> Self {
         Self::new(id, base_currency, quote_currency).with_settlement_days(1)
     }
 
@@ -667,10 +670,7 @@ impl finstack_quant_cashflows::CashflowScheduleSource for FxSpot {
                 );
                 matrix.as_ref().rate(q)?.rate
             };
-            let value = Money::new(
-                self.get_effective_notional().amount() * rate,
-                self.quote_currency,
-            )?;
+            let value = Money::new(self.notional.amount() * rate, self.quote_currency)?;
             vec![(settle_date, value)]
         };
 

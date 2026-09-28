@@ -60,7 +60,7 @@ fn build_market_from_deps(
 #[test]
 fn test_forward_curve_dependencies_complete() {
     let as_of = date!(2025 - 01 - 01);
-    let mut option = CommodityOption::example();
+    let mut option = CommodityOption::example().expect("example");
     option.spot_id = Some("WTI-SPOT".into());
 
     let deps =
@@ -80,7 +80,7 @@ fn test_forward_curve_dependencies_complete() {
 fn test_missing_forward_curve_with_spot_succeeds() {
     // When spot_id is present, commodity option can derive forward via cost-of-carry
     let as_of = date!(2025 - 01 - 01);
-    let mut option = CommodityOption::example();
+    let mut option = CommodityOption::example().expect("example");
     option.spot_id = Some("WTI-SPOT".into());
 
     let deps =
@@ -126,7 +126,7 @@ fn test_missing_forward_curve_with_spot_succeeds() {
 fn test_missing_both_forward_and_spot_fails() {
     // When neither PriceCurve nor spot_id is available, pricing should fail
     let as_of = date!(2025 - 01 - 01);
-    let mut option = CommodityOption::example();
+    let mut option = CommodityOption::example().expect("example");
     option.spot_id = None; // No spot fallback
 
     let deps =

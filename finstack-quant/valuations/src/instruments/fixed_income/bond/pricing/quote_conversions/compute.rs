@@ -40,7 +40,7 @@ pub(crate) fn clear_price_driving_overrides(bond: &mut Bond) {
 /// * `bond` - Bond to normalize and value. The function clones it before
 ///   applying the derived clean-price override, so the caller's instance is
 ///   unchanged.
-/// * `curves` - Market context supplying the bond schedule, discount curves,
+/// * `market` - Market context supplying the bond schedule, discount curves,
 ///   forward curves, and other metric dependencies.
 /// * `as_of` - Valuation or trade date from which settlement-aware accrued
 ///   interest and clean/dirty conversion are determined.
@@ -95,7 +95,7 @@ pub(crate) fn clear_price_driving_overrides(bond: &mut Bond) {
 /// ```
 pub fn compute_quotes(
     bond: &Bond,
-    curves: &MarketContext,
+    market: &MarketContext,
     as_of: Date,
     quote_input: BondQuoteInput,
     options: PricingOptions,
@@ -111,7 +111,7 @@ pub fn compute_quotes(
     let mut bond_for_metrics = bond.clone();
 
     // Quote normalization (clean/dirty conversion) must use accrued at quote/settlement date.
-    let quote_ctx = QuoteDateContext::new(&bond_for_metrics, curves, as_of)?;
+    let quote_ctx = QuoteDateContext::new(&bond_for_metrics, market, as_of)?;
     let accrued_currency = quote_ctx.accrued_at_quote_date;
 
     let notional = bond_for_metrics.notional.amount();
@@ -157,7 +157,7 @@ pub fn compute_quotes(
 
     let dirty_price_currency = settlement_dirty_from_quote_overrides(
         &bond_for_metrics,
-        curves,
+        market,
         as_of,
         model,
         Some(&pricing_dispatch),
@@ -182,7 +182,7 @@ pub fn compute_quotes(
 
     // 2) Build metric context with the same model and registries for the rest.
     let base_value = finstack_quant_core::money::Money::new(
-        pricing_dispatch.price_raw(&bond_for_metrics, curves, as_of)?,
+        pricing_dispatch.price_raw(&bond_for_metrics, market, as_of)?,
         bond_for_metrics.notional.currency(),
     )?;
     let metric_registry = match options.metric_registry.as_deref() {
@@ -191,7 +191,7 @@ pub fn compute_quotes(
     };
 
     let instrument_arc: Arc<dyn Instrument> = Arc::new(bond_for_metrics.clone());
-    let curves_arc = Arc::new(curves.clone());
+    let curves_arc = Arc::new(market.clone());
     let mut ctx = MetricContext::new(
         instrument_arc,
         curves_arc,
@@ -208,7 +208,7 @@ pub fn compute_quotes(
     ctx.set_recalibration_provider(options.recalibration_provider.clone());
     ctx.set_pricer_dispatch(pricing_dispatch);
     ctx.set_metric_overrides(bond_for_metrics.get_metric_pricing_overrides().cloned());
-    bond_for_metrics.seed_metric_context(&mut ctx, curves, as_of);
+    bond_for_metrics.seed_metric_context(&mut ctx, market, as_of);
     ctx.notional = Some(bond_for_metrics.notional);
 
     // Pre-populate accrued since we've already computed it.

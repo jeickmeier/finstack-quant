@@ -60,13 +60,13 @@ impl StructuredCredit {
     /// use finstack_quant_core::dates::BusinessDayConvention;
     /// use finstack_quant_valuations::instruments::fixed_income::structured_credit::StructuredCredit;
     ///
-    /// let clo = StructuredCredit::example()
-    ///     .with_calendar("nyse")
+    /// let clo = StructuredCredit::example().expect("example")
+    ///     .with_calendar_id("nyse")
     ///     .with_business_day_convention(BusinessDayConvention::ModifiedFollowing);
     /// # let _ = clo;
     /// ```
     #[must_use]
-    pub fn with_calendar(
+    pub fn with_calendar_id(
         mut self,
         calendar_id: impl Into<finstack_quant_core::types::CalendarId>,
     ) -> Self {
@@ -94,7 +94,10 @@ impl StructuredCredit {
     /// # Errors
     /// Returns a validation error if `threshold` is not finite or is outside
     /// `(0.0, 1.0)`.
-    pub fn with_cleanup_call(mut self, threshold: f64) -> finstack_quant_core::Result<Self> {
+    pub fn with_cleanup_call_decimal(
+        mut self,
+        threshold: f64,
+    ) -> finstack_quant_core::Result<Self> {
         if !threshold.is_finite() || threshold <= 0.0 || threshold >= 1.0 {
             return Err(finstack_quant_core::Error::Validation(format!(
                 "cleanup_call_decimal must be finite and in (0, 1), got {threshold}"
@@ -278,7 +281,7 @@ impl StructuredCredit {
     ///
     /// ```no_run
     /// # use finstack_quant_valuations::instruments::fixed_income::structured_credit::StructuredCredit;
-    /// let deal = StructuredCredit::example().with_standard_fees();
+    /// let deal = StructuredCredit::example().expect("example").with_standard_fees();
     /// assert!(deal.fees.is_some());
     /// ```
     #[must_use]

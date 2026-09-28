@@ -100,7 +100,7 @@ fn bench_range_accrual_analytic(c: &mut Criterion) {
     let mut group = c.benchmark_group("range_accrual_analytic");
     let as_of = date(2024, Month::January, 1);
     let market = equity_range_market(as_of);
-    let inst = RangeAccrual::example();
+    let inst = RangeAccrual::example().expect("example");
     group.bench_function("12_monthly_obs", |b| {
         b.iter(|| {
             black_box(&inst)
@@ -135,7 +135,7 @@ fn bench_quanto_range_accrual(c: &mut Criterion) {
                 .build()
                 .unwrap(),
         );
-    let mut inst = RangeAccrual::example();
+    let mut inst = RangeAccrual::example().expect("example");
     inst.terms.quanto = Some(QuantoSpec {
         asset_currency: Currency::EUR,
         asset_discount_curve_id: "EUR-OIS".into(),
@@ -171,9 +171,12 @@ fn bench_callable_range_accrual_lsmc(c: &mut Criterion) {
     group.throughput(Throughput::Elements(MC_PATHS));
     let as_of = date(2026, Month::January, 1);
     let market = hw1f_market(as_of);
-    let inst = with_mc_paths(CallableRangeAccrual::example(), |inst, overrides| {
-        inst.instrument_pricing_overrides = overrides;
-    });
+    let inst = with_mc_paths(
+        CallableRangeAccrual::example().expect("example"),
+        |inst, overrides| {
+            inst.instrument_pricing_overrides = overrides;
+        },
+    );
     group.bench_with_input(BenchmarkId::from_parameter(MC_PATHS), &MC_PATHS, |b, _| {
         b.iter(|| {
             black_box(&inst)
@@ -196,7 +199,7 @@ fn bench_snowball_mc(c: &mut Criterion) {
     group.throughput(Throughput::Elements(MC_PATHS));
     let as_of = date(2026, Month::January, 1);
     let market = hw1f_market(as_of);
-    let inst = with_mc_paths(Snowball::example_snowball(), |inst, overrides| {
+    let inst = with_mc_paths(Snowball::example().expect("example"), |inst, overrides| {
         inst.instrument_pricing_overrides = overrides;
     });
     group.bench_with_input(BenchmarkId::from_parameter(MC_PATHS), &MC_PATHS, |b, _| {
@@ -221,7 +224,7 @@ fn bench_tarn_mc(c: &mut Criterion) {
     group.throughput(Throughput::Elements(MC_PATHS));
     let as_of = date(2026, Month::January, 1);
     let market = hw1f_market(as_of);
-    let inst = with_mc_paths(Tarn::example(), |inst, overrides| {
+    let inst = with_mc_paths(Tarn::example().expect("example"), |inst, overrides| {
         inst.instrument_pricing_overrides = overrides;
     });
     group.bench_with_input(BenchmarkId::from_parameter(MC_PATHS), &MC_PATHS, |b, _| {

@@ -46,7 +46,7 @@ fn assert_rejects<T: Serialize + DeserializeOwned>(instrument: &T, canonical: &s
 #[test]
 // schema-rejection-test: every retired decimal-valued `_pct` key
 fn retired_decimal_pct_keys_are_rejected() {
-    let mut deal = StructuredCredit::example();
+    let mut deal = StructuredCredit::example().expect("example");
     deal.cleanup_call_decimal = Some(0.10);
     assert_rejects(&deal, "cleanup_call_decimal", "cleanup_call_pct");
 

@@ -61,7 +61,7 @@ pub enum TrsDividendSettlement {
 ///     .notional(Money::from((10_000_000_i64, Currency::USD)))
 ///     .underlying(
 ///         EquityUnderlyingParams::new("SPX", "SPX-SPOT", Currency::USD)
-///             .with_dividend_yield("SPX-DIV"),
+///             .with_div_yield_id("SPX-DIV"),
 ///     )
 ///     .financing_leg(FinancingLegSpec::new(
 ///         "USD-OIS", "USD-SOFR-3M", Decimal::from(50), DayCount::Act360,
@@ -385,7 +385,7 @@ impl EquityTotalReturnSwap {
     ) -> Result<Self> {
         let mut underlying = EquityUnderlyingParams::new(etf_ticker, spot_id, notional.currency());
         if let Some(div) = div_yield_id {
-            underlying = underlying.with_dividend_yield(div);
+            underlying = underlying.with_div_yield_id(div);
         }
 
         Self::builder()
@@ -512,14 +512,14 @@ impl EquityTotalReturnSwap {
     /// Calculates the present value of the total return leg.
     ///
     /// # Arguments
-    /// * `curves` — Market context containing curves and market data
+    /// * `market` — Market context containing curves and market data
     /// * `as_of` — Date that selects remaining return periods and anchors discounting
     ///
     /// # Returns
     /// Present value of the total return leg in the instrument's currency.
-    pub fn pv_total_return_leg(&self, curves: &MarketContext, as_of: Date) -> Result<Money> {
+    pub fn pv_total_return_leg(&self, market: &MarketContext, as_of: Date) -> Result<Money> {
         self.validate()?;
-        crate::instruments::equity::equity_trs::pricer::pv_total_return_leg(self, curves, as_of)
+        crate::instruments::equity::equity_trs::pricer::pv_total_return_leg(self, market, as_of)
     }
 
     /// Calculates the present value of the financing leg.
@@ -533,19 +533,19 @@ impl EquityTotalReturnSwap {
     /// from the metrics engine.)
     ///
     /// # Arguments
-    /// * `curves` — Market context containing curves and market data
+    /// * `market` — Market context containing curves and market data
     /// * `as_of` — Date that selects remaining financing periods and anchors discounting
     ///
     /// # Returns
     /// Present value of the financing leg in the instrument's currency.
-    pub fn pv_financing_leg(&self, curves: &MarketContext, as_of: Date) -> Result<Money> {
+    pub fn pv_financing_leg(&self, market: &MarketContext, as_of: Date) -> Result<Money> {
         self.validate()?;
         use crate::instruments::common_impl::pricing::TrsEngine;
         TrsEngine::pv_financing_leg(
             &self.financing_leg,
             &self.schedule,
             self.notional,
-            curves,
+            market,
             as_of,
         )
     }
@@ -553,19 +553,19 @@ impl EquityTotalReturnSwap {
     /// Calculates the financing annuity for par spread calculation.
     ///
     /// # Arguments
-    /// * `curves` — Market context containing curves and market data
+    /// * `market` — Market context containing curves and market data
     /// * `as_of` — Date that selects remaining financing periods and anchors discounting
     ///
     /// # Returns
     /// Financing annuity (sum of discounted year fractions × notional).
-    pub fn financing_annuity(&self, curves: &MarketContext, as_of: Date) -> Result<f64> {
+    pub fn financing_annuity(&self, market: &MarketContext, as_of: Date) -> Result<f64> {
         self.validate()?;
         use crate::instruments::common_impl::pricing::TrsEngine;
         TrsEngine::financing_annuity(
             &self.financing_leg,
             &self.schedule,
             self.notional,
-            curves,
+            market,
             as_of,
         )
     }

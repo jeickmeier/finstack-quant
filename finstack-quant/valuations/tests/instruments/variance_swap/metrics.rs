@@ -236,7 +236,7 @@ fn test_realized_variance_matches_series_calculation() {
 #[test]
 fn test_expected_variance_before_start_uses_implied_vol() {
     // Arrange
-    let swap = with_implied_vol(sample_swap(PayReceive::Receive), 0.22);
+    let swap = with_implied_volatility(sample_swap(PayReceive::Receive), 0.22);
     let ctx = base_context_without_vol();
     let as_of = date(2024, 12, 1);
 
@@ -539,7 +539,7 @@ fn test_dv01_at_maturity_is_zero() {
 #[test]
 fn test_dv01_decreases_as_maturity_approaches() {
     // Arrange
-    let swap = with_implied_vol(sample_swap(PayReceive::Receive), 0.22);
+    let swap = with_implied_volatility(sample_swap(PayReceive::Receive), 0.22);
     let ctx = base_context();
     let dates = [
         date(2024, 12, 1),

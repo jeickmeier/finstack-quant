@@ -45,11 +45,11 @@ fn retired_fx_keys_are_rejected() {
     // schema-rejection-test
     rejects::<FxSpot>(spot, "domestic_discount_curve_id", "discount_curve_id");
 
-    let swap = serde_json::to_value(FxSwap::example()).expect("ser");
+    let swap = serde_json::to_value(FxSwap::example().expect("example")).expect("ser");
     // schema-rejection-test
     rejects::<FxSwap>(swap, "notional", "base_notional");
 
-    let mut ndf = serde_json::to_value(Ndf::example()).expect("ser");
+    let mut ndf = serde_json::to_value(Ndf::example().expect("example")).expect("ser");
     ndf["settlement_calendar_id"] = json!("nyse");
     ndf["fixing_source"] = json!("pboc");
     // schema-rejection-test
@@ -60,7 +60,7 @@ fn retired_fx_keys_are_rejected() {
 
 #[test]
 fn retired_repo_special_security_id_is_rejected() {
-    let mut repo = serde_json::to_value(Repo::example()).expect("ser");
+    let mut repo = serde_json::to_value(Repo::example().expect("example")).expect("ser");
     repo["collateral"]["collateral_type"] = json!({"special": {"rate_adjustment_bp": -25.0}});
     let parsed: Repo = serde_json::from_value(repo.clone()).expect("special collateral parses");
     assert_eq!(
@@ -77,7 +77,7 @@ fn retired_repo_special_security_id_is_rejected() {
 
 #[test]
 fn ndf_contract_rate_is_optional_on_the_wire() {
-    let mut ndf = Ndf::example();
+    let mut ndf = Ndf::example().expect("example");
     ndf.contract_rate = None;
     let json = serde_json::to_value(&ndf).expect("ser");
     assert!(json.get("contract_rate").is_none());
@@ -100,6 +100,6 @@ fn fx_option_style_instruments_default_day_count_to_act365f() {
         i.day_count
     });
     check(FxTouchOption::example().expect("example"), |i| i.day_count);
-    check(QuantoOption::example(), |i| i.day_count);
-    check(FxVarianceSwap::example(), |i| i.day_count);
+    check(QuantoOption::example().expect("example"), |i| i.day_count);
+    check(FxVarianceSwap::example().expect("example"), |i| i.day_count);
 }

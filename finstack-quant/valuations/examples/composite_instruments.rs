@@ -62,10 +62,10 @@ fn rates_examples() -> finstack_quant_core::Result<(CompositeSpec, CompositeSpec
 }
 
 fn commodity_spread() -> finstack_quant_core::Result<InstrumentEnvelope> {
-    let mut wti = CommodityForward::example();
+    let mut wti = CommodityForward::example().expect("example");
     wti.id = InstrumentId::new("WTI");
 
-    let mut brent = CommodityForward::example();
+    let mut brent = CommodityForward::example().expect("example");
     brent.id = InstrumentId::new("BRENT");
     brent.underlying = CommodityUnderlyingParams::new("Energy", "CO", "BBL", Currency::USD);
     brent.forward_curve_id = "BRENT-FORWARD".into();

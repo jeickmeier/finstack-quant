@@ -152,7 +152,7 @@ mod tests {
 
     #[test]
     fn cds_quote_override_returns_provider_contract() {
-        let mut cds = CreditDefaultSwap::example();
+        let mut cds = CreditDefaultSwap::example().expect("example");
         cds.instrument_pricing_overrides.market_quotes.cds_quote_bp = Some(321.0);
         let request = deal_quote_override(&cds).expect("deal quote override");
         assert_eq!(request.contract_end, cds.premium_leg.end);

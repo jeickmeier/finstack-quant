@@ -177,9 +177,9 @@ mod tests {
     #[test]
     fn swaption_default_matches_declared_volatility_model_for_pv_and_raw() {
         let as_of = date(2025, 1, 1);
-        let mut black = Swaption::example();
+        let mut black = Swaption::example().expect("example");
         black.instrument_pricing_overrides =
-            InstrumentPricingOverrides::default().with_implied_vol(0.20);
+            InstrumentPricingOverrides::default().with_implied_volatility(0.20);
         let mut normal = black.clone();
         normal.vol_model = VolatilityModel::Normal;
         let mut sabr = black.clone();
@@ -232,9 +232,9 @@ mod tests {
     #[test]
     fn black76_registry_applies_swaption_scenario_once_for_pv_and_raw() {
         let as_of = date(2025, 1, 1);
-        let mut baseline = Swaption::example();
+        let mut baseline = Swaption::example().expect("example");
         baseline.instrument_pricing_overrides =
-            InstrumentPricingOverrides::default().with_implied_vol(0.20);
+            InstrumentPricingOverrides::default().with_implied_volatility(0.20);
         let market = MarketContext::new().insert(flat_discount_with_tenor(
             baseline.get_discount_curve_id().as_str(),
             as_of,

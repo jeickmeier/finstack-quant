@@ -22,20 +22,20 @@ impl StructuredCredit {
     ///
     /// # Arguments
     ///
-    /// * `context` - Market context holding the deal's discount curve, any
+    /// * `market` - Market context holding the deal's discount curve, any
     ///   floating-rate index curves and fixings, and the hedge swaps' curves.
     /// * `as_of` - Requested valuation date; the deal's quote settlement date
     ///   or the last contractual boundary may move the effective date.
     /// * `metrics` - Metric identifiers to compute alongside the value.
     pub fn price_with_metrics_standalone(
         &self,
-        context: &MarketContext,
+        market: &MarketContext,
         as_of: Date,
         metrics: &[MetricId],
     ) -> finstack_quant_core::Result<ValuationResult> {
         Ok(Instrument::price_with_metrics(
             self,
-            context,
+            market,
             as_of,
             metrics,
             PricingOptions::default(),

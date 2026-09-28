@@ -47,7 +47,7 @@ fn assert_rejects_at<T: Serialize + DeserializeOwned>(
 #[test]
 // schema-rejection-test: PremiumLegSpec `spread_bp`, `standard_imm_dates`
 fn cds_premium_retired_coupon_and_imm_keys_are_rejected() {
-    let cds = CreditDefaultSwap::example();
+    let cds = CreditDefaultSwap::example().expect("example");
     let mut json = serde_json::to_value(&cds).expect("serialize");
     let premium = json["premium_leg"]
         .as_object_mut()
@@ -68,7 +68,7 @@ fn cds_premium_retired_coupon_and_imm_keys_are_rejected() {
 #[test]
 // schema-rejection-test: MarketQuoteOverrides `upfront_payment`
 fn market_quote_upfront_payment_is_rejected() {
-    let cds = CreditDefaultSwap::example();
+    let cds = CreditDefaultSwap::example().expect("example");
     let mut json = serde_json::to_value(&cds).expect("serialize");
     json["instrument_pricing_overrides"] = serde_json::json!({
         "market_quotes": {"upfront_payment": {"amount": "25000", "currency": "USD"}}
@@ -81,7 +81,7 @@ fn market_quote_upfront_payment_is_rejected() {
 #[test]
 // schema-rejection-test: CdsTranche root `running_coupon_bp`, `accumulated_loss`, `standard_imm_dates`
 fn cds_tranche_retired_keys_are_rejected() {
-    let tranche = CdsTranche::example();
+    let tranche = CdsTranche::example().expect("example");
     assert_rejects_at(&tranche, "", "running_coupon_bp", serde_json::json!(100.0));
     assert_rejects_at(&tranche, "", "accumulated_loss", serde_json::json!(0.0));
     assert_rejects_at(&tranche, "", "standard_imm_dates", serde_json::json!(true));
@@ -103,7 +103,7 @@ fn cds_option_retired_keys_are_rejected() {
 #[test]
 // schema-rejection-test: structured-credit Tranche `attachment_point`, `detachment_point`
 fn structured_credit_tranche_retired_bounds_are_rejected() {
-    let deal = StructuredCredit::example();
+    let deal = StructuredCredit::example().expect("example");
     assert_rejects_at(
         &deal,
         "/tranches/tranches/0",
@@ -120,7 +120,7 @@ fn structured_credit_tranche_retired_bounds_are_rejected() {
 
 #[test]
 fn cds_premium_rejects_futures_imm_roll_rule() {
-    let mut cds = CreditDefaultSwap::example();
+    let mut cds = CreditDefaultSwap::example().expect("example");
     cds.premium_leg.roll_rule = RollRule::Imm;
     let err = cds
         .isda_coupon_schedule()
@@ -151,7 +151,7 @@ fn cds_tranche_new_carries_schedule_stub_and_roll_rule() {
     assert_eq!(tranche.stub, StubKind::LongFront);
     assert_eq!(tranche.roll_rule, RollRule::None);
 
-    let standard = CdsTranche::example();
+    let standard = CdsTranche::example().expect("example");
     assert_eq!(standard.roll_rule, RollRule::CdsImm);
 
     let mut imm = standard;
@@ -193,7 +193,7 @@ fn cds_option_accepts_zero_recovery_like_every_credit_instrument() {
 fn cds_tranche_side_uses_pay_receive_like_cds() {
     // A tranche buyer pays the running premium, exactly like a CDS/CDS-index
     // `pay` side: `pay` buys protection, `receive` sells it.
-    let tranche = CdsTranche::example();
+    let tranche = CdsTranche::example().expect("example");
     assert_eq!(tranche.side, PayReceive::Pay);
     let json = serde_json::to_value(&tranche).expect("serialize");
     assert_eq!(json["side"], "pay");

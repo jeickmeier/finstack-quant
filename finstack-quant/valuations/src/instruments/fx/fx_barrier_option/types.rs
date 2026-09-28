@@ -229,22 +229,16 @@ impl FxBarrierOption {
     /// For EUR/USD (foreign=EUR, domestic=USD):
     /// - Strike and barrier are dimensionless exchange rates (USD per EUR)
     /// - Notional is in EUR (the foreign/base currency being bought)
-    #[allow(clippy::expect_used)] // Example uses hardcoded valid values
-    pub fn example() -> Self {
+    pub fn example() -> finstack_quant_core::Result<Self> {
         use finstack_quant_core::dates::DayCount;
-        use time::Month;
         FxBarrierOption::builder()
             .id(InstrumentId::new("FXBAR-EURUSD-UO-CALL"))
             .strike(1.10) // Strike rate (USD per EUR)
             .barrier(1.20) // Barrier rate (USD per EUR)
             .option_type(crate::instruments::OptionType::Call)
             .barrier_type(BarrierType::UpAndOut)
-            .expiry(
-                Date::from_calendar_date(2024, Month::December, 20).expect("Valid example date"),
-            )
-            .monitoring_start_date_opt(Some(
-                Date::from_calendar_date(2024, Month::January, 1).expect("Valid example date"),
-            ))
+            .expiry(time::macros::date!(2024 - 12 - 20))
+            .monitoring_start_date_opt(Some(time::macros::date!(2024 - 01 - 01)))
             .observed_barrier_breached_opt(None)
             .notional(Money::from((1_000_000_i64, Currency::EUR))) // Notional in foreign currency (EUR)
             .base_currency(Currency::EUR)
@@ -257,7 +251,6 @@ impl FxBarrierOption {
             .vol_surface_id(CurveId::new("EURUSD-VOL"))
             .attributes(Attributes::new())
             .build()
-            .expect("Example FxBarrierOption construction should not fail")
     }
 }
 
@@ -581,7 +574,7 @@ mod tests {
 
     #[test]
     fn test_fx_barrier_option_curve_dependencies_includes_both_curves() {
-        let option = FxBarrierOption::example();
+        let option = FxBarrierOption::example().expect("example");
         let deps = option
             .market_dependencies()
             .expect("market_dependencies")
@@ -605,7 +598,7 @@ mod tests {
 
     #[test]
     fn test_fx_barrier_option_example_has_correct_values() {
-        let option = FxBarrierOption::example();
+        let option = FxBarrierOption::example().expect("example");
 
         // Strike and barrier are f64 exchange rates
         assert!(
@@ -660,7 +653,8 @@ mod tests {
 
     #[test]
     fn test_fx_barrier_option_serde_defaults_to_continuous_monitoring() {
-        let mut value = serde_json::to_value(FxBarrierOption::example()).expect("serialize");
+        let mut value =
+            serde_json::to_value(FxBarrierOption::example().expect("example")).expect("serialize");
         let obj = value
             .as_object_mut()
             .expect("FxBarrierOption should serialize to an object");
@@ -671,7 +665,7 @@ mod tests {
 
     #[test]
     fn discrete_monitoring_requires_strict_contractual_dates() {
-        let mut option = FxBarrierOption::example();
+        let mut option = FxBarrierOption::example().expect("example");
         let start = option.monitoring_start_date.expect("example start");
         option.monitoring = Monitoring::Discrete {
             observation_dates: vec![start, start],
@@ -684,7 +678,8 @@ mod tests {
 
     #[test]
     fn test_fx_barrier_option_serde_allows_missing_fx_spot_id() {
-        let mut value = serde_json::to_value(FxBarrierOption::example()).expect("serialize");
+        let mut value =
+            serde_json::to_value(FxBarrierOption::example().expect("example")).expect("serialize");
         let obj = value
             .as_object_mut()
             .expect("FxBarrierOption should serialize to an object");

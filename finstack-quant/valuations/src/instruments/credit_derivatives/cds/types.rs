@@ -399,16 +399,16 @@ impl CreditDefaultSwap {
     /// Create a canonical example CDS for testing and documentation.
     ///
     /// Returns a 5-year investment-grade CDS with standard ISDA conventions.
-    #[allow(clippy::expect_used)] // Example uses hardcoded valid values
-    pub fn example() -> Self {
+    pub fn example() -> finstack_quant_core::Result<Self> {
         let convention = CdsConvention::IsdaNa;
         let day_count = convention.day_count();
         let frequency = convention.frequency();
         let business_day_convention = convention.business_day_convention();
         let stub = convention.stub_convention();
 
-        let coupon_bp = Decimal::try_from(100.0)
-            .expect("Example CDS spread 100bp should always be representable as Decimal");
+        let coupon_bp = Decimal::try_from(100.0).map_err(|e: rust_decimal::Error| {
+            finstack_quant_core::Error::Validation(e.to_string())
+        })?;
 
         let cds = CreditDefaultSwap::builder()
             .id(InstrumentId::new("CDS-CORP-5Y"))
@@ -434,13 +434,11 @@ impl CreditDefaultSwap {
             })
             .instrument_pricing_overrides(Default::default())
             .attributes(Attributes::new())
-            .build()
-            .expect("Example CDS construction should not fail");
+            .build()?;
 
-        cds.validate()
-            .expect("Example CDS validation should not fail");
+        cds.validate()?;
 
-        cds
+        Ok(cds)
     }
 
     /// Create a new CDS with standard ISDA conventions using explicit inputs.
@@ -907,7 +905,7 @@ mod tests {
 
     #[test]
     fn builder_rejects_invalid_cds_recovery_rate() {
-        let cds = CreditDefaultSwap::example();
+        let cds = CreditDefaultSwap::example().expect("example");
         let mut protection = cds.protection_leg;
         protection.recovery_rate = 1.1;
 
@@ -927,7 +925,7 @@ mod tests {
 
     #[test]
     fn simm_margin_spec_without_credit_classification_is_rejected() {
-        let mut cds = CreditDefaultSwap::example();
+        let mut cds = CreditDefaultSwap::example().expect("example");
         cds.margin_spec =
             Some(finstack_quant_margin::OtcMarginSpec::usd_bilateral().expect("margin spec"));
 
@@ -937,7 +935,7 @@ mod tests {
 
     #[test]
     fn classified_simm_margin_spec_is_valid() {
-        let mut cds = CreditDefaultSwap::example();
+        let mut cds = CreditDefaultSwap::example().expect("example");
         cds.margin_spec = Some(
             finstack_quant_margin::OtcMarginSpec::usd_bilateral()
                 .expect("margin spec")

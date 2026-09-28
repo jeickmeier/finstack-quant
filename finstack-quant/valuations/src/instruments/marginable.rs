@@ -766,7 +766,7 @@ mod tests {
 
     #[test]
     fn test_repo_marginable() {
-        let repo = Repo::example();
+        let repo = Repo::example().expect("example");
 
         // Repo uses repo_margin_spec, not margin_spec
         assert!(repo.margin_spec().is_none());
@@ -839,7 +839,7 @@ mod tests {
     fn cds_marginable_uses_explicit_sector_classification() {
         use finstack_quant_margin::{SimmCreditClassification, SimmCreditSector};
 
-        let mut cds = CreditDefaultSwap::example();
+        let mut cds = CreditDefaultSwap::example().expect("example");
         cds.margin_spec = Some(
             OtcMarginSpec::usd_bilateral()
                 .expect("margin spec")

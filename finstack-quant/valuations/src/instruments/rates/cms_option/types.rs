@@ -157,31 +157,32 @@ impl CmsOption {
     }
 
     /// Create a canonical example CMS option (10Y CMS caplet style).
-    #[allow(clippy::expect_used)] // Example uses hardcoded valid values
-    pub fn example() -> Self {
+    pub fn example() -> finstack_quant_core::Result<Self> {
         use finstack_quant_core::currency::Currency;
-        use time::Month;
 
         let fixing_dates = vec![
-            Date::from_calendar_date(2025, Month::March, 20).expect("Valid example date"),
-            Date::from_calendar_date(2025, Month::June, 20).expect("Valid example date"),
-            Date::from_calendar_date(2025, Month::September, 22).expect("Valid example date"),
-            Date::from_calendar_date(2025, Month::December, 22).expect("Valid example date"),
+            time::macros::date!(2025 - 03 - 20),
+            time::macros::date!(2025 - 06 - 20),
+            time::macros::date!(2025 - 09 - 22),
+            time::macros::date!(2025 - 12 - 22),
         ];
         let payment_dates = vec![
-            Date::from_calendar_date(2025, Month::June, 20).expect("Valid example date"),
-            Date::from_calendar_date(2025, Month::September, 22).expect("Valid example date"),
-            Date::from_calendar_date(2025, Month::December, 22).expect("Valid example date"),
-            Date::from_calendar_date(2026, Month::March, 20).expect("Valid example date"),
+            time::macros::date!(2025 - 06 - 20),
+            time::macros::date!(2025 - 09 - 22),
+            time::macros::date!(2025 - 12 - 22),
+            time::macros::date!(2026 - 03 - 20),
         ];
         let accrual_fractions = vec![0.25, 0.25, 0.25, 0.25];
 
         CmsOption::builder()
             .id(InstrumentId::new("CMSOPT-10Y-USD"))
-            .strike(Decimal::try_from(0.025).expect("valid decimal"))
-            .cms_tenor(
-                Tenor::new(10, finstack_quant_core::dates::TenorUnit::Years).expect("10Y tenor"),
-            )
+            .strike(Decimal::try_from(0.025).map_err(|e: rust_decimal::Error| {
+                finstack_quant_core::Error::Validation(e.to_string())
+            })?)
+            .cms_tenor(Tenor::new(
+                10,
+                finstack_quant_core::dates::TenorUnit::Years,
+            )?)
             .fixing_dates(fixing_dates)
             .payment_dates(payment_dates)
             .accrual_fractions(accrual_fractions)
@@ -195,7 +196,6 @@ impl CmsOption {
             .vol_surface_id(CurveId::new("USD-CMS10Y-VOL"))
             .attributes(Attributes::new())
             .build()
-            .expect("Example CmsOption construction should not fail")
     }
 }
 

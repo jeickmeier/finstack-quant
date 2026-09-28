@@ -501,7 +501,7 @@ mod tests {
         let as_of = date(2025, 1, 1);
         let payment = date(2025, 3, 1);
 
-        let mut inst = CmsSpreadOption::example();
+        let mut inst = CmsSpreadOption::example().expect("example");
         inst.expiry = expiry;
         inst.payment_date = payment;
         inst.strike = rust_decimal::Decimal::ZERO;

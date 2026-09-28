@@ -117,7 +117,6 @@ fn test_commodity_swap_fixed_leg_pv() {
 
 #[test]
 fn test_commodity_swap_payment_schedule() {
-    let as_of = Date::from_calendar_date(2025, Month::January, 1).unwrap();
     let start = Date::from_calendar_date(2025, Month::January, 1).unwrap();
     let end = Date::from_calendar_date(2025, Month::December, 31).unwrap();
 
@@ -141,9 +140,7 @@ fn test_commodity_swap_payment_schedule() {
         .build()
         .expect("should build");
 
-    let schedule = swap
-        .payment_schedule(as_of)
-        .expect("should generate schedule");
+    let schedule = swap.payment_schedule().expect("should generate schedule");
 
     // Should have approximately 12 monthly payments
     assert!(
@@ -405,7 +402,7 @@ fn test_commodity_swap_delta_analytical() {
 
     // Analytical delta for pay-fixed swap: ∑ Q × DF(payment_date)
     let disc = market.get_discount("USD-OIS").expect("discount curve");
-    let schedule = swap.payment_schedule(as_of).expect("schedule");
+    let schedule = swap.payment_schedule().expect("schedule");
 
     let mut expected_delta = 0.0;
     for payment_date in schedule {

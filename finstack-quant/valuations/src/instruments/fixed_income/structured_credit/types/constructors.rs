@@ -49,7 +49,7 @@ impl StructuredCredit {
     ///
     /// # fn main() -> finstack_quant_core::Result<()> {
     /// // Start from the canonical example deal and re-apply deal defaults explicitly.
-    /// let base = StructuredCredit::example();
+    /// let base = StructuredCredit::example().expect("example");
     /// let clo = StructuredCredit::apply_deal_defaults(
     ///     "MY_CLO",
     ///     DealType::Clo,
@@ -65,13 +65,13 @@ impl StructuredCredit {
     /// ```
     #[allow(clippy::too_many_arguments)]
     pub fn apply_deal_defaults(
-        id: impl Into<String>,
+        id: impl Into<InstrumentId>,
         deal_type: DealType,
         pool: AssetPool,
         tranches: TrancheStructure,
         closing_date: Date,
         maturity: Date,
-        discount_curve_id: impl Into<String>,
+        discount_curve_id: impl Into<CurveId>,
     ) -> Self {
         match deal_type {
             DealType::Clo => Self::new_clo(
@@ -115,18 +115,13 @@ impl StructuredCredit {
     /// It creates a fully valid CLO deal with one fixed-rate collateral asset,
     /// a matching senior tranche, and a basic waterfall.
     ///
-    /// # Panics
+    /// # Errors
     ///
-    /// Panics if the hard-coded example dates (2024-01-01, 2034-01-01) are invalid.
-    /// This should never happen barring library bugs in the `time` crate.
-    #[must_use]
-    #[allow(clippy::expect_used)] // Example uses hardcoded valid values
-    pub fn example() -> Self {
+    /// Returns an error if the hard-coded example pool or tranches fail validation.
+    pub fn example() -> finstack_quant_core::Result<Self> {
         use finstack_quant_core::currency::Currency;
-        use time::Month;
-        let closing =
-            Date::from_calendar_date(2024, Month::January, 1).expect("Valid example date");
-        let legal = Date::from_calendar_date(2034, Month::January, 1).expect("Valid example date");
+        let closing = time::macros::date!(2024 - 01 - 01);
+        let legal = time::macros::date!(2034 - 01 - 01);
         let mut pool = AssetPool::new("POOL-1", DealType::Clo, Currency::USD);
         pool.assets.push(PoolAsset::fixed_rate_bond(
             "COLLATERAL-1",
@@ -145,24 +140,24 @@ impl StructuredCredit {
             Money::from((100_000_000_i64, Currency::USD)),
             RateSpec::Fixed { rate: 0.06 },
             legal,
+        )?;
+        let tranches = TrancheStructure::new(vec![tranche])?;
+        Ok(
+            StructuredCredit::new_clo("CLO-EXAMPLE", pool, tranches, closing, legal, "USD-OIS")
+                .with_calendar_id("nyse"),
         )
-        .expect("Tranche build should not fail");
-        let tranches = TrancheStructure::new(vec![tranche]).expect("TrancheStructure should build");
-        StructuredCredit::new_clo("CLO-EXAMPLE", pool, tranches, closing, legal, "USD-OIS")
-            .with_calendar("nyse")
     }
 
     /// Internal helper to create structured credit with common fields
     pub(super) fn new_with_deal_config(
-        id: impl Into<String>,
+        id: impl Into<InstrumentId>,
         deal_type: DealType,
         params: InstrumentParams,
         config: DealConfig,
         closing_date: Date,
     ) -> Self {
-        let id_str = id.into();
         Self {
-            id: InstrumentId::new(id_str),
+            id: id.into(),
             deal_type,
             // Senior fees are opt-in via `with_fees` / `with_standard_fees`.
             fees: None,
@@ -232,14 +227,14 @@ impl StructuredCredit {
     ///
     #[allow(clippy::expect_used)] // Builder with valid default dates
     pub fn new_abs(
-        id: impl Into<String>,
+        id: impl Into<InstrumentId>,
         pool: AssetPool,
         tranches: TrancheStructure,
         closing_date: Date,
         maturity: Date,
-        discount_curve_id: impl Into<String>,
+        discount_curve_id: impl Into<CurveId>,
     ) -> Self {
-        let disc_id_str = discount_curve_id.into();
+        let disc_id: CurveId = discount_curve_id.into();
         Self::new_with_deal_config(
             id,
             DealType::Abs,
@@ -247,7 +242,7 @@ impl StructuredCredit {
                 pool,
                 tranches,
                 maturity,
-                discount_curve_id: &disc_id_str,
+                discount_curve_id: disc_id.as_str(),
             },
             deal_config_from_registry("abs_auto_standard", closing_date),
             closing_date,
@@ -270,14 +265,14 @@ impl StructuredCredit {
     ///
     #[allow(clippy::expect_used)] // Builder with valid default dates
     pub fn new_clo(
-        id: impl Into<String>,
+        id: impl Into<InstrumentId>,
         pool: AssetPool,
         tranches: TrancheStructure,
         closing_date: Date,
         maturity: Date,
-        discount_curve_id: impl Into<String>,
+        discount_curve_id: impl Into<CurveId>,
     ) -> Self {
-        let disc_id_str = discount_curve_id.into();
+        let disc_id: CurveId = discount_curve_id.into();
         Self::new_with_deal_config(
             id,
             DealType::Clo,
@@ -285,7 +280,7 @@ impl StructuredCredit {
                 pool,
                 tranches,
                 maturity,
-                discount_curve_id: &disc_id_str,
+                discount_curve_id: disc_id.as_str(),
             },
             deal_config_from_registry("clo_standard", closing_date),
             closing_date,
@@ -308,14 +303,14 @@ impl StructuredCredit {
     ///
     #[allow(clippy::expect_used)] // Builder with valid default dates
     pub fn new_cmbs(
-        id: impl Into<String>,
+        id: impl Into<InstrumentId>,
         pool: AssetPool,
         tranches: TrancheStructure,
         closing_date: Date,
         maturity: Date,
-        discount_curve_id: impl Into<String>,
+        discount_curve_id: impl Into<CurveId>,
     ) -> Self {
-        let disc_id_str = discount_curve_id.into();
+        let disc_id: CurveId = discount_curve_id.into();
         Self::new_with_deal_config(
             id,
             DealType::Cmbs,
@@ -323,7 +318,7 @@ impl StructuredCredit {
                 pool,
                 tranches,
                 maturity,
-                discount_curve_id: &disc_id_str,
+                discount_curve_id: disc_id.as_str(),
             },
             deal_config_from_registry("cmbs_standard", closing_date),
             closing_date,
@@ -346,14 +341,14 @@ impl StructuredCredit {
     ///
     #[allow(clippy::expect_used)] // Builder with valid default dates
     pub fn new_rmbs(
-        id: impl Into<String>,
+        id: impl Into<InstrumentId>,
         pool: AssetPool,
         tranches: TrancheStructure,
         closing_date: Date,
         maturity: Date,
-        discount_curve_id: impl Into<String>,
+        discount_curve_id: impl Into<CurveId>,
     ) -> Self {
-        let disc_id_str = discount_curve_id.into();
+        let disc_id: CurveId = discount_curve_id.into();
         Self::new_with_deal_config(
             id,
             DealType::Rmbs,
@@ -361,7 +356,7 @@ impl StructuredCredit {
                 pool,
                 tranches,
                 maturity,
-                discount_curve_id: &disc_id_str,
+                discount_curve_id: disc_id.as_str(),
             },
             deal_config_from_registry("rmbs_standard", closing_date),
             closing_date,

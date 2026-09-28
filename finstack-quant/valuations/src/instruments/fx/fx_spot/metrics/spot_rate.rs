@@ -21,7 +21,7 @@ pub struct SpotRateCalculator;
 impl MetricCalculator for SpotRateCalculator {
     fn calculate(&self, context: &mut MetricContext) -> finstack_quant_core::Result<f64> {
         let fx: &FxSpot = context.instrument_as()?;
-        let base_amt = fx.get_effective_notional().amount();
+        let base_amt = fx.notional.amount();
 
         if base_amt.abs() < EPSILON {
             return Err(finstack_quant_core::Error::Validation(format!(

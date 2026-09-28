@@ -167,7 +167,7 @@ impl PreparedHullWhiteModel {
 /// use time::macros::date;
 /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
 /// let as_of = date!(2026-01-15);
-/// let swaption = BermudanSwaption::example();
+/// let swaption = BermudanSwaption::example().expect("example");
 /// let disc = DiscountCurve::flat("USD-OIS", as_of, 0.03)?;
 /// let model = PreparedHullWhiteModel::prepare(
 ///     HullWhiteCalibrationParams::default(), 100, &disc, as_of,

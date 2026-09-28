@@ -658,7 +658,7 @@ mod tests {
 
     #[test]
     fn malformed_instrument_precedes_model_and_date_errors() {
-        let mut deal = StructuredCredit::example();
+        let mut deal = StructuredCredit::example().expect("example");
         deal.cleanup_call_decimal = Some(-0.5);
         let json = serde_json::to_string(&InstrumentEnvelope::new(
             InstrumentJson::StructuredCredit(Box::new(deal)),
@@ -678,7 +678,7 @@ mod tests {
     #[test]
     fn mixed_currency_fx_swap_rows_use_native_curves_and_reporting_currency_pv() {
         let as_of = Date::from_calendar_date(2024, Month::January, 1).expect("date");
-        let swap = FxSwap::example();
+        let swap = FxSwap::example().expect("example");
         let provider = Arc::new(SimpleFxProvider::new());
         provider
             .set_quote(Currency::EUR, Currency::USD, 1.10)

@@ -151,7 +151,7 @@ fn make_fund(
 ) -> PrivateMarketsFund {
     let fund = PrivateMarketsFund::new("PMF-BENCH", Currency::USD, spec, events);
     if with_discount {
-        fund.with_discount_curve("USD-OIS")
+        fund.with_discount_curve_id("USD-OIS")
     } else {
         fund
     }

@@ -26,7 +26,7 @@
 //! # Quick Example
 //!
 //! ```rust
-//! use finstack_quant_valuations::instruments::equity::EquityOptionMarketData;
+//! use finstack_quant_valuations::instruments::equity::{EquityOptionMarketData, EquityOptionParams};
 //! use finstack_quant_valuations::instruments::EquityOption;
 //! use finstack_quant_core::currency::Currency;
 //! use finstack_quant_core::money::Money;
@@ -39,14 +39,11 @@
 //!     "EQUITY-SPOT",
 //!     CurveId::new("EQUITY-VOL"),
 //! )
-//! .with_dividend_yield(PriceId::new("EQUITY-DIVYIELD"));
-//! let option = EquityOption::european_call_with_market_data(
+//! .with_div_yield_id(PriceId::new("EQUITY-DIVYIELD"));
+//! let option = EquityOption::european_with_market_data(
 //!     "SPX-CALL-4500",
 //!     "SPX",
-//!     4500.0,
-//!     date!(2025 - 07 - 15),
-//!     100.0,
-//!     Currency::USD,
+//!     EquityOptionParams::call(4500.0, date!(2025 - 07 - 15), 100.0, Currency::USD),
 //!     market_data,
 //! )
 //! .expect("valid option");
@@ -122,7 +119,9 @@ pub use cliquet_option::CliquetOption;
 pub use dcf_equity::{DiscountedCashFlow, TerminalValueSpec};
 pub use equity_future::EquityFuture;
 pub use equity_future_option::EquityFutureOption;
-pub use equity_option::{EquityOption, EquityOptionExercise, EquityOptionMarketData};
+pub use equity_option::{
+    EquityOption, EquityOptionExercise, EquityOptionMarketData, EquityOptionParams,
+};
 pub use equity_total_return_future::EquityTotalReturnFuture;
 pub use equity_trs::{EquityTotalReturnSwap, TrsDividendSettlement};
 pub use pe_fund::PrivateMarketsFund;

@@ -185,12 +185,12 @@ pub fn year_fraction(
 /// # Arguments
 ///
 /// * `instrument` - The instrument providing cashflows
-/// * `curves` - Market data context
+/// * `market` - Market data context
 /// * `as_of` - Valuation date
 /// * `discount_curve_id` - ID of the discount curve to use
 pub fn schedule_pv<S>(
     instrument: &S,
-    curves: &MarketContext,
+    market: &MarketContext,
     as_of: Date,
     discount_curve_id: &finstack_quant_core::types::CurveId,
 ) -> finstack_quant_core::Result<Money>
@@ -199,8 +199,8 @@ where
 {
     use finstack_quant_core::cashflow::npv;
 
-    let flows = S::dated_cashflows(instrument, curves, as_of)?;
-    let disc = curves.get_discount(discount_curve_id.as_str())?;
+    let flows = S::dated_cashflows(instrument, market, as_of)?;
+    let disc = market.get_discount(discount_curve_id.as_str())?;
     // Use None to use the curve's day count for consistent pricing with metrics
     npv(disc.as_ref(), as_of, &flows)
 }
@@ -213,7 +213,7 @@ where
 /// only distinction is the unrounded scalar output used by calibration and risk.
 pub fn schedule_pv_raw<S>(
     instrument: &S,
-    curves: &MarketContext,
+    market: &MarketContext,
     as_of: Date,
     discount_curve_id: &finstack_quant_core::types::CurveId,
 ) -> finstack_quant_core::Result<f64>
@@ -222,8 +222,8 @@ where
 {
     use finstack_quant_core::cashflow::npv_amounts_with_curve;
 
-    let flows = S::dated_cashflows(instrument, curves, as_of)?;
-    let disc = curves.get_discount(discount_curve_id.as_str())?;
+    let flows = S::dated_cashflows(instrument, market, as_of)?;
+    let disc = market.get_discount(discount_curve_id.as_str())?;
 
     let amounts = flows
         .into_iter()
@@ -240,7 +240,7 @@ where
 /// convention so their quoted rate can zero the complete trade NPV.
 pub fn schedule_trade_pv_raw<S>(
     instrument: &S,
-    curves: &MarketContext,
+    market: &MarketContext,
     as_of: Date,
     discount_curve_id: &finstack_quant_core::types::CurveId,
 ) -> finstack_quant_core::Result<f64>
@@ -249,8 +249,8 @@ where
 {
     use finstack_quant_core::math::NeumaierAccumulator;
 
-    let flows = S::dated_cashflows(instrument, curves, as_of)?;
-    let disc = curves.get_discount(discount_curve_id.as_str())?;
+    let flows = S::dated_cashflows(instrument, market, as_of)?;
+    let disc = market.get_discount(discount_curve_id.as_str())?;
     let mut total = NeumaierAccumulator::new();
 
     for (date, amount) in flows {
@@ -269,14 +269,14 @@ where
 /// configured, missing or wrongly-typed market data is treated as a validation
 /// error rather than silently assuming zero carry.
 pub fn resolve_optional_dividend_yield(
-    curves: &MarketContext,
+    market: &MarketContext,
     div_yield_id: Option<&finstack_quant_core::types::PriceId>,
 ) -> finstack_quant_core::Result<f64> {
     let Some(div_id) = div_yield_id else {
         return Ok(0.0);
     };
 
-    let scalar = curves.get_price(div_id.as_str()).map_err(|e| {
+    let scalar = market.get_price(div_id.as_str()).map_err(|e| {
         finstack_quant_core::Error::Validation(format!(
             "Failed to fetch dividend yield '{}': {}",
             div_id, e
@@ -1171,7 +1171,7 @@ impl BlackScholesInputsDf {
 /// * `strike` - Strike price for volatility lookup
 /// * `expiry` - Expiry date
 /// * `day_count` - Day count convention for vol surface time calculation
-/// * `curves` - Market data context
+/// * `market` - Market data context
 /// * `as_of` - Valuation date
 ///
 /// # Returns
@@ -1186,10 +1186,10 @@ pub fn collect_black_scholes_inputs_df(
     strike: f64,
     expiry: Date,
     day_count: DayCount,
-    curves: &MarketContext,
+    market: &MarketContext,
     as_of: Date,
 ) -> finstack_quant_core::Result<BlackScholesInputsDf> {
-    let disc_curve = curves.get_discount(discount_curve_id.as_str())?;
+    let disc_curve = market.get_discount(discount_curve_id.as_str())?;
 
     // Time to expiry for vol surface lookup (using instrument's day count, which should
     // match how the vol surface was calibrated - typically ACT/365F for equity options)
@@ -1207,17 +1207,17 @@ pub fn collect_black_scholes_inputs_df(
     }
 
     // Spot price (S)
-    let spot_scalar = curves.get_price(spot_id)?;
+    let spot_scalar = market.get_price(spot_id)?;
     let spot = match spot_scalar {
         MarketScalar::Unitless(v) => *v,
         MarketScalar::Price(m) => m.amount(),
     };
 
     // Dividend yield (q)
-    let q = resolve_optional_dividend_yield(curves, div_yield_id)?;
+    let q = resolve_optional_dividend_yield(market, div_yield_id)?;
 
     // Volatility (sigma) using vol surface's time basis
-    let vol_surface = curves.get_surface(vol_surface_id)?;
+    let vol_surface = market.get_surface(vol_surface_id)?;
     let sigma =
         finstack_quant_models::volatility::get_surface_vol_clamped(&vol_surface, t_vol, strike);
 
@@ -1254,7 +1254,7 @@ pub fn collect_black_scholes_inputs_df(
 /// * `strike` - Strike price for volatility lookup
 /// * `expiry` - Expiry date
 /// * `day_count` - Day count convention for vol surface time calculation (should match vol surface calibration basis)
-/// * `curves` - Market data context
+/// * `market` - Market data context
 /// * `as_of` - Valuation date
 ///
 /// # Returns
@@ -1274,7 +1274,7 @@ pub fn collect_black_scholes_inputs(
     strike: f64,
     expiry: Date,
     day_count: DayCount,
-    curves: &MarketContext,
+    market: &MarketContext,
     as_of: Date,
 ) -> finstack_quant_core::Result<(f64, f64, f64, f64, f64)> {
     // Delegate to DF-based helper and derive r_eff
@@ -1286,7 +1286,7 @@ pub fn collect_black_scholes_inputs(
         strike,
         expiry,
         day_count,
-        curves,
+        market,
         as_of,
     )?;
 

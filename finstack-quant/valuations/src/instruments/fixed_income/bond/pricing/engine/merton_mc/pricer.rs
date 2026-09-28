@@ -307,7 +307,7 @@ mod tests {
         bond.instrument_pricing_overrides = bond
             .instrument_pricing_overrides
             .clone()
-            .with_merton_mc(config.clone())
+            .with_merton_mc_config(config.clone())
             .with_mc_paths(32)
             .with_mc_antithetic(false);
         (bond, config)
@@ -421,7 +421,7 @@ mod tests {
         bond.instrument_pricing_overrides = bond
             .instrument_pricing_overrides
             .clone()
-            .with_merton_mc(default_free_config())
+            .with_merton_mc_config(default_free_config())
             .with_mc_paths(8)
             .with_mc_antithetic(false);
 
@@ -492,7 +492,7 @@ mod tests {
         gilt.instrument_pricing_overrides = gilt
             .instrument_pricing_overrides
             .clone()
-            .with_merton_mc(default_free_config())
+            .with_merton_mc_config(default_free_config())
             .with_mc_paths(8)
             .with_mc_antithetic(false);
 

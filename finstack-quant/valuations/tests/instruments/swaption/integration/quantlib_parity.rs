@@ -373,12 +373,12 @@ fn test_quantlib_parity_vega() {
     // Cross-check with finite difference
     let mut swaption_up = swaption.clone();
     swaption_up.instrument_pricing_overrides =
-        InstrumentPricingOverrides::default().with_implied_vol(0.21);
+        InstrumentPricingOverrides::default().with_implied_volatility(0.21);
     let pv_up = swaption_up.value(&market, as_of).unwrap().amount();
 
     let mut swaption_down = swaption;
     swaption_down.instrument_pricing_overrides =
-        InstrumentPricingOverrides::default().with_implied_vol(0.19);
+        InstrumentPricingOverrides::default().with_implied_volatility(0.19);
     let pv_down = swaption_down.value(&market, as_of).unwrap().amount();
 
     let vega_fd = (pv_up - pv_down) / 2.0; // Per 1% change

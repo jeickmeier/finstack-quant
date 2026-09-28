@@ -178,7 +178,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/composite/composite.schema.json",
-      "bytes": 999258,
+      "bytes": 999282,
       "kind": "input",
       "path": "schemas/instruments/1/composite/composite.schema.json",
       "summary": "Resolved cross-asset synthetic instrument with immutable leg quantities.",
@@ -306,7 +306,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/equity/trs_equity.schema.json",
-      "bytes": 48224,
+      "bytes": 48222,
       "kind": "input",
       "path": "schemas/instruments/1/equity/trs_equity.schema.json",
       "summary": "Equity total-return swap versus a funding leg.",
@@ -354,7 +354,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/exotics/basket.schema.json",
-      "bytes": 998235,
+      "bytes": 998259,
       "kind": "input",
       "path": "schemas/instruments/1/exotics/basket.schema.json",
       "summary": "Weighted basket of constituents priced as one position.",
@@ -498,7 +498,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/trs_fixed_income_index.schema.json",
-      "bytes": 46112,
+      "bytes": 46118,
       "kind": "input",
       "path": "schemas/instruments/1/fixed_income/trs_fixed_income_index.schema.json",
       "summary": "Total-return swap on a fixed-income index versus a funding leg.",
@@ -602,7 +602,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/instrument.schema.json",
-      "bytes": 1088616,
+      "bytes": 1088640,
       "kind": "input",
       "path": "schemas/instruments/1/instrument.schema.json",
       "summary": "The seventy-branch union of every instrument type. Prefer the per-type schema beside it: this document is too large to hand to a model.",
@@ -618,7 +618,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/rates/bermudan_swaption.schema.json",
-      "bytes": 27206,
+      "bytes": 27226,
       "kind": "input",
       "path": "schemas/instruments/1/rates/bermudan_swaption.schema.json",
       "summary": "Bermudan-exercise swaption valued on a short-rate lattice.",

@@ -1409,7 +1409,7 @@ fn test_calculator_can_be_reused() {
     let basket1 = simple_equity_basket();
     let basket2 = simple_equity_basket();
     let context = equity_market_context();
-    let calc = BasketCalculator::with_defaults();
+    let calc = BasketCalculator::new();
     let as_of = date(2025, 1, 1);
 
     // Act

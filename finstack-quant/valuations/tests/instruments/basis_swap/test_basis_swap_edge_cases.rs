@@ -382,11 +382,16 @@ fn identical_forward_curves() {
     let ctx = market();
     let as_of = d(2025, 1, 2);
 
-    let swap = BasisSwap::new_allowing_same_curve(
-        "IDENTICAL-CURVES",
-        Money::new(10_000_000.0, USD).expect("valid money fixture"),
-        make_leg("USD-SOFR-3M", d(2025, 1, 2), d(2026, 1, 2), Decimal::ZERO),
-        FloatLegSpec {
+    let swap = BasisSwap::builder()
+        .id("IDENTICAL-CURVES".into())
+        .notional(Money::new(10_000_000.0, USD).expect("valid money fixture"))
+        .primary_leg(make_leg(
+            "USD-SOFR-3M",
+            d(2025, 1, 2),
+            d(2026, 1, 2),
+            Decimal::ZERO,
+        ))
+        .reference_leg(FloatLegSpec {
             end_of_month: false,
             fixing_calendar_id: None,
             forward_curve_id: CurveId::new("USD-SOFR-3M"),
@@ -402,9 +407,11 @@ fn identical_forward_curves() {
             payment_lag_days: 0,
             reset_lag_days: 0,
             compounding: Default::default(),
-        },
-    )
-    .expect("swap construction with same curves allowed");
+        })
+        .allow_same_curve(true)
+        .attributes(Default::default())
+        .build()
+        .expect("swap construction with same curves allowed");
 
     let res = swap
         .price_with_metrics(

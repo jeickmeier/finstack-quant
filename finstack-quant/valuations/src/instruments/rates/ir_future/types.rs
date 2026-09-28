@@ -411,16 +411,16 @@ impl InterestRateFuture {
     ///
     /// # Arguments
     ///
-    /// * `context` - Market context containing the forward curve and any required
+    /// * `market` - Market context containing the forward curve and any required
     ///   `FIXING:{index}` historical series.
     /// * `as_of` - Valuation date separating published fixings from projected
     ///   observations; valuation is assumed to occur before the same-day fixing.
     pub fn model_settlement_rate(
         &self,
-        context: &MarketContext,
+        market: &MarketContext,
         as_of: Date,
     ) -> finstack_quant_core::Result<f64> {
-        Ok(self.rate_projection(context, as_of)?.rate)
+        Ok(self.rate_projection(market, as_of)?.rate)
     }
 
     pub(crate) fn rate_projection(
@@ -567,16 +567,16 @@ impl InterestRateFuture {
     ///
     /// # Arguments
     ///
-    /// * `context` - Market context containing the projection, discount, fixing, and volatility inputs.
+    /// * `market` - Market context containing the projection, discount, fixing, and volatility inputs.
     /// * `as_of` - Valuation date controlling live versus final-settlement state.
     pub fn mark_price(
         &self,
-        context: &MarketContext,
+        market: &MarketContext,
         as_of: Date,
     ) -> finstack_quant_core::Result<f64> {
         self.validate()?;
         self.terms
-            .resolve_mark(self.id.as_str(), as_of, || self.fair_price(context, as_of))
+            .resolve_mark(self.id.as_str(), as_of, || self.fair_price(market, as_of))
     }
 
     /// Model futures price `100 × (1 − R − CA)` in price points, where `R` is
@@ -585,11 +585,11 @@ impl InterestRateFuture {
     ///
     /// # Arguments
     ///
-    /// * `context` - Market context containing the projection, discount, fixing, and volatility inputs.
+    /// * `market` - Market context containing the projection, discount, fixing, and volatility inputs.
     /// * `as_of` - Valuation date separating published fixings from projected observations.
     pub fn fair_price(
         &self,
-        context: &MarketContext,
+        market: &MarketContext,
         as_of: Date,
     ) -> finstack_quant_core::Result<f64> {
         self.validate()?;
@@ -599,13 +599,13 @@ impl InterestRateFuture {
         // Validate both curve dependencies while the contract is live. Futures
         // are not discounted, but the discount curve remains a declared market
         // dependency for consistent rate-market validation.
-        let _disc = context.get_discount(&self.discount_curve_id)?;
-        let projection = self.rate_projection(context, as_of)?;
+        let _disc = market.get_discount(&self.discount_curve_id)?;
+        let projection = self.rate_projection(market, as_of)?;
         let effective_adjustment =
             if let Some(adjustment) = self.contract_specs.convexity_adjustment {
                 adjustment * projection.parallel_forward_sensitivity
             } else {
-                let fwd = context.get_forward(&self.forward_curve_id)?;
+                let fwd = market.get_forward(&self.forward_curve_id)?;
                 let fwd_day_count = fwd.day_count();
                 let t_start_remaining = if period_start <= as_of {
                     0.0
@@ -620,7 +620,7 @@ impl InterestRateFuture {
                         .max(t_start_remaining)
                 };
                 (self.calculate_convexity_adjusted_rate(
-                    context,
+                    market,
                     projection.rate,
                     t_start_remaining,
                     t_end_remaining,
@@ -655,16 +655,12 @@ impl InterestRateFuture {
     ///
     /// # Arguments
     ///
-    /// * `context` - Market context containing the projection, discount, fixing, and volatility inputs.
+    /// * `market` - Market context containing the projection, discount, fixing, and volatility inputs.
     /// * `as_of` - Valuation date controlling the contract lifecycle.
-    pub fn npv_raw(
-        &self,
-        context: &MarketContext,
-        as_of: Date,
-    ) -> finstack_quant_core::Result<f64> {
+    pub fn npv_raw(&self, market: &MarketContext, as_of: Date) -> finstack_quant_core::Result<f64> {
         self.validate()?;
         self.terms
-            .npv_from_model_price(self.id.as_str(), as_of, || self.fair_price(context, as_of))
+            .npv_from_model_price(self.id.as_str(), as_of, || self.fair_price(market, as_of))
     }
 
     /// Derive contract tick value for the instrument accrual.

@@ -76,7 +76,7 @@ fn build_sc(id: &str, pool_balance: f64) -> StructuredCredit {
         legal_maturity(),
         "USD-OIS",
     )
-    .with_calendar("nyse")
+    .with_calendar_id("nyse")
 }
 
 #[test]
@@ -137,10 +137,10 @@ fn stochastic_pricing_is_deterministic_and_returns_tranche_results() {
 fn cleanup_call_builder_rejects_invalid_thresholds() {
     let sc = build_sc("ABS-CLEANUP", 1_000_000.0);
 
-    assert!(sc.clone().with_cleanup_call(0.10).is_ok());
-    assert!(sc.clone().with_cleanup_call(0.0).is_err());
-    assert!(sc.clone().with_cleanup_call(1.0).is_err());
-    assert!(sc.with_cleanup_call(f64::NAN).is_err());
+    assert!(sc.clone().with_cleanup_call_decimal(0.10).is_ok());
+    assert!(sc.clone().with_cleanup_call_decimal(0.0).is_err());
+    assert!(sc.clone().with_cleanup_call_decimal(1.0).is_err());
+    assert!(sc.with_cleanup_call_decimal(f64::NAN).is_err());
 }
 
 #[test]
@@ -247,7 +247,7 @@ fn enable_stochastic_populates_specs_for_each_deal_family() {
 
 #[test]
 fn price_with_metrics_standalone_returns_base_value_when_no_metrics_or_hedges() {
-    let sc = build_sc("ABS-STANDALONE", 1_000_000.0).with_calendar("nyse");
+    let sc = build_sc("ABS-STANDALONE", 1_000_000.0).with_calendar_id("nyse");
     let mut market = MarketContext::new();
     market = market.insert(discount_curve(closing_date()));
 
@@ -420,9 +420,8 @@ fn structured_credit_pricing_conveniences_validate_before_market_access() {
 
 #[test]
 fn hedge_pricing_validates_nested_swap_before_market_access() {
-    let mut swap =
-        finstack_quant_valuations::instruments::rates::irs::InterestRateSwap::example_standard()
-            .expect("example hedge swap");
+    let mut swap = finstack_quant_valuations::instruments::rates::irs::InterestRateSwap::example()
+        .expect("example hedge swap");
     swap.fixed_leg.end = swap.fixed_leg.start;
     swap.float_leg.end = swap.float_leg.start;
     let sc = build_sc("ABS-INVALID-HEDGE", 1_000_000.0).with_hedge_swap(HedgeSwap::new(swap));
@@ -440,9 +439,8 @@ fn hedge_pricing_validates_nested_swap_before_market_access() {
 
 #[test]
 fn with_hedge_swap_attaches_a_waterfall_settled_swap() {
-    let swap =
-        finstack_quant_valuations::instruments::rates::irs::InterestRateSwap::example_standard()
-            .expect("example hedge swap");
+    let swap = finstack_quant_valuations::instruments::rates::irs::InterestRateSwap::example()
+        .expect("example hedge swap");
     let sc = build_sc("ABS-HEDGED", 1_000_000.0);
     assert!(sc.hedge_swaps.is_empty());
     let hedged = sc.with_hedge_swap(HedgeSwap::new(swap.clone()).on_pool_par().junior());
@@ -491,7 +489,7 @@ fn mc_variance_no_catastrophic_cancellation_on_large_pv_deal() {
         maturity,
         "USD-OIS",
     )
-    .with_calendar("nyse");
+    .with_calendar_id("nyse");
 
     // Factor-correlated default spec: moderate base CDR with inter-path
     // dispersion driven by the systemic factor. Correlation=0.5 means paths
@@ -617,7 +615,7 @@ fn philox_rng_discipline_determinism_and_stream_identity() {
         maturity,
         "USD-OIS",
     )
-    .with_calendar("nyse");
+    .with_calendar_id("nyse");
 
     sc.credit_model.default_spec = DefaultModelSpec::constant_cdr(0.02);
     sc.credit_model.stochastic_default_spec = Some(StochasticDefaultSpec::factor_correlated(
@@ -1066,7 +1064,7 @@ fn stochastic_waterfall_matches_independent_cashflow_vectors() {
             .unwrap();
             let mut sc =
                 StructuredCredit::new_abs("REFERENCE", pool, tranches, start, end, "USD-OIS")
-                    .with_calendar("nyse");
+                    .with_calendar_id("nyse");
             sc.frequency = Tenor::quarterly();
             sc.first_payment_date = date!(2024 - 04 - 02);
             sc.credit_model.prepayment_spec = PrepaymentModelSpec::constant_cpr(cpr);

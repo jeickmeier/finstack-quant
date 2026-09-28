@@ -277,11 +277,12 @@ impl CashflowSpec {
     /// - For full control (floors/caps/gearing), construct `FloatingCouponSpec` directly
     ///   and wrap in `CashflowSpec::Floating(...)`.
     pub fn floating(
-        forward_curve_id: CurveId,
+        forward_curve_id: impl Into<CurveId>,
         spread_bp: f64,
         frequency: Tenor,
         day_count: DayCount,
     ) -> finstack_quant_core::Result<Self> {
+        let forward_curve_id: CurveId = forward_curve_id.into();
         let reset_lag = rate_index_defaults(&forward_curve_id)
             .map(|conv| conv.default_reset_lag_days)
             .unwrap_or(2);
@@ -290,11 +291,12 @@ impl CashflowSpec {
 
     /// Create a floating-rate specification using a typed margin in basis points.
     pub fn floating_bp(
-        forward_curve_id: CurveId,
+        forward_curve_id: impl Into<CurveId>,
         spread_bp: Bps,
         frequency: Tenor,
         day_count: DayCount,
     ) -> Self {
+        let forward_curve_id: CurveId = forward_curve_id.into();
         let spread_bp = Decimal::from(spread_bp.as_bp());
         let defaults = rate_index_defaults(&forward_curve_id);
         let reset_lag_days = defaults
@@ -402,12 +404,13 @@ impl CashflowSpec {
     /// Returns a validation error if `spread_bp` is not finite or not
     /// representable as a `Decimal`.
     pub fn floating_with_reset_lag(
-        forward_curve_id: CurveId,
+        forward_curve_id: impl Into<CurveId>,
         spread_bp: f64,
         frequency: Tenor,
         day_count: DayCount,
         reset_lag_days: i32,
     ) -> finstack_quant_core::Result<Self> {
+        let forward_curve_id: CurveId = forward_curve_id.into();
         let spread_bp =
             decimal_from_finite_f64(spread_bp, "CashflowSpec::floating_with_reset_lag spread_bp")?;
         let calendar_id = rate_index_defaults(&forward_curve_id)

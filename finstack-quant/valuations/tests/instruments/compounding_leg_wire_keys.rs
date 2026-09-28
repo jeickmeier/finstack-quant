@@ -59,7 +59,7 @@ fn assert_value_rejected<T: Serialize + DeserializeOwned>(
 
 #[test]
 fn irs_bare_leg_keys_are_rejected() {
-    let irs = InterestRateSwap::example_standard().expect("example IRS");
+    let irs = InterestRateSwap::example().expect("example IRS");
     // schema-rejection-test: `fixed` / `float` are now `fixed_leg` / `float_leg`.
     assert_renamed_key_rejected(&irs, "", "fixed_leg", "fixed");
     assert_renamed_key_rejected(&irs, "", "float_leg", "float");
@@ -67,7 +67,7 @@ fn irs_bare_leg_keys_are_rejected() {
 
 #[test]
 fn irs_fixed_leg_compounding_simple_is_rejected() {
-    let irs = InterestRateSwap::example_standard().expect("example IRS");
+    let irs = InterestRateSwap::example().expect("example IRS");
     let mut json = serde_json::to_value(&irs).expect("serialize");
     // schema-rejection-test: the inert `compounding_simple` flag is removed.
     json["fixed_leg"]["compounding_simple"] = Value::Bool(true);
@@ -77,11 +77,11 @@ fn irs_fixed_leg_compounding_simple_is_rejected() {
 
 #[test]
 fn cds_family_bare_leg_keys_are_rejected() {
-    let cds = CreditDefaultSwap::example();
+    let cds = CreditDefaultSwap::example().expect("example");
     // schema-rejection-test: `premium` / `protection` are now `premium_leg` / `protection_leg`.
     assert_renamed_key_rejected(&cds, "", "premium_leg", "premium");
     assert_renamed_key_rejected(&cds, "", "protection_leg", "protection");
-    let index = CdsIndex::example();
+    let index = CdsIndex::example().expect("example");
     assert_renamed_key_rejected(&index, "", "premium_leg", "premium");
     assert_renamed_key_rejected(&index, "", "protection_leg", "protection");
 }
@@ -139,7 +139,7 @@ fn ir_future_rate_averaging_is_rejected() {
 
 #[test]
 fn xccy_flat_leg_keys_are_rejected() {
-    let swap = XccySwap::example();
+    let swap = XccySwap::example().expect("example");
     // schema-rejection-test: the redundant leg `currency` is removed.
     assert_value_rejected(&swap, "/leg1", "currency", Value::from("USD"));
     // schema-rejection-test: flat float-leg fields now live under `leg`.

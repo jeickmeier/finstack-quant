@@ -28,28 +28,28 @@ impl EquityPricer {
     pub fn price_per_share(
         &self,
         inst: &Equity,
-        curves: &MarketContext,
+        market: &MarketContext,
         as_of: Date,
     ) -> Result<Money> {
-        inst.price_per_share(curves, as_of)
+        inst.price_per_share(market, as_of)
     }
 
     /// Compute present value in the instrument's currency.
     ///
     /// Parameters:
     /// - `inst`: reference to the `Equity` instrument
-    /// - `curves`: market context (unused currently; placeholder for quotes)
+    /// - `market`: market context (unused currently; placeholder for quotes)
     /// - `as_of`: valuation date (unused currently)
-    pub fn pv(&self, inst: &Equity, curves: &MarketContext, as_of: Date) -> Result<Money> {
-        let px = self.price_per_share(inst, curves, as_of)?;
+    pub fn pv(&self, inst: &Equity, market: &MarketContext, as_of: Date) -> Result<Money> {
+        let px = self.price_per_share(inst, market, as_of)?;
         Money::new(px.amount() * inst.effective_quantity(), inst.currency)
     }
 
     /// Resolve dividend yield (annualized, decimal) for the equity.
     ///
     /// Reads the unitless `div_yield_id` scalar; an unset id means 0.0.
-    pub fn dividend_yield(&self, inst: &Equity, curves: &MarketContext) -> Result<f64> {
-        inst.dividend_yield(curves)
+    pub fn dividend_yield(&self, inst: &Equity, market: &MarketContext) -> Result<f64> {
+        inst.dividend_yield(market)
     }
 
     /// Build forward price per share using continuous-compound approximation:
@@ -61,22 +61,22 @@ impl EquityPricer {
     pub fn forward_price_per_share(
         &self,
         inst: &Equity,
-        curves: &MarketContext,
+        market: &MarketContext,
         as_of: Date,
         t: f64,
     ) -> Result<Money> {
-        inst.forward_price_per_share(curves, as_of, t)
+        inst.forward_price_per_share(market, as_of, t)
     }
 
     /// Forward total value for the position (per-share forward × shares).
     pub fn forward_value(
         &self,
         inst: &Equity,
-        curves: &MarketContext,
+        market: &MarketContext,
         as_of: Date,
         t: f64,
     ) -> Result<Money> {
-        let per_share = self.forward_price_per_share(inst, curves, as_of, t)?;
+        let per_share = self.forward_price_per_share(inst, market, as_of, t)?;
         Money::new(
             per_share.amount() * inst.effective_quantity(),
             inst.currency,

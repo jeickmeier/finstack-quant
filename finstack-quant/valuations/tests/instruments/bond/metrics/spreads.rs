@@ -752,7 +752,7 @@ fn test_callable_bond_vega_is_invariant_to_vol_bump_size() {
         bump: f64,
     ) -> f64 {
         let mut bond = base_bond.clone();
-        bond.metric_pricing_overrides = bond.metric_pricing_overrides.with_vol_bump(bump);
+        bond.metric_pricing_overrides = bond.metric_pricing_overrides.with_vol_bump_decimal(bump);
         bond.price_with_metrics(
             market,
             as_of,

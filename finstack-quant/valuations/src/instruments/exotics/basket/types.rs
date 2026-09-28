@@ -317,7 +317,7 @@ impl Basket {
     /// This centralizes calculator creation and avoids duplication across
     /// metrics, pricers, and other components.
     pub fn calculator(&self) -> crate::instruments::exotics::basket::pricer::BasketCalculator {
-        crate::instruments::exotics::basket::pricer::BasketCalculator::new(
+        crate::instruments::exotics::basket::pricer::BasketCalculator::with_config(
             self.pricing_config.clone(),
         )
     }

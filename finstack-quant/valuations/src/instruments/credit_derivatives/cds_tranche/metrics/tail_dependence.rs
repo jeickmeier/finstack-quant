@@ -94,7 +94,7 @@ mod tests {
 
     #[test]
     fn missing_credit_index_is_an_error_not_nan() {
-        let tranche = CdsTranche::example();
+        let tranche = CdsTranche::example().expect("example");
         let error = credit_index_for_tail_dependence(&tranche, &MarketContext::new())
             .expect_err("missing credit index must fail");
         assert!(error.to_string().contains(tranche.credit_index_id.as_str()));

@@ -21,7 +21,7 @@ fn market(as_of: Date) -> MarketContext {
 
 #[test]
 fn production_structured_constructor_uses_closing_date() {
-    let base = StructuredCredit::example();
+    let base = StructuredCredit::example().expect("example");
     let closing = date!(2026 - 09 - 09);
     for (deal, expected) in [
         (
@@ -71,7 +71,7 @@ fn production_structured_constructor_uses_closing_date() {
     ] {
         assert_eq!(deal.first_payment_date, expected);
         assert!(deal
-            .with_calendar("nyse")
+            .with_calendar_id("nyse")
             .value(&market(closing), closing)
             .is_ok());
     }
@@ -79,7 +79,7 @@ fn production_structured_constructor_uses_closing_date() {
 
 #[test]
 fn production_structured_representative_line_matches_asset_cashflows() {
-    let mut deal = StructuredCredit::example();
+    let mut deal = StructuredCredit::example().expect("example");
     deal.first_payment_date = date!(2024 - 04 - 01);
     deal.credit_model.prepayment_spec = PrepaymentModelSpec::constant_cpr(0.0);
     deal.credit_model.default_spec = DefaultModelSpec::constant_cdr(0.0);
@@ -110,7 +110,7 @@ fn production_structured_representative_line_matches_asset_cashflows() {
 
 #[test]
 fn production_structured_line_preserves_rates_recovery_and_seasoning() {
-    let mut deal = StructuredCredit::example();
+    let mut deal = StructuredCredit::example().expect("example");
     let asset = &mut deal.pool.assets[0];
     asset.smm_override = Some(0.01);
     asset.mdr_override = Some(0.02);
@@ -141,7 +141,7 @@ fn production_structured_line_preserves_rates_recovery_and_seasoning() {
 #[test]
 fn production_structured_zero_vol_stochastic_matches_deterministic_with_constant_rates() {
     use finstack_quant_valuations::instruments::fixed_income::structured_credit::StructuredCreditPricingMode;
-    let mut deal = StructuredCredit::example();
+    let mut deal = StructuredCredit::example().expect("example");
     deal.credit_model.prepayment_spec = PrepaymentModelSpec::constant_cpr(0.1);
     deal.credit_model.default_spec = DefaultModelSpec::constant_cdr(0.05);
     deal.credit_model.recovery_spec = RecoveryModelSpec::with_lag(0.7, 9);
@@ -172,7 +172,7 @@ fn production_waterfall_credit_enhancement_uses_current_collateral_and_cash() {
     use finstack_quant_valuations::instruments::fixed_income::structured_credit::AbsCreditEnhancementCalculator;
     use finstack_quant_valuations::metrics::{MetricCalculator, MetricContext};
     use std::sync::Arc;
-    let mut deal = StructuredCredit::example();
+    let mut deal = StructuredCredit::example().expect("example");
     deal.tranches.tranches[0].current_balance =
         Money::new(80_000_000.0, Currency::USD).expect("notes");
     deal.pool.reserve_account = Money::new(20_000_000.0, Currency::USD).expect("reserve");
@@ -194,14 +194,14 @@ fn production_waterfall_credit_enhancement_uses_current_collateral_and_cash() {
 }
 
 /// Identity pin for the retired deal-level override channel: before its
-/// removal, `StructuredCredit::example()` overridden to a constant 23% CPR,
+/// removal, `StructuredCredit::example().expect("example")` overridden to a constant 23% CPR,
 /// 12% CDR and 71% recovery with a nine-month lag valued at these exact bits.
 /// The same assumptions stated on `credit_model` must reproduce them bit for
 /// bit.
 #[test]
 fn production_structured_credit_model_reproduces_retired_override_value() {
     const OVERRIDE_VALUE_BITS: u64 = 0x4197_c7fb_a284_c023; // 99_745_512.6296392
-    let mut deal = StructuredCredit::example();
+    let mut deal = StructuredCredit::example().expect("example");
     deal.credit_model.prepayment_spec = PrepaymentModelSpec::constant_cpr(0.23);
     deal.credit_model.default_spec = DefaultModelSpec::constant_cdr(0.12);
     deal.credit_model.recovery_spec.rate = 0.71;

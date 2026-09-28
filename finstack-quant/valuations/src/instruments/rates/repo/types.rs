@@ -140,8 +140,8 @@ impl CollateralSpec {
     }
 
     /// Calculate the market value of this collateral.
-    pub fn market_value(&self, context: &MarketContext) -> Result<Money> {
-        let price_scalar = context.get_price(&self.market_value_id)?;
+    pub fn market_value(&self, market: &MarketContext) -> Result<Money> {
+        let price_scalar = market.get_price(&self.market_value_id)?;
         let unit_value = match price_scalar {
             finstack_quant_core::market_data::scalars::MarketScalar::Price(money) => money.amount(),
             finstack_quant_core::market_data::scalars::MarketScalar::Unitless(value) => *value,
@@ -307,13 +307,10 @@ impl Repo {
     /// Create a canonical example term repo for testing and documentation.
     ///
     /// Returns a 7-day general collateral USD repo.
-    #[allow(clippy::expect_used)] // Example uses hardcoded valid values
-    pub fn example() -> Self {
+    pub fn example() -> finstack_quant_core::Result<Self> {
         let collateral = CollateralSpec::new("UST-10Y", 10_000.0, "UST_10Y_PRICE");
-        let start =
-            Date::from_calendar_date(2024, time::Month::January, 2).expect("Valid example date");
-        let maturity =
-            Date::from_calendar_date(2024, time::Month::January, 9).expect("Valid example date");
+        let start = time::macros::date!(2024 - 01 - 02);
+        let maturity = time::macros::date!(2024 - 01 - 09);
         Self::term(
             "REPO-GC-7D",
             Money::from((10_000_000_i64, finstack_quant_core::currency::Currency::USD)),
@@ -323,7 +320,6 @@ impl Repo {
             maturity,
             "USD-OIS",
         )
-        .expect("Example repo construction should not fail")
     }
 
     /// Create a new repo builder (provided by derive).
@@ -344,12 +340,12 @@ impl Repo {
     /// The start date is business-day adjusted using the specified calendar, and
     /// maturity is calculated as the next business day after the adjusted start.
     pub fn overnight(
-        id: impl Into<String>,
+        id: impl Into<InstrumentId>,
         cash_amount: Money,
         collateral: CollateralSpec,
         repo_rate: f64,
         start_date: Date,
-        calendar_id: impl Into<String>,
+        calendar_id: impl Into<CalendarId>,
         discount_curve_id: impl Into<CurveId>,
     ) -> Result<Self> {
         use finstack_quant_core::dates::calendar::calendar_by_id;
@@ -372,7 +368,7 @@ impl Repo {
             .map_err(|_| finstack_quant_core::InputError::ConversionOverflow)?;
 
         Repo::builder()
-            .id(id.into().into())
+            .id(id.into())
             .cash_amount(cash_amount)
             .collateral(collateral)
             .repo_rate(repo_rate)
@@ -383,7 +379,7 @@ impl Repo {
             .triparty(defaults.triparty)
             .day_count(defaults.day_count)
             .business_day_convention(defaults.business_day_convention)
-            .calendar_id_opt(Some(cal_id.into()))
+            .calendar_id_opt(Some(cal_id))
             .discount_curve_id(discount_curve_id.into())
             .margin_spec_opt(None)
             .attributes(Attributes::default())
@@ -392,7 +388,7 @@ impl Repo {
 
     /// Create a term repo with specified maturity.
     pub fn term(
-        id: impl Into<String>,
+        id: impl Into<InstrumentId>,
         cash_amount: Money,
         collateral: CollateralSpec,
         repo_rate: f64,
@@ -406,7 +402,7 @@ impl Repo {
             .map_err(|_| finstack_quant_core::InputError::ConversionOverflow)?;
 
         Repo::builder()
-            .id(id.into().into())
+            .id(id.into())
             .cash_amount(cash_amount)
             .collateral(collateral)
             .repo_rate(repo_rate)
@@ -426,7 +422,7 @@ impl Repo {
 
     /// Create an open repo with an initial maturity (can be rolled/terminated later).
     pub fn open(
-        id: impl Into<String>,
+        id: impl Into<InstrumentId>,
         cash_amount: Money,
         collateral: CollateralSpec,
         repo_rate: f64,
@@ -440,7 +436,7 @@ impl Repo {
             .map_err(|_| finstack_quant_core::InputError::ConversionOverflow)?;
 
         Repo::builder()
-            .id(id.into().into())
+            .id(id.into())
             .cash_amount(cash_amount)
             .collateral(collateral)
             .repo_rate(repo_rate)
@@ -496,8 +492,8 @@ impl Repo {
     }
 
     /// Check if the repo is adequately collateralized.
-    pub fn is_adequately_collateralized(&self, context: &MarketContext) -> Result<bool> {
-        let collateral_value = self.collateral.market_value(context)?;
+    pub fn is_adequately_collateralized(&self, market: &MarketContext) -> Result<bool> {
+        let collateral_value = self.collateral.market_value(market)?;
         let required_value = self.required_collateral_value()?;
 
         // Ensure same currency for comparison
@@ -528,14 +524,14 @@ impl Repo {
     ///
     /// Uses business-day adjusted dates for all comparisons and discount factor
     /// calculations to ensure correct accrual fractions and haircut coverage.
-    pub fn pv(&self, context: &MarketContext, as_of: Date) -> Result<Money> {
+    pub fn pv(&self, market: &MarketContext, as_of: Date) -> Result<Money> {
         let (_, adj_maturity) = self.adjusted_dates()?;
         if as_of >= adj_maturity {
             return Ok(Money::from((0_i64, self.cash_amount.currency())));
         }
 
-        let disc_curve = context.get_discount(self.discount_curve_id.as_str())?;
-        let flows = self.dated_cashflows(context, as_of)?;
+        let disc_curve = market.get_discount(self.discount_curve_id.as_str())?;
+        let flows = self.dated_cashflows(market, as_of)?;
 
         if flows.is_empty() {
             return Ok(Money::from((0_i64, self.cash_amount.currency())));

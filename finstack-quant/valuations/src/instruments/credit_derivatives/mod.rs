@@ -37,7 +37,7 @@
 //! use finstack_quant_valuations::instruments::credit_derivatives::CreditDefaultSwap;
 //!
 //! // Canonical 5-year investment-grade CDS with standard ISDA conventions.
-//! let cds = CreditDefaultSwap::example();
+//! let cds = CreditDefaultSwap::example().expect("example");
 //! cds.validate().unwrap();
 //! ```
 //!

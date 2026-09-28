@@ -143,7 +143,7 @@ fn completed_period_remains_valued_until_lagged_payment_date() {
         .notional(Money::new(1_000_000.0, USD).expect("valid money fixture"))
         .underlying(
             EquityUnderlyingParams::new("SPX", "SPX-SPOT", USD)
-                .with_dividend_yield(PriceId::new("SPX-DIV-YIELD")),
+                .with_div_yield_id(PriceId::new("SPX-DIV-YIELD")),
         )
         .financing_leg(FinancingLegSpec::new(
             "USD-OIS",

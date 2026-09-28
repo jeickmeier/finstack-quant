@@ -110,7 +110,7 @@ fn clo(policy: Option<LossAllocationPolicy>) -> (StructuredCredit, Date) {
         maturity,
         "USD-OIS",
     )
-    .with_calendar("nyse");
+    .with_calendar_id("nyse");
     deal.credit_model.prepayment_spec = PrepaymentModelSpec::constant_cpr(0.0);
     deal.credit_model.default_spec = DefaultModelSpec::constant_cdr(0.05);
     deal.credit_model.recovery_spec = RecoveryModelSpec::with_lag(0.4, 18);
@@ -297,7 +297,7 @@ fn rmbs(recognition: Option<LossRecognition>) -> (StructuredCredit, Date) {
         maturity,
         "USD-OIS",
     )
-    .with_calendar("nyse");
+    .with_calendar_id("nyse");
     deal.credit_model.prepayment_spec = PrepaymentModelSpec::constant_cpr(0.0);
     deal.credit_model.default_spec = DefaultModelSpec::constant_cdr(0.03);
     deal.credit_model.recovery_spec = RecoveryModelSpec::with_lag(0.4, 24);

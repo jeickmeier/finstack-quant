@@ -130,20 +130,16 @@ impl InflationSwap {
     /// Create a canonical example zero-coupon inflation swap (US CPI, 5Y).
     ///
     /// Returns a 5-year USD inflation swap with standard 3-month CPI lag.
-    #[allow(clippy::expect_used)] // Example uses hardcoded valid values
-    pub fn example() -> Self {
+    pub fn example() -> finstack_quant_core::Result<Self> {
         use finstack_quant_core::currency::Currency;
-        use time::Month;
         InflationSwap::builder()
             .id(InstrumentId::new("INFLSWAP-USD-5Y"))
             .notional(Money::from((1_000_000_i64, Currency::USD)))
-            .start_date(
-                Date::from_calendar_date(2024, Month::January, 15).expect("Valid example date"),
-            )
-            .maturity(
-                Date::from_calendar_date(2029, Month::January, 15).expect("Valid example date"),
-            )
-            .fixed_rate(Decimal::try_from(0.02).expect("valid decimal"))
+            .start_date(time::macros::date!(2024 - 01 - 15))
+            .maturity(time::macros::date!(2029 - 01 - 15))
+            .fixed_rate(Decimal::try_from(0.02).map_err(|e: rust_decimal::Error| {
+                finstack_quant_core::Error::Validation(e.to_string())
+            })?)
             .inflation_index_id(CurveId::new("US-CPI"))
             .discount_curve_id(CurveId::new("USD-OIS"))
             .day_count(DayCount::Act365F)
@@ -152,7 +148,6 @@ impl InflationSwap {
             .business_day_convention(BusinessDayConvention::Following)
             .attributes(Attributes::new())
             .build()
-            .expect("Example InflationSwap construction should not fail")
     }
 
     /// Validate structural invariants of the inflation swap.
@@ -284,10 +279,10 @@ impl InflationSwap {
     /// - Year fraction calculation fails
     pub fn pv_fixed_leg(
         &self,
-        curves: &MarketContext,
+        market: &MarketContext,
         as_of: Date,
     ) -> finstack_quant_core::Result<Money> {
-        let disc = curves.get_discount(self.discount_curve_id.as_str())?;
+        let disc = market.get_discount(self.discount_curve_id.as_str())?;
 
         // Use instrument day count for accrual period
         let tau_accrual = self.fixed_accrual()?;
@@ -355,11 +350,11 @@ impl InflationSwap {
     /// - Year fraction calculation fails
     pub fn pv_inflation_leg(
         &self,
-        curves: &MarketContext,
+        market: &MarketContext,
         as_of: Date,
     ) -> finstack_quant_core::Result<Money> {
-        let disc = curves.get_discount(self.discount_curve_id.as_str())?;
-        let index_ratio = self.projected_index_ratio(curves, as_of)?;
+        let disc = market.get_discount(self.discount_curve_id.as_str())?;
+        let index_ratio = self.projected_index_ratio(market, as_of)?;
         let inflation_payment = self.notional * (index_ratio - 1.0);
 
         // Date-based DF from as_of to payment: correct when the curve base
@@ -398,10 +393,10 @@ impl InflationSwap {
     /// - Year fraction calculation fails
     pub fn par_rate(
         &self,
-        curves: &MarketContext,
+        market: &MarketContext,
         as_of: Date,
     ) -> finstack_quant_core::Result<f64> {
-        let index_ratio = self.projected_index_ratio(curves, as_of)?;
+        let index_ratio = self.projected_index_ratio(market, as_of)?;
 
         if index_ratio <= 0.0 {
             return Err(finstack_quant_core::InputError::NonPositiveValue.into());
@@ -418,13 +413,13 @@ impl InflationSwap {
     /// Raw (unrounded `f64`) present value of the swap from the holder's
     /// perspective, used by finite-difference metrics (convexity, gamma)
     /// where Money quantization noise would be amplified by tiny bump sizes.
-    pub fn npv_raw(&self, curves: &MarketContext, as_of: Date) -> finstack_quant_core::Result<f64> {
+    pub fn npv_raw(&self, market: &MarketContext, as_of: Date) -> finstack_quant_core::Result<f64> {
         let payment_date = self.adjusted_payment_date(self.maturity)?;
         if as_of >= payment_date {
             return Ok(0.0);
         }
 
-        let disc = curves.get_discount(self.discount_curve_id.as_str())?;
+        let disc = market.get_discount(self.discount_curve_id.as_str())?;
         let df = crate::instruments::common_impl::pricing::time::relative_df_discount_curve(
             disc.as_ref(),
             as_of,
@@ -435,7 +430,7 @@ impl InflationSwap {
         let fixed_rate = decimal_to_f64(self.fixed_rate, "InflationSwap fixed_rate")?;
         let fixed_pv = self.notional.amount() * ((1.0 + fixed_rate).powf(tau_accrual) - 1.0) * df;
 
-        let index_ratio = self.projected_index_ratio(curves, as_of)?;
+        let index_ratio = self.projected_index_ratio(market, as_of)?;
         let inflation_pv = self.notional.amount() * (index_ratio - 1.0) * df;
 
         Ok(match self.side {
@@ -684,21 +679,17 @@ impl YoYInflationSwap {
     ///
     /// Returns a 5-year pay-fixed YoY inflation swap with 2.5% fixed rate,
     /// $1M notional, annual frequency, and standard 3-month CPI lag.
-    #[allow(clippy::expect_used)] // Example uses hardcoded valid values
-    pub fn example() -> Self {
+    pub fn example() -> finstack_quant_core::Result<Self> {
         use finstack_quant_core::currency::Currency;
-        use time::Month;
 
         YoYInflationSwap::builder()
             .id(InstrumentId::new("YOYSWAP-USD-5Y"))
             .notional(Money::from((1_000_000_i64, Currency::USD)))
-            .start_date(
-                Date::from_calendar_date(2024, Month::January, 15).expect("Valid example date"),
-            )
-            .maturity(
-                Date::from_calendar_date(2029, Month::January, 15).expect("Valid example date"),
-            )
-            .fixed_rate(Decimal::try_from(0.025).expect("valid decimal"))
+            .start_date(time::macros::date!(2024 - 01 - 15))
+            .maturity(time::macros::date!(2029 - 01 - 15))
+            .fixed_rate(Decimal::try_from(0.025).map_err(|e: rust_decimal::Error| {
+                finstack_quant_core::Error::Validation(e.to_string())
+            })?)
             .frequency(Tenor::annual())
             .inflation_index_id(CurveId::new("US-CPI"))
             .discount_curve_id(CurveId::new("USD-OIS"))
@@ -708,7 +699,6 @@ impl YoYInflationSwap {
             .business_day_convention(BusinessDayConvention::ModifiedFollowing)
             .attributes(Attributes::new())
             .build()
-            .expect("Example YoYInflationSwap construction should not fail")
     }
 
     /// Validate structural invariants of the YoY inflation swap.
@@ -827,8 +817,8 @@ impl YoYInflationSwap {
     /// Ch. 16; Mercurio 2005). This implementation omits that correction, so
     /// for long-dated YoY swaps it carries a few-bp-to-material bias. Use a
     /// stochastic-inflation model where that bias is unacceptable.
-    pub fn npv_raw(&self, curves: &MarketContext, as_of: Date) -> finstack_quant_core::Result<f64> {
-        let disc = curves.get_discount(self.discount_curve_id.as_str())?;
+    pub fn npv_raw(&self, market: &MarketContext, as_of: Date) -> finstack_quant_core::Result<f64> {
+        let disc = market.get_discount(self.discount_curve_id.as_str())?;
         let mut pv = 0.0_f64;
 
         for (start, end, pay) in self.schedule()? {
@@ -839,11 +829,11 @@ impl YoYInflationSwap {
                 .day_count
                 .year_fraction(start, end, DayCountContext::default())?;
 
-            let cpi_start = self.cpi_value(curves, as_of, start)?;
+            let cpi_start = self.cpi_value(market, as_of, start)?;
             if cpi_start <= 0.0 {
                 return Err(finstack_quant_core::InputError::NonPositiveValue.into());
             }
-            let cpi_end = self.cpi_value(curves, as_of, end)?;
+            let cpi_end = self.cpi_value(market, as_of, end)?;
 
             let inflation_leg = self.notional.amount() * (cpi_end / cpi_start - 1.0);
             let fixed_rate = decimal_to_f64(self.fixed_rate, "YoYInflationSwap fixed_rate")?;
@@ -885,10 +875,10 @@ impl YoYInflationSwap {
     /// - The annuity (sum of discounted accruals) is zero
     pub fn par_rate(
         &self,
-        curves: &MarketContext,
+        market: &MarketContext,
         as_of: Date,
     ) -> finstack_quant_core::Result<f64> {
-        let disc = curves.get_discount(self.discount_curve_id.as_str())?;
+        let disc = market.get_discount(self.discount_curve_id.as_str())?;
 
         let mut sum_infl_pv = 0.0_f64;
         let mut sum_annuity = 0.0_f64;
@@ -901,11 +891,11 @@ impl YoYInflationSwap {
                 .day_count
                 .year_fraction(start, end, DayCountContext::default())?;
 
-            let cpi_start = self.cpi_value(curves, as_of, start)?;
+            let cpi_start = self.cpi_value(market, as_of, start)?;
             if cpi_start <= 0.0 {
                 return Err(finstack_quant_core::InputError::NonPositiveValue.into());
             }
-            let cpi_end = self.cpi_value(curves, as_of, end)?;
+            let cpi_end = self.cpi_value(market, as_of, end)?;
 
             let df = crate::instruments::common_impl::pricing::time::relative_df_discount_curve(
                 disc.as_ref(),

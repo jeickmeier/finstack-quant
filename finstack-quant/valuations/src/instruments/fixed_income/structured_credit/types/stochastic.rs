@@ -36,7 +36,7 @@ impl StructuredCredit {
     /// use finstack_quant_valuations::instruments::fixed_income::structured_credit::StructuredCredit;
     /// use finstack_quant_models::credit::pool::StochasticPrepaySpec;
     ///
-    /// let mut clo = StructuredCredit::example();
+    /// let mut clo = StructuredCredit::example().expect("example");
     /// clo.with_stochastic_prepay(StochasticPrepaySpec::factor_correlated(
     ///     finstack_quant_cashflows::builder::PrepaymentModelSpec::constant_cpr(0.15),
     ///     0.35,

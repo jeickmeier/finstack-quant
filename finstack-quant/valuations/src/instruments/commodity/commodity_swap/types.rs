@@ -212,8 +212,7 @@ impl CommoditySwap {
     /// Create a canonical example commodity swap for testing and documentation.
     ///
     /// Returns a natural gas swap with monthly settlements.
-    #[allow(clippy::expect_used)] // Example uses hardcoded valid values
-    pub fn example() -> Self {
+    pub fn example() -> finstack_quant_core::Result<Self> {
         Self::builder()
             .id(InstrumentId::new("NG-SWAP-2025"))
             .underlying(CommodityUnderlyingParams::new(
@@ -226,14 +225,8 @@ impl CommoditySwap {
             .fixed_price(3.50)
             .forward_curve_id(CurveId::new("NG-SPOT-AVG"))
             .side(PayReceive::Pay)
-            .start_date(
-                Date::from_calendar_date(2025, time::Month::January, 1)
-                    .expect("Valid example date"),
-            )
-            .maturity(
-                Date::from_calendar_date(2025, time::Month::December, 31)
-                    .expect("Valid example date"),
-            )
+            .start_date(time::macros::date!(2025 - 01 - 01))
+            .maturity(time::macros::date!(2025 - 12 - 31))
             .frequency(Tenor::monthly())
             .business_day_convention(BusinessDayConvention::ModifiedFollowing)
             .discount_curve_id(CurveId::new("USD-OIS"))
@@ -243,13 +236,12 @@ impl CommoditySwap {
                     .with_meta("sector", "natural-gas"),
             )
             .build()
-            .expect("Example commodity swap construction should not fail")
     }
 
     /// Calculate the present value of the fixed leg.
     pub fn fixed_leg_pv(&self, market: &MarketContext, as_of: Date) -> Result<f64> {
         let disc = market.get_discount(self.discount_curve_id.as_str())?;
-        let schedule = self.payment_schedule(as_of)?;
+        let schedule = self.payment_schedule()?;
         let fixed_price = self.fixed_price;
 
         let mut pv = 0.0;
@@ -271,7 +263,7 @@ impl CommoditySwap {
     /// with optional index lag and period averaging.
     pub fn floating_leg_pv(&self, market: &MarketContext, as_of: Date) -> Result<f64> {
         let disc = market.get_discount(self.discount_curve_id.as_str())?;
-        let schedule = self.payment_schedule(as_of)?;
+        let schedule = self.payment_schedule()?;
 
         // Try to get PriceCurve for floating index
         let price_curve = market.get_price_curve(self.forward_curve_id.as_str())?;
@@ -421,7 +413,7 @@ impl CommoditySwap {
     }
 
     /// Generate the payment schedule for this swap.
-    pub fn payment_schedule(&self, _as_of: Date) -> Result<Vec<Date>> {
+    pub fn payment_schedule(&self) -> Result<Vec<Date>> {
         use crate::cashflow::builder::periods::{build_periods, BuildPeriodsParams};
 
         self.validate()?;
@@ -499,7 +491,7 @@ impl CommoditySwap {
             PayReceive::Pay => -self.quantity * fixed_price,
             PayReceive::Receive => self.quantity * fixed_price,
         };
-        self.payment_schedule(self.start_date)?
+        self.payment_schedule()?
             .into_iter()
             .map(|payment_date| {
                 Ok((
@@ -518,7 +510,7 @@ impl CommoditySwap {
         let price_curve = market.get_price_curve(self.forward_curve_id.as_str())?;
         let mut prev_period_end = self.start_date;
         let mut flows = Vec::new();
-        let schedule = self.payment_schedule(as_of)?;
+        let schedule = self.payment_schedule()?;
         let last_payment = schedule.last().copied();
         for payment_date in schedule {
             let period_start = prev_period_end;
@@ -694,7 +686,7 @@ mod tests {
 
     #[test]
     fn validation_rejects_invalid_schedule_and_fixing_inputs() {
-        let mut swap = CommoditySwap::example();
+        let mut swap = CommoditySwap::example().expect("example");
         swap.quantity = 0.0;
         assert!(swap.validate_for_pricing().is_err());
 
@@ -718,7 +710,7 @@ mod tests {
 
     #[test]
     fn test_commodity_swap_example() {
-        let swap = CommoditySwap::example();
+        let swap = CommoditySwap::example().expect("example");
         assert_eq!(swap.id.as_str(), "NG-SWAP-2025");
         assert_eq!(swap.underlying.commodity_type, "Energy");
         assert_eq!(swap.underlying.underlying_ticker, "NG");
@@ -907,7 +899,7 @@ mod tests {
     fn test_commodity_swap_instrument_trait() {
         use crate::instruments::common_impl::traits::Instrument;
 
-        let swap = CommoditySwap::example();
+        let swap = CommoditySwap::example().expect("example");
 
         assert_eq!(swap.id(), "NG-SWAP-2025");
         assert_eq!(swap.key(), crate::pricer::InstrumentType::CommoditySwap);
@@ -915,7 +907,7 @@ mod tests {
 
     #[test]
     fn test_commodity_swap_market_dependencies() {
-        let swap = CommoditySwap::example();
+        let swap = CommoditySwap::example().expect("example");
         let deps = swap
             .market_dependencies()
             .expect("market_dependencies")
@@ -927,7 +919,7 @@ mod tests {
 
     #[test]
     fn test_commodity_swap_serde_roundtrip() {
-        let swap = CommoditySwap::example();
+        let swap = CommoditySwap::example().expect("example");
         let json = serde_json::to_string(&swap).expect("serialize");
         let deserialized: CommoditySwap = serde_json::from_str(&json).expect("deserialize");
 
@@ -1236,7 +1228,7 @@ mod tests {
 
     #[test]
     fn canonical_dependencies_include_discount_and_price_projection_curves() {
-        let swap = CommoditySwap::example();
+        let swap = CommoditySwap::example().expect("example");
         let deps =
             crate::instruments::Instrument::market_dependencies(&swap).expect("dependencies");
 

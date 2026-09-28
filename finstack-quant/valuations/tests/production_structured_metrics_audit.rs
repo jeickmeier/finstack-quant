@@ -15,7 +15,7 @@ use finstack_quant_valuations::{
 use time::macros::date;
 
 fn deal_and_market() -> (StructuredCredit, MarketContext) {
-    let mut deal = StructuredCredit::example();
+    let mut deal = StructuredCredit::example().expect("example");
     deal.credit_model.prepayment_spec = PrepaymentModelSpec::constant_cpr(0.0);
     deal.credit_model.default_spec = DefaultModelSpec::constant_cdr(0.0);
     let market = MarketContext::new().insert(

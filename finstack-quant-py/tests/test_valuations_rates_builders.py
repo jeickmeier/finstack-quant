@@ -163,7 +163,7 @@ def test_par_method_keyword() -> None:
 
 
 def test_swap_getters_return_typed_values() -> None:
-    swap = InterestRateSwap.example_standard()
+    swap = InterestRateSwap.example()
     assert isinstance(swap.notional, Money)
     assert swap.notional.amount == pytest.approx(10_000_000.0)
     assert swap.side == "pay"

@@ -213,8 +213,7 @@ impl CommoditySwaption {
     /// Create a canonical example commodity swaption for testing and documentation.
     ///
     /// Returns a natural gas European call swaption.
-    #[allow(clippy::expect_used)] // Example uses hardcoded valid values
-    pub fn example() -> Self {
+    pub fn example() -> finstack_quant_core::Result<Self> {
         Self::builder()
             .id(InstrumentId::new("NG-SWAPTION-2025"))
             .underlying(CommodityUnderlyingParams::new(
@@ -224,15 +223,9 @@ impl CommoditySwaption {
                 Currency::USD,
             ))
             .option_type(OptionType::Call)
-            .expiry(
-                Date::from_calendar_date(2025, time::Month::June, 15).expect("valid example date"),
-            )
-            .underlying_start_date(
-                Date::from_calendar_date(2025, time::Month::July, 1).expect("valid example date"),
-            )
-            .underlying_maturity(
-                Date::from_calendar_date(2026, time::Month::June, 30).expect("valid example date"),
-            )
+            .expiry(time::macros::date!(2025 - 06 - 15))
+            .underlying_start_date(time::macros::date!(2025 - 07 - 01))
+            .underlying_maturity(time::macros::date!(2026 - 06 - 30))
             .swap_frequency(Tenor::monthly())
             .fixed_price(3.50)
             .quantity(10000.0)
@@ -242,7 +235,6 @@ impl CommoditySwaption {
             .day_count(DayCount::Act365F)
             .attributes(Attributes::new())
             .build()
-            .expect("Example commodity swaption construction should not fail")
     }
 
     /// Generate the underlying swap payment schedule.
@@ -875,14 +867,14 @@ mod tests {
 
     #[test]
     fn test_commodity_swaption_example() {
-        let swaption = CommoditySwaption::example();
+        let swaption = CommoditySwaption::example().expect("example");
         assert_eq!(swaption.id.as_str(), "NG-SWAPTION-2025");
         assert_eq!(swaption.underlying.underlying_ticker, "NG");
     }
 
     #[test]
     fn test_commodity_swaption_instrument_trait() {
-        let swaption = CommoditySwaption::example();
+        let swaption = CommoditySwaption::example().expect("example");
         assert_eq!(swaption.id(), "NG-SWAPTION-2025");
         assert_eq!(
             swaption.key(),
@@ -892,7 +884,7 @@ mod tests {
 
     #[test]
     fn test_commodity_swaption_market_dependencies() {
-        let swaption = CommoditySwaption::example();
+        let swaption = CommoditySwaption::example().expect("example");
         let deps = swaption
             .market_dependencies()
             .expect("market_dependencies")
@@ -903,7 +895,7 @@ mod tests {
 
     #[test]
     fn test_commodity_swaption_serde_roundtrip() {
-        let swaption = CommoditySwaption::example();
+        let swaption = CommoditySwaption::example().expect("example");
         let json = serde_json::to_string(&swaption).expect("serialize");
         let deserialized: CommoditySwaption = serde_json::from_str(&json).expect("deserialize");
         assert_eq!(swaption.id.as_str(), deserialized.id.as_str());

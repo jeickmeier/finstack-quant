@@ -171,7 +171,7 @@ mod tests {
             let mut option = fully_observed_option();
             if let Some(bp) = bump_bp {
                 option.metric_pricing_overrides =
-                    MetricPricingOverrides::default().with_rate_bump(bp);
+                    MetricPricingOverrides::default().with_rate_bump_bp(bp);
             }
             let (pv, rho) = rho(&option, &mkt, as_of);
             let bp = bump_bp.unwrap_or(1.0);

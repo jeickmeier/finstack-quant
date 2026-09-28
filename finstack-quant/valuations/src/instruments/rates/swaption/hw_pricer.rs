@@ -309,7 +309,7 @@ mod tests {
         use finstack_quant_core::dates::{BusinessDayConvention, DayCount, Tenor};
         use rust_decimal::Decimal;
         let as_of = date(2025, 1, 1);
-        let mut swaption = Swaption::example();
+        let mut swaption = Swaption::example().expect("example");
         swaption.expiry = date(2026, 4, 1);
         swaption.option_type = OptionType::Call;
         let fixed = &mut swaption.underlying_fixed_leg;
@@ -369,7 +369,7 @@ mod tests {
     #[test]
     fn hw_swaption_produces_finite_pv() {
         let as_of = date(2025, 1, 1);
-        let mut swaption = Swaption::example();
+        let mut swaption = Swaption::example().expect("example");
         // example() uses an OIS discount curve; HW tree pricing is single-curve.
         swaption.underlying_float_leg.forward_curve_id =
             swaption.underlying_fixed_leg.discount_curve_id.clone();
@@ -404,7 +404,7 @@ mod tests {
         use finstack_quant_models::rates::hull_white::hw1f_scalar_keys;
 
         let as_of = date(2025, 1, 1);
-        let mut swaption = Swaption::example();
+        let mut swaption = Swaption::example().expect("example");
         swaption.underlying_float_leg.forward_curve_id =
             swaption.underlying_fixed_leg.discount_curve_id.clone();
         let (kappa_key, sigma_key) = hw1f_scalar_keys(swaption.get_discount_curve_id().as_str());

@@ -50,7 +50,7 @@ fn convertible_underlying_equity_id_is_rejected() {
 #[test]
 // schema-rejection-test: Equity `price_id`, `price_quote`, `shares`
 fn equity_retired_spot_and_size_keys_are_rejected() {
-    let equity = Equity::example();
+    let equity = Equity::example().expect("example");
     assert_rejects_at(&equity, "", "price_id", "AAPL-SPOT".into());
     assert_rejects_at(&equity, "", "price_quote", 150.0.into());
     assert_rejects_at(&equity, "", "shares", 100.0.into());
@@ -66,7 +66,7 @@ fn fx_retired_quote_override_keys_are_rejected() {
     assert_rejects_at(&forward, "", "spot_rate_override", 1.1.into());
     let future = FxFuture::example().expect("example");
     assert_rejects_at(&future, "", "spot_rate_override", 1.1.into());
-    let ndf = Ndf::example();
+    let ndf = Ndf::example().expect("example");
     assert_rejects_at(&ndf, "", "spot_rate_override", 7.1.into());
     assert_rejects_at(&ndf, "", "forward_rate_override", 7.25.into());
     let spot = FxSpot::example().expect("example");
@@ -76,7 +76,7 @@ fn fx_retired_quote_override_keys_are_rejected() {
 #[test]
 // schema-rejection-test: QuantoOption `fx_rate_id`, `fx_vol_id`, `underlying_quantity`
 fn quanto_option_retired_fx_and_size_keys_are_rejected() {
-    let option = QuantoOption::example();
+    let option = QuantoOption::example().expect("example");
     assert_rejects_at(&option, "", "fx_rate_id", "JPYUSD-SPOT".into());
     assert_rejects_at(&option, "", "fx_vol_id", "JPYUSD-VOL".into());
     assert_rejects_at(&option, "", "underlying_quantity", 4_000.0.into());
@@ -124,14 +124,40 @@ fn equity_future_quanto_asset_currency_must_match_underlying() {
 #[test]
 // schema-rejection-test: commodity flattened `ticker`, CommodityFuture `underlying`
 fn commodity_retired_ticker_keys_are_rejected() {
-    assert_rejects_at(&CommodityForward::example(), "", "ticker", "CL".into());
-    assert_rejects_at(&CommodityOption::example(), "", "ticker", "CL".into());
-    assert_rejects_at(&CommodityAsianOption::example(), "", "ticker", "CL".into());
-    assert_rejects_at(&CommoditySwap::example(), "", "ticker", "NG".into());
-    assert_rejects_at(&CommoditySwaption::example(), "", "ticker", "NG".into());
+    assert_rejects_at(
+        &CommodityForward::example().expect("example"),
+        "",
+        "ticker",
+        "CL".into(),
+    );
+    assert_rejects_at(
+        &CommodityOption::example().expect("example"),
+        "",
+        "ticker",
+        "CL".into(),
+    );
+    assert_rejects_at(
+        &CommodityAsianOption::example().expect("example"),
+        "",
+        "ticker",
+        "CL".into(),
+    );
+    assert_rejects_at(
+        &CommoditySwap::example().expect("example"),
+        "",
+        "ticker",
+        "NG".into(),
+    );
+    assert_rejects_at(
+        &CommoditySwaption::example().expect("example"),
+        "",
+        "ticker",
+        "NG".into(),
+    );
     let future = CommodityFuture::example().expect("example");
     assert_rejects_at(&future, "", "underlying", "TSI-62-FE".into());
-    let json = serde_json::to_value(CommodityForward::example()).expect("serialize");
+    let json =
+        serde_json::to_value(CommodityForward::example().expect("example")).expect("serialize");
     assert_eq!(json["underlying_ticker"], "CL");
 }
 
@@ -141,7 +167,7 @@ fn commodity_unit_count_notional_is_rejected() {
     let spread = CommoditySpreadOption::example().expect("example");
     assert_rejects_at(&spread, "", "notional", 10_000.0.into());
     assert_rejects_at(
-        &CommoditySwaption::example(),
+        &CommoditySwaption::example().expect("example"),
         "",
         "notional",
         10_000.0.into(),

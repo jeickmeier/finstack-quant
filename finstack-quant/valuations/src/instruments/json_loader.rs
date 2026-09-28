@@ -174,34 +174,34 @@ macro_rules! with_instrument_json_registry {
             [$($extra),*]
             plain: Bond(Bond) => "bond" @ "fixed_income" = Bond::example();
             plain: ConvertibleBond(ConvertibleBond) => "convertible_bond" @ "fixed_income" = ConvertibleBond::example();
-            plain: InflationLinkedBond(InflationLinkedBond) => "inflation_linked_bond" @ "fixed_income" = infallible_example(InflationLinkedBond::example());
+            plain: InflationLinkedBond(InflationLinkedBond) => "inflation_linked_bond" @ "fixed_income" = InflationLinkedBond::example();
             plain: TermLoan(TermLoan) => "term_loan" @ "fixed_income" = TermLoan::example();
             plain: RevolvingCredit(RevolvingCredit) => "revolving_credit" @ "fixed_income" = RevolvingCredit::example();
             plain: AgencyMbsPassthrough(AgencyMbsPassthrough) => "agency_mbs_passthrough" @ "fixed_income" = AgencyMbsPassthrough::example();
             plain: AgencyTba(AgencyTba) => "agency_tba" @ "fixed_income" = AgencyTba::example();
             plain: AgencyCmo(AgencyCmo) => "agency_cmo" @ "fixed_income" = AgencyCmo::example();
             plain: DollarRoll(DollarRoll) => "dollar_roll" @ "fixed_income" = DollarRoll::example();
-            plain: InterestRateSwap(InterestRateSwap) => "interest_rate_swap" @ "rates" = InterestRateSwap::example_standard();
+            plain: InterestRateSwap(InterestRateSwap) => "interest_rate_swap" @ "rates" = InterestRateSwap::example();
             plain: BasisSwap(BasisSwap) => "basis_swap" @ "rates" = BasisSwap::example();
-            plain: XccySwap(XccySwap) => "xccy_swap" @ "rates" = infallible_example(XccySwap::example());
-            plain: InflationSwap(InflationSwap) => "inflation_swap" @ "rates" = infallible_example(InflationSwap::example());
-            plain: YoYInflationSwap(YoYInflationSwap) => "yoy_inflation_swap" @ "rates" = infallible_example(YoYInflationSwap::example());
-            plain: InflationCapFloor(InflationCapFloor) => "inflation_cap_floor" @ "rates" = infallible_example(InflationCapFloor::example());
+            plain: XccySwap(XccySwap) => "xccy_swap" @ "rates" = XccySwap::example();
+            plain: InflationSwap(InflationSwap) => "inflation_swap" @ "rates" = InflationSwap::example();
+            plain: YoYInflationSwap(YoYInflationSwap) => "yoy_inflation_swap" @ "rates" = YoYInflationSwap::example();
+            plain: InflationCapFloor(InflationCapFloor) => "inflation_cap_floor" @ "rates" = InflationCapFloor::example();
             plain: ForwardRateAgreement(ForwardRateAgreement) => "forward_rate_agreement" @ "rates" = ForwardRateAgreement::example();
-            plain: Swaption(Swaption) => "swaption" @ "rates" = infallible_example(Swaption::example());
-            plain: BermudanSwaption(BermudanSwaption) => "bermudan_swaption" @ "rates" = infallible_example(BermudanSwaption::example());
+            plain: Swaption(Swaption) => "swaption" @ "rates" = Swaption::example();
+            plain: BermudanSwaption(BermudanSwaption) => "bermudan_swaption" @ "rates" = BermudanSwaption::example();
             plain: InterestRateFuture(InterestRateFuture) => "interest_rate_future" @ "rates" = InterestRateFuture::example();
             plain: InterestRateFutureOption(InterestRateFutureOption) => "interest_rate_future_option" @ "rates" = InterestRateFutureOption::example();
             plain: CapFloor(CapFloor) => "cap_floor" @ "rates" = CapFloor::example();
-            plain: CmsSwap(CmsSwap) => "cms_swap" @ "rates" = infallible_example(CmsSwap::example());
-            plain: CmsOption(CmsOption) => "cms_option" @ "rates" = infallible_example(CmsOption::example());
+            plain: CmsSwap(CmsSwap) => "cms_swap" @ "rates" = CmsSwap::example();
+            plain: CmsOption(CmsOption) => "cms_option" @ "rates" = CmsOption::example();
             plain: Deposit(Deposit) => "deposit" @ "rates" = Deposit::example();
-            plain: Repo(Repo) => "repo" @ "rates" = infallible_example(Repo::example());
-            plain: CreditDefaultSwap(CreditDefaultSwap) => "credit_default_swap" @ "credit_derivatives" = infallible_example(CreditDefaultSwap::example());
-            plain: CdsIndex(CdsIndex) => "cds_index" @ "credit_derivatives" = infallible_example(CdsIndex::example());
-            plain: CdsTranche(CdsTranche) => "cds_tranche" @ "credit_derivatives" = infallible_example(CdsTranche::example());
+            plain: Repo(Repo) => "repo" @ "rates" = Repo::example();
+            plain: CreditDefaultSwap(CreditDefaultSwap) => "credit_default_swap" @ "credit_derivatives" = CreditDefaultSwap::example();
+            plain: CdsIndex(CdsIndex) => "cds_index" @ "credit_derivatives" = CdsIndex::example();
+            plain: CdsTranche(CdsTranche) => "cds_tranche" @ "credit_derivatives" = CdsTranche::example();
             plain: CdsOption(CdsOption) => "cds_option" @ "credit_derivatives" = CdsOption::example();
-            plain: Equity(Equity) => "equity" @ "equity" = infallible_example(Equity::example());
+            plain: Equity(Equity) => "equity" @ "equity" = Equity::example();
             plain: EquityOption(EquityOption) => "equity_option" @ "equity" = EquityOption::example();
             plain: AsianOption(AsianOption) => "asian_option" @ "exotics" = AsianOption::example();
             plain: BarrierOption(BarrierOption) => "barrier_option" @ "exotics" = BarrierOption::example();
@@ -210,20 +210,20 @@ macro_rules! with_instrument_json_registry {
             plain: VolatilityIndexFuture(VolatilityIndexFuture) => "volatility_index_future" @ "equity" = VolatilityIndexFuture::example();
             plain: VolatilityIndexFutureOption(VolatilityIndexFutureOption) => "volatility_index_future_option" @ "equity" = VolatilityIndexFutureOption::example();
             plain: FxSpot(FxSpot) => "fx_spot" @ "fx" = FxSpot::example();
-            plain: FxSwap(FxSwap) => "fx_swap" @ "fx" = infallible_example(FxSwap::example());
+            plain: FxSwap(FxSwap) => "fx_swap" @ "fx" = FxSwap::example();
             plain: FxForward(FxForward) => "fx_forward" @ "fx" = FxForward::example();
-            plain: Ndf(Ndf) => "ndf" @ "fx" = infallible_example(Ndf::example());
+            plain: Ndf(Ndf) => "ndf" @ "fx" = Ndf::example();
             plain: FxOption(FxOption) => "fx_option" @ "fx" = FxOption::example();
             plain: FxDigitalOption(FxDigitalOption) => "fx_digital_option" @ "fx" = FxDigitalOption::example();
             plain: FxTouchOption(FxTouchOption) => "fx_touch_option" @ "fx" = FxTouchOption::example();
-            plain: FxBarrierOption(FxBarrierOption) => "fx_barrier_option" @ "fx" = infallible_example(FxBarrierOption::example());
-            plain: FxVarianceSwap(FxVarianceSwap) => "fx_variance_swap" @ "fx" = infallible_example(FxVarianceSwap::example());
-            plain: QuantoOption(QuantoOption) => "quanto_option" @ "fx" = infallible_example(QuantoOption::example());
-            plain: CommodityOption(CommodityOption) => "commodity_option" @ "commodity" = infallible_example(CommodityOption::example());
-            plain: CommodityAsianOption(CommodityAsianOption) => "commodity_asian_option" @ "commodity" = infallible_example(CommodityAsianOption::example());
-            plain: CommodityForward(CommodityForward) => "commodity_forward" @ "commodity" = infallible_example(CommodityForward::example());
-            plain: CommoditySwap(CommoditySwap) => "commodity_swap" @ "commodity" = infallible_example(CommoditySwap::example());
-            plain: CommoditySwaption(CommoditySwaption) => "commodity_swaption" @ "commodity" = infallible_example(CommoditySwaption::example());
+            plain: FxBarrierOption(FxBarrierOption) => "fx_barrier_option" @ "fx" = FxBarrierOption::example();
+            plain: FxVarianceSwap(FxVarianceSwap) => "fx_variance_swap" @ "fx" = FxVarianceSwap::example();
+            plain: QuantoOption(QuantoOption) => "quanto_option" @ "fx" = QuantoOption::example();
+            plain: CommodityOption(CommodityOption) => "commodity_option" @ "commodity" = CommodityOption::example();
+            plain: CommodityAsianOption(CommodityAsianOption) => "commodity_asian_option" @ "commodity" = CommodityAsianOption::example();
+            plain: CommodityForward(CommodityForward) => "commodity_forward" @ "commodity" = CommodityForward::example();
+            plain: CommoditySwap(CommoditySwap) => "commodity_swap" @ "commodity" = CommoditySwap::example();
+            plain: CommoditySwaption(CommoditySwaption) => "commodity_swaption" @ "commodity" = CommoditySwaption::example();
             plain: CommoditySpreadOption(CommoditySpreadOption) => "commodity_spread_option" @ "commodity" = CommoditySpreadOption::example();
             plain: CommodityFuture(CommodityFuture) => "commodity_future" @ "commodity" = CommodityFuture::example();
             plain: CommodityFutureOption(CommodityFutureOption) => "commodity_future_option" @ "commodity" = CommodityFutureOption::example();
@@ -234,19 +234,19 @@ macro_rules! with_instrument_json_registry {
             plain: EquityTotalReturnFuture(EquityTotalReturnFuture) => "equity_total_return_future" @ "equity" = EquityTotalReturnFuture::example();
             plain: Autocallable(Autocallable) => "autocallable" @ "equity" = Autocallable::example();
             plain: CliquetOption(CliquetOption) => "cliquet_option" @ "equity" = CliquetOption::example();
-            plain: RangeAccrual(RangeAccrual) => "range_accrual" @ "exotics" = infallible_example(RangeAccrual::example());
-            plain: Tarn(Tarn) => "tarn" @ "exotics" = infallible_example(Tarn::example());
-            plain: Snowball(Snowball) => "snowball" @ "exotics" = infallible_example(Snowball::example_snowball());
-            plain: CmsSpreadOption(CmsSpreadOption) => "cms_spread_option" @ "rates" = infallible_example(CmsSpreadOption::example());
+            plain: RangeAccrual(RangeAccrual) => "range_accrual" @ "exotics" = RangeAccrual::example();
+            plain: Tarn(Tarn) => "tarn" @ "exotics" = Tarn::example();
+            plain: Snowball(Snowball) => "snowball" @ "exotics" = Snowball::example();
+            plain: CmsSpreadOption(CmsSpreadOption) => "cms_spread_option" @ "rates" = CmsSpreadOption::example();
             plain: TrsEquity(EquityTotalReturnSwap) => "trs_equity" @ "equity" = EquityTotalReturnSwap::example();
             plain: TrsFixedIncomeIndex(FiIndexTotalReturnSwap) => "trs_fixed_income_index" @ "fixed_income" = FiIndexTotalReturnSwap::example();
             plain: Basket(Basket) => "basket" @ "exotics" = Basket::example();
             plain: PrivateMarketsFund(PrivateMarketsFund) => "private_markets_fund" @ "equity" = PrivateMarketsFund::example();
             plain: RealEstateAsset(RealEstateAsset) => "real_estate_asset" @ "equity" = RealEstateAsset::example();
             plain: DiscountedCashFlow(DiscountedCashFlow) => "discounted_cash_flow" @ "equity" = DiscountedCashFlow::example();
-            boxed: CallableRangeAccrual(CallableRangeAccrual) => "callable_range_accrual" @ "exotics" = infallible_example(CallableRangeAccrual::example());
+            boxed: CallableRangeAccrual(CallableRangeAccrual) => "callable_range_accrual" @ "exotics" = CallableRangeAccrual::example();
             boxed: BondFuture(BondFuture) => "bond_future" @ "fixed_income" = BondFuture::example();
-            boxed: StructuredCredit(StructuredCredit) => "structured_credit" @ "fixed_income" = infallible_example(StructuredCredit::example());
+            boxed: StructuredCredit(StructuredCredit) => "structured_credit" @ "fixed_income" = StructuredCredit::example();
             boxed: AssetBackedFacility(AssetBackedFacility) => "asset_backed_facility" @ "fixed_income" = AssetBackedFacility::example();
             boxed: LeveredRealEstateEquity(crate::instruments::equity::real_estate::LeveredRealEstateEquity) => "levered_real_estate_equity" @ "equity" = crate::instruments::equity::real_estate::LeveredRealEstateEquity::example();
             boxed: Composite(CompositeInstrument) => "composite" @ "composite" = CompositeInstrument::example();
@@ -442,10 +442,6 @@ fn schema_example_error(
     error: impl std::fmt::Display,
 ) -> finstack_quant_core::Error {
     finstack_quant_core::Error::Internal(format!("{context}: {error}"))
-}
-
-fn infallible_example<T>(value: T) -> Result<T> {
-    Ok(value)
 }
 
 macro_rules! instrument_registry_entries {
@@ -1236,7 +1232,7 @@ mod tests {
 
     #[test]
     fn test_structured_credit_deserializes_into_boxed_variant() {
-        let structured_credit = StructuredCredit::example();
+        let structured_credit = StructuredCredit::example().expect("example");
         let structured_credit_id = structured_credit.id.clone();
         let json = serde_json::to_value(InstrumentJson::StructuredCredit(Box::new(
             structured_credit,
@@ -1259,7 +1255,7 @@ mod tests {
 
     #[test]
     fn test_cds_roundtrip() {
-        let cds = CreditDefaultSwap::example();
+        let cds = CreditDefaultSwap::example().expect("example");
 
         let json = InstrumentJson::CreditDefaultSwap(cds.clone());
         let serialized =
@@ -1591,7 +1587,7 @@ mod tests {
     fn test_inflation_linked_bond_defaults_when_optional_fields_omitted() {
         use finstack_quant_core::dates::{BusinessDayConvention, StubKind};
 
-        let bond = InflationLinkedBond::example();
+        let bond = InflationLinkedBond::example().expect("example");
         let mut json = serde_json::to_value(InstrumentJson::InflationLinkedBond(bond))
             .expect("InflationLinkedBond JSON serialization should succeed");
         remove_spec_key(&mut json, "business_day_convention");
@@ -1615,7 +1611,7 @@ mod tests {
     fn test_cds_tranche_default_business_day_convention_when_omitted() {
         use finstack_quant_core::dates::BusinessDayConvention;
 
-        let tranche = CdsTranche::example();
+        let tranche = CdsTranche::example().expect("example");
         let mut json = serde_json::to_value(InstrumentJson::CdsTranche(tranche))
             .expect("CdsTranche JSON serialization should succeed");
         remove_spec_key(&mut json, "business_day_convention");

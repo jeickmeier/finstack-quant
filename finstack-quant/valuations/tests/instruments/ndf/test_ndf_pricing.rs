@@ -326,16 +326,17 @@ fn test_ndf_pricing_with_foreign_curve() {
 
 #[test]
 fn test_ndf_instrument_key() {
-    let ndf = Ndf::example();
+    let ndf = Ndf::example().expect("example");
     assert_eq!(ndf.key(), InstrumentType::Ndf);
 }
 
 #[test]
 fn test_ndf_is_fixed() {
-    let ndf_unfixed = Ndf::example();
+    let ndf_unfixed = Ndf::example().expect("example");
     assert!(!ndf_unfixed.is_fixed());
 
     let ndf_fixed = Ndf::example()
+        .expect("example")
         .with_observed_fixing(7.30)
         .expect("valid rate");
     assert!(ndf_fixed.is_fixed());
@@ -343,7 +344,7 @@ fn test_ndf_is_fixed() {
 
 #[test]
 fn test_ndf_serde_roundtrip() {
-    let ndf = Ndf::example();
+    let ndf = Ndf::example().expect("example");
 
     let json = serde_json::to_string_pretty(&ndf).expect("serialize");
     let parsed: Ndf = serde_json::from_str(&json).expect("deserialize");

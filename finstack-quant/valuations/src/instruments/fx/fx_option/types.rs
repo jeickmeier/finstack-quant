@@ -342,11 +342,11 @@ impl FxOption {
     /// Solve for implied volatility.
     pub fn implied_vol(
         &self,
-        curves: &finstack_quant_core::market_data::context::MarketContext,
+        market: &finstack_quant_core::market_data::context::MarketContext,
         as_of: Date,
         target_price: f64,
     ) -> Result<f64> {
-        pricer::implied_vol(self, curves, as_of, target_price)
+        pricer::implied_vol(self, market, as_of, target_price)
     }
 
     /// Calculate the Delta-Neutral Straddle (DNS) strike.

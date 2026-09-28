@@ -35,28 +35,39 @@ pub struct BasketCalculator {
     config: BasketPricingConfig,
 }
 
+impl Default for BasketCalculator {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl BasketCalculator {
-    /// Create a new calculator with the given configuration.
-    pub fn new(config: BasketPricingConfig) -> Self {
-        Self { config }
+    /// Create a calculator with the default configuration.
+    pub fn new() -> Self {
+        Self::with_config(BasketPricingConfig::default())
     }
 
-    /// Create a calculator with default configuration.
-    pub fn with_defaults() -> Self {
-        Self::new(BasketPricingConfig::default())
+    /// Create a calculator with an explicit configuration.
+    ///
+    /// # Arguments
+    ///
+    /// * `config` - Fee-accrual day basis (`days_in_year`, e.g. 365.25) and the
+    ///   FX-conversion policy for constituents quoted in another currency.
+    pub fn with_config(config: BasketPricingConfig) -> Self {
+        Self { config }
     }
 
     /// Calculate Net Asset Value per share.
     ///
     /// # Arguments
     /// * `basket` - The basket instrument to value
-    /// * `context` - Market context with pricing data
+    /// * `market` - Market context with pricing data
     /// * `as_of` - Valuation date
     /// * `shares_outstanding` - Total shares outstanding for per-share calculation
     pub fn nav(
         &self,
         basket: &Basket,
-        context: &MarketContext,
+        market: &MarketContext,
         as_of: Date,
         shares_outstanding: f64,
     ) -> Result<Money> {
@@ -66,7 +77,7 @@ impl BasketCalculator {
                 basket,
                 index,
                 constituent,
-                context,
+                market,
                 as_of,
                 ValueMode::PerShare {
                     shares: Some(shares_outstanding),
@@ -85,13 +96,13 @@ impl BasketCalculator {
     ///
     /// # Arguments
     /// * `basket` - The basket instrument to value
-    /// * `context` - Market context with pricing data
+    /// * `market` - Market context with pricing data
     /// * `as_of` - Valuation date
     /// * `shares_outstanding` - Optional shares outstanding for weight-based calculations
     pub fn basket_value(
         &self,
         basket: &Basket,
-        context: &MarketContext,
+        market: &MarketContext,
         as_of: Date,
         shares_outstanding: Option<f64>,
     ) -> Result<Money> {
@@ -101,7 +112,7 @@ impl BasketCalculator {
                 basket,
                 index,
                 constituent,
-                context,
+                market,
                 as_of,
                 ValueMode::Total {
                     shares: shares_outstanding,
@@ -121,21 +132,21 @@ impl BasketCalculator {
     ///
     /// # Arguments
     /// * `basket` - The basket instrument to value
-    /// * `context` - Market context with pricing data
+    /// * `market` - Market context with pricing data
     /// * `as_of` - Valuation date
     /// * `aum` - Assets under management amount
     /// * `shares_outstanding` - Total shares outstanding for per-share calculation
     pub fn nav_with_aum(
         &self,
         basket: &Basket,
-        context: &MarketContext,
+        market: &MarketContext,
         as_of: Date,
         aum: Money,
         shares_outstanding: f64,
     ) -> Result<Money> {
         let aum_basket =
-            self.to_basket_currency(basket, aum, basket.reporting_currency, context, as_of)?;
-        let total = self.basket_value_with_aum(basket, context, as_of, aum_basket)?;
+            self.to_basket_currency(basket, aum, basket.reporting_currency, market, as_of)?;
+        let total = self.basket_value_with_aum(basket, market, as_of, aum_basket)?;
         let nav_value = if shares_outstanding > 0.0 {
             total.amount() / shares_outstanding
         } else {
@@ -156,7 +167,7 @@ impl BasketCalculator {
     pub fn basket_value_with_aum(
         &self,
         basket: &Basket,
-        context: &MarketContext,
+        market: &MarketContext,
         as_of: Date,
         aum_basket: Money,
     ) -> Result<Money> {
@@ -181,7 +192,7 @@ impl BasketCalculator {
                     basket,
                     index,
                     constituent,
-                    context,
+                    market,
                     as_of,
                     ValueMode::Total {
                         shares: None,
@@ -379,12 +390,6 @@ impl BasketCalculator {
     }
 }
 
-impl Default for BasketCalculator {
-    fn default() -> Self {
-        Self::with_defaults()
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -431,7 +436,7 @@ mod tests {
     /// basket only 50%-invested is worth half the AUM in positions.
     #[test]
     fn w10_partially_invested_basket_scales_aum_by_weight_sum() {
-        let calc = BasketCalculator::with_defaults();
+        let calc = BasketCalculator::new();
         let context = MarketContext::new();
         let as_of = Date::from_calendar_date(2025, time::Month::January, 1).expect("date");
         let aum = Money::from((1_000_000_i64, Currency::USD));
@@ -453,7 +458,7 @@ mod tests {
     /// scaled — a 1.2× levered weight set is worth 1.2 × AUM.
     #[test]
     fn w10_over_weighted_basket_scales_aum_up() {
-        let calc = BasketCalculator::with_defaults();
+        let calc = BasketCalculator::new();
         let context = MarketContext::new();
         let as_of = Date::from_calendar_date(2025, time::Month::January, 1).expect("date");
         let aum = Money::from((1_000_000_i64, Currency::USD));
@@ -474,7 +479,7 @@ mod tests {
     /// shortcut for the common, well-formed case.
     #[test]
     fn w10_fully_invested_basket_returns_aum_exactly() {
-        let calc = BasketCalculator::with_defaults();
+        let calc = BasketCalculator::new();
         let context = MarketContext::new();
         let as_of = Date::from_calendar_date(2025, time::Month::January, 1).expect("date");
         let aum = Money::from((1_000_000_i64, Currency::USD));

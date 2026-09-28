@@ -2,6 +2,68 @@
 
 ## [Unreleased]
 
+### Rust constructors, setters and parameters (2026-09-24)
+
+#### Changed (BREAKING)
+
+- Pricing-override setters use the exact field name (Rust only):
+  `InstrumentPricingOverrides::with_implied_vol` (now `with_implied_volatility`),
+  `with_quoted_dirty_price` (now `with_quoted_dirty_price_currency`),
+  `with_merton_mc` (now `with_merton_mc_config`);
+  `MetricPricingOverrides::with_spot_bump` (now `with_spot_bump_decimal`),
+  `with_vol_bump` (now `with_vol_bump_decimal`), `with_rate_bump` (now
+  `with_rate_bump_bp`), `with_credit_spread_bump` (now
+  `with_credit_spread_bump_bp`), `with_ytm_bump` (now `with_ytm_bump_bp`);
+  `ScenarioPricingOverrides::with_spread_shock_bp` (now
+  `with_scenario_spread_shock_bp`).
+- Instrument setters use the exact field name (Rust only):
+  `Equity::with_dividend_yield_id`, `EquityUnderlyingParams::with_dividend_yield`
+  and `EquityOptionMarketData::with_dividend_yield` (now `with_div_yield_id`);
+  `Bond::with_cashflows` (now `with_custom_cashflows`); `Swaption::with_sabr`
+  (now `with_sabr_params`); `StructuredCredit::with_cleanup_call` (now
+  `with_cleanup_call_decimal`); `StructuredCredit::with_calendar` (now
+  `with_calendar_id`); `PrivateMarketsFund::with_discount_curve` (now
+  `with_discount_curve_id`); `IndexUnderlyingParams::with_yield` /
+  `with_duration` (now `with_yield_id` / `with_duration_id`);
+  `PoolAsset::with_obligor` (now `with_obligor_id`).
+- Every instrument `example()` returns `finstack_quant_core::Result<Self>`
+  (30 instruments previously returned `Self` and panicked internally).
+  `InterestRateSwap::example_standard` (now `example`) and
+  `Snowball::example_snowball` (now `example`). Python:
+  `InterestRateSwap.example_standard()` (now `example()`); the Python
+  `example()` factories of `Swaption`, `CreditDefaultSwap`, `CdsIndex` and
+  `CdsTranche` now raise `ValueError` on a validation failure.
+- `EquityOption::european_call` (now `european`, with a trailing
+  `option_type` argument) and `european_call_with_market_data` (now
+  `european_with_market_data(id, ticker, option_params, market_data)`);
+  `EquityOptionParams::european_call` / `european_put` (now `call` / `put`).
+  Python: `EquityOption.european_call(...)` (now `EquityOption.european(...,
+  option_type, ...)`).
+- `CdsTranchePricer::with_params` (now `with_config`); `BasketCalculator::new(config)`
+  (now `with_config(config)`) and `BasketCalculator::with_defaults` (now `new`).
+- Constructor id parameters take `impl Into<InstrumentId>` (FxSpot, the
+  listed future options, EquityOption, Equity, BasisSwap, XccySwap, Repo,
+  StructuredCredit) and curve ids take `impl Into<CurveId>`
+  (`FinancingLegSpec::new`, `EquityOption::new`, the StructuredCredit
+  constructors, `CashflowSpec::floating*`, `PoolAsset::floating_rate_loan`);
+  `Repo::overnight` takes `calendar_id: impl Into<CalendarId>`.
+- Public instrument helpers name the market argument `market` and the
+  valuation date `as_of` (previously `curves`, `context`, `market_ctx`,
+  `market_context`, `valuation_date`); `asw_*_with_forward` take
+  `forward_curve_id` (was `fwd_curve_id`).
+- `CommoditySwap::payment_schedule` drops its unused `as_of` argument.
+
+#### Removed
+
+- `BasisSwap::new_allowing_same_curve` and `BasisSwap::with_allow_same_curve`
+  (use `BasisSwap::builder().allow_same_curve(true)` or the JSON field
+  `allow_same_curve`).
+- `FxSpot::get_effective_notional` (read `notional`).
+- Typed-input twins `CreditParams::new_pct`, `ProtectionLegSpec::new_pct`,
+  `CdsTranchePricerConfig::with_rfl_copula_pct` /
+  `with_custom_stochastic_recovery_pct` / `with_constant_recovery_pct`, and
+  `RangeAccrualTermsBuilder::coupon_rate_rate`.
+
 ### Type-name hygiene (2026-09-24)
 
 #### Changed (BREAKING)

@@ -28,7 +28,7 @@ fn execute(
     interest: f64,
     principal: f64,
 ) -> finstack_quant_core::Result<WaterfallDistribution> {
-    let deal = StructuredCredit::example();
+    let deal = StructuredCredit::example().expect("example");
     let market = MarketContext::new();
     execute_waterfall(
         waterfall,
@@ -84,7 +84,7 @@ fn production_waterfall_principal_cannot_fund_fees_unless_the_tier_draws_on_it()
 
 #[test]
 fn production_waterfall_interest_cannot_repay_principal_without_diversion() {
-    let deal = StructuredCredit::example();
+    let deal = StructuredCredit::example().expect("example");
     let waterfall = Waterfall::builder(Currency::USD)
         .add_tier(
             WaterfallTier::new("principal", 1, PaymentType::Principal).add_recipient(

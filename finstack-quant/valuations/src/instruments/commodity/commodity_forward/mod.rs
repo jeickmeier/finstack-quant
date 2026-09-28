@@ -31,7 +31,7 @@
 //! use finstack_quant_core::currency::Currency;
 //!
 //! // Create a WTI crude oil forward
-//! let forward = CommodityForward::example();
+//! let forward = CommodityForward::example().expect("example");
 //! assert_eq!(forward.underlying.underlying_ticker, "CL");
 //! ```
 

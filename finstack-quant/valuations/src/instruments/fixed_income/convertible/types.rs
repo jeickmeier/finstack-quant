@@ -931,15 +931,15 @@ impl ConvertibleBond {
     ///
     /// # Arguments
     ///
-    /// * `curves` - Market context containing `spot_id` as the
+    /// * `market` - Market context containing `spot_id` as the
     ///   current share price in the bond's currency. Mandatory-variable terms
     ///   determine share delivery from the lower and upper conversion prices.
     pub fn parity(
         &self,
-        curves: &finstack_quant_core::market_data::context::MarketContext,
+        market: &finstack_quant_core::market_data::context::MarketContext,
     ) -> finstack_quant_core::Result<f64> {
         crate::instruments::common_impl::traits::Instrument::validate_for_pricing(self)?;
-        let spot_price = curves.get_price(&self.spot_id)?;
+        let spot_price = market.get_price(&self.spot_id)?;
         let spot = match spot_price {
             finstack_quant_core::market_data::scalars::MarketScalar::Price(money) => money.amount(),
             finstack_quant_core::market_data::scalars::MarketScalar::Unitless(value) => *value,
@@ -952,18 +952,18 @@ impl ConvertibleBond {
     ///
     /// # Arguments
     ///
-    /// * `curves` - Market context containing the current underlying share price
+    /// * `market` - Market context containing the current underlying share price
     ///   in the bond's currency; missing data and invalid conversion terms fail.
     /// * `bond_price` - Finite nonnegative total bond value in notional-currency
     ///   units, not percent of par. Returns `bond_price / conversion_value - 1`;
     ///   a nonpositive or non-finite conversion value fails.
     pub fn conversion_premium(
         &self,
-        curves: &finstack_quant_core::market_data::context::MarketContext,
+        market: &finstack_quant_core::market_data::context::MarketContext,
         bond_price: f64,
     ) -> finstack_quant_core::Result<f64> {
         crate::instruments::common_impl::traits::Instrument::validate_for_pricing(self)?;
-        let spot_price = curves.get_price(&self.spot_id)?;
+        let spot_price = market.get_price(&self.spot_id)?;
         let spot = match spot_price {
             finstack_quant_core::market_data::scalars::MarketScalar::Price(money) => money.amount(),
             finstack_quant_core::market_data::scalars::MarketScalar::Unitless(value) => *value,
@@ -986,7 +986,7 @@ impl ConvertibleBond {
     ///
     /// # Arguments
     ///
-    /// * `curves` - Discount and risky discount curves, equity price and
+    /// * `market` - Discount and risky discount curves, equity price and
     ///   volatility, plus forward curves and realized fixings for floating
     ///   coupons. An instrument volatility override takes precedence; surface
     ///   lookup otherwise uses the contractual conversion strike.
@@ -1000,7 +1000,7 @@ impl ConvertibleBond {
     /// 1 vol point and 1bp. Vega is per volatility point and rho per bp.
     pub fn greeks(
         &self,
-        curves: &finstack_quant_core::market_data::context::MarketContext,
+        market: &finstack_quant_core::market_data::context::MarketContext,
         tree_type: Option<pricing::ConvertibleTreeType>,
         as_of: finstack_quant_core::dates::Date,
     ) -> finstack_quant_core::Result<ConvertibleGreeks> {
@@ -1010,7 +1010,7 @@ impl ConvertibleBond {
         )?;
         let greeks = pricing::calculate_convertible_greeks(
             self,
-            curves,
+            market,
             tree_type.unwrap_or_default(),
             crate::instruments::GreekBumps::from(&bumps),
             as_of,
@@ -1021,50 +1021,50 @@ impl ConvertibleBond {
     /// Calculate delta of this convertible bond
     pub fn delta(
         &self,
-        curves: &finstack_quant_core::market_data::context::MarketContext,
+        market: &finstack_quant_core::market_data::context::MarketContext,
         as_of: finstack_quant_core::dates::Date,
     ) -> finstack_quant_core::Result<f64> {
-        let greeks = self.greeks(curves, None, as_of)?;
+        let greeks = self.greeks(market, None, as_of)?;
         Ok(greeks.delta)
     }
 
     /// Calculate gamma of this convertible bond
     pub fn gamma(
         &self,
-        curves: &finstack_quant_core::market_data::context::MarketContext,
+        market: &finstack_quant_core::market_data::context::MarketContext,
         as_of: finstack_quant_core::dates::Date,
     ) -> finstack_quant_core::Result<f64> {
-        let greeks = self.greeks(curves, None, as_of)?;
+        let greeks = self.greeks(market, None, as_of)?;
         Ok(greeks.gamma)
     }
 
     /// Calculate vega of this convertible bond
     pub fn vega(
         &self,
-        curves: &finstack_quant_core::market_data::context::MarketContext,
+        market: &finstack_quant_core::market_data::context::MarketContext,
         as_of: finstack_quant_core::dates::Date,
     ) -> finstack_quant_core::Result<f64> {
-        let greeks = self.greeks(curves, None, as_of)?;
+        let greeks = self.greeks(market, None, as_of)?;
         Ok(greeks.vega)
     }
 
     /// Calculate rho of this convertible bond
     pub fn rho(
         &self,
-        curves: &finstack_quant_core::market_data::context::MarketContext,
+        market: &finstack_quant_core::market_data::context::MarketContext,
         as_of: finstack_quant_core::dates::Date,
     ) -> finstack_quant_core::Result<f64> {
-        let greeks = self.greeks(curves, None, as_of)?;
+        let greeks = self.greeks(market, None, as_of)?;
         Ok(greeks.rho)
     }
 
     /// Calculate theta of this convertible bond
     pub fn theta(
         &self,
-        curves: &finstack_quant_core::market_data::context::MarketContext,
+        market: &finstack_quant_core::market_data::context::MarketContext,
         as_of: finstack_quant_core::dates::Date,
     ) -> finstack_quant_core::Result<f64> {
-        let greeks = self.greeks(curves, None, as_of)?;
+        let greeks = self.greeks(market, None, as_of)?;
         Ok(greeks.theta)
     }
 }

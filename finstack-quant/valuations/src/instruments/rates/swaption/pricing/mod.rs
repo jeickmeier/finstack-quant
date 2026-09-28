@@ -13,7 +13,7 @@
 //! use finstack_quant_valuations::instruments::rates::swaption::BermudanSwaption;
 //! use finstack_quant_valuations::instruments::rates::swaption::pricing::BermudanSwaptionTreeValuator;
 //!
-//! let swaption = BermudanSwaption::example();
+//! let swaption = BermudanSwaption::example().expect("example");
 //! // Use with HullWhiteTree for backward induction pricing
 //! ```
 

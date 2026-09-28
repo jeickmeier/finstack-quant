@@ -85,7 +85,7 @@ fn abs(model: DelinquencyModel) -> StructuredCredit {
     .expect("structure");
     let mut deal =
         StructuredCredit::new_abs("ABS-DQ", pool, tranches, close(), maturity(), "USD-OIS")
-            .with_calendar("nyse");
+            .with_calendar_id("nyse");
     deal.credit_model.prepayment_spec = PrepaymentModelSpec::constant_cpr(0.0);
     deal.credit_model.default_spec = DefaultModelSpec::constant_cdr(0.0);
     deal.credit_model.recovery_spec = RecoveryModelSpec::with_lag(0.0, 0);
@@ -319,7 +319,7 @@ fn max_delinquency_step_down_trigger_fires_and_reverts() {
         .expect("structure");
         let mut deal =
             StructuredCredit::new_abs("ABS-DQ-SD", pool, tranches, close(), maturity(), "USD-OIS")
-                .with_calendar("nyse");
+                .with_calendar_id("nyse");
         deal.credit_model.prepayment_spec = PrepaymentModelSpec::constant_cpr(0.20);
         // Heavy entries for one year, then none: delinquency climbs past 5%
         // and decays back below it as balances cure or charge off.

@@ -611,11 +611,11 @@ impl CdsOption {
     /// percentage). Calls Δ ≥ 0, puts Δ ≤ 0.
     pub fn delta(
         &self,
-        curves: &finstack_quant_core::market_data::context::MarketContext,
+        market: &finstack_quant_core::market_data::context::MarketContext,
         as_of: finstack_quant_core::dates::Date,
     ) -> finstack_quant_core::Result<f64> {
         crate::instruments::common_impl::traits::Instrument::validate_for_pricing(self)?;
-        super::metrics::delta::delta(self, curves, as_of)
+        super::metrics::delta::delta(self, market, as_of)
     }
 
     /// CDS option Γ, branched by strike kind: central difference of the
@@ -626,11 +626,11 @@ impl CdsOption {
     /// number.
     pub fn gamma(
         &self,
-        curves: &finstack_quant_core::market_data::context::MarketContext,
+        market: &finstack_quant_core::market_data::context::MarketContext,
         as_of: finstack_quant_core::dates::Date,
     ) -> finstack_quant_core::Result<f64> {
         crate::instruments::common_impl::traits::Instrument::validate_for_pricing(self)?;
-        super::metrics::gamma::gamma(self, curves, as_of)
+        super::metrics::gamma::gamma(self, market, as_of)
     }
 
     /// Bloomberg CDSO Vega(1%) — one-sided forward difference of the
@@ -638,11 +638,11 @@ impl CdsOption {
     /// bump (DOCS 2055833 §2.5).
     pub fn vega(
         &self,
-        curves: &finstack_quant_core::market_data::context::MarketContext,
+        market: &finstack_quant_core::market_data::context::MarketContext,
         as_of: finstack_quant_core::dates::Date,
     ) -> finstack_quant_core::Result<f64> {
         crate::instruments::common_impl::traits::Instrument::validate_for_pricing(self)?;
-        super::metrics::vega::vega(self, curves, as_of)
+        super::metrics::vega::vega(self, market, as_of)
     }
 
     /// Bloomberg CDSO θ: change in option premium for a one-calendar-day
@@ -652,11 +652,11 @@ impl CdsOption {
     /// is the Bloomberg convention.
     pub fn theta(
         &self,
-        curves: &finstack_quant_core::market_data::context::MarketContext,
+        market: &finstack_quant_core::market_data::context::MarketContext,
         as_of: finstack_quant_core::dates::Date,
     ) -> finstack_quant_core::Result<f64> {
         crate::instruments::common_impl::traits::Instrument::validate_for_pricing(self)?;
-        super::pricer::theta(self, curves, as_of)
+        super::pricer::theta(self, market, as_of)
     }
 
     /// Solve for the Bloomberg CDSO implied volatility `σ` that reproduces
@@ -664,13 +664,13 @@ impl CdsOption {
     /// pricer used for valuation. Brent root finding in log-σ space.
     pub fn implied_vol(
         &self,
-        curves: &finstack_quant_core::market_data::context::MarketContext,
+        market: &finstack_quant_core::market_data::context::MarketContext,
         as_of: finstack_quant_core::dates::Date,
         target_price: f64,
         initial_guess: Option<f64>,
     ) -> finstack_quant_core::Result<f64> {
         crate::instruments::common_impl::traits::Instrument::validate_for_pricing(self)?;
-        super::pricer::implied_vol(self, curves, as_of, target_price, initial_guess)
+        super::pricer::implied_vol(self, market, as_of, target_price, initial_guess)
     }
 }
 

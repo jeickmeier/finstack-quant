@@ -141,13 +141,13 @@ fn test_resolve_volatility_priority_and_greek_inputs_expired() {
     swaption.instrument_pricing_overrides = swaption
         .instrument_pricing_overrides
         .clone()
-        .with_implied_vol(0.35)
+        .with_implied_volatility(0.35)
         .with_vol_surface_extrapolation(VolSurfaceExtrapolation::Clamp);
     let override_vol = swaption.resolve_volatility(&market, forward, t).unwrap();
     assert_approx_eq(override_vol, 0.35, 1e-12, "override vol");
 
     let sabr_params = SabrParameters::rates_standard(0.2, 0.5, -0.25).unwrap();
-    swaption = swaption.with_sabr(sabr_params);
+    swaption = swaption.with_sabr_params(sabr_params);
     let sabr_vol = swaption.resolve_volatility(&market, forward, t).unwrap();
     assert!(sabr_vol.is_finite(), "sabr vol should be finite");
     assert!(
@@ -185,7 +185,7 @@ fn test_sabr_parameter_constructors_and_internal_conversion() {
 
 #[test]
 fn test_swaption_example_and_builder_helpers() {
-    let example = Swaption::example();
+    let example = Swaption::example().expect("example");
     assert_eq!(example.exercise_style, ExerciseStyle::European);
     assert_eq!(example.settlement, SettlementType::Cash);
     assert_eq!(

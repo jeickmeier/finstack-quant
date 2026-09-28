@@ -16,7 +16,7 @@ mod cases {
         consequence: crate::instruments::fixed_income::structured_credit::TriggerConsequence,
     ) -> StructuredCredit {
         use crate::instruments::fixed_income::structured_credit::CoverageTrigger;
-        let mut deal = StructuredCredit::example();
+        let mut deal = StructuredCredit::example().expect("example");
         deal.tranches = TrancheStructure::new(vec![
             Tranche::new(
                 "A",
@@ -52,7 +52,7 @@ mod cases {
         use crate::instruments::fixed_income::structured_credit::{
             ReinvestmentCriteria, ReinvestmentPeriod,
         };
-        let mut deal = StructuredCredit::example();
+        let mut deal = StructuredCredit::example().expect("example");
         deal.pool.reinvestment_period = Some(ReinvestmentPeriod {
             end: deal.maturity,
             is_active: true,
@@ -215,7 +215,7 @@ mod cases {
         use crate::instruments::fixed_income::structured_credit::{
             ReinvestmentCriteria, ReinvestmentPeriod,
         };
-        let mut deal = StructuredCredit::example();
+        let mut deal = StructuredCredit::example().expect("example");
         let first = deal.first_payment_date;
         deal.credit_model.prepayment_spec = PrepaymentModelSpec::constant_cpr(0.36);
         deal.credit_model.default_spec = DefaultModelSpec::constant_cdr(0.0);
@@ -339,7 +339,7 @@ mod cases {
 
     #[test]
     fn production_waterfall_terminal_spread_is_interest_and_conserved() {
-        let mut deal = StructuredCredit::example();
+        let mut deal = StructuredCredit::example().expect("example");
         deal.credit_model.prepayment_spec = PrepaymentModelSpec::constant_cpr(0.0);
         deal.credit_model.default_spec = DefaultModelSpec::constant_cdr(0.0);
         let market = MarketContext::new();
@@ -376,7 +376,7 @@ mod cases {
 
     #[test]
     fn production_waterfall_predefaulted_par_is_not_performing_collateral() {
-        let mut deal = StructuredCredit::example();
+        let mut deal = StructuredCredit::example().expect("example");
         deal.pool.assets[0].default_with_recovery(
             Money::new(70_000_000.0, Currency::USD).expect("recovery"),
             deal.closing_date,
@@ -400,7 +400,7 @@ mod cases {
 
     #[test]
     fn production_waterfall_equity_interest_preserves_loss_absorbing_principal() {
-        let mut deal = StructuredCredit::example();
+        let mut deal = StructuredCredit::example().expect("example");
         deal.tranches = TrancheStructure::new(vec![
             Tranche::new(
                 "A",
@@ -478,7 +478,7 @@ mod cases {
         use crate::instruments::fixed_income::structured_credit::{
             ReinvestmentCriteria, ReinvestmentPeriod,
         };
-        let mut deal = StructuredCredit::example();
+        let mut deal = StructuredCredit::example().expect("example");
         deal.credit_model.prepayment_spec = PrepaymentModelSpec::constant_cpr(0.36);
         deal.credit_model.default_spec = DefaultModelSpec::constant_cdr(0.0);
         deal.pool.reinvestment_period = Some(ReinvestmentPeriod {
@@ -956,8 +956,8 @@ mod cases {
             maturity,
             "USD-OIS",
         )
-        .with_calendar("nyse")
-        .with_cleanup_call(0.10)
+        .with_calendar_id("nyse")
+        .with_cleanup_call_decimal(0.10)
         .expect("cleanup call");
         // 60% CPR: the pool factor crosses below 10% within ~4 years, well
         // before maturity, so a cleanup call genuinely fires mid-life.
@@ -1105,7 +1105,7 @@ mod cases {
                 maturity,
                 "USD-OIS",
             )
-            .with_calendar("nyse");
+            .with_calendar_id("nyse");
             instrument.credit_model.prepayment_spec = PrepaymentModelSpec::constant_cpr(0.20);
             instrument.credit_model.default_spec = DefaultModelSpec::constant_cdr(0.0);
             instrument.credit_model.recovery_spec = RecoveryModelSpec::with_lag(0.40, 0);
@@ -1209,7 +1209,7 @@ mod cases {
             maturity,
             "USD-OIS",
         )
-        .with_calendar("nyse");
+        .with_calendar_id("nyse");
         // Heavy prepayment + heavy default running together.
         instrument.credit_model.prepayment_spec = PrepaymentModelSpec::constant_cpr(0.40);
         instrument.credit_model.default_spec = DefaultModelSpec::constant_cdr(0.30);
@@ -1299,7 +1299,7 @@ mod cases {
             maturity,
             "USD-OIS",
         )
-        .with_calendar("nyse");
+        .with_calendar_id("nyse");
         instrument.credit_model.prepayment_spec = PrepaymentModelSpec::constant_cpr(0.10);
         instrument.credit_model.default_spec = DefaultModelSpec::constant_cdr(0.05);
         instrument.credit_model.recovery_spec = RecoveryModelSpec::with_lag(0.40, 6);
@@ -1767,7 +1767,7 @@ mod cases {
             maturity,
             "USD-OIS",
         )
-        .with_calendar("nyse");
+        .with_calendar_id("nyse");
         instrument.credit_model.prepayment_spec = PrepaymentModelSpec::constant_cpr(0.0);
         instrument.credit_model.default_spec = DefaultModelSpec::constant_cdr(0.0);
         instrument.credit_model.recovery_spec = RecoveryModelSpec::with_lag(0.40, 0);
@@ -1865,7 +1865,7 @@ mod cases {
                 maturity,
                 "USD-OIS",
             )
-            .with_calendar("nyse");
+            .with_calendar_id("nyse");
             deal.credit_model.prepayment_spec = PrepaymentModelSpec::constant_cpr(0.0);
             deal.credit_model.default_spec = DefaultModelSpec::constant_cdr(0.0);
             deal.credit_model.recovery_spec = RecoveryModelSpec::with_lag(0.40, 0);
@@ -2026,7 +2026,7 @@ mod cases {
             maturity,
             "USD-OIS",
         )
-        .with_calendar("nyse");
+        .with_calendar_id("nyse");
         instrument.credit_model.prepayment_spec = PrepaymentModelSpec::constant_cpr(0.0);
         // Sustained defaults erode the pool and therefore the OC ratio.
         instrument.credit_model.default_spec = DefaultModelSpec::constant_cdr(0.05);
@@ -2096,7 +2096,7 @@ mod cases {
             maturity,
             "USD-OIS",
         )
-        .with_calendar("nyse");
+        .with_calendar_id("nyse");
         instrument.credit_model.prepayment_spec = PrepaymentModelSpec::constant_cpr(0.0);
         instrument.credit_model.default_spec = DefaultModelSpec::constant_cdr(0.03);
         instrument.credit_model.recovery_spec = RecoveryModelSpec::with_lag(0.40, 0);
@@ -2528,8 +2528,8 @@ mod cases {
             maturity,
             "USD-OIS",
         )
-        .with_calendar("nyse")
-        .with_cleanup_call(0.10)
+        .with_calendar_id("nyse")
+        .with_cleanup_call_decimal(0.10)
         .expect("cleanup call");
         // No fees/coupons: principal funding is independently conserved as
         // performing par plus recoveries, less allocated net credit losses.
@@ -2788,7 +2788,7 @@ mod cases {
                 maturity,
                 "USD-OIS",
             )
-            .with_calendar("nyse");
+            .with_calendar_id("nyse");
             // CDR 20%: defaults occur in every period including the final
             // year, so with a 12-month lag the queue is non-empty at the
             // final scheduled date. No prepayments, 40% recovery.

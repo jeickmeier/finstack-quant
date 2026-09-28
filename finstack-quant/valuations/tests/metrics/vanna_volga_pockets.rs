@@ -68,7 +68,7 @@ fn approx_eq(actual: f64, expected: f64, tol: f64) {
 }
 
 fn equity_market(as_of: Date, spot: f64, vol: f64, rate: f64, div_yield: f64) -> MarketContext {
-    // IDs chosen to align with EquityOption::european_call defaults.
+    // IDs chosen to align with EquityOption::european defaults.
     let expiries = [0.25, 0.5, 1.0, 2.0];
     let strikes = [80.0, 90.0, 100.0, 110.0, 120.0];
 

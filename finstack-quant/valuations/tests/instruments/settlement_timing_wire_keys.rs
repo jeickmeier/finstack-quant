@@ -59,7 +59,7 @@ fn commodity_future_retired_settlement_rule_is_rejected() {
 // schema-rejection-test: CommodityForward `settlement_lag_days`
 fn commodity_forward_retired_settlement_lag_days_is_rejected() {
     assert_rejects(
-        &CommodityForward::example(),
+        &CommodityForward::example().expect("example"),
         "settlement_days",
         "settlement_lag_days",
         serde_json::json!(2),

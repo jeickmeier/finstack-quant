@@ -65,7 +65,7 @@ fn published_cpi_move_must_be_inflation_pnl() {
             .insert(discount(as_of))
             .insert_inflation_index("US-CPI", cpi_index(cpi))
     };
-    let mut bond = InflationLinkedBond::example();
+    let mut bond = InflationLinkedBond::example().expect("example");
     bond.maturity = date!(2025 - 07 - 15);
     let instrument: Arc<dyn Instrument> = Arc::new(bond);
     let m0 = market(100.0);

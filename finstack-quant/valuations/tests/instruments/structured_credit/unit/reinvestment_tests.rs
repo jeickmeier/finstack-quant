@@ -125,7 +125,7 @@ fn clo(
     .expect("structure");
     let mut deal =
         StructuredCredit::new_clo("CLO-REINVEST", pool, tranches, close, maturity, "USD-OIS")
-            .with_calendar("nyse")
+            .with_calendar_id("nyse")
             .with_coverage_triggers(tests)
             .expect("coverage tests");
     deal.credit_model.prepayment_spec = PrepaymentModelSpec::constant_cpr(0.20);
@@ -414,7 +414,7 @@ fn instrument_collateral_pools_cannot_reinvest() {
     .expect("tranche")])
     .expect("structure");
     let deal = StructuredCredit::new_clo("CLO-INSTR", pool, tranches, close, maturity, "USD-OIS")
-        .with_calendar("nyse");
+        .with_calendar_id("nyse");
     let err = run_simulation(&deal, &market(close), close)
         .expect_err("instrument pools reject reinvestment periods");
     assert!(

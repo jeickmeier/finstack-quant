@@ -682,7 +682,9 @@ mod tests {
         use finstack_quant_valuations::instruments::rates::swaption::BermudanSwaption;
         use finstack_quant_valuations::instruments::InstrumentJson;
 
-        envelope_json(InstrumentJson::BermudanSwaption(BermudanSwaption::example()))
+        envelope_json(InstrumentJson::BermudanSwaption(
+            BermudanSwaption::example().expect("example"),
+        ))
     }
 
     pub(crate) fn tarn_json() -> String {

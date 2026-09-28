@@ -25,12 +25,12 @@ fn serialize_example(instrument: InstrumentJson) -> Result<String, JsValue> {
 ///
 /// # Errors
 ///
-/// Throws a JavaScript exception if the example envelope cannot be serialized
-/// to JSON.
+/// Throws a JavaScript exception if the example instrument fails validation
+/// or the example envelope cannot be serialized to JSON.
 #[wasm_bindgen(js_name = creditDefaultSwapExampleJson)]
 pub fn credit_default_swap_example_json() -> Result<String, JsValue> {
     serialize_example(InstrumentJson::CreditDefaultSwap(
-        CreditDefaultSwap::example(),
+        CreditDefaultSwap::example().map_err(|e| JsValue::from_str(&e.to_string()))?,
     ))
 }
 
@@ -38,22 +38,26 @@ pub fn credit_default_swap_example_json() -> Result<String, JsValue> {
 ///
 /// # Errors
 ///
-/// Throws a JavaScript exception if the example envelope cannot be serialized
-/// to JSON.
+/// Throws a JavaScript exception if the example instrument fails validation
+/// or the example envelope cannot be serialized to JSON.
 #[wasm_bindgen(js_name = cdsIndexExampleJson)]
 pub fn cds_index_example_json() -> Result<String, JsValue> {
-    serialize_example(InstrumentJson::CdsIndex(CdsIndex::example()))
+    serialize_example(InstrumentJson::CdsIndex(
+        CdsIndex::example().map_err(|e| JsValue::from_str(&e.to_string()))?,
+    ))
 }
 
 /// Example `CdsTranche` canonical instrument envelope.
 ///
 /// # Errors
 ///
-/// Throws a JavaScript exception if the example envelope cannot be serialized
-/// to JSON.
+/// Throws a JavaScript exception if the example instrument fails validation
+/// or the example envelope cannot be serialized to JSON.
 #[wasm_bindgen(js_name = cdsTrancheExampleJson)]
 pub fn cds_tranche_example_json() -> Result<String, JsValue> {
-    serialize_example(InstrumentJson::CdsTranche(CdsTranche::example()))
+    serialize_example(InstrumentJson::CdsTranche(
+        CdsTranche::example().map_err(|e| JsValue::from_str(&e.to_string()))?,
+    ))
 }
 
 /// Example `CdsOption` canonical instrument envelope.

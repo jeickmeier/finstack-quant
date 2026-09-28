@@ -445,22 +445,20 @@ impl CmsSwap {
     }
 
     /// Create a canonical example CMS swap (pay 10Y CMS, receive fixed).
-    #[allow(clippy::expect_used)]
-    pub fn example() -> Self {
+    pub fn example() -> finstack_quant_core::Result<Self> {
         use finstack_quant_core::currency::Currency;
-        use time::Month;
 
         let fixing_dates = vec![
-            Date::from_calendar_date(2025, Month::March, 20).expect("valid"),
-            Date::from_calendar_date(2025, Month::June, 20).expect("valid"),
-            Date::from_calendar_date(2025, Month::September, 22).expect("valid"),
-            Date::from_calendar_date(2025, Month::December, 22).expect("valid"),
+            time::macros::date!(2025 - 03 - 20),
+            time::macros::date!(2025 - 06 - 20),
+            time::macros::date!(2025 - 09 - 22),
+            time::macros::date!(2025 - 12 - 22),
         ];
         let payment_dates = vec![
-            Date::from_calendar_date(2025, Month::June, 20).expect("valid"),
-            Date::from_calendar_date(2025, Month::September, 22).expect("valid"),
-            Date::from_calendar_date(2025, Month::December, 22).expect("valid"),
-            Date::from_calendar_date(2026, Month::March, 20).expect("valid"),
+            time::macros::date!(2025 - 06 - 20),
+            time::macros::date!(2025 - 09 - 22),
+            time::macros::date!(2025 - 12 - 22),
+            time::macros::date!(2026 - 03 - 20),
         ];
         let accrual_fractions = vec![0.25, 0.25, 0.25, 0.25];
 
@@ -468,9 +466,10 @@ impl CmsSwap {
             .id(InstrumentId::new("CMSSWAP-10Y-USD"))
             .notional(Money::from((10_000_000_i64, Currency::USD)))
             .side(crate::instruments::common_impl::parameters::legs::PayReceive::Pay)
-            .cms_tenor(
-                Tenor::new(10, finstack_quant_core::dates::TenorUnit::Years).expect("10Y tenor"),
-            )
+            .cms_tenor(Tenor::new(
+                10,
+                finstack_quant_core::dates::TenorUnit::Years,
+            )?)
             .fixing_dates(fixing_dates)
             .payment_dates(payment_dates.clone())
             .accrual_fractions(accrual_fractions.clone())
@@ -488,7 +487,6 @@ impl CmsSwap {
             .vol_surface_id(CurveId::new("USD-CMS10Y-VOL"))
             .attributes(Attributes::new())
             .build()
-            .expect("Example CmsSwap construction should not fail")
     }
 
     fn cms_leg_flows(
@@ -865,7 +863,7 @@ mod tests {
 
     #[test]
     fn market_dependencies_retain_surface_and_every_optional_strike() {
-        let mut swap = CmsSwap::example();
+        let mut swap = CmsSwap::example().expect("example");
         swap.cms_cap = Some(0.06);
         swap.cms_floor = Some(0.01);
 
@@ -893,7 +891,7 @@ mod tests {
     #[test]
     fn cms_swap_cashflow_provider_emits_signed_modeled_flows() {
         let as_of = date(2025, 1, 1);
-        let swap = CmsSwap::example();
+        let swap = CmsSwap::example().expect("example");
         let market = finstack_quant_core::market_data::context::MarketContext::new()
             .insert(flat_discount_with_tenor("USD-OIS", as_of, 0.0, 2.0))
             .insert(flat_forward_with_tenor("USD-LIBOR-3M", as_of, 0.04, 2.0))

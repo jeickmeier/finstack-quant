@@ -63,7 +63,7 @@ fn test_ndf_builder_with_optional_fields() {
 
 #[test]
 fn test_ndf_example() {
-    let ndf = Ndf::example();
+    let ndf = Ndf::example().expect("example");
 
     assert_eq!(ndf.id.as_str(), "USDCNY-NDF-3M");
     assert_eq!(ndf.base_currency, Currency::CNY);
@@ -105,7 +105,7 @@ fn test_ndf_from_trade_date() {
 
 #[test]
 fn test_ndf_with_fixing_rate() {
-    let ndf = Ndf::example();
+    let ndf = Ndf::example().expect("example");
     assert!(!ndf.is_fixed());
 
     let fixed_ndf = ndf.with_observed_fixing(7.30).expect("valid rate");
@@ -115,7 +115,7 @@ fn test_ndf_with_fixing_rate() {
 
 #[test]
 fn test_ndf_instrument_trait() {
-    let ndf = Ndf::example();
+    let ndf = Ndf::example().expect("example");
 
     assert_eq!(ndf.id(), "USDCNY-NDF-3M");
     assert_eq!(ndf.key(), InstrumentType::Ndf);
@@ -124,7 +124,7 @@ fn test_ndf_instrument_trait() {
 
 #[test]
 fn test_ndf_curve_dependencies_single() {
-    let ndf = Ndf::example();
+    let ndf = Ndf::example().expect("example");
     let deps = ndf
         .market_dependencies()
         .expect("market_dependencies")
@@ -162,7 +162,7 @@ fn test_ndf_curve_dependencies_with_foreign() {
 
 #[test]
 fn test_ndf_required_discount_curves() {
-    let ndf = Ndf::example();
+    let ndf = Ndf::example().expect("example");
     let curves = ndf
         .market_dependencies()
         .expect("market_dependencies")
@@ -195,7 +195,7 @@ fn test_ndf_required_discount_curves() {
 
 #[test]
 fn test_ndf_clone() {
-    let ndf = Ndf::example();
+    let ndf = Ndf::example().expect("example");
     let cloned = ndf.clone();
 
     assert_eq!(ndf.id.as_str(), cloned.id.as_str());

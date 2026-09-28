@@ -73,7 +73,8 @@ mod tests {
 
     #[test]
     fn test_mismatched_model_params_report_expected_instrument_type() {
-        let instrument: Arc<dyn Instrument> = Arc::new(StructuredCredit::example());
+        let instrument: Arc<dyn Instrument> =
+            Arc::new(StructuredCredit::example().expect("example"));
         let params = ModelParamsSnapshot::Convertible {
             conversion_spec: ConversionSpec {
                 ratio: Some(10.0),

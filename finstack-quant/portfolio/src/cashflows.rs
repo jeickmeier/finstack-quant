@@ -757,7 +757,7 @@ mod tests {
             "POS_SWAP",
             "ENTITY_A",
             "NG-SWAP-2025",
-            Arc::new(CommoditySwap::example()),
+            Arc::new(CommoditySwap::example().expect("example")),
             1.0,
             PositionUnit::Units,
         )
@@ -805,7 +805,7 @@ mod tests {
             "POS_SWAPTION",
             "ENTITY_A",
             "SWAPTION_001",
-            Arc::new(Swaption::example()),
+            Arc::new(Swaption::example().expect("example")),
             1.0,
             PositionUnit::Units,
         )
@@ -877,7 +877,7 @@ mod tests {
             "POS_CDX",
             "ENTITY_A",
             "CDX-IG-42",
-            Arc::new(CdsIndex::example()),
+            Arc::new(CdsIndex::example().expect("example")),
             1.0,
             PositionUnit::Units,
         )

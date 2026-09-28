@@ -41,7 +41,7 @@ use finstack_quant_core::Result;
 ///
 /// * `bond` - Bond whose future pricing cashflows, settlement convention, and
 ///   z-spread compounding frequency are used.
-/// * `curves` - Market context supplying the bond discount curve and schedule
+/// * `market` - Market context supplying the bond discount curve and schedule
 ///   dependencies.
 /// * `as_of` - Valuation/trade date; the helper derives settlement internally.
 /// * `z` - Annual z-spread as a decimal zero-rate shift under the bond's
@@ -54,11 +54,11 @@ use finstack_quant_core::Result;
 /// an explicit workout path.
 pub fn price_from_z_spread(
     bond: &Bond,
-    curves: &MarketContext,
+    market: &MarketContext,
     as_of: Date,
     z: f64,
 ) -> finstack_quant_core::Result<f64> {
-    BondZSpreadPricingKernel::new(bond, curves, as_of)?.price(z)
+    BondZSpreadPricingKernel::new(bond, market, as_of)?.price(z)
 }
 
 /// Price from Option-Adjusted Spread using an explicit bond model.
@@ -78,7 +78,7 @@ pub fn price_from_z_spread(
 ///
 /// * `bond` - Bond whose embedded tree-pricing configuration and contractual
 ///   cashflows are used for OAS valuation.
-/// * `curves` - Market context supplying the discount curve and tree inputs.
+/// * `market` - Market context supplying the discount curve and tree inputs.
 /// * `as_of` - Valuation date supplied to the short-rate tree pricer.
 /// * `model` - Caller-selected bond model. `discounting` and `hazard_rate`
 ///   require a non-callable bond; `tree` and `rates_credit` value embedded
@@ -92,13 +92,13 @@ pub fn price_from_z_spread(
 /// distribution path.
 pub fn price_from_oas(
     bond: &Bond,
-    curves: &MarketContext,
+    market: &MarketContext,
     as_of: Date,
     model: ModelKey,
     oas_decimal: f64,
 ) -> finstack_quant_core::Result<f64> {
     Ok(bond
-        .price_at_oas_for_model_outcome(model, curves, as_of, oas_decimal)?
+        .price_at_oas_for_model_outcome(model, market, as_of, oas_decimal)?
         .amount)
 }
 
@@ -128,7 +128,7 @@ pub fn price_from_oas(
 ///
 /// * `bond` - Floating-rate bond whose contractual cashflows are projected at
 ///   the quoted margin and re-discounted at the shifted rate.
-/// * `curves` - Market context supplying discounting and floating-rate reset
+/// * `market` - Market context supplying discounting and floating-rate reset
 ///   data.
 /// * `as_of` - Valuation/trade date used for projection. Settlement is derived
 ///   internally once, and the returned dirty price is valued at settlement.
@@ -136,7 +136,7 @@ pub fn price_from_oas(
 ///   (`0.01` = 100 bp).
 pub fn price_from_dm(
     bond: &Bond,
-    curves: &MarketContext,
+    market: &MarketContext,
     as_of: Date,
     dm: f64,
 ) -> finstack_quant_core::Result<f64> {
@@ -153,7 +153,7 @@ pub fn price_from_dm(
     }
     // Coupons stay at the contractual quoted margin; the DM shifts the
     // discount rate via the shared Z-spread discounting mechanics.
-    price_from_z_spread(&b, curves, as_of, dm)
+    price_from_z_spread(&b, market, as_of, dm)
 }
 
 /// Price from market asset swap spread (decimal) using the same

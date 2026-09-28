@@ -199,22 +199,18 @@ impl CmsSpreadOption {
     }
 
     /// Create a canonical example CMS spread option for testing.
-    #[allow(clippy::expect_used)]
-    pub fn example() -> Self {
+    pub fn example() -> finstack_quant_core::Result<Self> {
         use finstack_quant_core::currency::Currency;
-        use time::Month;
 
-        CmsSpreadOption {
+        Ok(CmsSpreadOption {
             id: InstrumentId::new("CMS-SPREAD-10Y2Y"),
-            long_cms_tenor: Tenor::new(10, finstack_quant_core::dates::TenorUnit::Years)
-                .expect("valid example tenor"),
-            short_cms_tenor: Tenor::new(2, finstack_quant_core::dates::TenorUnit::Years)
-                .expect("valid example tenor"),
+            long_cms_tenor: Tenor::new(10, finstack_quant_core::dates::TenorUnit::Years)?,
+            short_cms_tenor: Tenor::new(2, finstack_quant_core::dates::TenorUnit::Years)?,
             strike: Decimal::new(5, 3), // 50bp
             option_type: OptionType::Call,
             notional: Money::from((10_000_000_i64, Currency::USD)),
-            expiry: Date::from_calendar_date(2027, Month::March, 29).expect("valid"),
-            payment_date: Date::from_calendar_date(2027, Month::March, 31).expect("valid"),
+            expiry: time::macros::date!(2027 - 03 - 29),
+            payment_date: time::macros::date!(2027 - 03 - 31),
             long_vol_surface_id: CurveId::new("USD-SWAPTION-VOL-10Y"),
             short_vol_surface_id: CurveId::new("USD-SWAPTION-VOL-2Y"),
             discount_curve_id: CurveId::new("USD-OIS"),
@@ -230,7 +226,7 @@ impl CmsSpreadOption {
             metric_pricing_overrides: Default::default(),
             scenario_pricing_overrides: Default::default(),
             attributes: Attributes::new(),
-        }
+        })
     }
 }
 
@@ -388,13 +384,13 @@ mod tests {
 
     #[test]
     fn example_validates() {
-        let opt = CmsSpreadOption::example();
+        let opt = CmsSpreadOption::example().expect("example");
         assert!(opt.validate().is_ok());
     }
 
     #[test]
     fn long_tenor_shorter_than_short_fails() {
-        let mut opt = CmsSpreadOption::example();
+        let mut opt = CmsSpreadOption::example().expect("example");
         // Swap the tenors so long < short
         opt.long_cms_tenor = Tenor::new(2, finstack_quant_core::dates::TenorUnit::Years)
             .expect("valid tenor fixture");
@@ -405,7 +401,7 @@ mod tests {
 
     #[test]
     fn correlation_out_of_range_fails() {
-        let mut opt = CmsSpreadOption::example();
+        let mut opt = CmsSpreadOption::example().expect("example");
         opt.correlation = 1.5;
         assert!(opt.validate().is_err());
     }
@@ -413,7 +409,7 @@ mod tests {
     #[test]
     fn payment_before_expiry_fails() {
         use time::Month;
-        let mut opt = CmsSpreadOption::example();
+        let mut opt = CmsSpreadOption::example().expect("example");
         opt.payment_date = Date::from_calendar_date(2027, Month::March, 28).expect("valid");
         assert!(opt.validate().is_err());
     }
@@ -421,14 +417,14 @@ mod tests {
     #[test]
     fn instrument_trait() {
         use crate::instruments::common_impl::traits::Instrument;
-        let opt = CmsSpreadOption::example();
+        let opt = CmsSpreadOption::example().expect("example");
         assert_eq!(opt.id(), "CMS-SPREAD-10Y2Y");
         assert_eq!(opt.key(), crate::pricer::InstrumentType::CmsSpreadOption);
     }
 
     #[test]
     fn serde_roundtrip() {
-        let opt = CmsSpreadOption::example();
+        let opt = CmsSpreadOption::example().expect("example");
         let json = serde_json::to_string(&opt).expect("serialize");
         let deser: CmsSpreadOption = serde_json::from_str(&json).expect("deserialize");
         assert_eq!(deser.id, opt.id);
@@ -439,7 +435,7 @@ mod tests {
     fn static_replication_pricer_returns_positive_price() {
         let as_of = date(2025, Month::January, 1);
         let market = market(as_of, 0.030);
-        let mut opt = CmsSpreadOption::example();
+        let mut opt = CmsSpreadOption::example().expect("example");
         opt.expiry = date(2026, Month::January, 1);
         opt.payment_date = date(2026, Month::January, 5);
         opt.strike = Decimal::new(5, 3);
@@ -456,7 +452,7 @@ mod tests {
     fn lower_correlation_increases_curve_spread_option_value() {
         let as_of = date(2025, Month::January, 1);
         let market = market(as_of, 0.035);
-        let mut low_corr = CmsSpreadOption::example();
+        let mut low_corr = CmsSpreadOption::example().expect("example");
         low_corr.expiry = date(2026, Month::January, 1);
         low_corr.payment_date = date(2026, Month::January, 5);
         low_corr.strike = Decimal::new(10, 3);
@@ -474,7 +470,7 @@ mod tests {
     #[test]
     fn higher_sabr_volatility_increases_option_value() {
         let as_of = date(2025, Month::January, 1);
-        let mut opt = CmsSpreadOption::example();
+        let mut opt = CmsSpreadOption::example().expect("example");
         opt.expiry = date(2026, Month::January, 1);
         opt.payment_date = date(2026, Month::January, 5);
         opt.strike = Decimal::new(10, 3);
@@ -500,7 +496,7 @@ mod tests {
         use finstack_quant_core::dates::{DayCount, Tenor, TenorUnit};
 
         // Default (no convention set) -> USD market standard.
-        let mut opt = CmsSpreadOption::example();
+        let mut opt = CmsSpreadOption::example().expect("example");
         opt.index_id = None;
         assert_eq!(
             opt.reference_swap()
@@ -557,7 +553,7 @@ mod tests {
         let as_of = date(2025, Month::January, 1);
         let market = market(as_of, 0.035);
 
-        let mut usd = CmsSpreadOption::example();
+        let mut usd = CmsSpreadOption::example().expect("example");
         usd.expiry = date(2026, Month::January, 1);
         usd.payment_date = date(2026, Month::January, 5);
         usd.strike = Decimal::ZERO;
