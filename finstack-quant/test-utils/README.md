@@ -253,7 +253,7 @@ see [INVARIANTS.md](../../INVARIANTS.md) and the testing standards.
 
 ```bash
 cargo nextest run -p finstack-quant-test-utils
-cargo nextest run -p finstack-quant-core --test golden_tests
+cargo nextest run -p finstack-quant-core --test core golden_tests
 cargo clippy -p finstack-quant-test-utils --lib --bins --tests --examples --all-features -- -D warnings
 ```
 
