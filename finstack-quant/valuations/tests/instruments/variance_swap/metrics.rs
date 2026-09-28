@@ -322,12 +322,12 @@ fn test_vega_matches_formula() {
     let vega = *result.measures.get(MetricId::Vega.as_str()).unwrap();
 
     // Assert
-    // Vega must differentiate the same PV as `compute_pv`, which uses the
-    // day-count `time_elapsed_fraction` (W-32), not an observation-count weight.
+    // Vega must differentiate the same PV as `compute_pv`, which weights the
+    // forward leg by the unobserved share of contractual samples.
     // PV vega differentiates the remaining forward-variance leg, so its
     // volatility base is the current forward vol. Strike vol is reserved for
     // quoted-notional conversion.
-    let remaining_fraction = 1.0 - swap.time_elapsed_fraction(as_of);
+    let remaining_fraction = 1.0 - swap.realized_fraction_by_observations(as_of).unwrap();
     let df = ctx
         .get_discount(DISC_ID)
         .unwrap()
@@ -430,9 +430,9 @@ fn test_variance_vega_matches_formula() {
         .unwrap();
 
     // Assert
-    // Variance vega uses the day-count `time_elapsed_fraction` (W-32) to stay
-    // consistent with `compute_pv`, not an observation-count weight.
-    let remaining_fraction = 1.0 - swap.time_elapsed_fraction(as_of);
+    // Variance vega weights by the unobserved share of contractual samples,
+    // the same weight `compute_pv` gives forward variance.
+    let remaining_fraction = 1.0 - swap.realized_fraction_by_observations(as_of).unwrap();
     let df = ctx
         .get_discount(DISC_ID)
         .unwrap()
@@ -666,4 +666,46 @@ fn test_all_metrics_mid_period() {
 
     // Realized variance should be positive mid-period
     assert!(result.measures[MetricId::RealizedVariance.as_str()] >= 0.0);
+}
+
+/// Variance vega is dPV/d(forward variance). On a weekend-skipping daily
+/// schedule the observation-count and day-count weights differ, so a central
+/// difference of the PV pins which one the metric uses.
+#[test]
+fn test_variance_vega_matches_pv_finite_difference_on_daily_schedule() {
+    let swap = sample_swap(PayReceive::Receive);
+    let as_of = swap.start_date + time::Duration::days(45);
+    let vol_id = format!("{}_IMPL_VOL", UNDERLYING_ID);
+    let sigma: f64 = 0.25;
+    let bump = 1e-4;
+    // (PV, forward variance) at a given implied vol; the FD divides by the
+    // realized change in forward variance so it is exact in that coordinate.
+    let pv_and_variance = |vol: f64| {
+        let ctx = add_unitless(base_context(), &vol_id, vol);
+        (
+            swap.value(&ctx, as_of).unwrap().amount(),
+            swap.remaining_forward_variance(&ctx, as_of).unwrap(),
+        )
+    };
+    let ctx = add_unitless(base_context(), &vol_id, sigma);
+    let variance_vega = swap
+        .price_with_metrics(
+            &ctx,
+            as_of,
+            &[MetricId::VarianceVega],
+            finstack_quant_valuations::instruments::PricingOptions::default(),
+        )
+        .unwrap()
+        .measures[MetricId::VarianceVega.as_str()];
+    let (pv_up, var_up) = pv_and_variance(sigma + bump);
+    let (pv_down, var_down) = pv_and_variance(sigma - bump);
+    assert!(var_up > var_down);
+    let fd = (pv_up - pv_down) / (var_up - var_down);
+    assert!(
+        (variance_vega - fd).abs() <= LOOSE_EPSILON * fd.abs(),
+        "variance_vega ({variance_vega}) must equal dPV/dvariance ({fd})"
+    );
+    let day_count_weight = 1.0 - swap.time_elapsed_fraction(as_of);
+    let sample_weight = 1.0 - swap.realized_fraction_by_observations(as_of).unwrap();
+    assert!((day_count_weight - sample_weight).abs() > 1e-3);
 }

@@ -24,10 +24,8 @@ impl MetricCalculator for ExpectedVarianceCalculator {
 
         // Partially observed: defer to the same seasoned blend the pricer feeds
         // into the payoff, so this metric always matches the variance implied by
-        // the swap's PV. The realized term is annualized on the day-count time
-        // basis (V_accrued / t_elapsed) to match the blend weight `w`, rather than
-        // the observation-count basis of `partial_realized_variance`, which would
-        // disagree for non-uniform schedules (W-33).
+        // the swap's PV. Both terms are weighted by contractual sample counts,
+        // the basis settlement uses (W-33).
         swap.seasoned_expected_variance(&context.curves, as_of)
     }
 }
@@ -53,11 +51,10 @@ mod tests {
     /// W-33 regression: the `ExpectedVariance` metric must equal the expected
     /// variance the swap is actually priced on, i.e. `pv = payoff(metric) · df`.
     ///
-    /// The realized term in the seasoned blend is annualized on the day-count
-    /// time basis (`V_accrued / t_elapsed`), not the observation-count basis of
-    /// `partial_realized_variance`. For a weekend-skipping daily schedule the two
-    /// genuinely differ, so this pins the metric to the PV and guards against the
-    /// metric and pricer drifting apart again.
+    /// The seasoned blend weights realized and forward variance by contractual
+    /// sample counts. For a weekend-skipping daily schedule that differs from a
+    /// calendar-time blend, so this pins the metric to the PV and guards against
+    /// the metric and pricer drifting apart again.
     #[test]
     fn expected_variance_metric_matches_pv_for_weekend_skipping_schedule() {
         let start = date!(2025 - 01 - 06); // Monday
@@ -120,8 +117,8 @@ mod tests {
         )
         .expect("df");
 
-        // Observation-count blend — the old, wrong basis — used only to prove the
-        // schedule is non-uniform so this test is a real regression guard.
+        // Calendar-time blend, used only to prove the schedule is non-uniform so
+        // this test is a real regression guard.
         let w = swap.time_elapsed_fraction(as_of);
         let count_realized =
             partial_realized_variance(&swap, &market, as_of).expect("obs-count realized");
@@ -152,11 +149,11 @@ mod tests {
             pv_from_metric,
         );
 
-        // 2) The weekend-skipping schedule makes the observation-count blend
-        //    materially different, so the time-basis fix is load-bearing.
+        // 2) The weekend-skipping schedule makes the calendar-time blend
+        //    materially different, so the sample-count basis is load-bearing.
         assert!(
             (metric - count_blend).abs() / count_blend.abs().max(1e-12) > 1e-3,
-            "metric ({metric}) must differ from the observation-count blend ({count_blend})"
+            "metric ({metric}) must differ from the calendar-time blend ({count_blend})"
         );
     }
 }

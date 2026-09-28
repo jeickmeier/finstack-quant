@@ -10,6 +10,7 @@
 
 #### Fixed
 
+- Variance swap `vega` and `variance_vega` now weight the forward leg by the unobserved share of contractual samples, the same weight the seasoned PV uses. They used the day-count elapsed fraction, which disagreed with dPV/dσ² on weekend-skipping schedules (about 3% on a daily schedule).
 - The UI token checker no longer reports words spelled only with hex letters (such as "Fade") as colour literals; hex colours still need a `#`.
 
 ### Message and doc pass (2026-09-24)
