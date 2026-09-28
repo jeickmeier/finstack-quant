@@ -299,7 +299,7 @@ mod tests {
         );
 
         let tranche_wal = calculate_tranche_wal(&tranche, as_of).expect("tranche WAL");
-        let schedule_wal = schedule.weighted_average_life(as_of).expect("schedule WAL");
+        let schedule_wal = schedule.wal(as_of).expect("schedule WAL");
 
         assert_eq!(tranche_wal, schedule_wal);
     }

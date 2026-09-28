@@ -2,6 +2,16 @@
 
 ## [Unreleased]
 
+### Master cleanup (2026-09-28)
+
+#### Changed (BREAKING)
+
+- `CashFlowSchedule::weighted_average_life` (now `wal`, matching `AssetPool::wal_from_cashflows` and `MetricId::WAL`). Rust and Python.
+
+#### Fixed
+
+- The UI token checker no longer reports words spelled only with hex letters (such as "Fade") as colour literals; hex colours still need a `#`.
+
 ### Message and doc pass (2026-09-24)
 
 #### Fixed

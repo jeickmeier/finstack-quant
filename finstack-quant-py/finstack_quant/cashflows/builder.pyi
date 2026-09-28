@@ -1321,7 +1321,7 @@ class CashFlowSchedule:
         """
         ...
 
-    def weighted_average_life(self, as_of: datetime.date) -> float:
+    def wal(self, as_of: datetime.date) -> float:
         """
         Weighted Average Life (WAL) in years from ``as_of``.
 

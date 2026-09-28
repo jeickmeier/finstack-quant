@@ -27,7 +27,7 @@ ns-per-coupon is linear; rising ns-per-coupon is the regression signal.
 | `cashflow_npv` | `5y` — `Discountable::npv` on a semi-annual schedule (one allocation per call) |
 | `cashflow_merge_schedules` | `20` — `merge_cashflow_schedules` k-way concat plus re-sort |
 | `cashflow_outstanding_by_date` | `40` — balance-path tracking over an amortizing schedule |
-| `cashflow_wal` | `40` — `weighted_average_life` over the same amortizing schedule |
+| `cashflow_wal` | `40` — `wal` over the same amortizing schedule |
 
 Market fixtures are a six-knot `USD-OIS` `DiscountCurve` (`InterpStyle::LogLinear`,
 discount factors 1.0 at 0y down to 0.375 at 30y — a downward-sloping zero curve, not a

@@ -826,7 +826,7 @@ class TestCashFlowSchedule:
     def test_weighted_average_life_bullet(self) -> None:
         schedule = self._bond()
         # Single 1MM principal repayment exactly one non-leap year out: Act/365F WAL = 1.0.
-        wal = schedule.weighted_average_life(dt.date(2025, 1, 15))
+        wal = schedule.wal(dt.date(2025, 1, 15))
         assert wal == pytest.approx(1.0, abs=1e-12)
 
     def test_outstanding_by_date(self) -> None:

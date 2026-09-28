@@ -9,7 +9,7 @@
 //! - `npv`: per-instrument NPV (allocation-per-call pattern)
 //! - `merge_cashflow_schedules`: k-way schedule concatenation + sort
 //! - `outstanding_by_date`: balance-path tracking for amortizing instruments
-//! - `weighted_average_life`: WAL over principal flows
+//! - `wal`: WAL over principal flows
 //!
 //! Run with:
 //! ```sh
@@ -459,7 +459,7 @@ fn bench_outstanding_by_date(c: &mut Criterion) {
     group.finish();
 }
 
-// Benchmark: weighted_average_life
+// Benchmark: wal
 
 fn bench_wal(c: &mut Criterion) {
     let mut group = c.benchmark_group("cashflow_wal");
@@ -471,11 +471,7 @@ fn bench_wal(c: &mut Criterion) {
 
         group.throughput(Throughput::Elements(n as u64));
         group.bench_with_input(BenchmarkId::from_parameter(n), &n, |b, _| {
-            b.iter(|| {
-                black_box(&schedule)
-                    .weighted_average_life(black_box(base))
-                    .ok()
-            });
+            b.iter(|| black_box(&schedule).wal(black_box(base)).ok());
         });
     }
 

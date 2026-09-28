@@ -705,7 +705,7 @@ impl CashFlowSchedule {
     /// # Errors
     ///
     /// Returns an error if the day-count year-fraction calculation fails.
-    pub fn weighted_average_life(&self, as_of: Date) -> finstack_quant_core::Result<f64> {
+    pub fn wal(&self, as_of: Date) -> finstack_quant_core::Result<f64> {
         weighted_average_life_from_principal(
             self.flows
                 .iter()
@@ -1725,7 +1725,7 @@ mod tests {
             CashFlowMeta::default(),
         );
 
-        let wal = schedule.weighted_average_life(as_of).expect("WAL succeeds");
+        let wal = schedule.wal(as_of).expect("WAL succeeds");
 
         let t1 = DayCount::Act365F
             .year_fraction(as_of, d1, DayCountContext::default())

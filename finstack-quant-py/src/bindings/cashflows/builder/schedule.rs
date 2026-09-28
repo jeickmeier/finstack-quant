@@ -551,10 +551,8 @@ impl PyCashFlowSchedule {
     /// ValueError
     ///     If the schedule carries no principal flows after ``as_of``.
     #[pyo3(text_signature = "(self, as_of)")]
-    fn weighted_average_life(&self, as_of: &Bound<'_, PyAny>) -> PyResult<f64> {
-        self.inner
-            .weighted_average_life(extract_date(as_of)?)
-            .map_err(core_to_py)
+    fn wal(&self, as_of: &Bound<'_, PyAny>) -> PyResult<f64> {
+        self.inner.wal(extract_date(as_of)?).map_err(core_to_py)
     }
 
     /// Outstanding balance path as ``[(date, Money), ...]``.
