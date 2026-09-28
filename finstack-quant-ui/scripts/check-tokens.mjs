@@ -80,7 +80,10 @@ export function checkLiterals(source, name) {
       /(?:#[\da-f]{3,8}\b|\b(?:rgb|hsl|hwb|lab|lch|oklab|oklch|color)\s*\()/i.test(
         value,
       ) ||
-      value.split(/\s+/).some((part) => parse(part)?.mode) ||
+      // culori also accepts unprefixed hex ("fade", "bdc"); hex needs "#" (matched above).
+      value
+        .split(/\s+/)
+        .some((part) => !/^[\da-f]+$/i.test(part) && parse(part)?.mode) ||
       /(?:bg|text|border|ring|fill|stroke)-(?:red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose|slate|gray|zinc|neutral|stone|white|black)(?:-\d+)?(?:\b|$)/.test(
         value,
       )

@@ -96,6 +96,9 @@ it("allows token references and computed geometry", () => {
       "test.tsx",
     ),
   ).not.toThrow();
+  expect(() =>
+    checkLiterals('const label = "Fade to target";', "test.tsx"),
+  ).not.toThrow();
 });
 it("pins licensed font packages and ships no font binaries", async () => {
   const { item } = themeOutput(tokens);
