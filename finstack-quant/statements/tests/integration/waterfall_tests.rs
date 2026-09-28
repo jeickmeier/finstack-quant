@@ -679,7 +679,7 @@ mod period_flow_waterfall_integration {
         instruments.insert("DDTL-1".to_string(), instrument);
 
         let periods: Vec<Period> = (1..=4).map(|q| quarter_period(2025, q)).collect();
-        let cashflows = crate::support::aggregate_period_flows(
+        let cashflows = crate::integration_all::support::aggregate_period_flows(
             &instruments,
             &periods,
             &MarketContext::new(),

@@ -15,5 +15,4 @@ mod term_loan_integration_tests;
 #[path = "integration/waterfall_tests.rs"]
 mod waterfall_tests;
 
-#[path = "support/period_flows.rs"]
-mod support;
+pub(crate) use crate::dsl_all::support;
