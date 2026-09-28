@@ -55,7 +55,7 @@ Both compare with exact `f64` equality: with `scramble_seed = 0` the Owen
 scramble is the identity and the `(x + 0.5) / 2^32` mapping is exact.
 
 ```bash
-cargo nextest run -p finstack-quant-core --test sobol_golden
+cargo nextest run -p finstack-quant-core --test core sobol_golden
 ```
 
 Any edit to the embedded table must be re-validated against this file, not

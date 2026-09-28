@@ -8,6 +8,7 @@ license.workspace = true
 repository.workspace = true
 description = "Core primitives for Finstack Quant: Decimal-backed Money/Currency/FX, dates and calendars, market data, math, and an expression engine"
 autobenches = false
+autotests = false
 
 [dependencies]
 # Serde is a core public dependency: we rely on derive macros across the crate.
@@ -121,3 +122,8 @@ rustdoc-args = ["--cfg", "docsrs"]
 
 [lints]
 workspace = true
+
+# Consolidated integration tests
+[[test]]
+name = "core"
+path = "tests/main.rs"
