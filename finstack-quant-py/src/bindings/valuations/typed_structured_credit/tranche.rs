@@ -150,16 +150,16 @@ impl PyTranche {
         crate::bindings::pandas_utils::serde_to_py(py, &self.inner.coupon)
     }
 
-    /// Payment frequency (tenor string such as ``"3M"``).
+    /// Payment frequency.
     #[getter]
-    fn frequency(&self) -> PyResult<String> {
-        enum_to_py_string(&self.inner.frequency)
+    fn frequency(&self) -> PyTenor {
+        PyTenor::from_inner(self.inner.frequency)
     }
 
-    /// Accrual day count (serde name).
+    /// Accrual day-count convention.
     #[getter]
-    fn day_count(&self) -> PyResult<String> {
-        enum_to_py_string(&self.inner.day_count)
+    fn day_count(&self) -> PyDayCount {
+        PyDayCount::from_inner(self.inner.day_count)
     }
 
     /// Accumulated deferred (PIK) interest.
@@ -497,7 +497,7 @@ impl PyTrancheBuilder {
     ///
     /// Parameters
     /// ----------
-    /// value : Tenor
+    /// value : Tenor | str
     ///     Payment frequency. Defaults to quarterly when never set.
     ///
     /// Returns
@@ -509,14 +509,15 @@ impl PyTrancheBuilder {
     /// ------
     /// ValueError
     ///     If this builder was already consumed by a prior call to
-    ///     :meth:`TrancheBuilder.build`.
+    ///     :meth:`TrancheBuilder.build`, or a string ``value`` is not a recognized tenor string.
     #[pyo3(text_signature = "($self, value)")]
     fn frequency<'py>(
         mut slf: PyRefMut<'py, Self>,
-        value: PyRef<'_, PyTenor>,
+        value: &Bound<'_, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
+        let frequency = crate::bindings::valuations::convert::tenor_from_py(value, "frequency")?;
         let b = take_tranche(&mut slf)?;
-        slf.inner = Some(b.frequency(value.inner));
+        slf.inner = Some(b.frequency(frequency));
         Ok(slf)
     }
 
@@ -524,7 +525,7 @@ impl PyTrancheBuilder {
     ///
     /// Parameters
     /// ----------
-    /// value : DayCount
+    /// value : DayCount | str
     ///     Day count convention. Defaults to Act/360 when never set.
     ///
     /// Returns
@@ -536,14 +537,16 @@ impl PyTrancheBuilder {
     /// ------
     /// ValueError
     ///     If this builder was already consumed by a prior call to
-    ///     :meth:`TrancheBuilder.build`.
+    ///     :meth:`TrancheBuilder.build`, or a string ``value`` is not a recognized day-count name.
     #[pyo3(text_signature = "($self, value)")]
     fn day_count<'py>(
         mut slf: PyRefMut<'py, Self>,
-        value: PyRef<'_, PyDayCount>,
+        value: &Bound<'_, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
+        let day_count =
+            crate::bindings::valuations::convert::day_count_from_py(value, "day_count")?;
         let b = take_tranche(&mut slf)?;
-        slf.inner = Some(b.day_count(value.inner));
+        slf.inner = Some(b.day_count(day_count));
         Ok(slf)
     }
 

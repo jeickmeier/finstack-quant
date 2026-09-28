@@ -2,6 +2,19 @@
 
 ## [Unreleased]
 
+### Remaining binding fixes (2026-09-24)
+
+#### Changed (BREAKING)
+
+- `EquityOption.day_count`, `FxOption.day_count`, `CdsTranche.day_count`, `RepLine.day_count` and `Tranche.day_count` (now `DayCount`, was a serde-name `str`), Python only.
+- `Tranche.frequency` (now `Tenor`, was a tenor `str`), Python only. Every typed instrument now returns `DayCount`/`Tenor`, so a getter value can be passed back to its own builder.
+- `TermLoanBuilder.frequency`/`day_count`, `CapFloorBuilder.frequency`/`day_count`, `TrancheBuilder.frequency`/`day_count` and `StructuredCreditBuilder.frequency` (now accept `Tenor | str` / `DayCount | str`, was wrapper only), Python only.
+
+#### Removed
+
+- `SwaptionBuilder.sabr_params_json` (use `sabr_params`, which accepts a dict or JSON `str`), Python only.
+- `RevolvingCreditBuilder.fees_flat` (use `fees` with the `RevolvingCreditFees` dict/JSON shape), Python only.
+
 ### Rust constructors, setters and parameters (2026-09-24)
 
 #### Changed (BREAKING)

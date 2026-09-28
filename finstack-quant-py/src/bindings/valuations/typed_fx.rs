@@ -1647,10 +1647,10 @@ vol_surface_id, option_type, delta_convention_kind, premium_currency, venue)"
         date_to_py(py, self.inner.expiry)
     }
 
-    /// Day count used for the time-to-expiry year fraction (serde name).
+    /// Accrual day-count convention.
     #[getter]
-    fn day_count(&self) -> PyResult<String> {
-        enum_to_py_string(&self.inner.day_count)
+    fn day_count(&self) -> crate::bindings::core::dates::daycount::PyDayCount {
+        crate::bindings::core::dates::daycount::PyDayCount::from_inner(self.inner.day_count)
     }
 
     /// Notional amount in the base currency.

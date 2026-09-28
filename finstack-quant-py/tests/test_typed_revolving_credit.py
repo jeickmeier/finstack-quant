@@ -83,7 +83,11 @@ def builder(draw_repay_spec: dict[str, object] | None = None, *, credit: bool = 
         .rate(RevolvingCredit.example().rate)
         .day_count("act_360")
         .frequency("3M")
-        .fees_flat(25.0, 10.0, 5.0)
+        .fees({
+            "commitment_fee_tiers": [{"threshold": "0", "bp": "25"}],
+            "usage_fee_tiers": [{"threshold": "0", "bp": "10"}],
+            "facility_fee_bp": 5.0,
+        })
         .draw_repay_spec(draw_repay_spec if draw_repay_spec is not None else {"deterministic": []})
         .discount_curve_id("USD-OIS")
         .recovery_rate(0.4)

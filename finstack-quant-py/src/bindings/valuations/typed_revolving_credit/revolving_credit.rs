@@ -637,7 +637,9 @@ impl PyRevolvingCredit {
 /// ...     .rate(0.06)
 /// ...     .day_count("act_360")
 /// ...     .frequency("3M")
-/// ...     .fees_flat(25.0, 10.0, 5.0)
+/// ...     .fees({"commitment_fee_tiers": [{"threshold": "0", "bp": "25"}],
+/// ...           "usage_fee_tiers": [{"threshold": "0", "bp": "10"}],
+/// ...           "facility_fee_bp": 5.0})
 /// ...     .draw_repay_spec({"deterministic": []})
 /// ...     .discount_curve_id("USD-OIS")
 /// ...     .recovery_rate(0.4)
@@ -1128,46 +1130,6 @@ impl PyRevolvingCreditBuilder {
         let b = take_builder(&mut slf)?;
         slf.inner = Some(b.margin_steps(steps));
         slf.fields.push(("margin_steps", "[..]".to_string()));
-        Ok(slf)
-    }
-
-    /// Set flat (non-tiered) fees in basis points (mirrors Rust
-    /// ``RevolvingCreditFees::flat``).
-    ///
-    /// Parameters
-    /// ----------
-    /// commitment_fee_bp : float
-    ///     Annual commitment fee on the undrawn amount, in basis points;
-    ///     values ``<= 0`` produce no commitment fee.
-    /// usage_fee_bp : float
-    ///     Annual usage fee on the drawn amount, in basis points.
-    /// facility_fee_bp : float
-    ///     Annual facility fee on the total commitment, in basis points.
-    ///
-    /// Returns
-    /// -------
-    /// RevolvingCreditBuilder
-    ///     ``self``, for chaining.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If a rate is not finite or the builder was already consumed.
-    #[pyo3(text_signature = "($self, commitment_fee_bp, usage_fee_bp, facility_fee_bp)")]
-    fn fees_flat<'py>(
-        mut slf: PyRefMut<'py, Self>,
-        commitment_fee_bp: f64,
-        usage_fee_bp: f64,
-        facility_fee_bp: f64,
-    ) -> PyResult<PyRefMut<'py, Self>> {
-        let fees = RevolvingCreditFees::flat(commitment_fee_bp, usage_fee_bp, facility_fee_bp)
-            .map_err(core_to_py)?;
-        let b = take_builder(&mut slf)?;
-        slf.inner = Some(b.fees(fees));
-        slf.fields.push((
-            "fees",
-            format!("flat({commitment_fee_bp}, {usage_fee_bp}, {facility_fee_bp})"),
-        ));
         Ok(slf)
     }
 

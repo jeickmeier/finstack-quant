@@ -27,7 +27,7 @@ use super::convert::{
 };
 use super::instruments::{
     builder_repr, decimal_from_f64, enum_from_str, instrument_default_model, instrument_expiry,
-    instrument_market_dependencies, json_field, metric_typed_envelope, money_repr, opt_serde_to_py,
+    instrument_market_dependencies, metric_typed_envelope, money_repr, opt_serde_to_py,
     parse_typed_instrument_json, price_typed_envelope, serialize_typed_instrument_json,
     spec_from_py, stub_kind_from_py,
 };
@@ -1474,36 +1474,6 @@ impl PySwaptionBuilder {
         Ok(slf)
     }
 
-    /// Set the SABR volatility model parameters from a JSON string.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : str
-    ///     JSON-encoded SABR parameters object with fields ``alpha``,
-    ///     ``beta``, ``nu``, ``rho`` and optional ``shift``.
-    ///
-    /// Returns
-    /// -------
-    /// SwaptionBuilder
-    ///     ``self``, for chaining.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``value`` is not valid JSON for the SABR parameters shape.
-    #[pyo3(text_signature = "($self, value)")]
-    fn sabr_params_json<'py>(
-        mut slf: PyRefMut<'py, Self>,
-        value: &str,
-    ) -> PyResult<PyRefMut<'py, Self>> {
-        let sabr_params: finstack_quant_models::volatility::SabrParameters =
-            json_field(value, "sabr_params")?;
-        let b = take_swaption(&mut slf)?;
-        slf.inner = Some(b.sabr_params(sabr_params));
-        slf.fields.push(("sabr_params", "{...}".to_string()));
-        Ok(slf)
-    }
-
     /// Set instrument attributes (tags and metadata).
     ///
     /// Parameters
@@ -2252,19 +2222,24 @@ impl PyCapFloorBuilder {
     ///
     /// Parameters
     /// ----------
-    /// value : Tenor
+    /// value : Tenor | str
     ///     Payment frequency for caps/floors.
     ///
     /// Returns
     /// -------
     /// CapFloorBuilder
     ///     ``self``, for chaining.
+    ///
+    /// Raises
+    /// ------
+    /// ValueError
+    ///     If a string ``value`` is not a recognized tenor string.
     #[pyo3(text_signature = "($self, value)")]
     fn frequency<'py>(
         mut slf: PyRefMut<'py, Self>,
-        value: PyRef<'_, PyTenor>,
+        value: &Bound<'_, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        let tenor = value.inner;
+        let tenor = crate::bindings::valuations::convert::tenor_from_py(value, "frequency")?;
         let b = take_cap_floor(&mut slf)?;
         slf.inner = Some(b.frequency(tenor));
         slf.fields.push(("frequency", tenor.to_string()));
@@ -2275,19 +2250,25 @@ impl PyCapFloorBuilder {
     ///
     /// Parameters
     /// ----------
-    /// value : DayCount
+    /// value : DayCount | str
     ///     Day count convention.
     ///
     /// Returns
     /// -------
     /// CapFloorBuilder
     ///     ``self``, for chaining.
+    ///
+    /// Raises
+    /// ------
+    /// ValueError
+    ///     If a string ``value`` is not a recognized day-count name.
     #[pyo3(text_signature = "($self, value)")]
     fn day_count<'py>(
         mut slf: PyRefMut<'py, Self>,
-        value: PyRef<'_, PyDayCount>,
+        value: &Bound<'_, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        let day_count = value.inner;
+        let day_count =
+            crate::bindings::valuations::convert::day_count_from_py(value, "day_count")?;
         let b = take_cap_floor(&mut slf)?;
         slf.inner = Some(b.day_count(day_count));
         slf.fields.push(("day_count", day_count.to_string()));

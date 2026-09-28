@@ -312,7 +312,7 @@ class TestCdsTranche:
         assert params.coupon_bp == 100.0
         tranche = CdsTranche.standard("CDX-42-3X7", params, "USD-OIS", "CDX.NA.IG.HAZARD", "pay")
         assert tranche.side == "pay"
-        assert tranche.day_count == "act_360"
+        assert tranche.day_count == DayCount.ACT_360
         assert tranche.frequency == Tenor.quarterly()
         assert tranche.business_day_convention == "following"
         assert tranche.maturity == datetime.date(2029, 12, 20)
@@ -429,7 +429,7 @@ class TestEquityOption:
         assert option.underlying_ticker == "SPX"
         assert option.strike == 4500.0
         assert option.expiry == datetime.date(2024, 6, 21)
-        assert option.day_count == "act_365f"
+        assert option.day_count == DayCount.ACT_365F
         assert option.settlement == "cash"
         assert option.exercise is None
         assert option.div_yield_id == "EQUITY-DIVYIELD"
@@ -511,7 +511,7 @@ class TestEquityOption:
         )
         assert "day_count=DayCount(" in repr(builder)
         option = builder.build()
-        assert option.day_count == "act_360"
+        assert option.day_count == DayCount.ACT_360
         assert "strike=200.0" in repr(option)
 
 
@@ -554,7 +554,7 @@ class TestFxOption:
             "premium_currency": "USD",
             "venue": "generic_interbank",
         }
-        assert opt.day_count == "act_365f"
+        assert opt.day_count == DayCount.ACT_365F
         assert opt.notional.currency == EUR
 
     def test_european_and_pricing(self) -> None:
@@ -600,6 +600,6 @@ class TestFxOption:
             .attributes({"book": "fx"})
             .build()
         )
-        assert opt.day_count == "act_360"
+        assert opt.day_count == DayCount.ACT_360
         assert opt.attributes.get_meta("book") == "fx"
         assert 'option_type="put"' in repr(opt)

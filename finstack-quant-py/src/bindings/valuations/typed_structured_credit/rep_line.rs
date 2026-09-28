@@ -4,7 +4,7 @@ use crate::bindings::core::dates::daycount::PyDayCount;
 use crate::bindings::core::money::PyMoney;
 use crate::bindings::date_utils::{date_to_py, extract_date};
 use crate::bindings::valuations::convert::{
-    bps_from_py, enum_to_py_string, money_from_py, money_to_py, opt_repr, rate_decimal_from_py,
+    bps_from_py, money_from_py, money_to_py, opt_repr, rate_decimal_from_py,
 };
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::RepLine;
 
@@ -267,10 +267,10 @@ spread_bp=None, forward_curve_id=None, index_floor_bp=None, cpr=None, cdr=None, 
         self.inner.seasoning_months
     }
 
-    /// Day count convention (serde name).
+    /// Accrual day-count convention.
     #[getter]
-    fn day_count(&self) -> PyResult<String> {
-        enum_to_py_string(&self.inner.day_count)
+    fn day_count(&self) -> PyDayCount {
+        PyDayCount::from_inner(self.inner.day_count)
     }
 
     /// CPR override as an annual decimal, or ``None``.

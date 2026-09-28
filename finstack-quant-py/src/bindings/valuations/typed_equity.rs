@@ -418,10 +418,10 @@ spot_id='EQUITY-SPOT', vol_surface_id='EQUITY-VOL', div_yield_id='EQUITY-DIVYIEL
         self.inner.currency.to_string()
     }
 
-    /// Day count for the time-to-expiry year fraction (serde name).
+    /// Accrual day-count convention.
     #[getter]
-    fn day_count(&self) -> PyResult<String> {
-        enum_to_py_string(&self.inner.day_count)
+    fn day_count(&self) -> crate::bindings::core::dates::daycount::PyDayCount {
+        crate::bindings::core::dates::daycount::PyDayCount::from_inner(self.inner.day_count)
     }
 
     /// ``"physical"`` or ``"cash"`` settlement.

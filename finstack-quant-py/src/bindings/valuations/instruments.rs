@@ -2389,19 +2389,24 @@ impl PyTermLoanBuilder {
     ///
     /// Parameters
     /// ----------
-    /// value : Tenor
+    /// value : Tenor | str
     ///     Payment frequency (e.g. ``Tenor.quarterly()``).
     ///
     /// Returns
     /// -------
     /// TermLoanBuilder
     ///     ``self``, for chaining.
+    ///
+    /// Raises
+    /// ------
+    /// ValueError
+    ///     If a string ``value`` is not a recognized tenor string.
     #[pyo3(text_signature = "($self, value)")]
     fn frequency<'py>(
         mut slf: PyRefMut<'py, Self>,
-        value: PyRef<'_, PyTenor>,
+        value: &Bound<'_, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        let tenor = value.inner;
+        let tenor = crate::bindings::valuations::convert::tenor_from_py(value, "frequency")?;
         let b = take_term_loan(&mut slf)?;
         slf.inner = Some(b.frequency(tenor));
         slf.fields.push(("frequency", tenor.to_string()));
@@ -2412,19 +2417,25 @@ impl PyTermLoanBuilder {
     ///
     /// Parameters
     /// ----------
-    /// value : DayCount
+    /// value : DayCount | str
     ///     Day count convention (e.g. ``DayCount.ACT_360``).
     ///
     /// Returns
     /// -------
     /// TermLoanBuilder
     ///     ``self``, for chaining.
+    ///
+    /// Raises
+    /// ------
+    /// ValueError
+    ///     If a string ``value`` is not a recognized day-count name.
     #[pyo3(text_signature = "($self, value)")]
     fn day_count<'py>(
         mut slf: PyRefMut<'py, Self>,
-        value: PyRef<'_, PyDayCount>,
+        value: &Bound<'_, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        let day_count = value.inner;
+        let day_count =
+            crate::bindings::valuations::convert::day_count_from_py(value, "day_count")?;
         let b = take_term_loan(&mut slf)?;
         slf.inner = Some(b.day_count(day_count));
         slf.fields.push(("day_count", day_count.to_string()));

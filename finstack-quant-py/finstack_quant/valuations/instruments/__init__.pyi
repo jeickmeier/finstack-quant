@@ -3387,13 +3387,13 @@ class TermLoanBuilder:
             If ``value`` has an unsupported type.
         """
         ...
-    def frequency(self, value: Tenor) -> TermLoanBuilder:
+    def frequency(self, value: Tenor | str) -> TermLoanBuilder:
         """
         Set the payment frequency.
 
         Parameters
         ----------
-        value : Tenor
+        value : Tenor | str
             Payment frequency (e.g. ``Tenor.quarterly()``).
 
         Returns
@@ -3404,16 +3404,16 @@ class TermLoanBuilder:
         Raises
         ------
         ValueError
-            If the builder was already consumed by ``build()``.
+            If the builder was already consumed by ``build()``, or a string ``value`` is not a recognized tenor string.
         """
         ...
-    def day_count(self, value: DayCount) -> TermLoanBuilder:
+    def day_count(self, value: DayCount | str) -> TermLoanBuilder:
         """
         Set the accrual day-count convention.
 
         Parameters
         ----------
-        value : DayCount
+        value : DayCount | str
             Day count convention (e.g. ``DayCount.ACT_360``).
 
         Returns
@@ -3424,7 +3424,7 @@ class TermLoanBuilder:
         Raises
         ------
         ValueError
-            If the builder was already consumed by ``build()``.
+            If the builder was already consumed by ``build()``, or a string ``value`` is not a recognized day-count name.
         """
         ...
     def business_day_convention(self, value: str) -> TermLoanBuilder:
@@ -6556,26 +6556,6 @@ class SwaptionBuilder:
             If the builder was already consumed by ``build()`` or ``value`` does not deserialize as a ``SabrParameters``.
         """
         ...
-    def sabr_params_json(self, value: str) -> SwaptionBuilder:
-        """
-        Set the SABR volatility model parameters from a JSON string.
-
-        Parameters
-        ----------
-        value : str
-            JSON object with fields ``alpha``, ``beta``, ``nu``, ``rho`` and optional ``shift``.
-
-        Returns
-        -------
-        SwaptionBuilder
-            ``self``, for chaining.
-
-        Raises
-        ------
-        ValueError
-            If the builder was already consumed by ``build()`` or ``value`` is not valid JSON for the SABR parameters shape.
-        """
-        ...
     def attributes(self, value: Attributes | dict[str, str]) -> SwaptionBuilder:
         """
         Set instrument attributes (tags and metadata).
@@ -7434,13 +7414,13 @@ class CapFloorBuilder:
             If the builder was already consumed by ``build()`` or the date cannot be interpreted.
         """
         ...
-    def frequency(self, value: Tenor) -> CapFloorBuilder:
+    def frequency(self, value: Tenor | str) -> CapFloorBuilder:
         """
         Set the payment frequency.
 
         Parameters
         ----------
-        value : Tenor
+        value : Tenor | str
             Payment frequency for caps/floors.
 
         Returns
@@ -7451,16 +7431,16 @@ class CapFloorBuilder:
         Raises
         ------
         ValueError
-            If the builder was already consumed by ``build()``.
+            If the builder was already consumed by ``build()``, or a string ``value`` is not a recognized tenor string.
         """
         ...
-    def day_count(self, value: DayCount) -> CapFloorBuilder:
+    def day_count(self, value: DayCount | str) -> CapFloorBuilder:
         """
         Set the day count convention.
 
         Parameters
         ----------
-        value : DayCount
+        value : DayCount | str
             Day count convention.
 
         Returns
@@ -7471,7 +7451,7 @@ class CapFloorBuilder:
         Raises
         ------
         ValueError
-            If the builder was already consumed by ``build()``.
+            If the builder was already consumed by ``build()``, or a string ``value`` is not a recognized day-count name.
         """
         ...
     def stub(
@@ -10215,14 +10195,14 @@ class CdsTranche:
         """
         ...
     @property
-    def day_count(self) -> str:
+    def day_count(self) -> DayCount:
         """
-        Day count convention (serde name).
+        Day count convention.
 
         Returns
         -------
-        str
-            ``"act_360"`` for standard tranches.
+        DayCount
+            ``DayCount.ACT_360`` for standard tranches.
 
         Notes
         -----
@@ -13701,14 +13681,14 @@ class FxOption:
         """
         ...
     @property
-    def day_count(self) -> str:
+    def day_count(self) -> DayCount:
         """
-        Day count for the time-to-expiry year fraction (serde name).
+        Day count for the time-to-expiry year fraction.
 
         Returns
         -------
-        str
-            ``"act_365f"`` unless set otherwise.
+        DayCount
+            ``DayCount.ACT_365F`` unless set otherwise.
 
         Notes
         -----
@@ -14818,15 +14798,15 @@ class EquityOption:
         """
         ...
     @property
-    def day_count(self) -> str:
+    def day_count(self) -> DayCount:
         """
-        Model day count for volatility, carry and exercise times (serde name).
+        Model day count for volatility, carry and exercise times.
         Discount factors use the discount curve's own date convention.
 
         Returns
         -------
-        str
-            ``"act_365f"`` unless set otherwise.
+        DayCount
+            ``DayCount.ACT_365F`` unless set otherwise.
 
         Notes
         -----
@@ -15841,14 +15821,14 @@ class RepLine:
         ...
 
     @property
-    def day_count(self) -> str:
+    def day_count(self) -> DayCount:
         """
-        Day count convention (serde string).
+        Day count convention.
 
         Returns
         -------
-        str
-            e.g. ``"act_360"``.
+        DayCount
+            e.g. ``DayCount.ACT_360``.
 
         Notes
         -----
@@ -16929,15 +16909,15 @@ class Tranche:
         ...
 
     @property
-    def frequency(self) -> str:
+    def frequency(self) -> Tenor:
         """
         Coupon payment frequency of the tranche premium leg.
 
         Returns
         -------
-        str
-            Tenor string giving the period between payments, such as
-            ``"3M"`` for quarterly or ``"6M"`` for semi-annual. Payment
+        Tenor
+            Tenor giving the period between payments, such as
+            ``Tenor.quarterly()`` or ``Tenor.semi_annual()``. Payment
             dates are rolled from this frequency using the deal's
             business-day convention.
 
@@ -16948,14 +16928,14 @@ class Tranche:
         ...
 
     @property
-    def day_count(self) -> str:
+    def day_count(self) -> DayCount:
         """
-        Accrual day count (serde string).
+        Accrual day count.
 
         Returns
         -------
-        str
-            e.g. ``"act_360"``.
+        DayCount
+            e.g. ``DayCount.ACT_360``.
 
         Notes
         -----
@@ -17284,13 +17264,13 @@ class TrancheBuilder:
         """
         ...
 
-    def frequency(self, value: Tenor) -> TrancheBuilder:
+    def frequency(self, value: Tenor | str) -> TrancheBuilder:
         """
         Set the payment frequency.
 
         Parameters
         ----------
-        value : Tenor
+        value : Tenor | str
             Payment frequency. Defaults to quarterly when never set.
 
         Returns
@@ -17302,17 +17282,17 @@ class TrancheBuilder:
         ------
         ValueError
             If this builder was already consumed by a prior call to
-            :meth:`TrancheBuilder.build`.
+            :meth:`TrancheBuilder.build`, or a string ``value`` is not a recognized tenor string.
         """
         ...
 
-    def day_count(self, value: DayCount) -> TrancheBuilder:
+    def day_count(self, value: DayCount | str) -> TrancheBuilder:
         """
         Set the day count convention for interest accrual.
 
         Parameters
         ----------
-        value : DayCount
+        value : DayCount | str
             Day count convention. Defaults to Act/360 when never set.
 
         Returns
@@ -17324,7 +17304,7 @@ class TrancheBuilder:
         ------
         ValueError
             If this builder was already consumed by a prior call to
-            :meth:`TrancheBuilder.build`.
+            :meth:`TrancheBuilder.build`, or a string ``value`` is not a recognized day-count name.
         """
         ...
 
@@ -23353,13 +23333,13 @@ class StructuredCreditBuilder:
         """
         ...
 
-    def frequency(self, value: Tenor) -> StructuredCreditBuilder:
+    def frequency(self, value: Tenor | str) -> StructuredCreditBuilder:
         """
         Set the payment frequency for the structure.
 
         Parameters
         ----------
-        value : Tenor
+        value : Tenor | str
             Payment frequency.
 
         Returns
@@ -23371,7 +23351,7 @@ class StructuredCreditBuilder:
         ------
         ValueError
             If this builder was already consumed by a prior call to
-            :meth:`StructuredCreditBuilder.build`.
+            :meth:`StructuredCreditBuilder.build`, or a string ``value`` is not a recognized tenor string.
         """
         ...
 
@@ -27343,7 +27323,7 @@ class RevolvingCreditBuilder:
     Builders are consumed by ``build()``; create a new builder per facility.
     Required fields: ``id``, ``commitment``, ``drawn``,
     ``issue_date``, ``maturity``, ``rate``, ``day_count``,
-    ``frequency``, ``fees`` (or :meth:`fees_flat`), ``draw_repay_spec``,
+    ``frequency``, ``fees``, ``draw_repay_spec``,
     ``discount_curve_id`` and ``recovery_rate``. Nested specs accept a
     ``dict`` or JSON ``str`` in the Rust serde shape.
 
@@ -27364,7 +27344,11 @@ class RevolvingCreditBuilder:
     ...     .rate(0.06)
     ...     .day_count("act_360")
     ...     .frequency("3M")
-    ...     .fees_flat(25.0, 10.0, 5.0)
+    ...     .fees({
+    ...         "commitment_fee_tiers": [{"threshold": "0", "bp": "25"}],
+    ...         "usage_fee_tiers": [{"threshold": "0", "bp": "10"}],
+    ...         "facility_fee_bp": 5.0,
+    ...     })
     ...     .draw_repay_spec({"deterministic": []})
     ...     .discount_curve_id("USD-OIS")
     ...     .recovery_rate(0.4)
@@ -27700,33 +27684,6 @@ class RevolvingCreditBuilder:
         ValueError
             If a row does not match the serde shape or the builder was
             already consumed; ordering fails at ``build()``.
-        """
-        ...
-    def fees_flat(
-        self, commitment_fee_bp: float, usage_fee_bp: float, facility_fee_bp: float
-    ) -> RevolvingCreditBuilder:
-        """
-        Set flat (non-tiered) fees in basis points (mirrors Rust ``RevolvingCreditFees::flat``).
-
-        Parameters
-        ----------
-        commitment_fee_bp : float
-            Annual commitment fee on the undrawn amount, in basis points;
-            values ``<= 0`` produce no commitment fee.
-        usage_fee_bp : float
-            Annual usage fee on the drawn amount, in basis points.
-        facility_fee_bp : float
-            Annual facility fee on the total commitment, in basis points.
-
-        Returns
-        -------
-        RevolvingCreditBuilder
-            ``self``, for chaining.
-
-        Raises
-        ------
-        ValueError
-            If a rate is not finite or the builder was already consumed.
         """
         ...
     def draw_repay_spec(self, value: dict[str, Any] | str) -> RevolvingCreditBuilder:

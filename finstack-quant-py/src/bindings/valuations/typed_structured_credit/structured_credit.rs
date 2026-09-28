@@ -1191,7 +1191,7 @@ impl PyStructuredCreditBuilder {
     ///
     /// Parameters
     /// ----------
-    /// value : Tenor
+    /// value : Tenor | str
     ///     Payment frequency.
     ///
     /// Returns
@@ -1203,14 +1203,15 @@ impl PyStructuredCreditBuilder {
     /// ------
     /// ValueError
     ///     If this builder was already consumed by a prior call to
-    ///     :meth:`StructuredCreditBuilder.build`.
+    ///     :meth:`StructuredCreditBuilder.build`, or a string ``value`` is not a recognized tenor string.
     #[pyo3(text_signature = "($self, value)")]
     fn frequency<'py>(
         mut slf: PyRefMut<'py, Self>,
-        value: PyRef<'_, PyTenor>,
+        value: &Bound<'_, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
+        let frequency = crate::bindings::valuations::convert::tenor_from_py(value, "frequency")?;
         let b = take_sc(&mut slf)?;
-        slf.inner = Some(b.frequency(value.inner));
+        slf.inner = Some(b.frequency(frequency));
         Ok(slf)
     }
 

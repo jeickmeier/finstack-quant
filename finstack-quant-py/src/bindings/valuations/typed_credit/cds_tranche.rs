@@ -4,6 +4,7 @@
 use pyo3::prelude::*;
 
 use crate::bindings::cashflows::builder::specs::PyRollRule;
+use crate::bindings::core::dates::daycount::PyDayCount;
 use crate::bindings::core::dates::schedule::PyStubKind;
 use crate::bindings::core::dates::tenor::PyTenor;
 use crate::bindings::core::money::PyMoney;
@@ -543,10 +544,10 @@ impl PyCdsTranche {
         PyTenor::from_inner(self.inner.frequency)
     }
 
-    /// Day count convention (serde name, e.g. ``"act_360"``).
+    /// Accrual day-count convention.
     #[getter]
-    fn day_count(&self) -> PyResult<String> {
-        enum_to_py_string(&self.inner.day_count)
+    fn day_count(&self) -> PyDayCount {
+        PyDayCount::from_inner(self.inner.day_count)
     }
 
     /// Business day convention (serde name, default ``"modified_following"``).

@@ -87,7 +87,7 @@ class TestSwaptionTyped:
     def test_every_vol_model_literal_value_accepted(self, value: str) -> None:
         assert _payer_swaption(vol_model=value).id == "SWPT-1"
 
-    def test_sabr_params_json_accepted(self) -> None:
+    def test_sabr_params_json_string_accepted(self) -> None:
         fixed, float_leg = _legs()
         swpt = (
             Swaption
@@ -103,7 +103,7 @@ class TestSwaptionTyped:
             .vol_surface_id("USD-SWPT-VOL")
             .underlying_fixed_leg(fixed)
             .underlying_float_leg(float_leg)
-            .sabr_params_json(json.dumps({"alpha": 0.025, "beta": 0.5, "nu": 0.4, "rho": -0.3, "shift": None}))
+            .sabr_params(json.dumps({"alpha": 0.025, "beta": 0.5, "nu": 0.4, "rho": -0.3, "shift": None}))
             .build()
         )
         payload = json.loads(swpt.to_json())
