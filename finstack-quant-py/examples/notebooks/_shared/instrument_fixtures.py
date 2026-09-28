@@ -183,9 +183,10 @@ def revolver(idx: int) -> tuple[str, dict]:
                     "reset_lag_days": 2,
                 }
             },
+            # `drawn` is the balance at the simulation anchor (the later of the
+            # issue and valuation dates), so only future events belong here.
             "draw_repay_spec": {
                 "deterministic": [
-                    {"date": "2024-06-01", "amount": {"amount": "5000000", "currency": "USD"}, "is_draw": True},
                     {"date": "2025-06-01", "amount": {"amount": "3000000", "currency": "USD"}, "is_draw": False},
                 ]
             },

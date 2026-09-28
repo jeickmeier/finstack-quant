@@ -34,14 +34,6 @@
         "deterministic": [
           {
             "amount": {
-              "amount": "5000000",
-              "currency": "USD"
-            },
-            "date": "2024-03-01",
-            "is_draw": true
-          },
-          {
-            "amount": {
               "amount": "3000000",
               "currency": "USD"
             },
