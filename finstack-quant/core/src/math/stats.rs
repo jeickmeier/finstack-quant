@@ -339,6 +339,22 @@ impl RealizedVarMethod {
     pub fn requires_ohlc(self) -> bool {
         !matches!(self, Self::CloseToClose)
     }
+
+    /// Estimator [`realized_variance_ohlc`] uses when no method is given.
+    ///
+    /// Yang-Zhang (2000) is the minimum-variance OHLC estimator that is robust
+    /// to both drift and opening gaps, so it is the natural choice once all
+    /// four bar fields are supplied. The close-series entry point
+    /// [`realized_variance`] instead defaults to [`RealizedVarMethod::default`]
+    /// (`CloseToClose`), the only method it supports.
+    pub const OHLC_DEFAULT: Self = Self::YangZhang;
+}
+
+/// Annualization factor applied when a realized-variance caller passes none:
+/// [`PeriodKind::Daily`](crate::dates::PeriodKind::Daily) observations, i.e.
+/// 252 trading days per year.
+fn default_annualization_factor() -> f64 {
+    crate::dates::PeriodKind::Daily.annualization_factor()
 }
 
 impl std::fmt::Display for RealizedVarMethod {
@@ -472,21 +488,30 @@ pub fn quantile(data: &mut [f64], p: f64) -> f64 {
 /// convention explicitly.
 ///
 /// # Arguments
-/// * `prices` - Close price series ordered in time
-/// * `method` - Must be `CloseToClose`; OHLC-only methods return an error
-/// * `annualization_factor` - Factor to annualize variance (e.g., 252 for daily data)
+/// * `prices` - Close price series ordered in time; every price must be finite
+///   and strictly positive.
+/// * `method` - Estimator; must be `CloseToClose` (OHLC-only methods return an
+///   error). `None` selects [`RealizedVarMethod::default`] (`CloseToClose`).
+/// * `annualization_factor` - Observations per year used to annualize the
+///   per-period variance (for example `252.0` for daily closes); must be
+///   finite and positive. `None` selects the daily convention,
+///   `PeriodKind::Daily.annualization_factor()` (252).
 ///
 /// # Errors
 ///
-/// Returns [`Error::Validation`](crate::Error::Validation) if `method` requires OHLC data.
+/// Returns [`Error::Validation`](crate::Error::Validation) if `method` requires
+/// OHLC data, the annualization factor is not finite and positive, or a price
+/// is not finite and positive.
 ///
 /// # Returns
 /// Annualized realized variance
 pub fn realized_variance(
     prices: &[f64],
-    method: RealizedVarMethod,
-    annualization_factor: f64,
+    method: Option<RealizedVarMethod>,
+    annualization_factor: Option<f64>,
 ) -> crate::Result<f64> {
+    let method = method.unwrap_or_default();
+    let annualization_factor = annualization_factor.unwrap_or_else(default_annualization_factor);
     if !annualization_factor.is_finite() || annualization_factor <= 0.0 {
         return Err(crate::Error::Validation(format!(
             "realized_variance: annualization_factor must be positive and finite, got {annualization_factor}"
@@ -537,12 +562,18 @@ pub fn realized_variance(
 /// * `high` - High prices (required for `Parkinson`, `GarmanKlass`, `RogersSatchell`, `YangZhang`)
 /// * `low` - Low prices (required for `Parkinson`, `GarmanKlass`, `RogersSatchell`, `YangZhang`)
 /// * `close` - Closing prices (required for all methods)
-/// * `method` - Method to use for calculation
-/// * `annualization_factor` - Factor to annualize variance
+/// * `method` - Estimator to use. `None` selects
+///   [`RealizedVarMethod::OHLC_DEFAULT`] (Yang-Zhang).
+/// * `annualization_factor` - Bars per year used to annualize the per-bar
+///   variance (for example `252.0` for daily bars); must be finite and
+///   positive. `None` selects the daily convention,
+///   `PeriodKind::Daily.annualization_factor()` (252).
 ///
 /// # Errors
 ///
-/// Returns [`Error::Validation`](crate::Error::Validation) if the four slices have different lengths.
+/// Returns [`Error::Validation`](crate::Error::Validation) if the four slices
+/// have different lengths, the annualization factor is not finite and
+/// positive, or a bar is not finite, positive and internally consistent.
 ///
 /// # Returns
 /// Annualized realized variance
@@ -551,9 +582,11 @@ pub fn realized_variance_ohlc(
     high: &[f64],
     low: &[f64],
     close: &[f64],
-    method: RealizedVarMethod,
-    annualization_factor: f64,
+    method: Option<RealizedVarMethod>,
+    annualization_factor: Option<f64>,
 ) -> crate::Result<f64> {
+    let method = method.unwrap_or(RealizedVarMethod::OHLC_DEFAULT);
+    let annualization_factor = annualization_factor.unwrap_or_else(default_annualization_factor);
     let n = close.len();
     if open.len() != n || high.len() != n || low.len() != n {
         return Err(crate::Error::Validation(format!(
@@ -596,7 +629,9 @@ pub fn realized_variance_ohlc(
     }
 
     let result = match method {
-        RealizedVarMethod::CloseToClose => realized_variance(close, method, annualization_factor),
+        RealizedVarMethod::CloseToClose => {
+            realized_variance(close, Some(method), Some(annualization_factor))
+        }
         RealizedVarMethod::Parkinson => {
             // Parkinson (1980) high-low range estimator
             // More efficient than close-to-close, using intraday range information
@@ -1478,8 +1513,8 @@ mod tests {
             &high,
             &[0.0, 100.0],
             &close,
-            RealizedVarMethod::Parkinson,
-            252.0,
+            Some(RealizedVarMethod::Parkinson),
+            Some(252.0),
         )
         .is_err());
         assert!(realized_variance_ohlc(
@@ -1487,8 +1522,8 @@ mod tests {
             &high,
             &low,
             &close,
-            RealizedVarMethod::GarmanKlass,
-            252.0,
+            Some(RealizedVarMethod::GarmanKlass),
+            Some(252.0),
         )
         .is_err());
         assert!(realized_variance_ohlc(
@@ -1496,8 +1531,8 @@ mod tests {
             &[98.0, 103.0],
             &low,
             &close,
-            RealizedVarMethod::RogersSatchell,
-            252.0,
+            Some(RealizedVarMethod::RogersSatchell),
+            Some(252.0),
         )
         .is_err());
         assert!(realized_variance_ohlc(
@@ -1505,10 +1540,46 @@ mod tests {
             &high,
             &low,
             &close,
-            RealizedVarMethod::YangZhang,
-            f64::INFINITY,
+            Some(RealizedVarMethod::YangZhang),
+            Some(f64::INFINITY),
         )
         .is_err());
-        assert!(realized_variance(&close, RealizedVarMethod::CloseToClose, -1.0).is_err());
+        assert!(
+            realized_variance(&close, Some(RealizedVarMethod::CloseToClose), Some(-1.0)).is_err()
+        );
+    }
+
+    #[test]
+    fn realized_variance_defaults_are_rust_owned() {
+        use super::{realized_variance, realized_variance_ohlc, RealizedVarMethod};
+
+        let open = [100.0, 101.5, 100.8, 102.0];
+        let high = [102.0, 103.0, 102.5, 103.5];
+        let low = [99.0, 100.2, 99.9, 101.0];
+        let close = [101.0, 102.0, 101.5, 103.0];
+        let daily = crate::dates::PeriodKind::Daily.annualization_factor();
+        assert_eq!(daily, 252.0);
+
+        assert_eq!(
+            realized_variance(&close, None, None).expect("defaults"),
+            realized_variance(&close, Some(RealizedVarMethod::CloseToClose), Some(daily))
+                .expect("explicit"),
+        );
+        assert_eq!(
+            RealizedVarMethod::OHLC_DEFAULT,
+            RealizedVarMethod::YangZhang
+        );
+        assert_eq!(
+            realized_variance_ohlc(&open, &high, &low, &close, None, None).expect("defaults"),
+            realized_variance_ohlc(
+                &open,
+                &high,
+                &low,
+                &close,
+                Some(RealizedVarMethod::YangZhang),
+                Some(daily),
+            )
+            .expect("explicit"),
+        );
     }
 }

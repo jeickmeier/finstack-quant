@@ -83,18 +83,17 @@ impl std::fmt::Display for RoundingMode {
     }
 }
 
+/// Parse the exact serde name (`"bankers"`, `"away_from_zero"`,
+/// `"toward_zero"`, `"floor"`, `"ceil"`; case-sensitive).
+///
+/// Delegates to [`crate::wire::serde_parse`], so the serde names are the only
+/// spelling table and a new variant is accepted by `FromStr`, serde and every
+/// host binding at once.
 impl std::str::FromStr for RoundingMode {
-    type Err = String;
+    type Err = crate::Error;
 
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
-            "bankers" => Ok(Self::Bankers),
-            "away_from_zero" => Ok(Self::AwayFromZero),
-            "toward_zero" => Ok(Self::TowardZero),
-            "floor" => Ok(Self::Floor),
-            "ceil" => Ok(Self::Ceil),
-            _ => Err(format!("unknown rounding mode {s:?}")),
-        }
+    fn from_str(s: &str) -> crate::Result<Self> {
+        crate::wire::serde_parse(s)
     }
 }
 
@@ -787,7 +786,18 @@ mod tests {
                 matches!(label.parse::<RoundingMode>(), Ok(value) if value == *mode),
                 "roundtrip failed for {label}"
             );
+            // Display, FromStr and serde share one spelling table.
+            assert_eq!(crate::wire::serde_label(mode).expect("serde label"), label);
         }
+    }
+
+    #[test]
+    fn rounding_mode_from_str_error_names_the_input() {
+        let err = "BANKERS"
+            .parse::<RoundingMode>()
+            .expect_err("case-sensitive");
+        assert_eq!(err.kind(), crate::error::ErrorKind::Validation);
+        assert!(err.to_string().contains("\"BANKERS\""), "{err}");
     }
 
     #[test]

@@ -1112,7 +1112,6 @@ dependencies = [
  "serde",
  "serde-wasm-bindgen",
  "serde_json",
- "strum",
  "time",
  "wasm-bindgen",
  "wasm-bindgen-test",

@@ -71,12 +71,14 @@ fn format_with_handles_negative_amounts() {
 
 #[test]
 fn validation_mode_resolves_binding_presets_canonically() {
+    for name in [None, Some("market_standard")] {
+        assert_eq!(
+            ValidationMode::from_preset(name, None).expect("market preset"),
+            ValidationMode::MarketStandard
+        );
+    }
     assert_eq!(
-        ValidationMode::from_preset("market_standard", None).expect("market preset"),
-        ValidationMode::MarketStandard
-    );
-    assert_eq!(
-        ValidationMode::from_preset("negative_rate_friendly", Some(-0.01))
+        ValidationMode::from_preset(Some("negative_rate_friendly"), Some(-0.01))
             .expect("negative-rate preset"),
         ValidationMode::NegativeRateFriendly {
             forward_floor: -0.01
@@ -84,10 +86,11 @@ fn validation_mode_resolves_binding_presets_canonically() {
     );
 
     for result in [
-        ValidationMode::from_preset("market_standard", Some(-0.01)),
-        ValidationMode::from_preset("negative_rate_friendly", None),
-        ValidationMode::from_preset("negative_rate_friendly", Some(f64::NAN)),
-        ValidationMode::from_preset("unknown", None),
+        ValidationMode::from_preset(None, Some(-0.01)),
+        ValidationMode::from_preset(Some("market_standard"), Some(-0.01)),
+        ValidationMode::from_preset(Some("negative_rate_friendly"), None),
+        ValidationMode::from_preset(Some("negative_rate_friendly"), Some(f64::NAN)),
+        ValidationMode::from_preset(Some("unknown"), None),
     ] {
         assert!(result.is_err());
     }

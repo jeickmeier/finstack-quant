@@ -236,8 +236,8 @@ fn test_npv_at_maturity_recovers_realized_payoff() {
     // Assert
     let realized = realized_variance(
         &prices.iter().map(|(_, p)| *p).collect::<Vec<_>>(),
-        RealizedVarMethod::CloseToClose,
-        252.0,
+        Some(RealizedVarMethod::CloseToClose),
+        Some(252.0),
     )
     .expect("CloseToClose should succeed");
     let expected = swap.payoff(realized).expect("valid variance payoff");

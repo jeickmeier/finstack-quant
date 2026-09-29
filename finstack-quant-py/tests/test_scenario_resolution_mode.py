@@ -81,7 +81,9 @@ def test_scenario_spec_exposes_resolution_mode() -> None:
         resolution_mode="cumulative",
     )
     assert spec.resolution_mode == "cumulative"
-    with pytest.raises(ValueError, match="resolution_mode"):
+    # Rust `wire::serde_parse` owns the message: it names the bad value and
+    # lists the serde variants.
+    with pytest.raises(ValueError, match=r'invalid value "nope".*most_specific_wins'):
         ScenarioSpec("bad", [], resolution_mode="nope")
 
 

@@ -62,7 +62,11 @@ test('core date integer widths match generated runtime types', () => {
   const start = core.createDate(2025, 1, 1);
   const end = core.createDate(2025, 1, 3);
   assert.ok(core.dateFromEpochDays(start) instanceof Int32Array);
-  assert.equal(typeof core.DayCount.act360().calendarDays(start, end), 'bigint');
+  // `calendarDays` is a static, like Rust `DayCount::calendar_days` and Python.
+  assert.equal(typeof core.DayCount.calendarDays, 'function');
+  assert.equal('calendarDays' in core.DayCount.act360(), false);
+  assert.equal(typeof core.DayCount.calendarDays(start, end), 'bigint');
+  assert.equal(core.DayCount.calendarDays(start, end), 2n);
 });
 
 test('core ACT/ACT ICMA short-month rolls require a reference period', () => {
@@ -75,9 +79,9 @@ test('core ACT/ACT ICMA short-month rolls require a reference period', () => {
   ]) {
     const start = core.createDate(year, month, day);
     const end = core.createDate(year, month + 1, 31);
-    assert.throws(() => dayCount.yearFractionWithContext(start, end, context), /coupon_period/);
+    assert.throws(() => dayCount.yearFraction(start, end, context), /coupon_period/);
     const reference = context.withCouponPeriod(start, end);
-    assert.ok(Math.abs(dayCount.yearFractionWithContext(start, end, reference) - 1 / 12) < 1e-12);
+    assert.ok(Math.abs(dayCount.yearFraction(start, end, reference) - 1 / 12) < 1e-12);
   }
 });
 
@@ -91,22 +95,43 @@ test('wasm-bindgen handles expose free and conditional Symbol.dispose', () => {
 });
 
 test('DiscountCurve uses canonical forward and explicit negative-rate validation', () => {
-  assert.throws(
-    () => new core.DiscountCurve('CHF-OIS', '2025-01-01', [0, 1, 1, 1.002]),
-    /non-increasing/
-  );
-  const curve = new core.DiscountCurve(
-    'CHF-OIS',
-    '2025-01-01',
-    [0, 1, 1, 1.002],
-    undefined,
-    undefined,
-    undefined,
-    'negative_rate_friendly',
-    -0.01
-  );
+  const chf = { id: 'CHF-OIS', baseDate: '2025-01-01', knots: [0, 1, 1, 1.002] };
+  assert.throws(() => new core.DiscountCurve(chf), /non-increasing/);
+  const curve = new core.DiscountCurve({
+    ...chf,
+    validationMode: 'negative_rate_friendly',
+    forwardFloor: -0.01,
+  });
   assert.ok(curve.forward(0, 1) < 0);
   assert.equal(curve.forwardRate, undefined);
+});
+
+test('DiscountCurve options are strict and defaults come from the Rust builder', () => {
+  const knots = new Float64Array([0, 1, 1, 0.98, 5, 0.88]);
+  const curve = new core.DiscountCurve({ id: 'USD-OIS', baseDate: '2025-01-01', knots });
+  const explicit = new core.DiscountCurve(
+    JSON.stringify({
+      id: 'USD-OIS',
+      baseDate: '2025-01-01',
+      knots: [...knots],
+      interp: 'monotone_convex',
+      extrapolation: 'flat_forward',
+      dayCount: 'act_365f',
+      validationMode: 'market_standard',
+    })
+  );
+  assert.equal(curve.df(2.5), explicit.df(2.5));
+  // A floor without `negative_rate_friendly` is rejected by
+  // `ValidationMode::from_preset`, whether the preset is explicit or omitted.
+  assert.throws(
+    () => new core.DiscountCurve({ id: 'X', baseDate: '2025-01-01', knots, forwardFloor: -0.01 }),
+    /forward_floor is only valid/
+  );
+  assert.throws(
+    () => new core.DiscountCurve({ id: 'X', baseDate: '2025-01-01', knots, dayCountt: 'act_360' }),
+    (error) => error.kind === 'validation' && /unknown field `dayCountt`/.test(error.message)
+  );
+  assert.throws(() => new core.DiscountCurve('X', '2025-01-01', knots), /options/);
 });
 
 test('ForwardCurve options expose resetLag', () => {
@@ -188,13 +213,14 @@ test('core.FxMatrix quote updates invalidate cached crosses', () => {
     const setEurUsd = (rate) =>
       pinned ? fx.setQuoteOn('EUR', 'USD', date, policy, rate) : fx.setQuote('EUR', 'USD', rate);
     setEurUsd(1.1);
-    assert.ok(Math.abs(fx.rateDefault('EUR', 'GBP', date).rate - 0.88) < 1e-12);
+    assert.ok(Math.abs(fx.rate('EUR', 'GBP', date).rate - 0.88) < 1e-12);
     setEurUsd(1.2);
-    const result = fx.rateDefault('EUR', 'GBP', date);
+    const result = fx.rate('EUR', 'GBP', date);
     assert.ok(Math.abs(result.rate - 0.96) < 1e-12);
     assert.equal(result.triangulated, true);
-    assert.ok(Math.abs(fx.rateDefault('GBP', 'EUR', date).rate - 1 / 0.96) < 1e-12);
-    assert.equal(fx.rateDefault('GBP', 'USD', date).rate, 1.25);
+    assert.ok(Math.abs(fx.rate('GBP', 'EUR', date).rate - 1 / 0.96) < 1e-12);
+    assert.equal(fx.rate('GBP', 'USD', date).rate, 1.25);
+    assert.equal(fx.rate('GBP', 'USD', date, policy).rate, 1.25);
   }
 });
 

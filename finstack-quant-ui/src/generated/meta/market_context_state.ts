@@ -1044,7 +1044,7 @@ export default [
   {
     "path": "#/$defs/d_a154a0f59b6758a0e791",
     "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/FxDeltaVolSurface",
-    "description": "Delta-quoted FX volatility surface.\n\nStores market-standard FX vol quotes (ATM DNS, 25-delta risk-reversal,\n25-delta butterfly) across multiple expiries. Models-layer functions\nperform delta conversion and volatility evaluation.\n\n# Examples\n\n```rust\nuse finstack_quant_core::market_data::surfaces::FxDeltaVolSurface;\n\nlet surface = FxDeltaVolSurface::new(\n    \"EURUSD-DELTA-VOL\",\n    vec![0.25, 0.5, 1.0],\n    vec![0.08, 0.085, 0.09],\n    vec![0.01, 0.012, 0.015],\n    vec![0.005, 0.006, 0.007],\n    None,\n).expect(\"surface should build\");\n\nassert_eq!(surface.num_expiries(), 3);\nassert!((surface.atm_vols()[0] - 0.08).abs() < 1e-12);\n```"
+    "description": "Delta-quoted FX volatility surface.\n\nStores market-standard FX vol quotes (ATM DNS, 25-delta risk-reversal,\n25-delta butterfly) across multiple expiries. Models-layer functions\nperform delta conversion and volatility evaluation.\n\n# Examples\n\n```rust\nuse finstack_quant_core::market_data::surfaces::FxDeltaVolSurface;\n\nlet surface = FxDeltaVolSurface::new(\n    \"EURUSD-DELTA-VOL\",\n    vec![0.25, 0.5, 1.0],\n    vec![0.08, 0.085, 0.09],\n    vec![0.01, 0.012, 0.015],\n    vec![0.005, 0.006, 0.007],\n    None,\n    None,\n).expect(\"surface should build\");\n\nassert_eq!(surface.num_expiries(), 3);\nassert!((surface.atm_vols()[0] - 0.08).abs() < 1e-12);\n```"
   },
   {
     "path": "#/$defs/d_a154a0f59b6758a0e791/properties/atm_vols",

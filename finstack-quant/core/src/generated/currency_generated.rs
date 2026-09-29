@@ -4,7 +4,7 @@ use strum_macros::{AsRefStr, EnumIter, EnumString, Display};
 #[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, AsRefStr, EnumString, EnumIter, Display, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 /// ISO 4217 currency enumeration
-#[strum(ascii_case_insensitive)]
+#[strum(ascii_case_insensitive, parse_err_ty = crate::Error, parse_err_fn = unknown_currency_code)]
 #[repr(u16)]
 pub enum Currency {
     /// UAE Dirham (784)

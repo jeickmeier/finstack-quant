@@ -224,12 +224,32 @@ pub(crate) fn tenor_from_py(
     )))
 }
 
+/// Parse a business-day-convention name with the Rust `FromStr` (the parser
+/// `adjust` uses), so every Python BDC string argument accepts the same
+/// spellings: serde names and the `MF`/`F`/`P`/`MP`/`NONE` short codes,
+/// case-insensitive.
+///
+/// # Arguments
+///
+/// * `value` - Convention name supplied by the caller.
+/// * `what` - Parameter name used in the error message.
+pub(crate) fn bdc_from_str(
+    value: &str,
+    what: &str,
+) -> PyResult<finstack_quant_core::dates::BusinessDayConvention> {
+    value
+        .parse::<finstack_quant_core::dates::BusinessDayConvention>()
+        .map_err(|e| crate::errors::value_error(format!("invalid {what}: {e}")))
+}
+
 /// Coerce `BusinessDayConvention | str` to a Rust business-day convention.
 ///
 /// # Arguments
 ///
-/// * `obj` - A `finstack_quant.core.dates.BusinessDayConvention` or its
-///   serde name (`"modified_following"`, `"following"`, `"preceding"`, …).
+/// * `obj` - A `finstack_quant.core.dates.BusinessDayConvention` or a name
+///   accepted by the Rust `BusinessDayConvention` `FromStr` (the parser
+///   `adjust` uses): `"modified_following"`, `"following"`, `"preceding"`, …
+///   or the short codes `"MF"`, `"F"`, `"P"`, `"MP"`, case-insensitive.
 /// * `what` - Parameter name used in the error message.
 pub(crate) fn bdc_from_py(
     obj: &Bound<'_, PyAny>,
@@ -241,7 +261,7 @@ pub(crate) fn bdc_from_py(
         return Ok(convention.borrow().inner);
     }
     if let Ok(text) = obj.extract::<std::borrow::Cow<'_, str>>() {
-        return crate::bindings::valuations::instruments::enum_from_str(&text, what);
+        return bdc_from_str(&text, what);
     }
     Err(pyo3::exceptions::PyTypeError::new_err(format!(
         "{what}: expected finstack_quant.core.dates.BusinessDayConvention or its string name, got {}",

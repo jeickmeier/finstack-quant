@@ -126,7 +126,6 @@ validation_js_error!(
     std::num::ParseFloatError,
     std::num::ParseIntError,
     std::fmt::Error,
-    strum::ParseError,
     finstack_quant_core::math::linalg::CholeskyError,
 );
 

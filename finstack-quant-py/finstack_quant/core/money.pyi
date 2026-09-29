@@ -87,14 +87,19 @@ class Money:
         Parameters
         ----------
         amount : float | int | decimal.Decimal | str
-            Finite monetary amount. ``Decimal`` and ``str`` inputs preserve
-            full precision (no IEEE 754 round-trip); ``float``/``int`` follow
-            standard IEEE 754 semantics.
+            Finite monetary amount. ``Decimal`` and ``str`` inputs never pass
+            through ``float`` (no IEEE 754 round-trip), but digits beyond
+            Decimal's 96-bit mantissa or 28-digit scale are rounded exactly as
+            in ``from_json``; use ``from_decimal_str`` to reject such inputs.
+            ``str`` amounts are not trimmed. ``float``/``int`` follow standard
+            IEEE 754 semantics.
         currency : Currency | str
-            Currency object or ISO-4217 alphabetic code string.
+            Currency object or ISO-4217 alphabetic code string
+            (case-insensitive, not trimmed).
         config : FinstackConfig | None
             Optional config whose rounding mode and ingest scale are applied
-            to ``float``/``int`` amounts.
+            to every amount type (``Decimal``/``str`` amounts round without
+            going through ``float``).
 
         Raises
         ------
@@ -109,11 +114,13 @@ class Money:
     @classmethod
     def from_decimal(cls, amount: Decimal, currency: Union[Currency, str]) -> Money:
         """
-        Construct from a ``decimal.Decimal``, preserving full precision.
+        Construct from a ``decimal.Decimal`` without going through ``float``.
 
         This is the recommended entry point when the caller already holds a
         high-precision value. Unlike the regular ``Money(amount, ccy)``
-        constructor's float path, this never rounds through ``f64``.
+        constructor's float path, this never rounds through ``f64``; digits
+        beyond Decimal's 28-digit scale are rounded as in ``from_json`` (use
+        ``from_decimal_str`` to reject them).
 
         Parameters
         ----------
@@ -290,7 +297,8 @@ class Money:
             disables grouping.
         rounding : RoundingMode | str | None
             Rounding applied to the displayed value; a ``RoundingMode`` or
-            its exact lowercase name. Defaults to bankers rounding.
+            its exact lowercase name. Defaults to the Rust
+            ``RoundingMode::default()`` (bankers rounding).
 
         Returns
         -------
@@ -474,7 +482,9 @@ class Money:
         Raises
         ------
         ValueError
-            ``division by zero`` for a zero divisor, or a currency mismatch
+            ``Validation error: division by zero`` for a zero scalar or zero
+            ``Money`` divisor (the Rust error, identical in WASM
+            ``divScalar(0)``), a non-finite scalar, or a currency mismatch
             when dividing by ``Money`` in another currency.
 
         Returns

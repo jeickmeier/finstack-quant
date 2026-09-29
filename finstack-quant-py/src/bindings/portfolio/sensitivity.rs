@@ -319,7 +319,7 @@ fn compute_factor_sensitivities(
     let date = crate::bindings::date_utils::extract_date(as_of)?;
     let base_currency = base_currency
         .parse::<finstack_quant_core::currency::Currency>()
-        .map_err(display_to_py)?;
+        .map_err(core_to_py)?;
     let positions_json = positions_json.to_owned();
     let factors_json = factors_json.to_owned();
     let bump_config_json = bump_config_json.map(str::to_owned);
@@ -390,7 +390,7 @@ fn compute_pnl_profiles(
     let date = crate::bindings::date_utils::extract_date(as_of)?;
     let base_currency = base_currency
         .parse::<finstack_quant_core::currency::Currency>()
-        .map_err(display_to_py)?;
+        .map_err(core_to_py)?;
     let positions_json = positions_json.to_owned();
     let factors_json = factors_json.to_owned();
     let bump_config_json = bump_config_json.map(str::to_owned);

@@ -82,7 +82,7 @@ fn test_fx_forward_from_trade_date() {
         None,
         None,
         2, // T+2 spot
-        BusinessDayConvention::ModifiedFollowing,
+        Some(BusinessDayConvention::ModifiedFollowing),
         false,
     )
     .expect("should build");
@@ -91,6 +91,25 @@ fn test_fx_forward_from_trade_date() {
         forward.maturity,
         Date::from_calendar_date(2024, Month::April, 17).expect("valid date")
     );
+
+    // `None` selects the Rust-owned Modified Following default.
+    let defaulted = FxForward::from_trade_date(
+        "EURUSD-3M",
+        Currency::EUR,
+        Currency::USD,
+        trade_date,
+        Tenor::parse("3M").expect("valid tenor"),
+        Money::new(1_000_000.0, Currency::EUR).expect("valid money fixture"),
+        "USD-OIS",
+        "EUR-OIS",
+        None,
+        None,
+        2,
+        None,
+        false,
+    )
+    .expect("should build");
+    assert_eq!(defaulted.maturity, forward.maturity);
 }
 
 #[test]
@@ -107,7 +126,7 @@ fn standard_forward_tenor_preserves_explicit_end_of_month_policy() {
         None,
         None,
         2,
-        BusinessDayConvention::Unadjusted,
+        Some(BusinessDayConvention::Unadjusted),
         true,
     )
     .expect("should build");

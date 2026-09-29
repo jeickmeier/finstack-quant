@@ -272,9 +272,9 @@ export interface CurrencyConstructor {
    * const eur = new core.Currency("eur"); // case-insensitive
    * eur.code; // "EUR"
    * ```
-   * @param code - Three-letter ISO-4217 code (e.g. `"USD"`, `"eur"`, `"GBP"`). Leading and trailing whitespace is trimmed.
+   * @param code - Three-letter ISO-4217 code (e.g. `"USD"`, `"eur"`, `"GBP"`). Case-insensitive; surrounding whitespace is not trimmed.
    * @returns Constructed `Currency`.
-   * @throws If `code` is not a recognized ISO-4217 alphabetic code.
+   * @throws `TypeError` (kind `invalid_type`) if `code` is not a string; `FinstackError` (kind `validation`) naming the rejected text if it is not a supported ISO-4217 alphabetic code (e.g. `" USD "`).
    */
   new (code: string): Currency;
   /**
@@ -379,10 +379,12 @@ export interface Money extends WasmOwned {
    */
   divScalar(divisor: number): Money;
   /**
-   * Negate the monetary amount.
+   * Negate the monetary amount (Rust `Money::checked_neg`).
+   *
+   * Negation is exact on the stored `Decimal`, keeps its scale and never
+   * passes through `f64`, so it cannot fail.
    *
    * @returns Negated amount in the same currency.
-   * @throws If the negation is not representable as a `Decimal`.
    */
   negate(): Money;
   /**
@@ -408,7 +410,7 @@ export interface Money extends WasmOwned {
    * @param decimals - JavaScript number of fractional digits, an integer in `0..=1_000_000`; null or undefined selects ISO minor units.
    * @param showCurrency - Whether to prepend the ISO code; omitted means true.
    * @param group - Optional single-character thousands separator; omitted means no grouping.
-   * @param rounding - Canonical lowercase rounding mode; omitted means bankers.
+   * @param rounding - Canonical lowercase rounding mode; omitted selects the Rust default (bankers).
    * @returns Formatted amount such as `"USD 1,234.57"`.
    * @throws If `decimals` is not a non-negative integer or exceeds 1,000,000, if `group` is not a single character, or if `rounding` is not a recognised mode name.
    */
@@ -502,7 +504,7 @@ export interface MoneyConstructor {
    * }
    * ```
    * @param amount - Exact fixed-point or scientific decimal text in major currency units.
-   * @param currency - Case-insensitive ISO-4217 code; surrounding whitespace is trimmed.
+   * @param currency - Case-insensitive ISO-4217 code; surrounding whitespace is not trimmed.
    * @returns The constructed `Money`.
    * @throws If `amount` is malformed, non-finite, needs more precision than `Decimal` can hold, or underflows its supported scale; or if `currency` is not a recognised code.
    */
@@ -762,11 +764,12 @@ export interface PercentageConstructor {
  */
 export interface DayCount extends WasmOwned {
   /**
-   * Compute the year fraction between two dates given as epoch days.
+   * Compute the year fraction between two dates given as epoch days
+   * (Rust `DayCount::year_fraction(start, end, ctx)`).
    *
-   * Act/Act ISMA and Bus/252 require explicit frequency/calendar context.
-   * This method throws for those conventions; call
-   * `DayCount.yearFractionWithContext` with a configured `DayCountContext`.
+   * An omitted `ctx` is the empty Rust default context (`new DayCountContext()`).
+   * Act/Act ISMA needs a context frequency (or coupon period) and Bus/252 a
+   * context calendar; both throw without them.
    *
    * @example
    * ```javascript
@@ -774,42 +777,29 @@ export interface DayCount extends WasmOwned {
    * const start = core.createDate(2025, 1, 15);
    * const end   = core.createDate(2025, 4, 15);
    * dayCount.yearFraction(start, end); // 90 / 360 = 0.25
+   * const bus = new core.DayCountContext().withCalendar("nyse");
+   * core.DayCount.bus252().yearFraction(start, end, bus);
    * ```
    * @param startEpochDays - Start date as days since 1970-01-01.
-   * @param endEpochDays - End date as days since 1970-01-01.
-   * @returns Year fraction (`>= 0` if `end >= start`).
-   * @throws If either date is out of representable range. Act/Act ISMA and Bus/252 require explicit frequency/calendar context. This method throws for those conventions; call `DayCount.yearFractionWithContext` with a configured `DayCountContext`.
+   * @param endEpochDays - End date as days since 1970-01-01; must not be before the start.
+   * @param ctx - DayCountContext supplying calendar, frequency, coupon-period and termination metadata; omitted means the empty default context.
+   * @returns Non-negative year fraction in years under the convention and context.
+   * @throws `TypeError` (kind `invalid_type`) if a date is not an integer epoch-day number; `FinstackError` (kind `validation`) if a date is out of range, the start is after the end, or the convention's required context is missing or invalid; kind `not_found` if the context names an unknown calendar.
    */
-  yearFraction(startEpochDays: number, endEpochDays: number): number;
+  yearFraction(startEpochDays: number, endEpochDays: number, ctx?: DayCountContext): number;
   /**
-   * Compute a signed year fraction, preserving the start/end orientation.
+   * Compute a signed year fraction, preserving the start/end orientation
+   * (Rust `DayCount::signed_year_fraction(start, end, ctx)`).
+   *
+   * An omitted `ctx` is the empty Rust default context, as for `yearFraction`.
+   *
+   * @param startEpochDays - Start date as days since 1970-01-01.
+   * @param endEpochDays - End date as days since 1970-01-01; may precede the start.
+   * @param ctx - DayCountContext supplying calendar, frequency, coupon-period and termination metadata; omitted means the empty default context.
    * @returns Signed year fraction in years; negative when `end` is before `start`.
-   * @param startEpochDays - Start date as days since 1970-01-01.
-   * @param endEpochDays - End date as days since 1970-01-01.
-   * @throws Error - Throws a JavaScript exception if either epoch-day value is outside the representable date range or the selected convention requires calendar or coupon-frequency context. Use `yearFractionWithContext` for Bus/252 and Act/Act ISMA.
+   * @throws Error - Throws `TypeError` (kind `invalid_type`) if a date is not an integer epoch-day number; `FinstackError` (kind `validation`) if a date is out of range or the convention's required context is missing or invalid; kind `not_found` if the context names an unknown calendar.
    */
-  signedYearFraction(startEpochDays: number, endEpochDays: number): number;
-  /**
-   * Compute the year fraction with explicit convention context.
-   * @returns Non-negative year fraction in years under the selected convention and context.
-   * @param startEpochDays - Start date as days since 1970-01-01.
-   * @param endEpochDays - End date as days since 1970-01-01.
-   * @param ctx - DayCountContext supplying calendar, frequency, coupon-period, and termination metadata.
-   * @throws Error - Throws a JavaScript exception if either epoch-day value is outside the representable date range, the start is after the end, the context names an unknown calendar, or the selected convention's required context is missing or invalid.
-   */
-  yearFractionWithContext(
-    startEpochDays: number,
-    endEpochDays: number,
-    ctx: DayCountContext
-  ): number;
-  /**
-   * Count the calendar days between two dates (epoch days).
-   * @param startEpochDays - Start date as days since 1970-01-01.
-   * @param endEpochDays - End date as days since 1970-01-01.
-   * @returns Signed calendar-day count from start to end.
-   * @throws Error - Throws a JavaScript exception if either epoch-day value is outside the representable date range.
-   */
-  calendarDays(startEpochDays: number, endEpochDays: number): bigint;
+  signedYearFraction(startEpochDays: number, endEpochDays: number, ctx?: DayCountContext): number;
   /**
    * Convention name.
    * @returns Human-readable string form of this value.
@@ -855,6 +845,15 @@ export interface DayCountConstructor {
    * @throws If `name` is not a recognized day-count convention.
    */
   new (name: string): DayCount;
+  /**
+   * Count the calendar days between two dates (epoch days), independent of the
+   * convention (Rust associated fn `DayCount::calendar_days`).
+   * @param startEpochDays - Start date as days since 1970-01-01.
+   * @param endEpochDays - End date as days since 1970-01-01.
+   * @returns Signed calendar-day count from start to end.
+   * @throws Error - Throws a JavaScript exception if either epoch-day value is outside the representable date range.
+   */
+  calendarDays(startEpochDays: number, endEpochDays: number): bigint;
   /**
    * Act/360 day-count convention.
    * @returns A `DayCount` handle for this convention.
@@ -985,7 +984,10 @@ export interface DayCountContext extends WasmOwned {
  */
 export interface DayCountContextConstructor {
   /**
-   * Create an empty day-count context.
+   * Create an empty day-count context (Rust `DayCountContextState::default()`).
+   *
+   * `DayCount.yearFraction` / `signedYearFraction` use this context when none
+   * is passed.
    * @returns An empty `DayCountContext` handle.
    */
   new (): DayCountContext;
@@ -1095,6 +1097,44 @@ export interface TenorConstructor {
 export type DiscountCurveValidationMode = 'market_standard' | 'negative_rate_friendly';
 
 /**
+ * Named options for constructing a `DiscountCurve`; unknown keys are rejected.
+ */
+export interface DiscountCurveOptions {
+  /**
+   * Curve identifier; the lookup key inside a `MarketContext`.
+   */
+  id: string;
+  /**
+   * ISO-8601 base date; knot times are year fractions from it under `dayCount`.
+   */
+  baseDate: string;
+  /**
+   * Flat `[t0, df0, t1, df1, …]` pairs: `t` in years, `df` strictly positive; even length.
+   */
+  knots: NumericArray;
+  /**
+   * Interpolation style; the Rust builder default is `"monotone_convex"`.
+   */
+  interp?: string;
+  /**
+   * Extrapolation policy; the Rust builder default is `"flat_forward"`.
+   */
+  extrapolation?: string;
+  /**
+   * Day-count convention for the time axis; the Rust builder default is `"act_365f"`.
+   */
+  dayCount?: string;
+  /**
+   * Validation preset; omitted means the Rust default `"market_standard"`.
+   */
+  validationMode?: DiscountCurveValidationMode;
+  /**
+   * Decimal minimum implied forward; required with `"negative_rate_friendly"`, rejected otherwise.
+   */
+  forwardFloor?: number | null;
+}
+
+/**
  * Discount factor curve for present-value calculations.
  *
  * Built from `(time, discount_factor)` pillars where `time` is a year
@@ -1108,14 +1148,14 @@ export type DiscountCurveValidationMode = 'market_standard' | 'negative_rate_fri
  * import init, { core } from "finstack-quant-wasm";
  * await init();
  * // OIS-style USD curve, base-date 2025-01-02, three pillars.
- * const curve = new core.DiscountCurve(
- *   "USD-OIS",
- *   "2025-01-02",
- *   [0.0, 1.0, 1.0, 0.95, 5.0, 0.78],
- *   "monotone_convex",
- *   "flat_forward",
- *   "act_365f",
- * );
+ * const curve = new core.DiscountCurve({
+ *   id: "USD-OIS",
+ *   baseDate: "2025-01-02",
+ *   knots: [0.0, 1.0, 1.0, 0.95, 5.0, 0.78],
+ *   interp: "monotone_convex",
+ *   extrapolation: "flat_forward",
+ *   dayCount: "act_365f",
+ * });
  * curve.df(2.5);          // discount factor at 2.5y
  * curve.zero(2.5);        // continuously-compounded zero rate at 2.5y
  * ```
@@ -1165,43 +1205,27 @@ export interface DiscountCurve extends WasmOwned {
  * import init, { core } from "finstack-quant-wasm";
  * await init();
  * // OIS-style USD curve, base-date 2025-01-02, three pillars.
- * const curve = new core.DiscountCurve(
- *   "USD-OIS",
- *   "2025-01-02",
- *   [0.0, 1.0, 1.0, 0.95, 5.0, 0.78],
- *   "monotone_convex",
- *   "flat_forward",
- *   "act_365f",
- * );
+ * const curve = new core.DiscountCurve({
+ *   id: "USD-OIS",
+ *   baseDate: "2025-01-02",
+ *   knots: [0.0, 1.0, 1.0, 0.95, 5.0, 0.78],
+ *   interp: "monotone_convex",
+ *   extrapolation: "flat_forward",
+ *   dayCount: "act_365f",
+ * });
  * curve.df(2.5);          // discount factor at 2.5y
  * curve.zero(2.5);        // continuously-compounded zero rate at 2.5y
  * ```
  */
 export interface DiscountCurveConstructor {
   /**
-   * Construct from an array of `[time, df]` pairs.
+   * Construct a discount curve from named options.
    *
-   * @param id - Curve identifier (e.g. `"USD-OIS"`). Used as the lookup key inside a `MarketContext`.
-   * @param baseDate - ISO-8601 date string (`"YYYY-MM-DD"`). All `time` values are interpreted as year fractions from this date under `dayCount`.
-   * @param knots - Flat `[t0, df0, t1, df1, …]` array. `t` in years, `df` strictly positive. Length must be even.
-   * @param interp - Interpolation style. When omitted, the Rust builder default (`"monotone_convex"`) applies. One of `"linear"`, `"log_linear"`, `"monotone_convex"`, `"cubic_hermite"`, `"piecewise_quadratic_forward"`.
-   * @param extrapolation - Extrapolation policy. When omitted, the Rust builder default (`"flat_forward"`) applies. One of `"flat_zero"`, `"flat_forward"`, `"nan"`.
-   * @param dayCount - Day-count convention (defaults to curve-ID inference).
-   * @param validationMode - Rust validation preset: `"market_standard"` (default) or `"negative_rate_friendly"`.
-   * @param forwardFloor - Required minimum implied forward when using `"negative_rate_friendly"`.
+   * @param options - DiscountCurveOptions object (or its JSON text) with: `id` (curve identifier, the `MarketContext` lookup key); `baseDate` (ISO-8601 `"YYYY-MM-DD"`; knot times are year fractions from it under `dayCount`); `knots` (flat `[t0, df0, t1, df1, …]` array or typed array, `t` in years, `df` strictly positive, even length); and the optional `interp` (`"linear"`, `"log_linear"`, `"monotone_convex"`, `"cubic_hermite"`, `"piecewise_quadratic_forward"`), `extrapolation` (`"flat_zero"`, `"flat_forward"`, `"nan"`), `dayCount`, `validationMode` (`"market_standard"` or `"negative_rate_friendly"`) and `forwardFloor` (decimal minimum implied forward, required with `"negative_rate_friendly"` and rejected otherwise). Omitted options use the Rust builder defaults: `monotone_convex`, `flat_forward`, `act_365f` and `market_standard`. Unknown keys are rejected.
    * @returns The constructed `DiscountCurve`.
-   * @throws If `knots` length is odd, the date is malformed, the interpolation style is unknown, or any `df` is non-positive.
+   * @throws `TypeError` (kind `invalid_type`) if `options` is not a JSON string or plain object; `FinstackError` (kind `validation`) for an unknown or mistyped key, an odd `knots` length, a malformed date, an unknown interpolation/extrapolation/day-count/validation name, a misplaced or missing `forwardFloor`, or discount factors the curve validation rejects.
    */
-  new (
-    id: string,
-    baseDate: string,
-    knots: NumericArray,
-    interp?: string,
-    extrapolation?: string,
-    dayCount?: string,
-    validationMode?: DiscountCurveValidationMode,
-    forwardFloor?: number | null
-  ): DiscountCurve;
+  new (options: DiscountCurveOptions | string): DiscountCurve;
   /**
    * Construct a flat continuously-compounded discount curve.
    * @returns A `DiscountCurve` handle.
@@ -1294,7 +1318,7 @@ export interface HazardCurveConstructor {
    * @param recoveryRate - Required recovery on default as a decimal fraction in `[0, 1]`.
    * @param dayCount - Day-count convention (default `"act_365f"`).
    * @returns The constructed `HazardCurve`.
-   * @throws If `recoveryRate` is missing, non-finite, or outside `[0, 1]`, `knots` length is odd, the date is malformed, the day-count is unknown, or the curve otherwise fails validation.
+   * @throws If `knots` length is odd, or (from the Rust curve builder, in its order: knots first, then recovery) the date is malformed, the day-count is unknown, a knot is invalid, or `recoveryRate` is missing (it reaches Rust as `NaN`), non-finite, or outside `[0, 1]`.
    */
   new (
     id: string,
@@ -1452,7 +1476,7 @@ export interface VolCubeConstructor {
    * @param tenors - Swap tenor axis in years (strictly increasing).
    * @param paramsFlat - Row-major flat array of SABR parameters: `[alpha0, beta0, rho0, nu0, shift0, alpha1, …]`. Length must equal `expiries.len() * tenors.len() * 5`. Pass `NaN` for the shift element of a node to omit the shift.
    * @param forwards - Row-major forward rates, one per grid node.
-   * @param interpolationMode - Volatility-surface interpolation mode used between quoted points.
+   * @param interpolationMode - Interpolation across the expiry axis: `"vol"` or `"total_variance"`; omitted keeps the Rust `VolCube::from_grid` default (`"vol"`).
    * @throws Error - Throws a JavaScript exception if an axis is empty, non-finite, non-positive, or not strictly increasing; the parameter or forward array has the wrong length; a forward is non-finite; any SABR node has invalid alpha, beta, rho, nu, or shift; or `interpolationMode` is neither `vol` nor `total_variance`.
    */
   new (
@@ -1609,24 +1633,18 @@ export interface FxMatrix extends WasmOwned {
   ): void;
   /**
    * Look up an FX rate.
+   * Global quotes precede pinned fixings, then provider observations,
+   * resolving source priority before taking a reciprocal. An omitted `policy`
+   * runs the Rust default query (`FxQuery::new`, cashflow-date policy).
    *
    * @returns Resolved FX rate, including whether it was triangulated.
    * @param base - Base (from) currency ISO code.
    * @param quote - Quote (to) currency ISO code.
    * @param date - ISO date string.
-   * @param policy - Reusable conversion policy handle.
+   * @param policy - Reusable conversion policy handle; omitted means the Rust default (cashflow date).
    * @throws Error - Throws a JavaScript exception if either currency code or `date` is invalid, no direct, inverse, or triangulated quote is available, or a resolved quote is non-finite or non-positive.
    */
-  rate(base: string, quote: string, date: string, policy: FxConversionPolicy): FxRateResult;
-  /**
-   * Look up an FX rate using cashflow-date conversion semantics.
-   * @returns Resolved FX rate, including whether it was triangulated.
-   * @param base - Base currency code of the FX quote, where the rate is quote per base.
-   * @param quote - Quote currency code of the FX rate, expressed per unit of base currency.
-   * @param date - ISO-8601 date used by the calculation or market-data lookup.
-   * @throws Error - Throws a JavaScript exception if either currency code or `date` is invalid, no direct, inverse, or triangulated cashflow-date quote is available, or a resolved quote is non-finite or non-positive.
-   */
-  rateDefault(base: string, quote: string, date: string): FxRateResult;
+  rate(base: string, quote: string, date: string, policy?: FxConversionPolicy): FxRateResult;
 }
 
 /**
@@ -1637,7 +1655,7 @@ export interface FxMatrix extends WasmOwned {
  * await init();
  * const matrix = new core.FxMatrix();
  * matrix.setQuote("EUR", "USD", 1.1);
- * console.log(matrix.rateDefault("EUR", "USD", "2026-01-02").rate);
+ * console.log(matrix.rate("EUR", "USD", "2026-01-02").rate);
  * ```
  */
 export interface FxMatrixConstructor {
@@ -1805,8 +1823,8 @@ export interface FxDeltaVolSurfaceConstructor {
    * Construct an FX delta-quoted vol surface with 25-delta wings.
    *
    * Optional `rr10d` / `bf10d` add 10-delta wings for richer wing
-   * interpolation. Pass an empty array for both to omit; if one is
-   * provided, the other must be too.
+   * interpolation. Omit both (`undefined`/`null`) for a three-point smile;
+   * the Rust constructor rejects one without the other.
    *
    * @returns An `FxDeltaVolSurface` handle.
    * @param id - Stable surface identifier.

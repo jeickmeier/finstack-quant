@@ -142,7 +142,12 @@ pub fn calculate_vm(
 /// ```javascript
 /// import init, { core, margin } from "finstack-quant-wasm";
 /// await init();
-/// const df = new core.DiscountCurve("USD-OIS", "2025-01-01", [0.0, 1.0, 5.0, 1.0], "log_linear");
+/// const df = new core.DiscountCurve({
+///   id: "USD-OIS",
+///   baseDate: "2025-01-01",
+///   knots: [0.0, 1.0, 5.0, 1.0],
+///   interp: "log_linear",
+/// });
 /// const hz = new core.HazardCurve("CPTY", "2025-01-01", [0.0, 0.02, 30.0, 0.02], 0.4);
 /// const result = margin.computeBilateralXva(
 ///   JSON.stringify({ times: [1, 2], mtm_values: [1e6, 1e6], epe: [1e6, 1e6], ene: [0, 0] }),

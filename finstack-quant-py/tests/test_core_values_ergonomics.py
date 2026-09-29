@@ -164,7 +164,7 @@ class TestConfig:
         assert cfg == FinstackConfig.from_json(cfg.to_json())
         assert cfg != FinstackConfig()
         assert "floor" in repr(cfg)
-        with pytest.raises(ValueError, match=r"unknown rounding mode"):
+        with pytest.raises(ValueError, match=r'invalid value "BANKERS": unknown variant'):
             RoundingMode.from_name("BANKERS")
         assert RoundingMode.from_json('"ceil"').name == "ceil"
         assert pickle.loads(pickle.dumps(RoundingMode.CEIL)) == RoundingMode.CEIL  # noqa: S301

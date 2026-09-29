@@ -71,13 +71,16 @@ impl<'a> std::fmt::Debug for DayCountContext<'a> {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 /// Serializable snapshot of [`DayCountContext`] state for persistence and interchange.
 ///
 /// This struct captures the optional context parameters (calendar, frequency, business-day basis)
 /// needed to reconstruct a [`DayCountContext`] at runtime using the built-in calendar lookup.
+/// `Default` is the empty context (no calendar, frequency, basis or coupon
+/// period; `end_is_termination_date = false`), the snapshot of
+/// [`DayCountContext::default`].
 pub struct DayCountContextState {
     /// Optional calendar code (e.g. "target2").
     pub calendar_id: Option<String>,
@@ -188,6 +191,14 @@ impl<'a> From<DayCountContext<'a>> for DayCountContextState {
 mod tests {
     use super::*;
     use time::macros::date;
+
+    #[test]
+    fn default_state_is_the_default_context_snapshot() {
+        assert_eq!(
+            DayCountContextState::default(),
+            DayCountContextState::from(DayCountContext::default())
+        );
+    }
 
     #[test]
     fn try_new_rejects_inverted_coupon_period() {

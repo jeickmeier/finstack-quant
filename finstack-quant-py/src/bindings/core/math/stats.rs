@@ -141,36 +141,40 @@ fn parse_method(method: &str) -> PyResult<RealizedVarMethod> {
 /// returns, no mean subtraction, times ``annualization_factor``).
 ///
 /// ``method`` must be ``"close_to_close"``; the OHLC estimators require
-/// ``realized_variance_ohlc``. Raises ``ValueError`` for non-positive or
-/// non-finite prices or annualization factor.
+/// ``realized_variance_ohlc``. ``None`` arguments select the Rust defaults
+/// (close-to-close, 252 daily observations per year). Raises ``ValueError``
+/// for non-positive or non-finite prices or annualization factor.
 #[pyfunction]
-#[pyo3(signature = (prices, method="close_to_close", annualization_factor=252.0))]
-#[pyo3(text_signature = "(prices, method='close_to_close', annualization_factor=252.0)")]
-fn realized_variance(prices: Vec<f64>, method: &str, annualization_factor: f64) -> PyResult<f64> {
-    let method = parse_method(method)?;
+#[pyo3(signature = (prices, method=None, annualization_factor=None))]
+#[pyo3(text_signature = "(prices, method=None, annualization_factor=None)")]
+fn realized_variance(
+    prices: Vec<f64>,
+    method: Option<&str>,
+    annualization_factor: Option<f64>,
+) -> PyResult<f64> {
+    let method = method.map(parse_method).transpose()?;
     stats::realized_variance(&prices, method, annualization_factor).map_err(core_to_py)
 }
 
 /// Annualized realized variance from OHLC bars.
 ///
 /// ``method`` is one of ``"close_to_close"``, ``"parkinson"``,
-/// ``"garman_klass"``, ``"rogers_satchell"``, ``"yang_zhang"``. Raises
-/// ``ValueError`` when the four series differ in length or contain invalid
-/// prices.
+/// ``"garman_klass"``, ``"rogers_satchell"``, ``"yang_zhang"``. ``None``
+/// arguments select the Rust defaults (Yang-Zhang, 252 daily bars per year).
+/// Raises ``ValueError`` when the four series differ in length or contain
+/// invalid prices.
 #[pyfunction]
-#[pyo3(signature = (open, high, low, close, method="yang_zhang", annualization_factor=252.0))]
-#[pyo3(
-    text_signature = "(open, high, low, close, method='yang_zhang', annualization_factor=252.0)"
-)]
+#[pyo3(signature = (open, high, low, close, method=None, annualization_factor=None))]
+#[pyo3(text_signature = "(open, high, low, close, method=None, annualization_factor=None)")]
 fn realized_variance_ohlc(
     open: Vec<f64>,
     high: Vec<f64>,
     low: Vec<f64>,
     close: Vec<f64>,
-    method: &str,
-    annualization_factor: f64,
+    method: Option<&str>,
+    annualization_factor: Option<f64>,
 ) -> PyResult<f64> {
-    let method = parse_method(method)?;
+    let method = method.map(parse_method).transpose()?;
     stats::realized_variance_ohlc(&open, &high, &low, &close, method, annualization_factor)
         .map_err(core_to_py)
 }

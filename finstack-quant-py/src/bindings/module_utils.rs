@@ -189,5 +189,5 @@ pub(crate) fn py_to_serde<'py, T: serde::de::DeserializeOwned + Send>(
 
 /// Parse an ISO-4217 code into a [`Currency`], mapping failures to `ValueError`.
 pub(crate) fn parse_currency(code: &str) -> PyResult<finstack_quant_core::currency::Currency> {
-    code.parse().map_err(crate::errors::display_to_py)
+    code.parse().map_err(crate::errors::core_to_py)
 }

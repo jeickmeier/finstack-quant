@@ -1856,6 +1856,7 @@ export interface D_7Fbd5A62C7C39Ad98666 {
  *     vec![0.01, 0.012, 0.015],
  *     vec![0.005, 0.006, 0.007],
  *     None,
+ *     None,
  * ).expect("surface should build");
  *
  * assert_eq!(surface.num_expiries(), 3);

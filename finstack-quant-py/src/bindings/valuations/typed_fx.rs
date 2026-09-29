@@ -531,7 +531,10 @@ impl PyFxForward {
     ///     the pair (``FxForward.standard_settlement_days``): T+1 for USD/CAD,
     ///     USD/TRY, USD/RUB and T+2 otherwise.
     /// business_day_convention : BusinessDayConvention | str | None
-    ///     Roll rule applied to the maturity; ``None`` means ``"modified_following"``.
+    ///     Roll rule applied to the maturity: a ``BusinessDayConvention`` or a
+    ///     name accepted by ``adjust`` (serde names or ``MF``/``F``/``P``/``MP``
+    ///     short codes). ``None`` selects the Rust ``FxForward::from_trade_date``
+    ///     default, Modified Following.
     /// end_of_month : bool
     ///     Apply the FX end-of-month rule when spot falls on month end.
     ///
@@ -578,10 +581,10 @@ end_of_month=False)"
     ) -> PyResult<Self> {
         let base = currency_from_py(base_currency, "base_currency")?;
         let quote = currency_from_py(quote_currency, "quote_currency")?;
-        let convention = match business_day_convention {
-            Some(value) if !value.is_none() => bdc_from_py(value, "business_day_convention")?,
-            _ => finstack_quant_core::dates::BusinessDayConvention::ModifiedFollowing,
-        };
+        let convention = business_day_convention
+            .filter(|value| !value.is_none())
+            .map(|value| bdc_from_py(value, "business_day_convention"))
+            .transpose()?;
         let settlement_days = settlement_days.unwrap_or_else(|| {
             finstack_quant_valuations::instruments::FxForward::standard_settlement_days(base, quote)
         });

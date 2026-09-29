@@ -1267,7 +1267,7 @@ impl PyStructuredCreditBuilder {
         value: &str,
     ) -> PyResult<PyRefMut<'py, Self>> {
         let business_day_convention: BusinessDayConvention =
-            enum_from_str(value, "business_day_convention")?;
+            crate::bindings::valuations::convert::bdc_from_str(value, "business_day_convention")?;
         let b = take_sc(&mut slf)?;
         slf.inner = Some(b.business_day_convention(business_day_convention));
         Ok(slf)

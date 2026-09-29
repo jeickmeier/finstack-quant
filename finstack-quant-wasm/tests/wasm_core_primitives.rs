@@ -40,7 +40,7 @@ fn thirty_e_360_isda_uses_termination_context() {
     let end = epoch(2025, 2, 28);
     let day_count = JsDayCount::thirty_e360_isda();
     let regular = day_count
-        .year_fraction_with_context(
+        .year_fraction(
             JsValue::from(start),
             JsValue::from(end),
             &JsDayCountContext::new(),
@@ -50,7 +50,7 @@ fn thirty_e_360_isda_uses_termination_context() {
         .with_end_is_termination_date(JsValue::from(true))
         .expect("context");
     let terminal = day_count
-        .year_fraction_with_context(JsValue::from(start), JsValue::from(end), &terminal_ctx)
+        .year_fraction(JsValue::from(start), JsValue::from(end), &terminal_ctx)
         .expect("terminal period");
 
     assert!((regular - 30.0 / 360.0).abs() < 1e-12);
@@ -65,10 +65,8 @@ fn daycount_from_string() {
 
 #[wasm_bindgen_test]
 fn calendar_days() {
-    let day_count = JsDayCount::act365f();
-    let days = day_count
-        .calendar_days(JsValue::from(jan15()), JsValue::from(jul15()))
-        .expect("valid");
+    let days =
+        JsDayCount::calendar_days(JsValue::from(jan15()), JsValue::from(jul15())).expect("valid");
     assert_eq!(days, (jul15() - jan15()) as i64);
 }
 

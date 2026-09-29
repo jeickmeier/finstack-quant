@@ -43,8 +43,8 @@ pub(crate) fn compute_pv(
                 &high,
                 &low,
                 &close,
-                inst.realized_var_method,
-                annualization_factor(inst),
+                Some(inst.realized_var_method),
+                Some(annualization_factor(inst)),
             )?
         } else {
             let prices = get_historical_prices(inst, curves, as_of)?;
@@ -53,8 +53,8 @@ pub(crate) fn compute_pv(
             }
             realized_variance(
                 &prices,
-                inst.realized_var_method,
-                annualization_factor(inst),
+                Some(inst.realized_var_method),
+                Some(annualization_factor(inst)),
             )?
         };
         let df = crate::instruments::common_impl::pricing::time::relative_df_discount_curve(
@@ -284,15 +284,19 @@ fn realized_variance_with_factor(
             &high,
             &low,
             &close,
-            inst.realized_var_method,
-            annualization_factor,
+            Some(inst.realized_var_method),
+            Some(annualization_factor),
         );
     }
     let prices = get_historical_prices(inst, context, as_of)?;
     if prices.len() < 2 {
         return Ok(0.0);
     }
-    realized_variance(&prices, inst.realized_var_method, annualization_factor)
+    realized_variance(
+        &prices,
+        Some(inst.realized_var_method),
+        Some(annualization_factor),
+    )
 }
 
 pub(crate) fn partial_realized_variance(

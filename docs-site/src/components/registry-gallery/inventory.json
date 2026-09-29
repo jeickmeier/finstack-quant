@@ -733,7 +733,7 @@
     },
     {
       "path": "finstack-quant-ui/tests/valuations/details/cases.json",
-      "sha256": "bfdab5be3c91d34178d0a0f16fdb693a66fb7a4e5549b60616b4c7411a225046"
+      "sha256": "5cc8c3b3d3e3589b16eb03cff1b3aa6c07f271fa700837f2c650218c2d1030f1"
     },
     {
       "path": "finstack-quant/valuations/tests/instruments/json_examples/interest_rate_swap.json",

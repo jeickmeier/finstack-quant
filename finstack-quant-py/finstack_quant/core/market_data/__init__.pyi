@@ -104,7 +104,7 @@ class DiscountCurve:
         interp: Optional[str] = None,
         extrapolation: Optional[str] = None,
         day_count: Optional[str] = None,
-        validation_mode: str = "market_standard",
+        validation_mode: Optional[str] = None,
         forward_floor: Optional[float] = None,
     ) -> None:
         """
@@ -129,11 +129,13 @@ class DiscountCurve:
             Day-count label used to convert query dates to curve time. The
             default is fixed at ``"act_365f"`` (it is not inferred from ``id``).
         validation_mode : str, optional
-            ``"market_standard"`` (default: monotonic DFs and a -50bp implied
-            forward floor) or ``"negative_rate_friendly"``.
+            ``"market_standard"`` (monotonic DFs and a -50bp implied forward
+            floor) or ``"negative_rate_friendly"``. ``None`` selects the Rust
+            ``ValidationMode::from_preset`` default, ``"market_standard"``.
         forward_floor : float, optional
             Minimum implied forward (decimal) required by
-            ``"negative_rate_friendly"``.
+            ``"negative_rate_friendly"``; rejected with any other preset,
+            including the defaulted one.
 
         Raises
         ------
@@ -3500,7 +3502,7 @@ class VolCube:
         tenors: Sequence[float],
         params_row_major: Sequence[Union[SabrParameterData, dict[str, float]]],
         forwards_row_major: Sequence[float],
-        interpolation_mode: str = "vol",
+        interpolation_mode: Optional[str] = None,
     ) -> None:
         """
         Construct a vol cube from row-major grid data.
@@ -3516,17 +3518,19 @@ class VolCube:
         params_row_major : Sequence[SabrParameterData or dict]
             ``len(expiries) * len(tenors)`` SABR nodes, row-major by expiry.
             Dicts use keys ``"alpha"``, ``"beta"``, ``"rho"``, ``"nu"`` and
-            optionally ``"shift"``.
+            optionally ``"shift"`` (the Rust ``SabrParameterData`` wire
+            shape); missing or unknown keys are rejected.
         forwards_row_major : Sequence[float]
             Forward swap rates (decimal) in the same row-major order.
         interpolation_mode : str, optional
-            ``"vol"`` (default) or ``"total_variance"``.
+            ``"vol"`` or ``"total_variance"``; ``None`` keeps the Rust
+            ``VolCube::from_grid`` default (``"vol"``).
 
         Raises
         ------
         ValueError
-            If grid sizes do not match the axes, a node fails SABR
-            validation, or a label is unknown.
+            If grid sizes do not match the axes, a node dict has a missing or
+            unknown key or fails SABR validation, or a label is unknown.
         TypeError
             If a node is neither ``SabrParameterData`` nor a dict.
 

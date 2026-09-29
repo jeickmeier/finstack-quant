@@ -3127,7 +3127,6 @@ backlog = [
     "from_name",
     "parse",
 ]
-wasm_only = { yearFractionWithContext = "S10: merged into yearFraction(start, end, ctx?)" }
 
 [parity.members."finstack_quant.core.dates.DayCountContext"]
 backlog = [
@@ -3241,7 +3240,6 @@ backlog = [
     "quotes",
     "set_quotes",
 ]
-wasm_only = { rateDefault = "S10: removed in favour of rate(..., policy?)" }
 
 [parity.members."finstack_quant.core.market_data.fx.FxRateResult"]
 backlog = [

@@ -36,7 +36,7 @@ fn log_returns_and_realized_variance_close_to_close() {
     let returns = log_returns(&prices);
     assert_eq!(returns.len(), prices.len() - 1);
 
-    let rv = realized_variance(&prices, RealizedVarMethod::CloseToClose, 252.0)
+    let rv = realized_variance(&prices, Some(RealizedVarMethod::CloseToClose), Some(252.0))
         .expect("CloseToClose should succeed");
     assert!(rv.is_finite() && rv >= 0.0);
     let expected = returns.iter().map(|r| r * r).sum::<f64>() / returns.len() as f64 * 252.0;
@@ -52,7 +52,7 @@ fn log_returns_and_realized_variance_close_to_close() {
         RealizedVarMethod::RogersSatchell,
         RealizedVarMethod::YangZhang,
     ] {
-        let result = realized_variance(&prices, method, 252.0);
+        let result = realized_variance(&prices, Some(method), Some(252.0));
         assert!(
             result.is_err(),
             "realized_variance with {} must return Err for close-only input",
@@ -69,7 +69,7 @@ fn log_returns_and_realized_variance_close_to_close() {
 #[test]
 fn realized_variance_close_to_close_rejects_invalid_prices() {
     for prices in [[100.0, 0.0], [100.0, -5.0], [100.0, f64::NAN]] {
-        let err = realized_variance(&prices, RealizedVarMethod::CloseToClose, 252.0)
+        let err = realized_variance(&prices, Some(RealizedVarMethod::CloseToClose), Some(252.0))
             .expect_err("invalid close prices should be rejected");
         assert!(
             err.to_string()
@@ -81,7 +81,7 @@ fn realized_variance_close_to_close_rejects_invalid_prices() {
 
 #[test]
 fn realized_variance_close_to_close_single_price_is_zero() {
-    let result = realized_variance(&[100.0], RealizedVarMethod::CloseToClose, 252.0)
+    let result = realized_variance(&[100.0], Some(RealizedVarMethod::CloseToClose), Some(252.0))
         .expect("single close price should use early zero return");
     assert_eq!(result, 0.0);
 }
@@ -100,7 +100,7 @@ fn realized_variance_ohlc_estimators_behave() {
         RealizedVarMethod::RogersSatchell,
         RealizedVarMethod::YangZhang,
     ] {
-        let value = realized_variance_ohlc(&open, &high, &low, &close, method, 252.0)
+        let value = realized_variance_ohlc(&open, &high, &low, &close, Some(method), Some(252.0))
             .expect("realized_variance_ohlc should succeed for valid OHLC input");
         assert!(value.is_finite() && value >= 0.0);
     }
@@ -113,8 +113,8 @@ fn realized_variance_ohlc_rejects_mismatched_lengths() {
         &[102.0],
         &[99.0, 100.0],
         &[101.0, 102.0],
-        RealizedVarMethod::Parkinson,
-        252.0,
+        Some(RealizedVarMethod::Parkinson),
+        Some(252.0),
     )
     .expect_err("mismatched OHLC vectors should be rejected");
 

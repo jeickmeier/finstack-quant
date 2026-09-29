@@ -160,10 +160,10 @@ test('FX global source precedes the pinned quote in both orientations', () => {
   const fx = new core.FxMatrix();
   fx.setQuote('USD', 'EUR', 0.8);
   fx.setQuoteOn('EUR', 'USD', '2025-01-02', core.FxConversionPolicy.cashflowDate(), 1.3);
-  assert.equal(fx.rateDefault('EUR', 'USD', '2025-01-02').rate, 1.25);
-  assert.equal(fx.rateDefault('USD', 'EUR', '2025-01-02').rate, 0.8);
+  assert.equal(fx.rate('EUR', 'USD', '2025-01-02').rate, 1.25);
+  assert.equal(fx.rate('USD', 'EUR', '2025-01-02').rate, 0.8);
   fx.setQuote('USD', 'GBP', 0.8);
-  assert.equal(fx.rateDefault('EUR', 'GBP', '2025-01-02').rate, 1);
+  assert.equal(fx.rate('EUR', 'GBP', '2025-01-02').rate, 1);
 });
 
 test('zero-rate bond DV01 permits negative-rate stress', () => {

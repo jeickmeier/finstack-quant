@@ -336,17 +336,9 @@ impl PyFxDeltaVolSurface {
         rr_10d: Option<Vec<f64>>,
         bf_10d: Option<Vec<f64>>,
     ) -> PyResult<Self> {
-        let wings_10d = match (rr_10d, bf_10d) {
-            (Some(rr), Some(bf)) => Some((rr, bf)),
-            (None, None) => None,
-            _ => {
-                return Err(crate::errors::value_error(
-                    "rr_10d and bf_10d must both be provided or both omitted",
-                ));
-            }
-        };
-        let surface = FxDeltaVolSurface::new(id, expiries, atm_vols, rr_25d, bf_25d, wings_10d)
-            .map_err(core_to_py)?;
+        let surface =
+            FxDeltaVolSurface::new(id, expiries, atm_vols, rr_25d, bf_25d, rr_10d, bf_10d)
+                .map_err(core_to_py)?;
         Ok(Self {
             inner: Arc::new(surface),
         })
@@ -590,8 +582,14 @@ impl PySabrParameterData {
     }
 }
 
-/// Parse one cube node: a ``SabrParameterData`` or a dict with keys
-/// ``alpha``, ``beta``, ``rho``, ``nu`` and optional ``shift``.
+/// Parse one cube node: a ``SabrParameterData`` or a dict in the Rust
+/// ``SabrParameterData`` wire shape (``alpha``, ``beta``, ``rho``, ``nu`` and
+/// optional ``shift``).
+///
+/// The dict is converted to its JSON value and decoded by the Rust
+/// `Deserialize` impl, which rejects missing and unknown keys and validates the
+/// parameter ranges. JSON cannot carry a non-finite number, so one is rejected
+/// at this boundary with its key named, as the WASM JSON input walker does.
 fn extract_sabr_node(obj: &Bound<'_, PyAny>, idx: usize) -> PyResult<SabrParameterData> {
     if let Ok(typed) = obj.extract::<PyRef<'_, PySabrParameterData>>() {
         return Ok(typed.inner);
@@ -601,27 +599,25 @@ fn extract_sabr_node(obj: &Bound<'_, PyAny>, idx: usize) -> PyResult<SabrParamet
             "params_row_major[{idx}]: expected SabrParameterData or dict"
         ))
     })?;
-    let get = |key: &str| -> PyResult<f64> {
-        dict.get_item(key)?
-            .ok_or_else(|| {
-                crate::errors::value_error(format!(
-                    "params_row_major[{idx}]: missing required key {key:?}"
-                ))
-            })?
-            .extract::<f64>()
-    };
-
-    let alpha = get("alpha")?;
-    let beta = get("beta")?;
-    let rho = get("rho")?;
-    let nu = get("nu")?;
-
-    let shift = dict
-        .get_item("shift")?
-        .filter(|value| !value.is_none())
-        .map(|value| value.extract::<f64>())
-        .transpose()?;
-    SabrParameterData::new_with_shift(alpha, beta, rho, nu, shift).map_err(core_to_py)
+    let mut node = serde_json::Map::with_capacity(dict.len());
+    for (key, value) in dict.iter() {
+        let key: String = key.extract()?;
+        let value = if value.is_none() {
+            serde_json::Value::Null
+        } else {
+            let number: f64 = value.extract()?;
+            serde_json::Number::from_f64(number)
+                .map(serde_json::Value::Number)
+                .ok_or_else(|| {
+                    crate::errors::value_error(format!(
+                        "params_row_major[{idx}].{key}: expected a finite number, got {number}"
+                    ))
+                })?
+        };
+        node.insert(key, value);
+    }
+    serde_json::from_value::<SabrParameterData>(serde_json::Value::Object(node))
+        .map_err(|e| crate::errors::value_error(format!("params_row_major[{idx}]: {e}")))
 }
 
 /// SABR volatility cube on an expiry x tenor grid.
@@ -670,11 +666,12 @@ impl PyVolCube {
     /// params_row_major : list[SabrParameterData | dict]
     ///     ``len(expiries) * len(tenors)`` SABR nodes, row-major by expiry.
     ///     Dicts use keys ``"alpha"``, ``"beta"``, ``"rho"``, ``"nu"`` and
-    ///     optionally ``"shift"``.
+    ///     optionally ``"shift"``; missing or unknown keys are rejected.
     /// forwards_row_major : list[float]
     ///     Forward swap rates (decimal) in the same row-major order.
     /// interpolation_mode : str, optional
-    ///     ``"vol"`` (default) or ``"total_variance"``.
+    ///     ``"vol"`` or ``"total_variance"``; ``None`` keeps the Rust
+    ///     ``VolCube::from_grid`` default (``"vol"``).
     ///
     /// Raises
     /// ------
@@ -691,16 +688,18 @@ impl PyVolCube {
     /// >>> VolCube("USD-SWPT", [1.0], [5.0, 10.0], [node, node], [0.03, 0.035]).grid_shape
     /// (1, 2)
     #[new]
-    #[pyo3(signature = (id, expiries, tenors, params_row_major, forwards_row_major, interpolation_mode="vol"))]
+    #[pyo3(signature = (id, expiries, tenors, params_row_major, forwards_row_major, interpolation_mode=None))]
     fn new(
         id: &str,
         expiries: Vec<f64>,
         tenors: Vec<f64>,
         params_row_major: Vec<Bound<'_, PyAny>>,
         forwards_row_major: Vec<f64>,
-        interpolation_mode: &str,
+        interpolation_mode: Option<&str>,
     ) -> PyResult<Self> {
-        let mode = parse_vol_interpolation_mode(interpolation_mode)?;
+        let mode = interpolation_mode
+            .map(parse_vol_interpolation_mode)
+            .transpose()?;
 
         let sabr_params: Vec<SabrParameterData> = params_row_major
             .iter()
@@ -708,9 +707,12 @@ impl PyVolCube {
             .map(|(i, node)| extract_sabr_node(node, i))
             .collect::<PyResult<Vec<_>>>()?;
 
-        let cube = VolCube::from_grid(id, &expiries, &tenors, &sabr_params, &forwards_row_major)
-            .map_err(core_to_py)?
-            .with_interpolation_mode(mode);
+        let mut cube =
+            VolCube::from_grid(id, &expiries, &tenors, &sabr_params, &forwards_row_major)
+                .map_err(core_to_py)?;
+        if let Some(mode) = mode {
+            cube = cube.with_interpolation_mode(mode);
+        }
 
         Ok(Self {
             inner: Arc::new(cube),

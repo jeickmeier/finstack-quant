@@ -1,5 +1,35 @@
 import * as wasm from '../pkg/finstack_quant_wasm.js';
 
+// Rust `DayCount::year_fraction` / `signed_year_fraction` take a context; the
+// published methods make it optional. An omitted context is the Rust default
+// (`new DayCountContext()`), created once after `init()` and only borrowed.
+let defaultDayCountContext;
+const dayCountContext = (ctx) =>
+  ctx === undefined || ctx === null ? (defaultDayCountContext ??= new wasm.DayCountContext()) : ctx;
+const rawYearFraction = wasm.DayCount.prototype.yearFraction;
+const rawSignedYearFraction = wasm.DayCount.prototype.signedYearFraction;
+wasm.DayCount.prototype.yearFraction = function yearFraction(start, end, ctx = undefined) {
+  return rawYearFraction.call(this, start, end, dayCountContext(ctx));
+};
+wasm.DayCount.prototype.signedYearFraction = function signedYearFraction(
+  start,
+  end,
+  ctx = undefined
+) {
+  return rawSignedYearFraction.call(this, start, end, dayCountContext(ctx));
+};
+
+// `FxMatrix.rate(base, quote, date, policy?)`: an omitted policy runs the
+// Rust default query (`FxQuery::new`), exposed raw as `rateWithDefaultPolicy`.
+const rateWithPolicy = wasm.FxMatrix.prototype.rate;
+const rateWithDefaultPolicy = wasm.FxMatrix.prototype.rateWithDefaultPolicy;
+delete wasm.FxMatrix.prototype.rateWithDefaultPolicy;
+wasm.FxMatrix.prototype.rate = function rate(base, quote, date, policy = undefined) {
+  return policy === undefined || policy === null
+    ? rateWithDefaultPolicy.call(this, base, quote, date)
+    : rateWithPolicy.call(this, base, quote, date, policy);
+};
+
 export const core = {
   Currency: wasm.Currency,
   Money: wasm.Money,

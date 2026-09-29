@@ -134,6 +134,7 @@ hunts lives below the facade (see below).
 | `analytics_period_stats.test.mjs`                          | non-finite ratio round-tripping in `Performance.periodStats`                                                                                      |
 | `plain_object_returns.test.mjs`                            | map-returning functions produce plain objects, not ES2015 `Map`s                                                                                  |
 | `boundary_input.test.mjs`                                  | wrong argument types throw `TypeError` (`kind: "invalid_type"`) without trapping or leaking; JSON inputs accept objects with unknown-field checks |
+| `core_rust_owned.test.mjs`                                 | core currency/money/date/curve behaviour owned by Rust; asserts the same values and messages as `finstack-quant-py/tests/test_core_rust_owned.py` |
 
 **These need a build.** All of them except `plain_object_returns.test.mjs` load
 the web target from `pkg/finstack_quant_wasm_bg.wasm` (Node has no fetchable

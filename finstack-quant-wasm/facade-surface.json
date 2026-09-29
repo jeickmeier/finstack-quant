@@ -290,20 +290,14 @@
       "actActAfb",
       "actActIsma",
       "bus252",
+      "calendarDays",
       "oneOne",
       "thirty360",
       "thirty360It",
       "thirtyE360",
       "thirtyE360Isda"
     ],
-    "methods": [
-      "calendarDays",
-      "free",
-      "signedYearFraction",
-      "toString",
-      "yearFraction",
-      "yearFractionWithContext"
-    ],
+    "methods": ["free", "signedYearFraction", "toString", "yearFraction"],
     "getters": []
   },
   "core.DayCountContext": {
@@ -382,7 +376,7 @@
   "core.FxMatrix": {
     "kind": "class",
     "statics": [],
-    "methods": ["free", "rate", "rateDefault", "setQuote", "setQuoteOn"],
+    "methods": ["free", "rate", "setQuote", "setQuoteOn"],
     "getters": []
   },
   "core.FxQuoteConvention": {

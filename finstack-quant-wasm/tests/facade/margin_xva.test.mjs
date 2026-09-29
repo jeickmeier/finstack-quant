@@ -39,12 +39,12 @@ await init({ module_or_path: readFileSync(WASM_BG) });
 // Flat DF = 1 out to 4y, so discounting is a no-op and the arithmetic is
 // hand-checkable.
 const flatDiscount = () =>
-  new core.DiscountCurve(
-    'USD-OIS',
-    '2025-01-01',
-    [0.0, 1.0, 1.0, 1.0, 2.0, 1.0, 3.0, 1.0, 4.0, 1.0],
-    'log_linear'
-  );
+  new core.DiscountCurve({
+    id: 'USD-OIS',
+    baseDate: '2025-01-01',
+    knots: [0.0, 1.0, 1.0, 1.0, 2.0, 1.0, 3.0, 1.0, 4.0, 1.0],
+    interp: 'log_linear',
+  });
 
 const flatHazard = (lambda) =>
   new core.HazardCurve('HZ', '2025-01-01', [0.0, lambda, 30.0, lambda], 0.4);
@@ -72,9 +72,25 @@ test('core namespace exports HazardCurve as a live constructor', () => {
 });
 
 test('HazardCurve rejects missing recovery', () => {
+  // An omitted recovery reaches the Rust builder as NaN; the message is Rust's.
   assert.throws(
     () => new core.HazardCurve('HZ', '2025-01-01', [0.0, 0.02, 30.0, 0.02]),
-    /recovery/i
+    /recovery_rate must be a decimal fraction in \[0, 1\], got NaN/
+  );
+});
+
+test('HazardCurve recovery validation is the Rust builder check, in its order', () => {
+  assert.throws(
+    () => new core.HazardCurve('HZ', '2025-01-01', [1.0, 0.01, 5.0, 0.02], 1.5),
+    (error) =>
+      error.kind === 'validation' &&
+      error.message ===
+        'Validation error: recovery_rate must be a decimal fraction in [0, 1], got 1.5'
+  );
+  // Knots are validated before recovery, exactly as in Python.
+  assert.throws(
+    () => new core.HazardCurve('HZ', '2025-01-01', [1.0, -0.02], 1.5),
+    (error) => error.kind === 'validation' && error.message === 'Values must be non-negative'
   );
 });
 

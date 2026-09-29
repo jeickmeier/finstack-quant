@@ -504,11 +504,11 @@ test('portfolio.cellReturnsFromReference rejects an astronomically large duratio
 });
 
 const flatCurveKnots = (id) =>
-  new core.DiscountCurve(
+  new core.DiscountCurve({
     id,
-    '2024-01-01',
-    [0.0, 1.0, 0.25, 0.99004983, 0.5, 0.98019867, 1.25, 0.95122942, 1.5, 0.94176453]
-  );
+    baseDate: '2024-01-01',
+    knots: [0.0, 1.0, 0.25, 0.99004983, 0.5, 0.98019867, 1.25, 0.95122942, 1.5, 0.94176453],
+  });
 
 test('portfolio.cellReturnsFromCurves reproduces the flat-curve pure-carry golden', () => {
   const start = flatCurveKnots('UST');
@@ -529,16 +529,16 @@ test('portfolio.cellReturnsFromCurves reproduces the flat-curve pure-carry golde
 // `DiscountCurve` arguments is not a no-op, unlike the pure-carry golden
 // above whose start === end.
 test('portfolio.cellReturnsFromCurves distinguishes start and end curves under rising rates', () => {
-  const start = new core.DiscountCurve(
-    'UST',
-    '2024-01-01',
-    [0.0, 1.0, 0.5, 0.98019867, 1.5, 0.94176453]
-  );
-  const end = new core.DiscountCurve(
-    'UST',
-    '2024-01-01',
-    [0.0, 1.0, 0.25, 0.9875778, 1.25, 0.93941306]
-  );
+  const start = new core.DiscountCurve({
+    id: 'UST',
+    baseDate: '2024-01-01',
+    knots: [0.0, 1.0, 0.5, 0.98019867, 1.5, 0.94176453],
+  });
+  const end = new core.DiscountCurve({
+    id: 'UST',
+    baseDate: '2024-01-01',
+    knots: [0.0, 1.0, 0.25, 0.9875778, 1.25, 0.93941306],
+  });
   const table = portfolio.cellReturnsFromCurves(
     start,
     end,
@@ -553,8 +553,8 @@ test('portfolio.cellReturnsFromCurves distinguishes start and end curves under r
 
 test('portfolio.cellReturnsFromCurves fails closed when a cell matures inside the holding period', () => {
   const knots = [0.0, 1.0, 0.25, 0.99004983, 0.5, 0.98019867];
-  const start = new core.DiscountCurve('UST', '2024-01-01', knots);
-  const end = new core.DiscountCurve('UST', '2024-01-01', knots);
+  const start = new core.DiscountCurve({ id: 'UST', baseDate: '2024-01-01', knots });
+  const end = new core.DiscountCurve({ id: 'UST', baseDate: '2024-01-01', knots });
   assert.throws(() =>
     portfolio.cellReturnsFromCurves(start, end, 0.25, 0.5, 'UST', JSON.stringify({ width: 0.25 }))
   );

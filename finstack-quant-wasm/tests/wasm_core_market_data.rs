@@ -67,46 +67,36 @@ fn forward_curve_projection_grid_and_rate_between() {
     assert_eq!(curve.reset_lag(), 3);
 }
 
+/// `DiscountCurve` options object built from JSON text.
+fn discount_options(options: serde_json::Value) -> JsValue {
+    js_sys::JSON::parse(&options.to_string()).expect("valid options")
+}
+
 #[wasm_bindgen_test]
 fn discount_curve_negative_rate_validation_mode_is_explicit() {
-    assert!(JsDiscountCurve::new(
-        JsValue::from("CHF-OIS"),
-        JsValue::from("2025-01-01"),
-        &[0.0, 1.0, 1.0, 1.002],
-        None,
-        None,
-        None,
-        None,
-        None,
-    )
-    .is_err());
+    let chf = serde_json::json!({
+        "id": "CHF-OIS",
+        "baseDate": "2025-01-01",
+        "knots": [0.0, 1.0, 1.0, 1.002],
+    });
+    assert!(JsDiscountCurve::new(discount_options(chf.clone())).is_err());
 
-    let curve = JsDiscountCurve::new(
-        JsValue::from("CHF-OIS"),
-        JsValue::from("2025-01-01"),
-        &[0.0, 1.0, 1.0, 1.002],
-        None,
-        None,
-        None,
-        Some(JsValue::from("negative_rate_friendly".to_string())),
-        Some(-0.01),
-    )
-    .expect("negative-rate-friendly curve");
+    let mut friendly = chf.clone();
+    friendly["validationMode"] = "negative_rate_friendly".into();
+    friendly["forwardFloor"] = (-0.01).into();
+    let curve = JsDiscountCurve::new(discount_options(friendly.clone()))
+        .expect("negative-rate-friendly curve");
     assert!(curve.forward(0.0, 1.0).expect("negative forward") < 0.0);
 
-    for floor in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
-        assert!(JsDiscountCurve::new(
-            JsValue::from("CHF-OIS"),
-            JsValue::from("2025-01-01"),
-            &[0.0, 1.0, 1.0, 1.002],
-            None,
-            None,
-            None,
-            Some(JsValue::from("negative_rate_friendly".to_string())),
-            Some(floor),
-        )
-        .is_err());
-    }
+    // A non-finite floor cannot reach Rust through JSON; a floor without the
+    // negative-rate preset is rejected by `ValidationMode::from_preset`.
+    let mut stray_floor = chf.clone();
+    stray_floor["forwardFloor"] = (-0.01).into();
+    assert!(JsDiscountCurve::new(discount_options(stray_floor)).is_err());
+
+    let mut unknown_key = friendly;
+    unknown_key["forward_floor"] = (-0.01).into();
+    assert!(JsDiscountCurve::new(discount_options(unknown_key)).is_err());
 }
 
 #[wasm_bindgen_test]
@@ -117,7 +107,7 @@ fn fx_matrix_rate_defaults_policy_to_cashflow_date() {
         .unwrap();
 
     let result = matrix
-        .rate_default(
+        .rate_with_default_policy(
             JsValue::from("GBP"),
             JsValue::from("USD"),
             JsValue::from("2024-01-02"),
@@ -211,7 +201,10 @@ fn fx_delta_vol_surface_rejects_mixed_10d_arguments() {
                 .ok()
                 .and_then(|k| k.as_string())
                 .unwrap_or_default();
-            assert!(msg.contains("rr10d"), "unexpected error message: {msg}");
+            assert!(
+                msg.contains("rr_10d and bf_10d must both be provided or both omitted"),
+                "unexpected error message: {msg}"
+            );
             assert_eq!(kind, "validation");
         }
     }
@@ -251,12 +244,16 @@ fn day_count_context_supports_context_dependent_conventions() {
     let end = create_date(JsValue::from(2024), JsValue::from(7), JsValue::from(1)).unwrap();
 
     assert!(JsDayCount::act_act_isma()
-        .year_fraction(JsValue::from(start), JsValue::from(end))
+        .year_fraction(
+            JsValue::from(start),
+            JsValue::from(end),
+            &JsDayCountContext::new()
+        )
         .is_err());
 
     let isma_ctx = JsDayCountContext::new().with_frequency(&JsTenor::semi_annual());
     let isma = JsDayCount::act_act_isma()
-        .year_fraction_with_context(JsValue::from(start), JsValue::from(end), &isma_ctx)
+        .year_fraction(JsValue::from(start), JsValue::from(end), &isma_ctx)
         .unwrap();
     assert!((isma - 0.5).abs() < 1e-12);
 
@@ -264,7 +261,7 @@ fn day_count_context_supports_context_dependent_conventions() {
         .with_calendar(JsValue::from("target2"))
         .expect("context");
     let bus = JsDayCount::bus252()
-        .year_fraction_with_context(JsValue::from(start), JsValue::from(end), &bus_ctx)
+        .year_fraction(JsValue::from(start), JsValue::from(end), &bus_ctx)
         .unwrap();
     assert!(bus > 0.0);
 }
@@ -275,13 +272,21 @@ fn day_count_exposes_act365l_and_signed_fraction() {
     let end = create_date(JsValue::from(2025), JsValue::from(1), JsValue::from(1)).unwrap();
     assert_eq!(
         JsDayCount::act365l()
-            .signed_year_fraction(JsValue::from(start), JsValue::from(end))
+            .signed_year_fraction(
+                JsValue::from(start),
+                JsValue::from(end),
+                &JsDayCountContext::new()
+            )
             .unwrap(),
         1.0
     );
     assert_eq!(
         JsDayCount::act365l()
-            .signed_year_fraction(JsValue::from(end), JsValue::from(start))
+            .signed_year_fraction(
+                JsValue::from(end),
+                JsValue::from(start),
+                &JsDayCountContext::new()
+            )
             .unwrap(),
         -1.0
     );
@@ -289,16 +294,11 @@ fn day_count_exposes_act365l_and_signed_fraction() {
 
 #[wasm_bindgen_test]
 fn discount_curve_new_and_accessors() {
-    let curve = JsDiscountCurve::new(
-        JsValue::from("USD-OIS"),
-        JsValue::from("2024-01-15"),
-        &[0.5, 0.99, 1.0, 0.98, 2.0, 0.96],
-        None,
-        None,
-        None,
-        None,
-        None,
-    )
+    let curve = JsDiscountCurve::new(discount_options(serde_json::json!({
+        "id": "USD-OIS",
+        "baseDate": "2024-01-15",
+        "knots": [0.5, 0.99, 1.0, 0.98, 2.0, 0.96],
+    })))
     .expect("discount curve");
     assert_eq!(curve.id(), "USD-OIS");
     assert_eq!(curve.base_date(), "2024-01-15");
@@ -326,7 +326,7 @@ fn fx_matrix_quote_and_rate() {
     m.set_quote(JsValue::from("USD"), JsValue::from("EUR"), 0.92)
         .expect("set quote");
     let r = m
-        .rate_default(
+        .rate_with_default_policy(
             JsValue::from("USD"),
             JsValue::from("EUR"),
             JsValue::from("2024-01-15"),

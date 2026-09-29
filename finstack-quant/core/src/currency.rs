@@ -70,8 +70,11 @@
 //! let currency = "eur".parse::<Currency>().expect("Currency parsing should succeed");
 //! assert_eq!(currency, Currency::EUR);
 //!
-//! // Invalid codes return error
-//! assert!("XXX".parse::<Currency>().is_err());
+//! // Invalid codes return an error naming the rejected text; surrounding
+//! // whitespace is not trimmed.
+//! let err = "XXX".parse::<Currency>().expect_err("XXX is not a deliverable currency");
+//! assert!(err.to_string().contains("\"XXX\""));
+//! assert!(" USD ".parse::<Currency>().is_err());
 //! ```
 //!
 //! ## Converting between representations
@@ -111,6 +114,19 @@
 // Generated enum (ISO-4217), included by path so IDEs (`rust-analyzer`) can
 // parse it for auto-completion and navigation.
 include!("generated/currency_generated.rs");
+
+/// Parse-error constructor wired into the generated `FromStr` derive.
+///
+/// This is the only currency-text parser: `FromStr`, `TryFrom<&str>` and
+/// every host binding go through it, so a bad code always reports
+/// [`InputError::UnknownCurrency`](crate::error::InputError::UnknownCurrency)
+/// naming the rejected text.
+fn unknown_currency_code(code: &str) -> crate::Error {
+    crate::error::InputError::UnknownCurrency {
+        code: code.to_string(),
+    }
+    .into()
+}
 
 impl Currency {
     /// ISO-4217 decimal precision for this currency (e.g. USD → 2).
@@ -228,6 +244,24 @@ mod tests {
         assert!("INVALID".parse::<Currency>().is_err());
         assert!("XXX".parse::<Currency>().is_err());
         assert!("".parse::<Currency>().is_err());
+    }
+
+    #[test]
+    fn test_currency_parse_error_names_code_and_does_not_trim() {
+        use crate::error::{ErrorKind, InputError};
+        for code in [" USD ", "USD\n", "XXX", "é€x"] {
+            let err = code.parse::<Currency>().expect_err("rejected code");
+            assert_eq!(err.kind(), ErrorKind::Validation);
+            assert_eq!(
+                err,
+                crate::Error::Input(InputError::UnknownCurrency {
+                    code: code.to_string()
+                })
+            );
+            assert!(err.to_string().starts_with("Invalid currency code"));
+            assert!(err.to_string().contains(&format!("{code:?}")));
+        }
+        assert_eq!(Currency::try_from("eur"), Ok(Currency::EUR));
     }
 
     #[test]

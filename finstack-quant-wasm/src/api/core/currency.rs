@@ -31,9 +31,11 @@ impl JsCurrency {
     /// Parse a case-insensitive ISO-4217 alphabetic currency code.
     ///
     /// @param code - Three-letter ISO-4217 code (e.g. `"USD"`, `"eur"`,
-    /// `"GBP"`). Leading and trailing whitespace is trimmed.
+    /// `"GBP"`). Case-insensitive; surrounding whitespace is not trimmed.
     /// @returns Constructed `Currency`.
-    /// @throws If `code` is not a recognized ISO-4217 alphabetic code.
+    /// @throws `TypeError` (kind `invalid_type`) if `code` is not a string;
+    /// `FinstackError` (kind `validation`) naming the rejected text if it is not
+    /// a supported ISO-4217 alphabetic code (e.g. `" USD "`).
     ///
     /// @example
     /// ```javascript
@@ -43,7 +45,7 @@ impl JsCurrency {
     #[wasm_bindgen(constructor)]
     pub fn new(code: JsValue) -> Result<JsCurrency, JsValue> {
         let code = crate::utils::input::js_string(&code, "code")?;
-        RustCurrency::from_str(code.trim())
+        RustCurrency::from_str(&code)
             .map(|inner| JsCurrency { inner })
             .map_err(to_js_err)
     }
@@ -61,7 +63,7 @@ impl JsCurrency {
     /// @returns Numeric code (e.g. `840` for USD, `978` for EUR).
     #[wasm_bindgen(getter, js_name = numeric)]
     pub fn numeric(&self) -> u16 {
-        self.inner as u16
+        self.inner.numeric()
     }
 
     /// Number of decimal places (minor units) for this currency.
@@ -162,10 +164,10 @@ mod tests {
     }
 
     #[test]
-    fn whitespace_trimmed() {
-        // JsCurrency::new trims, so "  USD  " should succeed
+    fn whitespace_is_not_trimmed() {
+        // `Currency` construction is the Rust parser: untrimmed text is rejected.
         use std::str::FromStr;
-        assert!(RustCurrency::from_str("USD").is_ok());
+        assert!(RustCurrency::from_str("  USD  ").is_err());
     }
 
     #[test]

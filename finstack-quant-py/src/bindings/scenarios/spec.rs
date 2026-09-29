@@ -19,13 +19,11 @@ fn enum_label<T: serde::Serialize>(value: &T) -> PyResult<String> {
 fn parse_resolution_mode(
     value: &str,
 ) -> PyResult<finstack_quant_core::market_data::hierarchy::ResolutionMode> {
-    serde_json::from_value(serde_json::Value::String(value.to_string()))
-        .map_err(|error| crate::errors::value_error(format!("resolution_mode: {error}")))
+    finstack_quant_core::wire::serde_parse(value).map_err(crate::errors::core_to_py)
 }
 
 fn parse_hazard_bump_mode(value: &str) -> PyResult<finstack_quant_scenarios::HazardBumpMode> {
-    serde_json::from_value(serde_json::Value::String(value.to_string()))
-        .map_err(|error| crate::errors::value_error(format!("hazard_bump_mode: {error}")))
+    finstack_quant_core::wire::serde_parse(value).map_err(crate::errors::core_to_py)
 }
 
 /// Validated scenario specification executed by the scenario engine.

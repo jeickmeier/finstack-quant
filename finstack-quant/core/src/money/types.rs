@@ -670,8 +670,9 @@ impl Money {
     ///
     /// # Errors
     ///
-    /// Returns `InputError::Invalid` for a zero scalar,
-    /// `InputError::NonFiniteValue` for NaN or infinity, or
+    /// Returns `Error::Validation("division by zero")` for a zero scalar
+    /// (the same error [`Self::checked_div`] reports for a zero `Money`
+    /// divisor), `InputError::NonFiniteValue` for NaN or infinity, or
     /// `InputError::ConversionOverflow` when the quotient is out of range.
     ///
     /// # Arguments
@@ -1133,8 +1134,23 @@ mod tests {
 
         assert!(money.checked_mul_f64(f64::NAN).is_err());
         assert!(money.checked_mul_f64(f64::INFINITY).is_err());
-        assert!(money.checked_div_f64(0.0).is_err());
         assert!(money.checked_div_f64(f64::NEG_INFINITY).is_err());
+        // A zero scalar and a zero `Money` divisor report the same error.
+        let zero = Money::from((0_i64, Currency::USD));
+        let division_by_zero = Err(Error::Validation("division by zero".into()));
+        assert_eq!(money.checked_div_f64(0.0).map(|_| ()), division_by_zero);
+        assert_eq!(money.checked_div_f64(-0.0).map(|_| ()), division_by_zero);
+        assert_eq!(money.checked_div(zero).map(|_| ()), division_by_zero);
+    }
+
+    #[test]
+    fn checked_neg_is_exact_and_keeps_scale() {
+        let exact = Money::from_decimal_str("1.2500", Currency::USD).expect("exact");
+        let negated = exact.checked_neg();
+        assert_eq!(negated.amount_decimal().to_string(), "-1.2500");
+        assert_eq!(negated.checked_neg(), exact);
+        let tiny = Money::from_decimal_str("1e-27", Currency::USD).expect("exact");
+        assert_eq!(tiny.checked_neg().amount_decimal(), -tiny.amount_decimal());
     }
 
     #[test]

@@ -93,7 +93,14 @@ The facade is mostly a re-export map, but not purely: `exports/valuations.js`
 `JSON.stringify`s object arguments for the calibration entry points, and
 `exports/portfolio.js` rebinds `Portfolio.fromMaterialization` /
 `Portfolio.validateMaterialization` to inject an ephemeral
-`InstrumentArtifactCache` when the caller omits one. Check the facade before
+`InstrumentArtifactCache` when the caller omits one. `exports/core.js` likewise
+makes the context of `DayCount.yearFraction` / `signedYearFraction` optional
+(the raw methods require a `DayCountContext`; the facade passes the Rust-default
+`new DayCountContext()`), and folds the raw `FxMatrix.rateWithDefaultPolicy`
+(`FxQuery::new`) into `rate(base, quote, date, policy?)`, deleting that name
+from the public prototype. wasm-bindgen cannot take an optional handle by
+reference (and a by-value `Option<Handle>` consumes the caller's object), so
+optional handle arguments are completed here. Check the facade before
 assuming a JS signature equals the Rust one.
 
 `index.d.ts` is hand-maintained and is the authoritative published contract. A new

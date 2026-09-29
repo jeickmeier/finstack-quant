@@ -18,8 +18,18 @@ const materializationParseNanos: number = materializationPhases.parse;
 const materializationTimingAvailable: boolean = materializationReport.timing_available;
 const materializationDependencies: number = materializationReport.dependencies;
 
-const discountFromArray = new core.DiscountCurve('USD-OIS', '2025-01-01', numberValues);
-const discountFromTyped = new core.DiscountCurve('USD-OIS-TYPED', '2025-01-01', typedValues);
+const discountFromArray = new core.DiscountCurve({
+  id: 'USD-OIS',
+  baseDate: '2025-01-01',
+  knots: numberValues,
+});
+const discountFromTyped = new core.DiscountCurve({
+  id: 'USD-OIS-TYPED',
+  baseDate: '2025-01-01',
+  knots: typedValues,
+  validationMode: 'negative_rate_friendly',
+  forwardFloor: -0.01,
+});
 
 const forwardFromArray = new core.ForwardCurve({
   id: 'USD-SOFR-3M',

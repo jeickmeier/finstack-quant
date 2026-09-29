@@ -102,7 +102,7 @@ impl PyDiscountCurve {
         clippy::too_many_arguments,
         reason = "keyword-only curve options mirror the Rust builder setters"
     )]
-    #[pyo3(signature = (id, base_date, knots, *, interp=None, extrapolation=None, day_count=None, validation_mode="market_standard", forward_floor=None))]
+    #[pyo3(signature = (id, base_date, knots, *, interp=None, extrapolation=None, day_count=None, validation_mode=None, forward_floor=None))]
     fn new(
         id: &str,
         base_date: &Bound<'_, PyAny>,
@@ -110,7 +110,7 @@ impl PyDiscountCurve {
         interp: Option<&str>,
         extrapolation: Option<&str>,
         day_count: Option<&str>,
-        validation_mode: &str,
+        validation_mode: Option<&str>,
         forward_floor: Option<f64>,
     ) -> PyResult<Self> {
         let base = py_to_date(base_date)?;

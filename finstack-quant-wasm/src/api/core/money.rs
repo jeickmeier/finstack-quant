@@ -169,16 +169,17 @@ impl JsMoney {
             .map_err(to_js_err)
     }
 
-    /// Negate the monetary amount.
+    /// Negate the monetary amount (Rust `Money::checked_neg`).
+    ///
+    /// Negation is exact on the stored `Decimal`, keeps its scale and never
+    /// passes through `f64`, so it cannot fail.
     ///
     /// @returns Negated amount in the same currency.
-    /// @throws If the negation is not representable as a `Decimal`.
     #[wasm_bindgen(js_name = negate)]
-    pub fn negate(&self) -> Result<JsMoney, JsValue> {
-        self.inner
-            .checked_mul_f64(-1.0)
-            .map(|inner| JsMoney { inner })
-            .map_err(to_js_err)
+    pub fn negate(&self) -> JsMoney {
+        JsMoney {
+            inner: self.inner.checked_neg(),
+        }
     }
 
     /// Format the amount with explicit display options.
@@ -188,8 +189,9 @@ impl JsMoney {
     /// single-character thousands separator (e.g. `","`); `null`/`undefined`
     /// disables grouping. `rounding` accepts the canonical mode names
     /// (`"bankers"`, `"away_from_zero"`, `"toward_zero"`, `"floor"`,
-    /// `"ceil"`); `null`/`undefined` selects bankers rounding. Formatting
-    /// never mutates the stored amount.
+    /// `"ceil"`; case-sensitive); `null`/`undefined` selects the Rust default
+    /// (`RoundingMode::default()`, bankers). Formatting never mutates the
+    /// stored amount.
     ///
     /// # Arguments
     ///
@@ -197,7 +199,8 @@ impl JsMoney {
     ///   `0..=1_000_000`; null or undefined selects ISO minor units.
     /// * `show_currency` - Whether to prepend the ISO code; omitted means true.
     /// * `group` - Optional single-character thousands separator; omitted means no grouping.
-    /// * `rounding` - Canonical lowercase rounding mode; omitted means bankers.
+    /// * `rounding` - Canonical lowercase rounding mode; omitted selects the
+    ///   Rust default (bankers).
     ///
     /// @returns Formatted amount such as `"USD 1,234.57"`.
     /// @throws If `decimals` is not a non-negative integer or exceeds 1,000,000, if `group` is not a single character, or if `rounding` is not a recognised mode name.
@@ -234,9 +237,8 @@ impl JsMoney {
             }
         };
         let rounding = match rounding {
-            Some(mode) => serde_json::from_value::<RoundingMode>(serde_json::Value::String(mode))
-                .map_err(to_js_err)?,
-            None => RoundingMode::Bankers,
+            Some(mode) => mode.parse::<RoundingMode>().map_err(to_js_err)?,
+            None => RoundingMode::default(),
         };
         let opts = FormatOpts::new(decimals, show_currency.unwrap_or(true), group, rounding)
             .map_err(to_js_err)?;
@@ -286,7 +288,7 @@ impl JsMoney {
     /// # Arguments
     ///
     /// * `amount` - Exact fixed-point or scientific decimal text in major currency units.
-    /// * `currency` - Case-insensitive ISO-4217 code; surrounding whitespace is trimmed.
+    /// * `currency` - Case-insensitive ISO-4217 code; surrounding whitespace is not trimmed.
     ///
     /// @returns The constructed `Money`.
     /// @throws If `amount` is malformed, non-finite, needs more precision than `Decimal` can hold, or underflows its supported scale; or if `currency` is not a recognised code.
@@ -304,7 +306,7 @@ impl JsMoney {
     pub fn from_decimal_str(amount: JsValue, currency: JsValue) -> Result<JsMoney, JsValue> {
         let amount: &str = &js_string(&amount, "amount")?;
         let currency: &str = &js_string(&currency, "currency")?;
-        let ccy = currency.trim().parse::<Currency>().map_err(to_js_err)?;
+        let ccy = currency.parse::<Currency>().map_err(to_js_err)?;
         RustMoney::from_decimal_str(amount, ccy)
             .map(|inner| JsMoney { inner })
             .map_err(to_js_err)
@@ -364,7 +366,7 @@ mod tests {
     #[test]
     fn negate() {
         let m = JsMoney::new(10.0, &usd()).expect("valid");
-        let neg = m.negate().expect("negate");
+        let neg = m.negate();
         assert!((neg.amount() + 10.0).abs() < 1e-10);
     }
 
@@ -405,9 +407,19 @@ mod tests {
     }
 
     #[test]
-    fn negate_zero() {
-        let m = JsMoney::new(0.0, &usd()).expect("valid");
-        let neg = m.negate().expect("negate");
-        assert!(neg.amount().abs() < 1e-12);
+    fn negate_is_the_rust_checked_neg() {
+        for inner in [
+            RustMoney::new(0.0, finstack_quant_core::currency::Currency::USD).expect("zero"),
+            RustMoney::from_decimal_str("0.00", finstack_quant_core::currency::Currency::USD)
+                .expect("scaled zero"),
+            RustMoney::from_decimal_str("1e-27", finstack_quant_core::currency::Currency::USD)
+                .expect("tiny"),
+        ] {
+            let neg = JsMoney { inner }.negate();
+            assert_eq!(
+                neg.to_json().expect("json"),
+                serde_json::to_string(&inner.checked_neg()).expect("json")
+            );
+        }
     }
 }

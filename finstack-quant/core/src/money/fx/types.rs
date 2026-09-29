@@ -89,6 +89,57 @@ impl FxQuery {
     }
 }
 
+/// An ordered `base/quote` currency pair parsed from host text.
+///
+/// [`FromStr`](std::str::FromStr) accepts the slash form `"EUR/USD"` and the
+/// six-letter compact form `"EURUSD"`. Each half parses with [`Currency`]'s
+/// case-insensitive, non-trimming parser, so a bad half reports the code it
+/// rejected. Orientation is kept: a quote on the pair means
+/// `1 base = rate quote`.
+///
+/// # Examples
+/// ```
+/// use finstack_quant_core::currency::Currency;
+/// use finstack_quant_core::money::fx::CurrencyPair;
+///
+/// let pair: CurrencyPair = "eur/usd".parse().expect("slash form");
+/// assert_eq!((pair.base, pair.quote), (Currency::EUR, Currency::USD));
+/// assert_eq!("GBPJPY".parse::<CurrencyPair>().expect("compact form").quote, Currency::JPY);
+/// assert!("EURUS".parse::<CurrencyPair>().is_err());
+/// ```
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub struct CurrencyPair {
+    /// Base (from) currency: one unit of it is worth `rate` quote units.
+    pub base: Currency,
+    /// Quote (to) currency in which the rate is expressed.
+    pub quote: Currency,
+}
+
+impl std::str::FromStr for CurrencyPair {
+    type Err = crate::Error;
+
+    /// Parse `"EUR/USD"` or `"EURUSD"`.
+    ///
+    /// The compact form is split after the third character only when the text
+    /// is exactly six ASCII characters, so multi-byte input is rejected rather
+    /// than sliced inside a character.
+    fn from_str(s: &str) -> crate::Result<Self> {
+        let (base, quote) = match s.split_once('/') {
+            Some(halves) => halves,
+            None if s.len() == 6 && s.is_ascii() => s.split_at(3),
+            None => {
+                return Err(crate::Error::Validation(format!(
+                    "invalid FX pair {s:?}: expected \"EURUSD\" or \"EUR/USD\""
+                )))
+            }
+        };
+        Ok(Self {
+            base: base.parse()?,
+            quote: quote.parse()?,
+        })
+    }
+}
+
 /// Metadata describing the policy applied by the provider.
 ///
 /// Attach [`FxPolicyMeta`] to valuation results so auditors can understand how

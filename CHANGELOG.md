@@ -2,6 +2,34 @@
 
 ## [Unreleased]
 
+### WASM binding audit: core primitives, dates and market data (2026-09-29)
+
+#### Changed (BREAKING)
+
+- Currency codes are parsed by one Rust parser that does not trim. `" USD "` is rejected in both hosts, including by WASM `new Currency`, `Money.fromDecimalStr` and Python `Money(1, " usd ")`. The error names the code: `Invalid currency code "<code>": not a supported ISO-4217 alphabetic code`.
+  - Rust: `Currency: FromStr` now returns `core::Error` (was `strum::ParseError`), `TryFrom<&str>` is derived, and `InputError::UnknownCurrency` carries `code`.
+- Python `Money(" 100.25 ", "USD")` is rejected (the amount parser no longer trims).
+- `RoundingMode: FromStr` returns `core::Error` and accepts only the serde names. Both bindings parse rounding and scenario modes with it and take their defaults from Rust.
+- A zero scalar divisor for `Money` is `Validation error: division by zero` in both hosts. The Python pre-check is gone.
+- `realized_variance` and `realized_variance_ohlc` take `Option` for the method and annualization factor. The defaults are CloseToClose and `RealizedVarMethod::OHLC_DEFAULT` (YangZhang), and the factor defaults to 252 via `PeriodKind::Daily`. Python passes `None` through, and its default values are unchanged.
+- `FxDeltaVolSurface::new` takes `rr_10d` and `bf_10d` as two `Option`s, and Rust `validate` owns the pairing rule.
+- `ValidationMode::from_preset` takes `Option<&str>`.
+- `FxForward::from_trade_date` takes `Option<BusinessDayConvention>`; `None` is the Rust default.
+- Every Python valuations business-day-convention string goes through the Rust `FromStr`, so the short codes (`MF`, `F`, `P`, `MP`, `NONE`) are accepted everywhere.
+- WASM API:
+  - `new DiscountCurve({ id, baseDate, knots, interp?, extrapolation?, dayCount?, validationMode?, forwardFloor? })` takes a strict options object or JSON string instead of eight positional arguments.
+  - `DayCount.yearFraction(start, end, ctx?)` and `signedYearFraction(start, end, ctx?)` replace `yearFractionWithContext`.
+  - `DayCount.calendarDays(start, end)` is static.
+  - `FxMatrix.rate(base, quote, date, policy?)` replaces `rateDefault`.
+  - `Money.negate()` no longer throws (it uses `Money::checked_neg`).
+- The WASM `HazardCurve` constructor no longer pre-checks the recovery rate. Validation order and messages come from the Rust builder (knots first, then recovery).
+- Python `VolCube` SABR node dicts are decoded by the Rust `SabrParameterData` serde contract, so unknown or missing keys are rejected.
+
+#### Added
+
+- `core::money::fx::CurrencyPair` with a character-safe `FromStr` (`"EUR/USD"` or `"EURUSD"`). Python `FxMatrix.from_dict` uses it, so a malformed key raises `ValueError` instead of panicking.
+- `DayCountContextState: Default`.
+
 ### WASM binding audit: wasm32 size safety (2026-09-29)
 
 #### Changed (BREAKING)

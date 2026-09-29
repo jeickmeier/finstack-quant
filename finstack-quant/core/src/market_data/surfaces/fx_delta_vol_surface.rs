@@ -46,6 +46,7 @@ use crate::{error::InputError, types::CurveId};
 ///     vec![0.01, 0.012, 0.015],
 ///     vec![0.005, 0.006, 0.007],
 ///     None,
+///     None,
 /// ).expect("surface should build");
 ///
 /// assert_eq!(surface.num_expiries(), 3);
@@ -137,28 +138,28 @@ impl FxDeltaVolSurface {
     ///   (decimal, strictly positive).
     /// * `rr_25d` - 25-delta risk reversal per expiry (decimal vol difference).
     /// * `bf_25d` - 25-delta butterfly per expiry (decimal vol difference).
-    /// * `wings_10d` - Optional `(rr_10d, bf_10d)` pair adding 10-delta risk
-    ///   reversal and butterfly quotes per expiry; `None` builds a
-    ///   three-point (ATM/25d) smile.
+    /// * `rr_10d` - Optional 10-delta risk reversal per expiry (decimal vol
+    ///   difference). Must be supplied together with `bf_10d`; omit both to
+    ///   build a three-point (ATM/25d) smile.
+    /// * `bf_10d` - Optional 10-delta butterfly per expiry (decimal vol
+    ///   difference). Must be supplied together with `rr_10d`.
     ///
     /// # Errors
     ///
-    /// Returns an error if any quote vector is empty or has a length different
-    /// from `expiries`, expiries are non-positive, non-finite, or not strictly
-    /// increasing, ATM volatilities are non-positive or non-finite, or any
-    /// risk-reversal or butterfly quote is non-finite.
+    /// Returns an error if exactly one of `rr_10d` / `bf_10d` is supplied, any
+    /// quote vector is empty or has a length different from `expiries`,
+    /// expiries are non-positive, non-finite, or not strictly increasing, ATM
+    /// volatilities are non-positive or non-finite, or any risk-reversal or
+    /// butterfly quote is non-finite.
     pub fn new(
         id: impl Into<CurveId>,
         expiries: Vec<f64>,
         atm_vols: Vec<f64>,
         rr_25d: Vec<f64>,
         bf_25d: Vec<f64>,
-        wings_10d: Option<(Vec<f64>, Vec<f64>)>,
+        rr_10d: Option<Vec<f64>>,
+        bf_10d: Option<Vec<f64>>,
     ) -> crate::Result<Self> {
-        let (rr_10d, bf_10d) = match wings_10d {
-            Some((rr, bf)) => (Some(rr), Some(bf)),
-            None => (None, None),
-        };
         Self::validate(
             &expiries,
             &atm_vols,

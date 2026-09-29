@@ -649,9 +649,9 @@ impl PyRebalanceRule {
                 .transpose()?,
             frequency: crate::bindings::core::dates::tenor::extract_tenor(frequency)?,
             calendar_id: calendar_id.to_string(),
-            business_day_convention: super::instruments::enum_from_str(
+            business_day_convention: super::convert::bdc_from_str(
                 business_day_convention,
-                "business-day convention",
+                "business_day_convention",
             )?,
         };
         inner.validate().map_err(core_to_py)?;

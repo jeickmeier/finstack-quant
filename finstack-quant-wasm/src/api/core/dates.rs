@@ -11,24 +11,11 @@ use wasm_bindgen::prelude::*;
 
 /// Optional context for day-count conventions that need market metadata.
 #[wasm_bindgen(js_name = DayCountContext)]
-#[derive(Clone)]
+#[derive(Clone, Default)]
 pub struct JsDayCountContext {
-    /// Serializable state; the live calendar is resolved on each use.
+    /// Serializable state (`DayCountContextState::default()` when empty); the
+    /// live calendar is resolved on each use.
     pub(crate) inner: DayCountContextState,
-}
-
-impl Default for JsDayCountContext {
-    fn default() -> Self {
-        Self {
-            inner: DayCountContextState {
-                calendar_id: None,
-                frequency: None,
-                bus_basis: None,
-                coupon_period: None,
-                end_is_termination_date: false,
-            },
-        }
-    }
 }
 
 impl JsDayCountContext {
@@ -45,7 +32,10 @@ impl JsDayCountContext {
 
 #[wasm_bindgen(js_class = DayCountContext)]
 impl JsDayCountContext {
-    /// Create an empty day-count context.
+    /// Create an empty day-count context (Rust `DayCountContextState::default()`).
+    ///
+    /// `DayCount.yearFraction` / `signedYearFraction` use this context when
+    /// none is passed.
     #[wasm_bindgen(constructor)]
     pub fn new() -> JsDayCountContext {
         JsDayCountContext::default()
@@ -102,12 +92,15 @@ impl JsDayCountContext {
     ) -> Result<JsDayCountContext, JsValue> {
         let start = js_epoch_days(&start_epoch_days, "startEpochDays")?;
         let end = js_epoch_days(&end_epoch_days, "endEpochDays")?;
-        let validated = RustDayCountContext::default()
-            .with_coupon_period(start, end)
-            .map_err(to_js_err)?;
-        let mut next = self.clone();
-        next.inner.coupon_period = validated.coupon_period;
-        Ok(next)
+        let inner = DayCountContextState::try_new(
+            self.inner.calendar_id.clone(),
+            self.inner.frequency,
+            self.inner.bus_basis,
+            Some((start, end)),
+            self.inner.end_is_termination_date,
+        )
+        .map_err(to_js_err)?;
+        Ok(JsDayCountContext { inner })
     }
 
     /// Return a copy indicating whether the accrual end is the instrument's
@@ -284,16 +277,25 @@ impl JsDayCount {
         }
     }
 
-    /// Compute the year fraction between two dates given as epoch days.
+    /// Compute the year fraction between two dates given as epoch days
+    /// (Rust `DayCount::year_fraction(start, end, ctx)`).
+    ///
+    /// The published facade makes `ctx` optional: an omitted context is the
+    /// empty Rust default (`new DayCountContext()`). Act/Act ISMA needs a
+    /// context frequency (or coupon period) and Bus/252 a context calendar;
+    /// both throw without them.
     ///
     /// @param startEpochDays - Start date as days since 1970-01-01.
-    /// @param endEpochDays - End date as days since 1970-01-01.
-    /// @returns Year fraction (`>= 0` if `end >= start`).
-    /// @throws If either date is out of representable range.
-    ///
-    /// Act/Act ISMA and Bus/252 require explicit frequency/calendar context.
-    /// This method throws for those conventions; call
-    /// `DayCount.yearFractionWithContext` with a configured `DayCountContext`.
+    /// @param endEpochDays - End date as days since 1970-01-01; must not be
+    /// before the start.
+    /// @param ctx - DayCountContext supplying calendar, frequency, coupon-period
+    /// and termination metadata; omitted means the empty default context.
+    /// @returns Non-negative year fraction in years under the convention and context.
+    /// @throws `TypeError` (kind `invalid_type`) if a date is not an integer
+    /// epoch-day number; `FinstackError` (kind `validation`) if a date is out
+    /// of range, the start is after the end, or the convention's required
+    /// context is missing or invalid; kind `not_found` if the context names an
+    /// unknown calendar.
     ///
     /// @example
     /// ```javascript
@@ -307,53 +309,6 @@ impl JsDayCount {
         &self,
         start_epoch_days: JsValue,
         end_epoch_days: JsValue,
-    ) -> Result<f64, JsValue> {
-        let start = crate::utils::input::js_epoch_days(&start_epoch_days, "startEpochDays")?;
-        let end = crate::utils::input::js_epoch_days(&end_epoch_days, "endEpochDays")?;
-        self.inner
-            .year_fraction(start, end, RustDayCountContext::default())
-            .map_err(to_js_err)
-    }
-
-    /// Compute a signed year fraction, preserving the start/end orientation.
-    /// @param start_epoch_days - Start date as days since 1970-01-01.
-    /// @param end_epoch_days - End date as days since 1970-01-01.
-    ///
-    /// # Errors
-    ///
-    /// Throws a JavaScript exception if either epoch-day value is outside the
-    /// representable date range or the selected convention requires calendar or
-    /// coupon-frequency context. Use `yearFractionWithContext` for Bus/252 and
-    /// Act/Act ISMA.
-    #[wasm_bindgen(js_name = signedYearFraction)]
-    pub fn signed_year_fraction(
-        &self,
-        start_epoch_days: JsValue,
-        end_epoch_days: JsValue,
-    ) -> Result<f64, JsValue> {
-        let start = js_epoch_days(&start_epoch_days, "startEpochDays")?;
-        let end = js_epoch_days(&end_epoch_days, "endEpochDays")?;
-        self.inner
-            .signed_year_fraction(start, end, RustDayCountContext::default())
-            .map_err(to_js_err)
-    }
-
-    /// Compute the year fraction with explicit convention context.
-    /// @param start_epoch_days - Start date as days since 1970-01-01.
-    /// @param end_epoch_days - End date as days since 1970-01-01.
-    /// @param ctx - DayCountContext supplying calendar, frequency, coupon-period, and termination metadata.
-    ///
-    /// # Errors
-    ///
-    /// Throws a JavaScript exception if either epoch-day value is outside the
-    /// representable date range, the start is after the end, the context names an
-    /// unknown calendar, or the selected convention's required context is missing
-    /// or invalid.
-    #[wasm_bindgen(js_name = yearFractionWithContext)]
-    pub fn year_fraction_with_context(
-        &self,
-        start_epoch_days: JsValue,
-        end_epoch_days: JsValue,
         ctx: &JsDayCountContext,
     ) -> Result<f64, JsValue> {
         let start = js_epoch_days(&start_epoch_days, "startEpochDays")?;
@@ -363,7 +318,39 @@ impl JsDayCount {
             .map_err(to_js_err)
     }
 
-    /// Count the calendar days between two dates (epoch days).
+    /// Compute a signed year fraction, preserving the start/end orientation
+    /// (Rust `DayCount::signed_year_fraction(start, end, ctx)`).
+    ///
+    /// The published facade makes `ctx` optional, as for `yearFraction`.
+    ///
+    /// @param start_epoch_days - Start date as days since 1970-01-01.
+    /// @param end_epoch_days - End date as days since 1970-01-01; may precede the start.
+    /// @param ctx - DayCountContext supplying calendar, frequency, coupon-period
+    /// and termination metadata; omitted means the empty default context.
+    /// @returns Signed year fraction in years; negative when `end` is before `start`.
+    ///
+    /// # Errors
+    ///
+    /// Throws `TypeError` (kind `invalid_type`) if a date is not an integer
+    /// epoch-day number; `FinstackError` (kind `validation`) if a date is out of
+    /// range or the convention's required context is missing or invalid; kind
+    /// `not_found` if the context names an unknown calendar.
+    #[wasm_bindgen(js_name = signedYearFraction)]
+    pub fn signed_year_fraction(
+        &self,
+        start_epoch_days: JsValue,
+        end_epoch_days: JsValue,
+        ctx: &JsDayCountContext,
+    ) -> Result<f64, JsValue> {
+        let start = js_epoch_days(&start_epoch_days, "startEpochDays")?;
+        let end = js_epoch_days(&end_epoch_days, "endEpochDays")?;
+        self.inner
+            .signed_year_fraction(start, end, ctx.to_rust_ctx()?)
+            .map_err(to_js_err)
+    }
+
+    /// Count the calendar days between two dates (epoch days), independent of
+    /// the convention (Rust associated fn `DayCount::calendar_days`).
     /// @param start_epoch_days - Start date as days since 1970-01-01.
     /// @param end_epoch_days - End date as days since 1970-01-01.
     /// @returns Signed calendar-day count from start to end.
@@ -374,7 +361,6 @@ impl JsDayCount {
     /// representable date range.
     #[wasm_bindgen(js_name = calendarDays)]
     pub fn calendar_days(
-        &self,
         start_epoch_days: JsValue,
         end_epoch_days: JsValue,
     ) -> Result<i64, JsValue> {

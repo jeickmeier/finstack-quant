@@ -310,7 +310,9 @@ impl FxForward {
     /// * `settlement_days` - T+N spot lag in business days (typically 2, or 1 for
     ///   USD/CAD). Use [`standard_settlement_days`](Self::standard_settlement_days)
     ///   to determine it automatically.
-    /// * `business_day_convention` - Business day convention
+    /// * `business_day_convention` - Business day convention used to roll the
+    ///   maturity on the joint calendar. `None` selects Modified Following,
+    ///   the ISDA FX settlement convention (and the `FxSpot` builder default).
     /// * `end_of_month` - Preserve month-end when the spot date is month-end.
     #[allow(clippy::too_many_arguments)]
     pub fn from_trade_date(
@@ -325,12 +327,14 @@ impl FxForward {
         base_calendar_id: Option<String>,
         quote_calendar_id: Option<String>,
         settlement_days: u32,
-        business_day_convention: finstack_quant_core::dates::BusinessDayConvention,
+        business_day_convention: Option<finstack_quant_core::dates::BusinessDayConvention>,
         end_of_month: bool,
     ) -> finstack_quant_core::Result<Self> {
         use crate::instruments::common_impl::fx_dates::{
             add_fx_standard_tenor, fx_spot_date_for_pair,
         };
+        let business_day_convention =
+            business_day_convention.unwrap_or_else(crate::serde_defaults::bdc_modified_following);
 
         // CLS-consistent spot roll: a US holiday on an intermediate day does not
         // delay a USD pair's spot date (FX spot convention

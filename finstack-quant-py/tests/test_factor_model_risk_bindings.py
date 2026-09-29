@@ -115,5 +115,5 @@ def test_sensitivity_reporting_currency_is_required_and_survives_round_trip() ->
     assert SensitivityMatrix.from_json(matrix.to_json()).base_currency == "EUR"
     assert pickle.loads(pickle.dumps(matrix)).base_currency == "EUR"  # noqa: S301 - trusted local roundtrip
     assert compute_pnl_profiles("[]", "[]", market, "2025-01-15", "EUR") == []
-    with pytest.raises(ValueError, match="Matching variant not found"):
+    with pytest.raises(ValueError, match=r'Invalid currency code "INVALID"'):
         compute_factor_sensitivities("[]", "[]", market, "2025-01-15", "INVALID")

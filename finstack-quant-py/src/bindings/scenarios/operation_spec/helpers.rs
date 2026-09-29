@@ -18,8 +18,7 @@ use super::hierarchy::PyHierarchyTarget;
 use super::kinds::{PyCompounding, PyCurveKind, PyTenorMatchMode, PyTimeRollMode};
 
 pub(super) fn parse_currency(code: &str) -> PyResult<Currency> {
-    Currency::from_str(code)
-        .map_err(|e| crate::errors::value_error(format!("Invalid currency code {code:?}: {e}")))
+    Currency::from_str(code).map_err(crate::errors::core_to_py)
 }
 
 pub(super) fn parse_instrument_type(name: &str) -> PyResult<InstrumentType> {

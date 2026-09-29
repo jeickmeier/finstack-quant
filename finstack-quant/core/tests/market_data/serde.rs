@@ -395,6 +395,7 @@ fn semantic_restore_fixture() -> MarketContextState {
         vec![0.01],
         vec![0.005],
         None,
+        None,
     )
     .expect("FX delta vol surface");
     let vol_cube = VolCube::from_grid(
@@ -1068,6 +1069,7 @@ fn fx_delta_vol_surface_rejects_unknown_fields() {
         vec![0.01, 0.012, 0.015],
         vec![0.005, 0.006, 0.007],
         None,
+        None,
     )
     .unwrap();
     assert_strict_inbound(&surface);
@@ -1082,6 +1084,7 @@ fn fx_delta_vol_surface_rejects_invalid_data_on_deserialize() {
         vec![0.08, 0.085, 0.09],
         vec![0.01, 0.012, 0.015],
         vec![0.005, 0.006, 0.007],
+        None,
         None,
     )
     .unwrap();
@@ -1102,7 +1105,8 @@ fn fx_delta_vol_surface_requires_paired_wings_on_deserialize() {
         vec![0.1],
         vec![0.01],
         vec![0.005],
-        Some((vec![0.02], vec![0.01])),
+        Some(vec![0.02]),
+        Some(vec![0.01]),
     )
     .unwrap();
     let json = serde_json::to_value(&surface).unwrap();
@@ -1115,4 +1119,30 @@ fn fx_delta_vol_surface_requires_paired_wings_on_deserialize() {
         null[field] = serde_json::Value::Null;
         assert!(serde_json::from_value::<FxDeltaVolSurface>(null).is_err());
     }
+}
+
+#[test]
+fn fx_delta_vol_surface_constructor_owns_wing_pairing() {
+    use finstack_quant_core::market_data::surfaces::FxDeltaVolSurface;
+    let build = |rr: Option<Vec<f64>>, bf: Option<Vec<f64>>| {
+        FxDeltaVolSurface::new(
+            "EURUSD",
+            vec![1.0],
+            vec![0.1],
+            vec![0.01],
+            vec![0.005],
+            rr,
+            bf,
+        )
+    };
+    for (rr, bf) in [(Some(vec![0.02]), None), (None, Some(vec![0.01]))] {
+        let err = build(rr, bf).expect_err("unpaired 10-delta wings");
+        assert_eq!(
+            err,
+            finstack_quant_core::Error::Validation(
+                "rr_10d and bf_10d must both be provided or both omitted".into()
+            )
+        );
+    }
+    assert!(build(None, None).expect("no wings").rr_10d().is_none());
 }

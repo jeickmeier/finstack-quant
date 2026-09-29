@@ -225,12 +225,14 @@ pub fn build_scenario_spec(
     let operations: Vec<finstack_quant_scenarios::OperationSpec> =
         from_js_json(&operations, "operations")?;
     let resolution_mode = resolution_mode
-        .map(|value| serde_json::from_value(serde_json::Value::String(value)))
+        .as_deref()
+        .map(finstack_quant_core::wire::serde_parse)
         .transpose()
         .map_err(to_js_err)?
         .unwrap_or_default();
     let hazard_bump_mode = hazard_bump_mode
-        .map(|value| serde_json::from_value(serde_json::Value::String(value)))
+        .as_deref()
+        .map(finstack_quant_core::wire::serde_parse)
         .transpose()
         .map_err(to_js_err)?
         .unwrap_or_default();

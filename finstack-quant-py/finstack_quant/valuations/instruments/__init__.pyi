@@ -12304,7 +12304,10 @@ class FxForward:
             T+N spot lag in business days (non-negative); ``None`` uses
             :meth:`FxForward.standard_settlement_days` for the pair.
         business_day_convention : BusinessDayConvention | str | None
-            Roll rule applied to the maturity; ``None`` means ``"modified_following"``.
+            Roll rule applied to the maturity: a ``BusinessDayConvention`` or a
+            name accepted by ``adjust`` (serde names or ``MF``/``F``/``P``/``MP``
+            short codes). ``None`` selects the Rust ``FxForward::from_trade_date``
+            default, Modified Following.
         end_of_month : bool, default False
             Apply the FX end-of-month rule when spot falls on month end.
 

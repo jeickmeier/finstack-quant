@@ -29,13 +29,24 @@ impl ValidationMode {
     /// Bindings expose the two safe presets by name while keeping [`Self::Raw`]
     /// available only to canonical Rust callers.
     ///
+    /// # Arguments
+    ///
+    /// * `name` - Preset name: `"market_standard"` or
+    ///   `"negative_rate_friendly"`. `None` selects `"market_standard"`, the
+    ///   [`DiscountCurve`](crate::market_data::term_structures::DiscountCurve)
+    ///   builder default (monotone discount factors, −50bp implied-forward
+    ///   floor).
+    /// * `forward_floor` - Minimum implied forward rate as a decimal (for
+    ///   example `-0.01` for −100bp). Required with `negative_rate_friendly`
+    ///   and rejected otherwise, including when `name` is `None`.
+    ///
     /// # Errors
     ///
     /// Returns `Error::Validation` for an unsupported preset, a floor supplied
-    /// with `market_standard`, a missing floor for `negative_rate_friendly`, or
-    /// a non-finite floor.
-    pub fn from_preset(name: &str, forward_floor: Option<f64>) -> crate::Result<Self> {
-        match name {
+    /// with `market_standard` (explicit or defaulted), a missing floor for
+    /// `negative_rate_friendly`, or a non-finite floor.
+    pub fn from_preset(name: Option<&str>, forward_floor: Option<f64>) -> crate::Result<Self> {
+        match name.unwrap_or("market_standard") {
             "market_standard" => {
                 if forward_floor.is_some() {
                     return Err(crate::Error::Validation(

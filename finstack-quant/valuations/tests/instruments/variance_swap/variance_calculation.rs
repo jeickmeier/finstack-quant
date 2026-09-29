@@ -154,8 +154,12 @@ fn test_partial_realized_variance_matches_manual_calculation() {
         .filter(|d| **d >= swap.start_date && **d <= as_of)
         .filter_map(|d| prices.iter().find(|(pd, _)| pd == d).map(|(_, p)| *p))
         .collect();
-    let manual = realized_variance(&used_prices, RealizedVarMethod::CloseToClose, 252.0)
-        .expect("CloseToClose should succeed");
+    let manual = realized_variance(
+        &used_prices,
+        Some(RealizedVarMethod::CloseToClose),
+        Some(252.0),
+    )
+    .expect("CloseToClose should succeed");
 
     // Assert
     assert!((realized - manual).abs() < EPSILON);
@@ -180,8 +184,12 @@ fn test_partial_realized_variance_uses_contract_annualization() {
         .filter(|d| **d >= swap.start_date && **d <= as_of)
         .filter_map(|d| prices.iter().find(|(pd, _)| pd == d).map(|(_, p)| *p))
         .collect();
-    let manual_260 = realized_variance(&used_prices, RealizedVarMethod::CloseToClose, 260.0)
-        .expect("CloseToClose should succeed");
+    let manual_260 = realized_variance(
+        &used_prices,
+        Some(RealizedVarMethod::CloseToClose),
+        Some(260.0),
+    )
+    .expect("CloseToClose should succeed");
 
     // The contract annualisation factor should be applied
     assert!((realized - manual_260).abs() < EPSILON);

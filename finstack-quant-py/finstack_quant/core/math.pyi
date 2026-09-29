@@ -585,8 +585,8 @@ class stats:
     @staticmethod
     def realized_variance(
         prices: Sequence[float] | npt.NDArray[np.float64],
-        method: str = "close_to_close",
-        annualization_factor: float = 252.0,
+        method: str | None = None,
+        annualization_factor: float | None = None,
     ) -> float:
         """
         Annualized realized variance of a close price series.
@@ -598,11 +598,13 @@ class stats:
         ----------
         prices : Sequence[float] or numpy.ndarray
             Finite, strictly positive close prices in time order.
-        method : str
+        method : str or None
             Must be ``"close_to_close"``; OHLC estimators require
-            :func:`realized_variance_ohlc`.
-        annualization_factor : float
-            Positive scaling factor (``252`` for daily bars).
+            :func:`realized_variance_ohlc`. ``None`` selects the Rust default
+            (``RealizedVarMethod::default()``, close-to-close).
+        annualization_factor : float or None
+            Positive observations-per-year scaling factor. ``None`` selects
+            the Rust daily convention (``PeriodKind::Daily``, 252).
 
         Returns
         -------
@@ -630,8 +632,8 @@ class stats:
         high: Sequence[float] | npt.NDArray[np.float64],
         low: Sequence[float] | npt.NDArray[np.float64],
         close: Sequence[float] | npt.NDArray[np.float64],
-        method: str = "yang_zhang",
-        annualization_factor: float = 252.0,
+        method: str | None = None,
+        annualization_factor: float | None = None,
     ) -> float:
         """
         Annualized realized variance from OHLC bars.
@@ -650,11 +652,13 @@ class stats:
         close : Sequence[float] or numpy.ndarray
             Bar closing prices, same length and ordering as *open*; the
             close-to-close estimator uses only this series.
-        method : str
+        method : str or None
             ``"close_to_close"``, ``"parkinson"``, ``"garman_klass"``,
-            ``"rogers_satchell"`` or ``"yang_zhang"``.
-        annualization_factor : float
-            Positive scaling factor (``252`` for daily bars).
+            ``"rogers_satchell"`` or ``"yang_zhang"``. ``None`` selects the
+            Rust OHLC default (``RealizedVarMethod::OHLC_DEFAULT``, Yang-Zhang).
+        annualization_factor : float or None
+            Positive bars-per-year scaling factor. ``None`` selects the Rust
+            daily convention (``PeriodKind::Daily``, 252).
 
         Returns
         -------

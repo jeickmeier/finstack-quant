@@ -100,7 +100,7 @@ pub(crate) fn try_repr_div_f64(a: AmountRepr, rhs: f64) -> Result<AmountRepr, Er
     #[allow(clippy::float_cmp)]
     let is_zero = rhs == 0.0;
     if is_zero {
-        return Err(InputError::Invalid.into());
+        return Err(Error::Validation("division by zero".into()));
     }
     // Shortest round-trip conversion per the 2026-06-09 core quant review
     // (user decision): avoids embedding IEEE noise digits in the Decimal.

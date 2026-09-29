@@ -2327,7 +2327,7 @@ impl PyCapFloorBuilder {
         mut slf: PyRefMut<'py, Self>,
         value: &str,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        let convention = enum_from_str(value, "business_day_convention")?;
+        let convention = super::convert::bdc_from_str(value, "business_day_convention")?;
         let b = take_cap_floor(&mut slf)?;
         slf.inner = Some(b.business_day_convention(convention));
         slf.fields

@@ -338,9 +338,15 @@ fn discount_curve_dts_exposes_canonical_validation_and_forward_names() {
         "forward(t1: number, t2: number): number;"
     ));
     assert!(!curve.contains("forwardRate"));
-    assert!(constructor.contains("validationMode?: DiscountCurveValidationMode"));
-    assert!(constructor.contains("forwardFloor?: number | null"));
-    assert!(contains_ignoring_ws(constructor, "knots: NumericArray"));
+    // One named-options constructor (no positional optional arguments).
+    assert!(contains_signature(
+        constructor,
+        "new (options: DiscountCurveOptions | string): DiscountCurve;"
+    ));
+    let options = interface_block(&dts, "DiscountCurveOptions");
+    assert!(options.contains("validationMode?: DiscountCurveValidationMode"));
+    assert!(options.contains("forwardFloor?: number | null"));
+    assert!(contains_ignoring_ws(options, "knots: NumericArray"));
     assert!(contains_signature(
         constructor,
         "flat(id: string, baseDate: string, continuousRate: number): DiscountCurve;"
@@ -771,10 +777,13 @@ fn core_daycount_dts_exposes_context_for_context_dependent_conventions() {
     let dts = index_dts();
 
     assert!(dts.contains("export interface DayCountContext"));
-    assert!(contains_ignoring_ws(
-        &dts,
-        "yearFractionWithContext(startEpochDays: number, endEpochDays: number, ctx: DayCountContext): number;",
+    // One method per Rust fn: the context is an optional third argument.
+    let day_count = interface_block(&dts, "DayCount ");
+    assert!(contains_signature(
+        day_count,
+        "yearFraction(startEpochDays: number, endEpochDays: number, ctx?: DayCountContext): number;",
     ));
+    assert!(!dts.contains("yearFractionWithContext"));
     assert!(dts.contains("DayCountContext: DayCountContextConstructor;"));
     let day_count_ctor = interface_block(&dts, "DayCountConstructor");
     assert!(contains_signature(
@@ -786,18 +795,15 @@ fn core_daycount_dts_exposes_context_for_context_dependent_conventions() {
         day_count_ctor,
         "thirty360It(): DayCount;"
     ));
-    let day_count = interface_block(&dts, "DayCount ");
+    // `calendarDays` is static, like Rust `DayCount::calendar_days`.
     assert!(contains_signature(
-        day_count,
+        day_count_ctor,
         "calendarDays(startEpochDays: number, endEpochDays: number): bigint;"
     ));
+    assert!(!day_count.contains("calendarDays("));
     assert!(contains_ignoring_ws(
         &dts,
-        "Act/Act ISMA and Bus/252 require explicit frequency/calendar context"
-    ));
-    assert!(contains_ignoring_ws(
-        &dts,
-        "This method throws for those conventions"
+        "Act/Act ISMA needs a context frequency (or coupon period) and Bus/252 a"
     ));
 }
 
@@ -1201,17 +1207,14 @@ fn core_market_data_dts_exposes_data_only_fx_surface_and_rate_result() {
     ));
     assert!(contains_signature(
         fx,
-        "rate(base: string, quote: string, date: string, policy: FxConversionPolicy): FxRateResult;"
+        "rate(base: string, quote: string, date: string, policy?: FxConversionPolicy): FxRateResult;"
     ));
-    assert!(contains_signature(
-        fx,
-        "rateDefault(base: string, quote: string, date: string): FxRateResult;"
-    ));
+    assert!(!dts.contains("rateDefault"));
 
     let day_count = interface_block(&dts, "DayCount ");
     assert!(contains_signature(
         day_count,
-        "signedYearFraction(startEpochDays: number, endEpochDays: number): number;"
+        "signedYearFraction(startEpochDays: number, endEpochDays: number, ctx?: DayCountContext): number;"
     ));
     let day_count_constructor = interface_block(&dts, "DayCountConstructor ");
     assert!(contains_signature(

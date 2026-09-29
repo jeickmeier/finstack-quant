@@ -46,8 +46,8 @@ pub(crate) fn compute_pv(
                 &high,
                 &low,
                 &close,
-                inst.realized_var_method,
-                annualization_factor(inst),
+                Some(inst.realized_var_method),
+                Some(annualization_factor(inst)),
             )?
         } else {
             let prices = get_historical_prices_with_dates(inst, context, as_of, &obs_dates)?;
@@ -56,8 +56,8 @@ pub(crate) fn compute_pv(
             }
             realized_variance(
                 &prices,
-                inst.realized_var_method,
-                annualization_factor(inst),
+                Some(inst.realized_var_method),
+                Some(annualization_factor(inst)),
             )?
         };
         let df = dom.df_between_dates(as_of, settlement_date)?;
@@ -306,15 +306,19 @@ fn realized_variance_with_factor(
             &high,
             &low,
             &close,
-            inst.realized_var_method,
-            annualization_factor,
+            Some(inst.realized_var_method),
+            Some(annualization_factor),
         );
     }
     let prices = get_historical_prices_with_dates(inst, context, as_of, obs_dates)?;
     if prices.len() < 2 {
         return Ok(0.0);
     }
-    realized_variance(&prices, inst.realized_var_method, annualization_factor)
+    realized_variance(
+        &prices,
+        Some(inst.realized_var_method),
+        Some(annualization_factor),
+    )
 }
 
 /// Number of per-period samples (return periods or OHLC bars) accrued by

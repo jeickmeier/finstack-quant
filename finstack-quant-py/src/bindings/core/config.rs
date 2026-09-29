@@ -6,7 +6,6 @@ use crate::bindings::core::currency::extract_currency;
 use crate::bindings::module_utils::py_to_json_value;
 use crate::errors::{core_to_py, serde_json_to_py};
 use finstack_quant_core::config::{FinstackConfig, RoundingMode, ToleranceConfig};
-use finstack_quant_core::Error;
 use pyo3::exceptions::PyTypeError;
 use pyo3::prelude::*;
 use pyo3::types::{PyList, PyModule, PyString, PyType};
@@ -52,10 +51,7 @@ pub(crate) fn extract_rounding_mode(obj: &Bound<'_, PyAny>) -> PyResult<Rounding
         return Ok(mode.inner);
     }
     if let Ok(text) = obj.cast::<PyString>() {
-        return text
-            .to_str()?
-            .parse::<RoundingMode>()
-            .map_err(|e| core_to_py(Error::Validation(e)));
+        return text.to_str()?.parse::<RoundingMode>().map_err(core_to_py);
     }
     Err(PyTypeError::new_err(
         "expected RoundingMode or its lowercase name (e.g. 'bankers')",
@@ -98,7 +94,7 @@ impl PyRoundingMode {
     fn from_name(_cls: &Bound<'_, PyType>, name: &str) -> PyResult<Self> {
         name.parse::<RoundingMode>()
             .map(Self::from_inner)
-            .map_err(|e| core_to_py(Error::Validation(e)))
+            .map_err(core_to_py)
     }
 
     /// Canonical lowercase name (the serde representation), e.g. ``"bankers"``.

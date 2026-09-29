@@ -564,9 +564,15 @@ async function main() {
   const moneyA = new w.Money(100.0, usd);
   const moneyB = new w.Money(25.5, usd);
   const day_count = w.DayCount.act360();
+  // Raw pkg-node binding: the context is required (the facade defaults it).
+  const day_count_ctx = new w.DayCountContext();
   const t0d = w.createDate(2024, 1, 2);
   const t1d = w.createDate(2025, 1, 2);
-  const curve = new w.DiscountCurve('USD-OIS', '2024-01-02', [0.0, 1.0, 1.0, 0.98, 5.0, 0.88]);
+  const curve = new w.DiscountCurve({
+    id: 'USD-OIS',
+    baseDate: '2024-01-02',
+    knots: [0.0, 1.0, 1.0, 0.98, 5.0, 0.88],
+  });
   const pricePerf = new w.Performance(priceDates, [prices], ['bench'], null, 'daily');
   const returnPerf = w.Performance.fromReturns(
     returnDates,
@@ -591,7 +597,7 @@ async function main() {
   });
 
   bench('core', 'DayCount.yearFraction', 10000, () => {
-    day_count.yearFraction(t0d, t1d);
+    day_count.yearFraction(t0d, t1d, day_count_ctx);
   });
 
   bench('core', 'DiscountCurve.df', 15000, () => {
@@ -742,7 +748,8 @@ async function main() {
   bench('core', 'FxMatrix setQuote + rate', 4000, () => {
     const fx = new w.FxMatrix();
     fx.setQuote('USD', 'EUR', 0.92);
-    fx.rateDefault('USD', 'EUR', '2024-01-02');
+    // Raw pkg-node twin of the facade's `rate(base, quote, date)`.
+    fx.rateWithDefaultPolicy('USD', 'EUR', '2024-01-02');
   });
 
   const cholFactor = w.choleskyDecomposition(cholMat);
