@@ -144,11 +144,8 @@ impl PyScenarioSpec {
     #[staticmethod]
     #[pyo3(text_signature = "(json)")]
     fn from_json(json: &str) -> PyResult<Self> {
-        let inner: finstack_quant_scenarios::ScenarioSpec =
-            serde_json::from_str(json).map_err(|error| {
-                crate::errors::value_error(format!("Failed to parse ScenarioSpec JSON: {error}"))
-            })?;
-        inner.validate().map_err(scenarios_to_py)?;
+        let inner =
+            finstack_quant_scenarios::ScenarioSpec::from_json(json).map_err(scenarios_to_py)?;
         Ok(Self { inner })
     }
 

@@ -51,17 +51,8 @@ fn apply_with_context(
 /// @param json_str - Canonical JSON string to validate and re-serialize.
 #[wasm_bindgen(js_name = parseScenarioSpec)]
 pub fn parse_scenario_spec(json_str: &str) -> Result<JsValue, JsValue> {
-    let spec = parse_scenario_spec_inner(json_str).map_err(to_js_err)?;
+    let spec = finstack_quant_scenarios::ScenarioSpec::from_json(json_str).map_err(to_js_err)?;
     crate::utils::to_js_value(&spec)
-}
-
-fn parse_scenario_spec_inner(
-    json_str: &str,
-) -> Result<finstack_quant_scenarios::ScenarioSpec, String> {
-    let spec: finstack_quant_scenarios::ScenarioSpec =
-        serde_json::from_str(json_str).map_err(|error| error.to_string())?;
-    spec.validate().map_err(|error| error.to_string())?;
-    Ok(spec)
 }
 
 /// Compose multiple scenario specs (JSON array) into a single scenario.
@@ -78,14 +69,8 @@ fn parse_scenario_spec_inner(
 pub fn compose_scenarios(specs: JsValue) -> Result<JsValue, JsValue> {
     let specs: Vec<finstack_quant_scenarios::ScenarioSpec> =
         serde_wasm_bindgen::from_value(specs).map_err(to_js_err)?;
-    let composed = compose_scenarios_inner(specs).map_err(to_js_err)?;
+    let composed = finstack_quant_scenarios::ScenarioSpec::compose(specs).map_err(to_js_err)?;
     crate::utils::to_js_value(&composed)
-}
-
-fn compose_scenarios_inner(
-    specs: Vec<finstack_quant_scenarios::ScenarioSpec>,
-) -> Result<finstack_quant_scenarios::ScenarioSpec, String> {
-    finstack_quant_scenarios::ScenarioSpec::compose(specs).map_err(|error| error.to_string())
 }
 
 /// Validate a scenario specification JSON without executing it.
@@ -443,7 +428,6 @@ pub fn compute_horizon_return(
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use finstack_quant_core::market_data::hierarchy::ResolutionMode;
     use finstack_quant_scenarios::{HazardBumpMode, OperationSpec, ScenarioSpec, TimeRollMode};
 
@@ -462,11 +446,14 @@ mod tests {
     #[test]
     fn parse_and_compose_helpers_return_typed_specs() {
         let json = serde_json::to_string(&empty_spec("parsed", 0)).expect("serialize");
-        let parsed = parse_scenario_spec_inner(&json).expect("parse");
+        let parsed = finstack_quant_scenarios::ScenarioSpec::from_json(&json).expect("parse");
         assert_eq!(parsed.id, "parsed");
 
-        let composed =
-            compose_scenarios_inner(vec![empty_spec("a", 0), empty_spec("b", 1)]).expect("compose");
+        let composed = finstack_quant_scenarios::ScenarioSpec::compose(vec![
+            empty_spec("a", 0),
+            empty_spec("b", 1),
+        ])
+        .expect("compose");
         assert!(!composed.id.is_empty());
     }
 
@@ -486,8 +473,9 @@ mod tests {
         second.operations = operations("3M");
         second.resolution_mode = ResolutionMode::Cumulative;
 
-        let error = compose_scenarios_inner(vec![first, second])
+        let error = finstack_quant_scenarios::ScenarioSpec::compose(vec![first, second])
             .expect_err("duplicate time rolls should be rejected");
+        let error = error.to_string();
         assert!(
             error.contains("TimeRollForward"),
             "unexpected error: {error}"
@@ -500,8 +488,10 @@ mod tests {
         first_order.hazard_bump_mode = HazardBumpMode::FirstOrderShift;
         let solve_to_par = empty_spec("solve-to-par", 1);
 
-        let error = compose_scenarios_inner(vec![first_order, solve_to_par])
-            .expect_err("mixed hazard bump modes should be rejected");
+        let error =
+            finstack_quant_scenarios::ScenarioSpec::compose(vec![first_order, solve_to_par])
+                .expect_err("mixed hazard bump modes should be rejected")
+                .to_string();
         assert!(
             error.contains("first-order")
                 && error.contains("first_order_shift")

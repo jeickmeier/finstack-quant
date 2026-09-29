@@ -132,7 +132,10 @@ test('listedProductCatalog exposes exact venue-filtered valuation routes', () =>
       'volatility_index_future_option',
     ])
   );
-  assert.throws(() => valuations.market.listedProductCatalog('mx'));
+  assert.throws(
+    () => valuations.market.listedProductCatalog('mx'),
+    (error) => error.name === 'FinstackError' && error.kind === 'validation'
+  );
 });
 
 // Flat 3% USD-OIS discounting. `MarketContextState` denies unknown fields and

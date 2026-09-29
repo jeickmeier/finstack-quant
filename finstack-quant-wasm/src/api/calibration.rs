@@ -182,28 +182,24 @@ fn attach_host_error(host: &HostExecuteError) -> Result<JsValue, String> {
         );
         let _ = js_sys::Reflect::set(
             &error,
-            &JsValue::from_str("stage"),
-            &JsValue::from_str(host.stage.as_str()),
+            &JsValue::from("stage"),
+            &JsValue::from(host.stage.as_str()),
         );
         let step_value = host
             .step_id
             .as_deref()
-            .map_or(JsValue::UNDEFINED, JsValue::from_str);
-        let _ = js_sys::Reflect::set(&error, &JsValue::from_str("step_id"), &step_value);
+            .map_or(JsValue::UNDEFINED, JsValue::from);
+        let _ = js_sys::Reflect::set(&error, &JsValue::from("step_id"), &step_value);
         let solver_value = match host.solver_diagnostics.as_deref() {
             Some(json) => js_sys::JSON::parse(json)
                 .map_err(|_| "failed to parse serialized solver diagnostics".to_string())?,
             None => JsValue::UNDEFINED,
         };
+        let _ = js_sys::Reflect::set(&error, &JsValue::from("solver_diagnostics"), &solver_value);
         let _ = js_sys::Reflect::set(
             &error,
-            &JsValue::from_str("solver_diagnostics"),
-            &solver_value,
-        );
-        let _ = js_sys::Reflect::set(
-            &error,
-            &JsValue::from_str("details"),
-            &JsValue::from_str(&host.details),
+            &JsValue::from("details"),
+            &JsValue::from(&host.details),
         );
         Ok(error)
     }

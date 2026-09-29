@@ -38,7 +38,7 @@ fn ensure_finite(field: &str, v: f64) -> Result<(), JsValue> {
     if v.is_finite() {
         Ok(())
     } else {
-        Err(JsValue::from_str(&format!(
+        Err(to_js_err(format!(
             "non-finite value ({v}) in output field '{field}'"
         )))
     }
@@ -209,12 +209,7 @@ impl JsLevelsAtDate {
     /// @returns A bucket-name to factor-level mapping in basis points.
     #[wasm_bindgen(js_name = levelValues)]
     pub fn level_values(&self, level_index: usize) -> Result<JsValue, JsValue> {
-        let level = self.inner.by_level.get(level_index).ok_or_else(|| {
-            JsValue::from_str(&format!(
-                "levelIndex {level_index} out of range (nLevels={})",
-                self.inner.by_level.len()
-            ))
-        })?;
+        let level = self.inner.level(level_index).map_err(to_js_err)?;
         to_js_value(&level.values)
     }
 
@@ -311,12 +306,7 @@ impl JsPeriodDecomposition {
     /// @returns A bucket-name to factor-change mapping in basis points.
     #[wasm_bindgen(js_name = levelDeltas)]
     pub fn level_deltas(&self, level_index: usize) -> Result<JsValue, JsValue> {
-        let level = self.inner.by_level.get(level_index).ok_or_else(|| {
-            JsValue::from_str(&format!(
-                "levelIndex {level_index} out of range (nLevels={})",
-                self.inner.by_level.len()
-            ))
-        })?;
+        let level = self.inner.level(level_index).map_err(to_js_err)?;
         to_js_value(&level.deltas)
     }
 

@@ -469,9 +469,9 @@ pub fn listed_product_catalog(exchange: Option<String>) -> Result<JsValue, JsVal
         .as_deref()
         .map(str::parse::<finstack_quant_valuations::market::listed::ListedExchange>)
         .transpose()
-        .map_err(|error| JsValue::from_str(&error))?;
+        .map_err(to_js_err)?;
     let rows = finstack_quant_valuations::market::listed::listed_product_catalog(exchange)
-        .map_err(|error| JsValue::from_str(&error.to_string()))?;
+        .map_err(to_js_err)?;
     to_js_value(&rows)
 }
 

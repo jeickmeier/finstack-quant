@@ -35,10 +35,7 @@ pub(crate) fn extract_scenario_spec(obj: &Bound<'_, PyAny>) -> PyResult<Scenario
             obj.get_type()
         ))
     })?;
-    let spec: ScenarioSpec = serde_json::from_str(&json)
-        .map_err(|error| value_error(format!("Failed to parse ScenarioSpec JSON: {error}")))?;
-    spec.validate().map_err(scenarios_to_py)?;
-    Ok(spec)
+    ScenarioSpec::from_json(&json).map_err(scenarios_to_py)
 }
 
 /// Extract a [`FinstackConfig`] from a `FinstackConfig` object, a JSON string,

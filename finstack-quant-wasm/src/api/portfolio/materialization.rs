@@ -99,12 +99,12 @@ impl JsPortfolio {
         };
         js_sys::Reflect::set(
             &result,
-            &JsValue::from_str("portfolio"),
+            &JsValue::from("portfolio"),
             &JsValue::from(portfolio),
         )?;
         js_sys::Reflect::set(
             &result,
-            &JsValue::from_str("report"),
+            &JsValue::from("report"),
             &to_js_value_with_kind(&report, "serialization")?,
         )?;
         Ok(result.into())

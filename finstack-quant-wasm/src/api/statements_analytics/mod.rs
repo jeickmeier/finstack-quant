@@ -367,7 +367,7 @@ pub fn goal_seek(
     let mut model = parse_validated_model(model_json)?;
     let tp: finstack_quant_core::dates::PeriodId = target_period.parse().map_err(to_js_err)?;
     let dp: finstack_quant_core::dates::PeriodId = driver_period.parse().map_err(to_js_err)?;
-    let bounds = goal_seek_bounds(bounds_lo, bounds_hi).map_err(|e| JsValue::from_str(&e))?;
+    let bounds = goal_seek_bounds(bounds_lo, bounds_hi).map_err(to_js_err)?;
 
     let result = finstack_quant_statements_analytics::analysis::goal_seek(
         &mut model,

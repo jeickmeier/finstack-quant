@@ -212,9 +212,7 @@ impl JsSabrSmile {
             .map_err(to_js_err)?
             .first()
             .copied()
-            .ok_or_else(|| {
-                JsValue::from_str("SABR smile returned no volatility for the requested strike")
-            })
+            .ok_or_else(|| to_js_err("SABR smile returned no volatility for the requested strike"))
     }
 
     /// Implied volatilities for a strike grid.
@@ -366,7 +364,7 @@ impl JsSabrCalibrator {
         .map(|policy| Self {
             inner: self.inner.clone().with_shift(policy),
         })
-        .map_err(|e| JsValue::from_str(&e))
+        .map_err(to_js_err)
     }
 
     /// Return a copy of this calibrator with exact ATM pinning enabled or
@@ -438,9 +436,9 @@ pub fn convert_atm_volatility(
     time_to_expiry: f64,
 ) -> Result<f64, JsValue> {
     let from: vol::VolatilityConvention = serde_wasm_bindgen::from_value(from_convention)
-        .map_err(|e| JsValue::from_str(&format!("invalid from_convention: {e}")))?;
+        .map_err(|e| to_js_err(format!("invalid from_convention: {e}")))?;
     let to: vol::VolatilityConvention = serde_wasm_bindgen::from_value(to_convention)
-        .map_err(|e| JsValue::from_str(&format!("invalid to_convention: {e}")))?;
+        .map_err(|e| to_js_err(format!("invalid to_convention: {e}")))?;
     vol::convert_atm_volatility(vol, from, to, forward_rate, time_to_expiry).map_err(to_js_err)
 }
 
@@ -489,7 +487,7 @@ pub fn calibrate_svi(
 pub fn svi_implied_vol(params: JsValue, k: f64, t: f64) -> Result<f64, JsValue> {
     let params: finstack_quant_models::volatility::svi::SviParams =
         serde_wasm_bindgen::from_value(params)
-            .map_err(|e| JsValue::from_str(&format!("invalid SVI params: {e}")))?;
+            .map_err(|e| to_js_err(format!("invalid SVI params: {e}")))?;
     params.implied_vol(k, t).map_err(to_js_err)
 }
 

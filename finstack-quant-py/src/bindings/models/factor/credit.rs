@@ -723,13 +723,7 @@ impl PyLevelsAtDate {
         py: Python<'py>,
         level_index: usize,
     ) -> PyResult<Bound<'py, PyDict>> {
-        let lev = self.inner.by_level.get(level_index).ok_or_else(|| {
-            value_error(format!(
-                "level_index {} out of range (n_levels={})",
-                level_index,
-                self.inner.by_level.len()
-            ))
-        })?;
+        let lev = self.inner.level(level_index).map_err(core_to_py)?;
         let d = PyDict::new(py);
         for (k, v) in &lev.values {
             d.set_item(k, v)?;
@@ -905,13 +899,7 @@ impl PyPeriodDecomposition {
         py: Python<'py>,
         level_index: usize,
     ) -> PyResult<Bound<'py, PyDict>> {
-        let lev = self.inner.by_level.get(level_index).ok_or_else(|| {
-            value_error(format!(
-                "level_index {} out of range (n_levels={})",
-                level_index,
-                self.inner.by_level.len()
-            ))
-        })?;
+        let lev = self.inner.level(level_index).map_err(core_to_py)?;
         let d = PyDict::new(py);
         for (k, v) in &lev.deltas {
             d.set_item(k, v)?;

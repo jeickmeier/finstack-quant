@@ -30,7 +30,7 @@ fn serialize_example(instrument: InstrumentJson) -> Result<String, JsValue> {
 #[wasm_bindgen(js_name = creditDefaultSwapExampleJson)]
 pub fn credit_default_swap_example_json() -> Result<String, JsValue> {
     serialize_example(InstrumentJson::CreditDefaultSwap(
-        CreditDefaultSwap::example().map_err(|e| JsValue::from_str(&e.to_string()))?,
+        CreditDefaultSwap::example().map_err(to_js_err)?,
     ))
 }
 
@@ -43,7 +43,7 @@ pub fn credit_default_swap_example_json() -> Result<String, JsValue> {
 #[wasm_bindgen(js_name = cdsIndexExampleJson)]
 pub fn cds_index_example_json() -> Result<String, JsValue> {
     serialize_example(InstrumentJson::CdsIndex(
-        CdsIndex::example().map_err(|e| JsValue::from_str(&e.to_string()))?,
+        CdsIndex::example().map_err(to_js_err)?,
     ))
 }
 
@@ -56,7 +56,7 @@ pub fn cds_index_example_json() -> Result<String, JsValue> {
 #[wasm_bindgen(js_name = cdsTrancheExampleJson)]
 pub fn cds_tranche_example_json() -> Result<String, JsValue> {
     serialize_example(InstrumentJson::CdsTranche(
-        CdsTranche::example().map_err(|e| JsValue::from_str(&e.to_string()))?,
+        CdsTranche::example().map_err(to_js_err)?,
     ))
 }
 

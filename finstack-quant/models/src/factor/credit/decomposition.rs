@@ -114,7 +114,30 @@ fn ensure_finite(label: &str, value: f64) -> finstack_quant_core::Result<()> {
     }
 }
 
+fn level_out_of_range(level_index: usize, n_levels: usize) -> finstack_quant_core::Error {
+    finstack_quant_core::Error::Validation(format!(
+        "level_index {level_index} out of range (n_levels={n_levels})"
+    ))
+}
+
 impl LevelsAtDate {
+    /// Bucket values for one hierarchy level.
+    ///
+    /// # Arguments
+    ///
+    /// * `level_index` - Zero-based position in [`Self::by_level`], i.e. the
+    ///   hierarchy spec's level order; must be less than `by_level.len()`.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`finstack_quant_core::Error::Validation`] when `level_index`
+    /// is not a valid level position.
+    pub fn level(&self, level_index: usize) -> finstack_quant_core::Result<&LevelValuesAtDate> {
+        self.by_level
+            .get(level_index)
+            .ok_or_else(|| level_out_of_range(level_index, self.by_level.len()))
+    }
+
     /// Reject any non-finite generic, bucket, or adder value.
     ///
     /// `serde_json` encodes `NaN`/`±inf` as `null`, so hosts call this at the
@@ -142,6 +165,23 @@ impl LevelsAtDate {
 }
 
 impl PeriodDecomposition {
+    /// Bucket deltas for one hierarchy level.
+    ///
+    /// # Arguments
+    ///
+    /// * `level_index` - Zero-based position in [`Self::by_level`], i.e. the
+    ///   hierarchy spec's level order; must be less than `by_level.len()`.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`finstack_quant_core::Error::Validation`] when `level_index`
+    /// is not a valid level position.
+    pub fn level(&self, level_index: usize) -> finstack_quant_core::Result<&LevelValuesDelta> {
+        self.by_level
+            .get(level_index)
+            .ok_or_else(|| level_out_of_range(level_index, self.by_level.len()))
+    }
+
     /// Reject any non-finite generic, bucket, or adder delta.
     ///
     /// See [`LevelsAtDate::validate`] for the rationale.

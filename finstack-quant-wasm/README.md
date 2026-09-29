@@ -194,9 +194,9 @@ throw `ContractValidationError`: `kind` is `report` when structured diagnostics 
 available, and `error.report` then carries the serialized `ValidationReport`; a
 breached load limit gives `kind` `limit_exceeded`. Their remaining failures stay
 `FinstackError` with a domain `kind` (`unknown_entity`, `fx_conversion`,
-`valuation`, `missing_market_data`, and so on). A handful of low-level argument
-guards still reject with a bare string, so match on `err.message` defensively
-rather than assuming `Error` everywhere.
+`valuation`, `missing_market_data`, and so on). No export throws a bare string:
+`mise run wasm-check-errors` rejects any binding error that bypasses
+`crate::utils::to_js_err`.
 
 **Money.** `new core.Money(amount, currency)` takes a finite JavaScript `number`,
 converts it to a Rust `Decimal`, and does **not** round to the currency's minor

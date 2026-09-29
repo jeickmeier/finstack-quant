@@ -624,6 +624,7 @@ run = [
   "npm --prefix finstack-quant-wasm run format",
   "npm --prefix finstack-quant-wasm run lint",
   "mise run wasm-check-serializer",
+  "mise run wasm-check-errors",
 ]
 
 [tasks.wasm-check-serializer]
@@ -645,6 +646,27 @@ if [ -n "$offenders" ]; then
 fi
 echo 'WASM serializer check passed: all JsValue returns route through to_js_value.'
 """
+
+[tasks.wasm-check-errors]
+description = "Fail if a binding throws a bare string instead of a structured FinstackError"
+# A JS error built from a string (`JsValue::from_str`, `JsValue::from(format!(..))`,
+# `js_sys::Error::new`) has no `name`/`kind`, unlike every error routed through
+# `crate::utils::to_js_err`. Build object keys with `JsValue::from`. Helpers must
+# return a typed Rust error, not `Result<_, String>`; the allowlist below is a
+# ratchet for helpers whose logic later moves into Rust (it only shrinks).
+run = '''
+set -eu
+code() { grep -rnE --include='*.rs' -e "$1" finstack-quant-wasm/src/api | grep -vE '^[^:]+:[0-9]+:[[:space:]]*//' || true; }
+bare=$(code 'JsValue::from_str|js_sys::Error::new|Err\(JsValue::from|JsValue::from\(format!')
+string_errs=$(code '-> Result<[^>]*, String>' | grep -vE -e 'src/api/portfolio/sensitivity\.rs' -e 'src/api/models/volatility\.rs' -e 'src/api/calibration\.rs' || true)
+if [ -n "$bare$string_errs" ]; then
+  echo 'Bindings must throw through crate::utils::to_js_err (structured FinstackError with kind).'
+  if [ -n "$bare" ]; then echo "$bare"; fi
+  if [ -n "$string_errs" ]; then echo "$string_errs"; fi
+  exit 1
+fi
+echo 'WASM error check passed: every binding error is a structured FinstackError.'
+'''
 
 [tasks.wasm-doc]
 description = "Enforce complete WASM and TypeScript IntelliSense documentation"

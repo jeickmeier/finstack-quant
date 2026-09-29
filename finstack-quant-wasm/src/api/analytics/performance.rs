@@ -148,14 +148,10 @@ fn periodic_panel_to_js(panel: Vec<Vec<(time::Date, f64)>>) -> Result<JsValue, J
             let point = js_sys::Object::new();
             Reflect::set(
                 &point,
-                &JsValue::from_str("date"),
-                &JsValue::from_str(&date_to_iso(date)),
+                &JsValue::from("date"),
+                &JsValue::from(&date_to_iso(date)),
             )?;
-            Reflect::set(
-                &point,
-                &JsValue::from_str("value"),
-                &JsValue::from_f64(value),
-            )?;
+            Reflect::set(&point, &JsValue::from("value"), &JsValue::from_f64(value))?;
             points.set(point_idx as u32, point.into());
         }
         outer.set(ticker_idx as u32, points.into());
@@ -170,7 +166,7 @@ fn result_vec_f64_to_js(result: finstack_quant_core::Result<Vec<f64>>) -> Result
 fn dates_to_js_array(dates: &[time::Date]) -> Array {
     let date_array = Array::new_with_length(dates.len() as u32);
     for (i, &d) in dates.iter().enumerate() {
-        date_array.set(i as u32, JsValue::from_str(&date_to_iso(d)));
+        date_array.set(i as u32, JsValue::from(&date_to_iso(d)));
     }
     date_array
 }
@@ -180,7 +176,7 @@ fn dates_to_js_array(dates: &[time::Date]) -> Array {
 fn obj_from_pairs(pairs: &[(&str, JsValue)]) -> Result<JsValue, JsValue> {
     let obj = js_sys::Object::new();
     for (key, value) in pairs {
-        Reflect::set(&obj, &JsValue::from_str(key), value)?;
+        Reflect::set(&obj, &JsValue::from(*key), value)?;
     }
     Ok(obj.into())
 }
@@ -1305,7 +1301,7 @@ fn restore_non_finite_ratios(js: &JsValue, stats: &fa::PeriodStats) -> Result<()
         ("cpc_ratio", stats.cpc_ratio),
         ("kelly_criterion", stats.kelly_criterion),
     ] {
-        Reflect::set(js, &JsValue::from_str(key), &JsValue::from_f64(value))?;
+        Reflect::set(js, &JsValue::from(key), &JsValue::from_f64(value))?;
     }
     Ok(())
 }

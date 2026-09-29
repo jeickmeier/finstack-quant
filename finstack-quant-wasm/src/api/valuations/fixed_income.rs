@@ -126,9 +126,10 @@ impl JsBond {
     pub fn from_json(json: &str) -> Result<JsBond, JsValue> {
         match parse_envelope(json)? {
             InstrumentJson::Bond(inner) => Ok(JsBond { inner }),
-            _ => Err(JsValue::from_str(
-                "expected instrument type \"bond\", got a different instrument type",
-            )),
+            other => Err(to_js_err(finstack_quant_core::Error::Validation(format!(
+                "expected instrument type \"bond\", found '{}'",
+                other.type_tag()
+            )))),
         }
     }
 
@@ -176,9 +177,10 @@ impl JsTermLoan {
     pub fn from_json(json: &str) -> Result<JsTermLoan, JsValue> {
         match parse_envelope(json)? {
             InstrumentJson::TermLoan(inner) => Ok(JsTermLoan { inner }),
-            _ => Err(JsValue::from_str(
-                "expected instrument type \"term_loan\", got a different instrument type",
-            )),
+            other => Err(to_js_err(finstack_quant_core::Error::Validation(format!(
+                "expected instrument type \"term_loan\", found '{}'",
+                other.type_tag()
+            )))),
         }
     }
 
@@ -238,10 +240,13 @@ impl JsAssetBackedFacility {
     #[wasm_bindgen(js_name = fromJson)]
     pub fn from_json(json: &str) -> Result<JsAssetBackedFacility, JsValue> {
         match parse_envelope(json)? {
-            InstrumentJson::AssetBackedFacility(inner) => Ok(JsAssetBackedFacility { inner: *inner }),
-            _ => Err(JsValue::from_str(
-                "expected instrument type \"asset_backed_facility\", got a different instrument type",
-            )),
+            InstrumentJson::AssetBackedFacility(inner) => {
+                Ok(JsAssetBackedFacility { inner: *inner })
+            }
+            other => Err(to_js_err(finstack_quant_core::Error::Validation(format!(
+                "expected instrument type \"asset_backed_facility\", found '{}'",
+                other.type_tag()
+            )))),
         }
     }
 
@@ -307,9 +312,10 @@ impl JsRevolvingCredit {
     pub fn from_json(json: &str) -> Result<JsRevolvingCredit, JsValue> {
         match parse_envelope(json)? {
             InstrumentJson::RevolvingCredit(inner) => Ok(JsRevolvingCredit { inner }),
-            _ => Err(JsValue::from_str(
-                "expected instrument type \"revolving_credit\", got a different instrument type",
-            )),
+            other => Err(to_js_err(finstack_quant_core::Error::Validation(format!(
+                "expected instrument type \"revolving_credit\", found '{}'",
+                other.type_tag()
+            )))),
         }
     }
 

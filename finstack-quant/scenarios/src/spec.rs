@@ -1162,6 +1162,38 @@ impl RateBindingSpec {
 pub use finstack_quant_core::math::Compounding;
 
 impl ScenarioSpec {
+    /// Parse a scenario specification from JSON and validate it.
+    ///
+    /// The single ingest path for host bindings: strict serde decoding
+    /// (unknown fields are rejected) followed by [`ScenarioSpec::validate`].
+    ///
+    /// # Arguments
+    ///
+    /// * `json` - Canonical `ScenarioSpec` JSON document.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::Validation`](crate::Error::Validation) prefixed with
+    /// `Failed to parse ScenarioSpec JSON:` when `json` does not decode, or
+    /// the error [`ScenarioSpec::validate`] returns for an inconsistent spec.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use finstack_quant_scenarios::ScenarioSpec;
+    ///
+    /// let spec = ScenarioSpec::from_json(r#"{"id":"base","operations":[]}"#)?;
+    /// assert_eq!(spec.id, "base");
+    /// # Ok::<(), finstack_quant_scenarios::Error>(())
+    /// ```
+    pub fn from_json(json: &str) -> crate::error::Result<Self> {
+        let spec: Self = serde_json::from_str(json).map_err(|error| {
+            crate::error::Error::Validation(format!("Failed to parse ScenarioSpec JSON: {error}"))
+        })?;
+        spec.validate()?;
+        Ok(spec)
+    }
+
     /// Validate the scenario specification for consistency.
     ///
     /// Checks for:
