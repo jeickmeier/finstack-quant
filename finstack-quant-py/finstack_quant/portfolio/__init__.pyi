@@ -13563,7 +13563,7 @@ def compute_pnl_profiles(
     bump_config_json : str, optional
         Optional JSON-serialized ``BumpSizeConfig``.
     n_scenario_points : int, default 5
-        Number of scenario grid points
+        Odd number of scenario grid points in ``3..=1001``
         (default 5 produces shifts ``[-2, -1, 0, 1, 2]``).
 
     Returns
@@ -13577,8 +13577,8 @@ def compute_pnl_profiles(
         If ``market`` is neither a ``MarketContext`` nor a JSON string.
     ValueError
         If position, factor, market, bump-configuration, or date input is
-        malformed or invalid; if ``n_scenario_points`` is less than ``3`` or
-        even; or if a factor cannot be bumped or priced.
+        malformed or invalid; if ``n_scenario_points`` is less than ``3``,
+        greater than ``1001`` or even; or if a factor cannot be bumped or priced.
     KeyError
         If repricing requires market data that is absent from ``market``.
 

@@ -136,6 +136,30 @@ fn calibrate_then_decompose_round_trip() {
     assert_eq!(model.schema(), "finstack_quant.credit_factor_model/1");
 }
 
+/// Level indices are strict whole numbers: `1.5` and `-1` throw instead of
+/// truncating or wrapping to another hierarchy level.
+#[wasm_bindgen_test]
+fn level_values_reject_non_integer_indices() {
+    let calibrator = JsCreditCalibrator::new(JsValue::from(&minimal_config_json()))
+        .expect("JsCreditCalibrator::new must succeed");
+    let model = calibrator
+        .calibrate(JsValue::from(&minimal_inputs_json()))
+        .expect("calibrate must succeed on minimal inputs");
+    let spreads = r#"{"ISSUER-A": 0.0150, "ISSUER-B": 0.0175, "ISSUER-C": 0.0200}"#;
+    let levels = finstack_quant_wasm::api::models::factor::decompose_levels(
+        &model,
+        JsValue::from(spreads),
+        0.0100,
+        JsValue::from("2024-03-31"),
+        None,
+    )
+    .expect("decompose_levels");
+    assert!(levels.level_values(JsValue::from(0)).is_ok());
+    for bad in [JsValue::from(1.5), JsValue::from(-1), JsValue::from("0")] {
+        assert!(levels.level_values(bad).is_err());
+    }
+}
+
 #[wasm_bindgen_test]
 fn covariance_forecast_returns_structured_objects() {
     let calibrator =

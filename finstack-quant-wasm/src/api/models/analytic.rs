@@ -554,9 +554,9 @@ pub fn barrier_put(
 ///
 /// # Errors
 ///
-/// Throws a JavaScript exception if `averaging` is not `"arithmetic"` or
-/// `"geometric"`, or the supplied model inputs produce a non-finite option
-/// price.
+/// Throws a JavaScript exception if `numFixings` is not a positive whole
+/// number, `averaging` is not `"arithmetic"` or `"geometric"`, or the supplied
+/// model inputs produce a non-finite option price.
 #[wasm_bindgen(js_name = asianOptionPrice)]
 #[allow(clippy::too_many_arguments)]
 pub fn asian_option_price(

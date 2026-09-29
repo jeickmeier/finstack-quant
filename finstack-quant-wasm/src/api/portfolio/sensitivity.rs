@@ -124,7 +124,7 @@ pub fn compute_factor_sensitivities_with_market(
 /// @param as_of - ISO-8601 valuation date used to resolve date-dependent market data.
 /// @param base_currency - ISO reporting currency for all returned monetary exposures; missing FX throws an error.
 /// @param bump_config_json - Canonical bump-configuration JSON defining factor shock sizes and conventions.
-/// @param n_scenario_points - Positive number of evenly spaced bump levels in each P-and-L profile.
+/// @param n_scenario_points - Odd number of evenly spaced bump levels in each P-and-L profile, in `3..=1001`; omit for 5.
 ///
 /// # Errors
 ///
@@ -181,7 +181,7 @@ pub fn compute_pnl_profiles(
 /// @param as_of - ISO-8601 valuation date used to resolve date-dependent market data.
 /// @param base_currency - ISO reporting currency for all returned monetary exposures; missing FX throws an error.
 /// @param bump_config_json - Canonical bump-configuration JSON defining factor shock sizes and conventions.
-/// @param n_scenario_points - Positive number of evenly spaced bump levels in each P-and-L profile.
+/// @param n_scenario_points - Odd number of evenly spaced bump levels in each P-and-L profile, in `3..=1001`; omit for 5.
 ///
 /// # Errors
 ///

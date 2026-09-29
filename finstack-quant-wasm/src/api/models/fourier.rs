@@ -29,11 +29,12 @@ use wasm_bindgen::prelude::*;
 /// @param vol - Annualized volatility expressed as a decimal, such as 0.20 for 20%; must be positive.
 /// @param expiry - Time to option expiry in years.
 /// @param is_call - Whether to value a call (`true`) or put (`false`).
-/// @param n_terms - Optional positive number of COS expansion terms; omit to use the pricer default.
+/// @param n_terms - Optional number of COS expansion terms in `1..=65536`; omit to use the pricer default (128).
 ///
 /// # Errors
 ///
-/// Throws a JavaScript exception if `vol` is not positive, the model produces a degenerate or invalid
+/// Throws a JavaScript exception if `nTerms` is outside `1..=65536`, `vol` is not positive, the
+/// model produces a degenerate or invalid
 /// COS truncation range, a non-finite characteristic-function value or forward
 /// moment, or a non-finite option price.
 #[wasm_bindgen(js_name = bsCosPrice)]
@@ -76,12 +77,12 @@ pub fn bs_cos_price(
 /// @param nu - Variance-Gamma variance-rate parameter; larger values increase tail thickness.
 /// @param expiry - Time to option expiry in years.
 /// @param is_call - Whether to value a call (`true`) or put (`false`).
-/// @param n_terms - Optional positive number of COS expansion terms; omit to use the pricer default.
+/// @param n_terms - Optional number of COS expansion terms in `1..=65536`; omit to use the pricer default (128).
 ///
 /// # Errors
 ///
-/// Throws a JavaScript exception if the model produces a degenerate or invalid
-/// COS truncation range, a non-finite characteristic-function value or forward
+/// Throws a JavaScript exception if `nTerms` is outside `1..=65536`, the model
+/// produces a degenerate or invalid COS truncation range, a non-finite characteristic-function value or forward
 /// moment, or a non-finite option price.
 #[wasm_bindgen(js_name = vgCosPrice)]
 #[allow(clippy::too_many_arguments)]
@@ -128,12 +129,12 @@ pub fn vg_cos_price(
 /// @param lambda - Annual jump-arrival intensity in the Merton jump-diffusion model.
 /// @param expiry - Time to option expiry in years.
 /// @param is_call - Whether to value a call (`true`) or put (`false`).
-/// @param n_terms - Optional positive number of COS expansion terms; omit to use the pricer default.
+/// @param n_terms - Optional number of COS expansion terms in `1..=65536`; omit to use the pricer default (128).
 ///
 /// # Errors
 ///
-/// Throws a JavaScript exception if the model produces a degenerate or invalid
-/// COS truncation range, a non-finite characteristic-function value or forward
+/// Throws a JavaScript exception if `nTerms` is outside `1..=65536`, the model
+/// produces a degenerate or invalid COS truncation range, a non-finite characteristic-function value or forward
 /// moment, or a non-finite option price.
 #[wasm_bindgen(js_name = mertonJumpCosPrice)]
 #[allow(clippy::too_many_arguments)]

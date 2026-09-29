@@ -1010,7 +1010,7 @@ def asian_option_price(
     expiry : float
         Time to expiry in years.
     num_fixings : int
-        Number of averaging fixings.
+        Positive number of equally spaced averaging fixings.
     averaging : str, default "arithmetic"
         ``"arithmetic"`` (Turnbull-Wakeman) or ``"geometric"`` (Kemna-Vorst).
     is_call : bool, default True
@@ -1024,8 +1024,8 @@ def asian_option_price(
     Raises
     ------
     ValueError
-        If ``averaging`` is not ``"arithmetic"`` or ``"geometric"``, or the
-        formula produces a non-finite price.
+        If ``num_fixings`` is zero, ``averaging`` is not ``"arithmetic"`` or
+        ``"geometric"``, or the formula produces a non-finite price.
 
     Examples
     --------
@@ -1196,7 +1196,7 @@ def bs_cos_price(
     is_call : bool
         ``True`` for a call, ``False`` for a put.
     n_terms : int, optional
-        Positive number of COS terms. Uses a default when ``None``.
+        Number of COS terms in ``1..=65536``. Uses 128 when ``None``.
 
     Returns
     -------
@@ -1206,9 +1206,9 @@ def bs_cos_price(
     Raises
     ------
     ValueError
-        If ``vol`` is not strictly positive, the inputs produce an invalid COS
-        truncation range, a non-finite characteristic-function value, or a
-        non-finite option price.
+        If ``n_terms`` is outside ``1..=65536``, ``vol`` is not strictly positive,
+        the inputs produce an invalid COS truncation range, a non-finite
+        characteristic-function value, or a non-finite option price.
 
     Examples
     --------
@@ -1260,7 +1260,7 @@ def vg_cos_price(
     is_call : bool
         ``True`` for a call, ``False`` for a put.
     n_terms : int, optional
-        Positive number of COS terms. Uses a default when ``None``.
+        Number of COS terms in ``1..=65536``. Uses 128 when ``None``.
 
     Returns
     -------
@@ -1270,9 +1270,9 @@ def vg_cos_price(
     Raises
     ------
     ValueError
-        If the Variance Gamma parameters produce an invalid COS truncation
-        range, a non-finite characteristic-function value, or a non-finite
-        option price.
+        If ``n_terms`` is outside ``1..=65536``, the Variance Gamma parameters
+        produce an invalid COS truncation range, a non-finite
+        characteristic-function value, or a non-finite option price.
 
     Examples
     --------
@@ -1327,7 +1327,7 @@ def merton_jump_cos_price(
     is_call : bool
         ``True`` for a call, ``False`` for a put.
     n_terms : int, optional
-        Positive number of COS terms. Uses a default when ``None``.
+        Number of COS terms in ``1..=65536``. Uses 128 when ``None``.
 
     Returns
     -------
@@ -1337,9 +1337,9 @@ def merton_jump_cos_price(
     Raises
     ------
     ValueError
-        If the jump-diffusion parameters produce an invalid COS truncation
-        range, a non-finite characteristic-function value, or a non-finite
-        option price.
+        If ``n_terms`` is outside ``1..=65536``, the jump-diffusion parameters
+        produce an invalid COS truncation range, a non-finite
+        characteristic-function value, or a non-finite option price.
 
     Examples
     --------

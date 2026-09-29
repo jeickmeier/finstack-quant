@@ -8309,7 +8309,7 @@ export interface ModelsNamespace {
    * @param numFixings - Positive number of equally spaced averaging observations before expiry.
    * @param averaging - Asian averaging convention: `"arithmetic"` (default) or `"geometric"`.
    * @param isCall - Whether to value a call (`true`) or put (`false`).
-   * @throws Error - Throws a JavaScript exception if `averaging` is not `"arithmetic"` or `"geometric"`, or the supplied model inputs produce a non-finite option price.
+   * @throws Error - Throws a JavaScript exception if `numFixings` is not a positive whole number, `averaging` is not `"arithmetic"` or `"geometric"`, or the supplied model inputs produce a non-finite option price.
    */
   asianOptionPrice(
     spot: number,
@@ -8426,8 +8426,8 @@ export interface ModelsNamespace {
    * @param vol - Annualized volatility expressed as a decimal, such as 0.20 for 20%; must be positive.
    * @param expiry - Time to option expiry in years.
    * @param isCall - Whether to value a call (`true`) or put (`false`).
-   * @param nTerms - Optional positive number of COS expansion terms; omit to use the pricer default.
-   * @throws Error - Throws a JavaScript exception if `vol` is not positive, the model produces a degenerate or invalid COS truncation range, a non-finite characteristic-function value or forward moment, or a non-finite option price.
+   * @param nTerms - Optional number of COS expansion terms in `1..=65536`; omit to use the pricer default (128).
+   * @throws Error - Throws a JavaScript exception if `nTerms` is outside `1..=65536`, `vol` is not positive, the model produces a degenerate or invalid COS truncation range, a non-finite characteristic-function value or forward moment, or a non-finite option price.
    */
   bsCosPrice(
     spot: number,
@@ -8454,8 +8454,8 @@ export interface ModelsNamespace {
    * @param nu - Variance-Gamma variance-rate parameter; larger values increase tail thickness.
    * @param expiry - Time to option expiry in years.
    * @param isCall - Whether to value a call (`true`) or put (`false`).
-   * @param nTerms - Optional positive number of COS expansion terms; omit to use the pricer default.
-   * @throws Error - Throws a JavaScript exception if the model produces a degenerate or invalid COS truncation range, a non-finite characteristic-function value or forward moment, or a non-finite option price.
+   * @param nTerms - Optional number of COS expansion terms in `1..=65536`; omit to use the pricer default (128).
+   * @throws Error - Throws a JavaScript exception if `nTerms` is outside `1..=65536`, the model produces a degenerate or invalid COS truncation range, a non-finite characteristic-function value or forward moment, or a non-finite option price.
    */
   vgCosPrice(
     spot: number,
@@ -8485,8 +8485,8 @@ export interface ModelsNamespace {
    * @param lambda - Annual jump-arrival intensity in the Merton jump-diffusion model.
    * @param expiry - Time to option expiry in years.
    * @param isCall - Whether to value a call (`true`) or put (`false`).
-   * @param nTerms - Optional positive number of COS expansion terms; omit to use the pricer default.
-   * @throws Error - Throws a JavaScript exception if the model produces a degenerate or invalid COS truncation range, a non-finite characteristic-function value or forward moment, or a non-finite option price.
+   * @param nTerms - Optional number of COS expansion terms in `1..=65536`; omit to use the pricer default (128).
+   * @throws Error - Throws a JavaScript exception if `nTerms` is outside `1..=65536`, the model produces a degenerate or invalid COS truncation range, a non-finite characteristic-function value or forward moment, or a non-finite option price.
    */
   mertonJumpCosPrice(
     spot: number,
@@ -10873,7 +10873,7 @@ export interface PortfolioNamespace {
    * @param asOf - ISO-8601 valuation date used to resolve date-dependent market data.
    * @param baseCurrency - ISO reporting currency for all returned monetary exposures; missing FX throws an error.
    * @param bumpConfigJson - Canonical bump-configuration JSON defining factor shock sizes and conventions.
-   * @param nScenarioPoints - Positive number of evenly spaced bump levels in each P-and-L profile.
+   * @param nScenarioPoints - Odd number of evenly spaced bump levels in each P-and-L profile, in `3..=1001`; omit for 5.
    * @throws Error - Throws a JavaScript exception if `asOf` is not a valid ISO date; any JSON input is malformed; a factor, bump configuration, or scenario-point count is invalid or unsupported; bumping or repricing fails; or the profiles cannot be converted to a JavaScript value.
    */
   computePnlProfiles(
@@ -10894,7 +10894,7 @@ export interface PortfolioNamespace {
    * @param asOf - ISO-8601 valuation date used to resolve date-dependent market data.
    * @param baseCurrency - ISO reporting currency for all returned monetary exposures; missing FX throws an error.
    * @param bumpConfigJson - Canonical bump-configuration JSON defining factor shock sizes and conventions.
-   * @param nScenarioPoints - Positive number of evenly spaced bump levels in each P-and-L profile.
+   * @param nScenarioPoints - Odd number of evenly spaced bump levels in each P-and-L profile, in `3..=1001`; omit for 5.
    * @throws Error - Throws a JavaScript exception if `asOf` is not a valid ISO date; a position, factor, or bump-config JSON input is malformed; a factor or scenario-point count is invalid or unsupported; bumping or repricing fails; or the profiles cannot be converted to a JavaScript value.
    */
   computePnlProfilesWithMarket(
