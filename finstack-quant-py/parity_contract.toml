@@ -1708,9 +1708,9 @@ root_exports = [
     "validatePikToggleSpecJson",
     "evaluateModel",
     "evaluateModelWithMarket",
-    "runMonteCarlo",
-    "parseFormulaText",
-    "validateFormula",
+    "evaluateMonteCarlo",
+    "parseFormula",
+    "parseAndCompile",
 ]
 
 # Python-only surface: the typed wrappers (spec/builder/evaluator/results and
@@ -1746,8 +1746,8 @@ python_only = [
 ]
 
 [wasm_statements_subset.python_js_map]
-parse_formula = "parseFormulaText"
-parse_and_compile = "validateFormula"
+parse_formula = "parseFormula"
+parse_and_compile = "parseAndCompile"
 
 # JSON helpers with no Python snake_case twin — Python uses the typed
 # wrappers (FinancialModelSpec, Evaluator, CheckSuiteSpec, ...) instead.
@@ -1764,8 +1764,9 @@ symbols = [
     "evaluateModelWithMarket",
     # Python exposes this as the method `Evaluator.evaluate_monte_carlo`
     # (mirroring Rust `Evaluator::evaluate_monte_carlo`), not as a free
-    # function, so there is no snake_case root twin to map.
-    "runMonteCarlo",
+    # function, so there is no snake_case root twin to map. The JS name is the
+    # camelCase of that Rust method.
+    "evaluateMonteCarlo",
 ]
 
 # ---------------------------------------------------------------------------

@@ -8969,7 +8969,7 @@ export interface StatementResultJson {
  * ```typescript
  * import init, { statements } from "finstack-quant-wasm";
  * await init();
- * console.log(statements.parseFormulaText("revenue - expenses"));
+ * console.log(statements.parseFormula("revenue-expenses")); // "revenue - expenses"
  * ```
  */
 export interface StatementsNamespace {
@@ -9055,38 +9055,42 @@ export interface StatementsNamespace {
    */
   evaluateModelWithMarket(modelJson: string, marketJson: string, asOf: string): StatementResultJson;
   /**
-   * Run Monte Carlo simulation on a financial model (JSON in/out).
+   * Evaluate a financial model under Monte Carlo simulation (JSON in, structured object out).
+   *
+   * The Python twin is the `Evaluator.evaluate_monte_carlo` method.
    * @returns Canonical JSON containing percentile summaries and optional path data.
    * @param modelJson - Financial-model specification JSON.
    * @param configJson - Monte Carlo configuration JSON.
    * @throws Error - Rejects malformed model or configuration JSON, model semantic failures, zero simulation paths, a model containing capital structure, model compilation or dependency failures, any path-evaluation failure, or failure to serialize the results to JavaScript.
    */
-  runMonteCarlo(modelJson: string, configJson: string): Record<string, unknown>;
+  evaluateMonteCarlo(modelJson: string, configJson: string): Record<string, unknown>;
   /**
-   * Parse a DSL formula and return a human-readable rendering of its AST.
+   * Parse a DSL formula and return its canonical source text.
    *
-   * Useful for previewing expression structure in UI tooling before
-   * committing a formula to a model. The returned string is a debug rendering,
-   * **not** JSON: the canonical `StmtExpr` AST deliberately does not implement
-   * `serde::Serialize`, so there is no structured wire form to return. Treat
-   * the output as display text and do not parse it.
-   * @returns Returns a human-readable text rendering, not JSON.
+   * The formula is parsed into the statements AST and rendered back through
+   * the AST's `Display`: whitespace normalised, operators spaced, and
+   * parentheses kept only where precedence requires them. Parsing the returned
+   * text again yields the same AST, so it is a stable form for previewing,
+   * diffing, or hashing formulas. Mirrors Python `parse_formula`.
    * @param formula - Financial-model formula string to parse into its canonical expression representation.
+   * @returns Canonical formula text, e.g. `"(revenue - cogs) / revenue"`.
    * @throws Error - Rejects trailing tokens, malformed or incomplete syntax, or a formula that exceeds the parser's nesting or term limits.
    */
-  parseFormulaText(formula: string): string;
+  parseFormula(formula: string): string;
   /**
-   * Validate that a DSL formula parses and compiles successfully.
+   * Parse and compile a DSL formula, throwing if either step fails.
    *
-   * Returns `undefined` when the formula is valid; throws a `FinstackError`
-   * otherwise. This mirrors the Python `validate_formula` API, which returns
-   * `None` — an invalid formula raises rather than returning a falsy value, so
-   * `if (validateFormula(f))` is not a validity check.
+   * Compilation lowers the AST onto the core expression engine and rejects
+   * unsupported functions, wrong arities, and malformed capital-structure
+   * references that a bare parse would accept. Returns `undefined` when the
+   * formula is valid; an invalid formula throws a `FinstackError`, so
+   * `if (parseAndCompile(f))` is not a validity check. Mirrors Python
+   * `parse_and_compile`.
    * @returns nothing; failure is reported by throwing.
    * @param formula - Financial-model formula string to parse and validate without evaluation.
    * @throws Error - Rejects any formula that cannot be parsed as one complete DSL expression or compiled because it contains an unsupported component, function, or operator form.
    */
-  validateFormula(formula: string): void;
+  parseAndCompile(formula: string): void;
 }
 
 /**

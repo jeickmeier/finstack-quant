@@ -915,8 +915,8 @@ async function main() {
     skipBench('statements_analytics', 'generateTornadoEntries', 'missing sensitivity output');
   }
 
-  benchTry('statements_analytics', 'runMonteCarlo', 30, () => {
-    w.runMonteCarlo(MONTE_CARLO_MODEL_JSON, MONTE_CARLO_CONFIG_JSON);
+  benchTry('statements_analytics', 'evaluateMonteCarlo', 30, () => {
+    w.evaluateMonteCarlo(MONTE_CARLO_MODEL_JSON, MONTE_CARLO_CONFIG_JSON);
   });
 
   benchTry('statements_analytics', 'goalSeek', 400, () => {

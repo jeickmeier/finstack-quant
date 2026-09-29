@@ -75,10 +75,10 @@ test('statements.evaluateModel returns a structured StatementResult', () => {
   assert.ok(roundTripped.nodes.revenue, 'revenue survives serialization');
 });
 
-test('statements.runMonteCarlo returns a structured object', () => {
+test('statements.evaluateMonteCarlo returns a structured object', () => {
   const config = JSON.stringify({ n_paths: 10, seed: 42 });
-  const results = statements.runMonteCarlo(MODEL_JSON, config);
-  assertStructured(results, 'runMonteCarlo result');
+  const results = statements.evaluateMonteCarlo(MODEL_JSON, config);
+  assertStructured(results, 'evaluateMonteCarlo result');
 });
 
 test('statements_analytics.runSensitivity returns a structured object', () => {
@@ -151,4 +151,15 @@ test('statement declarations cannot relabel explicit foreign money', () => {
   model.nodes.revenue.values['2025Q1'] = { amount: '100', currency: 'EUR' };
   model.nodes.revenue.value_type = { type: 'monetary', currency: 'USD' };
   assert.throws(() => statements.evaluateModel(JSON.stringify(model)), /declares.*explicit values/);
+});
+
+test('statements.parseFormula returns the canonical text Python parse_formula returns', () => {
+  // Same literal as the Python `parse_formula` doctest.
+  assert.equal(statements.parseFormula('revenue-cogs'), 'revenue - cogs');
+  assert.equal(statements.parseFormula('(revenue-cogs)/revenue'), '(revenue - cogs) / revenue');
+  assert.equal(statements.parseAndCompile('revenue * 0.5'), undefined);
+  assert.throws(
+    () => statements.parseAndCompile('revenue +'),
+    (error) => error.kind === 'validation'
+  );
 });

@@ -157,7 +157,6 @@ fn computation_results_are_structured_not_strings() {
 fn prose_returning_exports_are_named_text() {
     let dts = index_dts();
     for export in [
-        "parseFormulaText",
         "plSummaryReportText",
         "creditAssessmentReportText",
         "explainFormulaText",
@@ -170,7 +169,7 @@ fn prose_returning_exports_are_named_text() {
     }
     // The pre-refactor names must be gone, not aliased.
     for stale in [
-        "parseFormula(",
+        "parseFormulaText(",
         "plSummaryReport(",
         "creditAssessmentReport(",
     ] {

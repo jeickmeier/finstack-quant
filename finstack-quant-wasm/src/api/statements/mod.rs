@@ -212,10 +212,11 @@ pub fn evaluate_model_with_market(
     crate::utils::to_js_value(&result)
 }
 
-/// Run Monte Carlo simulation on a financial model.
+/// Evaluate a financial model under Monte Carlo simulation.
 ///
-/// Takes JSON inputs and returns a structured JavaScript object (the Python
-/// binding returns a typed `MonteCarloResults` from the same Rust engine).
+/// Takes JSON inputs and returns a structured JavaScript object; the Python
+/// twin is the `Evaluator.evaluate_monte_carlo` method, which returns a typed
+/// `MonteCarloResults` from the same Rust `Evaluator::evaluate_monte_carlo`.
 ///
 /// # Errors
 ///
@@ -225,8 +226,8 @@ pub fn evaluate_model_with_market(
 /// to serialize the results to JavaScript.
 /// @param model_json - Financial-model specification JSON.
 /// @param config_json - Monte Carlo configuration JSON.
-#[wasm_bindgen(js_name = runMonteCarlo)]
-pub fn run_monte_carlo(model_json: &str, config_json: &str) -> Result<JsValue, JsValue> {
+#[wasm_bindgen(js_name = evaluateMonteCarlo)]
+pub fn evaluate_monte_carlo(model_json: &str, config_json: &str) -> Result<JsValue, JsValue> {
     let model = parse_validated_model(model_json)?;
     let config: finstack_quant_statements::evaluator::MonteCarloConfig =
         serde_json::from_str(config_json).map_err(to_js_err)?;
@@ -237,31 +238,34 @@ pub fn run_monte_carlo(model_json: &str, config_json: &str) -> Result<JsValue, J
     crate::utils::to_js_value(&results)
 }
 
-/// Parse a DSL formula and return a human-readable rendering of its AST.
+/// Parse a DSL formula and return its canonical source text.
 ///
-/// Useful for previewing expression structure in UI tooling before
-/// committing a formula to a model. The returned string is a debug rendering,
-/// **not** JSON: the canonical `StmtExpr` AST deliberately does not implement
-/// `serde::Serialize`, so there is no structured wire form to return. Treat
-/// the output as display text and do not parse it.
+/// The formula is parsed into the statements AST and rendered back through
+/// the AST's `Display`: whitespace normalised, operators spaced, and
+/// parentheses kept only where precedence requires them. Parsing the returned
+/// text again yields the same AST, so it is a stable form for previewing,
+/// diffing, or hashing formulas. Mirrors Python `parse_formula`.
 ///
 /// # Errors
 ///
 /// Rejects trailing tokens, malformed or incomplete syntax, or a formula that
 /// exceeds the parser's nesting or term limits.
 /// @param formula - Financial-model formula string to parse into its canonical expression representation.
-#[wasm_bindgen(js_name = parseFormulaText)]
-pub fn parse_formula_text(formula: &str) -> Result<String, JsValue> {
+/// @returns Canonical formula text, e.g. `"(revenue - cogs) / revenue"`.
+#[wasm_bindgen(js_name = parseFormula)]
+pub fn parse_formula(formula: &str) -> Result<String, JsValue> {
     let ast = finstack_quant_statements::dsl::parse_formula(formula).map_err(to_js_err)?;
-    Ok(format!("{ast:?}"))
+    Ok(ast.to_string())
 }
 
-/// Validate that a DSL formula parses and compiles successfully.
+/// Parse and compile a DSL formula, throwing if either step fails.
 ///
-/// Returns `undefined` when the formula is valid; throws a `FinstackError`
-/// otherwise. This mirrors the Python `validate_formula` API, which returns
-/// `None` — an invalid formula raises rather than returning a falsy value, so
-/// `if (validateFormula(f))` is not a validity check.
+/// Compilation lowers the AST onto the core expression engine and rejects
+/// unsupported functions, wrong arities, and malformed capital-structure
+/// references that a bare parse would accept. Returns `undefined` when the
+/// formula is valid; an invalid formula throws a `FinstackError`, so
+/// `if (parseAndCompile(f))` is not a validity check. Mirrors Python
+/// `parse_and_compile`.
 ///
 /// # Errors
 ///
@@ -269,8 +273,8 @@ pub fn parse_formula_text(formula: &str) -> Result<String, JsValue> {
 /// compiled because it contains an unsupported component, function, or
 /// operator form.
 /// @param formula - Financial-model formula string to parse and validate without evaluation.
-#[wasm_bindgen(js_name = validateFormula)]
-pub fn validate_formula(formula: &str) -> Result<(), JsValue> {
+#[wasm_bindgen(js_name = parseAndCompile)]
+pub fn parse_and_compile(formula: &str) -> Result<(), JsValue> {
     finstack_quant_statements::dsl::parse_and_compile(formula).map_err(to_js_err)?;
     Ok(())
 }
@@ -401,7 +405,7 @@ mod tests {
     }
 
     #[test]
-    fn run_monte_carlo_on_model() {
+    fn evaluate_monte_carlo_on_model() {
         use finstack_quant_statements::builder::ModelBuilder;
         use finstack_quant_statements::types::AmountOrScalar;
 
@@ -427,7 +431,7 @@ mod tests {
             .expect("build");
         let config = finstack_quant_statements::evaluator::MonteCarloConfig::new(10, 42);
 
-        // `run_monte_carlo` now returns a `JsValue` (unconstructible off
+        // `evaluate_monte_carlo` returns a `JsValue` (unconstructible off
         // wasm32); assert the underlying engine and its serializable shape.
         let mut evaluator = finstack_quant_statements::evaluator::Evaluator::new();
         let results = evaluator
@@ -438,19 +442,20 @@ mod tests {
     }
 
     #[test]
-    fn parse_formula_returns_ast_debug() {
-        let out = parse_formula_text("revenue - cogs").expect("parse_formula_text should succeed");
-        // Debug format contains "BinOp"/"NodeRef" markers
-        assert!(!out.is_empty());
+    fn parse_formula_returns_canonical_text() {
+        let out = parse_formula("revenue-cogs").expect("parse_formula should succeed");
+        assert_eq!(out, "revenue - cogs");
+        // The canonical text parses back to itself.
+        assert_eq!(parse_formula(&out).expect("reparse"), out);
     }
 
     #[test]
-    fn validate_formula_accepts_valid() {
-        validate_formula("revenue * 0.5").expect("should accept valid formula");
+    fn parse_and_compile_accepts_valid() {
+        parse_and_compile("revenue * 0.5").expect("should accept valid formula");
     }
 
     #[test]
-    fn validate_formula_rejects_invalid() {
+    fn parse_and_compile_rejects_invalid() {
         // Error path creates JsValue, which panics on native targets.
         // Test the underlying compile instead.
         assert!(finstack_quant_statements::dsl::parse_and_compile("revenue @").is_err());

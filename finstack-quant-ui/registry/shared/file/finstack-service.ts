@@ -38,8 +38,8 @@ export function createService(native: {
     | "validateFinancialModelJson"
     | "modelNodeIds"
     | "validateCheckSuiteSpecJson"
-    | "validateFormula"
-    | "parseFormulaText"
+    | "parseAndCompile"
+    | "parseFormula"
     | "evaluateModel"
     | "evaluateModelWithMarket"
   >;
@@ -145,8 +145,8 @@ export function createService(native: {
     },
     validateStatementFormula(formula) {
       return result(() => {
-        native.statements.validateFormula(formula);
-        return native.statements.parseFormulaText(formula);
+        native.statements.parseAndCompile(formula);
+        return native.statements.parseFormula(formula);
       });
     },
     evaluateStatement(request) {

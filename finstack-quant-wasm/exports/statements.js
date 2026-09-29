@@ -10,7 +10,7 @@ export const statements = {
   validatePikToggleSpecJson: wasm.validatePikToggleSpecJson,
   evaluateModel: wasm.evaluateModel,
   evaluateModelWithMarket: wasm.evaluateModelWithMarket,
-  runMonteCarlo: wasm.runMonteCarlo,
-  parseFormulaText: wasm.parseFormulaText,
-  validateFormula: wasm.validateFormula,
+  evaluateMonteCarlo: wasm.evaluateMonteCarlo,
+  parseFormula: wasm.parseFormula,
+  parseAndCompile: wasm.parseAndCompile,
 };

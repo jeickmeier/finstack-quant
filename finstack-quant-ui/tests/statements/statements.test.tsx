@@ -124,7 +124,8 @@ it("routes formula, explanation and check semantics to WASM", async () => {
   const preview = unwrap(
     await harness.proxy.validateStatementFormula("revenue * 0.2"),
   );
-  expect(preview).toBe(native.parseFormulaText("revenue * 0.2"));
+  expect(preview).toBe(native.parseFormula("revenue * 0.2"));
+  expect(preview).toBe("revenue * 0.2");
   const invalid = await harness.proxy.validateStatementFormula("revenue +");
   expect(invalid.ok).toBe(false);
   const result = unwrap(await harness.proxy.evaluateStatement({ modelJson }));

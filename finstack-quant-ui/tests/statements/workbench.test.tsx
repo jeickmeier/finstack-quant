@@ -42,8 +42,8 @@ beforeEach(() => {
       case "evaluateStatement":
         return native.evaluateModel(arg.modelJson);
       case "validateStatementFormula":
-        native.validateFormula(arg);
-        return native.parseFormulaText(arg);
+        native.parseAndCompile(arg);
+        return native.parseFormula(arg);
       default:
         throw new Error(`Unexpected worker call: ${method}`);
     }

@@ -871,7 +871,7 @@ fn statements_dts_matches_runtime_exports() {
     ));
     assert!(contains_ignoring_ws(
         &dts,
-        "runMonteCarlo(modelJson: string, configJson: string): Record<string, unknown>;",
+        "evaluateMonteCarlo(modelJson: string, configJson: string): Record<string, unknown>;",
     ));
     assert!(dts.contains("export interface StatementResultJson"));
     assert!(dts.contains("export declare const statements: StatementsNamespace;"));

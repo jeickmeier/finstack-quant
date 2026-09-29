@@ -94,14 +94,13 @@ fn evaluate_model_produces_computed_nodes() {
 // DSL
 
 #[wasm_bindgen_test]
-fn parse_formula_text_returns_non_empty_ast() {
-    let out = parse_formula_text("revenue - cogs").unwrap();
-    assert!(!out.is_empty());
+fn parse_formula_returns_canonical_text() {
+    assert_eq!(parse_formula("revenue-cogs").unwrap(), "revenue - cogs");
 }
 
 #[wasm_bindgen_test]
-fn validate_formula_accepts_valid() {
-    validate_formula("a + b").expect("should accept valid formula");
+fn parse_and_compile_accepts_valid() {
+    parse_and_compile("a + b").expect("should accept valid formula");
 }
 
 // Capital structure / waterfall validators
