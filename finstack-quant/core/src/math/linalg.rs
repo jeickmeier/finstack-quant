@@ -103,6 +103,25 @@ pub const CORRELATION_BOUND_SLACK: f64 = 1e-12;
 /// (diagonal ≈ 1) and general covariance matrices with large entries.
 pub const PIVOT_TOLERANCE_RELATIVE: f64 = 1e-10;
 
+/// Number of entries in an `n × n` row-major matrix, or `None` when `n * n`
+/// overflows `usize` (from `n = 65536` on 32-bit targets such as wasm32).
+///
+/// Every flat-matrix size check compares against this rather than an
+/// unchecked `n * n`, which wraps in release builds and lets a wrong-length
+/// buffer pass the check.
+#[inline]
+pub(crate) fn square_len(n: usize) -> Option<usize> {
+    n.checked_mul(n)
+}
+
+/// `n * n` for an error message, or a note that it overflows.
+fn square_len_label(n: usize) -> String {
+    square_len(n).map_or_else(
+        || "more entries than fit in memory".to_owned(),
+        |len| len.to_string(),
+    )
+}
+
 /// Detailed error type for correlation matrix operations.
 ///
 /// Validation variants preserve the first failure detected while checking a
@@ -114,7 +133,7 @@ pub const PIVOT_TOLERANCE_RELATIVE: f64 = 1e-10;
 #[non_exhaustive]
 pub enum CorrelationError {
     /// Matrix size does not match expected n×n.
-    #[error("Invalid matrix size: expected {expected}×{expected}={}, got {actual}", expected * expected)]
+    #[error("Invalid matrix size: expected {expected}×{expected} entries, got {actual}")]
     InvalidSize {
         /// Expected number of factors (n for n×n matrix).
         expected: usize,
@@ -496,7 +515,7 @@ pub fn cholesky_correlation(
     matrix: &[f64],
     n: usize,
 ) -> std::result::Result<CorrelationFactor, CholeskyError> {
-    if matrix.len() != n * n {
+    if square_len(n) != Some(matrix.len()) {
         return Err(CholeskyError::DimensionMismatch {
             expected: n,
             actual: matrix.len(),
@@ -665,7 +684,7 @@ pub fn symmetric_eigen(
     matrix: &[f64],
     n: usize,
 ) -> std::result::Result<(Vec<f64>, Vec<f64>), CholeskyError> {
-    if matrix.len() != n * n {
+    if square_len(n) != Some(matrix.len()) {
         return Err(CholeskyError::DimensionMismatch {
             expected: n,
             actual: matrix.len(),
@@ -779,7 +798,7 @@ pub fn cholesky_decomposition(
     matrix: &[f64],
     n: usize,
 ) -> std::result::Result<Vec<f64>, CholeskyError> {
-    if matrix.len() != n * n {
+    if square_len(n) != Some(matrix.len()) {
         return Err(CholeskyError::DimensionMismatch {
             expected: n,
             actual: matrix.len(),
@@ -851,7 +870,8 @@ pub fn cholesky_decomposition_into(
     n: usize,
     l: &mut [f64],
 ) -> std::result::Result<(), CholeskyError> {
-    if matrix.len() != n * n || l.len() != n * n {
+    let len = square_len(n);
+    if len != Some(matrix.len()) || len != Some(l.len()) {
         return Err(CholeskyError::DimensionMismatch {
             expected: n,
             actual: matrix.len(),
@@ -920,8 +940,9 @@ pub fn cholesky_decomposition_into(
 ///
 /// # Errors
 ///
-/// Returns [`crate::error::InputError::DimensionMismatch`] if `l.len() != n * n`
-/// or `z.len() != n`.
+/// Returns [`crate::Error::Validation`], naming both lengths, if `l` does not
+/// hold exactly `n * n` entries (including when `n * n` overflows `usize`) or
+/// `z.len() != n`.
 ///
 /// # Arguments
 ///
@@ -967,8 +988,18 @@ pub fn cholesky_decomposition_into(
 ///
 /// - [`CorrelationFactor::apply`] for the pivoted, rank-aware, allocation-free factor.
 pub fn apply_lower_triangular(l: &[f64], n: usize, z: &[f64]) -> Result<Vec<f64>> {
-    if l.len() != n * n || z.len() != n {
-        return Err(error::InputError::DimensionMismatch.into());
+    if square_len(n) != Some(l.len()) {
+        return Err(crate::Error::Validation(format!(
+            "lower-triangular factor has {} entries but a {n}x{n} factor needs {}",
+            l.len(),
+            square_len_label(n)
+        )));
+    }
+    if z.len() != n {
+        return Err(crate::Error::Validation(format!(
+            "vector has length {} but the factor is {n}x{n}",
+            z.len()
+        )));
     }
 
     let mut out = vec![0.0; n];
@@ -1005,8 +1036,18 @@ pub fn apply_lower_triangular(l: &[f64], n: usize, z: &[f64]) -> Result<Vec<f64>
 /// forward-substitution result and must not be used as a solution.
 pub fn cholesky_solve(chol: &[f64], b: &[f64], x: &mut [f64]) -> Result<()> {
     let n = b.len();
-    if chol.len() != n * n || x.len() != n {
-        return Err(crate::error::InputError::DimensionMismatch.into());
+    if square_len(n) != Some(chol.len()) {
+        return Err(crate::Error::Validation(format!(
+            "Cholesky factor has {} entries but a right-hand side of length {n} needs {}",
+            chol.len(),
+            square_len_label(n)
+        )));
+    }
+    if x.len() != n {
+        return Err(crate::Error::Validation(format!(
+            "solution buffer has length {} but the right-hand side has length {n}",
+            x.len()
+        )));
     }
     let diagonal_scale = (0..n)
         .map(|i| chol[i * n + i].abs())
@@ -1109,7 +1150,7 @@ pub fn validate_correlation_matrix(
     matrix: &[f64],
     n: usize,
 ) -> std::result::Result<(), CorrelationError> {
-    if matrix.len() != n * n {
+    if square_len(n) != Some(matrix.len()) {
         return Err(CorrelationError::InvalidSize {
             expected: n,
             actual: matrix.len(),
@@ -1200,9 +1241,9 @@ pub struct LedoitWolfResult {
 ///
 /// # Errors
 ///
-/// Returns [`crate::Error::Validation`] when `t < 2`, `n == 0`, or any entry
-/// is non-finite, and [`crate::InputError::DimensionMismatch`] when
-/// `observations.len() != t * n`.
+/// Returns [`crate::Error::Validation`] when `t < 2`, `n == 0`, any entry is
+/// non-finite, `observations.len() != t * n`, or the `n * n` covariance size
+/// overflows `usize`.
 ///
 /// # Examples
 ///
@@ -1236,8 +1277,16 @@ pub fn ledoit_wolf_shrinkage(
             "ledoit_wolf_shrinkage: need at least 2 observations, got {t}"
         )));
     }
-    if observations.len() != t * n {
-        return Err(crate::InputError::DimensionMismatch.into());
+    if t.checked_mul(n) != Some(observations.len()) {
+        return Err(crate::Error::Validation(format!(
+            "ledoit_wolf_shrinkage: {} observations do not form a {t}x{n} panel",
+            observations.len()
+        )));
+    }
+    if square_len(n).is_none() {
+        return Err(crate::Error::Validation(format!(
+            "ledoit_wolf_shrinkage: a {n}x{n} covariance matrix does not fit in memory"
+        )));
     }
     if let Some(bad) = observations.iter().find(|v| !v.is_finite()) {
         return Err(crate::Error::Validation(format!(
@@ -1328,6 +1377,47 @@ pub fn ledoit_wolf_shrinkage(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// A dimension whose square overflows `usize` on this target, so an
+    /// unchecked `n * n` wraps (to 0 for `2^(BITS/2)`) and a wrong-length
+    /// buffer would pass the size check.
+    const WRAPPING_N: [usize; 2] = [1 << (usize::BITS / 2), usize::MAX];
+
+    #[test]
+    fn size_checks_reject_a_square_that_overflows() {
+        for n in WRAPPING_N {
+            assert!(cholesky_decomposition(&[], n).is_err(), "n = {n}");
+            assert!(
+                cholesky_decomposition_into(&[], n, &mut []).is_err(),
+                "n = {n}"
+            );
+            assert!(cholesky_correlation(&[], n).is_err(), "n = {n}");
+            assert!(symmetric_eigen(&[], n).is_err(), "n = {n}");
+            assert!(apply_lower_triangular(&[], n, &[]).is_err(), "n = {n}");
+            assert!(ledoit_wolf_shrinkage(&[], 2, n).is_err(), "n = {n}");
+            let size_error = validate_correlation_matrix(&[], n).expect_err("wrapping n");
+            assert!(matches!(size_error, CorrelationError::InvalidSize { .. }));
+            // Display must not multiply the dimension either.
+            assert!(size_error.to_string().contains("entries, got 0"));
+        }
+    }
+
+    #[test]
+    fn cholesky_solve_names_both_lengths() {
+        let mut x = [0.0; 3];
+        let error = cholesky_solve(&[2.0, 0.0, 1.0, 1.0], &[2.0, 1.0, 0.0], &mut x)
+            .expect_err("a 2x2 factor cannot solve a length-3 system");
+        assert_eq!(error.kind(), crate::error::ErrorKind::Validation);
+        assert!(
+            error
+                .to_string()
+                .contains("4 entries but a right-hand side of length 3 needs 9"),
+            "{error}"
+        );
+        let mut x = [0.0; 2];
+        cholesky_solve(&[2.0, 0.0, 1.0, 1.0], &[2.0, 1.0], &mut x).expect("2x2 solve");
+        assert_eq!(x, [0.5, 0.0]);
+    }
 
     #[test]
     fn correlation_error_kind_survives_the_core_fold() {

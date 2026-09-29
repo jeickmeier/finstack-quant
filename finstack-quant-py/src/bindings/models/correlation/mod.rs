@@ -1472,13 +1472,6 @@ fn simulate_portfolio_loss(
 /// a 2-D array, validating the shape against ``n``.
 fn extract_square_matrix(matrix: &Bound<'_, PyAny>, n: usize) -> PyResult<Vec<f64>> {
     if let Ok(flat) = matrix.extract::<Vec<f64>>() {
-        if flat.len() != n * n {
-            return Err(value_error(format!(
-                "matrix has {} entries but n={n} requires {} (flat row-major n*n)",
-                flat.len(),
-                n * n
-            )));
-        }
         return Ok(flat);
     }
     let rows: Vec<Vec<f64>> = matrix.extract().map_err(|_| {

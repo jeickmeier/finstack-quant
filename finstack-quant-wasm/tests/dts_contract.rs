@@ -269,7 +269,7 @@ fn core_dts_exposes_typed_array_math() {
     ));
     assert!(contains_ignoring_ws(
         &dts,
-        "choleskySolve(chol: NumericArray, b: NumericArray, n: number): Float64Array;",
+        "choleskySolve(chol: NumericArray, b: NumericArray): Float64Array;",
     ));
     assert!(contains_ignoring_ws(
         &dts,

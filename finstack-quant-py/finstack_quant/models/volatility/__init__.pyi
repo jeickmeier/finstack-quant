@@ -1312,22 +1312,6 @@ class ArbitrageReport:
         ...
 
     @property
-    def elapsed_us(self) -> int:
-        """
-        Wall-clock microseconds spent on the check suite (non-deterministic).
-
-        Returns
-        -------
-        int
-            Elapsed run time in microseconds. Non-deterministic: it varies run to run and must not be used in golden comparisons.
-
-        Notes
-        -----
-        This accessor does not raise; it returns the stored value.
-        """
-        ...
-
-    @property
     def violations(self) -> list[_ArbitrageViolation]:
         """
         Violation rows as serde dicts, critical first.
@@ -1597,7 +1581,7 @@ def check_surface_grid(
     -------
     ArbitrageReport
         Typed report with ``total_violations``, ``passed``, ``by_severity``,
-        ``by_type``, ``violations``, ``elapsed_us`` and ``to_dataframe()``.
+        ``by_type``, ``violations`` and ``to_dataframe()``.
 
     Raises
     ------

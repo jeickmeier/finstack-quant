@@ -449,6 +449,8 @@ pub fn standard_normal_inv_cdf(p: f64) -> f64 {
 ///
 /// This is a thin wrapper around `statrs::distribution::StudentsT::cdf`.
 #[inline]
+/// A NaN `x` returns NaN (as [`norm_cdf`] does); statrs itself panics on it.
+///
 /// # Errors
 /// Returns a validation error when `df` is non-finite or not strictly positive.
 pub fn student_t_cdf(x: f64, df: f64) -> crate::Result<f64> {
@@ -456,6 +458,9 @@ pub fn student_t_cdf(x: f64, df: f64) -> crate::Result<f64> {
         return Err(crate::Error::Validation(format!(
             "student_t_cdf requires finite df > 0, got {df}"
         )));
+    }
+    if x.is_nan() {
+        return Ok(f64::NAN);
     }
     use statrs::distribution::{ContinuousCDF, StudentsT};
     StudentsT::new(0.0, 1.0, df)
@@ -525,6 +530,13 @@ pub fn student_t_inv_cdf(p: f64, df: f64) -> crate::Result<f64> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn student_t_cdf_propagates_nan() {
+        // statrs panics on a NaN argument; the wrapper returns NaN like norm_cdf.
+        assert!(student_t_cdf(f64::NAN, 5.0).expect("valid df").is_nan());
+        assert!(student_t_cdf(f64::NAN, 0.0).is_err());
+    }
 
     #[test]
     fn test_standard_normal_inv_cdf_out_of_domain_saturates() {

@@ -28,14 +28,14 @@ fn cholesky_decomposition_identity() {
 #[wasm_bindgen_test]
 fn cholesky_solve_solves_system() {
     let chol = cholesky_decomposition(&[4.0, 2.0, 2.0, 3.0], JsValue::from(2)).unwrap();
-    let x = cholesky_solve(&chol, &[2.0, 1.0], JsValue::from(2)).unwrap();
+    let x = cholesky_solve(&chol, &[2.0, 1.0]).unwrap();
     assert_eq!(x.len(), 2);
     assert!((x[0] - 0.5).abs() < 1e-10);
 }
 
 #[wasm_bindgen_test]
 fn cholesky_solve_rejects_wrong_rhs_length() {
-    assert!(cholesky_solve(&[1.0, 0.0, 0.0, 1.0], &[1.0], JsValue::from(2)).is_err());
+    assert!(cholesky_solve(&[1.0, 0.0, 0.0, 1.0], &[1.0]).is_err());
 }
 
 // ---- Statistics ----

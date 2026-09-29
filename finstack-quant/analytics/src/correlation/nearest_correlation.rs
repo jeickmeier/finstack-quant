@@ -105,7 +105,7 @@ pub fn nearest_correlation_matrix(
     n: usize,
     opts: NearestCorrelationOpts,
 ) -> Result<Vec<f64>> {
-    if input.len() != n * n {
+    if n.checked_mul(n) != Some(input.len()) {
         return Err(Error::InvalidSize {
             expected: n,
             actual: input.len(),

@@ -216,7 +216,6 @@ pub fn check_surface(
             "forward prices are required when arbitrage checks are enabled".into(),
         ));
     }
-    let start = std::time::Instant::now();
     let mut all_violations: Vec<ArbitrageViolation> = Vec::new();
 
     let forwards = if let Some(forwards) = &config.forward_prices {
@@ -269,7 +268,6 @@ pub fn check_surface(
         passed,
         counts_by_type,
         counts_by_severity,
-        elapsed_us: start.elapsed().as_micros() as u64,
     })
 }
 
@@ -926,7 +924,6 @@ mod tests {
         assert_eq!(report.vol_surface_id, deserialized.vol_surface_id);
         assert_eq!(report.passed, deserialized.passed);
         assert_eq!(report.violations.len(), deserialized.violations.len());
-        assert_eq!(report.elapsed_us, deserialized.elapsed_us);
     }
 
     #[test]

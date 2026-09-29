@@ -243,7 +243,7 @@ def test_matrix_helpers_accept_two_dimensional_input() -> None:
     assert nearest_correlation(rows, 2) == pytest.approx([1.0, 0.3, 0.3, 1.0])
     with pytest.raises(ValueError, match="got 2 rows with widths"):
         validate_correlation_matrix(rows, 3)
-    with pytest.raises(ValueError, match="requires 9"):
+    with pytest.raises(ValueError, match="expected 3×3 entries, got 4"):
         validate_correlation_matrix([1.0, 0.0, 0.0, 1.0], 3)
 
 

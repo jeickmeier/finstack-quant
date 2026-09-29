@@ -2,6 +2,21 @@
 
 ## [Unreleased]
 
+### WASM binding audit: wasm32 size safety (2026-09-29)
+
+#### Changed (BREAKING)
+
+- WASM `core.choleskySolve(chol, b)` drops its `n` argument; the system size is `b.length`, as in Rust `cholesky_solve` and Python `cholesky_solve(chol, b)`.
+- `ArbitrageReport.elapsed_us` is removed, along with the Python getter and `skip_elapsed`. The arbitrage checker no longer reads the wall clock, so its report is deterministic and safe on wasm32.
+- `cholesky_solve` and `apply_lower_triangular` return a `Validation` error that names both lengths, replacing the bare `DimensionMismatch`. `CorrelationError::InvalidSize` prints `expected n×n entries, got m`.
+
+#### Fixed
+
+- Flat-matrix size checks in `core::math::linalg` and `nearest_correlation_matrix` use checked `n * n`. A dimension whose square overflows `usize` (65536 on wasm32) used to wrap past the check and trap the WASM instance or panic in Python. It is now a validation error. `ledoit_wolf_shrinkage` checks `t * n` and `n * n` the same way.
+- `MertonModel::simulate_paths` sizes its buffers with checked arithmetic and fallible allocation. An oversized request is a validation error, not a trap or abort.
+- `student_t_cdf(NaN, df)` returns NaN instead of panicking inside statrs. `StudentTCopula::tail_dependence(NaN)` is therefore NaN in both hosts.
+- The WASM and Python bindings no longer repeat these size checks.
+
 ### WASM binding audit: Rust-owned error kinds (2026-09-29)
 
 #### Changed (BREAKING)

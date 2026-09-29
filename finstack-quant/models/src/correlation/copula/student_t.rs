@@ -545,6 +545,11 @@ mod tests {
     use finstack_quant_core::math::standard_normal_inv_cdf;
 
     #[test]
+    fn tail_dependence_of_nan_is_nan() {
+        assert!(StudentTCopula::new(5.0).tail_dependence(f64::NAN).is_nan());
+    }
+
+    #[test]
     fn test_student_t_creation() {
         let copula = StudentTCopula::new(5.0);
         // [Z, W]: the quadrature engine must integrate over both the Gaussian

@@ -89,14 +89,8 @@ fn cholesky_decomposition(py: Python<'_>, matrix: &Bound<'_, PyAny>) -> PyResult
 #[pyfunction]
 #[pyo3(text_signature = "(chol, b)")]
 fn cholesky_solve(py: Python<'_>, chol: &Bound<'_, PyAny>, b: Vec<f64>) -> PyResult<Vec<f64>> {
-    let (flat, n) = extract_square_matrix(chol)?;
-    if b.len() != n {
-        return Err(crate::errors::value_error(format!(
-            "Right-hand side has length {} but Cholesky factor is {n}x{n}",
-            b.len()
-        )));
-    }
-    let mut x = vec![0.0; n];
+    let (flat, _) = extract_square_matrix(chol)?;
+    let mut x = vec![0.0; b.len()];
     py.detach(|| linalg::cholesky_solve(&flat, &b, &mut x))
         .map_err(core_to_py)?;
     Ok(x)

@@ -2313,7 +2313,7 @@ export interface CoreNamespace {
    * @param l - Lower-triangular Cholesky factor as a flat row-major array of n × n entries.
    * @param n - Positive square-matrix dimension; flat arrays must contain n × n entries.
    * @param z - Vector of length n to transform, typically independent standard-normal draws.
-   * @throws Error - Throws a JavaScript exception if `n * n` overflows, `l` does not contain exactly `n * n` entries, or `z` does not contain exactly `n` entries.
+   * @throws Error - Throws a JavaScript exception if `l` does not contain exactly `n * n` entries (including when `n * n` overflows) or `z` does not contain exactly `n` entries.
    */
   applyLowerTriangular(l: NumericArray, n: number, z: NumericArray): Float64Array;
   /**
@@ -2324,18 +2324,17 @@ export interface CoreNamespace {
    * @param matrix - Flat row-major `n * n` entries of a symmetric positive-definite matrix.
    * @param n - Positive square-matrix dimension; `matrix` must contain exactly `n * n` entries.
    * @returns Lower-triangular factor L as a flat row-major `Float64Array`.
-   * @throws Error - Throws a JavaScript exception if `n * n` overflows, `matrix` does not contain exactly `n * n` entries, or the matrix contains a non-finite value, is singular, or is not positive definite.
+   * @throws Error - Throws a JavaScript exception if `matrix` does not contain exactly `n * n` entries (including when `n * n` overflows), or the matrix contains a non-finite value, is singular, or is not positive definite.
    */
   choleskyDecomposition(matrix: NumericArray, n: number): Float64Array;
   /**
    * Solve a symmetric positive-definite linear system from a flat Cholesky factor.
-   * @returns Solution vector `x` as a `Float64Array` of length `n`.
-   * @param chol - Lower-triangular Cholesky factor as a flat row-major `n * n` array.
-   * @param b - Right-hand-side vector of a linear system, aligned with the Cholesky factor dimension.
-   * @param n - Positive square-matrix dimension; flat arrays must contain n × n entries.
-   * @throws Error - Throws a JavaScript exception if `n * n` overflows, `chol` does not contain exactly `n * n` entries, `b` does not contain `n` entries, or a diagonal factor is singular.
+   * @param chol - Lower-triangular Cholesky factor as a flat row-major array of `b.length * b.length` entries.
+   * @param b - Right-hand-side vector of the linear system; its length is the system dimension.
+   * @returns Solution vector `x` of `L Lᵀ x = b`, with the same length as `b`.
+   * @throws Error - Throws a JavaScript exception if `chol` does not contain exactly `b.length * b.length` entries or a diagonal factor is singular.
    */
-  choleskySolve(chol: NumericArray, b: NumericArray, n: number): Float64Array;
+  choleskySolve(chol: NumericArray, b: NumericArray): Float64Array;
   /**
    * Arithmetic mean over a typed numeric array.
    * @param data - Numeric observations in input order; an empty series yields 0.0.

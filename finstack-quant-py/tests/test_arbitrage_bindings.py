@@ -13,7 +13,6 @@ def test_surface_report_keys_match_stub_contract() -> None:
 
     assert report.passed is True
     assert report.total_violations == 0
-    assert isinstance(report.elapsed_us, int)
     assert set(report.by_severity) == {"negligible", "minor", "major", "critical"}
     # Every `ArbitrageType` variant is reported, including the SVI checks.
     assert set(report.by_type) == {

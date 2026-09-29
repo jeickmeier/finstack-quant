@@ -18,39 +18,33 @@ use wasm_bindgen::prelude::*;
 ///
 /// # Errors
 ///
-/// Throws a JavaScript exception if `n * n` overflows, `matrix` does not contain
-/// exactly `n * n` entries, or the matrix contains a non-finite value, is
-/// singular, or is not positive definite.
+/// Throws a JavaScript exception if `matrix` does not contain exactly `n * n`
+/// entries (including when `n * n` overflows), or the matrix contains a
+/// non-finite value, is singular, or is not positive definite.
 #[wasm_bindgen(js_name = choleskyDecomposition)]
 pub fn cholesky_decomposition(matrix: &[f64], n: JsValue) -> Result<Box<[f64]>, JsValue> {
     let n: usize = js_uint(&n, "n")?;
-    validate_flat_matrix_len(matrix, n)?;
     linalg::cholesky_decomposition(matrix, n)
         .map(Vec::into_boxed_slice)
         .map_err(to_js_err)
 }
 
 /// Solve a symmetric positive-definite linear system from a flat Cholesky factor.
-/// @param chol - Lower-triangular Cholesky factor as a flat row-major `n * n` array.
-/// @param b - Right-hand-side vector of a linear system, aligned with the Cholesky factor dimension.
-/// @param n - Positive square-matrix dimension; flat arrays must contain n × n entries.
+///
+/// The system dimension is `b.length`, as in Rust `cholesky_solve` and Python
+/// `cholesky_solve(chol, b)`.
+/// @param chol - Lower-triangular Cholesky factor as a flat row-major array of
+///   `b.length * b.length` entries.
+/// @param b - Right-hand-side vector of the linear system; its length is the system dimension.
+/// @returns Solution vector `x` of `L Lᵀ x = b`, with the same length as `b`.
 ///
 /// # Errors
 ///
-/// Throws a JavaScript exception if `n * n` overflows, `chol` does not contain
-/// exactly `n * n` entries, `b` does not contain `n` entries, or a diagonal
-/// factor is singular.
+/// Throws a JavaScript exception if `chol` does not contain exactly
+/// `b.length * b.length` entries or a diagonal factor is singular.
 #[wasm_bindgen(js_name = choleskySolve)]
-pub fn cholesky_solve(chol: &[f64], b: &[f64], n: JsValue) -> Result<Box<[f64]>, JsValue> {
-    let n: usize = js_uint(&n, "n")?;
-    validate_flat_matrix_len(chol, n)?;
-    if b.len() != n {
-        return Err(to_js_err(format!(
-            "Right-hand side has length {} but Cholesky factor is {n}x{n}",
-            b.len()
-        )));
-    }
-    let mut x = vec![0.0; n];
+pub fn cholesky_solve(chol: &[f64], b: &[f64]) -> Result<Box<[f64]>, JsValue> {
+    let mut x = vec![0.0; b.len()];
     linalg::cholesky_solve(chol, b, &mut x).map_err(to_js_err)?;
     Ok(x.into_boxed_slice())
 }
@@ -67,12 +61,12 @@ pub fn cholesky_solve(chol: &[f64], b: &[f64], n: JsValue) -> Result<Box<[f64]>,
 ///
 /// # Errors
 ///
-/// Throws a JavaScript exception if `n * n` overflows, `l` does not contain
-/// exactly `n * n` entries, or `z` does not contain exactly `n` entries.
+/// Throws a JavaScript exception if `l` does not contain exactly `n * n`
+/// entries (including when `n * n` overflows) or `z` does not contain exactly
+/// `n` entries.
 #[wasm_bindgen(js_name = applyLowerTriangular)]
 pub fn apply_lower_triangular(l: &[f64], n: JsValue, z: &[f64]) -> Result<Box<[f64]>, JsValue> {
     let n: usize = js_uint(&n, "n")?;
-    validate_flat_matrix_len(l, n)?;
     linalg::apply_lower_triangular(l, n, z)
         .map(Vec::into_boxed_slice)
         .map_err(to_js_err)
@@ -192,19 +186,6 @@ pub fn neumaier_sum(values: &[f64]) -> f64 {
 #[wasm_bindgen(js_name = longestPositiveRun)]
 pub fn longest_positive_run(values: &[f64]) -> usize {
     math::longest_positive_run(values)
-}
-
-fn validate_flat_matrix_len(matrix: &[f64], n: usize) -> Result<(), JsValue> {
-    let expected = n
-        .checked_mul(n)
-        .ok_or_else(|| to_js_err("Matrix dimension is too large"))?;
-    if matrix.len() != expected {
-        return Err(to_js_err(format!(
-            "Flat matrix has length {} but expected {expected} for {n}x{n}",
-            matrix.len()
-        )));
-    }
-    Ok(())
 }
 
 #[cfg(test)]

@@ -93,12 +93,6 @@ impl PyArbitrageReport {
         self.inner.violations.len()
     }
 
-    /// Wall-clock microseconds spent on the check suite (non-deterministic).
-    #[getter]
-    fn elapsed_us(&self) -> u64 {
-        self.inner.elapsed_us
-    }
-
     /// Violation rows as serde dicts (``violation_type``, ``location``,
     /// ``severity``, ``magnitude``, ``description``, ``suggested_fix``).
     #[getter]
@@ -363,7 +357,7 @@ fn check_local_vol_density_grid<'py>(
 /// -------
 /// ArbitrageReport
 ///     Typed report with ``passed``, ``total_violations``, ``by_severity``,
-///     ``by_type``, ``violations``, ``elapsed_us`` and ``to_dataframe()``.
+///     ``by_type``, ``violations`` and ``to_dataframe()``.
 ///
 /// Raises
 /// ------
