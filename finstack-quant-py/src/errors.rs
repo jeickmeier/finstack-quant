@@ -17,8 +17,6 @@
 //!     ├── AnalyticsError
 //!     ├── CholeskyError
 //!     ├── PortfolioError
-//!     │   ├── ValuationError
-//!     │   └── FxError
 //!     └── ContractValidationError
 //!         ├── UnsupportedContractVersionError
 //!         ├── MissingContractVersionError
@@ -41,10 +39,17 @@
 //!   stop it being a `RuntimeError` and break existing `except RuntimeError`
 //!   handlers, so it is deliberately left out until PyO3 can express two bases.
 //!
-//! The bare `ValueError`/`KeyError`/`RuntimeError` values produced by
-//! [`core_to_py`], [`value_error`], and friends are deliberately left
-//! unclassified — reclassifying them would change the exception type of every
-//! existing call site.
+//! # Exception class from the Rust error kind
+//!
+//! Every typed Rust error reports a Rust-owned
+//! [`ErrorKind`](finstack_quant_core::error::ErrorKind), and [`kind_to_py`]
+//! turns it into the builtin class: `NotFound` → `KeyError`, `Validation` →
+//! `ValueError`, `Computation` → `RuntimeError`. A domain subclass is raised
+//! only where its base matches the kind: `AnalyticsError` and
+//! `PortfolioError` refine `ValueError`, so they are raised for
+//! validation-kind analytics and portfolio errors, and their not-found and
+//! computation errors raise `KeyError` / `RuntimeError`. The WASM binding
+//! reports the same kind as the error's `kind` property.
 
 use pyo3::exceptions::{PyKeyError, PyRuntimeError, PyValueError};
 use pyo3::prelude::*;
@@ -69,20 +74,6 @@ pyo3::create_exception!(
     PortfolioError,
     FinstackError,
     "Portfolio validation or calculation failure (inherits FinstackError, ValueError)."
-);
-
-pyo3::create_exception!(
-    finstack_quant.portfolio,
-    ValuationError,
-    PortfolioError,
-    "Portfolio valuation failure (inherits PortfolioError)."
-);
-
-pyo3::create_exception!(
-    finstack_quant.portfolio,
-    FxError,
-    PortfolioError,
-    "Portfolio FX conversion or market-data failure (inherits PortfolioError)."
 );
 
 pyo3::create_exception!(
@@ -120,25 +111,21 @@ pyo3::create_exception!(
     "Persisted contract resource limit exceeded (inherits ContractValidationError)."
 );
 
-/// Format an error and its full `source()` chain into a single string.
-///
-/// PyO3 exceptions only carry a message, not a structured cause chain, so we
-/// concatenate every level of context (`top: first cause: deeper cause: …`)
-/// into the message. This mirrors `anyhow`'s default display and lets quants
-/// see the full diagnostic context in Python without dropping back to Rust.
-fn format_chain(err: &dyn std::error::Error) -> String {
-    let mut out = err.to_string();
-    let mut src = err.source();
-    while let Some(cause) = src {
-        // De-duplicate when a wrapper already included the inner display.
-        let msg = cause.to_string();
-        if !out.ends_with(&msg) {
-            out.push_str(": ");
-            out.push_str(&msg);
-        }
-        src = cause.source();
+/// Flatten an error and its `source()` chain into one message (see
+/// [`finstack_quant_core::error::format_chain`]).
+fn format_chain(err: &(dyn std::error::Error + 'static)) -> String {
+    finstack_quant_core::error::format_chain(err)
+}
+
+/// Build the builtin exception for a Rust-owned error kind: `NotFound` →
+/// `KeyError`, `Validation` → `ValueError`, `Computation` → `RuntimeError`.
+pub fn kind_to_py(kind: finstack_quant_core::error::ErrorKind, message: String) -> PyErr {
+    use finstack_quant_core::error::ErrorKind;
+    match kind {
+        ErrorKind::NotFound => PyKeyError::new_err(message),
+        ErrorKind::Validation => PyValueError::new_err(message),
+        ErrorKind::Computation => PyRuntimeError::new_err(message),
     }
-    out
 }
 
 /// Convert a `finstack_quant_core::Error` into a Python exception.
@@ -156,16 +143,7 @@ fn format_chain(err: &dyn std::error::Error) -> String {
 /// - `MetricCalculationFailed` → classified recursively by its underlying cause
 /// - Everything else → `ValueError`
 pub fn core_to_py(e: finstack_quant_core::Error) -> PyErr {
-    use finstack_quant_core::error::ErrorKind;
-
-    let message = format_chain(&e);
-    match e.kind() {
-        ErrorKind::NotFound => PyKeyError::new_err(message),
-        // Numerical non-convergence and allocation-limit breaches are
-        // operational states, not bad user input.
-        ErrorKind::Computation => PyRuntimeError::new_err(message),
-        ErrorKind::Validation => PyValueError::new_err(message),
-    }
+    kind_to_py(e.kind(), format_chain(&e))
 }
 
 /// Convert a `PdCalibrationError` into a Python exception.
@@ -175,23 +153,10 @@ pub fn pd_calibration_to_py(e: finstack_quant_models::credit::pd::PdCalibrationE
     PyValueError::new_err(format_chain(&e))
 }
 
-/// Convert a `MigrationError` into a Python exception.
-///
-/// Mirrors [`core_to_py`]: label/state lookup misses raise `KeyError`,
-/// numerical/operational failures raise `RuntimeError`, validation failures
-/// raise `ValueError`.
+/// Convert a `MigrationError` into a Python exception by its Rust-owned
+/// [`MigrationError::kind`](finstack_quant_models::credit::migration::MigrationError::kind).
 pub fn migration_to_py(e: finstack_quant_models::credit::migration::MigrationError) -> PyErr {
-    use finstack_quant_models::credit::migration::MigrationError as E;
-    let message = format_chain(&e);
-    match &e {
-        E::UnknownState { .. } | E::NoWarfFactor { .. } => PyKeyError::new_err(message),
-        E::NoValidGenerator { .. }
-        | E::ComplexEigenvalues
-        | E::RoundTripError { .. }
-        | E::SingularMatrix
-        | E::Internal(_) => PyRuntimeError::new_err(message),
-        _ => PyValueError::new_err(message),
-    }
+    kind_to_py(e.kind(), format_chain(&e))
 }
 
 /// Convert an analytics-domain core error into a Python `AnalyticsError`.
@@ -200,71 +165,50 @@ pub fn migration_to_py(e: finstack_quant_models::credit::migration::MigrationErr
 /// `ValueError`, so existing callers catching `ValueError` remain compatible
 /// while analytics users can opt into a narrower exception type.
 pub fn analytics_to_py(e: finstack_quant_core::Error) -> PyErr {
-    use finstack_quant_core::error::ErrorKind;
-
-    let message = format_chain(&e);
     match e.kind() {
-        ErrorKind::NotFound => PyKeyError::new_err(message),
-        ErrorKind::Computation => PyRuntimeError::new_err(message),
-        ErrorKind::Validation => AnalyticsError::new_err(message),
+        finstack_quant_core::error::ErrorKind::Validation => {
+            AnalyticsError::new_err(format_chain(&e))
+        }
+        kind => kind_to_py(kind, format_chain(&e)),
     }
 }
 
-/// Convert a `finstack_quant_scenarios::Error` into a Python exception.
-///
-/// Lookup misses (`MarketDataNotFound`, `NodeNotFound`, `TenorNotFound`,
-/// `InstrumentNotFound`) raise `KeyError`; engine/computation failures
-/// (`Internal`) raise `RuntimeError`; wrapped core/statements/valuations
-/// errors delegate to their own mappers; everything else (validation,
-/// unsupported operation, malformed tenor/period) raises `ValueError`.
+/// Convert a `finstack_quant_scenarios::Error` into a Python exception by its
+/// Rust-owned kind. Wrapped core, statements and valuations errors keep their
+/// own message rendering.
 pub fn scenarios_to_py(e: finstack_quant_scenarios::Error) -> PyErr {
     use finstack_quant_scenarios::Error as SErr;
     match e {
         SErr::Core(core) => core_to_py(core),
         SErr::Statements(inner) => statements_to_py(inner),
         SErr::Valuations(inner) => core_to_py(inner.into()),
-        err @ (SErr::MarketDataNotFound { .. }
-        | SErr::NodeNotFound { .. }
-        | SErr::TenorNotFound { .. }
-        | SErr::InstrumentNotFound(_)) => PyKeyError::new_err(format_chain(&err)),
-        err @ SErr::Internal(_) => PyRuntimeError::new_err(format_chain(&err)),
-        err => PyValueError::new_err(format_chain(&err)),
+        err => kind_to_py(err.kind(), format_chain(&err)),
     }
 }
 
-/// Convert a factor-model `DecompositionError` into a Python exception.
-///
-/// `UnknownIssuer` is a lookup miss and raises `KeyError`; `ModelInconsistent`
-/// is an operational invariant failure and raises `RuntimeError`; the
-/// remaining shape/tag validation failures raise `ValueError`.
+/// Convert a factor-model `DecompositionError` into a Python exception by its
+/// Rust-owned kind (unknown issuer → `KeyError`, inconsistent model →
+/// `RuntimeError`, otherwise `ValueError`).
 pub fn decomposition_error_to_py(
     e: finstack_quant_models::factor::credit::decomposition::DecompositionError,
 ) -> PyErr {
-    use finstack_quant_models::factor::credit::decomposition::DecompositionError as E;
-    let message = format_chain(&e);
-    match &e {
-        E::UnknownIssuer { .. } => PyKeyError::new_err(message),
-        E::ModelInconsistent { .. } => PyRuntimeError::new_err(message),
-        _ => PyValueError::new_err(message),
-    }
+    kind_to_py(e.kind(), format_chain(&e))
 }
 
-/// Convert a `finstack_quant_portfolio::Error` into a portfolio-domain Python exception.
-///
-/// The named subclasses preserve compatibility with callers catching
-/// `ValueError` or `PortfolioError`, while letting portfolio users distinguish
-/// valuation and FX/market-data failures.
+/// Convert a `finstack_quant_portfolio::Error` into a Python exception by its
+/// Rust-owned kind: validation errors raise `PortfolioError` (a `ValueError`),
+/// not-found errors (unknown entity, missing market data or FX rate, a
+/// valuation that failed on missing data) raise `KeyError`, and computation
+/// failures raise `RuntimeError`.
 pub fn portfolio_to_py(e: finstack_quant_portfolio::Error) -> PyErr {
     match e {
         finstack_quant_portfolio::Error::Core(core) => core_to_py(core),
-        err @ finstack_quant_portfolio::Error::ValuationError { .. } => {
-            ValuationError::new_err(format_chain(&err))
-        }
-        err @ (finstack_quant_portfolio::Error::FxConversionFailed { .. }
-        | finstack_quant_portfolio::Error::MissingMarketData(_)) => {
-            FxError::new_err(format_chain(&err))
-        }
-        err => PortfolioError::new_err(format_chain(&err)),
+        err => match err.kind() {
+            finstack_quant_core::error::ErrorKind::Validation => {
+                PortfolioError::new_err(format_chain(&err))
+            }
+            kind => kind_to_py(kind, format_chain(&err)),
+        },
     }
 }
 
@@ -318,10 +262,7 @@ fn contract_report_to_py(
     py: Python<'_>,
     report: &finstack_quant_core::contract::ValidationReport,
 ) -> PyErr {
-    let error = ContractValidationError::new_err(format!(
-        "validation failed with {} structured diagnostic(s)",
-        report.diagnostics.len()
-    ));
+    let error = ContractValidationError::new_err(report.summary());
     match diagnostics_to_py(py, report) {
         Ok(diagnostics) => {
             if let Err(setattr_error) = error.value(py).setattr("report", diagnostics) {
@@ -387,28 +328,16 @@ fn severity_name(severity: finstack_quant_core::contract::Severity) -> &'static 
     }
 }
 
-/// Convert a `finstack_quant_statements::Error` into a Python exception.
-///
-/// Follows the binding error contract: lookup failures (missing node / data /
-/// registry metric) raise `KeyError`; core errors delegate to [`core_to_py`]
-/// (so e.g. a missing curve stays a `KeyError`); operational failures
-/// (I/O, capital-structure, index) raise `RuntimeError`; malformed input —
-/// including deserialization (`Serde`) — and the remaining validation/argument
-/// errors raise `ValueError`. The full source chain is preserved via
-/// [`format_chain`].
+/// Convert a `finstack_quant_statements::Error` into a Python exception by its
+/// Rust-owned [`kind`](finstack_quant_statements::Error::kind): lookup
+/// failures (missing node / data / registry entry) raise `KeyError`, cycles
+/// and capital-structure failures `RuntimeError`, and malformed input —
+/// including formula evaluation errors and deserialization — `ValueError`.
+/// Core errors keep their own mapping; the source chain is preserved.
 pub fn statements_to_py(e: finstack_quant_statements::Error) -> PyErr {
-    use finstack_quant_statements::Error as SErr;
     match e {
-        SErr::Core(core) => core_to_py(core),
-        err @ (SErr::NodeNotFound(_) | SErr::MissingData(_) | SErr::RegistryNotFound(_)) => {
-            PyKeyError::new_err(format_chain(&err))
-        }
-        // `Serde` is malformed *input*, not an operational failure: bad JSON at
-        // one entry point (`MetricRegistry.load_from_json_str`) must raise the
-        // same `ValueError` as bad JSON at another (`FinancialModelSpec.from_json`),
-        // so a caller catching `ValueError` for bad config handles both.
-        err @ SErr::CapitalStructure(_) => PyRuntimeError::new_err(format_chain(&err)),
-        err => PyValueError::new_err(format_chain(&err)),
+        finstack_quant_statements::Error::Core(core) => core_to_py(core),
+        err => kind_to_py(err.kind(), format_chain(&err)),
     }
 }
 

@@ -38,9 +38,9 @@ create_exception!(
     CalibrationEnvelopeError,
     PyRuntimeError,
     "Raised when calibration ingestion, validation, context construction, or solving fails.\n\n\
-     Carries `kind`, `stage`, `step_id`, `solver_diagnostics`, `details` (JSON string) and \
-     `diagnostics` (list of strict-load diagnostic dicts with `pointer`, `message`, `code`, \
-     `expected_version`, ...) attributes for programmatic handling."
+     Carries `kind`, `stage`, `step_id`, `solver_diagnostics` (dict or None), `details` \
+     (JSON string) and `diagnostics` (list of strict-load diagnostic dicts with `pointer`, \
+     `message`, `code`, `expected_version`, ...) attributes for programmatic handling."
 );
 
 /// Attach the Rust-owned host-error payload to `CalibrationEnvelopeError`.
@@ -58,6 +58,21 @@ pub(crate) fn execute_error_to_py(py: Python<'_>, err: ExecuteError) -> PyErr {
             ))
         }
     };
+    let solver_diagnostics = match host
+        .solver_diagnostics
+        .as_ref()
+        .map(|diagnostics| crate::bindings::pandas_utils::serde_to_py(py, diagnostics))
+        .transpose()
+    {
+        Ok(dict) => dict,
+        Err(convert_err) => {
+            return PyRuntimeError::new_err(format!(
+                "failed to convert calibration solver diagnostics ({}): underlying calibration error: {}",
+                convert_err.value(py),
+                host.message
+            ))
+        }
+    };
     let attrs: [(&str, PyResult<()>); 6] = [
         ("kind", value.setattr("kind", host.kind)),
         ("stage", value.setattr("stage", host.stage.as_str())),
@@ -65,7 +80,7 @@ pub(crate) fn execute_error_to_py(py: Python<'_>, err: ExecuteError) -> PyErr {
         ("step_id", value.setattr("step_id", host.step_id)),
         (
             "solver_diagnostics",
-            value.setattr("solver_diagnostics", host.solver_diagnostics),
+            value.setattr("solver_diagnostics", solver_diagnostics),
         ),
         ("diagnostics", value.setattr("diagnostics", diagnostics)),
     ];

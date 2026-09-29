@@ -9,7 +9,7 @@
 //! removed because the underlying implementation was known-divergent
 //! off-ATM. Use `bs_cos_price` for all Black-Scholes Fourier pricing.
 
-use crate::errors::display_to_py;
+use crate::errors::core_to_py;
 use finstack_quant_models::fourier::cos::{
     bs_cos_price as rust_bs_cos_price, merton_jump_cos_price as rust_merton_jump_cos_price,
     vg_cos_price as rust_vg_cos_price, BlackScholesCosParams, MertonJumpCosParams,
@@ -78,7 +78,7 @@ fn bs_cos_price(
             is_call,
             n_terms,
         })
-        .map_err(display_to_py)
+        .map_err(|error| core_to_py(error.into()))
     })
 }
 
@@ -145,7 +145,7 @@ fn vg_cos_price(
             is_call,
             n_terms,
         })
-        .map_err(display_to_py)
+        .map_err(|error| core_to_py(error.into()))
     })
 }
 
@@ -217,7 +217,7 @@ fn merton_jump_cos_price(
             is_call,
             n_terms,
         })
-        .map_err(display_to_py)
+        .map_err(|error| core_to_py(error.into()))
     })
 }
 

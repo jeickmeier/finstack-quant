@@ -17,6 +17,18 @@ description = "Canonical Rust→Python structural parity contract"
 umbrella_crate = "finstack-quant"
 umbrella_lib = "finstack-quant/src/lib.rs"
 
+# Error mapping (both hosts). Every Rust error exposes `kind()`; neither binding
+# chooses a kind. Python raises NotFound -> KeyError, Validation -> ValueError,
+# Computation -> RuntimeError (`errors::kind_to_py`). A documented domain
+# subclass (PortfolioError, AnalyticsError, the ContractValidationError family,
+# CholeskyError) is raised only where its base class matches the kind.
+# CalibrationEnvelopeError (RuntimeError) is the one named exception whose
+# `kind` attribute is the calibration execution category. WASM throws
+# FinstackError with `kind` = not_found | validation | computation (plus the
+# host-only invalid_type) and `code` = the Rust `code()` where one exists.
+# Behavioural parity: tests/test_error_kinds.py and
+# finstack-quant-wasm/tests/facade/error_kinds.test.mjs drive the same failures.
+
 # ---------------------------------------------------------------------------
 # finstack-quant-core  →  finstack_quant.core
 # ---------------------------------------------------------------------------
@@ -1491,7 +1503,7 @@ builder      = { python = "finstack_quant.portfolio",              status = "fla
 cashflows    = { python = "finstack_quant.portfolio.cashflows",    status = "missing", note = "Bindings are currently exported from finstack_quant.portfolio root" }
 dataframe    = { python = "finstack_quant.portfolio.dataframe",    status = "missing", note = "The Rust root re-exports positions_to_table/entities_to_table/metrics_to_table/aggregated_metrics_to_table, but Python does not bind the free functions; they back the typed exits (PortfolioValuation.to_dataframe/to_arrow_positions, PortfolioMetrics.to_position_dataframe/to_aggregated_dataframe). entities_to_table has no host consumer yet." }
 dependencies = { python = "finstack_quant.portfolio.dependencies", status = "missing" }
-error        = { python = "finstack_quant.portfolio",              status = "flattened", note = "The Rust Error/Result surface flattens onto the Python root as PortfolioError, ValuationError, and FxError (plus the materialization ContractValidationError family); optimization outcomes use the typed OptimizationStatus result envelope" }
+error        = { python = "finstack_quant.portfolio",              status = "flattened", note = "The Rust Error/Result surface flattens onto the Python root as PortfolioError (validation-kind failures) plus the materialization ContractValidationError family; not-found failures (unknown entity, missing market data, missing FX) raise KeyError and computation failures RuntimeError, per Error::kind(). Optimization outcomes use the typed OptimizationStatus result envelope" }
 excess_return = { python = "finstack_quant.portfolio",             status = "flattened", note = "Duration-matched credit excess return functions (cell_returns_from_reference, cell_returns_from_curves, excess_returns) are exported flat on finstack_quant.portfolio (Dynkin, Hyman & Vankudre 1998, Appendix B); duration_cell_label remains Rust-only" }
 factor_brinson = { python = "finstack_quant.portfolio",            status = "flattened", note = "Jeet-Partani (2023) factor-Brinson unified attribution (factor_brinson_attribution) is exported flat on finstack_quant.portfolio" }
 factor_model = { python = "finstack_quant.portfolio",              status = "flattened", note = "Portfolio-owned assignment, what-if, valuation stress, and credit report adapters remain flat on finstack_quant.portfolio; pure risk kernels are owned by finstack_quant.models.factor.risk." }
@@ -1552,8 +1564,6 @@ public = [
     "FiCarinoLinkedResult",
     "FiReconciliationReport",
     "FinstackError",
-    "FxError",
-    "ValuationError",
     "GridAttributionResult",
     "GridCarinoLinkedResult",
     "Inequality",
@@ -1707,7 +1717,7 @@ status = "exists"
 # of contract scope by the scoping rule; they are intentionally not listed.)
 engine    = { python = "finstack_quant.scenarios",           status = "flattened", note = "ApplicationReport (typed) plus apply_scenario / apply_scenario_to_market are exported flat on finstack_quant.scenarios; ScenarioEngine, ExecutionContext, ApplicationEnvelope, and RollForwardReport remain Rust-only (reports cross the boundary as ApplicationResult / structured objects). All three Python entry points (apply_scenario, apply_scenario_to_market, compute_horizon_return) build the engine through one bindings::scenarios::extract::scenario_engine(config) helper that threads the caller's FinstackConfig and attaches a CachedRecalibrationProvider; HorizonAnalysis::with_recalibration_provider carries the same provider into metrics_based pricing" }
 envelope  = { python = "finstack_quant.scenarios.envelope",  status = "missing", note = "Versioned persistence envelope (ScenarioEnvelope, ScenarioSchema, SCENARIO_CONTRACT) is bound in no host; Rust-only" }
-error     = { python = "finstack_quant.scenarios.error",     status = "missing", note = "No typed exception classes are bound; errors map through errors::scenarios_to_py (lookup misses MarketDataNotFound/NodeNotFound/TenorNotFound/InstrumentNotFound -> KeyError, Internal -> RuntimeError, everything else -> ValueError). From<scenarios::Error> for core::Error keeps the NotFound kind for the same four variants" }
+error     = { python = "finstack_quant.scenarios.error",     status = "missing", note = "No typed exception classes are bound; errors map through errors::scenarios_to_py on scenarios::Error::kind() (lookup misses MarketDataNotFound/NodeNotFound/TenorNotFound/InstrumentNotFound -> KeyError, Internal -> RuntimeError, wrapped core/statements/valuations errors keep their own kind, everything else -> ValueError). From<scenarios::Error> for core::Error keeps the kind" }
 horizon   = { python = "finstack_quant.scenarios",           status = "flattened", note = "compute_horizon_return and the typed HorizonResult are exported flat on finstack_quant.scenarios; HorizonAnalysis (builder-style analyzer) remains Rust-only. Both hosts parse the attribution method through the canonical scenarios::horizon::attribution_method_from_str" }
 spec      = { python = "finstack_quant.scenarios",           status = "flattened", note = "ScenarioSpec, OperationSpec (typed classmethod constructors), RateBindingSpec, HierarchyTarget (core::market_data::hierarchy::HierarchyTarget, bound here because only hierarchy-targeted operations consume it), and the enums CurveKind/TenorMatchMode/TimeRollMode/Compounding are exported flat; every enum also constructs from its wire label (CurveKind('par_cds')) and OperationSpec constructors accept the wrapper or the label. ScenarioSpec.hazard_bump_mode is a shared string-literal field in both hosts (solve_to_par / first_order_shift), not a typed host enum. Construction is ScenarioSpec(...) / ScenarioSpec.from_json (the former build_scenario_spec / parse_scenario_spec free functions were removed as duplicates); compose_scenarios returns a typed ScenarioSpec and validate_scenario_spec accepts ScenarioSpec | str. OperationSpec.curve_parallel_bp(curve_id=list[str]) expands via Rust ScenarioSpec::parallel_bp_many." }
 templates = { python = "finstack_quant.scenarios",           status = "flattened", note = "TemplateMetadata plus registry access (list_builtin_templates, list_builtin_template_metadata, build_from_template, list_template_components, build_template_component) are exported flat; TemplateRegistry/RegisteredTemplate types remain Rust-only. WASM returns equivalent plain objects." }
@@ -2636,7 +2646,6 @@ backlog = [
     "FiAttributionResult",
     "FiCarinoLinkedResult",
     "FiReconciliationReport",
-    "FxError",
     "GridAttributionResult",
     "GridCarinoLinkedResult",
     "Inequality",
@@ -2674,7 +2683,6 @@ backlog = [
     "TradeUniverse",
     "UnmatchedEntry",
     "UnsupportedContractVersionError",
-    "ValuationError",
     "WeightAllocationResult",
     "WeightingScheme",
     "WhatIfResult",

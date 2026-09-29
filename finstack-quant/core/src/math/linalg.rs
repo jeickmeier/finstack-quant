@@ -168,6 +168,56 @@ pub enum CorrelationError {
     EigenDecompositionFailed,
 }
 
+impl CorrelationError {
+    /// Host-exception category: an exhausted iteration budget or a failed
+    /// eigendecomposition is a [`ErrorKind::Computation`](crate::error::ErrorKind::Computation)
+    /// failure; every other variant rejects the input matrix
+    /// ([`ErrorKind::Validation`](crate::error::ErrorKind::Validation)).
+    ///
+    /// Agrees with `crate::Error::from(self).kind()`.
+    #[must_use]
+    pub fn kind(&self) -> crate::error::ErrorKind {
+        match self {
+            Self::DidNotConverge { .. } | Self::EigenDecompositionFailed => {
+                crate::error::ErrorKind::Computation
+            }
+            Self::InvalidSize { .. }
+            | Self::DiagonalNotOne { .. }
+            | Self::NotSymmetric { .. }
+            | Self::NotPositiveSemiDefinite { .. }
+            | Self::OutOfBounds { .. } => crate::error::ErrorKind::Validation,
+        }
+    }
+}
+
+impl From<CorrelationError> for crate::Error {
+    /// Fold a correlation failure into the core taxonomy, keeping its
+    /// [`CorrelationError::kind`]: iterative failures become
+    /// `InputError::SolverConvergenceFailed`, everything else a validation error
+    /// with the full message.
+    fn from(error: CorrelationError) -> Self {
+        match error {
+            CorrelationError::DidNotConverge { max_iter, tol } => {
+                crate::Error::Input(error::InputError::SolverConvergenceFailed {
+                    iterations: max_iter,
+                    residual: tol,
+                    last_x: f64::NAN,
+                    reason: error.to_string(),
+                })
+            }
+            CorrelationError::EigenDecompositionFailed => {
+                crate::Error::Input(error::InputError::SolverConvergenceFailed {
+                    iterations: 0,
+                    residual: f64::NAN,
+                    last_x: f64::NAN,
+                    reason: error.to_string(),
+                })
+            }
+            other => crate::Error::Validation(other.to_string()),
+        }
+    }
+}
+
 /// Error type for Cholesky decomposition failures.
 #[derive(Debug, Clone, PartialEq, Error, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -1278,6 +1328,45 @@ pub fn ledoit_wolf_shrinkage(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn correlation_error_kind_survives_the_core_fold() {
+        use crate::error::ErrorKind;
+        let cases = [
+            (
+                CorrelationError::DidNotConverge {
+                    max_iter: 3,
+                    tol: 1e-9,
+                },
+                ErrorKind::Computation,
+            ),
+            (
+                CorrelationError::EigenDecompositionFailed,
+                ErrorKind::Computation,
+            ),
+            (
+                CorrelationError::InvalidSize {
+                    expected: 2,
+                    actual: 3,
+                },
+                ErrorKind::Validation,
+            ),
+            (
+                CorrelationError::DiagonalNotOne {
+                    index: 0,
+                    value: 2.0,
+                },
+                ErrorKind::Validation,
+            ),
+        ];
+        for (error, kind) in cases {
+            assert_eq!(error.kind(), kind, "{error}");
+            let message = error.to_string();
+            let core = crate::Error::from(error);
+            assert_eq!(core.kind(), kind);
+            assert!(core.to_string().contains(&message), "{core}");
+        }
+    }
 
     #[test]
     fn test_cholesky_2x2() {

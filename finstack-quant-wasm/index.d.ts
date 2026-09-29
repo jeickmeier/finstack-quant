@@ -37,6 +37,8 @@
 //     or 'solver'
 //   - step_id: offending step ID, or undefined for plan-wide failures
 //   - solver_diagnostics: structured fit diagnostics, or undefined when unavailable
+//   - diagnostics: strict-load diagnostics array (empty unless ingestion
+//     rejected the document)
 //   - details: JSON-serialized stable execution-error payload
 //   - cause: the same stable execution-error payload as a structured object
 // `kind` and `step_id` are independent: never use a step ID as the category.
@@ -2297,7 +2299,7 @@ export interface CoreNamespace {
    * Reciprocal of a strictly positive finite FX rate.
    * @param rate - Outright FX rate to invert, in quote-per-base units. Must be finite and strictly positive; the reciprocal must also be a valid FX rate.
    * @returns `1 / rate` when that reciprocal is a valid FX rate.
-   * @throws Error - Throws a JavaScript exception if `rate` is non-finite, non-positive, or when `1 / rate` is not a usable FX rate (overflow to infinity, zero, or a negative value).
+   * @throws Error - Throws a `validation` error if `rate` is non-finite, zero or negative, or its reciprocal overflows.
    */
   invertFxRate(rate: number): number;
   /**
@@ -3024,9 +3026,9 @@ declare class Performance {
    * core DayCount names such as `"act_365f"` or `"bus_252"`. `bus_252`
    * requires `calendarId`.
    * @param dayCount - Optional day-count: `"act365_25"` or a core name such as `"act_365f"`; defaults to Act/365.25.
-   * @param calendarId - Optional holiday-calendar id; required for `bus_252`.
+   * @param calendarId - Optional holiday-calendar id, or `+`-joined ids for a union calendar (`"nyse+gblo"`); required for `bus_252`.
    * @returns Per-ticker values as a Float64Array in `tickerNames()` order.
-   * @throws Error - Rejects an unknown day-count or calendar id, a missing calendar when `bus_252` is requested, or a ticker whose active range has no positive holding period.
+   * @throws Error - Rejects an unknown day-count (kind `validation`), an unknown calendar id (kind `not_found`, with suggestions), a missing calendar when `bus_252` is requested, or a ticker whose active range has no positive holding period.
    */
   cagr(dayCount?: string, calendarId?: string): Float64Array;
   /**
@@ -3977,7 +3979,7 @@ export interface FactorModelCreditNamespace {
    * @param observedGeneric - Observed generic-market spread in decimal, aligned with the model factors.
    * @param asOf - ISO-8601 valuation date used to stamp the snapshot.
    * @param runtimeTagsJson - Optional runtime-tag JSON for issuers missing from the artifact.
-   * @throws Error - Throws if an issuer has no model row and no `runtime_tags` entry, if `as_of` cannot be parsed, or if a spread is outside the decimal band.
+   * @throws Error - Throws a `not_found` error if an issuer has no model row and no `runtime_tags` entry, and a `validation` error if `as_of` cannot be parsed or a spread is outside the decimal band.
    */
   decomposeLevels(
     model: CreditFactorModel,
@@ -4688,7 +4690,7 @@ export interface CorrelationNamespace {
    * @param n - Positive square-matrix dimension; `matrix` must contain exactly `n * n` entries.
    * @param maxIter - Maximum number of Higham nearest-correlation projection iterations.
    * @param tol - Positive convergence tolerance for the nearest-correlation projection.
-   * @throws Error - Throws a JavaScript exception if the flat length is not `n * n`, the input has a gross diagonal or symmetry violation, or the projection does not converge within `maxIter` iterations at `tol`.
+   * @throws Error - Throws a `validation` error if the flat length is not `n * n` or the input has a gross diagonal or symmetry violation, and a `computation` error if the projection does not converge within `maxIter` iterations at `tol`.
    */
   nearestCorrelation(matrix: NumericArray, n: number, maxIter?: number, tol?: number): Float64Array;
   /**
@@ -8427,7 +8429,7 @@ export interface ModelsNamespace {
    * @param expiry - Time to option expiry in years.
    * @param isCall - Whether to value a call (`true`) or put (`false`).
    * @param nTerms - Optional number of COS expansion terms in `1..=65536`; omit to use the pricer default (128).
-   * @throws Error - Throws a JavaScript exception if `nTerms` is outside `1..=65536`, `vol` is not positive, the model produces a degenerate or invalid COS truncation range, a non-finite characteristic-function value or forward moment, or a non-finite option price.
+   * @throws Error - Throws a `validation` error if `nTerms` is outside `1..=65536` or `vol` is not positive, and a `computation` error if the model produces a degenerate or invalid COS truncation range, a non-finite characteristic-function value or forward moment, or a non-finite option price.
    */
   bsCosPrice(
     spot: number,
@@ -8455,7 +8457,7 @@ export interface ModelsNamespace {
    * @param expiry - Time to option expiry in years.
    * @param isCall - Whether to value a call (`true`) or put (`false`).
    * @param nTerms - Optional number of COS expansion terms in `1..=65536`; omit to use the pricer default (128).
-   * @throws Error - Throws a JavaScript exception if `nTerms` is outside `1..=65536`, the model produces a degenerate or invalid COS truncation range, a non-finite characteristic-function value or forward moment, or a non-finite option price.
+   * @throws Error - Throws a `validation` error if `nTerms` is outside `1..=65536`, and a `computation` error if the model produces a degenerate or invalid COS truncation range, a non-finite characteristic-function value or forward moment, or a non-finite option price.
    */
   vgCosPrice(
     spot: number,
@@ -8486,7 +8488,7 @@ export interface ModelsNamespace {
    * @param expiry - Time to option expiry in years.
    * @param isCall - Whether to value a call (`true`) or put (`false`).
    * @param nTerms - Optional number of COS expansion terms in `1..=65536`; omit to use the pricer default (128).
-   * @throws Error - Throws a JavaScript exception if `nTerms` is outside `1..=65536`, the model produces a degenerate or invalid COS truncation range, a non-finite characteristic-function value or forward moment, or a non-finite option price.
+   * @throws Error - Throws a `validation` error if `nTerms` is outside `1..=65536`, and a `computation` error if the model produces a degenerate or invalid COS truncation range, a non-finite characteristic-function value or forward moment, or a non-finite option price.
    */
   mertonJumpCosPrice(
     spot: number,
@@ -8937,7 +8939,7 @@ export interface AttributionNamespace {
    * the default.
    * @returns Structured `PnlAttribution` result object for the instrument.
    * @param params - Fully specified AttributionParams object containing instrument, markets, dates, and method.
-   * @throws Error - Rejects malformed instrument, market, method, or configuration JSON; invalid ISO attribution dates; instrument or market reconstruction, pricing, FX, rounding, metric, or method-specific attribution failures; a caught attribution panic; or failure to convert the result to a JavaScript value.
+   * @throws Error - Throws a `FinstackError` whose `kind` is the Rust classification (`not_found` for missing market data, `computation` for a caught panic or solver failure, otherwise `validation`). Rejects malformed instrument, market, method, or configuration JSON; invalid ISO attribution dates; instrument or market reconstruction, pricing, FX, rounding, metric, or method-specific attribution failures; a caught attribution panic; or failure to convert the result to a JavaScript value.
    */
   attributePnl(params: AttributionParams): PnlAttribution;
   /**
@@ -10196,18 +10198,16 @@ export interface ContractValidationError extends Error {
    */
   name: 'ContractValidationError';
   /**
-   * Typed Rust contract-error variant in snake_case.
+   * Rust error kind; a contract that cannot be loaded is always a validation failure.
    */
-  kind:
-    | 'unsupported_version'
-    | 'missing_version'
-    | 'malformed_schema'
-    | 'limit_exceeded'
-    | 'report'
-    | 'core'
-    | 'contract';
+  kind: 'validation';
   /**
-   * Structured diagnostics when `kind` is `"report"`.
+   * Rust error code: `"report"` when structured diagnostics are attached,
+   * `"limit_exceeded"` when a resource limit was breached.
+   */
+  code: 'report' | 'limit_exceeded';
+  /**
+   * Structured diagnostics when `code` is `"report"`.
    */
   report?: ValidationReport;
 }
@@ -10278,7 +10278,7 @@ declare class Portfolio {
    * @param bundle - Complete UTF-8 materialization JSON string or `Uint8Array`.
    * @param cache - Optional reusable decoded-artifact cache created outside any timed validation region.
    * @returns An object containing the reusable portfolio and load report.
-   * @throws Error - Throws `TypeError` for unsupported input types. Contract failures throw `ContractValidationError` with typed `kind` and structured `report` properties if the persisted contract is malformed, invalid, unsupported, or exceeds a resource limit.
+   * @throws Error - Throws `TypeError` for unsupported input types. Contract failures throw `ContractValidationError` (`kind` `validation`) with a `code` of `report` plus a structured `report` property if the persisted contract is malformed, invalid, or unsupported, or a `code` of `limit_exceeded` if it exceeds a resource limit.
    */
   static fromMaterialization(
     bundle: MaterializationBundleInput,

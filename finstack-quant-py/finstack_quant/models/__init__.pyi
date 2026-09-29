@@ -1206,8 +1206,10 @@ def bs_cos_price(
     Raises
     ------
     ValueError
-        If ``n_terms`` is outside ``1..=65536``, ``vol`` is not strictly positive,
-        the inputs produce an invalid COS truncation range, a non-finite
+        If ``n_terms`` is outside ``1..=65536`` or ``vol`` is not strictly
+        positive.
+    RuntimeError
+        If the inputs produce an invalid COS truncation range, a non-finite
         characteristic-function value, or a non-finite option price.
 
     Examples
@@ -1270,9 +1272,11 @@ def vg_cos_price(
     Raises
     ------
     ValueError
-        If ``n_terms`` is outside ``1..=65536``, the Variance Gamma parameters
-        produce an invalid COS truncation range, a non-finite
-        characteristic-function value, or a non-finite option price.
+        If ``n_terms`` is outside ``1..=65536``.
+    RuntimeError
+        If the Variance Gamma parameters produce an invalid COS truncation
+        range, a non-finite characteristic-function value, or a non-finite
+        option price.
 
     Examples
     --------
@@ -1337,9 +1341,11 @@ def merton_jump_cos_price(
     Raises
     ------
     ValueError
-        If ``n_terms`` is outside ``1..=65536``, the jump-diffusion parameters
-        produce an invalid COS truncation range, a non-finite
-        characteristic-function value, or a non-finite option price.
+        If ``n_terms`` is outside ``1..=65536``.
+    RuntimeError
+        If the jump-diffusion parameters produce an invalid COS truncation
+        range, a non-finite characteristic-function value, or a non-finite
+        option price.
 
     Examples
     --------

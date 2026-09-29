@@ -3166,7 +3166,12 @@ class Evaluator:
         Raises
         ------
         ValueError
-            If evaluation fails (for example cyclic dependencies or bad formulas).
+            If a formula is invalid or references an unknown identifier.
+        KeyError
+            If a referenced node or required input data is missing.
+        RuntimeError
+            If the dependency graph has a cycle or a capital-structure
+            computation fails.
 
         """
         ...
@@ -3200,7 +3205,12 @@ class Evaluator:
         Raises
         ------
         ValueError
-            If evaluation fails or required market data is missing.
+            If ``as_of`` or a formula is invalid.
+        KeyError
+            If a referenced node, input data or required market data is missing.
+        RuntimeError
+            If the dependency graph has a cycle or a capital-structure
+            computation fails.
 
         """
         ...

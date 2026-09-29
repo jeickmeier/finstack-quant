@@ -313,6 +313,7 @@ fn value_position(input: &EvaluationInput<'_>, position: &Position) -> Result<Po
                 return Err(Error::ValuationError {
                     position_id: position.position_id.clone(),
                     message: error.to_string(),
+                    kind: error.kind(),
                 });
             }
             Err(pricing_error) => {
@@ -331,6 +332,7 @@ fn value_position(input: &EvaluationInput<'_>, position: &Position) -> Result<Po
                          {failed_path} also failed ({pricing_error})",
                             position.instrument.id()
                         ),
+                        kind: error.kind(),
                     })?;
                 // When metrics were requested, the position is degraded: something
                 // risk-related is missing. When none were, nothing risk-related is

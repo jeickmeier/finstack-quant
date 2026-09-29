@@ -9,7 +9,7 @@ use wasm_bindgen::prelude::*;
 use wasm_bindgen::JsCast;
 
 use super::JsPortfolio;
-use crate::utils::{materialization_to_js_error, structured_js_error, to_js_value_with_kind};
+use crate::utils::{materialization_to_js_error, to_js_value_with_kind};
 
 /// Reusable bounded cache for decoded content-addressed instrument artifacts.
 ///
@@ -82,9 +82,10 @@ impl JsPortfolio {
     /// any timed validation region.
     /// @returns An object containing the reusable portfolio and load report.
     /// @throws Error - Throws `TypeError` for unsupported input types. Contract
-    /// failures throw `ContractValidationError` with typed `kind` and structured
-    /// `report` properties if the persisted contract is malformed, invalid,
-    /// unsupported, or exceeds a resource limit.
+    /// failures throw `ContractValidationError` (`kind` `validation`) with a
+    /// `code` of `report` plus a structured `report` property if the persisted
+    /// contract is malformed, invalid, or unsupported, or a `code` of
+    /// `limit_exceeded` if it exceeds a resource limit.
     #[wasm_bindgen(js_name = fromMaterialization)]
     pub fn from_materialization(
         bundle: JsValue,
@@ -148,10 +149,8 @@ fn extract_bundle_bytes(bundle: JsValue) -> Result<Vec<u8>, JsValue> {
     if bundle.is_instance_of::<js_sys::Uint8Array>() {
         return Ok(js_sys::Uint8Array::new(&bundle).to_vec());
     }
-    Err(structured_js_error(
-        "TypeError",
-        "bundle must be a string or Uint8Array",
-        Some("invalid_type"),
-        None,
+    Err(crate::utils::input::invalid_type(
+        "bundle",
+        "expected a string or Uint8Array",
     ))
 }

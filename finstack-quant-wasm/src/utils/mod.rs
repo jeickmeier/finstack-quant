@@ -13,99 +13,92 @@ use wasm_bindgen::JsValue;
 /// Anything the bindings can turn into a structured JS error.
 ///
 /// The `kind` property is decided by the error's *type*, never by sniffing
-/// its message: typed core errors classify by variant through
-/// [`finstack_quant_core::Error::kind`], crate errors that wrap a core error
-/// defer to it, and plain strings / parse errors are input validation.
+/// its message: every typed Rust error reports its Rust-owned
+/// [`ErrorKind`](finstack_quant_core::error::ErrorKind) (`kind()` on the error,
+/// or the kind of its fold into [`finstack_quant_core::Error`]), and plain
+/// strings / parse errors are input validation.
 pub trait IntoJsError {
     /// Structured `kind` for the JS error (`"not_found"`, `"validation"`,
     /// `"computation"`).
     fn js_kind(&self) -> &'static str;
     /// Full message, including the source chain where one exists.
     fn js_message(&self) -> String;
-}
-
-/// JS `kind` label for a core [`ErrorKind`](finstack_quant_core::error::ErrorKind).
-fn kind_label(kind: finstack_quant_core::error::ErrorKind) -> &'static str {
-    use finstack_quant_core::error::ErrorKind;
-    match kind {
-        ErrorKind::NotFound => "not_found",
-        ErrorKind::Validation => "validation",
-        ErrorKind::Computation => "computation",
+    /// Stable machine-readable `code` refining `kind`, when the Rust error
+    /// defines one.
+    fn js_code(&self) -> Option<&'static str> {
+        None
     }
 }
 
-impl IntoJsError for finstack_quant_core::Error {
-    fn js_kind(&self) -> &'static str {
-        kind_label(self.kind())
-    }
-    fn js_message(&self) -> String {
-        format_error_chain(self)
-    }
-}
-
-impl IntoJsError for finstack_quant_valuations::Error {
-    fn js_kind(&self) -> &'static str {
-        match self {
-            finstack_quant_valuations::Error::Core(e) => e.js_kind(),
-            finstack_quant_valuations::Error::Pricing(e) => {
-                let core: finstack_quant_core::Error = e.clone().into();
-                core.js_kind()
+/// Errors with a Rust-owned `kind()`: the kind is used as is and the message
+/// is the full source chain.
+macro_rules! kinded_js_error {
+    ($($ty:ty),* $(,)?) => {$(
+        impl IntoJsError for $ty {
+            fn js_kind(&self) -> &'static str {
+                self.kind().as_str()
             }
-            _ => "computation",
+            fn js_message(&self) -> String {
+                finstack_quant_core::error::format_chain(self)
+            }
         }
-    }
-    fn js_message(&self) -> String {
-        format_error_chain(self)
-    }
+    )*};
 }
 
-impl IntoJsError for finstack_quant_statements::error::Error {
-    fn js_kind(&self) -> &'static str {
-        use finstack_quant_statements::error::Error;
-        match self {
-            Error::Core(e) => e.js_kind(),
-            Error::NodeNotFound(_) | Error::RegistryNotFound(_) => "not_found",
-            Error::Eval(_) | Error::CircularDependency(_) => "computation",
-            _ => "validation",
+kinded_js_error!(
+    finstack_quant_core::Error,
+    finstack_quant_statements::error::Error,
+    finstack_quant_models::factor::credit::decomposition::DecompositionError,
+    finstack_quant_models::credit::migration::MigrationError,
+);
+
+/// Errors reported through their fold into [`finstack_quant_core::Error`]:
+/// kind and message both come from the folded core error, exactly as the
+/// Python binding's `core_to_py(error.into())` reports them.
+macro_rules! core_folded_js_error {
+    ($($ty:ty),* $(,)?) => {$(
+        impl IntoJsError for $ty {
+            fn js_kind(&self) -> &'static str {
+                finstack_quant_core::Error::from(self.clone()).js_kind()
+            }
+            fn js_message(&self) -> String {
+                finstack_quant_core::Error::from(self.clone()).js_message()
+            }
         }
-    }
-    fn js_message(&self) -> String {
-        format_error_chain(self)
-    }
+    )*};
 }
+
+core_folded_js_error!(
+    finstack_quant_valuations::Error,
+    finstack_quant_models::correlation::Error,
+    finstack_quant_core::math::linalg::CorrelationError,
+    finstack_quant_models::fourier::FourierError,
+);
 
 impl IntoJsError for finstack_quant_portfolio::Error {
     fn js_kind(&self) -> &'static str {
-        use finstack_quant_portfolio::Error;
-        match self {
-            Error::Core(e) => e.js_kind(),
-            Error::UnknownEntity { .. } | Error::MissingMarketData(_) => "not_found",
-            Error::ValuationError { .. } | Error::FxConversionFailed { .. } => "computation",
-            _ => "validation",
-        }
+        self.kind().as_str()
     }
     fn js_message(&self) -> String {
-        format_error_chain(self)
+        finstack_quant_core::error::format_chain(self)
+    }
+    fn js_code(&self) -> Option<&'static str> {
+        self.code()
     }
 }
 
 impl IntoJsError for finstack_quant_scenarios::Error {
     fn js_kind(&self) -> &'static str {
-        use finstack_quant_scenarios::Error;
-        match self {
-            Error::Core(e) => e.js_kind(),
-            Error::Statements(e) => e.js_kind(),
-            Error::Valuations(e) => e.js_kind(),
-            Error::MarketDataNotFound { .. }
-            | Error::NodeNotFound { .. }
-            | Error::TenorNotFound { .. }
-            | Error::InstrumentNotFound(_) => "not_found",
-            Error::Internal(_) => "computation",
-            _ => "validation",
-        }
+        self.kind().as_str()
     }
     fn js_message(&self) -> String {
-        format_error_chain(self)
+        use finstack_quant_scenarios::Error;
+        match self {
+            Error::Core(error) => error.js_message(),
+            Error::Statements(error) => error.js_message(),
+            Error::Valuations(error) => error.js_message(),
+            other => finstack_quant_core::error::format_chain(other),
+        }
     }
 }
 
@@ -134,27 +127,8 @@ validation_js_error!(
     std::num::ParseIntError,
     std::fmt::Error,
     strum::ParseError,
-    finstack_quant_core::math::linalg::CorrelationError,
     finstack_quant_core::math::linalg::CholeskyError,
-    finstack_quant_models::correlation::Error,
-    finstack_quant_models::factor::credit::decomposition::DecompositionError,
 );
-
-/// Numerical failures inside a model are computation errors.
-macro_rules! computation_js_error {
-    ($($ty:ty),* $(,)?) => {$(
-        impl IntoJsError for $ty {
-            fn js_kind(&self) -> &'static str {
-                "computation"
-            }
-            fn js_message(&self) -> String {
-                self.to_string()
-            }
-        }
-    )*};
-}
-
-computation_js_error!(finstack_quant_models::fourier::FourierError);
 
 impl<T: IntoJsError + ?Sized> IntoJsError for &T {
     fn js_kind(&self) -> &'static str {
@@ -162,6 +136,9 @@ impl<T: IntoJsError + ?Sized> IntoJsError for &T {
     }
     fn js_message(&self) -> String {
         (**self).js_message()
+    }
+    fn js_code(&self) -> Option<&'static str> {
+        (**self).js_code()
     }
 }
 
@@ -172,6 +149,9 @@ impl<T: IntoJsError + ?Sized> IntoJsError for Box<T> {
     fn js_message(&self) -> String {
         (**self).js_message()
     }
+    fn js_code(&self) -> Option<&'static str> {
+        (**self).js_code()
+    }
 }
 
 /// Convert a binding error into a structured `JsValue` error.
@@ -181,9 +161,20 @@ impl<T: IntoJsError + ?Sized> IntoJsError for Box<T> {
 /// `"FinstackError"`. The `kind` property comes from [`IntoJsError`], i.e.
 /// from the error's type — never from its message text, so an identifier
 /// that happens to contain "not found" cannot change the classification.
-/// Convert an error with a `source()` chain into a structured `JsValue` error.
+/// A Rust error that defines a `code()` also sets `error.code`.
 pub fn to_js_err(e: impl IntoJsError) -> JsValue {
-    structured_js_error("FinstackError", &e.js_message(), Some(e.js_kind()), None)
+    named_js_error("FinstackError", &e)
+}
+
+/// A structured error named `name` carrying `e`'s message, `kind` and, when
+/// defined, `code`.
+fn named_js_error(name: &str, e: &impl IntoJsError) -> JsValue {
+    let error = structured_js_error(name, &e.js_message(), Some(e.js_kind()), None);
+    #[cfg(target_arch = "wasm32")]
+    if let Some(code) = e.js_code() {
+        let _ = js_sys::Reflect::set(&error, &JsValue::from("code"), &JsValue::from(code));
+    }
+    error
 }
 
 /// Serialize a value to a `JsValue` using JSON-compatible conventions.
@@ -253,112 +244,43 @@ pub fn structured_js_error(
     }
 }
 
-/// Convert a typed persisted-contract failure to a structured JavaScript error.
+/// Convert a portfolio materialization failure.
 ///
-/// The public ``kind`` value comes directly from the Rust enum variant. Report
-/// failures additionally expose the serialized [`ValidationReport`] as
-/// ``error.report``.
-///
-/// # Arguments
-///
-/// * `error` - Typed contract failure to map without inspecting its message.
-pub fn contract_to_js_error(error: finstack_quant_core::contract::ContractError) -> JsValue {
-    use finstack_quant_core::contract::ContractError;
-
-    let kind = contract_error_kind(&error);
-    match error {
-        ContractError::Report(report) => validation_report_js_error(&report),
-        other => contract_error_without_report(&other.to_string(), kind),
-    }
-}
-
-fn contract_error_kind(error: &finstack_quant_core::contract::ContractError) -> &'static str {
-    use finstack_quant_core::contract::ContractError;
-
-    match error {
-        ContractError::UnsupportedVersion { .. } => "unsupported_version",
-        ContractError::MissingVersion { .. } => "missing_version",
-        ContractError::MalformedSchema { .. } => "malformed_schema",
-        ContractError::LimitExceeded { .. } => "limit_exceeded",
-        ContractError::Report(_) => "report",
-        ContractError::Core(_) => "core",
-        #[allow(unreachable_patterns)]
-        _ => "contract",
-    }
-}
-
-/// Convert a portfolio materialization failure without message classification.
+/// Contract failures (a validation report or an exceeded resource limit) are
+/// `ContractValidationError`s with `kind: "validation"`, the Rust `code`
+/// (`"report"` / `"limit_exceeded"`) and, for a report, the serialized
+/// [`ValidationReport`](finstack_quant_core::contract::ValidationReport) as
+/// `error.report`. Every other failure is an ordinary [`to_js_err`] error.
 ///
 /// # Arguments
 ///
 /// * `error` - Typed portfolio error returned by the materialization API.
 pub fn materialization_to_js_error(error: finstack_quant_portfolio::Error) -> JsValue {
-    let kind = materialization_error_kind(&error);
-    match error {
-        finstack_quant_portfolio::Error::MaterializationFailed(report) => {
-            validation_report_js_error(&report)
-        }
-        error @ finstack_quant_portfolio::Error::ContractLimitExceeded { .. } => {
-            contract_error_without_report(&error.to_string(), kind)
-        }
-        other => structured_js_error("FinstackError", &other.to_string(), Some(kind), None),
-    }
-}
-
-fn materialization_error_kind(error: &finstack_quant_portfolio::Error) -> &'static str {
     use finstack_quant_portfolio::Error;
-
-    match error {
-        Error::UnknownEntity { .. } => "unknown_entity",
-        Error::ValidationFailed(_) => "validation",
-        Error::FxConversionFailed { .. } => "fx_conversion",
-        Error::ValuationError { .. } => "valuation",
-        Error::ScenarioError(_) => "scenario",
-        Error::MissingMarketData(_) => "missing_market_data",
-        Error::Core(_) => "core",
-        Error::InvalidInput(_) => "invalid_input",
-        Error::ContractLimitExceeded { .. } => "limit_exceeded",
-        Error::MaterializationFailed(_) => "report",
-        #[allow(unreachable_patterns)]
-        _ => "portfolio",
-    }
-}
-
-fn validation_report_js_error(report: &finstack_quant_core::contract::ValidationReport) -> JsValue {
-    let error = structured_js_error(
-        "ContractValidationError",
-        &format!(
-            "validation failed with {} structured diagnostic(s)",
-            report.diagnostics.len()
-        ),
-        Some("report"),
-        None,
-    );
+    let js = match &error {
+        Error::MaterializationFailed(report) => {
+            let js = structured_js_error(
+                "ContractValidationError",
+                &report.summary(),
+                Some(error.js_kind()),
+                None,
+            );
+            #[cfg(target_arch = "wasm32")]
+            if let Ok(value) = to_js_value_with_kind(report.as_ref(), "serialization") {
+                let _ = js_sys::Reflect::set(&js, &JsValue::from("report"), &value);
+            }
+            js
+        }
+        Error::ContractLimitExceeded { .. } => {
+            return named_js_error("ContractValidationError", &error)
+        }
+        _ => return to_js_err(error),
+    };
     #[cfg(target_arch = "wasm32")]
-    {
-        if let Ok(value) = to_js_value_with_kind(report, "serialization") {
-            let _ = js_sys::Reflect::set(&error, &JsValue::from_str("report"), &value);
-        }
+    if let Some(code) = error.js_code() {
+        let _ = js_sys::Reflect::set(&js, &JsValue::from("code"), &JsValue::from(code));
     }
-    error
-}
-
-fn contract_error_without_report(message: &str, kind: &str) -> JsValue {
-    structured_js_error("ContractValidationError", message, Some(kind), None)
-}
-
-fn format_error_chain(err: &dyn std::error::Error) -> String {
-    let mut out = err.to_string();
-    let mut src = err.source();
-    while let Some(cause) = src {
-        let msg = cause.to_string();
-        if !out.ends_with(&msg) {
-            out.push_str(": ");
-            out.push_str(&msg);
-        }
-        src = cause.source();
-    }
-    out
+    js
 }
 
 // Native unit tests for `to_js_err` are limited because `js_sys::Error` only
@@ -368,44 +290,6 @@ fn format_error_chain(err: &dyn std::error::Error) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::error::Error;
-    use std::fmt;
-
-    #[derive(Debug)]
-    struct Wrapper(Box<dyn Error + Send + Sync>);
-
-    impl fmt::Display for Wrapper {
-        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-            write!(f, "calibration failed")
-        }
-    }
-
-    impl Error for Wrapper {
-        fn source(&self) -> Option<&(dyn Error + 'static)> {
-            Some(&*self.0)
-        }
-    }
-
-    #[derive(Debug)]
-    struct Leaf;
-
-    impl fmt::Display for Leaf {
-        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-            write!(f, "solver diverged after 1000 iterations")
-        }
-    }
-
-    impl Error for Leaf {}
-
-    #[test]
-    fn format_error_chain_flattens_error_sources() {
-        let err = Wrapper(Box::new(Leaf));
-
-        assert_eq!(
-            format_error_chain(&err),
-            "calibration failed: solver diverged after 1000 iterations"
-        );
-    }
 
     #[test]
     fn core_error_kind_is_selected_from_variant_not_message() {
@@ -511,128 +395,6 @@ mod tests {
 
         for (error, expected) in cases {
             assert_eq!(error.js_kind(), expected);
-        }
-    }
-
-    #[test]
-    fn contract_error_kind_is_selected_from_variant_not_message() {
-        use finstack_quant_core::contract::{
-            ContractError, Diagnostic, LoadPhase, Severity, ValidationReport,
-        };
-
-        let mut report = ValidationReport::default();
-        report.diagnostics.push(Diagnostic::new(
-            "test/misleading",
-            LoadPhase::Build,
-            Severity::Error,
-            "missing curve but this is still a report variant",
-        ));
-        let cases = [
-            (
-                ContractError::UnsupportedVersion {
-                    contract: "missing curve".to_string(),
-                    found: 3,
-                    min: 1,
-                    max: 2,
-                },
-                "unsupported_version",
-            ),
-            (
-                ContractError::MissingVersion {
-                    contract: "malformed validation".to_string(),
-                },
-                "missing_version",
-            ),
-            (
-                ContractError::MalformedSchema {
-                    value: "missing curve".to_string(),
-                    expected: "not found".to_string(),
-                },
-                "malformed_schema",
-            ),
-            (
-                ContractError::LimitExceeded {
-                    what: "malformed validation",
-                    found: 2,
-                    limit: 1,
-                },
-                "limit_exceeded",
-            ),
-            (ContractError::Report(Box::new(report)), "report"),
-            (
-                ContractError::Core(finstack_quant_core::Error::Internal(
-                    "missing curve malformed validation".to_string(),
-                )),
-                "core",
-            ),
-        ];
-
-        for (error, expected) in cases {
-            assert_eq!(contract_error_kind(&error), expected);
-        }
-    }
-
-    #[test]
-    fn materialization_error_kind_is_selected_from_variant_not_message() {
-        use finstack_quant_portfolio::Error;
-
-        let cases = [
-            (
-                Error::UnknownEntity {
-                    position_id: "position".into(),
-                    entity_id: "entity".into(),
-                },
-                "unknown_entity",
-            ),
-            (
-                Error::ValidationFailed("missing curve".to_string()),
-                "validation",
-            ),
-            (
-                Error::FxConversionFailed {
-                    from: finstack_quant_core::currency::Currency::USD,
-                    to: finstack_quant_core::currency::Currency::EUR,
-                },
-                "fx_conversion",
-            ),
-            (
-                Error::ValuationError {
-                    position_id: "position".into(),
-                    message: "malformed validation".to_string(),
-                },
-                "valuation",
-            ),
-            (
-                Error::ScenarioError("missing curve".to_string()),
-                "scenario",
-            ),
-            (
-                Error::MissingMarketData("malformed validation".to_string()),
-                "missing_market_data",
-            ),
-            (
-                Error::Core(finstack_quant_core::Error::Internal(
-                    "missing curve malformed validation".to_string(),
-                )),
-                "core",
-            ),
-            (
-                Error::InvalidInput("not found malformed validation".to_string()),
-                "invalid_input",
-            ),
-            (
-                Error::ContractLimitExceeded {
-                    what: "missing curve malformed validation".to_string(),
-                    found: 2,
-                    limit: 1,
-                },
-                "limit_exceeded",
-            ),
-            (Error::MaterializationFailed(Box::default()), "report"),
-        ];
-
-        for (error, expected) in cases {
-            assert_eq!(materialization_error_kind(&error), expected);
         }
     }
 }

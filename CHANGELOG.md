@@ -2,6 +2,28 @@
 
 ## [Unreleased]
 
+### WASM binding audit: Rust-owned error kinds (2026-09-29)
+
+#### Changed (BREAKING)
+
+- Every Rust error now reports its own `kind()` (`NotFound`, `Validation`, `Computation`): statements, portfolio, scenarios, valuations `PricingError`, `DecompositionError`, `MigrationError`, `FourierError` and `CorrelationError`. Folding into `finstack_quant_core::Error` keeps that kind. Python raises `KeyError`, `ValueError` or `RuntimeError` from it, and WASM sets `error.kind` from it, so both hosts classify a failure the same way. Failures that change class:
+  - A statements dependency cycle raises `RuntimeError` (was `ValueError`).
+  - A missing statements node or period raises `KeyError`.
+  - A COS pricing failure other than bad input raises `RuntimeError`.
+  - Correlation repair that does not converge raises `RuntimeError`.
+  - An unknown portfolio entity or missing FX rate raises `KeyError`.
+  - A failed position valuation carries the kind of its cause.
+- Python `finstack_quant.portfolio.ValuationError` and `FxError` are removed. Catch `KeyError`, `ValueError` or `RuntimeError` according to the failure, or `FinstackError`/`PortfolioError` for validation failures.
+- Python `CalibrationEnvelopeError.solver_diagnostics` is a dict (was a JSON string), matching the WASM object.
+- WASM `ContractValidationError.kind` is always `validation`. The contract-specific label moves to `error.code` (`report` or `limit_exceeded`). Portfolio and attribution errors no longer use domain kinds such as `unknown_entity` or PascalCase variant names.
+- `invert_fx_rate(0)` is an `InvalidFxRate` validation error.
+- An unknown calendar in `Performance.cagr` is `NotFound` in both hosts. Calendar unions such as `nyse+gblo` resolve.
+
+#### Added
+
+- WASM `CalibrationEnvelopeError` carries the strict-load `diagnostics` array.
+- `ErrorKind::as_str`, `core::error::format_chain` and `AttributionEnvelope::from_json` in Rust.
+
 ### Master cleanup (2026-09-28)
 
 #### Changed (BREAKING)

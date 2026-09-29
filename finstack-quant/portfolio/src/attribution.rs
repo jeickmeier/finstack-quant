@@ -386,6 +386,7 @@ fn attribute_composite_primitives(
         let definition = exposure.instrument_definition().ok_or_else(|| {
             Error::valuation(
                 composite.id(),
+                finstack_quant_core::error::ErrorKind::Computation,
                 format!(
                     "primitive path '{}' lost its embedded definition",
                     exposure.path.join("/")
@@ -660,6 +661,7 @@ fn attribute_single_position_method_owned(
     .map_err(|error| Error::ValuationError {
         position_id: position.position_id.clone(),
         message: format!("Attribution failed: {error}"),
+        kind: error.kind(),
     })?;
 
     pos_attr.scale(position.scale_factor());
@@ -724,6 +726,7 @@ fn prepared_valuation_result<'a>(
     if position_value.position_id != position.position_id {
         return Err(Error::valuation(
             position.position_id.clone(),
+            finstack_quant_core::error::ErrorKind::Validation,
             format!(
                 "Attribution {endpoint} prepared position ID '{}' does not match '{}'",
                 position_value.position_id, position.position_id
@@ -734,6 +737,7 @@ fn prepared_valuation_result<'a>(
     if require_complete_metrics && !position_value.risk_metrics_complete {
         return Err(Error::valuation(
             position.position_id.clone(),
+            finstack_quant_core::error::ErrorKind::Validation,
             format!(
                 "Attribution {endpoint} valuation is incomplete and cannot satisfy a strict metrics-based attribution request"
             ),
@@ -743,6 +747,7 @@ fn prepared_valuation_result<'a>(
     let valuation_result = position_value.valuation_result.as_ref().ok_or_else(|| {
         Error::valuation(
             position.position_id.clone(),
+            finstack_quant_core::error::ErrorKind::NotFound,
             format!("Attribution {endpoint} valuation result is missing"),
         )
     })?;
@@ -750,6 +755,7 @@ fn prepared_valuation_result<'a>(
     if valuation_result.instrument_id != position.instrument.id() {
         return Err(Error::valuation(
             position.position_id.clone(),
+            finstack_quant_core::error::ErrorKind::Validation,
             format!(
                 "Attribution {endpoint} valuation instrument stamp '{}' does not match '{}'",
                 valuation_result.instrument_id,
@@ -761,6 +767,7 @@ fn prepared_valuation_result<'a>(
     if valuation_result.as_of != as_of {
         return Err(Error::valuation(
             position.position_id.clone(),
+            finstack_quant_core::error::ErrorKind::Validation,
             format!(
                 "Attribution {endpoint} valuation date stamp {} does not match {as_of}",
                 valuation_result.as_of
@@ -807,6 +814,7 @@ pub(crate) fn reduce_metrics_based_prepared(
                 .ok_or_else(|| {
                     Error::valuation(
                         position.position_id.clone(),
+                        finstack_quant_core::error::ErrorKind::NotFound,
                         "Attribution T0 prepared position valuation is missing",
                     )
                 })?;
@@ -815,6 +823,7 @@ pub(crate) fn reduce_metrics_based_prepared(
                 .ok_or_else(|| {
                     Error::valuation(
                         position.position_id.clone(),
+                        finstack_quant_core::error::ErrorKind::NotFound,
                         "Attribution T1 prepared position valuation is missing",
                     )
                 })?;
@@ -848,6 +857,7 @@ pub(crate) fn reduce_metrics_based_prepared(
                 .map_err(|error| Error::ValuationError {
                     position_id: position.position_id.clone(),
                     message: format!("Attribution failed: {error}"),
+                    kind: error.kind(),
                 })?
             };
 
@@ -938,6 +948,7 @@ pub(crate) fn reduce_method_owned_prepared(
                 .ok_or_else(|| {
                     Error::valuation(
                         position.position_id.clone(),
+                        finstack_quant_core::error::ErrorKind::NotFound,
                         "Attribution T0 prepared position valuation is missing",
                     )
                 })?;
@@ -946,6 +957,7 @@ pub(crate) fn reduce_method_owned_prepared(
                 .ok_or_else(|| {
                     Error::valuation(
                         position.position_id.clone(),
+                        finstack_quant_core::error::ErrorKind::NotFound,
                         "Attribution T1 prepared position valuation is missing",
                     )
                 })?;
@@ -1084,8 +1096,10 @@ fn attribution_endpoint_error(error: Error, endpoint: &str) -> Error {
         Error::ValuationError {
             position_id,
             message,
+            kind,
         } => Error::valuation(
             position_id,
+            kind,
             format!("Attribution {endpoint} valuation failed: {message}"),
         ),
         other => other,

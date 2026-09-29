@@ -148,3 +148,37 @@ pub enum MigrationError {
     #[error("internal migration invariant violated: {0}")]
     Internal(String),
 }
+
+impl MigrationError {
+    /// Classify this error for host-language exception mapping.
+    ///
+    /// Unknown rating states and ratings without a WARF factor are not-found
+    /// errors; failed generator estimation, complex eigenvalues, round-trip
+    /// and singular-matrix failures and internal invariants are computation
+    /// errors; every other variant rejects the input (validation).
+    #[must_use]
+    pub fn kind(&self) -> finstack_quant_core::error::ErrorKind {
+        use finstack_quant_core::error::ErrorKind;
+        match self {
+            Self::UnknownState { .. } | Self::NoWarfFactor { .. } => ErrorKind::NotFound,
+            Self::NoValidGenerator { .. }
+            | Self::ComplexEigenvalues
+            | Self::RoundTripError { .. }
+            | Self::SingularMatrix
+            | Self::Internal(_) => ErrorKind::Computation,
+            Self::DimensionMismatch { .. }
+            | Self::RowSumViolation { .. }
+            | Self::EntryOutOfRange { .. }
+            | Self::InsufficientStates
+            | Self::DuplicateLabel { .. }
+            | Self::NonAbsorbingDefault { .. }
+            | Self::InvalidHorizon(_)
+            | Self::InvalidState { .. }
+            | Self::InvalidPathCount
+            | Self::NoWarfMapping
+            | Self::InvalidWarf(_)
+            | Self::InvalidDiagnostic { .. }
+            | Self::ScaleMismatch => ErrorKind::Validation,
+        }
+    }
+}

@@ -15,7 +15,7 @@
 use finstack_quant_wasm::api::portfolio::sensitivity::decompose_factor_risk;
 use finstack_quant_wasm::api::portfolio::*;
 use finstack_quant_wasm::api::scenarios::build_scenario_spec;
-use finstack_quant_wasm::utils::{contract_to_js_error, materialization_to_js_error};
+use finstack_quant_wasm::utils::materialization_to_js_error;
 use wasm_bindgen::JsValue;
 use wasm_bindgen_test::*;
 
@@ -647,61 +647,7 @@ fn apply_scenario_and_revalue_built_empty_portfolio() {
 }
 
 #[wasm_bindgen_test]
-fn contract_error_js_kinds_follow_variants_not_messages() {
-    use finstack_quant_core::contract::ContractError;
-
-    let cases = [
-        (
-            ContractError::UnsupportedVersion {
-                contract: "missing curve".to_string(),
-                found: 3,
-                min: 1,
-                max: 2,
-            },
-            "unsupported_version",
-        ),
-        (
-            ContractError::MissingVersion {
-                contract: "malformed validation".to_string(),
-            },
-            "missing_version",
-        ),
-        (
-            ContractError::MalformedSchema {
-                value: "missing curve".to_string(),
-                expected: "not found".to_string(),
-            },
-            "malformed_schema",
-        ),
-        (
-            ContractError::LimitExceeded {
-                what: "malformed validation",
-                found: 2,
-                limit: 1,
-            },
-            "limit_exceeded",
-        ),
-        (ContractError::Report(Box::default()), "report"),
-        (
-            ContractError::Core(finstack_quant_core::Error::Internal(
-                "missing curve malformed validation".to_string(),
-            )),
-            "core",
-        ),
-    ];
-
-    for (error, expected) in cases {
-        let js_error = contract_to_js_error(error);
-        let kind = js_sys::Reflect::get(&js_error, &JsValue::from_str("kind"))
-            .unwrap()
-            .as_string()
-            .unwrap();
-        assert_eq!(kind, expected);
-    }
-}
-
-#[wasm_bindgen_test]
-fn materialization_limit_and_invalid_input_have_distinct_js_kinds() {
+fn materialization_errors_carry_the_rust_kind_and_code() {
     let cases = [
         (
             finstack_quant_portfolio::Error::ContractLimitExceeded {
@@ -709,23 +655,36 @@ fn materialization_limit_and_invalid_input_have_distinct_js_kinds() {
                 found: 2,
                 limit: 1,
             },
-            "limit_exceeded",
+            "ContractValidationError",
+            "validation",
+            Some("limit_exceeded"),
         ),
         (
             finstack_quant_portfolio::Error::InvalidInput(
                 "unrelated validation failure".to_string(),
             ),
-            "invalid_input",
+            "FinstackError",
+            "validation",
+            None,
+        ),
+        (
+            finstack_quant_portfolio::Error::MissingMarketData("USD-OIS".to_string()),
+            "FinstackError",
+            "not_found",
+            None,
         ),
     ];
 
-    for (error, expected) in cases {
+    for (error, name, kind, code) in cases {
         let js_error = materialization_to_js_error(error);
-        let kind = js_sys::Reflect::get(&js_error, &JsValue::from_str("kind"))
-            .unwrap()
-            .as_string()
-            .unwrap();
-        assert_eq!(kind, expected);
+        let get = |key: &str| {
+            js_sys::Reflect::get(&js_error, &JsValue::from(key))
+                .unwrap()
+                .as_string()
+        };
+        assert_eq!(get("name").as_deref(), Some(name));
+        assert_eq!(get("kind").as_deref(), Some(kind));
+        assert_eq!(get("code").as_deref(), code);
     }
 }
 

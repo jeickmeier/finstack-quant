@@ -101,8 +101,7 @@ fn index() -> PyResult<String> {
 #[pyfunction]
 #[pyo3(signature = (selector, profile = "canonical"), text_signature = "(selector, profile='canonical')")]
 fn get(selector: &str, profile: &str) -> PyResult<String> {
-    let artifact = finstack_quant::schema::find(selector)
-        .map_err(|error| pyo3::exceptions::PyKeyError::new_err(error.to_string()))?;
+    let artifact = finstack_quant::schema::find(selector).map_err(crate::errors::core_to_py)?;
     let value = finstack_quant::schema::render_profile(artifact, profile)
         .map_err(|error| pyo3::exceptions::PyValueError::new_err(error.to_string()))?;
     serde_json::to_string_pretty(&value).map_err(|error| {
@@ -145,8 +144,7 @@ fn get(selector: &str, profile: &str) -> PyResult<String> {
 #[pyfunction]
 #[pyo3(text_signature = "(selector, payload)")]
 fn validate(selector: &str, payload: &str) -> PyResult<String> {
-    let artifact = finstack_quant::schema::find(selector)
-        .map_err(|error| pyo3::exceptions::PyKeyError::new_err(error.to_string()))?;
+    let artifact = finstack_quant::schema::find(selector).map_err(crate::errors::core_to_py)?;
     let parsed: serde_json::Value = serde_json::from_str(payload).map_err(|error| {
         pyo3::exceptions::PyValueError::new_err(format!("payload is not JSON: {error}"))
     })?;

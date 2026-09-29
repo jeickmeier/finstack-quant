@@ -11,7 +11,9 @@ use crate::utils::input::{
 };
 use crate::utils::{date_to_iso, to_js_err};
 use finstack_quant_analytics as fa;
-use finstack_quant_core::dates::{calendar_by_id, FiscalConfig, HolidayCalendar, PeriodKind};
+use finstack_quant_core::dates::{
+    calendar_by_id_strict, FiscalConfig, HolidayCalendar, PeriodKind,
+};
 use js_sys::{Array, Float64Array, Reflect};
 use wasm_bindgen::prelude::*;
 
@@ -62,11 +64,6 @@ fn lookback_fiscal_config(
     }
 }
 
-fn resolve_fiscal_calendar(calendar_id: &str) -> Result<&'static dyn HolidayCalendar, JsValue> {
-    calendar_by_id(calendar_id)
-        .ok_or_else(|| to_js_err(format!("calendar {calendar_id:?} not found")))
-}
-
 fn parse_cagr_day_count(day_count: Option<&str>) -> Result<fa::CagrDayCount, JsValue> {
     match day_count {
         None => Ok(fa::CagrDayCount::Act365_25),
@@ -77,7 +74,10 @@ fn parse_cagr_day_count(day_count: Option<&str>) -> Result<fa::CagrDayCount, JsV
 fn resolve_optional_calendar(
     calendar_id: Option<&str>,
 ) -> Result<Option<&'static dyn HolidayCalendar>, JsValue> {
-    calendar_id.map(resolve_fiscal_calendar).transpose()
+    calendar_id
+        .map(calendar_by_id_strict)
+        .transpose()
+        .map_err(to_js_err)
 }
 
 fn parse_return_kind(
@@ -411,11 +411,12 @@ impl JsPerformance {
     ///
     /// # Errors
     ///
-    /// Rejects an unknown day-count or calendar id, a missing calendar when
+    /// Rejects an unknown day-count (kind `validation`), an unknown calendar
+    /// id (kind `not_found`, with suggestions), a missing calendar when
     /// `bus_252` is requested, or a ticker whose active range has no
     /// positive holding period.
     /// @param day_count - Optional day-count: `"act365_25"` or a core name such as `"act_365f"`; defaults to Act/365.25.
-    /// @param calendar_id - Optional holiday-calendar id; required for `bus_252`.
+    /// @param calendar_id - Optional holiday-calendar id, or `+`-joined ids for a union calendar (`"nyse+gblo"`); required for `bus_252`.
     /// @returns Per-ticker values as a Float64Array in `tickerNames()` order.
     pub fn cagr(
         &self,

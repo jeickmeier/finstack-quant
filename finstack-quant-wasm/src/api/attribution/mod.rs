@@ -11,7 +11,7 @@
 //! the safe-integer ceiling.
 
 use crate::utils::input::{js_opt_bool, js_string, json_text, opt_json_text};
-use crate::utils::{structured_js_error, to_js_err};
+use crate::utils::to_js_err;
 use wasm_bindgen::prelude::*;
 
 /// Parameters for P&L attribution via [`attribute_pnl`].
@@ -143,51 +143,6 @@ impl JsAttributionParams {
     }
 }
 
-/// Map a `finstack_quant_core::Error` raised by attribution into a structured JS
-/// error.
-///
-/// Mirrors the calibration binding's `envelope_error_to_js`: sets
-/// `name = "AttributionError"`, attaches the variant name as `kind`, and the
-/// full enum-serialized payload as `cause`. JS clients can pattern-match on
-/// `err.kind` (e.g. `"Calibration"`, `"Validation"`, `"CurrencyMismatch"`,
-/// `"Input"`) rather than parsing the human message.
-///
-/// JSON-parse errors during envelope deserialization fall back to a generic
-/// `to_js_err` since they are not `finstack_quant_core::Error` instances.
-fn attribution_error_to_js(err: finstack_quant_core::Error) -> JsValue {
-    let message = err.to_string();
-    let kind = error_variant_name(&err);
-    let cause_json = serde_json::to_string(&err).ok();
-    structured_js_error(
-        "AttributionError",
-        &message,
-        Some(kind),
-        cause_json.as_deref(),
-    )
-}
-
-/// Return the externally-tagged variant name for a `finstack_quant_core::Error`.
-/// Stable identifier suitable for JS clients to switch on (e.g.
-/// `if (err.kind === "CurrencyMismatch") …`).
-fn error_variant_name(err: &finstack_quant_core::Error) -> &'static str {
-    use finstack_quant_core::Error as E;
-    match err {
-        E::Input(_) => "Input",
-        E::CurrencyMismatch { .. } => "CurrencyMismatch",
-        E::Calibration { .. } => "Calibration",
-        E::Validation(_) => "Validation",
-        E::UnknownMetric { .. } => "UnknownMetric",
-        E::MetricNotApplicable { .. } => "MetricNotApplicable",
-        E::MetricCalculationFailed { .. } => "MetricCalculationFailed",
-        E::CircularDependency { .. } => "CircularDependency",
-        E::Internal(_) => "Internal",
-        // The Error enum is `#[non_exhaustive]`; future variants land here
-        // until they are added above. The fallback keeps the binding
-        // forward-compatible.
-        _ => "Other",
-    }
-}
-
 /// Parse and execute one attribution request.
 ///
 /// Shared by [`attribute_pnl`] and [`attribute_pnl_json`], which differ only
@@ -212,8 +167,8 @@ fn run_attribute_pnl(
             full_cross_attribution: params.full_cross_attribution.unwrap_or(false),
         },
     )
-    .map_err(attribution_error_to_js)?;
-    spec.execute_contained().map_err(attribution_error_to_js)
+    .map_err(to_js_err)?;
+    spec.execute_contained().map_err(to_js_err)
 }
 
 /// Run P&L attribution for a single instrument.
@@ -229,7 +184,10 @@ fn run_attribute_pnl(
 ///
 /// # Errors
 ///
-/// Rejects malformed instrument, market, method, or configuration JSON;
+/// Throws a `FinstackError` whose `kind` is the Rust classification
+/// (`not_found` for missing market data, `computation` for a caught panic or
+/// solver failure, otherwise `validation`). Rejects malformed instrument,
+/// market, method, or configuration JSON;
 /// invalid ISO attribution dates; instrument or market reconstruction,
 /// pricing, FX, rounding, metric, or method-specific attribution failures; a
 /// caught attribution panic; or failure to convert the result to a
@@ -272,11 +230,9 @@ pub fn attribute_pnl_json(params: &JsAttributionParams) -> Result<String, JsValu
 #[wasm_bindgen(js_name = attributePnlEnvelopeJson)]
 pub fn attribute_pnl_envelope_json(spec_json: JsValue) -> Result<String, JsValue> {
     let spec_json: &str = &json_text(&spec_json, "specJson")?;
-    let envelope: finstack_quant_attribution::AttributionEnvelope =
-        serde_json::from_str(spec_json).map_err(to_js_err)?;
-    let result_envelope = envelope
-        .execute_contained()
-        .map_err(attribution_error_to_js)?;
+    let envelope =
+        finstack_quant_attribution::AttributionEnvelope::from_json(spec_json).map_err(to_js_err)?;
+    let result_envelope = envelope.execute_contained().map_err(to_js_err)?;
     serde_json::to_string(&result_envelope).map_err(to_js_err)
 }
 

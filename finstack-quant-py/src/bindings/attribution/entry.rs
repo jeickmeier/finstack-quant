@@ -430,8 +430,7 @@ pub(crate) fn pnl_bridge(
 ///     If the engine reports an internal failure.
 #[pyfunction]
 pub(crate) fn attribute_pnl_envelope_json(py: Python<'_>, spec_json: &str) -> PyResult<String> {
-    let envelope: AttributionEnvelope = serde_json::from_str(spec_json)
-        .map_err(|e| serde_json_to_py(e, "invalid attribution envelope JSON"))?;
+    let envelope = AttributionEnvelope::from_json(spec_json).map_err(core_to_py)?;
     let result_envelope = py
         .detach(|| envelope.execute_contained())
         .map_err(core_to_py)?;

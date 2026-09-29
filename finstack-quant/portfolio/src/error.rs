@@ -41,6 +41,9 @@ pub enum Error {
         position_id: PositionId,
         /// Error message describing the valuation failure.
         message: String,
+        /// Classification of the failure: the wrapped pricing error's kind, or
+        /// the kind of the consistency check that failed.
+        kind: finstack_quant_core::error::ErrorKind,
     },
 
     /// Scenario application error
@@ -71,7 +74,7 @@ pub enum Error {
     },
 
     /// Structured portfolio materialization diagnostics.
-    #[error("Portfolio materialization failed: {0:?}")]
+    #[error("Portfolio materialization failed: {}", .0.summary())]
     MaterializationFailed(Box<finstack_quant_core::contract::ValidationReport>),
 }
 
@@ -90,11 +93,60 @@ impl Error {
     /// # Arguments
     ///
     /// * `position_id` - Position that triggered the valuation failure.
+    /// * `kind` - Classification of the failure (see [`Error::kind`]): the
+    ///   wrapped pricing error's kind, or the kind of the failed check.
     /// * `msg` - Human-readable error detail.
-    pub fn valuation(position_id: impl Into<PositionId>, msg: impl Into<String>) -> Self {
+    pub fn valuation(
+        position_id: impl Into<PositionId>,
+        kind: finstack_quant_core::error::ErrorKind,
+        msg: impl Into<String>,
+    ) -> Self {
         Self::ValuationError {
             position_id: position_id.into(),
             message: msg.into(),
+            kind,
+        }
+    }
+
+    /// Classify this error for host-language exception mapping.
+    ///
+    /// | Kind | Variants |
+    /// |------|----------|
+    /// | [`ErrorKind::NotFound`] | `UnknownEntity`, `MissingMarketData`, `FxConversionFailed` (no rate for the pair) |
+    /// | [`ErrorKind::Validation`] | `ValidationFailed`, `ScenarioError`, `InvalidInput`, `ContractLimitExceeded`, `MaterializationFailed` |
+    ///
+    /// `Core` keeps its own kind and `ValuationError` carries the kind of the
+    /// failure it wraps.
+    ///
+    /// [`ErrorKind::NotFound`]: finstack_quant_core::error::ErrorKind::NotFound
+    /// [`ErrorKind::Validation`]: finstack_quant_core::error::ErrorKind::Validation
+    #[must_use]
+    pub fn kind(&self) -> finstack_quant_core::error::ErrorKind {
+        use finstack_quant_core::error::ErrorKind;
+        match self {
+            Error::Core(core) => core.kind(),
+            Error::ValuationError { kind, .. } => *kind,
+            Error::UnknownEntity { .. }
+            | Error::MissingMarketData(_)
+            | Error::FxConversionFailed { .. } => ErrorKind::NotFound,
+            Error::ValidationFailed(_)
+            | Error::ScenarioError(_)
+            | Error::InvalidInput(_)
+            | Error::ContractLimitExceeded { .. }
+            | Error::MaterializationFailed(_) => ErrorKind::Validation,
+        }
+    }
+
+    /// Stable machine-readable code for contract failures, surfaced by the
+    /// bindings beside [`Error::kind`]: `"limit_exceeded"` for
+    /// `ContractLimitExceeded` and `"report"` for `MaterializationFailed`;
+    /// `None` for every other variant.
+    #[must_use]
+    pub fn code(&self) -> Option<&'static str> {
+        match self {
+            Error::ContractLimitExceeded { .. } => Some("limit_exceeded"),
+            Error::MaterializationFailed(_) => Some("report"),
+            _ => None,
         }
     }
 
@@ -125,13 +177,21 @@ impl Error {
 }
 
 impl From<Error> for finstack_quant_core::Error {
+    /// Fold a portfolio error into the core taxonomy, keeping [`Error::kind`]:
+    /// lookup misses become `InputError::NotFound`, computation failures
+    /// `Internal`, and the rest validation errors with the full message.
     fn from(err: Error) -> Self {
-        match err {
-            Error::Core(core) => core,
-            Error::FxConversionFailed { from, to } => finstack_quant_core::Error::Validation(
-                format!("FX conversion failed: {from} to {to}"),
-            ),
-            other => finstack_quant_core::Error::Validation(other.to_string()),
+        use finstack_quant_core::error::{ErrorKind, InputError};
+        if let Error::Core(core) = err {
+            return core;
+        }
+        let message = err.to_string();
+        match err.kind() {
+            ErrorKind::NotFound => {
+                finstack_quant_core::Error::Input(InputError::NotFound { id: message })
+            }
+            ErrorKind::Computation => finstack_quant_core::Error::Internal(message),
+            ErrorKind::Validation => finstack_quant_core::Error::Validation(message),
         }
     }
 }
@@ -142,12 +202,52 @@ mod tests {
     use finstack_quant_core::currency::Currency;
 
     #[test]
-    fn converts_portfolio_errors_to_core_error() {
-        let core: finstack_quant_core::Error = Error::FxConversionFailed {
-            from: Currency::USD,
-            to: Currency::EUR,
+    fn kind_is_preserved_by_the_core_fold() {
+        use finstack_quant_core::error::ErrorKind;
+        let cases = [
+            (
+                Error::FxConversionFailed {
+                    from: Currency::USD,
+                    to: Currency::EUR,
+                },
+                ErrorKind::NotFound,
+            ),
+            (
+                Error::UnknownEntity {
+                    position_id: "P".into(),
+                    entity_id: "E".into(),
+                },
+                ErrorKind::NotFound,
+            ),
+            (
+                Error::MissingMarketData("USD-OIS".into()),
+                ErrorKind::NotFound,
+            ),
+            (
+                Error::valuation("P", ErrorKind::NotFound, "missing curve"),
+                ErrorKind::NotFound,
+            ),
+            (
+                Error::valuation("P", ErrorKind::Computation, "solver"),
+                ErrorKind::Computation,
+            ),
+            (Error::validation("bad"), ErrorKind::Validation),
+            (Error::ScenarioError("bad".into()), ErrorKind::Validation),
+            (Error::invalid_input("bad"), ErrorKind::Validation),
+            (
+                Error::contract_limit_exceeded("bytes", 2, 1),
+                ErrorKind::Validation,
+            ),
+        ];
+        for (error, kind) in cases {
+            assert_eq!(error.kind(), kind, "{error}");
+            let core = finstack_quant_core::Error::from(error);
+            assert_eq!(core.kind(), kind, "{core}");
         }
-        .into();
-        assert!(matches!(core, finstack_quant_core::Error::Validation(_)));
+        assert_eq!(
+            Error::contract_limit_exceeded("bytes", 2, 1).code(),
+            Some("limit_exceeded")
+        );
+        assert_eq!(Error::invalid_input("bad").code(), None);
     }
 }

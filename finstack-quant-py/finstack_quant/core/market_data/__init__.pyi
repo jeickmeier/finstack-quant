@@ -4224,11 +4224,8 @@ def invert_fx_rate(rate: float) -> float:
     Raises
     ------
     ValueError
-        If *rate* is non-finite or the reciprocal is not a usable FX rate
-        (overflow, zero, or negative).
-    KeyError
-        If *rate* is exactly zero (the reciprocal helper reports a missing
-        quote rather than an invalid numeric rate).
+        If *rate* is non-finite, zero or negative, or its reciprocal
+        overflows.
 
     Examples
     --------

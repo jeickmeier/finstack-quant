@@ -33,10 +33,10 @@ use wasm_bindgen::prelude::*;
 ///
 /// # Errors
 ///
-/// Throws a JavaScript exception if `nTerms` is outside `1..=65536`, `vol` is not positive, the
-/// model produces a degenerate or invalid
-/// COS truncation range, a non-finite characteristic-function value or forward
-/// moment, or a non-finite option price.
+/// Throws a `validation` error if `nTerms` is outside `1..=65536` or `vol` is
+/// not positive, and a `computation` error if the model produces a degenerate
+/// or invalid COS truncation range, a non-finite characteristic-function value
+/// or forward moment, or a non-finite option price.
 #[wasm_bindgen(js_name = bsCosPrice)]
 #[allow(clippy::too_many_arguments)]
 pub fn bs_cos_price(
@@ -81,8 +81,9 @@ pub fn bs_cos_price(
 ///
 /// # Errors
 ///
-/// Throws a JavaScript exception if `nTerms` is outside `1..=65536`, the model
-/// produces a degenerate or invalid COS truncation range, a non-finite characteristic-function value or forward
+/// Throws a `validation` error if `nTerms` is outside `1..=65536`, and a
+/// `computation` error if the model produces a degenerate or invalid COS
+/// truncation range, a non-finite characteristic-function value or forward
 /// moment, or a non-finite option price.
 #[wasm_bindgen(js_name = vgCosPrice)]
 #[allow(clippy::too_many_arguments)]
@@ -133,8 +134,9 @@ pub fn vg_cos_price(
 ///
 /// # Errors
 ///
-/// Throws a JavaScript exception if `nTerms` is outside `1..=65536`, the model
-/// produces a degenerate or invalid COS truncation range, a non-finite characteristic-function value or forward
+/// Throws a `validation` error if `nTerms` is outside `1..=65536`, and a
+/// `computation` error if the model produces a degenerate or invalid COS
+/// truncation range, a non-finite characteristic-function value or forward
 /// moment, or a non-finite option price.
 #[wasm_bindgen(js_name = mertonJumpCosPrice)]
 #[allow(clippy::too_many_arguments)]

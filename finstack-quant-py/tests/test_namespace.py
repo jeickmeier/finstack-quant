@@ -310,13 +310,11 @@ class TestPortfolioNamespace:
         from finstack_quant.portfolio import (  # noqa: F401
             FactorPnlProfile,
             FactorRiskDecomposition,
-            FxError,
             Portfolio,
             PortfolioError,
             PortfolioResult,
             PortfolioValuation,
             SensitivityMatrix,
-            ValuationError,
             aggregate_full_cashflows,
             aggregate_metrics,
             build_credit_vol_report,

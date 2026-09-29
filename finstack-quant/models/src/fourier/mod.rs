@@ -14,21 +14,49 @@ pub use cos::{
 pub struct FourierError {
     /// Diagnostic describing the invalid input or numerical failure.
     pub message: String,
+    /// [`ErrorKind::Validation`](finstack_quant_core::error::ErrorKind::Validation)
+    /// when the inputs were rejected before pricing (volatility, term count,
+    /// truncation multiplier);
+    /// [`ErrorKind::Computation`](finstack_quant_core::error::ErrorKind::Computation)
+    /// when pricing failed numerically (degenerate truncation range,
+    /// non-finite characteristic function or price).
+    pub kind: finstack_quant_core::error::ErrorKind,
 }
 
 impl FourierError {
-    pub(crate) fn model_failure(message: impl Into<String>) -> Self {
+    pub(crate) fn invalid_input(message: impl Into<String>) -> Self {
         Self {
             message: message.into(),
+            kind: finstack_quant_core::error::ErrorKind::Validation,
         }
+    }
+
+    pub(crate) fn numerical(message: impl Into<String>) -> Self {
+        Self {
+            message: message.into(),
+            kind: finstack_quant_core::error::ErrorKind::Computation,
+        }
+    }
+
+    /// Classify this error for host-language exception mapping (see
+    /// [`FourierError::kind`](Self::kind) field docs).
+    #[must_use]
+    pub fn kind(&self) -> finstack_quant_core::error::ErrorKind {
+        self.kind
     }
 }
 
 impl From<FourierError> for finstack_quant_core::Error {
+    /// Rejected inputs become validation errors and numerical failures
+    /// `Calibration { category: "fourier" }` (a computation error), so the
+    /// fold keeps [`FourierError::kind`].
     fn from(error: FourierError) -> Self {
-        Self::Calibration {
-            message: error.message,
-            category: "fourier".to_string(),
+        match error.kind {
+            finstack_quant_core::error::ErrorKind::Computation => Self::Calibration {
+                message: error.message,
+                category: "fourier".to_string(),
+            },
+            _ => Self::Validation(format!("Fourier model failure: {}", error.message)),
         }
     }
 }

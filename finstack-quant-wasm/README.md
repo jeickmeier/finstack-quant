@@ -186,15 +186,23 @@ result with `valuations.valuationResultToJson(result)`, which writes the canonic
 JSON (the same text as Python `ValuationResult.to_json()`) with every integer exact;
 ordinary `JSON.stringify(result)` throws when Monte Carlo details are present.
 
-**Errors.** Bindings that route through `crate::utils::to_js_err` — the large
-majority — throw a real `Error` whose `name` is `FinstackError` and whose `kind` is
-`not_found`, `validation`, or `computation`. The persisted-contract entry points
-(`portfolio.Portfolio.fromMaterialization` and `validateMaterialization`) instead
-throw `ContractValidationError`: `kind` is `report` when structured diagnostics are
-available, and `error.report` then carries the serialized `ValidationReport`; a
-breached load limit gives `kind` `limit_exceeded`. Their remaining failures stay
-`FinstackError` with a domain `kind` (`unknown_entity`, `fx_conversion`,
-`valuation`, `missing_market_data`, and so on). No export throws a bare string:
+**Errors.** Exports throw a real `Error` whose `name` is `FinstackError` and whose
+`kind` is the Rust error kind: `not_found`, `validation`, or `computation`.
+The Python bindings raise `KeyError`, `ValueError`, or `RuntimeError` for the same
+failures, so both hosts classify an error identically. A wrong JavaScript argument
+type throws a `TypeError` with `kind` `invalid_type` (see below). Where the Rust
+error defines a finer `code()`, it is set as `error.code`. The persisted-contract
+entry points (`portfolio.Portfolio.fromMaterialization` and
+`validateMaterialization`) throw `ContractValidationError` (`kind` `validation`)
+for a contract that cannot be loaded: `code` is `report` when structured
+diagnostics are available, and `error.report` then carries the serialized
+`ValidationReport`; a breached load limit gives `code` `limit_exceeded`. Their
+remaining failures are ordinary `FinstackError`s (an unknown entity or missing FX
+rate is `not_found`, a failed valuation carries the kind of its cause).
+The calibration envelope entry points (`calibrate`, `validateCalibrationJson`,
+`dryRun`) throw `CalibrationEnvelopeError`, whose `kind` is the Rust execution
+category (`strict_load`, `solver_not_converged`, …) alongside the failing `stage`,
+`step_id`, `solver_diagnostics` and strict-load `diagnostics`. No export throws a bare string:
 `mise run wasm-check-errors` rejects any binding error that bypasses
 `crate::utils::to_js_err`.
 

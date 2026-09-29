@@ -609,12 +609,9 @@ pub struct PyCsaSpec {
 
 impl PyCsaSpec {
     fn base_money(&self, amount: f64, field: &str) -> PyResult<Money> {
-        if !amount.is_finite() {
-            return Err(crate::errors::value_error(format!(
-                "CSA {field} must be finite, got {amount}"
-            )));
-        }
-        Money::new(amount, self.inner.base_currency).map_err(core_to_py)
+        Money::new(amount, self.inner.base_currency).map_err(|error| {
+            crate::errors::kind_to_py(error.kind(), format!("invalid {field}: {error}"))
+        })
     }
 }
 

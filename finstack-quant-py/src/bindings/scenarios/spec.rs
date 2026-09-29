@@ -19,19 +19,13 @@ fn enum_label<T: serde::Serialize>(value: &T) -> PyResult<String> {
 fn parse_resolution_mode(
     value: &str,
 ) -> PyResult<finstack_quant_core::market_data::hierarchy::ResolutionMode> {
-    serde_json::from_value(serde_json::Value::String(value.to_string())).map_err(|_| {
-        crate::errors::value_error(format!(
-            "Unknown resolution_mode {value:?}; expected 'most_specific_wins' or 'cumulative'"
-        ))
-    })
+    serde_json::from_value(serde_json::Value::String(value.to_string()))
+        .map_err(|error| crate::errors::value_error(format!("resolution_mode: {error}")))
 }
 
 fn parse_hazard_bump_mode(value: &str) -> PyResult<finstack_quant_scenarios::HazardBumpMode> {
-    serde_json::from_value(serde_json::Value::String(value.to_string())).map_err(|_| {
-        crate::errors::value_error(format!(
-            "Unknown hazard_bump_mode {value:?}; expected 'solve_to_par' or 'first_order_shift'"
-        ))
-    })
+    serde_json::from_value(serde_json::Value::String(value.to_string()))
+        .map_err(|error| crate::errors::value_error(format!("hazard_bump_mode: {error}")))
 }
 
 /// Validated scenario specification executed by the scenario engine.

@@ -73,7 +73,7 @@ macro_rules! schema_registry_functions {
         fn get(selector: &str, profile: &str) -> PyResult<String> {
             let artifact =
                 finstack_quant_core::schema::find_schema_artifact($registry, selector)
-                    .map_err(|error| pyo3::exceptions::PyKeyError::new_err(error.to_string()))?;
+                    .map_err(crate::errors::core_to_py)?;
             let value =
                 finstack_quant::schema::render_profile(artifact, profile)
                     .map_err(|error| pyo3::exceptions::PyValueError::new_err(error.to_string()))?;
@@ -110,7 +110,7 @@ macro_rules! schema_registry_functions {
         fn validate(selector: &str, payload: &str) -> PyResult<String> {
             let artifact =
                 finstack_quant_core::schema::find_schema_artifact($registry, selector)
-                    .map_err(|error| pyo3::exceptions::PyKeyError::new_err(error.to_string()))?;
+                    .map_err(crate::errors::core_to_py)?;
             let parsed: serde_json::Value = serde_json::from_str(payload).map_err(|error| {
                 pyo3::exceptions::PyValueError::new_err(format!("payload is not JSON: {error}"))
             })?;

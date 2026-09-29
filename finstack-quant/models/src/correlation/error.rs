@@ -79,30 +79,13 @@ pub enum Error {
 impl From<Error> for finstack_quant_core::Error {
     /// Fold a correlation error into the canonical core error taxonomy.
     ///
-    /// Iterative failures (`DidNotConverge`, `EigenDecompositionFailed`) map
-    /// to [`finstack_quant_core::InputError::SolverConvergenceFailed`] so
-    /// hosts classify them as computation errors; every other variant is an
-    /// input-validation failure and maps to
+    /// Matrix failures use core's `From<CorrelationError>` (iterative
+    /// failures such as `DidNotConverge` become computation errors); every
+    /// other variant is an input-validation failure and maps to
     /// [`finstack_quant_core::Error::Validation`] with the full message.
     fn from(error: Error) -> Self {
         match error {
-            Error::Matrix(
-                matrix @ (MatrixError::DidNotConverge { .. }
-                | MatrixError::EigenDecompositionFailed),
-            ) => {
-                let (iterations, residual) = match matrix {
-                    MatrixError::DidNotConverge { max_iter, tol } => (max_iter, tol),
-                    _ => (0, f64::NAN),
-                };
-                finstack_quant_core::Error::Input(
-                    finstack_quant_core::InputError::SolverConvergenceFailed {
-                        iterations,
-                        residual,
-                        last_x: f64::NAN,
-                        reason: matrix.to_string(),
-                    },
-                )
-            }
+            Error::Matrix(matrix) => matrix.into(),
             other => finstack_quant_core::Error::Validation(other.to_string()),
         }
     }

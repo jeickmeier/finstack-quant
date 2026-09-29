@@ -64,8 +64,7 @@ conversion helper. The remaining `mod.rs` files only declare submodules or
 re-export their children.
 
 Shared conversion helpers are one level up in [`../utils/`](../utils): `to_js_value`,
-`to_js_err`, `to_js_error`, `structured_js_error`, `contract_to_js_error`,
-`materialization_to_js_error`, and the date helpers `parse_iso_date`,
+`to_js_err`, `structured_js_error`, `materialization_to_js_error`, and the date helpers `parse_iso_date`,
 `parse_iso_dates`, `date_to_iso`. Argument conversion lives in
 [`../utils/input.rs`](../utils/input.rs): `js_string`, `js_bool`, `js_uint`,
 `js_int`, `js_u64`, `js_epoch_days`, the `js_opt_*` twins, `js_string_seq`,
@@ -135,11 +134,13 @@ export that is not in it is invisible to TypeScript users, and
   `../utils/mod.rs`.
 
 - **Errors go through `to_js_err`**, which throws a real `Error` named
-  `FinstackError` with a `kind` of `not_found` / `validation` / `computation`.
-  Persisted-contract paths use `contract_to_js_error` and
-  `materialization_to_js_error`, which select `kind` from the Rust enum variant
-  rather than by sniffing the message, and attach `error.report` for structured
-  diagnostics.
+  `FinstackError` whose `kind` is the Rust error's own `kind()` (`not_found` /
+  `validation` / `computation`) and whose optional `code` is its `code()`. The
+  binding never chooses a kind: a new typed error implements `IntoJsError` in
+  `../utils/mod.rs` by delegating to `kind()` or to its fold into
+  `finstack_quant_core::Error`. Portfolio materialization uses
+  `materialization_to_js_error`, which names the error `ContractValidationError`
+  and attaches `error.report` for structured diagnostics.
 
 - **Keep validation in a private `*_inner` helper** that returns the domain error,
   and make the `#[wasm_bindgen]` function a thin converter. Native tests cannot

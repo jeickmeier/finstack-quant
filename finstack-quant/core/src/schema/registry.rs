@@ -399,7 +399,8 @@ pub(super) fn generate_artifact<T: SerdeSchema>(artifact: &SchemaArtifact) -> Re
 ///
 /// # Errors
 ///
-/// Returns an error when no entry matches the selector.
+/// Returns `InputError::NotFound` (a not-found error) when no entry matches
+/// the selector.
 pub fn find_schema_artifact<'a>(
     artifacts: impl IntoIterator<Item = &'a SchemaArtifact>,
     selector: &str,
@@ -413,8 +414,8 @@ pub fn find_schema_artifact<'a>(
                 || artifact.relative_path.ends_with(&anchored)
         })
         .ok_or_else(|| {
-            Error::Internal(format!(
-                "no schema matches {selector:?}; call index() for published artifacts"
-            ))
+            Error::Input(crate::error::InputError::NotFound {
+                id: format!("schema {selector:?} (call index() for published artifacts)"),
+            })
         })
 }

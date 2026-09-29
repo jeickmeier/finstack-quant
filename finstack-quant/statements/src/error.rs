@@ -160,14 +160,69 @@ impl Error {
     }
 }
 
+impl Error {
+    /// Classify this error for host-language exception mapping.
+    ///
+    /// | Kind | Variants |
+    /// |------|----------|
+    /// | [`ErrorKind::NotFound`] | `NodeNotFound`, `MissingData`, `RegistryNotFound` |
+    /// | [`ErrorKind::Computation`] | `CircularDependency`, `CapitalStructure` |
+    /// | [`ErrorKind::Validation`] | `Build`, `FormulaParse`, `Eval`, `CurrencyMismatch`, `Period`, `InvalidInput`, `Forecast`, `Registry`, `Serde` |
+    ///
+    /// `Core` keeps its own kind. `Eval` is validation because it almost
+    /// always reports a malformed formula (unknown identifier, wrong argument
+    /// count, missing reference) rather than a numerical failure.
+    ///
+    /// [`ErrorKind::NotFound`]: finstack_quant_core::error::ErrorKind::NotFound
+    /// [`ErrorKind::Computation`]: finstack_quant_core::error::ErrorKind::Computation
+    /// [`ErrorKind::Validation`]: finstack_quant_core::error::ErrorKind::Validation
+    #[must_use]
+    pub fn kind(&self) -> finstack_quant_core::error::ErrorKind {
+        use finstack_quant_core::error::ErrorKind;
+        match self {
+            Error::Core(core) => core.kind(),
+            Error::NodeNotFound(_) | Error::MissingData(_) | Error::RegistryNotFound(_) => {
+                ErrorKind::NotFound
+            }
+            Error::CircularDependency(_) | Error::CapitalStructure(_) => ErrorKind::Computation,
+            Error::Build(_)
+            | Error::FormulaParse(_)
+            | Error::Eval(_)
+            | Error::CurrencyMismatch(..)
+            | Error::Period(_)
+            | Error::InvalidInput(_)
+            | Error::Forecast(_)
+            | Error::Registry(_)
+            | Error::Serde(_) => ErrorKind::Validation,
+        }
+    }
+}
+
 impl From<Error> for finstack_quant_core::Error {
+    /// Fold a statements error into the core taxonomy, keeping [`Error::kind`]:
+    /// lookup misses become `InputError::NotFound`, a dependency cycle becomes
+    /// core `CircularDependency`, capital-structure failures become
+    /// `Internal`, and the rest validation errors with the full message.
     fn from(err: Error) -> Self {
+        use finstack_quant_core::error::InputError;
         match err {
             Error::Core(core) => core,
             Error::CurrencyMismatch(expected, actual) => {
                 finstack_quant_core::Error::CurrencyMismatch { expected, actual }
             }
-            Error::Serde(message) => finstack_quant_core::Error::Internal(message),
+            Error::CircularDependency(path) => {
+                finstack_quant_core::Error::CircularDependency { path }
+            }
+            other @ (Error::NodeNotFound(_)
+            | Error::MissingData(_)
+            | Error::RegistryNotFound(_)) => {
+                finstack_quant_core::Error::Input(InputError::NotFound {
+                    id: other.to_string(),
+                })
+            }
+            other @ Error::CapitalStructure(_) => {
+                finstack_quant_core::Error::Internal(other.to_string())
+            }
             other => finstack_quant_core::Error::Validation(other.to_string()),
         }
     }
@@ -181,5 +236,49 @@ mod tests {
     fn converts_statements_errors_to_core_error() {
         let core: finstack_quant_core::Error = Error::invalid_input("bad assumptions").into();
         assert!(matches!(core, finstack_quant_core::Error::Validation(_)));
+    }
+
+    #[test]
+    fn kind_is_preserved_by_the_core_fold() {
+        use finstack_quant_core::error::ErrorKind;
+        let cases = [
+            (Error::NodeNotFound("revenue".into()), ErrorKind::NotFound),
+            (Error::MissingData("2025Q1".into()), ErrorKind::NotFound),
+            (
+                Error::RegistryNotFound("fin.margin".into()),
+                ErrorKind::NotFound,
+            ),
+            (
+                Error::CircularDependency(vec!["a".into(), "b".into()]),
+                ErrorKind::Computation,
+            ),
+            (
+                Error::CapitalStructure("no tranche".into()),
+                ErrorKind::Computation,
+            ),
+            (
+                Error::Eval("unknown identifier".into()),
+                ErrorKind::Validation,
+            ),
+            (Error::Build("no periods".into()), ErrorKind::Validation),
+            (Error::FormulaParse("bad".into()), ErrorKind::Validation),
+            (Error::Period("bad".into()), ErrorKind::Validation),
+            (Error::InvalidInput("bad".into()), ErrorKind::Validation),
+            (Error::Forecast("bad".into()), ErrorKind::Validation),
+            (Error::Registry("bad".into()), ErrorKind::Validation),
+            (Error::Serde("bad".into()), ErrorKind::Validation),
+            (
+                Error::CurrencyMismatch(
+                    finstack_quant_core::currency::Currency::USD,
+                    finstack_quant_core::currency::Currency::EUR,
+                ),
+                ErrorKind::Validation,
+            ),
+        ];
+        for (error, kind) in cases {
+            assert_eq!(error.kind(), kind, "{error}");
+            let core = finstack_quant_core::Error::from(error);
+            assert_eq!(core.kind(), kind, "{core}");
+        }
     }
 }

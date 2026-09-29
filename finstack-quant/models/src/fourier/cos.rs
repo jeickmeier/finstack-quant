@@ -132,7 +132,7 @@ pub struct MertonJumpCosParams {
 ///   count; `None` uses [`CosConfig::default`].
 pub fn bs_cos_price(params: BlackScholesCosParams) -> std::result::Result<f64, FourierError> {
     if !params.vol.is_finite() || params.vol <= 0.0 {
-        return Err(FourierError::model_failure(format!(
+        return Err(FourierError::invalid_input(format!(
             "Black-Scholes COS volatility must be finite and strictly positive, got {}",
             params.vol
         )));
@@ -337,7 +337,7 @@ impl<'a> CosPricer<'a> {
             .into_iter()
             .next()
             .ok_or_else(|| {
-                FourierError::model_failure(
+                FourierError::numerical(
                     "COS method: price_strip returned no price for a single strike",
                 )
             })
@@ -352,14 +352,14 @@ impl<'a> CosPricer<'a> {
         is_call: bool,
     ) -> Result<Vec<f64>, FourierError> {
         if self.config.num_terms == 0 || self.config.num_terms > CosConfig::MAX_TERMS {
-            return Err(FourierError::model_failure(format!(
+            return Err(FourierError::invalid_input(format!(
                 "COS method: num_terms must be in 1..={}, got {}",
                 CosConfig::MAX_TERMS,
                 self.config.num_terms
             )));
         }
         if !self.config.truncation_l.is_finite() || self.config.truncation_l <= 0.0 {
-            return Err(FourierError::model_failure(
+            return Err(FourierError::invalid_input(
                 "COS method: truncation_l must be finite and positive",
             ));
         }
@@ -385,7 +385,7 @@ impl<'a> CosPricer<'a> {
         let (a, b) = truncation_range(&cumulants, self.config.truncation_l)?;
 
         if !(a.is_finite() && b.is_finite()) || b <= a {
-            return Err(FourierError::model_failure(
+            return Err(FourierError::numerical(
                 "COS method: invalid truncation range from cumulants",
             ));
         }
@@ -410,7 +410,7 @@ impl<'a> CosPricer<'a> {
             let u_k = k as f64 * PI / bma;
             let cf_val = self.cf.cf(Complex64::new(u_k, 0.0), t);
             if !(cf_val.re.is_finite() && cf_val.im.is_finite()) {
-                return Err(FourierError::model_failure(format!(
+                return Err(FourierError::numerical(format!(
                     "COS method: characteristic function returned a non-finite \
                          value ({cf_val}) at frequency u_{k}={u_k}; the model is \
                          likely parameterised outside its domain of validity"
@@ -440,7 +440,7 @@ impl<'a> CosPricer<'a> {
         let fwd_moment_re = if is_call {
             let fwd_moment = self.cf.cf(Complex64::new(0.0, -1.0), t);
             if !(fwd_moment.re.is_finite() && fwd_moment.im.is_finite()) {
-                return Err(FourierError::model_failure(format!(
+                return Err(FourierError::numerical(format!(
                     "COS method: characteristic function returned a non-finite \
                          forward moment phi(-i) ({fwd_moment}); cannot apply \
                          put-call parity"
@@ -543,7 +543,7 @@ impl<'a> CosPricer<'a> {
 /// `raw < -tol` is `false` for `NaN`. Surface it as an explicit error instead.
 fn cos_finite_price(raw: f64, side: &str) -> std::result::Result<f64, FourierError> {
     if !raw.is_finite() {
-        return Err(FourierError::model_failure(format!(
+        return Err(FourierError::numerical(format!(
             "COS method: {side} price is non-finite ({raw}); the cosine \
                  series or characteristic function diverged — increase \
                  num_terms / truncation_l or check the model parameters"
@@ -589,7 +589,7 @@ fn truncation_range(
 ) -> std::result::Result<(f64, f64), FourierError> {
     let radicand = c.c2 + c.c4.abs().sqrt();
     if !radicand.is_finite() || radicand <= DEGENERATE_CUMULANT_RADICAND {
-        return Err(FourierError::model_failure(format!(
+        return Err(FourierError::numerical(format!(
             "COS method: degenerate cumulant set (c2={}, c4={}); the \
                  log-price distribution has effectively zero spread, so no \
                  meaningful truncation window exists — the COS method is not \
@@ -919,7 +919,24 @@ mod tests {
                 err.message.contains("num_terms must be in 1..=65536"),
                 "{err}"
             );
+            assert_eq!(
+                err.kind(),
+                finstack_quant_core::error::ErrorKind::Validation
+            );
+            assert_eq!(
+                finstack_quant_core::Error::from(err).kind(),
+                finstack_quant_core::error::ErrorKind::Validation
+            );
         }
+        let degenerate = bs_cos_price(BlackScholesCosParams {
+            vol: -0.2,
+            ..params(128)
+        })
+        .expect_err("negative volatility is rejected");
+        assert_eq!(
+            degenerate.kind(),
+            finstack_quant_core::error::ErrorKind::Validation
+        );
     }
 
     /// Item 1: a non-finite characteristic-function result must surface as an

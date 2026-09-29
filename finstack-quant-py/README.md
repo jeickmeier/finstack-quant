@@ -247,12 +247,14 @@ schedule = (
 
 ### Errors
 
-Fallible bindings raise through `src/errors.rs` (`core_to_py`,
-`display_to_py`): missing ids become `KeyError`, validation and argument
-failures `ValueError`, calibration and operational failures `RuntimeError`. The
+Fallible bindings raise through `src/errors.rs`. Every Rust error reports its
+own kind, and the exception class follows it: a missing id, node, entity or
+market datum raises `KeyError`, invalid input raises `ValueError`, and a failed
+computation (a dependency cycle, a solver that does not converge) raises
+`RuntimeError`. The WASM bindings report the same kind as `error.kind`. The
 Rust error chain is preserved in the message. Named exceptions inherit
-`FinstackError`, which inherits `ValueError`, so `except ValueError` still
-catches them.
+`FinstackError`, which inherits `ValueError`; they are raised only for
+validation failures, so `except ValueError` catches them.
 
 | Exception | Module | Base |
 |-----------|--------|------|
@@ -260,14 +262,12 @@ catches them.
 | `AnalyticsError` | `finstack_quant.analytics` | `FinstackError` |
 | `CholeskyError` | `finstack_quant.core.math.linalg` | `FinstackError` |
 | `PortfolioError` | `finstack_quant.portfolio` | `FinstackError` |
-| `ValuationError` | `finstack_quant.portfolio` | `PortfolioError` |
-| `FxError` | `finstack_quant.portfolio` | `PortfolioError` |
 | `ContractValidationError` | `finstack_quant.portfolio` | `FinstackError` |
 | `ContractLimitExceededError` | `finstack_quant.portfolio` | `ContractValidationError` |
 | `MalformedContractSchemaError` | `finstack_quant.portfolio` | `ContractValidationError` |
 | `MissingContractVersionError` | `finstack_quant.portfolio` | `ContractValidationError` |
 | `UnsupportedContractVersionError` | `finstack_quant.portfolio` | `ContractValidationError` |
-| `CalibrationEnvelopeError` | `finstack_quant.valuations` | `RuntimeError` (deliberately outside the `FinstackError` tree) |
+| `CalibrationEnvelopeError` | `finstack_quant.calibration` | `RuntimeError` (deliberately outside the `FinstackError` tree) |
 
 ### Determinism and the GIL
 

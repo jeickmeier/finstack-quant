@@ -292,7 +292,8 @@ mod tests {
 
     #[test]
     fn invert_fx_rate_rejects_non_positive() {
-        assert!(invert_fx_rate(0.0).is_err());
+        let zero = invert_fx_rate(0.0).expect_err("a zero rate has no reciprocal");
+        assert_eq!(zero.kind(), crate::error::ErrorKind::Validation, "{zero}");
         assert!(invert_fx_rate(-1.10).is_err());
         assert!(invert_fx_rate(f64::NAN).is_err());
         assert!(invert_fx_rate(f64::INFINITY).is_err());

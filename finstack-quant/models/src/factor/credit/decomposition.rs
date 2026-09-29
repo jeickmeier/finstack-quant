@@ -279,6 +279,26 @@ pub enum DecompositionError {
     },
 }
 
+impl DecompositionError {
+    /// Classify this error for host-language exception mapping: an issuer
+    /// with no model row or runtime tags is a not-found error, an internally
+    /// inconsistent model a computation error, and every other variant
+    /// rejects the input (validation).
+    #[must_use]
+    pub fn kind(&self) -> finstack_quant_core::error::ErrorKind {
+        use finstack_quant_core::error::ErrorKind;
+        match self {
+            Self::UnknownIssuer { .. } => ErrorKind::NotFound,
+            Self::ModelInconsistent { .. } => ErrorKind::Computation,
+            Self::MissingTag { .. }
+            | Self::SnapshotShapeMismatch { .. }
+            | Self::DateMismatchInPeriod { .. }
+            | Self::InvalidDecimalSpread { .. }
+            | Self::InvalidDtsWeight { .. } => ErrorKind::Validation,
+        }
+    }
+}
+
 /// Indexes every issuer beta row by `issuer_id` for O(log n) lookup.
 fn index_issuer_betas(model: &CreditFactorModel) -> BTreeMap<&IssuerId, &IssuerBetaRow> {
     let mut idx = BTreeMap::new();

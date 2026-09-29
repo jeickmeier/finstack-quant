@@ -331,9 +331,9 @@ impl PortfolioMarginAggregator {
                     return Ok(SimmSensitivities::new(self.base_currency));
                 }
             }
-            let sens = marginable
-                .simm_sensitivities(market, as_of)
-                .map_err(|e| Error::valuation(position.position_id.clone(), e.to_string()))?;
+            let sens = marginable.simm_sensitivities(market, as_of).map_err(|e| {
+                Error::valuation(position.position_id.clone(), e.kind(), e.to_string())
+            })?;
             // B-6: instrument sensitivities are per unit (same contract as
             // `mtm_for_vm`), so scale them to the HELD sensitivity by the signed
             // position factor before the netting-set merge. The sign matters:
@@ -376,7 +376,7 @@ impl PortfolioMarginAggregator {
                 market,
                 as_of,
             )
-            .map_err(|e| Error::valuation(position_id.clone(), e.to_string()))?;
+            .map_err(|e| Error::valuation(position_id.clone(), e.kind(), e.to_string()))?;
         Ok(sensitivities.scaled_to_currency(self.base_currency, fx_rate))
     }
 
@@ -687,9 +687,9 @@ impl PortfolioMarginAggregator {
         as_of: Date,
     ) -> Result<Money> {
         if let Some(marginable) = position.instrument.as_marginable() {
-            let unit_mtm = marginable
-                .mtm_for_vm(market, as_of)
-                .map_err(|e| Error::valuation(position.position_id.clone(), e.to_string()))?;
+            let unit_mtm = marginable.mtm_for_vm(market, as_of).map_err(|e| {
+                Error::valuation(position.position_id.clone(), e.kind(), e.to_string())
+            })?;
             if let PositionUnit::Notional(Some(notional_currency)) = position.unit {
                 if notional_currency != unit_mtm.currency() {
                     return Err(Error::invalid_input(format!(

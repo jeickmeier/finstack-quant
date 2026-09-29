@@ -188,6 +188,7 @@ pub(crate) fn build_decision_space(
         {
             return Err(Error::valuation(
                 position.position_id.clone(),
+                finstack_quant_core::error::ErrorKind::Validation,
                 "valuation result missing required metrics",
             ));
         }
@@ -309,7 +310,13 @@ pub(crate) fn build_decision_space(
         let val_entry = candidate_valuation
             .as_ref()
             .and_then(|v| v.position_values.get(&candidate.id))
-            .ok_or_else(|| Error::valuation(candidate.id.clone(), "failed to value candidate"))?;
+            .ok_or_else(|| {
+                Error::valuation(
+                    candidate.id.clone(),
+                    finstack_quant_core::error::ErrorKind::NotFound,
+                    "failed to value candidate",
+                )
+            })?;
 
         let pv_unit = val_entry.value_base.amount();
         let unit_scale = scale_of_quantity(candidate.unit, 1.0);

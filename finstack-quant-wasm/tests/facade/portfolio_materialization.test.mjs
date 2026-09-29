@@ -222,8 +222,8 @@ test('fromMaterialization throws typed errors with reports', () => {
     () => portfolio.Portfolio.fromMaterialization('{"schema":'),
     (error) => {
       assert.equal(error.name, 'ContractValidationError');
-      assert.equal(error.kind, 'report');
-      assert.notEqual(error.kind, 'limit_exceeded');
+      assert.equal(error.kind, 'validation');
+      assert.equal(error.code, 'report');
       assert.equal(error.report.diagnostics[0].code, 'contract/parse-error');
       assert.equal(error.report.diagnostics[0].pointer, null);
       return true;
@@ -238,7 +238,8 @@ test('fromMaterialization maps only max input size to limit_exceeded', () => {
     () => portfolio.Portfolio.fromMaterialization(payload),
     (error) => {
       assert.equal(error.name, 'ContractValidationError');
-      assert.equal(error.kind, 'limit_exceeded');
+      assert.equal(error.kind, 'validation');
+      assert.equal(error.code, 'limit_exceeded');
       assert.match(error.message, /bytes/);
       return true;
     }
@@ -258,7 +259,8 @@ test('fromMaterialization maps max artifact count to limit_exceeded', () => {
     () => portfolio.Portfolio.fromMaterialization(payload),
     (error) => {
       assert.equal(error.name, 'ContractValidationError');
-      assert.equal(error.kind, 'limit_exceeded');
+      assert.equal(error.kind, 'validation');
+      assert.equal(error.code, 'limit_exceeded');
       assert.match(error.message, /artifacts/);
       return true;
     }

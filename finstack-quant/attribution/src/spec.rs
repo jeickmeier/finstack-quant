@@ -64,6 +64,25 @@ impl AttributionEnvelope {
         }
     }
 
+    /// Parse a serialized attribution envelope.
+    ///
+    /// # Arguments
+    ///
+    /// * `json` - `finstack_quant.attribution/1` envelope JSON; unknown fields
+    ///   and unsupported schema markers are rejected.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`finstack_quant_core::Error::Validation`] (message prefixed
+    /// `invalid attribution envelope JSON:`) when `json` does not deserialize.
+    pub fn from_json(json: &str) -> Result<Self> {
+        serde_json::from_str(json).map_err(|e| {
+            finstack_quant_core::Error::Validation(format!(
+                "invalid attribution envelope JSON: {e}"
+            ))
+        })
+    }
+
     /// Execute the attribution and return the result envelope.
     ///
     /// # Errors
@@ -398,9 +417,7 @@ pub fn default_attribution_metrics() -> Vec<MetricId> {
 /// assert!(validate_attribution_json("{}").is_err());
 /// ```
 pub fn validate_attribution_json(json: &str) -> Result<String> {
-    let envelope: AttributionEnvelope = serde_json::from_str(json).map_err(|e| {
-        finstack_quant_core::Error::Validation(format!("invalid attribution JSON: {e}"))
-    })?;
+    let envelope = AttributionEnvelope::from_json(json)?;
     // Explicit schema-version gate. `AttributionSchema` deserialization already
     // rejects unknown markers, but the gate is asserted here so the contract is
     // visible at the validation boundary and stays correct if the enum ever

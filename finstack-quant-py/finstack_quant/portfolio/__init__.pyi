@@ -47,7 +47,6 @@ __all__ = [
     "FiCarinoLinkedResult",
     "FiReconciliationReport",
     "FinstackError",
-    "FxError",
     "GridAttributionResult",
     "GridCarinoLinkedResult",
     "Inequality",
@@ -88,7 +87,6 @@ __all__ = [
     "TradeUniverse",
     "UnmatchedEntry",
     "UnsupportedContractVersionError",
-    "ValuationError",
     "WeightAllocationResult",
     "WeightingScheme",
     "WhatIfResult",
@@ -174,35 +172,18 @@ class FinstackError(ValueError):
 
 class PortfolioError(FinstackError):
     """
-    Portfolio validation or calculation failure.
+    Portfolio validation failure (a ``ValueError``).
+
+    Portfolio errors are classified by their Rust-owned kind: validation
+    failures raise ``PortfolioError``, not-found failures (unknown entity,
+    missing market data or FX rate, a valuation that failed on missing data)
+    raise ``KeyError``, and computation failures raise ``RuntimeError``.
 
     Examples
     --------
     >>> from finstack_quant.portfolio import PortfolioError
     >>> str(PortfolioError("invalid portfolio"))
     'invalid portfolio'
-    """
-
-class ValuationError(PortfolioError):
-    """
-    Portfolio valuation failure.
-
-    Examples
-    --------
-    >>> from finstack_quant.portfolio import ValuationError
-    >>> str(ValuationError("valuation failed"))
-    'valuation failed'
-    """
-
-class FxError(PortfolioError):
-    """
-    Portfolio FX conversion or market-data failure.
-
-    Examples
-    --------
-    >>> from finstack_quant.portfolio import FxError
-    >>> str(FxError("missing FX rate"))
-    'missing FX rate'
     """
 
 class ContractValidationError(FinstackError):
@@ -3660,7 +3641,7 @@ def aggregate_metrics(
     PortfolioError
         If the valuation base currency or date is inconsistent with the
         requested aggregation context.
-    FxError
+    KeyError
         If an FX rate required for base-currency aggregation is unavailable.
 
     Examples
@@ -3712,7 +3693,7 @@ def aggregate_metrics_json(
         If supplied JSON, ``base_currency``, or ``as_of`` is invalid.
     PortfolioError
         If the valuation is inconsistent with the aggregation context.
-    FxError
+    KeyError
         If a required FX rate is unavailable.
 
     Examples
@@ -13050,10 +13031,11 @@ def optimize_portfolio(
     PortfolioError
         If the embedded portfolio specification cannot be constructed or an
         operational optimization failure occurs before a result is available.
-    ValuationError
-        If a required position metric cannot be valued.
-    FxError
-        If a required base-currency conversion is unavailable.
+    KeyError
+        If a required position metric cannot be valued for lack of market
+        data, or a required base-currency conversion is unavailable.
+    RuntimeError
+        If a required position metric fails to compute.
 
     Examples
     --------

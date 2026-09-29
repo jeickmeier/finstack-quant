@@ -141,16 +141,20 @@ bypasses the error-chain preservation the helpers provide and is a review reject
 |--------|-----|
 | `core_to_py` | `finstack_quant_core::Error` — by far the most common |
 | `display_to_py` | Any `Display` error without a dedicated mapper |
-| `portfolio_to_py`, `statements_to_py`, `analytics_to_py` | Crate-specific root errors |
-| `pd_calibration_to_py`, `migration_to_py` | `models::credit` sub-errors |
+| `portfolio_to_py`, `statements_to_py`, `scenarios_to_py`, `analytics_to_py` | Crate-specific root errors |
+| `pd_calibration_to_py`, `migration_to_py`, `decomposition_error_to_py`, `correlation_to_py` | `models` sub-errors |
+| `kind_to_py` | Any error that exposes `kind()` but has no dedicated mapper |
 | `contract_to_py`, `materialization_to_py`, `diagnostics_to_py` | Persisted-contract and materialization paths that attach structured diagnostics |
 | `value_error`, `serde_json_to_py` | Constructing a new error in binding code |
 
-Broad shape: missing id → `KeyError`; validation / bad argument → `ValueError`;
-calibration or operational failure → `RuntimeError`. Named exceptions descend from
-`FinstackError` (itself a `ValueError`, so pre-existing `except ValueError` handlers
-keep working); the sole carve-out is `CalibrationEnvelopeError`, which derives from
-`RuntimeError` because `pyo3::create_exception!` accepts only one base. The
+The binding never chooses the exception class: every mapper dispatches on the Rust
+error's `kind()` through `kind_to_py` (NotFound → `KeyError`, Validation →
+`ValueError`, Computation → `RuntimeError`), so Python and WASM (`error.kind`)
+classify a failure identically. A named domain exception (`PortfolioError`,
+`AnalyticsError`, the `ContractValidationError` family, `CholeskyError`) is raised
+only where its base matches the kind. Named exceptions descend from `FinstackError`
+(itself a `ValueError`); the sole carve-out is `CalibrationEnvelopeError`, which
+derives from `RuntimeError` because `pyo3::create_exception!` accepts only one base. The
 hierarchy is drawn in the `../errors.rs` module docs.
 
 The crate root denies `unwrap`, `expect`, and `panic` outside `#[cfg(test)]`

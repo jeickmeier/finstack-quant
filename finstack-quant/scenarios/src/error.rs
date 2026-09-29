@@ -223,6 +223,36 @@ impl Error {
     }
 }
 
+impl Error {
+    /// Classify this error for host-language exception mapping; agrees with
+    /// the `From<Error> for finstack_quant_core::Error` fold.
+    ///
+    /// Wrapped `Core`, `Statements` and `Valuations` errors keep their own
+    /// kind. `MarketDataNotFound`, `NodeNotFound`, `TenorNotFound` and
+    /// `InstrumentNotFound` are not-found errors, `Internal` a computation
+    /// error, and every other variant a validation error.
+    #[must_use]
+    pub fn kind(&self) -> finstack_quant_core::error::ErrorKind {
+        use finstack_quant_core::error::ErrorKind;
+        match self {
+            Error::Core(error) => error.kind(),
+            Error::Statements(error) => error.kind(),
+            Error::Valuations(error) => error.kind(),
+            Error::MarketDataNotFound { .. }
+            | Error::NodeNotFound { .. }
+            | Error::TenorNotFound { .. }
+            | Error::InstrumentNotFound(_) => ErrorKind::NotFound,
+            Error::Internal(_) => ErrorKind::Computation,
+            Error::MissingStatementModel { .. }
+            | Error::CurveTypeMismatch { .. }
+            | Error::UnsupportedOperation { .. }
+            | Error::Validation(_)
+            | Error::InvalidTenor(_)
+            | Error::InvalidPeriod(_) => ErrorKind::Validation,
+        }
+    }
+}
+
 impl From<Error> for finstack_quant_core::Error {
     /// Lookup misses (`MarketDataNotFound`, `NodeNotFound`, `TenorNotFound`,
     /// `InstrumentNotFound`) map to core's `InputError::NotFound` so they keep

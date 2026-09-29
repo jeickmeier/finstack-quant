@@ -303,6 +303,16 @@ impl ValidationReport {
     }
 }
 
+impl ValidationReport {
+    /// One-line summary used as the message of every report-carrying error:
+    /// `validation failed with N error(s)`, counting error-severity
+    /// diagnostics only.
+    #[must_use]
+    pub fn summary(&self) -> String {
+        format!("validation failed with {} error(s)", self.error_count())
+    }
+}
+
 impl std::fmt::Display for ValidationReport {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         self.error_count().fmt(formatter)
@@ -352,7 +362,7 @@ pub enum ContractError {
         limit: usize,
     },
     /// Structured validation produced one or more fatal findings.
-    #[error("validation failed with {0} error(s)")]
+    #[error("{}", .0.summary())]
     Report(Box<ValidationReport>),
     /// A core-domain operation failed while processing the contract.
     #[error(transparent)]

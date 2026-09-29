@@ -52,6 +52,8 @@ function assertStructuredError(error) {
   assert.ok(error.solver_diagnostics === undefined || typeof error.solver_diagnostics === 'object');
   assert.equal(typeof error.details, 'string');
   assert.deepEqual(error.cause, JSON.parse(error.details));
+  assert.ok(Array.isArray(error.diagnostics));
+  assert.deepEqual(error.diagnostics, error.cause.diagnostics ?? []);
 }
 
 test('calibration is owned only by the calibration namespace', () => {

@@ -1965,7 +1965,8 @@ class Performance:
             name / instance (``"act_365f"``, ``DayCount.ACT_365F``,
             ``"bus_252"``, …).
         calendar_id : str, optional
-            Holiday-calendar id required when ``day_count`` is Bus/252.
+            Holiday-calendar id, or ``+``-joined ids for a union calendar
+            (``"nyse+gblo"``); required when ``day_count`` is Bus/252.
 
         Returns
         -------

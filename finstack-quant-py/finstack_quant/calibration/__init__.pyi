@@ -3570,7 +3570,8 @@ class CalibrationResult:
 class CalibrationEnvelopeError(RuntimeError):
     """Raised when calibration ingestion, validation, or solving fails.
 
-    Carries ``kind``, ``stage``, ``step_id``, ``solver_diagnostics``, ``details``
+    Carries ``kind``, ``stage``, ``step_id``, ``solver_diagnostics`` (dict of
+    fit-acceptance diagnostics for solver failures, else ``None``), ``details``
     (JSON string) and ``diagnostics`` (list of dicts with ``pointer``,
     ``message``, ``code`` and ``expected_version`` for strict-load failures).
 
@@ -3588,7 +3589,7 @@ class CalibrationEnvelopeError(RuntimeError):
     kind: str
     stage: str
     step_id: str | None
-    solver_diagnostics: str | None
+    solver_diagnostics: dict[str, Any] | None
     details: str
     diagnostics: list[dict[str, Any]]
 

@@ -79,6 +79,18 @@ pub enum Error {
 /// Convenience result type used throughout the valuations crate.
 pub type Result<T> = std::result::Result<T, Error>;
 
+impl Error {
+    /// Classify this error for host-language exception mapping: the wrapped
+    /// core or pricing error's kind.
+    #[must_use]
+    pub fn kind(&self) -> finstack_quant_core::error::ErrorKind {
+        match self {
+            Error::Core(error) => error.kind(),
+            Error::Pricing(error) => error.kind(),
+        }
+    }
+}
+
 /// One-way conversion from [`Error`] into [`finstack_quant_core::Error`].
 ///
 /// | `valuations::Error`       | `finstack_quant_core::Error`          |

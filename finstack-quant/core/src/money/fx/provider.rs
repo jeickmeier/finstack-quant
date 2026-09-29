@@ -26,10 +26,7 @@ pub(crate) fn reciprocal_rate_or_err(
         .into());
     }
     if rate == 0.0 {
-        return Err(crate::error::InputError::NotFound {
-            id: format!("FX:{from}->{to} (zero reciprocal)"),
-        }
-        .into());
+        return Err(crate::error::InputError::InvalidFxRate { from, to, rate }.into());
     }
     let reciprocal = 1.0 / rate;
     // Validate the OUTPUT: tiny (subnormal) or negative inputs produce a

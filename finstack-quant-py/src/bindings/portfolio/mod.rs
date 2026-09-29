@@ -48,11 +48,6 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
         py.get_type::<crate::errors::PortfolioError>(),
     )?;
     m.add(
-        "ValuationError",
-        py.get_type::<crate::errors::ValuationError>(),
-    )?;
-    m.add("FxError", py.get_type::<crate::errors::FxError>())?;
-    m.add(
         "ContractValidationError",
         py.get_type::<crate::errors::ContractValidationError>(),
     )?;
@@ -93,8 +88,6 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
     let exports = vec![
         "FinstackError",
         "PortfolioError",
-        "ValuationError",
-        "FxError",
         "ContractValidationError",
         "UnsupportedContractVersionError",
         "MissingContractVersionError",

@@ -365,9 +365,9 @@ pub fn validate_correlation_matrix(matrix: &[f64], n: JsValue) -> Result<(), JsV
 ///
 /// # Errors
 ///
-/// Throws a JavaScript exception if the flat length is not `n * n`, the input
-/// has a gross diagonal or symmetry violation, or the projection does not
-/// converge within `maxIter` iterations at `tol`.
+/// Throws a `validation` error if the flat length is not `n * n` or the input
+/// has a gross diagonal or symmetry violation, and a `computation` error if
+/// the projection does not converge within `maxIter` iterations at `tol`.
 #[wasm_bindgen(js_name = nearestCorrelation)]
 pub fn nearest_correlation(
     matrix: Vec<f64>,

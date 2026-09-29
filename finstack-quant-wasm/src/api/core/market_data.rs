@@ -725,9 +725,8 @@ pub fn fx_pip_size(base: JsValue, quote: JsValue) -> Result<f64, JsValue> {
 ///
 /// # Errors
 ///
-/// Throws a JavaScript exception if `rate` is non-finite, non-positive, or
-/// when `1 / rate` is not a usable FX rate (overflow to infinity, zero, or a
-/// negative value).
+/// Throws a `validation` error if `rate` is non-finite, zero or negative, or
+/// its reciprocal overflows.
 #[wasm_bindgen(js_name = invertFxRate)]
 pub fn invert_fx_rate(rate: f64) -> Result<f64, JsValue> {
     rust_invert_fx_rate(rate).map_err(to_js_err)

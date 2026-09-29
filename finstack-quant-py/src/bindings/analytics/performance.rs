@@ -10,7 +10,7 @@ use crate::bindings::pandas_utils::{
 use crate::errors::analytics_to_py as core_to_py;
 use crate::errors::display_to_py;
 use finstack_quant_analytics as fa;
-use finstack_quant_core::dates::{calendar_by_id, FiscalConfig, HolidayCalendar, PeriodKind};
+use finstack_quant_core::dates::{FiscalConfig, HolidayCalendar, PeriodKind};
 use numpy::PyArray1;
 use pyo3::buffer::PyBuffer;
 use pyo3::exceptions::PyTypeError;
@@ -52,17 +52,6 @@ fn lookback_fiscal_config(month: Option<u8>, day: Option<u8>) -> PyResult<Fiscal
     }
 }
 
-fn resolve_fiscal_calendar(calendar_id: &str) -> PyResult<&'static dyn HolidayCalendar> {
-    calendar_by_id(calendar_id).ok_or_else(|| {
-        core_to_py(
-            finstack_quant_core::Error::calendar_not_found_with_suggestions(
-                calendar_id.to_string(),
-                finstack_quant_core::dates::available_calendars(),
-            ),
-        )
-    })
-}
-
 fn parse_cagr_day_count(day_count: Option<&Bound<'_, PyAny>>) -> PyResult<fa::CagrDayCount> {
     let Some(value) = day_count else {
         return Ok(fa::CagrDayCount::Act365_25);
@@ -84,7 +73,10 @@ fn parse_cagr_day_count(day_count: Option<&Bound<'_, PyAny>>) -> PyResult<fa::Ca
 fn resolve_optional_calendar(
     calendar_id: Option<&str>,
 ) -> PyResult<Option<&'static dyn HolidayCalendar>> {
-    calendar_id.map(resolve_fiscal_calendar).transpose()
+    calendar_id
+        .map(finstack_quant_core::dates::calendar_by_id_strict)
+        .transpose()
+        .map_err(core_to_py)
 }
 
 fn parse_return_kind(return_kind: &str, risk_free_rate: f64) -> PyResult<fa::ReturnKind> {

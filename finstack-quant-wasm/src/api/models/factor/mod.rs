@@ -351,8 +351,9 @@ impl JsPeriodDecomposition {
 ///
 /// # Errors
 ///
-/// Throws if an issuer has no model row and no `runtime_tags` entry, if
-/// `as_of` cannot be parsed, or if a spread is outside the decimal band.
+/// Throws a `not_found` error if an issuer has no model row and no
+/// `runtime_tags` entry, and a `validation` error if `as_of` cannot be parsed
+/// or a spread is outside the decimal band.
 ///
 /// @param model - Calibrated CreditFactorModel used for the peel.
 /// @param observedSpreadsJson - JSON `{issuer_id: spread}` map in decimal (`0.012` = 120 bp). Returned levels are bp.

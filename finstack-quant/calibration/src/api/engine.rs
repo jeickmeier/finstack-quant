@@ -58,7 +58,7 @@ impl ExecutionStage {
 }
 
 /// Solver diagnostics attached to a structured execution failure.
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct ExecutionSolverDiagnostics {
     /// Maximum absolute residual at termination.
     pub max_residual: f64,

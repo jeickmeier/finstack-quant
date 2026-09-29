@@ -177,12 +177,16 @@ fn attribute_pnl_missing_market_data_yields_structured_error() {
     )
     .expect("valid attribution params");
     let err = attribute_pnl(&p).expect_err("missing curves must error");
-    let kind = js_sys::Reflect::get(&err, &"kind".into())
-        .ok()
-        .and_then(|v| v.as_string());
-    assert!(
-        kind.is_some(),
-        "attribution errors must carry a structured kind tag"
+    let get = |key: &str| {
+        js_sys::Reflect::get(&err, &JsValue::from(key))
+            .ok()
+            .and_then(|v| v.as_string())
+    };
+    assert_eq!(get("name").as_deref(), Some("FinstackError"));
+    assert_eq!(
+        get("kind").as_deref(),
+        Some("not_found"),
+        "a missing curve is a lookup miss, as Python's KeyError"
     );
 }
 

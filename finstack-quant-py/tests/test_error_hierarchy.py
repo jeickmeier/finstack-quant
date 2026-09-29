@@ -37,22 +37,18 @@ from finstack_quant.portfolio import (
     ContractLimitExceededError,
     ContractValidationError,
     FinstackError,
-    FxError,
     MalformedContractSchemaError,
     MissingContractVersionError,
     Portfolio,
     PortfolioError,
     PortfolioResult,
     UnsupportedContractVersionError,
-    ValuationError,
     value_portfolio,
 )
 
 REPARENTED_ERRORS = [
     AnalyticsError,
     PortfolioError,
-    ValuationError,
-    FxError,
     ContractValidationError,
     UnsupportedContractVersionError,
     MissingContractVersionError,
@@ -215,29 +211,26 @@ class TestRealFailuresRaiseTheMappedClass:
         assert isinstance(excinfo.value, AnalyticsError)
         assert isinstance(excinfo.value, FinstackError)
 
-    def test_missing_curve_raises_valuation_error(self) -> None:
-        """A position priced off an absent curve raises ``ValuationError``."""
+    def test_missing_curve_raises_key_error(self) -> None:
+        """A position priced off an absent curve is a lookup miss: ``KeyError``.
+
+        The portfolio error carries the kind of the pricing failure it wraps,
+        so the class matches ``price_instrument`` on the same position (and the
+        WASM error ``kind`` of ``not_found``).
+        """
         portfolio = Portfolio.from_spec(_portfolio_json(discount_curve_id="MISSING-CURVE"))
-        with pytest.raises(ValuationError, match="MISSING-CURVE"):
+        with pytest.raises(KeyError, match="MISSING-CURVE") as excinfo:
             value_portfolio(portfolio, MarketContext())
+        assert not isinstance(excinfo.value, PortfolioError)
 
-    def test_missing_curve_failure_is_still_caught_by_value_error(self) -> None:
-        """``except ValueError`` and ``except PortfolioError`` both still catch it."""
-        portfolio = Portfolio.from_spec(_portfolio_json(discount_curve_id="MISSING-CURVE"))
-        with pytest.raises(ValueError, match="MISSING-CURVE") as excinfo:
-            value_portfolio(portfolio, MarketContext())
-        assert isinstance(excinfo.value, PortfolioError)
-        assert isinstance(excinfo.value, FinstackError)
+    def test_missing_fx_matrix_raises_key_error(self) -> None:
+        """Collapsing a USD position into an EUR base without FX is a missing FX rate.
 
-    def test_missing_fx_matrix_raises_fx_error(self) -> None:
-        """Collapsing a USD position into an EUR base without FX is an FX failure.
-
-        This is the sibling variant: same portfolio, same market, only the base
-        currency differs — so it discriminates ``FxError`` from
-        ``ValuationError`` rather than merely reaching ``PortfolioError``.
+        Same portfolio and market as the control, only the base currency
+        differs, so the trigger is the absent rate.
         """
         portfolio = Portfolio.from_spec(_portfolio_json(base_currency="EUR"))
-        with pytest.raises(FxError, match=r"(?i)fx"):
+        with pytest.raises(KeyError, match=r"(?i)fx"):
             value_portfolio(portfolio, _usd_market())
 
     def test_the_same_market_prices_cleanly_in_the_native_base(self) -> None:
@@ -248,7 +241,7 @@ class TestRealFailuresRaiseTheMappedClass:
     def test_bad_contract_marker_raises_contract_validation_error(self) -> None:
         """An unknown persisted-contract version is a ``ContractValidationError``."""
         bundle = _materialization_bundle("finstack_quant.portfolio_materialization/99")
-        with pytest.raises(ContractValidationError, match="structured diagnostic") as excinfo:
+        with pytest.raises(ContractValidationError, match="validation failed with") as excinfo:
             Portfolio.from_materialization(bundle)
         # The structured report is the reason this class exists at all.
         report = excinfo.value.report
@@ -259,7 +252,7 @@ class TestRealFailuresRaiseTheMappedClass:
     def test_contract_failure_is_still_caught_by_value_error(self) -> None:
         """The contract family stayed inside ``ValueError`` too."""
         bundle = _materialization_bundle("not-a-contract-marker")
-        with pytest.raises(ValueError, match="structured diagnostic") as excinfo:
+        with pytest.raises(ValueError, match="validation failed with") as excinfo:
             Portfolio.from_materialization(bundle)
         assert isinstance(excinfo.value, ContractValidationError)
         assert isinstance(excinfo.value, FinstackError)
@@ -282,11 +275,9 @@ class TestRealFailuresRaiseTheMappedClass:
         assert lower[0][0] == pytest.approx(2.0)
 
     def test_one_clause_catches_every_real_finstack_failure(self) -> None:
-        """``except FinstackError`` spans real analytics, valuation and contract failures."""
-        portfolio = Portfolio.from_spec(_portfolio_json(discount_curve_id="MISSING-CURVE"))
+        """``except FinstackError`` spans real analytics and contract failures."""
         triggers = [
             lambda: constrained_least_squares([0.0, 1.0, 1.0], 2, [0.05, 0.02, 0.01], [0.6, 0.3, 0.1]),
-            lambda: value_portfolio(portfolio, MarketContext()),
             lambda: Portfolio.from_materialization(_materialization_bundle("bad-marker")),
         ]
         caught: list[str] = []
@@ -297,7 +288,6 @@ class TestRealFailuresRaiseTheMappedClass:
                 caught.append(type(exc).__name__)
         assert caught == [
             "AnalyticsError",
-            "ValuationError",
             "ContractValidationError",
         ]
 
@@ -327,14 +317,6 @@ class TestBackwardCompatibility:
             ContractLimitExceededError,
         ):
             assert issubclass(error_type, ContractValidationError)
-
-    def test_portfolio_subclasses_keep_their_intermediate_base(self) -> None:
-        """The portfolio family kept its own two-level shape."""
-        for error_type in (
-            ValuationError,
-            FxError,
-        ):
-            assert issubclass(error_type, PortfolioError)
 
     def test_currency_mismatch_still_raises_value_error(self) -> None:
         """Bare ``ValueError`` from core mapping helpers was not reclassified."""
