@@ -56,24 +56,24 @@ fn credit_factor_hierarchy_dts_exposes_public_surface() {
     let dts = index_dts();
 
     // Classes
-    assert!(dts.contains("export declare class CreditFactorModel {"));
+    assert!(dts.contains("declare class CreditFactorModel {"));
     assert!(contains_signature(
         &dts,
         "static fromJson(s: string): CreditFactorModel;"
     ));
     assert!(contains_signature(&dts, "toJson(): string;"));
 
-    assert!(dts.contains("export declare class CreditCalibrator {"));
+    assert!(dts.contains("declare class CreditCalibrator {"));
     assert!(contains_signature(&dts, "constructor(configJson: string);"));
     assert!(contains_signature(
         &dts,
         "calibrate(inputsJson: string): CreditFactorModel;"
     ));
 
-    assert!(dts.contains("export declare class LevelsAtDate {"));
-    assert!(dts.contains("export declare class PeriodDecomposition {"));
+    assert!(dts.contains("declare class LevelsAtDate {"));
+    assert!(dts.contains("declare class PeriodDecomposition {"));
 
-    assert!(dts.contains("export declare class FactorCovarianceForecast {"));
+    assert!(dts.contains("declare class FactorCovarianceForecast {"));
     assert!(dts.contains("export interface FactorCovarianceMatrix"));
     assert!(dts.contains("export interface FactorModelConfig"));
     assert!(contains_signature(
@@ -93,15 +93,10 @@ fn credit_factor_hierarchy_dts_exposes_public_surface() {
         "factorModelAt(horizonJson: string, riskMeasureJson: string): FactorModelConfig;"
     ));
 
-    // Free functions
-    assert!(contains_signature(
-        &dts,
-        "export declare function decomposeLevels(",
-    ));
-    assert!(contains_signature(
-        &dts,
-        "export declare function decomposePeriod(",
-    ));
+    // The decomposition functions live on `models.factor.credit`; the package
+    // root exports no functions besides the `init` default.
+    assert!(!dts.contains("export declare function decomposeLevels("));
+    assert!(!dts.contains("export declare function decomposePeriod("));
 
     // FactorModelCreditNamespace entries
     assert!(dts.contains("CreditFactorModel: typeof CreditFactorModel;"));
@@ -136,7 +131,7 @@ fn analytics_dts_matches_runtime_hotspots() {
         "  periodicReturns(frequency?: string): PeriodicReturnPoint[][];",
     );
 
-    assert!(dts.contains("export declare class Performance {"));
+    assert!(dts.contains("declare class Performance {"));
     assert!(dts.contains("Performance: typeof Performance;"));
     assert!(contains_ignoring_ws(
         &dts,
@@ -443,7 +438,7 @@ fn valuations_dts_exposes_direct_fx_instruments() {
 fn valuations_dts_exposes_reusable_market_handle_pricing() {
     let dts = index_dts();
 
-    assert!(dts.contains("export declare class Market {"));
+    assert!(dts.contains("declare class Market {"));
     assert!(contains_ignoring_ws(
         &dts,
         "priceInstrumentWithMarket(instrumentJson: string, market: Market, asOf: string, model: string, metrics?: string[] | null, metricPricingOverrides?: string | null, marketHistory?: string | null): ValuationResult;",
@@ -847,7 +842,7 @@ fn dts_documents_wasm_owned_handles_and_dispose_contract() {
     ] {
         assert!(
             dts.contains(&format!(
-                "export interface {class_name} extends WasmOwned {{}}"
+                "interface {class_name} extends WasmOwned {{}}"
             )),
             "{class_name} must merge the wasm ownership contract"
         );

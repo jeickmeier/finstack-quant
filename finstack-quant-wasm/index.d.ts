@@ -90,6 +90,19 @@ export type { MarketDatum } from './types/generated/MarketDatum';
 export type { PriorMarketObject } from './types/generated/PriorMarketObject';
 export type { CalibrationResult } from './types/generated/CalibrationResult';
 export type { CalibrationReport } from './types/generated/CalibrationReport';
+// wasm-bindgen handle classes are reached through their namespace (for example
+// `valuations.Market`); the package root exports their types only.
+export type {
+  CreditCalibrator,
+  CreditFactorModel,
+  FactorCovarianceForecast,
+  InstrumentArtifactCache,
+  LevelsAtDate,
+  Market,
+  Performance,
+  PeriodDecomposition,
+  Portfolio,
+};
 
 // --- core -----------------------------------------------------------------
 
@@ -120,39 +133,39 @@ export interface WasmOwned {
  * Invalid dates, shapes, frequencies, tickers, and confidence levels are
  * returned as rejected JsValue errors.
  */
-export interface Performance extends WasmOwned {}
+interface Performance extends WasmOwned {}
 /**
  * Calibrated credit factor hierarchy artifact.
  *
  * Produced by [`JsCreditCalibrator`] or loaded from JSON via
  * [`JsCreditFactorModel::from_json`]. Immutable once constructed.
  */
-export interface CreditFactorModel extends WasmOwned {}
+interface CreditFactorModel extends WasmOwned {}
 /**
  * Deterministic calibrator that produces a [`JsCreditFactorModel`].
  *
  * Configuration and inputs are passed as JSON strings.
  */
-export interface CreditCalibrator extends WasmOwned {}
+interface CreditCalibrator extends WasmOwned {}
 /**
  * Snapshot of all hierarchy-level factor values at a single date.
  *
  * Produced by [`decompose_levels`]. Pass to [`decompose_period`] to compute
  * period-over-period changes.  The full data is available via `toJson`.
  */
-export interface LevelsAtDate extends WasmOwned {}
+interface LevelsAtDate extends WasmOwned {}
 /**
  * Component-wise difference between two [`JsLevelsAtDate`] snapshots.
  *
  * Produced by [`decompose_period`].
  */
-export interface PeriodDecomposition extends WasmOwned {}
+interface PeriodDecomposition extends WasmOwned {}
 /**
  * Vol-forecast view over a calibrated `CreditFactorModel`.
  *
  * `VolHorizon::Custom` is intentionally **not** exposed.
  */
-export interface FactorCovarianceForecast extends WasmOwned {}
+interface FactorCovarianceForecast extends WasmOwned {}
 /**
  * Opaque handle wrapping a parsed [`MarketContext`].
  *
@@ -168,7 +181,7 @@ export interface FactorCovarianceForecast extends WasmOwned {}
  * }
  * ```
  */
-export interface Market extends WasmOwned {}
+interface Market extends WasmOwned {}
 /**
  * Handle to a built [`finstack_quant_portfolio::Portfolio`] that can be reused
  * across WASM calls without re-parsing and rebuilding from the spec.
@@ -178,7 +191,7 @@ export interface Market extends WasmOwned {}
  * `aggregateFullCashflows` on the same portfolio, holding this handle
  * avoids paying that cost twice.
  */
-export interface Portfolio extends WasmOwned {}
+interface Portfolio extends WasmOwned {}
 
 /**
  * ISO-4217 currency code wrapper for JavaScript.
@@ -990,7 +1003,7 @@ export interface DayCountContextConstructor {
  * await init();
  * const t = new core.Tenor("3M");
  * t.toString();        // "3M"
- * t.toYearsSimple();   // 0.25
+ * t.toYears();   // 0.25
  *
  * const annual = core.Tenor.annual();
  * annual.toString();   // "1Y"
@@ -1005,7 +1018,7 @@ export interface Tenor extends WasmOwned {
    * Approximate length in years (simple estimate, no calendar).
    * @returns Approximate tenor length in years, such as `0.25` for `"3M"`.
    */
-  toYearsSimple(): number;
+  toYears(): number;
   /**
    * Tenor string representation.
    * @returns Human-readable string form of this value.
@@ -1027,7 +1040,7 @@ export interface Tenor extends WasmOwned {
  * await init();
  * const t = new core.Tenor("3M");
  * t.toString();        // "3M"
- * t.toYearsSimple();   // 0.25
+ * t.toYears();   // 0.25
  *
  * const annual = core.Tenor.annual();
  * annual.toString();   // "1Y"
@@ -1498,6 +1511,10 @@ export interface FxConversionPolicy extends WasmOwned {
  */
 export interface FxConversionPolicyConstructor {
   /**
+   * JavaScript prototype of `FxConversionPolicy`; instances come from the static factories, not `new`.
+   */
+  readonly prototype: FxConversionPolicy;
+  /**
    * Use spot/forward on the cashflow date.
    * @returns An `FxConversionPolicy` handle.
    */
@@ -1660,6 +1677,10 @@ export interface FxQuoteConvention extends WasmOwned {
  * ```
  */
 export interface FxQuoteConventionConstructor {
+  /**
+   * JavaScript prototype of `FxQuoteConvention`; instances come from the static factories, not `new`.
+   */
+  readonly prototype: FxQuoteConvention;
   /**
    * USD is the quote currency (units of USD per one unit of CCY1).
    * @returns An `FxQuoteConvention` handle.
@@ -2844,6 +2865,61 @@ export interface PeriodicReturnPoint {
 }
 
 /**
+ * Column-oriented table: the serde form of Rust
+ * `finstack_quant_core::table::TableEnvelope`, as returned by
+ * `Performance.summary`. Every column holds `row_count` values.
+ */
+export interface TableEnvelope {
+  /**
+   * Number of rows; every column's `values` has this length.
+   */
+  row_count: number;
+  /**
+   * Columns in display order.
+   */
+  columns: TableColumn[];
+  /**
+   * Table-level metadata; omitted when empty.
+   */
+  metadata?: Record<string, unknown>;
+}
+
+/**
+ * One named column of a `TableEnvelope`.
+ */
+export interface TableColumn {
+  /**
+   * Column name, unique within the table.
+   */
+  name: string;
+  /**
+   * Typed column storage.
+   */
+  data: TableColumnData;
+  /**
+   * Optional semantic hint; omitted when unset.
+   */
+  role?: 'dimension' | 'index' | 'measure' | 'attribute';
+  /**
+   * Column-level metadata; omitted when empty.
+   */
+  metadata?: Record<string, unknown>;
+}
+
+/**
+ * Typed column storage, tagged by `type` (Rust `TableColumnData`).
+ */
+export type TableColumnData =
+  | { type: 'string'; values: string[] }
+  | { type: 'nullable_string'; values: (string | null)[] }
+  | { type: 'float64'; values: number[] }
+  | { type: 'nullable_float64'; values: (number | null)[] }
+  | { type: 'u_int32'; values: number[] }
+  | { type: 'nullable_u_int32'; values: (number | null)[] }
+  | { type: 'int64'; values: number[] }
+  | { type: 'nullable_int64'; values: (number | null)[] };
+
+/**
  * Stateful performance analytics engine over a panel of ticker series.
  *
  * `Performance` is the single entry point exposed to JS. Construct from
@@ -2859,7 +2935,7 @@ export interface PeriodicReturnPoint {
  * panel's ticker order; vector / per-ticker / structured outputs are
  * serialized to plain JS objects (e.g. `DatedSeries`, `BetaResult[]`).
  */
-export declare class Performance {
+declare class Performance {
   /**
    * Construct from a ticker-major, column-oriented price matrix. The outer
    * element selects a ticker, and each inner series is aligned to `dates`.
@@ -3502,7 +3578,7 @@ export declare const analytics: AnalyticsNamespace;
  * Produced by `CreditCalibrator` or deserialized from JSON via `fromJson`.
  * Immutable once constructed.
  */
-export declare class CreditFactorModel {
+declare class CreditFactorModel {
   private constructor();
   /**
    * Deserialize and validate a `CreditFactorModel` from JSON.
@@ -3533,7 +3609,7 @@ export declare class CreditFactorModel {
  *
  * Configuration and inputs are passed as JSON strings.
  */
-export declare class CreditCalibrator {
+declare class CreditCalibrator {
   /**
    * Construct a calibrator from a JSON-serialized `CreditCalibrationConfig`.
    * @param configJson - Credit-factor calibration configuration JSON controlling model fitting.
@@ -3559,7 +3635,7 @@ export declare class CreditCalibrator {
  * Produced by `decomposeLevels`. Pass to `decomposePeriod` to compute
  * period-over-period changes.
  */
-export declare class LevelsAtDate {
+declare class LevelsAtDate {
   private constructor();
   /**
    * Deserialize a hierarchy-level snapshot from canonical JSON.
@@ -3612,7 +3688,7 @@ export declare class LevelsAtDate {
  *
  * Produced by `decomposePeriod`.
  */
-export declare class PeriodDecomposition {
+declare class PeriodDecomposition {
   private constructor();
   /**
    * Deserialize a period decomposition from canonical JSON.
@@ -3801,7 +3877,7 @@ export interface FactorModelConfig {
  * - `"unconditional"` — long-run.
  * - `'{"n_steps": N}'` — variance scaled by `N`.
  */
-export declare class FactorCovarianceForecast {
+declare class FactorCovarianceForecast {
   /**
    * Wrap a `CreditFactorModel` for vol forecasting.
    * @param model - Calibrated CreditFactorModel used to produce the covariance forecast.
@@ -3835,73 +3911,6 @@ export declare class FactorCovarianceForecast {
    */
   free(): void;
 }
-
-/**
- * Decompose observed issuer spreads at a point in time into per-level factor
- * values and per-issuer residual adders.
- *
- * @example
- * ```typescript
- * import init, {
- *   decomposeLevels,
- *   type CreditFactorModel,
- *   type LevelsAtDate
- * } from "finstack-quant-wasm";
- * await init();
- * function currentLevels(model: CreditFactorModel): LevelsAtDate {
- *   // Callers pass decimal spreads (0.012 = 120 bp). Returned levels are bp.
- *   return decomposeLevels(model, '{"ACME": 0.012}', 0.01, "2026-01-02");
- * }
- * ```
- * @returns Per-level factor values and residual adders at the requested date, in bp.
- * @param model - Calibrated credit factor hierarchy used for the peel.
- * @param observedSpreadsJson - JSON `{issuer_id: spread}` map in decimal (`0.012` = 120 bp). Values that look like bp (e.g. `100.0`) are rejected.
- * @param observedGeneric - Generic (PC) factor value at `as_of`, same decimal convention as the spreads.
- * @param asOf - ISO-8601 valuation date for the snapshot.
- * @param runtimeTagsJson - Optional JSON `{issuer_id: {dim_key: tag}}` for issuers not present in the model artifact.
- * @param model - Calibrated CreditFactorModel used for the peel.
- * @param observedSpreadsJson - JSON `{issuer_id: spread}` map in decimal (`0.012` = 120 bp). Returned levels are bp.
- * @param observedGeneric - Observed generic-market spread in decimal, aligned with the model factors.
- * @param asOf - ISO-8601 valuation date used to stamp the snapshot.
- * @param runtimeTagsJson - Optional runtime-tag JSON for issuers missing from the artifact.
- * @throws Error - Throws if an issuer has no model row and no `runtime_tags` entry, if `as_of` cannot be parsed, or if a spread is outside the decimal band.
- */
-export declare function decomposeLevels(
-  model: CreditFactorModel,
-  observedSpreadsJson: string,
-  observedGeneric: number,
-  asOf: string,
-  runtimeTagsJson?: string
-): LevelsAtDate;
-
-/**
- * Difference two `LevelsAtDate` snapshots component-wise.
- *
- * Output is restricted to buckets and issuers present in **both** snapshots.
- * @example
- * ```typescript
- * import init, {
- *   decomposePeriod,
- *   type LevelsAtDate,
- *   type PeriodDecomposition
- * } from "finstack-quant-wasm";
- * await init();
- * function periodChange(
- *   fromLevels: LevelsAtDate,
- *   toLevels: LevelsAtDate
- * ): PeriodDecomposition {
- *   return decomposePeriod(fromLevels, toLevels);
- * }
- * ```
- * @returns Component-wise change between two hierarchy-level snapshots.
- * @param fromLevels - Credit-factor levels at the start of the attribution period.
- * @param toLevels - Credit-factor levels at the end of the attribution period.
- * @throws Error - Throws if `from_levels.date > to_levels.date` or the snapshots disagree on hierarchy depth.
- */
-export declare function decomposePeriod(
-  fromLevels: LevelsAtDate,
-  toLevels: LevelsAtDate
-): PeriodDecomposition;
 
 /**
  * Namespaced TypeScript entry points for factor model credit calculations and types.
@@ -4392,6 +4401,10 @@ export interface CopulaSpec extends WasmOwned {
  */
 export interface CopulaSpecConstructor {
   /**
+   * JavaScript prototype of `CopulaSpec`; instances come from the static factories, not `new`.
+   */
+  readonly prototype: CopulaSpec;
+  /**
    * One-factor Gaussian copula (market standard).
    * @returns A `CopulaSpec` handle for deferred construction.
    */
@@ -4487,6 +4500,10 @@ export interface RecoverySpec extends WasmOwned {
  * ```
  */
 export interface RecoverySpecConstructor {
+  /**
+   * JavaScript prototype of `RecoverySpec`; instances come from the static factories, not `new`.
+   */
+  readonly prototype: RecoverySpec;
   /**
    * Constant recovery rate.
    *
@@ -5189,7 +5206,7 @@ export declare const covenants: CovenantsNamespace;
  * }
  * ```
  */
-export declare class Market {
+declare class Market {
   /**
    * Parse a MarketContext from its JSON representation.
    *
@@ -5250,6 +5267,10 @@ export interface Bond extends WasmOwned {
  * ```
  */
 export interface BondConstructor {
+  /**
+   * JavaScript prototype of `Bond`; instances come from the static factories, not `new`.
+   */
+  readonly prototype: Bond;
   /**
    * Create a US corporate fixed-rate bond (semi-annual, 30/360, T+1).
    * Mirrors Rust `Bond::fixed` and requires an explicit stub policy.
@@ -5348,6 +5369,10 @@ export interface TermLoan extends WasmOwned {
  */
 export interface TermLoanConstructor {
   /**
+   * JavaScript prototype of `TermLoan`; instances come from the static factories, not `new`.
+   */
+  readonly prototype: TermLoan;
+  /**
    * Deserialize a term loan from its canonical v1 instrument envelope.
    *
    * Bare payloads are rejected; the loader's validation runs on the result.
@@ -5433,6 +5458,10 @@ export interface AssetBackedFacility extends WasmOwned {
  * ```
  */
 export interface AssetBackedFacilityConstructor {
+  /**
+   * JavaScript prototype of `AssetBackedFacility`; instances come from the static factories, not `new`.
+   */
+  readonly prototype: AssetBackedFacility;
   /**
    * Parse a canonical `finstack_quant.instrument/1` envelope whose instrument is an `asset_backed_facility`.
    * @param json - Canonical instrument envelope JSON.
@@ -5528,6 +5557,10 @@ export interface EnhancedMonteCarloResult {
  * ```
  */
 export interface RevolvingCreditConstructor {
+  /**
+   * JavaScript prototype of `RevolvingCredit`; instances come from the static factories, not `new`.
+   */
+  readonly prototype: RevolvingCredit;
   /**
    * Deserialize a revolving credit facility from its canonical v1 instrument envelope.
    *
@@ -10173,7 +10206,7 @@ export interface PortfolioMaterializationResult {
  * cache.free();
  * ```
  */
-export declare class InstrumentArtifactCache {
+declare class InstrumentArtifactCache {
   /**
    * Create an empty cache with explicit bounds.
    * @param capacity - Maximum retained artifacts. Omit, `null`, or `undefined` to use the native default of 4,096.
@@ -10201,7 +10234,7 @@ export declare class InstrumentArtifactCache {
  * `Portfolio.fromSpec` and reuse it across cashflow / valuation calls to
  * skip the per-call `PortfolioSpec` parse + rebuild cost.
  */
-export declare class Portfolio {
+declare class Portfolio {
   private constructor();
   /**
    * Build a runtime portfolio from a portable embedded specification.

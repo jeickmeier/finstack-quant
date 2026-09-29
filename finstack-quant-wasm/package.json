@@ -36,7 +36,7 @@
     "docs:check": "node scripts/check-dts-docs.mjs && node scripts/check-typescript-docs.mjs && node scripts/complete-facade-jsdoc.mjs --check && npm run test:docs-tools && npm run test:dts",
     "optimize": "command -v wasm-opt >/dev/null 2>&1 && wasm-opt -Oz -o pkg/finstack_quant_wasm_bg.wasm pkg/finstack_quant_wasm_bg.wasm || echo 'wasm-opt not found, skipping optimization'",
     "test": "wasm-pack test --node",
-    "test:dts": "tsc -p tests/typescript/tsconfig.es2020.json && tsc -p tests/typescript/tsconfig.esnext-disposable.json",
+    "test:dts": "tsc -p tests/typescript/tsconfig.es2020.json && tsc -p tests/typescript/tsconfig.esnext-disposable.json && tsc -p tests/typescript/tsconfig.libcheck.json",
     "test:docs-tools": "node --test tests/scripts/typescript_docs.test.mjs",
     "test:browser": "wasm-pack test --chrome --headless",
     "test:facade": "node --test \"tests/facade/**/*.test.mjs\"",

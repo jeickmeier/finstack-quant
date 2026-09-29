@@ -1,0 +1,1724 @@
+{
+  "analytics": {
+    "kind": "namespace",
+    "keys": [
+      "Performance",
+      "constrainedLeastSquares",
+      "maxDrawdown",
+      "sharpe",
+      "sortino",
+      "volatility"
+    ]
+  },
+  "analytics.Performance": {
+    "kind": "class",
+    "statics": ["fromReturns"],
+    "methods": [
+      "activeDates",
+      "activeDatesForTicker",
+      "battingAverage",
+      "benchmarkIdx",
+      "beta",
+      "burkeRatio",
+      "cagr",
+      "calmar",
+      "captureRatio",
+      "cdar",
+      "cornishFisherVar",
+      "correlationMatrix",
+      "correlationMatrixRepaired",
+      "cumulativeReturns",
+      "cumulativeReturnsOutperformance",
+      "dates",
+      "downCapture",
+      "downsideDeviation",
+      "drawdownDetails",
+      "drawdownDifference",
+      "drawdownSeries",
+      "excessReturns",
+      "expectedShortfall",
+      "free",
+      "frequency",
+      "gainToPain",
+      "geometricMean",
+      "greeks",
+      "informationRatio",
+      "kurtosis",
+      "lookbackReturns",
+      "mSquared",
+      "martinRatio",
+      "maxDrawdown",
+      "maxDrawdownDuration",
+      "meanDrawdown",
+      "meanReturn",
+      "modifiedSharpe",
+      "multiFactorGreeks",
+      "omegaRatio",
+      "painIndex",
+      "painRatio",
+      "parametricVar",
+      "periodStats",
+      "periodicReturns",
+      "rSquared",
+      "recoveryFactor",
+      "resetBenchTicker",
+      "resetDateRange",
+      "returns",
+      "returnsForTicker",
+      "rollingGreeks",
+      "rollingReturns",
+      "rollingSharpe",
+      "rollingSortino",
+      "rollingVolatility",
+      "sharpe",
+      "skewness",
+      "sortino",
+      "sterlingRatio",
+      "summary",
+      "tailRatio",
+      "tickerNames",
+      "trackingError",
+      "treynor",
+      "ulcerIndex",
+      "upCapture",
+      "valueAtRisk",
+      "volatility"
+    ],
+    "getters": []
+  },
+  "analytics.constrainedLeastSquares": {
+    "kind": "function"
+  },
+  "analytics.maxDrawdown": {
+    "kind": "function"
+  },
+  "analytics.sharpe": {
+    "kind": "function"
+  },
+  "analytics.sortino": {
+    "kind": "function"
+  },
+  "analytics.volatility": {
+    "kind": "function"
+  },
+  "attribution": {
+    "kind": "namespace",
+    "keys": [
+      "AttributionParams",
+      "attributePnl",
+      "attributePnlEnvelopeJson",
+      "attributePnlJson",
+      "defaultAttributionMetrics",
+      "defaultWaterfallOrder",
+      "validateAttributionJson"
+    ]
+  },
+  "attribution.AttributionParams": {
+    "kind": "class",
+    "statics": [],
+    "methods": ["free"],
+    "getters": ["creditFactorModelJson", "modelParamsT0Json"]
+  },
+  "attribution.attributePnl": {
+    "kind": "function"
+  },
+  "attribution.attributePnlJson": {
+    "kind": "function"
+  },
+  "attribution.attributePnlEnvelopeJson": {
+    "kind": "function"
+  },
+  "attribution.validateAttributionJson": {
+    "kind": "function"
+  },
+  "attribution.defaultWaterfallOrder": {
+    "kind": "function"
+  },
+  "attribution.defaultAttributionMetrics": {
+    "kind": "function"
+  },
+  "calibration": {
+    "kind": "namespace",
+    "keys": ["calibrate", "calibrateBermudanLmmBaseVol", "dryRun", "validateCalibrationJson"]
+  },
+  "calibration.calibrate": {
+    "kind": "function"
+  },
+  "calibration.validateCalibrationJson": {
+    "kind": "function"
+  },
+  "calibration.dryRun": {
+    "kind": "function"
+  },
+  "calibration.calibrateBermudanLmmBaseVol": {
+    "kind": "function"
+  },
+  "cashflows": {
+    "kind": "namespace",
+    "keys": [
+      "accruedInterest",
+      "buildCashflowScheduleJson",
+      "cdrToMdr",
+      "cprToSmm",
+      "datedFlowsJson",
+      "mdrToCdr",
+      "smmToCpr",
+      "validateCashflowScheduleJson"
+    ]
+  },
+  "cashflows.accruedInterest": {
+    "kind": "function"
+  },
+  "cashflows.buildCashflowScheduleJson": {
+    "kind": "function"
+  },
+  "cashflows.cdrToMdr": {
+    "kind": "function"
+  },
+  "cashflows.cprToSmm": {
+    "kind": "function"
+  },
+  "cashflows.datedFlowsJson": {
+    "kind": "function"
+  },
+  "cashflows.mdrToCdr": {
+    "kind": "function"
+  },
+  "cashflows.smmToCpr": {
+    "kind": "function"
+  },
+  "cashflows.validateCashflowScheduleJson": {
+    "kind": "function"
+  },
+  "core": {
+    "kind": "namespace",
+    "keys": [
+      "Bps",
+      "Currency",
+      "DayCount",
+      "DayCountContext",
+      "DiscountCurve",
+      "ForwardCurve",
+      "FxConversionPolicy",
+      "FxDeltaVolSurface",
+      "FxMatrix",
+      "FxPairConvention",
+      "FxQuoteConvention",
+      "FxRateResult",
+      "HazardCurve",
+      "Money",
+      "Percentage",
+      "Rate",
+      "Tenor",
+      "VolCube",
+      "adjust",
+      "applyLowerTriangular",
+      "availableCalendars",
+      "choleskyDecomposition",
+      "choleskySolve",
+      "correlation",
+      "covariance",
+      "createDate",
+      "dateFromEpochDays",
+      "erf",
+      "fxMarketPair",
+      "fxPairConvention",
+      "fxPipSize",
+      "invertFxRate",
+      "kahanSum",
+      "lnGamma",
+      "longestPositiveRun",
+      "mean",
+      "neumaierSum",
+      "normCdf",
+      "normPdf",
+      "populationVariance",
+      "quantile",
+      "standardNormalInvCdf",
+      "variance"
+    ]
+  },
+  "core.Currency": {
+    "kind": "class",
+    "statics": ["fromJson"],
+    "methods": ["free", "toJson", "toString"],
+    "getters": ["code", "decimals", "numeric"]
+  },
+  "core.Money": {
+    "kind": "class",
+    "statics": ["fromDecimalStr", "fromJson"],
+    "methods": [
+      "add",
+      "amountDecimal",
+      "convertAtRate",
+      "divScalar",
+      "formatWith",
+      "free",
+      "mulScalar",
+      "negate",
+      "sub",
+      "toJson",
+      "toString"
+    ],
+    "getters": ["amount", "currency"]
+  },
+  "core.Rate": {
+    "kind": "class",
+    "statics": ["fromBp", "fromPercent"],
+    "methods": ["free"],
+    "getters": ["asBp", "asDecimal", "asPercent"]
+  },
+  "core.Bps": {
+    "kind": "class",
+    "statics": [],
+    "methods": ["asBp", "asDecimal", "free"],
+    "getters": []
+  },
+  "core.Percentage": {
+    "kind": "class",
+    "statics": [],
+    "methods": ["asDecimal", "asPercent", "free"],
+    "getters": []
+  },
+  "core.DayCount": {
+    "kind": "class",
+    "statics": [
+      "act360",
+      "act365f",
+      "act365l",
+      "actAct",
+      "actActAfb",
+      "actActIsma",
+      "bus252",
+      "oneOne",
+      "thirty360",
+      "thirty360It",
+      "thirtyE360",
+      "thirtyE360Isda"
+    ],
+    "methods": [
+      "calendarDays",
+      "free",
+      "signedYearFraction",
+      "toString",
+      "yearFraction",
+      "yearFractionWithContext"
+    ],
+    "getters": []
+  },
+  "core.DayCountContext": {
+    "kind": "class",
+    "statics": [],
+    "methods": [
+      "free",
+      "withBusBasis",
+      "withCalendar",
+      "withCouponPeriod",
+      "withEndIsTerminationDate",
+      "withFrequency"
+    ],
+    "getters": []
+  },
+  "core.Tenor": {
+    "kind": "class",
+    "statics": ["annual", "daily", "monthly", "quarterly", "semiAnnual", "weekly"],
+    "methods": ["free", "toString", "toYears"],
+    "getters": ["count"]
+  },
+  "core.createDate": {
+    "kind": "function"
+  },
+  "core.dateFromEpochDays": {
+    "kind": "function"
+  },
+  "core.adjust": {
+    "kind": "function"
+  },
+  "core.availableCalendars": {
+    "kind": "function"
+  },
+  "core.DiscountCurve": {
+    "kind": "class",
+    "statics": ["flat"],
+    "methods": ["df", "forward", "free", "zero"],
+    "getters": ["baseDate", "id"]
+  },
+  "core.HazardCurve": {
+    "kind": "class",
+    "statics": [],
+    "methods": ["free", "hazardRate", "sp"],
+    "getters": ["baseDate", "id", "recoveryRate"]
+  },
+  "core.ForwardCurve": {
+    "kind": "class",
+    "statics": [],
+    "methods": ["free", "rate", "rateBetween"],
+    "getters": ["baseDate", "id", "projectionGrid", "resetLag"]
+  },
+  "core.VolCube": {
+    "kind": "class",
+    "statics": ["fromJson"],
+    "methods": ["free"],
+    "getters": ["id", "interpolationMode"]
+  },
+  "core.FxDeltaVolSurface": {
+    "kind": "class",
+    "statics": ["fromJson"],
+    "methods": ["free"],
+    "getters": ["expiries", "id", "numExpiries"]
+  },
+  "core.FxConversionPolicy": {
+    "kind": "class",
+    "statics": ["cashflowDate", "fromName", "periodAverage", "periodEnd"],
+    "methods": ["free", "toString"],
+    "getters": []
+  },
+  "core.FxRateResult": {
+    "kind": "class",
+    "statics": [],
+    "methods": ["free"],
+    "getters": ["rate", "triangulated"]
+  },
+  "core.FxMatrix": {
+    "kind": "class",
+    "statics": [],
+    "methods": ["free", "rate", "rateDefault", "setQuote", "setQuoteOn"],
+    "getters": []
+  },
+  "core.FxQuoteConvention": {
+    "kind": "class",
+    "statics": ["direct", "fromName", "indirect"],
+    "methods": ["free", "toString"],
+    "getters": []
+  },
+  "core.FxPairConvention": {
+    "kind": "class",
+    "statics": [],
+    "methods": ["free"],
+    "getters": ["base", "pipSize", "quote", "settlementDays", "usdQuotation"]
+  },
+  "core.fxMarketPair": {
+    "kind": "function"
+  },
+  "core.fxPairConvention": {
+    "kind": "function"
+  },
+  "core.fxPipSize": {
+    "kind": "function"
+  },
+  "core.invertFxRate": {
+    "kind": "function"
+  },
+  "core.applyLowerTriangular": {
+    "kind": "function"
+  },
+  "core.choleskyDecomposition": {
+    "kind": "function"
+  },
+  "core.choleskySolve": {
+    "kind": "function"
+  },
+  "core.mean": {
+    "kind": "function"
+  },
+  "core.variance": {
+    "kind": "function"
+  },
+  "core.populationVariance": {
+    "kind": "function"
+  },
+  "core.correlation": {
+    "kind": "function"
+  },
+  "core.covariance": {
+    "kind": "function"
+  },
+  "core.quantile": {
+    "kind": "function"
+  },
+  "core.normCdf": {
+    "kind": "function"
+  },
+  "core.normPdf": {
+    "kind": "function"
+  },
+  "core.standardNormalInvCdf": {
+    "kind": "function"
+  },
+  "core.erf": {
+    "kind": "function"
+  },
+  "core.lnGamma": {
+    "kind": "function"
+  },
+  "core.kahanSum": {
+    "kind": "function"
+  },
+  "core.neumaierSum": {
+    "kind": "function"
+  },
+  "core.longestPositiveRun": {
+    "kind": "function"
+  },
+  "covenants": {
+    "kind": "namespace",
+    "keys": [
+      "covLiteJson",
+      "evaluateEngine",
+      "lboStandardJson",
+      "projectFinanceJson",
+      "realEstateJson",
+      "validateCovenantEngineJson",
+      "validateCovenantReportJson",
+      "validateCovenantSpecJson"
+    ]
+  },
+  "covenants.validateCovenantSpecJson": {
+    "kind": "function"
+  },
+  "covenants.validateCovenantReportJson": {
+    "kind": "function"
+  },
+  "covenants.validateCovenantEngineJson": {
+    "kind": "function"
+  },
+  "covenants.evaluateEngine": {
+    "kind": "function"
+  },
+  "covenants.lboStandardJson": {
+    "kind": "function"
+  },
+  "covenants.covLiteJson": {
+    "kind": "function"
+  },
+  "covenants.realEstateJson": {
+    "kind": "function"
+  },
+  "covenants.projectFinanceJson": {
+    "kind": "function"
+  },
+  "features": {
+    "kind": "namespace",
+    "keys": [
+      "neutralize",
+      "neutralizeAndZscore",
+      "rankToWeights",
+      "riskScaledWeights",
+      "rollingRegressionResidual",
+      "transformCrossSectional",
+      "transformCrossSectionalGrouped",
+      "transformPanelJson",
+      "transformTimeseries",
+      "transformTimeseriesPairwise"
+    ]
+  },
+  "features.neutralize": {
+    "kind": "function"
+  },
+  "features.neutralizeAndZscore": {
+    "kind": "function"
+  },
+  "features.rankToWeights": {
+    "kind": "function"
+  },
+  "features.riskScaledWeights": {
+    "kind": "function"
+  },
+  "features.rollingRegressionResidual": {
+    "kind": "function"
+  },
+  "features.transformTimeseries": {
+    "kind": "function"
+  },
+  "features.transformTimeseriesPairwise": {
+    "kind": "function"
+  },
+  "features.transformCrossSectional": {
+    "kind": "function"
+  },
+  "features.transformCrossSectionalGrouped": {
+    "kind": "function"
+  },
+  "features.transformPanelJson": {
+    "kind": "function"
+  },
+  "margin": {
+    "kind": "namespace",
+    "keys": [
+      "calculateVm",
+      "computeBilateralXva",
+      "csaEurRegulatoryJson",
+      "csaUsdRegulatoryJson",
+      "validateCsaJson"
+    ]
+  },
+  "margin.csaUsdRegulatoryJson": {
+    "kind": "function"
+  },
+  "margin.csaEurRegulatoryJson": {
+    "kind": "function"
+  },
+  "margin.validateCsaJson": {
+    "kind": "function"
+  },
+  "margin.calculateVm": {
+    "kind": "function"
+  },
+  "margin.computeBilateralXva": {
+    "kind": "function"
+  },
+  "models": {
+    "kind": "namespace",
+    "keys": [
+      "asianOptionPrice",
+      "bachelierGreeks",
+      "bachelierPrice",
+      "barrierCall",
+      "barrierPut",
+      "black76Greeks",
+      "black76ImpliedVol",
+      "black76Price",
+      "blackShiftedPrice",
+      "blackShiftedVega",
+      "bsCosPrice",
+      "bsGreeks",
+      "bsImpliedVol",
+      "bsPrice",
+      "correlation",
+      "credit",
+      "factor",
+      "hestonPrice",
+      "liquidity",
+      "lookbackOptionPrice",
+      "mertonJumpCosPrice",
+      "monteCarlo",
+      "quantoOptionPrice",
+      "rates",
+      "vanillaExpiryPayoff",
+      "vgCosPrice",
+      "volatility"
+    ]
+  },
+  "models.correlation": {
+    "kind": "namespace",
+    "keys": [
+      "Copula",
+      "CopulaSpec",
+      "RecoveryModel",
+      "RecoverySpec",
+      "correlationBounds",
+      "jointProbabilities",
+      "nearestCorrelation",
+      "trancheLossStatistics",
+      "validateCorrelationMatrix"
+    ]
+  },
+  "models.correlation.CopulaSpec": {
+    "kind": "class",
+    "statics": ["gaussian", "multiFactor", "randomFactorLoading", "studentT"],
+    "methods": ["build", "free"],
+    "getters": ["isGaussian", "isMultiFactor", "isRfl", "isStudentT"]
+  },
+  "models.correlation.Copula": {
+    "kind": "class",
+    "statics": [],
+    "methods": ["conditionalDefaultProb", "free", "stressCorrelationProxy", "tailDependence"],
+    "getters": ["modelName", "numFactors"]
+  },
+  "models.correlation.RecoverySpec": {
+    "kind": "class",
+    "statics": ["constant", "marketCorrelated", "marketStandardStochastic"],
+    "methods": ["build", "free"],
+    "getters": ["expectedRecovery"]
+  },
+  "models.correlation.RecoveryModel": {
+    "kind": "class",
+    "statics": [],
+    "methods": ["conditionalLgd", "conditionalRecovery", "free"],
+    "getters": ["expectedRecovery", "isStochastic", "lgd", "modelName", "recoveryVolatility"]
+  },
+  "models.correlation.correlationBounds": {
+    "kind": "function"
+  },
+  "models.correlation.jointProbabilities": {
+    "kind": "function"
+  },
+  "models.correlation.validateCorrelationMatrix": {
+    "kind": "function"
+  },
+  "models.correlation.nearestCorrelation": {
+    "kind": "function"
+  },
+  "models.correlation.trancheLossStatistics": {
+    "kind": "function"
+  },
+  "models.credit": {
+    "kind": "namespace",
+    "keys": [
+      "analyzeExchangeOffer",
+      "analyzeLme",
+      "creditGradesModelJson",
+      "creditStateJson",
+      "dynamicRecoveryAtNotional",
+      "dynamicRecoveryConstantJson",
+      "endogenousHazardAfterPikAccrual",
+      "endogenousHazardAtLeverage",
+      "endogenousHazardPowerLawJson",
+      "mertonCdsParSpread",
+      "mertonDebtSpread",
+      "mertonDefaultProbability",
+      "mertonDefaultProbabilityWithDrift",
+      "mertonDistanceToDefault",
+      "mertonDistanceToDefaultWithDrift",
+      "mertonFromCdsSpreadJson",
+      "mertonFromEquityJson",
+      "mertonFromTargetPdJson",
+      "mertonImpliedSpread",
+      "mertonKmvDefaultPoint",
+      "mertonModelJson",
+      "mertonModelWithDynamicsJson",
+      "mertonSimulatePathsJson",
+      "mertonToHazardCurveJson",
+      "mertonTryImpliedEquity",
+      "toggleExerciseOptimalJson",
+      "toggleExerciseThresholdJson"
+    ]
+  },
+  "models.credit.analyzeExchangeOffer": {
+    "kind": "function"
+  },
+  "models.credit.analyzeLme": {
+    "kind": "function"
+  },
+  "models.credit.mertonModelJson": {
+    "kind": "function"
+  },
+  "models.credit.creditGradesModelJson": {
+    "kind": "function"
+  },
+  "models.credit.mertonDefaultProbability": {
+    "kind": "function"
+  },
+  "models.credit.mertonDefaultProbabilityWithDrift": {
+    "kind": "function"
+  },
+  "models.credit.mertonDistanceToDefault": {
+    "kind": "function"
+  },
+  "models.credit.mertonDistanceToDefaultWithDrift": {
+    "kind": "function"
+  },
+  "models.credit.mertonKmvDefaultPoint": {
+    "kind": "function"
+  },
+  "models.credit.mertonImpliedSpread": {
+    "kind": "function"
+  },
+  "models.credit.mertonDebtSpread": {
+    "kind": "function"
+  },
+  "models.credit.mertonCdsParSpread": {
+    "kind": "function"
+  },
+  "models.credit.mertonFromEquityJson": {
+    "kind": "function"
+  },
+  "models.credit.mertonFromCdsSpreadJson": {
+    "kind": "function"
+  },
+  "models.credit.mertonFromTargetPdJson": {
+    "kind": "function"
+  },
+  "models.credit.mertonModelWithDynamicsJson": {
+    "kind": "function"
+  },
+  "models.credit.mertonTryImpliedEquity": {
+    "kind": "function"
+  },
+  "models.credit.mertonToHazardCurveJson": {
+    "kind": "function"
+  },
+  "models.credit.mertonSimulatePathsJson": {
+    "kind": "function"
+  },
+  "models.credit.dynamicRecoveryAtNotional": {
+    "kind": "function"
+  },
+  "models.credit.endogenousHazardAtLeverage": {
+    "kind": "function"
+  },
+  "models.credit.endogenousHazardAfterPikAccrual": {
+    "kind": "function"
+  },
+  "models.credit.dynamicRecoveryConstantJson": {
+    "kind": "function"
+  },
+  "models.credit.endogenousHazardPowerLawJson": {
+    "kind": "function"
+  },
+  "models.credit.creditStateJson": {
+    "kind": "function"
+  },
+  "models.credit.toggleExerciseThresholdJson": {
+    "kind": "function"
+  },
+  "models.credit.toggleExerciseOptimalJson": {
+    "kind": "function"
+  },
+  "models.factor": {
+    "kind": "namespace",
+    "keys": ["credit", "risk"]
+  },
+  "models.factor.credit": {
+    "kind": "namespace",
+    "keys": [
+      "CreditCalibrator",
+      "CreditFactorModel",
+      "FactorCovarianceForecast",
+      "LevelsAtDate",
+      "PeriodDecomposition",
+      "decomposeLevels",
+      "decomposePeriod"
+    ]
+  },
+  "models.factor.credit.CreditFactorModel": {
+    "kind": "class",
+    "statics": ["fromJson"],
+    "methods": ["free", "toJson"],
+    "getters": ["schema"]
+  },
+  "models.factor.credit.CreditCalibrator": {
+    "kind": "class",
+    "statics": [],
+    "methods": ["calibrate", "free"],
+    "getters": []
+  },
+  "models.factor.credit.LevelsAtDate": {
+    "kind": "class",
+    "statics": ["fromJson"],
+    "methods": ["adder", "free", "levelValues", "toJson"],
+    "getters": ["date", "generic", "nLevels"]
+  },
+  "models.factor.credit.PeriodDecomposition": {
+    "kind": "class",
+    "statics": ["fromJson"],
+    "methods": ["dAdder", "free", "levelDeltas", "toJson"],
+    "getters": ["dGeneric", "fromDate", "nLevels", "toDate"]
+  },
+  "models.factor.credit.FactorCovarianceForecast": {
+    "kind": "class",
+    "statics": [],
+    "methods": ["covarianceAt", "factorModelAt", "free", "idiosyncraticVol"],
+    "getters": []
+  },
+  "models.factor.credit.decomposeLevels": {
+    "kind": "function"
+  },
+  "models.factor.credit.decomposePeriod": {
+    "kind": "function"
+  },
+  "models.factor.risk": {
+    "kind": "namespace",
+    "keys": [
+      "evaluateRiskBudget",
+      "historicalVarDecomposition",
+      "parametricEsDecomposition",
+      "parametricVarDecomposition"
+    ]
+  },
+  "models.factor.risk.parametricVarDecomposition": {
+    "kind": "function"
+  },
+  "models.factor.risk.parametricEsDecomposition": {
+    "kind": "function"
+  },
+  "models.factor.risk.historicalVarDecomposition": {
+    "kind": "function"
+  },
+  "models.factor.risk.evaluateRiskBudget": {
+    "kind": "function"
+  },
+  "models.liquidity": {
+    "kind": "namespace",
+    "keys": [
+      "almgrenChrissImpact",
+      "amihudIlliquidity",
+      "daysToLiquidate",
+      "kyleLambda",
+      "liquidityTier",
+      "lvarBangia",
+      "rollEffectiveSpread"
+    ]
+  },
+  "models.liquidity.rollEffectiveSpread": {
+    "kind": "function"
+  },
+  "models.liquidity.amihudIlliquidity": {
+    "kind": "function"
+  },
+  "models.liquidity.daysToLiquidate": {
+    "kind": "function"
+  },
+  "models.liquidity.liquidityTier": {
+    "kind": "function"
+  },
+  "models.liquidity.lvarBangia": {
+    "kind": "function"
+  },
+  "models.liquidity.almgrenChrissImpact": {
+    "kind": "function"
+  },
+  "models.liquidity.kyleLambda": {
+    "kind": "function"
+  },
+  "models.monteCarlo": {
+    "kind": "namespace",
+    "keys": ["priceHestonCall", "priceHestonPut"]
+  },
+  "models.monteCarlo.priceHestonCall": {
+    "kind": "function"
+  },
+  "models.monteCarlo.priceHestonPut": {
+    "kind": "function"
+  },
+  "models.rates": {
+    "kind": "namespace",
+    "keys": ["dtsm"]
+  },
+  "models.rates.dtsm": {
+    "kind": "namespace",
+    "keys": ["nelsonSiegelYields"]
+  },
+  "models.rates.dtsm.nelsonSiegelYields": {
+    "kind": "function"
+  },
+  "models.volatility": {
+    "kind": "namespace",
+    "keys": [
+      "SabrCalibrator",
+      "SabrModel",
+      "SabrParameters",
+      "SabrSmile",
+      "calibrateSvi",
+      "convertAtmVolatility",
+      "deltaToStrike",
+      "getCubeNormalVol",
+      "getCubeNormalVolClamped",
+      "getCubeVol",
+      "getCubeVolClamped",
+      "getFxDeltaPillarVols",
+      "getFxDeltaVol",
+      "strikeToDelta",
+      "sviImpliedVol"
+    ]
+  },
+  "models.volatility.SabrCalibrator": {
+    "kind": "class",
+    "statics": ["highPrecision"],
+    "methods": [
+      "calibrate",
+      "free",
+      "withAtmPinning",
+      "withMaxIterations",
+      "withShift",
+      "withTolerance"
+    ],
+    "getters": []
+  },
+  "models.volatility.SabrModel": {
+    "kind": "class",
+    "statics": [],
+    "methods": ["free", "impliedVol", "supportsNegativeRates"],
+    "getters": ["params"]
+  },
+  "models.volatility.SabrParameters": {
+    "kind": "class",
+    "statics": ["equityDefault", "ratesDefault"],
+    "methods": ["free", "isShifted"],
+    "getters": ["alpha", "beta", "nu", "rho", "shift"]
+  },
+  "models.volatility.SabrSmile": {
+    "kind": "class",
+    "statics": [],
+    "methods": ["arbitrageDiagnostics", "atmVol", "free", "generateSmile", "impliedVol"],
+    "getters": []
+  },
+  "models.volatility.calibrateSvi": {
+    "kind": "function"
+  },
+  "models.volatility.convertAtmVolatility": {
+    "kind": "function"
+  },
+  "models.volatility.deltaToStrike": {
+    "kind": "function"
+  },
+  "models.volatility.getCubeNormalVol": {
+    "kind": "function"
+  },
+  "models.volatility.getCubeNormalVolClamped": {
+    "kind": "function"
+  },
+  "models.volatility.getCubeVol": {
+    "kind": "function"
+  },
+  "models.volatility.getCubeVolClamped": {
+    "kind": "function"
+  },
+  "models.volatility.getFxDeltaPillarVols": {
+    "kind": "function"
+  },
+  "models.volatility.getFxDeltaVol": {
+    "kind": "function"
+  },
+  "models.volatility.strikeToDelta": {
+    "kind": "function"
+  },
+  "models.volatility.sviImpliedVol": {
+    "kind": "function"
+  },
+  "models.bsPrice": {
+    "kind": "function"
+  },
+  "models.vanillaExpiryPayoff": {
+    "kind": "function"
+  },
+  "models.bsGreeks": {
+    "kind": "function"
+  },
+  "models.bsImpliedVol": {
+    "kind": "function"
+  },
+  "models.black76ImpliedVol": {
+    "kind": "function"
+  },
+  "models.black76Price": {
+    "kind": "function"
+  },
+  "models.black76Greeks": {
+    "kind": "function"
+  },
+  "models.bachelierPrice": {
+    "kind": "function"
+  },
+  "models.bachelierGreeks": {
+    "kind": "function"
+  },
+  "models.blackShiftedPrice": {
+    "kind": "function"
+  },
+  "models.blackShiftedVega": {
+    "kind": "function"
+  },
+  "models.barrierCall": {
+    "kind": "function"
+  },
+  "models.barrierPut": {
+    "kind": "function"
+  },
+  "models.asianOptionPrice": {
+    "kind": "function"
+  },
+  "models.lookbackOptionPrice": {
+    "kind": "function"
+  },
+  "models.quantoOptionPrice": {
+    "kind": "function"
+  },
+  "models.hestonPrice": {
+    "kind": "function"
+  },
+  "models.bsCosPrice": {
+    "kind": "function"
+  },
+  "models.vgCosPrice": {
+    "kind": "function"
+  },
+  "models.mertonJumpCosPrice": {
+    "kind": "function"
+  },
+  "portfolio": {
+    "kind": "namespace",
+    "keys": [
+      "InstrumentArtifactCache",
+      "Portfolio",
+      "aggregateFullCashflows",
+      "aggregateFullCashflowsBuilt",
+      "aggregateMetrics",
+      "applyScenarioAndRevalue",
+      "applyScenarioAndRevalueBuilt",
+      "brinsonFachler",
+      "buildPortfolioFromSpecJson",
+      "campisiAttribution",
+      "campisiCarinoLink",
+      "campisiCarinoLinkFromSnapshots",
+      "campisiReconciliationCheck",
+      "carinoLink",
+      "cellReturnsFromCurves",
+      "cellReturnsFromReference",
+      "computeFactorSensitivities",
+      "computeFactorSensitivitiesWithMarket",
+      "computePnlProfiles",
+      "computePnlProfilesWithMarket",
+      "decomposeFactorRisk",
+      "excessReturns",
+      "factorBrinsonAttribution",
+      "gridAttribution",
+      "gridCarinoLink",
+      "mwrXirr",
+      "optimizePortfolio",
+      "parsePortfolioSpecJson",
+      "portfolioResultGetMetric",
+      "portfolioResultTotalValue",
+      "replayPortfolio",
+      "scenarioPnl",
+      "scenarioPnlBuilt",
+      "twrrLinked",
+      "twrrModifiedDietz",
+      "valuePortfolio",
+      "valuePortfolioBuilt"
+    ]
+  },
+  "portfolio.InstrumentArtifactCache": {
+    "kind": "class",
+    "statics": [],
+    "methods": ["free"],
+    "getters": ["decodeCount", "size"]
+  },
+  "portfolio.Portfolio": {
+    "kind": "class",
+    "statics": ["fromMaterialization", "fromSpec", "validateMaterialization"],
+    "methods": ["free", "numPositions", "toJson"],
+    "getters": ["asOf", "baseCurrency", "id"]
+  },
+  "portfolio.parsePortfolioSpecJson": {
+    "kind": "function"
+  },
+  "portfolio.brinsonFachler": {
+    "kind": "function"
+  },
+  "portfolio.carinoLink": {
+    "kind": "function"
+  },
+  "portfolio.campisiAttribution": {
+    "kind": "function"
+  },
+  "portfolio.campisiCarinoLink": {
+    "kind": "function"
+  },
+  "portfolio.campisiCarinoLinkFromSnapshots": {
+    "kind": "function"
+  },
+  "portfolio.campisiReconciliationCheck": {
+    "kind": "function"
+  },
+  "portfolio.cellReturnsFromReference": {
+    "kind": "function"
+  },
+  "portfolio.cellReturnsFromCurves": {
+    "kind": "function"
+  },
+  "portfolio.excessReturns": {
+    "kind": "function"
+  },
+  "portfolio.gridAttribution": {
+    "kind": "function"
+  },
+  "portfolio.gridCarinoLink": {
+    "kind": "function"
+  },
+  "portfolio.factorBrinsonAttribution": {
+    "kind": "function"
+  },
+  "portfolio.twrrModifiedDietz": {
+    "kind": "function"
+  },
+  "portfolio.twrrLinked": {
+    "kind": "function"
+  },
+  "portfolio.mwrXirr": {
+    "kind": "function"
+  },
+  "portfolio.buildPortfolioFromSpecJson": {
+    "kind": "function"
+  },
+  "portfolio.portfolioResultTotalValue": {
+    "kind": "function"
+  },
+  "portfolio.portfolioResultGetMetric": {
+    "kind": "function"
+  },
+  "portfolio.aggregateMetrics": {
+    "kind": "function"
+  },
+  "portfolio.valuePortfolio": {
+    "kind": "function"
+  },
+  "portfolio.valuePortfolioBuilt": {
+    "kind": "function"
+  },
+  "portfolio.aggregateFullCashflows": {
+    "kind": "function"
+  },
+  "portfolio.aggregateFullCashflowsBuilt": {
+    "kind": "function"
+  },
+  "portfolio.applyScenarioAndRevalue": {
+    "kind": "function"
+  },
+  "portfolio.applyScenarioAndRevalueBuilt": {
+    "kind": "function"
+  },
+  "portfolio.scenarioPnl": {
+    "kind": "function"
+  },
+  "portfolio.scenarioPnlBuilt": {
+    "kind": "function"
+  },
+  "portfolio.optimizePortfolio": {
+    "kind": "function"
+  },
+  "portfolio.replayPortfolio": {
+    "kind": "function"
+  },
+  "portfolio.computeFactorSensitivities": {
+    "kind": "function"
+  },
+  "portfolio.computeFactorSensitivitiesWithMarket": {
+    "kind": "function"
+  },
+  "portfolio.computePnlProfiles": {
+    "kind": "function"
+  },
+  "portfolio.computePnlProfilesWithMarket": {
+    "kind": "function"
+  },
+  "portfolio.decomposeFactorRisk": {
+    "kind": "function"
+  },
+  "scenarios": {
+    "kind": "namespace",
+    "keys": [
+      "applyScenario",
+      "applyScenarioToMarket",
+      "buildFromTemplate",
+      "buildScenarioSpec",
+      "buildTemplateComponent",
+      "composeScenarios",
+      "computeHorizonReturn",
+      "listBuiltinTemplateMetadata",
+      "listBuiltinTemplates",
+      "listTemplateComponents",
+      "parseScenarioSpec",
+      "validateScenarioSpec"
+    ]
+  },
+  "scenarios.parseScenarioSpec": {
+    "kind": "function"
+  },
+  "scenarios.composeScenarios": {
+    "kind": "function"
+  },
+  "scenarios.validateScenarioSpec": {
+    "kind": "function"
+  },
+  "scenarios.listBuiltinTemplates": {
+    "kind": "function"
+  },
+  "scenarios.listBuiltinTemplateMetadata": {
+    "kind": "function"
+  },
+  "scenarios.buildFromTemplate": {
+    "kind": "function"
+  },
+  "scenarios.listTemplateComponents": {
+    "kind": "function"
+  },
+  "scenarios.buildTemplateComponent": {
+    "kind": "function"
+  },
+  "scenarios.buildScenarioSpec": {
+    "kind": "function"
+  },
+  "scenarios.applyScenario": {
+    "kind": "function"
+  },
+  "scenarios.applyScenarioToMarket": {
+    "kind": "function"
+  },
+  "scenarios.computeHorizonReturn": {
+    "kind": "function"
+  },
+  "statements": {
+    "kind": "namespace",
+    "keys": [
+      "evaluateModel",
+      "evaluateModelWithMarket",
+      "evaluateMonteCarlo",
+      "modelNodeIds",
+      "parseAndCompile",
+      "parseFormula",
+      "validateCapitalStructureSpecJson",
+      "validateCheckSuiteSpecJson",
+      "validateEcfSweepSpecJson",
+      "validateFinancialModelJson",
+      "validatePikToggleSpecJson",
+      "validateWaterfallSpecJson"
+    ]
+  },
+  "statements.validateFinancialModelJson": {
+    "kind": "function"
+  },
+  "statements.modelNodeIds": {
+    "kind": "function"
+  },
+  "statements.validateCheckSuiteSpecJson": {
+    "kind": "function"
+  },
+  "statements.validateCapitalStructureSpecJson": {
+    "kind": "function"
+  },
+  "statements.validateWaterfallSpecJson": {
+    "kind": "function"
+  },
+  "statements.validateEcfSweepSpecJson": {
+    "kind": "function"
+  },
+  "statements.validatePikToggleSpecJson": {
+    "kind": "function"
+  },
+  "statements.evaluateModel": {
+    "kind": "function"
+  },
+  "statements.evaluateModelWithMarket": {
+    "kind": "function"
+  },
+  "statements.evaluateMonteCarlo": {
+    "kind": "function"
+  },
+  "statements.parseFormula": {
+    "kind": "function"
+  },
+  "statements.parseAndCompile": {
+    "kind": "function"
+  },
+  "statements_analytics": {
+    "kind": "namespace",
+    "keys": [
+      "backtestForecast",
+      "computeMultiple",
+      "creditAssessment",
+      "creditAssessmentReportText",
+      "dcfSensitivity",
+      "evaluateLbo",
+      "evaluateScenarioSet",
+      "explainFormula",
+      "explainFormulaText",
+      "generateTornadoEntries",
+      "goalSeek",
+      "peerStats",
+      "percentileRank",
+      "plSummaryReportText",
+      "regressionFairValue",
+      "renderCheckReportHtml",
+      "renderCheckReportText",
+      "runChecks",
+      "runCreditUnderwritingChecks",
+      "runSensitivity",
+      "runThreeStatementChecks",
+      "runVariance",
+      "scoreRelativeValue",
+      "traceDependencies",
+      "wacc",
+      "zScore"
+    ]
+  },
+  "statements_analytics.runSensitivity": {
+    "kind": "function"
+  },
+  "statements_analytics.runVariance": {
+    "kind": "function"
+  },
+  "statements_analytics.evaluateScenarioSet": {
+    "kind": "function"
+  },
+  "statements_analytics.backtestForecast": {
+    "kind": "function"
+  },
+  "statements_analytics.generateTornadoEntries": {
+    "kind": "function"
+  },
+  "statements_analytics.goalSeek": {
+    "kind": "function"
+  },
+  "statements_analytics.dcfSensitivity": {
+    "kind": "function"
+  },
+  "statements_analytics.evaluateLbo": {
+    "kind": "function"
+  },
+  "statements_analytics.wacc": {
+    "kind": "function"
+  },
+  "statements_analytics.traceDependencies": {
+    "kind": "function"
+  },
+  "statements_analytics.explainFormula": {
+    "kind": "function"
+  },
+  "statements_analytics.explainFormulaText": {
+    "kind": "function"
+  },
+  "statements_analytics.plSummaryReportText": {
+    "kind": "function"
+  },
+  "statements_analytics.creditAssessmentReportText": {
+    "kind": "function"
+  },
+  "statements_analytics.creditAssessment": {
+    "kind": "function"
+  },
+  "statements_analytics.runChecks": {
+    "kind": "function"
+  },
+  "statements_analytics.runThreeStatementChecks": {
+    "kind": "function"
+  },
+  "statements_analytics.runCreditUnderwritingChecks": {
+    "kind": "function"
+  },
+  "statements_analytics.renderCheckReportText": {
+    "kind": "function"
+  },
+  "statements_analytics.renderCheckReportHtml": {
+    "kind": "function"
+  },
+  "statements_analytics.percentileRank": {
+    "kind": "function"
+  },
+  "statements_analytics.zScore": {
+    "kind": "function"
+  },
+  "statements_analytics.peerStats": {
+    "kind": "function"
+  },
+  "statements_analytics.regressionFairValue": {
+    "kind": "function"
+  },
+  "statements_analytics.computeMultiple": {
+    "kind": "function"
+  },
+  "statements_analytics.scoreRelativeValue": {
+    "kind": "function"
+  },
+  "valuations": {
+    "kind": "namespace",
+    "keys": [
+      "Market",
+      "callableRangeAccrualAccrued",
+      "cmsSpreadOptionIntrinsic",
+      "composite",
+      "creditDerivatives",
+      "fx",
+      "instruments",
+      "inverseFloaterCouponProfile",
+      "market",
+      "snowballCouponProfile",
+      "tarnCouponProfile",
+      "validateValuationResultJson",
+      "valuationResultToJson"
+    ]
+  },
+  "valuations.composite": {
+    "kind": "namespace",
+    "keys": [
+      "executionTrades",
+      "history",
+      "historyFromSpec",
+      "initialize",
+      "primitiveExposures",
+      "rebalance"
+    ]
+  },
+  "valuations.composite.initialize": {
+    "kind": "function"
+  },
+  "valuations.composite.rebalance": {
+    "kind": "function"
+  },
+  "valuations.composite.primitiveExposures": {
+    "kind": "function"
+  },
+  "valuations.composite.executionTrades": {
+    "kind": "function"
+  },
+  "valuations.composite.historyFromSpec": {
+    "kind": "function"
+  },
+  "valuations.composite.history": {
+    "kind": "function"
+  },
+  "valuations.creditDerivatives": {
+    "kind": "namespace",
+    "keys": [
+      "cdsIndexExampleJson",
+      "cdsOptionExampleJson",
+      "cdsTrancheExampleJson",
+      "creditDefaultSwapExampleJson"
+    ]
+  },
+  "valuations.creditDerivatives.creditDefaultSwapExampleJson": {
+    "kind": "function"
+  },
+  "valuations.creditDerivatives.cdsIndexExampleJson": {
+    "kind": "function"
+  },
+  "valuations.creditDerivatives.cdsTrancheExampleJson": {
+    "kind": "function"
+  },
+  "valuations.creditDerivatives.cdsOptionExampleJson": {
+    "kind": "function"
+  },
+  "valuations.fx": {
+    "kind": "namespace",
+    "keys": [
+      "FxBarrierOption",
+      "FxDigitalOption",
+      "FxForward",
+      "FxOption",
+      "FxSpot",
+      "FxSwap",
+      "FxTouchOption",
+      "FxVarianceSwap",
+      "Ndf",
+      "QuantoOption"
+    ]
+  },
+  "valuations.fx.FxSpot": {
+    "kind": "class",
+    "statics": ["fromJson"],
+    "methods": ["free", "price", "toJson"],
+    "getters": ["id"]
+  },
+  "valuations.fx.FxForward": {
+    "kind": "class",
+    "statics": ["fromJson"],
+    "methods": ["free", "price", "toJson"],
+    "getters": ["id"]
+  },
+  "valuations.fx.FxSwap": {
+    "kind": "class",
+    "statics": ["fromJson"],
+    "methods": ["free", "price", "toJson"],
+    "getters": ["id"]
+  },
+  "valuations.fx.Ndf": {
+    "kind": "class",
+    "statics": ["fromJson"],
+    "methods": ["free", "price", "toJson"],
+    "getters": ["id"]
+  },
+  "valuations.fx.FxOption": {
+    "kind": "class",
+    "statics": ["fromJson"],
+    "methods": [
+      "delta",
+      "foreignRho",
+      "free",
+      "gamma",
+      "greeks",
+      "price",
+      "rho",
+      "theta",
+      "toJson",
+      "vanna",
+      "vega",
+      "volga"
+    ],
+    "getters": ["id"]
+  },
+  "valuations.fx.FxDigitalOption": {
+    "kind": "class",
+    "statics": ["fromJson"],
+    "methods": ["delta", "free", "gamma", "greeks", "price", "rho", "theta", "toJson", "vega"],
+    "getters": ["id"]
+  },
+  "valuations.fx.FxTouchOption": {
+    "kind": "class",
+    "statics": ["fromJson"],
+    "methods": ["delta", "free", "gamma", "greeks", "price", "rho", "toJson", "vega"],
+    "getters": ["id"]
+  },
+  "valuations.fx.FxBarrierOption": {
+    "kind": "class",
+    "statics": ["fromJson"],
+    "methods": [
+      "delta",
+      "free",
+      "gamma",
+      "greeks",
+      "price",
+      "rho",
+      "toJson",
+      "vanna",
+      "vega",
+      "volga"
+    ],
+    "getters": ["id"]
+  },
+  "valuations.fx.FxVarianceSwap": {
+    "kind": "class",
+    "statics": ["fromJson"],
+    "methods": ["free", "price", "toJson"],
+    "getters": ["id"]
+  },
+  "valuations.fx.QuantoOption": {
+    "kind": "class",
+    "statics": ["fromJson"],
+    "methods": [
+      "delta",
+      "foreignRho",
+      "free",
+      "gamma",
+      "greeks",
+      "price",
+      "rho",
+      "theta",
+      "toJson",
+      "vanna",
+      "vega",
+      "volga"
+    ],
+    "getters": ["id"]
+  },
+  "valuations.instruments": {
+    "kind": "namespace",
+    "keys": [
+      "AssetBackedFacility",
+      "Bond",
+      "RevolvingCredit",
+      "TermLoan",
+      "bondFromCashflowsJson",
+      "instrumentCashflowsJson",
+      "instrumentCashflowsWithMarketJson",
+      "listModels",
+      "listModelsGrouped",
+      "listStandardMetrics",
+      "listStandardMetricsGrouped",
+      "metricMetadata",
+      "priceInstrument",
+      "priceInstrumentWithMarket",
+      "structuredCreditTrancheBreakevenCdr",
+      "structuredCreditTrancheDiscountMargin",
+      "structuredCreditTrancheMetrics",
+      "structuredCreditTrancheOas",
+      "structuredCreditTrancheScenarioTable",
+      "validateInstrumentJson"
+    ]
+  },
+  "valuations.instruments.Bond": {
+    "kind": "class",
+    "statics": ["fixed", "floating", "fromJson"],
+    "methods": ["free", "toJson"],
+    "getters": ["id"]
+  },
+  "valuations.instruments.TermLoan": {
+    "kind": "class",
+    "statics": ["example", "fromJson"],
+    "methods": ["free", "toJson"],
+    "getters": ["id"]
+  },
+  "valuations.instruments.RevolvingCredit": {
+    "kind": "class",
+    "statics": ["example", "fromJson"],
+    "methods": ["free", "priceWithPaths", "toJson"],
+    "getters": ["id"]
+  },
+  "valuations.instruments.AssetBackedFacility": {
+    "kind": "class",
+    "statics": ["example", "fromJson"],
+    "methods": ["borrowingBase", "free", "toJson"],
+    "getters": ["id"]
+  },
+  "valuations.instruments.bondFromCashflowsJson": {
+    "kind": "function"
+  },
+  "valuations.instruments.validateInstrumentJson": {
+    "kind": "function"
+  },
+  "valuations.instruments.priceInstrument": {
+    "kind": "function"
+  },
+  "valuations.instruments.priceInstrumentWithMarket": {
+    "kind": "function"
+  },
+  "valuations.instruments.instrumentCashflowsJson": {
+    "kind": "function"
+  },
+  "valuations.instruments.instrumentCashflowsWithMarketJson": {
+    "kind": "function"
+  },
+  "valuations.instruments.listModels": {
+    "kind": "function"
+  },
+  "valuations.instruments.listModelsGrouped": {
+    "kind": "function"
+  },
+  "valuations.instruments.listStandardMetrics": {
+    "kind": "function"
+  },
+  "valuations.instruments.listStandardMetricsGrouped": {
+    "kind": "function"
+  },
+  "valuations.instruments.metricMetadata": {
+    "kind": "function"
+  },
+  "valuations.instruments.structuredCreditTrancheDiscountMargin": {
+    "kind": "function"
+  },
+  "valuations.instruments.structuredCreditTrancheBreakevenCdr": {
+    "kind": "function"
+  },
+  "valuations.instruments.structuredCreditTrancheOas": {
+    "kind": "function"
+  },
+  "valuations.instruments.structuredCreditTrancheScenarioTable": {
+    "kind": "function"
+  },
+  "valuations.instruments.structuredCreditTrancheMetrics": {
+    "kind": "function"
+  },
+  "valuations.market": {
+    "kind": "namespace",
+    "keys": ["listedProductCatalog"]
+  },
+  "valuations.market.listedProductCatalog": {
+    "kind": "function"
+  },
+  "valuations.validateValuationResultJson": {
+    "kind": "function"
+  },
+  "valuations.valuationResultToJson": {
+    "kind": "function"
+  },
+  "valuations.Market": {
+    "kind": "class",
+    "statics": [],
+    "methods": ["free", "toJson"],
+    "getters": []
+  },
+  "valuations.tarnCouponProfile": {
+    "kind": "function"
+  },
+  "valuations.snowballCouponProfile": {
+    "kind": "function"
+  },
+  "valuations.inverseFloaterCouponProfile": {
+    "kind": "function"
+  },
+  "valuations.cmsSpreadOptionIntrinsic": {
+    "kind": "function"
+  },
+  "valuations.callableRangeAccrualAccrued": {
+    "kind": "function"
+  }
+}

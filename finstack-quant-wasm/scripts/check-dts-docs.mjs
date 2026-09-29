@@ -20,7 +20,7 @@ const ownedClasses = [
 const failures = [];
 
 for (const className of ownedClasses) {
-  if (!dts.includes(`export interface ${className} extends WasmOwned {}`)) {
+  if (!dts.includes(`interface ${className} extends WasmOwned {}`)) {
     failures.push(`${className} must merge the WasmOwned contract in index.d.ts`);
   }
 }

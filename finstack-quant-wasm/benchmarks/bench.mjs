@@ -724,9 +724,9 @@ async function main() {
     new w.Percentage(5).asDecimal();
   });
 
-  bench('core', 'Tenor construction + toYearsSimple', 8000, () => {
+  bench('core', 'Tenor construction + toYears', 8000, () => {
     const t = new w.Tenor('3M');
-    t.toYearsSimple();
+    t.toYears();
   });
 
   bench('core', 'ForwardCurve construction + rate()', 4000, () => {
