@@ -50,7 +50,7 @@
 use std::sync::Arc;
 
 use crate::api::core::market_data::JsDiscountCurve;
-use crate::utils::{to_js_err, to_js_value};
+use crate::utils::{to_js_err, to_js_value, to_js_value_with_bigints};
 use wasm_bindgen::prelude::*;
 
 pub mod materialization;
@@ -671,6 +671,10 @@ pub fn aggregate_metrics(
 ///   contract and throws on a metric its instrument cannot produce.
 ///   Mirrors the Python `metrics=` keyword.
 ///
+/// Each position's `valuation_result` keeps 64-bit fields (the Monte Carlo
+/// `seed` and path counts) as `BigInt`, exactly as `priceInstrument` returns
+/// them; serialize one with `valuations.valuationResultToJson`.
+///
 /// # Errors
 ///
 /// Throws a JavaScript exception if the portfolio or market JSON is malformed,
@@ -775,6 +779,10 @@ pub fn aggregate_full_cashflows_built(
 ///   contract and throws on a metric its instrument cannot produce.
 ///   Mirrors the Python `metrics=` keyword.
 ///
+/// Each position's `valuation_result` keeps 64-bit fields (the Monte Carlo
+/// `seed` and path counts) as `BigInt`, exactly as `priceInstrument` returns
+/// them; serialize one with `valuations.valuationResultToJson`.
+///
 /// # Errors
 ///
 /// Throws a JavaScript exception if `marketJson` is malformed, a requested
@@ -808,7 +816,7 @@ pub fn value_portfolio_built(
         &options,
     )
     .map_err(to_js_err)?;
-    to_js_value(&valuation)
+    to_js_value_with_bigints(&valuation)
 }
 
 /// Apply a scenario to an already-built [`JsPortfolio`] handle and revalue.
@@ -816,6 +824,10 @@ pub fn value_portfolio_built(
 /// @param portfolio - Built portfolio object whose positions and weights are used by the calculation.
 /// @param scenario_json - Scenario specification JSON.
 /// @param market_json - Canonical market-context JSON supplying curves, quotes, and FX data.
+///
+/// Each position's `valuation_result` keeps 64-bit fields (the Monte Carlo
+/// `seed` and path counts) as `BigInt`, exactly as `priceInstrument` returns
+/// them; serialize one with `valuations.valuationResultToJson`.
 ///
 /// # Errors
 ///
@@ -840,7 +852,7 @@ pub fn apply_scenario_and_revalue_built(
         &config,
     )
     .map_err(to_js_err)?;
-    to_js_value(&out)
+    to_js_value_with_bigints(&out)
 }
 
 /// Apply a scenario to a portfolio and revalue.
@@ -849,6 +861,10 @@ pub fn apply_scenario_and_revalue_built(
 /// @param spec_json - Canonical portfolio specification JSON defining positions, quantities, and base currency.
 /// @param scenario_json - Scenario specification JSON.
 /// @param market_json - Canonical market-context JSON supplying curves, quotes, and FX data.
+///
+/// Each position's `valuation_result` keeps 64-bit fields (the Monte Carlo
+/// `seed` and path counts) as `BigInt`, exactly as `priceInstrument` returns
+/// them; serialize one with `valuations.valuationResultToJson`.
 ///
 /// # Errors
 ///
@@ -963,6 +979,10 @@ pub fn optimize_portfolio(spec_json: &str, market_json: &str) -> Result<JsValue,
 /// @param snapshots_json - Market-snapshot JSON array.
 /// @param config_json - Configuration JSON for this call.
 ///
+/// Each position's `valuation_result` keeps 64-bit fields (the Monte Carlo
+/// `seed` and path counts) as `BigInt`, exactly as `priceInstrument` returns
+/// them; serialize one with `valuations.valuationResultToJson`.
+///
 /// # Errors
 ///
 /// Throws a JavaScript exception if any JSON input is malformed; the portfolio,
@@ -991,7 +1011,7 @@ pub fn replay_portfolio(
         &finstack_config,
     )
     .map_err(to_js_err)?;
-    to_js_value(&result)
+    to_js_value_with_bigints(&result)
 }
 
 /// Host-target unit tests.

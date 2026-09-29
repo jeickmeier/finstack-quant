@@ -184,6 +184,30 @@ pub fn validate_valuation_result_json(json: &str) -> Result<String, JsValue> {
     valuation_result_json(result)
 }
 
+/// Serialize a structured `ValuationResult` object to canonical JSON.
+///
+/// The inverse of the structured `priceInstrument*` return: it accepts the
+/// plain object those entry points return, with 64-bit fields such as the
+/// Monte Carlo `seed` as `BigInt`, and writes the same canonical JSON as
+/// Python `ValuationResult.to_json()`, keeping every integer exact. Use it in
+/// place of `JSON.stringify`, which throws on `BigInt`.
+/// @param result - `ValuationResult` object returned by `priceInstrument`,
+/// `priceInstrumentWithMarket`, a typed instrument's `price`, or a portfolio
+/// valuation's `valuation_result` entry; 64-bit fields must be `BigInt` or
+/// safe-integer numbers.
+/// @returns Canonical `ValuationResult` JSON text.
+///
+/// # Errors
+///
+/// Throws a JavaScript exception if `result` does not match the
+/// `ValuationResult` schema (for example a seed given as a string) or the
+/// canonical result cannot be serialized.
+#[wasm_bindgen(js_name = valuationResultToJson)]
+pub fn valuation_result_to_json(result: JsValue) -> Result<String, JsValue> {
+    let result: ValuationResult = serde_wasm_bindgen::from_value(result).map_err(to_js_err)?;
+    valuation_result_json(result)
+}
+
 /// Validate a canonical v1 instrument envelope after optional metric-pricing
 /// overrides are merged by the canonical pricing path.
 ///
@@ -257,9 +281,8 @@ pub fn bond_from_cashflows_json(
 /// factors are configured under `"rates_credit"`, `result.details` is tagged
 /// `{ type: "monte_carlo", data: ... }` and reports the standard error, path
 /// counts, random seed, simulation time grid, and variance-reduction flags.
-/// That seed is a lossless JavaScript `BigInt`; callers serializing stochastic
-/// results must use a BigInt-aware replacer, for example
-/// `JSON.stringify(result, (_, value) => typeof value === "bigint" ? value.toString() : value)`.
+/// That seed is a lossless JavaScript `BigInt`; serialize stochastic results
+/// with `valuationResultToJson`, since `JSON.stringify` throws on `BigInt`.
 /// @param instrument_json - Required `finstack_quant.instrument/1` envelope.
 /// @param market_json - Canonical market-context JSON supplying curves, quotes, and FX data.
 /// @param as_of - ISO-8601 valuation date used to resolve date-dependent market data.
@@ -462,8 +485,8 @@ pub fn listed_product_catalog(exchange: Option<String>) -> Result<JsValue, JsVal
 /// recovery of par, `"tree"` values rates-only exercise rights, and
 /// `"rates_credit"` values joint rates-credit bonds including call, put, and
 /// return floors. Stochastic `"rates_credit"` runs add tagged Monte Carlo diagnostics to
-/// `result.details`. Their `seed` is a lossless JavaScript `BigInt`, so
-/// `JSON.stringify` requires a BigInt-aware replacer.
+/// `result.details`. Their `seed` is a lossless JavaScript `BigInt`; serialize
+/// such results with `valuationResultToJson`.
 /// @param instrument_json - Canonical instrument envelope JSON in the Finstack v1 schema.
 /// @param market - Pre-parsed `Market` handle supplying curves, quotes, and FX data for this call.
 /// @param as_of - ISO-8601 valuation date used to resolve date-dependent market data.

@@ -13,7 +13,7 @@
 
 use super::pricing::{
     metric_value_with_context, parse_market_json, parse_pricing_instrument_json,
-    price_result_with_context, standard_option_greeks_with_context,
+    standard_option_greeks_with_context,
 };
 use crate::utils::{to_js_err, to_js_value};
 use finstack_quant_valuations::pricer::{
@@ -47,33 +47,6 @@ fn instrument_id_from_json(json: &str) -> Result<String, JsValue> {
     finstack_quant_valuations::pricer::parse_boxed_instrument_from_json(json, None)
         .map(|instrument| instrument.as_instrument().id().to_string())
         .map_err(to_js_err)
-}
-
-fn price_payload(
-    json: &str,
-    market_json: &str,
-    as_of: &str,
-    model: Option<String>,
-    metrics: Option<JsValue>,
-    metric_pricing_overrides: Option<String>,
-    market_history: Option<String>,
-) -> Result<JsValue, JsValue> {
-    let instrument = parse_pricing_instrument_json(json, metric_pricing_overrides.as_deref())?;
-    let market = parse_market_json(market_json)?;
-    let metrics: Vec<String> = match metrics {
-        None => Vec::new(),
-        Some(value) if value.is_undefined() || value.is_null() => Vec::new(),
-        Some(value) => serde_wasm_bindgen::from_value(value).map_err(to_js_err)?,
-    };
-    let result = price_result_with_context(
-        &instrument,
-        &market,
-        as_of,
-        model.as_deref().unwrap_or("default"),
-        metrics,
-        market_history.as_deref(),
-    )?;
-    to_js_value(&result)
 }
 
 fn metric_value(
@@ -126,7 +99,7 @@ mod tests {
 
     #[test]
     fn public_json_routes_validate_instrument_before_market_json() {
-        assert!(price_payload(
+        assert!(super::super::pricing::price_instrument(
             "{}",
             "not-market-json",
             "not-a-date",
@@ -244,7 +217,7 @@ macro_rules! fx_class {
                 metric_pricing_overrides: Option<String>,
                 market_history: Option<String>,
             ) -> Result<JsValue, JsValue> {
-                price_payload(
+                super::pricing::price_instrument(
                     &self.json,
                     market_json,
                     as_of,

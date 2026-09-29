@@ -5583,8 +5583,8 @@ export type ValuationDetails = import('./types/valuation-result').ValuationDetai
  * This is the same document Python callers hold as
  * `finstack_quant.valuations.ValuationResult` — field names are the canonical
  * Rust serde names. Monte Carlo details carry `seed` as a lossless `bigint`,
- * so stringify stochastic results with a BigInt-aware replacer such as
- * `JSON.stringify(result, (_, value) => typeof value === "bigint" ? value.toString() : value)`.
+ * so serialize stochastic results with `valuations.valuationResultToJson`
+ * rather than `JSON.stringify`, which throws on `bigint`.
  * Python's `price` / `currency` getters correspond to `value.amount` /
  * `value.currency` here.
  */
@@ -5787,7 +5787,7 @@ export interface ValuationInstrumentsNamespace {
    * Pass `model = "default"` to use the instrument-native default model.
    * Fields are readable directly (`result.value.amount`,
    * `result.measures.dv01`). Monte Carlo results carry a lossless `bigint`
-   * seed; use a BigInt-aware replacer when stringifying them.
+   * seed; serialize them with `valuations.valuationResultToJson`.
    * For bonds, `"discounting"` is non-callable rates-only PV,
    * `"hazard_rate"` is non-callable fractional recovery of par, `"tree"`
    * values rates-only exercise rights, and `"rates_credit"` values joint
@@ -5821,8 +5821,8 @@ export interface ValuationInstrumentsNamespace {
    * values rates-only exercise rights, and `"rates_credit"` values joint
    * rates-credit bonds including call, put, and return floors. Stochastic `"rates_credit"` runs add
    * `type: "monte_carlo"` diagnostics to `result.details`.
-   * Their `seed` is a lossless `bigint`, so `JSON.stringify` requires a
-   * BigInt-aware replacer.
+   * Their `seed` is a lossless `bigint`; serialize such results with
+   * `valuations.valuationResultToJson`.
    * @param instrumentJson - Canonical instrument envelope JSON in the Finstack v1 schema.
    * @param market - Pre-parsed `Market` handle supplying curves, quotes, and FX data for this call.
    * @param asOf - ISO-8601 valuation date used to resolve date-dependent market data.
@@ -8555,6 +8555,19 @@ export interface ValuationsNamespace {
    */
   validateValuationResultJson(json: string): string;
   /**
+   * Serialize a structured `ValuationResult` object to canonical JSON.
+   *
+   * The inverse of the structured `priceInstrument*` return: it accepts the
+   * plain object those entry points return, with 64-bit fields such as the
+   * Monte Carlo `seed` as `bigint`, and writes the same canonical JSON as
+   * Python `ValuationResult.to_json()`, keeping every integer exact. Use it in
+   * place of `JSON.stringify`, which throws on `bigint`.
+   * @param result - `ValuationResult` object returned by `priceInstrument`, `priceInstrumentWithMarket`, a typed instrument's `price`, or a portfolio valuation's `valuation_result` entry; 64-bit fields must be `BigInt` or safe-integer numbers.
+   * @returns Canonical `ValuationResult` JSON text.
+   * @throws Error - Throws a JavaScript exception if `result` does not match the `ValuationResult` schema (for example a seed given as a string) or the canonical result cannot be serialized.
+   */
+  valuationResultToJson(result: ValuationResult): string;
+  /**
    * Parsed `MarketContext` handle for reuse across pricing calls.
    */
   Market: typeof Market;
@@ -10576,7 +10589,7 @@ export interface PortfolioNamespace {
    * @param specJson - Canonical portfolio specification JSON defining positions, quantities, and base currency.
    * @param marketJson - Canonical market-context JSON supplying curves, quotes, and FX data.
    * @param strictRisk - Optional; when omitted or `undefined`, defaults to `true` (fail closed when a requested risk metric fails to compute), matching Rust `PortfolioValuationOptions`. Pass `false` only for an intentional PV-preserving fallback.
-   * @param metrics - Optional risk-metric ids to offer every position. Omit for the standard set (PV plus `dv01`; pricer-specific metrics such as `theta` or `cs01` must be listed explicitly); an empty array performs PV-only valuation. Names are validated strictly against the standard `MetricId` set — an unknown name throws. The list is a menu, not a per-position request: one list is chosen for a book of mixed instrument types, so each position is asked for exactly the entries its own instrument type has a calculator for, and the rest appear on that position's `inapplicable_metrics`. Narrowing covers structural inapplicability only; `strictRisk` still governs a metric an instrument type supports but fails to compute. `priceInstrument` keeps the opposite contract and throws on a metric its instrument cannot produce. Mirrors the Python `metrics=` keyword.
+   * @param metrics - Optional risk-metric ids to offer every position. Omit for the standard set (PV plus `dv01`; pricer-specific metrics such as `theta` or `cs01` must be listed explicitly); an empty array performs PV-only valuation. Names are validated strictly against the standard `MetricId` set — an unknown name throws. The list is a menu, not a per-position request: one list is chosen for a book of mixed instrument types, so each position is asked for exactly the entries its own instrument type has a calculator for, and the rest appear on that position's `inapplicable_metrics`. Narrowing covers structural inapplicability only; `strictRisk` still governs a metric an instrument type supports but fails to compute. `priceInstrument` keeps the opposite contract and throws on a metric its instrument cannot produce. Mirrors the Python `metrics=` keyword. Each position's `valuation_result` keeps 64-bit fields (the Monte Carlo `seed` and path counts) as `BigInt`, exactly as `priceInstrument` returns them; serialize one with `valuations.valuationResultToJson`.
    * @throws Error - Throws a JavaScript exception if the portfolio or market JSON is malformed, a requested metric name is unknown, portfolio construction or valuation fails, strict risk calculation cannot produce a requested metric, a required FX conversion is unavailable, or the valuation cannot be converted to a JavaScript value.
    */
   valuePortfolio(
@@ -10594,7 +10607,7 @@ export interface PortfolioNamespace {
    * @param portfolio - Built portfolio object whose positions and weights are used by the calculation.
    * @param marketJson - Canonical market-context JSON supplying curves, quotes, and FX data.
    * @param strictRisk - Optional; when omitted or `undefined`, defaults to `true` (fail closed when a requested risk metric fails to compute), matching Rust `PortfolioValuationOptions`. Pass `false` only for an intentional PV-preserving fallback.
-   * @param metrics - Optional risk-metric ids to offer every position. Omit for the standard set (PV plus `dv01`; pricer-specific metrics such as `theta` or `cs01` must be listed explicitly); an empty array performs PV-only valuation. Names are validated strictly against the standard `MetricId` set — an unknown name throws instead of silently degrading to PV-only valuation. The list is a menu, not a per-position request: one list is chosen for a book of mixed instrument types, so each position is asked for exactly the entries its own instrument type has a calculator for, and the rest appear on that position's `inapplicable_metrics`. Narrowing covers structural inapplicability only; `strictRisk` still governs a metric an instrument type supports but fails to compute. `priceInstrument` keeps the opposite contract and throws on a metric its instrument cannot produce. Mirrors the Python `metrics=` keyword.
+   * @param metrics - Optional risk-metric ids to offer every position. Omit for the standard set (PV plus `dv01`; pricer-specific metrics such as `theta` or `cs01` must be listed explicitly); an empty array performs PV-only valuation. Names are validated strictly against the standard `MetricId` set — an unknown name throws instead of silently degrading to PV-only valuation. The list is a menu, not a per-position request: one list is chosen for a book of mixed instrument types, so each position is asked for exactly the entries its own instrument type has a calculator for, and the rest appear on that position's `inapplicable_metrics`. Narrowing covers structural inapplicability only; `strictRisk` still governs a metric an instrument type supports but fails to compute. `priceInstrument` keeps the opposite contract and throws on a metric its instrument cannot produce. Mirrors the Python `metrics=` keyword. Each position's `valuation_result` keeps 64-bit fields (the Monte Carlo `seed` and path counts) as `BigInt`, exactly as `priceInstrument` returns them; serialize one with `valuations.valuationResultToJson`.
    * @throws Error - Throws a JavaScript exception if `marketJson` is malformed, a requested metric name is unknown, portfolio valuation fails, strict risk calculation cannot produce a requested metric, a required FX conversion is unavailable, or the valuation cannot be converted to a JavaScript value.
    */
   valuePortfolioBuilt(
@@ -10641,7 +10654,7 @@ export interface PortfolioNamespace {
    * @returns Revalued result object and scenario application report.
    * @param specJson - Canonical portfolio specification JSON defining positions, quantities, and base currency.
    * @param scenarioJson - Scenario specification JSON.
-   * @param marketJson - Canonical market-context JSON supplying curves, quotes, and FX data.
+   * @param marketJson - Canonical market-context JSON supplying curves, quotes, and FX data. Each position's `valuation_result` keeps 64-bit fields (the Monte Carlo `seed` and path counts) as `BigInt`, exactly as `priceInstrument` returns them; serialize one with `valuations.valuationResultToJson`.
    * @throws Error - Throws a JavaScript exception if the portfolio, scenario, or market JSON is malformed; portfolio construction, scenario application, or revaluation fails; or the structured result cannot be converted to a JavaScript value.
    */
   applyScenarioAndRevalue(
@@ -10655,7 +10668,7 @@ export interface PortfolioNamespace {
    * @returns Revalued result object and scenario application report.
    * @param portfolio - Built portfolio object whose positions and weights are used by the calculation.
    * @param scenarioJson - Scenario specification JSON.
-   * @param marketJson - Canonical market-context JSON supplying curves, quotes, and FX data.
+   * @param marketJson - Canonical market-context JSON supplying curves, quotes, and FX data. Each position's `valuation_result` keeps 64-bit fields (the Monte Carlo `seed` and path counts) as `BigInt`, exactly as `priceInstrument` returns them; serialize one with `valuations.valuationResultToJson`.
    * @throws Error - Throws a JavaScript exception if the scenario or market JSON is malformed, scenario application or portfolio revaluation fails, or the structured result cannot be converted to a JavaScript value.
    */
   applyScenarioAndRevalueBuilt(
@@ -10716,7 +10729,7 @@ export interface PortfolioNamespace {
    * @returns Returns a plain structured JavaScript object; `JSON.stringify` it for a canonical JSON string.
    * @param specJson - Canonical portfolio specification JSON defining positions, quantities, and base currency.
    * @param snapshotsJson - Market-snapshot JSON array.
-   * @param configJson - Configuration JSON for this call.
+   * @param configJson - Configuration JSON for this call. Each position's `valuation_result` keeps 64-bit fields (the Monte Carlo `seed` and path counts) as `BigInt`, exactly as `priceInstrument` returns them; serialize one with `valuations.valuationResultToJson`.
    * @throws Error - Throws a JavaScript exception if any JSON input is malformed; the portfolio, replay configuration, or snapshot dates and ordering are invalid; valuation, attribution, or currency conversion fails; best-effort replay retains no step; or the result cannot be converted to a JavaScript value.
    */
   replayPortfolio(

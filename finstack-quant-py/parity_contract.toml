@@ -3129,6 +3129,7 @@ root_exports = [
     "snowballCouponProfile",
     "tarnCouponProfile",
     "validateValuationResultJson",
+    "valuationResultToJson",
 ]
 
 # Python-only valuations symbols (not on WASM valuations facade).
@@ -3141,6 +3142,9 @@ python_only = [
 wasm_only = [
     "Market",
     "validateValuationResultJson",
+    # Host twin of the Python `ValuationResult.to_json()` method: WASM results
+    # are plain objects, so the serializer is a namespace function.
+    "valuationResultToJson",
 ]
 
 # Explicit python_snake_case -> js_name for root exports (triplet pinning).

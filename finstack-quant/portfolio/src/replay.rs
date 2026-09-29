@@ -197,6 +197,7 @@ pub struct ReplaySummary {
     /// Last date in the timeline.
     pub end_date: Date,
     /// Number of steps (including step 0).
+    #[serde(with = "finstack_quant_core::wire::count")]
     pub num_steps: usize,
     /// Portfolio value at step 0.
     pub start_value: Money,

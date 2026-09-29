@@ -104,6 +104,7 @@ fn json_suffixed_exports_return_strings() {
         "validateCovenantReportJson",
         "validateCovenantEngineJson",
         "validateValuationResultJson",
+        "valuationResultToJson",
         "instrumentCashflowsJson",
     ] {
         let Some(ret) = declared_return(&dts, export) else {

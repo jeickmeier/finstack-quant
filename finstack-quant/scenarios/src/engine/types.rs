@@ -131,6 +131,7 @@ pub struct ScenarioChangeManifest {
     /// Concrete market-data targets changed by applied effects.
     pub market_targets: Vec<ScenarioMarketTarget>,
     /// Zero-based indices of portfolio instruments mutated in place.
+    #[serde(with = "finstack_quant_core::wire::counts")]
     pub changed_instrument_indices: Vec<usize>,
     /// Whether the execution context's effective valuation date changed.
     pub as_of_changed: bool,
@@ -194,6 +195,7 @@ pub struct RollForwardReport {
     /// the target date is business-day adjusted, but the span back to
     /// `old_date` is still calendar days. Downstream ACT/365F annualization
     /// depends on this.
+    #[serde(with = "finstack_quant_core::wire::signed_count")]
     pub days: i64,
 
     /// Per-instrument carry accrual (if instruments provided), grouped by currency.
@@ -237,15 +239,18 @@ pub struct ApplicationReport {
     /// hierarchy expansion and target resolution. This low-level effect count
     /// is therefore not an operation-coverage ratio; inspect `changes` and
     /// `warnings` to determine which targets changed or were skipped.
+    #[serde(with = "finstack_quant_core::wire::count")]
     pub operations_applied: usize,
     /// Number of user-provided `OperationSpec` entries in the scenario
     /// (before hierarchy expansion and deduplication).
+    #[serde(with = "finstack_quant_core::wire::count")]
     pub user_operations: usize,
     /// Number of direct (non-hierarchy) operations produced after hierarchy
     /// expansion and resolution-mode deduplication. No-match expansion and
     /// deduplication can make this smaller than `user_operations`. Because
     /// `operations_applied` counts effects rather than operations, the two
     /// counters are not directly comparable.
+    #[serde(with = "finstack_quant_core::wire::count")]
     pub expanded_operations: usize,
 
     /// Authoritative metadata describing the state changed by applied effects.

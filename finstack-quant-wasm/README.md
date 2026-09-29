@@ -181,11 +181,10 @@ explicitly with `cargo nextest run -p finstack-quant-wasm --test wasm return_sha
 For LSMC valuations, `standard_error` measures pricing-path sampling uncertainty
 under the frozen fitted exercise policy and excludes regression approximation,
 time-grid discretization, and model error. Monte Carlo valuation details expose
-their full-width deterministic `seed` as a JavaScript `bigint`. Preserve it when producing application JSON with a replacer,
-for example
-`JSON.stringify(result, (_, value) => typeof value === "bigint" ? value.toString() : value)`.
-The resulting decimal string is lossless; ordinary `JSON.stringify(result)` throws
-when Monte Carlo details are present.
+their full-width deterministic `seed` as a JavaScript `bigint`. Serialize such a
+result with `valuations.valuationResultToJson(result)`, which writes the canonical
+JSON (the same text as Python `ValuationResult.to_json()`) with every integer exact;
+ordinary `JSON.stringify(result)` throws when Monte Carlo details are present.
 
 **Errors.** Bindings that route through `crate::utils::to_js_err` — the large
 majority — throw a real `Error` whose `name` is `FinstackError` and whose `kind` is
