@@ -152,8 +152,9 @@ you are calling.** There are two conventions in use:
 
 `core.createDate` and `core.adjust` both return `number`, and `core.adjust` expects
 that same integer as input. Never pass an ISO string to a `core` date function, and
-never pass epoch days to a panel constructor — neither coerces, and
-`serde_wasm_bindgen` will surface a type error rather than silently converting.
+never pass epoch days to a panel constructor — neither coerces: a wrong type throws a
+`TypeError` with `kind: "invalid_type"` whose message starts with the argument name
+(`"startEpochDays: expected a number, got string"`).
 
 Use `core.dateFromEpochDays(days)` to convert epoch days back to a
 `[year, month, day]` triple. To interoperate with the host `Date` type, convert

@@ -730,14 +730,14 @@ test('analytics.constrainedLeastSquares returns OLS when the constraint already 
 test('analytics.constrainedLeastSquares rejects fractional nFactors before conversion', () => {
   assert.throws(
     () => analytics.constrainedLeastSquares([1.0, -1.0], 1.5, [0.02, -0.02], [0.5, 0.5]),
-    /nFactors.*positive integer/i
+    /^TypeError: nFactors: expected a non-negative whole number, got 1\.5$/
   );
 });
 
 test('analytics.constrainedLeastSquares rejects truncating nFactors before conversion', () => {
   assert.throws(
     () => analytics.constrainedLeastSquares([1.0, -1.0], 2 ** 32 + 1, [0.02, -0.02], [0.5, 0.5]),
-    /nFactors.*positive integer/i
+    /^TypeError: nFactors: 4294967297 is out of range$/
   );
 });
 

@@ -22,6 +22,10 @@
 //! `tests::price_instrument_mc_is_deterministic_without_explicit_seed`.
 
 use super::market_handle::JsMarket;
+use crate::utils::input::{
+    from_js_json, js_opt_string, js_opt_string_seq, js_string, js_string_seq, json_text,
+    opt_json_text,
+};
 use crate::utils::{to_js_err, to_js_value, to_js_value_with_bigints};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_valuations::instruments::PricingOptions;
@@ -179,7 +183,8 @@ pub(super) fn standard_option_greeks_with_context(
 /// Throws a JavaScript exception if `json` is malformed or does not match the
 /// `ValuationResult` schema, or the canonical result cannot be serialized.
 #[wasm_bindgen(js_name = validateValuationResultJson)]
-pub fn validate_valuation_result_json(json: &str) -> Result<String, JsValue> {
+pub fn validate_valuation_result_json(json: JsValue) -> Result<String, JsValue> {
+    let json: &str = &json_text(&json, "json")?;
     let result: ValuationResult = serde_json::from_str(json).map_err(to_js_err)?;
     valuation_result_json(result)
 }
@@ -204,7 +209,7 @@ pub fn validate_valuation_result_json(json: &str) -> Result<String, JsValue> {
 /// canonical result cannot be serialized.
 #[wasm_bindgen(js_name = valuationResultToJson)]
 pub fn valuation_result_to_json(result: JsValue) -> Result<String, JsValue> {
-    let result: ValuationResult = serde_wasm_bindgen::from_value(result).map_err(to_js_err)?;
+    let result: ValuationResult = from_js_json(&result, "result")?;
     valuation_result_json(result)
 }
 
@@ -229,9 +234,12 @@ pub fn valuation_result_to_json(result: JsValue) -> Result<String, JsValue> {
 /// serialized.
 #[wasm_bindgen(js_name = validateInstrumentJson)]
 pub fn validate_instrument_json(
-    json: &str,
-    metric_pricing_overrides: Option<String>,
+    json: JsValue,
+    metric_pricing_overrides: Option<JsValue>,
 ) -> Result<String, JsValue> {
+    let json: &str = &json_text(&json, "json")?;
+    let metric_pricing_overrides =
+        opt_json_text(metric_pricing_overrides.as_ref(), "metricPricingOverrides")?;
     finstack_quant_valuations::pricer::validate_instrument_json(
         json,
         metric_pricing_overrides.as_deref(),
@@ -252,11 +260,14 @@ pub fn validate_instrument_json(
 /// envelope cannot be serialized.
 #[wasm_bindgen(js_name = bondFromCashflowsJson)]
 pub fn bond_from_cashflows_json(
-    instrument_id: &str,
-    schedule_json: &str,
-    discount_curve_id: &str,
+    instrument_id: JsValue,
+    schedule_json: JsValue,
+    discount_curve_id: JsValue,
     quoted_clean_price_pct: Option<f64>,
 ) -> Result<String, JsValue> {
+    let instrument_id: &str = &js_string(&instrument_id, "instrumentId")?;
+    let schedule_json: &str = &json_text(&schedule_json, "scheduleJson")?;
+    let discount_curve_id: &str = &js_string(&discount_curve_id, "discountCurveId")?;
     finstack_quant_valuations::instruments::fixed_income::bond::bond_from_cashflows_json(
         instrument_id,
         schedule_json,
@@ -312,32 +323,83 @@ pub fn bond_from_cashflows_json(
 /// to a JavaScript value.
 #[wasm_bindgen(js_name = priceInstrument)]
 pub fn price_instrument(
-    instrument_json: &str,
-    market_json: &str,
-    as_of: &str,
-    model: Option<String>,
+    instrument_json: JsValue,
+    market_json: JsValue,
+    as_of: JsValue,
+    model: Option<JsValue>,
     metrics: Option<JsValue>,
-    metric_pricing_overrides: Option<String>,
-    market_history: Option<String>,
+    metric_pricing_overrides: Option<JsValue>,
+    market_history: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
-    let instrument =
-        parse_pricing_instrument_json(instrument_json, metric_pricing_overrides.as_deref())?;
-    let market = parse_market_json(market_json)?;
-    let model = model.as_deref().unwrap_or("default");
-    let metric_strs: Vec<String> = match metrics {
-        None => Vec::new(),
-        Some(value) if value.is_undefined() || value.is_null() => Vec::new(),
-        Some(value) => serde_wasm_bindgen::from_value(value).map_err(to_js_err)?,
-    };
-    let result = price_result_with_context(
-        &instrument,
-        &market,
-        as_of,
-        model,
-        metric_strs,
-        market_history.as_deref(),
-    )?;
-    valuation_result_value(&result)
+    let instrument_json = json_text(&instrument_json, "instrumentJson")?;
+    PriceRequest::from_js(
+        &market_json,
+        &as_of,
+        model.as_ref(),
+        metrics.as_ref(),
+        metric_pricing_overrides.as_ref(),
+        market_history.as_ref(),
+    )?
+    .price(&instrument_json)
+}
+
+/// The converted arguments shared by `priceInstrument` and the typed
+/// instrument classes' `price` methods.
+pub(super) struct PriceRequest {
+    /// Canonical market-context JSON text.
+    pub(super) market_json: String,
+    /// ISO-8601 valuation date.
+    pub(super) as_of: String,
+    /// Pricing-model identifier; `None` selects the instrument default.
+    pub(super) model: Option<String>,
+    /// Canonical metric identifiers to compute.
+    pub(super) metrics: Vec<String>,
+    /// Metric-pricing overrides JSON merged into the envelope.
+    pub(super) metric_pricing_overrides: Option<String>,
+    /// Market-history JSON for historical risk metrics.
+    pub(super) market_history: Option<String>,
+}
+
+impl PriceRequest {
+    /// Convert the JavaScript pricing arguments, rejecting wrong types.
+    pub(super) fn from_js(
+        market_json: &JsValue,
+        as_of: &JsValue,
+        model: Option<&JsValue>,
+        metrics: Option<&JsValue>,
+        metric_pricing_overrides: Option<&JsValue>,
+        market_history: Option<&JsValue>,
+    ) -> Result<Self, JsValue> {
+        Ok(Self {
+            market_json: json_text(market_json, "marketJson")?,
+            as_of: js_string(as_of, "asOf")?,
+            model: js_opt_string(model, "model")?,
+            metrics: js_opt_string_seq(metrics, "metrics")?.unwrap_or_default(),
+            metric_pricing_overrides: opt_json_text(
+                metric_pricing_overrides,
+                "metricPricingOverrides",
+            )?,
+            market_history: opt_json_text(market_history, "marketHistory")?,
+        })
+    }
+
+    /// Price `instrument_json`, validating the instrument before the market.
+    pub(super) fn price(self, instrument_json: &str) -> Result<JsValue, JsValue> {
+        let instrument = parse_pricing_instrument_json(
+            instrument_json,
+            self.metric_pricing_overrides.as_deref(),
+        )?;
+        let market = parse_market_json(&self.market_json)?;
+        let result = price_result_with_context(
+            &instrument,
+            &market,
+            &self.as_of,
+            self.model.as_deref().unwrap_or("default"),
+            self.metrics,
+            self.market_history.as_deref(),
+        )?;
+        valuation_result_value(&result)
+    }
 }
 
 /// Per-flow cashflow envelope (DF / survival / PV) for a discountable instrument.
@@ -361,18 +423,30 @@ pub fn price_instrument(
 /// canonical pricing fails, or the cash-flow envelope cannot be serialized.
 #[wasm_bindgen(js_name = instrumentCashflowsJson)]
 pub fn instrument_cashflows_json(
-    instrument_json: &str,
-    market_json: &str,
+    instrument_json: JsValue,
+    market_json: JsValue,
+    as_of: JsValue,
+    model: JsValue,
+) -> Result<String, JsValue> {
+    let instrument_json: &str = &json_text(&instrument_json, "instrumentJson")?;
+    let market_json: &str = &json_text(&market_json, "marketJson")?;
+    let as_of: &str = &js_string(&as_of, "asOf")?;
+    let model: &str = &js_string(&model, "model")?;
+    let instrument = parse_pricing_instrument_json(instrument_json, None)?;
+    let market = parse_market_json(market_json)?;
+    cashflows_json(&instrument, &market, as_of, model)
+}
+
+/// The cash-flow envelope JSON shared by the `instrumentCashflows*Json` entry
+/// points; the instrument is parsed before the market is used.
+fn cashflows_json(
+    instrument: &finstack_quant_valuations::pricer::ParsedInstrument,
+    market: &MarketContext,
     as_of: &str,
     model: &str,
 ) -> Result<String, JsValue> {
-    let instrument = parse_pricing_instrument_json(instrument_json, None)?;
-    let market = parse_market_json(market_json)?;
     let envelope = finstack_quant_valuations::instruments::cashflow_export::instrument_cashflows(
-        &instrument,
-        &market,
-        as_of,
-        model,
+        instrument, market, as_of, model,
     )
     .map_err(to_js_err)?;
     serde_json::to_string(&envelope).map_err(to_js_err)
@@ -415,7 +489,8 @@ pub fn list_standard_metrics_grouped() -> Result<JsValue, JsValue> {
 /// @returns Ordered metadata records preserving original keys, decoded components, native unit families, display groups, and bucket eligibility.
 /// @throws Error - Throws a validation error for malformed canonical metric keys or a serialization error when conversion fails.
 #[wasm_bindgen(js_name = metricMetadata)]
-pub fn metric_metadata(keys: Vec<String>) -> Result<JsValue, JsValue> {
+pub fn metric_metadata(keys: JsValue) -> Result<JsValue, JsValue> {
+    let keys = js_string_seq(&keys, "keys")?;
     let metadata = finstack_quant_valuations::pricer::metric_metadata(&keys).map_err(to_js_err)?;
     to_js_value(&metadata)
 }
@@ -464,7 +539,8 @@ pub fn list_models_grouped() -> Result<JsValue, JsValue> {
 /// @returns Product-family coverage rows with instrument routes and official source URLs.
 /// @throws Error - Throws when `exchange` is unsupported, the embedded listed-product sidecar is invalid, or rows cannot be converted to JavaScript.
 #[wasm_bindgen(js_name = listedProductCatalog)]
-pub fn listed_product_catalog(exchange: Option<String>) -> Result<JsValue, JsValue> {
+pub fn listed_product_catalog(exchange: Option<JsValue>) -> Result<JsValue, JsValue> {
+    let exchange = js_opt_string(exchange.as_ref(), "exchange")?;
     let exchange = exchange
         .as_deref()
         .map(str::parse::<finstack_quant_valuations::market::listed::ListedExchange>)
@@ -511,21 +587,23 @@ pub fn listed_product_catalog(exchange: Option<String>) -> Result<JsValue, JsVal
 /// JavaScript value.
 #[wasm_bindgen(js_name = priceInstrumentWithMarket)]
 pub fn price_instrument_with_market(
-    instrument_json: &str,
+    instrument_json: JsValue,
     market: &JsMarket,
-    as_of: &str,
-    model: &str,
+    as_of: JsValue,
+    model: JsValue,
     metrics: Option<JsValue>,
-    metric_pricing_overrides: Option<String>,
-    market_history: Option<String>,
+    metric_pricing_overrides: Option<JsValue>,
+    market_history: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
+    let instrument_json: &str = &json_text(&instrument_json, "instrumentJson")?;
+    let as_of: &str = &js_string(&as_of, "asOf")?;
+    let model: &str = &js_string(&model, "model")?;
+    let metric_pricing_overrides =
+        opt_json_text(metric_pricing_overrides.as_ref(), "metricPricingOverrides")?;
+    let market_history = opt_json_text(market_history.as_ref(), "marketHistory")?;
     let instrument =
         parse_pricing_instrument_json(instrument_json, metric_pricing_overrides.as_deref())?;
-    let metric_strs: Vec<String> = match metrics {
-        None => Vec::new(),
-        Some(value) if value.is_undefined() || value.is_null() => Vec::new(),
-        Some(value) => serde_wasm_bindgen::from_value(value).map_err(to_js_err)?,
-    };
+    let metric_strs = js_opt_string_seq(metrics.as_ref(), "metrics")?.unwrap_or_default();
     let result = price_result_with_context(
         &instrument,
         market.inner(),
@@ -554,25 +632,33 @@ pub fn price_instrument_with_market(
 /// pricing fails, or the cash-flow envelope cannot be serialized.
 #[wasm_bindgen(js_name = instrumentCashflowsWithMarketJson)]
 pub fn instrument_cashflows_with_market_json(
-    instrument_json: &str,
+    instrument_json: JsValue,
     market: &JsMarket,
-    as_of: &str,
-    model: &str,
+    as_of: JsValue,
+    model: JsValue,
 ) -> Result<String, JsValue> {
+    let instrument_json: &str = &json_text(&instrument_json, "instrumentJson")?;
+    let as_of: &str = &js_string(&as_of, "asOf")?;
+    let model: &str = &js_string(&model, "model")?;
     let instrument = parse_pricing_instrument_json(instrument_json, None)?;
-    let envelope = finstack_quant_valuations::instruments::cashflow_export::instrument_cashflows(
-        &instrument,
-        market.inner(),
-        as_of,
-        model,
-    )
-    .map_err(to_js_err)?;
-    serde_json::to_string(&envelope).map_err(to_js_err)
+    cashflows_json(&instrument, market.inner(), as_of, model)
 }
 
 #[cfg(test)]
-mod tests {
+pub(super) mod tests {
     use super::*;
+
+    /// A request whose market, date and model are all invalid.
+    pub(crate) fn not_a_market_request() -> PriceRequest {
+        PriceRequest {
+            market_json: "not-market-json".to_string(),
+            as_of: "not-a-date".to_string(),
+            model: Some("not-a-model".to_string()),
+            metrics: Vec::new(),
+            metric_pricing_overrides: None,
+            market_history: None,
+        }
+    }
 
     fn envelope_json(instrument: finstack_quant_valuations::instruments::InstrumentJson) -> String {
         serde_json::to_string(
@@ -619,20 +705,8 @@ mod tests {
 
     #[test]
     fn public_json_routes_validate_instrument_before_market_json() {
-        assert!(price_instrument(
-            "{}",
-            "not-market-json",
-            "not-a-date",
-            Some("not-a-model".to_string()),
-            None,
-            None,
-            None,
-        )
-        .is_err());
-        assert!(
-            instrument_cashflows_json("{}", "not-market-json", "not-a-date", "not-a-model",)
-                .is_err()
-        );
+        assert!(not_a_market_request().price("{}").is_err());
+        assert!(parse_pricing_instrument_json("{}", None).is_err());
     }
 
     pub(crate) fn bond_instrument_json() -> String {
@@ -1060,21 +1134,27 @@ mod tests {
     #[test]
     fn validate_instrument_json_bond() {
         let json = bond_instrument_json();
-        let canonical = validate_instrument_json(&json, None).expect("validate");
+        let canonical = finstack_quant_valuations::pricer::validate_instrument_json(&json, None)
+            .expect("validate");
         assert!(!canonical.is_empty());
     }
 
     #[test]
     fn validate_instrument_json_bermudan_swaption() {
         let json = bermudan_swaption_json();
-        let canonical = validate_instrument_json(&json, None).expect("validate");
+        let canonical = finstack_quant_valuations::pricer::validate_instrument_json(&json, None)
+            .expect("validate");
         let parsed: serde_json::Value = serde_json::from_str(&canonical).expect("json");
         assert_eq!(parsed["instrument"]["type"], "bermudan_swaption");
     }
 
     #[test]
     fn validate_revolving_credit_rejects_invalid_floating_rate_spec() {
-        assert!(validate_instrument_json(&revolving_credit_json(true, false), None).is_err());
+        assert!(finstack_quant_valuations::pricer::validate_instrument_json(
+            &revolving_credit_json(true, false),
+            None
+        )
+        .is_err());
     }
 
     #[test]
@@ -1101,13 +1181,12 @@ mod tests {
         assert_eq!(parsed["measures"]["utilization_rate"], 0.20);
         assert_eq!(parsed["measures"]["available_capacity"], 40_000_000.0);
 
-        let credit_instrument = revolving_credit_json(false, true);
-        let credit_market_json =
-            serde_json::to_string(&revolving_credit_market(true)).expect("market json");
-        let credit_market = JsMarket::new(&credit_market_json).expect("market handle");
-        assert!(instrument_cashflows_with_market_json(
+        let credit_instrument =
+            parse_pricing_instrument_json(&revolving_credit_json(false, true), None)
+                .expect("credit instrument");
+        assert!(cashflows_json(
             &credit_instrument,
-            &credit_market,
+            &revolving_credit_market(true),
             "2024-01-01",
             "discounting",
         )
@@ -1127,14 +1206,14 @@ mod tests {
     }
 
     #[test]
-    fn wasm_market_reuses_parsed_market_for_pricing_and_cashflows() {
+    fn parsed_market_prices_and_exports_cashflows() {
         let inst = bond_instrument_json();
-        let market = JsMarket::new(&market_context_json()).expect("market handle");
+        let market = parse_market_json(&market_context_json()).expect("market");
         let instrument = parse_pricing_instrument_json(&inst, None).expect("parsed instrument");
 
         let priced = price_result_with_context(
             &instrument,
-            market.inner(),
+            &market,
             "2024-01-01",
             "discounting",
             Vec::new(),
@@ -1145,8 +1224,7 @@ mod tests {
         assert!(parsed.is_object());
 
         let cashflows =
-            instrument_cashflows_with_market_json(&inst, &market, "2024-01-01", "discounting")
-                .expect("cashflows");
+            cashflows_json(&instrument, &market, "2024-01-01", "discounting").expect("cashflows");
         let parsed_cashflows: serde_json::Value =
             serde_json::from_str(&cashflows).expect("cashflow json");
         assert!(parsed_cashflows.is_object());
@@ -1252,7 +1330,8 @@ mod tests {
         )
         .expect("price");
         let result_json = valuation_result_json(result).expect("serialize");
-        let canonical = validate_valuation_result_json(&result_json).expect("validate");
+        let reparsed: ValuationResult = serde_json::from_str(&result_json).expect("parse");
+        let canonical = valuation_result_json(reparsed).expect("validate");
         assert!(!canonical.is_empty());
         let parsed: serde_json::Value = serde_json::from_str(&canonical).expect("json");
         assert!(parsed.is_object());
@@ -1320,7 +1399,8 @@ mod tests {
         let inst = return_floor_bond_instrument_json(floor_spec);
 
         // Validate round-trips through the binding
-        let canonical = validate_instrument_json(&inst, None).expect("validate");
+        let canonical = finstack_quant_valuations::pricer::validate_instrument_json(&inst, None)
+            .expect("validate");
         assert!(
             canonical.contains("return_floor"),
             "return_floor survived round-trip"

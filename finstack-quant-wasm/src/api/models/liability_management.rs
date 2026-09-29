@@ -7,6 +7,7 @@
 //! returned as plain JS objects with snake_case keys matching the serde
 //! representation of the Rust result types.
 
+use crate::utils::input::js_string;
 use crate::utils::{to_js_err, to_js_value};
 use finstack_quant_models::credit::liability_management::{self as lm, ExchangeType, LmeType};
 use wasm_bindgen::prelude::*;
@@ -35,8 +36,9 @@ pub fn analyze_exchange_offer(
     new_pv: f64,
     consent_fee: f64,
     equity_sweetener_value: f64,
-    exchange_type: &str,
+    exchange_type: JsValue,
 ) -> Result<JsValue, JsValue> {
+    let exchange_type: &str = &js_string(&exchange_type, "exchangeType")?;
     let exchange_type: ExchangeType = exchange_type.parse().map_err(to_js_err)?;
     let analysis = lm::analyze_exchange_offer(
         old_pv,
@@ -70,12 +72,13 @@ pub fn analyze_exchange_offer(
 /// JavaScript object.
 #[wasm_bindgen(js_name = analyzeLme)]
 pub fn analyze_lme(
-    lme_type: &str,
+    lme_type: JsValue,
     notional: f64,
     repurchase_price_pct: f64,
     opt_acceptance_pct: f64,
     ebitda: Option<f64>,
 ) -> Result<JsValue, JsValue> {
+    let lme_type: &str = &js_string(&lme_type, "lmeType")?;
     let lme_type: LmeType = lme_type.parse().map_err(to_js_err)?;
     let analysis = lm::analyze_lme(
         lme_type,

@@ -15,6 +15,7 @@ use super::pricing::{
     metric_value_with_context, parse_market_json, parse_pricing_instrument_json,
     standard_option_greeks_with_context,
 };
+use crate::utils::input::{from_js_json, js_opt_string, js_string, json_text};
 use crate::utils::{to_js_err, to_js_value};
 use finstack_quant_valuations::pricer::{
     instrument_envelope_from_spec, pretty_instrument_json, validate_typed_instrument_json,
@@ -22,12 +23,9 @@ use finstack_quant_valuations::pricer::{
 use serde_json::{Map, Value};
 use wasm_bindgen::prelude::*;
 
-fn value_from_spec(spec: JsValue) -> Result<Value, JsValue> {
-    serde_wasm_bindgen::from_value(spec).map_err(to_js_err)
-}
-
 fn from_spec(type_tag: &str, spec: JsValue) -> Result<String, JsValue> {
-    instrument_envelope_from_spec(type_tag, value_from_spec(spec)?).map_err(to_js_err)
+    let spec: Value = from_js_json(&spec, "spec")?;
+    instrument_envelope_from_spec(type_tag, spec).map_err(to_js_err)
 }
 
 fn from_json_payload(type_tag: &str, json: &str) -> Result<String, JsValue> {
@@ -99,16 +97,9 @@ mod tests {
 
     #[test]
     fn public_json_routes_validate_instrument_before_market_json() {
-        assert!(super::super::pricing::price_instrument(
-            "{}",
-            "not-market-json",
-            "not-a-date",
-            Some("not-a-model".to_string()),
-            None,
-            None,
-            None,
-        )
-        .is_err());
+        assert!(super::super::pricing::tests::not_a_market_request()
+            .price("{}")
+            .is_err());
         assert!(metric_value(
             "{}",
             "not-market-json",
@@ -158,7 +149,8 @@ macro_rules! fx_class {
             /// canonical envelope for this exact FX instrument type, fails
             /// instrument validation, or cannot be canonically serialized.
             #[wasm_bindgen(js_name = fromJson)]
-            pub fn from_json(json: &str) -> Result<$rust_name, JsValue> {
+            pub fn from_json(json: JsValue) -> Result<$rust_name, JsValue> {
+                let json: &str = &json_text(&json, "json")?;
                 Ok(Self {
                     json: from_json_payload($type_tag, json)?,
                 })
@@ -210,22 +202,22 @@ macro_rules! fx_class {
             /// valuation cannot be converted to JavaScript.
             pub fn price(
                 &self,
-                market_json: &str,
-                as_of: &str,
-                model: Option<String>,
+                market_json: JsValue,
+                as_of: JsValue,
+                model: Option<JsValue>,
                 metrics: Option<JsValue>,
-                metric_pricing_overrides: Option<String>,
-                market_history: Option<String>,
+                metric_pricing_overrides: Option<JsValue>,
+                market_history: Option<JsValue>,
             ) -> Result<JsValue, JsValue> {
-                super::pricing::price_instrument(
-                    &self.json,
-                    market_json,
-                    as_of,
-                    model,
-                    metrics,
-                    metric_pricing_overrides,
-                    market_history,
-                )
+                super::pricing::PriceRequest::from_js(
+                    &market_json,
+                    &as_of,
+                    model.as_ref(),
+                    metrics.as_ref(),
+                    metric_pricing_overrides.as_ref(),
+                    market_history.as_ref(),
+                )?
+                .price(&self.json)
             }
         }
     };
@@ -250,10 +242,13 @@ macro_rules! fx_option_class {
             /// pricing fails; or delta is not produced by the selected model.
             pub fn delta(
                 &self,
-                market_json: &str,
-                as_of: &str,
-                model: Option<String>,
+                market_json: JsValue,
+                as_of: JsValue,
+                model: Option<JsValue>,
             ) -> Result<f64, JsValue> {
+                let market_json: &str = &json_text(&market_json, "marketJson")?;
+                let as_of: &str = &js_string(&as_of, "asOf")?;
+                let model = js_opt_string(model.as_ref(), "model")?;
                 metric_value(&self.json, market_json, as_of, model, "delta")
             }
 
@@ -270,10 +265,13 @@ macro_rules! fx_option_class {
             /// pricing fails; or gamma is not produced by the selected model.
             pub fn gamma(
                 &self,
-                market_json: &str,
-                as_of: &str,
-                model: Option<String>,
+                market_json: JsValue,
+                as_of: JsValue,
+                model: Option<JsValue>,
             ) -> Result<f64, JsValue> {
+                let market_json: &str = &json_text(&market_json, "marketJson")?;
+                let as_of: &str = &js_string(&as_of, "asOf")?;
+                let model = js_opt_string(model.as_ref(), "model")?;
                 metric_value(&self.json, market_json, as_of, model, "gamma")
             }
 
@@ -290,10 +288,13 @@ macro_rules! fx_option_class {
             /// pricing fails; or vega is not produced by the selected model.
             pub fn vega(
                 &self,
-                market_json: &str,
-                as_of: &str,
-                model: Option<String>,
+                market_json: JsValue,
+                as_of: JsValue,
+                model: Option<JsValue>,
             ) -> Result<f64, JsValue> {
+                let market_json: &str = &json_text(&market_json, "marketJson")?;
+                let as_of: &str = &js_string(&as_of, "asOf")?;
+                let model = js_opt_string(model.as_ref(), "model")?;
                 metric_value(&self.json, market_json, as_of, model, "vega")
             }
 
@@ -310,10 +311,13 @@ macro_rules! fx_option_class {
             /// pricing fails; or theta is not produced by the selected model.
             pub fn theta(
                 &self,
-                market_json: &str,
-                as_of: &str,
-                model: Option<String>,
+                market_json: JsValue,
+                as_of: JsValue,
+                model: Option<JsValue>,
             ) -> Result<f64, JsValue> {
+                let market_json: &str = &json_text(&market_json, "marketJson")?;
+                let as_of: &str = &js_string(&as_of, "asOf")?;
+                let model = js_opt_string(model.as_ref(), "model")?;
                 metric_value(&self.json, market_json, as_of, model, "theta")
             }
 
@@ -330,10 +334,13 @@ macro_rules! fx_option_class {
             /// pricing fails; or domestic rho is not produced by the selected model.
             pub fn rho(
                 &self,
-                market_json: &str,
-                as_of: &str,
-                model: Option<String>,
+                market_json: JsValue,
+                as_of: JsValue,
+                model: Option<JsValue>,
             ) -> Result<f64, JsValue> {
+                let market_json: &str = &json_text(&market_json, "marketJson")?;
+                let as_of: &str = &js_string(&as_of, "asOf")?;
+                let model = js_opt_string(model.as_ref(), "model")?;
                 metric_value(&self.json, market_json, as_of, model, "rho")
             }
 
@@ -351,10 +358,13 @@ macro_rules! fx_option_class {
             #[wasm_bindgen(js_name = foreignRho)]
             pub fn foreign_rho(
                 &self,
-                market_json: &str,
-                as_of: &str,
-                model: Option<String>,
+                market_json: JsValue,
+                as_of: JsValue,
+                model: Option<JsValue>,
             ) -> Result<f64, JsValue> {
+                let market_json: &str = &json_text(&market_json, "marketJson")?;
+                let as_of: &str = &js_string(&as_of, "asOf")?;
+                let model = js_opt_string(model.as_ref(), "model")?;
                 metric_value(&self.json, market_json, as_of, model, "foreign_rho")
             }
 
@@ -371,10 +381,13 @@ macro_rules! fx_option_class {
             /// pricing fails; or vanna is not produced by the selected model.
             pub fn vanna(
                 &self,
-                market_json: &str,
-                as_of: &str,
-                model: Option<String>,
+                market_json: JsValue,
+                as_of: JsValue,
+                model: Option<JsValue>,
             ) -> Result<f64, JsValue> {
+                let market_json: &str = &json_text(&market_json, "marketJson")?;
+                let as_of: &str = &js_string(&as_of, "asOf")?;
+                let model = js_opt_string(model.as_ref(), "model")?;
                 metric_value(&self.json, market_json, as_of, model, "vanna")
             }
 
@@ -391,10 +404,13 @@ macro_rules! fx_option_class {
             /// pricing fails; or volga is not produced by the selected model.
             pub fn volga(
                 &self,
-                market_json: &str,
-                as_of: &str,
-                model: Option<String>,
+                market_json: JsValue,
+                as_of: JsValue,
+                model: Option<JsValue>,
             ) -> Result<f64, JsValue> {
+                let market_json: &str = &json_text(&market_json, "marketJson")?;
+                let as_of: &str = &js_string(&as_of, "asOf")?;
+                let model = js_opt_string(model.as_ref(), "model")?;
                 metric_value(&self.json, market_json, as_of, model, "volga")
             }
 
@@ -412,10 +428,13 @@ macro_rules! fx_option_class {
             /// be converted to a JavaScript value.
             pub fn greeks(
                 &self,
-                market_json: &str,
-                as_of: &str,
-                model: Option<String>,
+                market_json: JsValue,
+                as_of: JsValue,
+                model: Option<JsValue>,
             ) -> Result<JsValue, JsValue> {
+                let market_json: &str = &json_text(&market_json, "marketJson")?;
+                let as_of: &str = &js_string(&as_of, "asOf")?;
+                let model = js_opt_string(model.as_ref(), "model")?;
                 option_greeks_object(&self.json, market_json, as_of, model.as_deref())
             }
         }
@@ -432,10 +451,13 @@ macro_rules! fx_option_subset_class {
                 /// Compute this supported option sensitivity.
                 pub fn $method(
                     &self,
-                    market_json: &str,
-                    as_of: &str,
-                    model: Option<String>,
+                    market_json: JsValue,
+                    as_of: JsValue,
+                    model: Option<JsValue>,
                 ) -> Result<f64, JsValue> {
+                    let market_json: &str = &json_text(&market_json, "marketJson")?;
+                    let as_of: &str = &js_string(&as_of, "asOf")?;
+                    let model = js_opt_string(model.as_ref(), "model")?;
                     metric_value(&self.json, market_json, as_of, model, $metric)
                 }
             )+
@@ -453,10 +475,13 @@ macro_rules! fx_option_subset_class {
             /// be converted to a JavaScript value.
             pub fn greeks(
                 &self,
-                market_json: &str,
-                as_of: &str,
-                model: Option<String>,
+                market_json: JsValue,
+                as_of: JsValue,
+                model: Option<JsValue>,
             ) -> Result<JsValue, JsValue> {
+                let market_json: &str = &json_text(&market_json, "marketJson")?;
+                let as_of: &str = &js_string(&as_of, "asOf")?;
+                let model = js_opt_string(model.as_ref(), "model")?;
                 option_greeks_object(&self.json, market_json, as_of, model.as_deref())
             }
         }

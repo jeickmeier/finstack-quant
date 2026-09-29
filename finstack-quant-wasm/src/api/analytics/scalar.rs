@@ -5,9 +5,8 @@
 //! simple-return series, without constructing a `Performance` panel. Inputs
 //! travel as `number[]` / `Float64Array`; outputs are plain numbers.
 
+use crate::utils::input::js_f64_seq;
 use wasm_bindgen::prelude::*;
-
-use super::support::parse_f64_vec;
 
 const DEFAULT_PERIODS_PER_YEAR: f64 = 252.0;
 
@@ -25,7 +24,7 @@ pub fn sharpe(
     rf: Option<f64>,
     periods_per_year: Option<f64>,
 ) -> Result<f64, JsValue> {
-    let returns = parse_f64_vec(returns)?;
+    let returns = js_f64_seq(&returns, "returns")?;
     Ok(finstack_quant_analytics::sharpe(
         &returns,
         rf.unwrap_or(0.0),
@@ -46,7 +45,7 @@ pub fn sortino(
     mar: Option<f64>,
     periods_per_year: Option<f64>,
 ) -> Result<f64, JsValue> {
-    let returns = parse_f64_vec(returns)?;
+    let returns = js_f64_seq(&returns, "returns")?;
     Ok(finstack_quant_analytics::sortino(
         &returns,
         mar.unwrap_or(0.0),
@@ -62,7 +61,7 @@ pub fn sortino(
 /// @throws Error - Rejects a `returns` value that is not a numeric array.
 #[wasm_bindgen(js_name = volatility)]
 pub fn volatility(returns: JsValue, periods_per_year: Option<f64>) -> Result<f64, JsValue> {
-    let returns = parse_f64_vec(returns)?;
+    let returns = js_f64_seq(&returns, "returns")?;
     Ok(finstack_quant_analytics::volatility(
         &returns,
         periods_per_year.unwrap_or(DEFAULT_PERIODS_PER_YEAR),
@@ -76,6 +75,6 @@ pub fn volatility(returns: JsValue, periods_per_year: Option<f64>) -> Result<f64
 /// @throws Error - Rejects a `returns` value that is not a numeric array.
 #[wasm_bindgen(js_name = maxDrawdown)]
 pub fn max_drawdown(returns: JsValue) -> Result<f64, JsValue> {
-    let returns = parse_f64_vec(returns)?;
+    let returns = js_f64_seq(&returns, "returns")?;
     Ok(finstack_quant_analytics::max_drawdown(&returns))
 }

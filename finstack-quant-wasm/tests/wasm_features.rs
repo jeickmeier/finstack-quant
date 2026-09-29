@@ -8,77 +8,80 @@ use finstack_quant_wasm::api::features::{
     transform_timeseries, transform_timeseries_pairwise,
 };
 use serde_json::json;
+use wasm_bindgen::JsValue;
 use wasm_bindgen_test::*;
 
 #[wasm_bindgen_test]
 fn transform_timeseries_and_cross_sectional_return_js_arrays() {
-    let values =
-        serde_wasm_bindgen::to_value(&vec![Some(12.0), Some(10.0), Some(21.0), Some(20.0)])
-            .expect("values");
-    let entity = serde_wasm_bindgen::to_value(&vec!["A", "A", "B", "B"]).expect("entity");
-    let order = serde_wasm_bindgen::to_value(&vec![
+    let values = crate::js_object(&vec![Some(12.0), Some(10.0), Some(21.0), Some(20.0)]);
+    let entity = crate::js_object(&vec!["A", "A", "B", "B"]);
+    let order = crate::js_object(&vec![
         "2026-01-02",
         "2026-01-01",
         "2026-01-02",
         "2026-01-01",
-    ])
-    .expect("order");
-    let params = serde_wasm_bindgen::to_value(&json!({"periods": 1})).expect("params");
+    ]);
+    let params = crate::js_object(&json!({"periods": 1}));
 
-    let returns =
-        transform_timeseries(values, entity, order, "returns", Some(params)).expect("returns");
+    let returns = transform_timeseries(
+        values,
+        entity,
+        order,
+        JsValue::from("returns"),
+        Some(params),
+    )
+    .expect("returns");
     let returns: Vec<Option<f64>> = serde_wasm_bindgen::from_value(returns).expect("returns vec");
     assert!((returns[0].expect("A return") - 0.2).abs() < 1e-12);
     assert_eq!(returns[1], None);
     assert!((returns[2].expect("B return") - 0.05).abs() < 1e-12);
 
-    let values = serde_wasm_bindgen::to_value(&vec![Some(1.0), Some(2.0), Some(100.0), Some(5.0)])
-        .expect("values");
-    let time_key = serde_wasm_bindgen::to_value(&vec![
+    let values = crate::js_object(&vec![Some(1.0), Some(2.0), Some(100.0), Some(5.0)]);
+    let time_key = crate::js_object(&vec![
         "2026-01-01",
         "2026-01-01",
         "2026-01-01",
         "2026-01-02",
-    ])
-    .expect("time key");
-    let ranks = transform_cross_sectional(values, time_key, "rank", None).expect("rank");
+    ]);
+    let ranks =
+        transform_cross_sectional(values, time_key, JsValue::from("rank"), None).expect("rank");
     let ranks: Vec<Option<f64>> = serde_wasm_bindgen::from_value(ranks).expect("rank vec");
     assert_eq!(ranks, vec![Some(0.0), Some(0.5), Some(1.0), Some(0.0)]);
 }
 
 #[wasm_bindgen_test]
 fn transform_expanded_feature_ops_return_js_arrays() {
-    let values = serde_wasm_bindgen::to_value(&vec![Some(1.0), Some(2.0), Some(2.0), Some(4.0)])
-        .expect("values");
-    let time_key = serde_wasm_bindgen::to_value(&vec![
+    let values = crate::js_object(&vec![Some(1.0), Some(2.0), Some(2.0), Some(4.0)]);
+    let time_key = crate::js_object(&vec![
         "2026-01-01",
         "2026-01-01",
         "2026-01-01",
         "2026-01-01",
-    ])
-    .expect("time key");
+    ]);
 
-    let ranks =
-        transform_cross_sectional(values, time_key, "percentile_rank", None).expect("percentile");
+    let ranks = transform_cross_sectional(values, time_key, JsValue::from("percentile_rank"), None)
+        .expect("percentile");
     let ranks: Vec<Option<f64>> = serde_wasm_bindgen::from_value(ranks).expect("rank vec");
     assert_eq!(ranks, vec![Some(0.2), Some(0.5), Some(0.5), Some(0.8)]);
 
-    let values =
-        serde_wasm_bindgen::to_value(&vec![Some(1.0), None, Some(f64::NAN)]).expect("values");
-    let time_key = serde_wasm_bindgen::to_value(&vec!["2026-01-01", "2026-01-01", "2026-01-01"])
-        .expect("time key");
-    let params = serde_wasm_bindgen::to_value(&json!({"value": 7.0})).expect("params");
-    let filled =
-        transform_cross_sectional(values, time_key, "fill_missing", Some(params)).expect("filled");
+    let values = crate::js_object(&vec![Some(1.0), None, Some(f64::NAN)]);
+    let time_key = crate::js_object(&vec!["2026-01-01", "2026-01-01", "2026-01-01"]);
+    let params = crate::js_object(&json!({"value": 7.0}));
+    let filled = transform_cross_sectional(
+        values,
+        time_key,
+        JsValue::from("fill_missing"),
+        Some(params),
+    )
+    .expect("filled");
     let filled: Vec<Option<f64>> = serde_wasm_bindgen::from_value(filled).expect("filled vec");
     assert_eq!(filled, vec![Some(1.0), Some(7.0), Some(7.0)]);
 
-    let values =
-        serde_wasm_bindgen::to_value(&vec![Some(1.0), Some(3.0), Some(6.0)]).expect("values");
-    let entity = serde_wasm_bindgen::to_value(&vec!["A", "A", "A"]).expect("entity");
-    let order = serde_wasm_bindgen::to_value(&vec!["2026-01-01", "2026-01-02", "2026-01-03"])
-        .expect("order");
-    let diff = transform_timeseries(values, entity, order, "diff", None).expect("diff");
+    let values = crate::js_object(&vec![Some(1.0), Some(3.0), Some(6.0)]);
+    let entity = crate::js_object(&vec!["A", "A", "A"]);
+    let order = crate::js_object(&vec!["2026-01-01", "2026-01-02", "2026-01-03"]);
+    let diff =
+        transform_timeseries(values, entity, order, JsValue::from("diff"), None).expect("diff");
     let diff: Vec<Option<f64>> = serde_wasm_bindgen::from_value(diff).expect("diff vec");
     assert_eq!(diff, vec![None, Some(2.0), Some(3.0)]);
 }
@@ -86,67 +89,62 @@ fn transform_expanded_feature_ops_return_js_arrays() {
 #[wasm_bindgen_test]
 fn transform_cross_sectional_rejects_removed_aliases() {
     for alias in ["clip_by_quantile", "dollar_neutral_weights"] {
-        let values = serde_wasm_bindgen::to_value(&vec![Some(1.0), Some(2.0)]).expect("values");
-        let time_key =
-            serde_wasm_bindgen::to_value(&vec!["2026-01-01", "2026-01-01"]).expect("time key");
-        assert!(transform_cross_sectional(values, time_key, alias, None).is_err());
+        let values = crate::js_object(&vec![Some(1.0), Some(2.0)]);
+        let time_key = crate::js_object(&vec!["2026-01-01", "2026-01-01"]);
+        assert!(transform_cross_sectional(values, time_key, JsValue::from(alias), None).is_err());
     }
 }
 
 #[wasm_bindgen_test]
 fn finance_specific_feature_ops_return_js_arrays() {
-    let values = serde_wasm_bindgen::to_value(&vec![Some(1.0), Some(3.0), Some(10.0), Some(14.0)])
-        .expect("values");
-    let time_key = serde_wasm_bindgen::to_value(&vec![
+    let values = crate::js_object(&vec![Some(1.0), Some(3.0), Some(10.0), Some(14.0)]);
+    let time_key = crate::js_object(&vec![
         "2026-01-01",
         "2026-01-01",
         "2026-01-01",
         "2026-01-01",
-    ])
-    .expect("time key");
-    let groups = serde_wasm_bindgen::to_value(&vec!["tech", "tech", "fin", "fin"]).expect("groups");
-    let grouped = transform_cross_sectional_grouped(values, time_key, groups, "zscore", None)
-        .expect("grouped");
+    ]);
+    let groups = crate::js_object(&vec!["tech", "tech", "fin", "fin"]);
+    let grouped =
+        transform_cross_sectional_grouped(values, time_key, groups, JsValue::from("zscore"), None)
+            .expect("grouped");
     let grouped: Vec<Option<f64>> = serde_wasm_bindgen::from_value(grouped).expect("grouped vec");
     assert_approx_options(&grouped, &[-1.0, 1.0, -1.0, 1.0]);
 
-    let values = serde_wasm_bindgen::to_value(&vec![Some(1.0), Some(2.0), Some(2.0), Some(4.0)])
-        .expect("values");
-    let time_key = serde_wasm_bindgen::to_value(&vec![
+    let values = crate::js_object(&vec![Some(1.0), Some(2.0), Some(2.0), Some(4.0)]);
+    let time_key = crate::js_object(&vec![
         "2026-01-01",
         "2026-01-01",
         "2026-01-01",
         "2026-01-01",
-    ])
-    .expect("time key");
-    let exposures =
-        serde_wasm_bindgen::to_value(&vec![vec![Some(0.0), Some(1.0), Some(0.0), Some(1.0)]])
-            .expect("exposures");
+    ]);
+    let exposures = crate::js_object(&vec![vec![Some(0.0), Some(1.0), Some(0.0), Some(1.0)]]);
     let residual = neutralize(values, time_key, exposures, None).expect("neutralize");
     let residual: Vec<Option<f64>> = serde_wasm_bindgen::from_value(residual).expect("residual");
     assert_approx_options(&residual, &[-0.5, -1.0, 0.5, 1.0]);
 
-    let values =
-        serde_wasm_bindgen::to_value(&vec![Some(1.0), Some(2.0), Some(3.0)]).expect("values");
-    let other =
-        serde_wasm_bindgen::to_value(&vec![Some(1.0), Some(2.0), Some(4.0)]).expect("other");
-    let entity = serde_wasm_bindgen::to_value(&vec!["A", "A", "A"]).expect("entity");
-    let order = serde_wasm_bindgen::to_value(&vec!["2026-01-01", "2026-01-02", "2026-01-03"])
-        .expect("order");
-    let params =
-        serde_wasm_bindgen::to_value(&json!({"window": 3, "min_periods": 3})).expect("params");
-    let beta =
-        transform_timeseries_pairwise(values, other, entity, order, "rolling_beta", Some(params))
-            .expect("beta");
+    let values = crate::js_object(&vec![Some(1.0), Some(2.0), Some(3.0)]);
+    let other = crate::js_object(&vec![Some(1.0), Some(2.0), Some(4.0)]);
+    let entity = crate::js_object(&vec!["A", "A", "A"]);
+    let order = crate::js_object(&vec!["2026-01-01", "2026-01-02", "2026-01-03"]);
+    let params = crate::js_object(&json!({"window": 3, "min_periods": 3}));
+    let beta = transform_timeseries_pairwise(
+        values,
+        other,
+        entity,
+        order,
+        JsValue::from("rolling_beta"),
+        Some(params),
+    )
+    .expect("beta");
     let beta: Vec<Option<f64>> = serde_wasm_bindgen::from_value(beta).expect("beta vec");
     assert_eq!(beta[0], None);
     assert_eq!(beta[1], None);
     assert!((beta[2].expect("beta") - 9.0 / 14.0).abs() < 1e-12);
 
-    let values = serde_wasm_bindgen::to_value(&vec![Some(1.0), Some(2.0)]).expect("values");
-    let time_key =
-        serde_wasm_bindgen::to_value(&vec!["2026-01-01", "2026-01-01"]).expect("time key");
-    let volatility = serde_wasm_bindgen::to_value(&vec![Some(1.0), Some(2.0)]).expect("volatility");
+    let values = crate::js_object(&vec![Some(1.0), Some(2.0)]);
+    let time_key = crate::js_object(&vec!["2026-01-01", "2026-01-01"]);
+    let volatility = crate::js_object(&vec![Some(1.0), Some(2.0)]);
     let weights = risk_scaled_weights(values, time_key, volatility).expect("weights");
     let weights: Vec<Option<f64>> = serde_wasm_bindgen::from_value(weights).expect("weights vec");
     assert_eq!(weights, vec![Some(0.0), Some(0.0)]);
@@ -154,46 +152,37 @@ fn finance_specific_feature_ops_return_js_arrays() {
 
 #[wasm_bindgen_test]
 fn pipeline_helper_feature_ops_return_js_arrays() {
-    let values =
-        serde_wasm_bindgen::to_value(&vec![Some(1.0), Some(2.0), Some(100.0)]).expect("values");
-    let time_key = serde_wasm_bindgen::to_value(&vec!["2026-01-01", "2026-01-01", "2026-01-01"])
-        .expect("time key");
-    let params =
-        serde_wasm_bindgen::to_value(&json!({"lower": 0.0, "upper": 0.5})).expect("params");
+    let values = crate::js_object(&vec![Some(1.0), Some(2.0), Some(100.0)]);
+    let time_key = crate::js_object(&vec!["2026-01-01", "2026-01-01", "2026-01-01"]);
+    let params = crate::js_object(&json!({"lower": 0.0, "upper": 0.5}));
     let cleaned =
-        transform_cross_sectional(values, time_key, "winsorize", Some(params)).expect("cleaned");
+        transform_cross_sectional(values, time_key, JsValue::from("winsorize"), Some(params))
+            .expect("cleaned");
     let cleaned: Vec<Option<f64>> = serde_wasm_bindgen::from_value(cleaned).expect("cleaned vec");
     assert_eq!(cleaned, vec![Some(1.0), Some(2.0), Some(2.0)]);
 
-    let values =
-        serde_wasm_bindgen::to_value(&vec![Some(1.0), Some(2.0), Some(100.0)]).expect("values");
-    let time_key = serde_wasm_bindgen::to_value(&vec!["2026-01-01", "2026-01-01", "2026-01-01"])
-        .expect("time key");
-    let normalized = transform_cross_sectional(values, time_key, "rank", None).expect("normalized");
+    let values = crate::js_object(&vec![Some(1.0), Some(2.0), Some(100.0)]);
+    let time_key = crate::js_object(&vec!["2026-01-01", "2026-01-01", "2026-01-01"]);
+    let normalized = transform_cross_sectional(values, time_key, JsValue::from("rank"), None)
+        .expect("normalized");
     let normalized: Vec<Option<f64>> =
         serde_wasm_bindgen::from_value(normalized).expect("normalized vec");
     assert_eq!(normalized, vec![Some(0.0), Some(0.5), Some(1.0)]);
 
-    let values =
-        serde_wasm_bindgen::to_value(&vec![Some(1.0), Some(2.0), Some(100.0)]).expect("values");
-    let time_key = serde_wasm_bindgen::to_value(&vec!["2026-01-01", "2026-01-01", "2026-01-01"])
-        .expect("time key");
+    let values = crate::js_object(&vec![Some(1.0), Some(2.0), Some(100.0)]);
+    let time_key = crate::js_object(&vec!["2026-01-01", "2026-01-01", "2026-01-01"]);
     let weights = rank_to_weights(values, time_key).expect("weights");
     let weights: Vec<Option<f64>> = serde_wasm_bindgen::from_value(weights).expect("weights vec");
     assert_approx_options(&weights, &[-0.5, 0.0, 0.5]);
 
-    let values = serde_wasm_bindgen::to_value(&vec![Some(1.0), Some(2.0), Some(2.0), Some(4.0)])
-        .expect("values");
-    let time_key = serde_wasm_bindgen::to_value(&vec![
+    let values = crate::js_object(&vec![Some(1.0), Some(2.0), Some(2.0), Some(4.0)]);
+    let time_key = crate::js_object(&vec![
         "2026-01-01",
         "2026-01-01",
         "2026-01-01",
         "2026-01-01",
-    ])
-    .expect("time key");
-    let exposures =
-        serde_wasm_bindgen::to_value(&vec![vec![Some(0.0), Some(1.0), Some(0.0), Some(1.0)]])
-            .expect("exposures");
+    ]);
+    let exposures = crate::js_object(&vec![vec![Some(0.0), Some(1.0), Some(0.0), Some(1.0)]]);
     let scored = neutralize_and_zscore(values, time_key, exposures, None).expect("scored");
     let scored: Vec<Option<f64>> = serde_wasm_bindgen::from_value(scored).expect("scored vec");
     assert!((scored[0].expect("score") + 0.632_455_532_033_675_9).abs() < 1e-12);
@@ -213,7 +202,7 @@ fn transform_panel_json_returns_json_result() {
         ]
     });
 
-    let out = transform_panel_json(&spec.to_string()).expect("panel");
+    let out = transform_panel_json(JsValue::from(&spec.to_string())).expect("panel");
     let result: serde_json::Value = serde_json::from_str(&out).expect("panel JSON");
     assert_eq!(result["columns"][0]["name"], "ret1");
     assert!((result["columns"][0]["values"][1].as_f64().expect("ret1") - 0.2).abs() < 1e-12);

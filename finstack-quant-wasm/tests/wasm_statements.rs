@@ -6,6 +6,7 @@
 #![cfg(target_arch = "wasm32")]
 
 use finstack_quant_wasm::api::statements::*;
+use wasm_bindgen::JsValue;
 use wasm_bindgen_test::*;
 
 fn model_with_nodes(nodes: &[&str]) -> String {
@@ -27,7 +28,7 @@ fn model_with_nodes(nodes: &[&str]) -> String {
 #[wasm_bindgen_test]
 fn model_node_ids_returns_array() {
     let json = model_with_nodes(&["revenue"]);
-    let result = model_node_ids(&json).unwrap();
+    let result = model_node_ids(JsValue::from(&json)).unwrap();
     let ids: Vec<String> = serde_wasm_bindgen::from_value(result).unwrap();
     assert_eq!(ids, vec!["revenue"]);
 }
@@ -36,7 +37,7 @@ fn model_node_ids_returns_array() {
 fn model_node_ids_empty_model() {
     let model = finstack_quant_statements::FinancialModelSpec::new("empty", vec![]);
     let json = serde_json::to_string(&model).unwrap();
-    let result = model_node_ids(&json).unwrap();
+    let result = model_node_ids(JsValue::from(&json)).unwrap();
     let ids: Vec<String> = serde_wasm_bindgen::from_value(result).unwrap();
     assert!(ids.is_empty());
 }
@@ -44,7 +45,7 @@ fn model_node_ids_empty_model() {
 #[wasm_bindgen_test]
 fn model_node_ids_multiple_nodes() {
     let json = model_with_nodes(&["revenue", "cogs", "gp"]);
-    let result = model_node_ids(&json).unwrap();
+    let result = model_node_ids(JsValue::from(&json)).unwrap();
     let ids: Vec<String> = serde_wasm_bindgen::from_value(result).unwrap();
     assert_eq!(ids.len(), 3);
 }
@@ -77,7 +78,7 @@ fn evaluate_model_produces_computed_nodes() {
 
     // `evaluate_model` returns a structured JS object; decode it back into the
     // canonical Rust type to assert the evaluated values.
-    let out = evaluate_model(&model_json).unwrap();
+    let out = evaluate_model(JsValue::from(&model_json)).unwrap();
     let result: finstack_quant_statements::evaluator::StatementResult =
         serde_wasm_bindgen::from_value(out).unwrap();
     assert!(result.nodes.contains_key("revenue"));
@@ -95,12 +96,15 @@ fn evaluate_model_produces_computed_nodes() {
 
 #[wasm_bindgen_test]
 fn parse_formula_returns_canonical_text() {
-    assert_eq!(parse_formula("revenue-cogs").unwrap(), "revenue - cogs");
+    assert_eq!(
+        parse_formula(JsValue::from("revenue-cogs")).unwrap(),
+        "revenue - cogs"
+    );
 }
 
 #[wasm_bindgen_test]
 fn parse_and_compile_accepts_valid() {
-    parse_and_compile("a + b").expect("should accept valid formula");
+    parse_and_compile(JsValue::from("a + b")).expect("should accept valid formula");
 }
 
 // Capital structure / waterfall validators
@@ -116,28 +120,92 @@ fn validate_waterfall_spec_roundtrips_minimal_spec() {
         ..Default::default()
     };
     let json = serde_json::to_string(&spec).unwrap();
-    let out = validate_waterfall_spec_json(&json).unwrap();
+    let out = validate_waterfall_spec_json(JsValue::from(&json)).unwrap();
     assert!(out.contains("priority_of_payments"));
 }
 
 #[wasm_bindgen_test]
 fn validate_ecf_sweep_spec_accepts_minimal() {
     let json = r#"{"ebitda_node":"ebitda","sweep_percentage":0.5}"#;
-    let out = validate_ecf_sweep_spec_json(json).unwrap();
+    let out = validate_ecf_sweep_spec_json(JsValue::from(json)).unwrap();
     assert!(out.contains("ebitda_node"));
 }
 
 #[wasm_bindgen_test]
 fn validate_pik_toggle_spec_accepts_minimal() {
     let json = r#"{"liquidity_metric":"cash","threshold":1000000.0}"#;
-    let out = validate_pik_toggle_spec_json(json).unwrap();
+    let out = validate_pik_toggle_spec_json(JsValue::from(json)).unwrap();
     assert!(out.contains("liquidity_metric"));
 }
 
 #[wasm_bindgen_test]
 fn validate_capital_structure_spec_accepts_empty() {
     let json = r#"{}"#;
-    let out = validate_capital_structure_spec_json(json).unwrap();
+    let out = validate_capital_structure_spec_json(JsValue::from(json)).unwrap();
     // Empty spec serializes with default fields.
     assert!(!out.is_empty());
+}
+
+#[wasm_bindgen_test]
+fn validate_financial_model_json_accepts_valid_model() {
+    let periods = finstack_quant_core::dates::build_periods("2025Q1..Q1", None)
+        .expect("valid periods")
+        .periods;
+    let model = finstack_quant_statements::FinancialModelSpec::new("test", periods);
+    let json = serde_json::to_string(&model).expect("model should serialize to JSON");
+    let out = validate_financial_model_json(JsValue::from(&json))
+        .expect("validate_financial_model_json should accept valid model");
+    let round_trip = serde_json::from_str::<finstack_quant_statements::FinancialModelSpec>(&out)
+        .expect("validated JSON should deserialize");
+    assert_eq!(round_trip.id, "test");
+    assert!(round_trip.nodes.is_empty());
+}
+
+#[wasm_bindgen_test]
+fn validate_check_suite_spec_roundtrip() {
+    let spec = finstack_quant_statements::checks::CheckSuiteSpec {
+        name: "test".to_string(),
+        description: None,
+        builtin_checks: vec![],
+        formula_checks: vec![],
+        config: finstack_quant_statements::checks::CheckConfig::default(),
+    };
+    let json = serde_json::to_string(&spec).expect("serialize");
+    let out =
+        validate_check_suite_spec_json(JsValue::from(&json)).expect("should accept valid spec");
+    let rt = serde_json::from_str::<finstack_quant_statements::checks::CheckSuiteSpec>(&out)
+        .expect("should roundtrip");
+    assert_eq!(rt.name, "test");
+}
+
+#[wasm_bindgen_test]
+fn validate_waterfall_spec_accepts_minimal_spec() {
+    let spec = finstack_quant_statements::capital_structure::WaterfallSpec {
+        priority_of_payments: vec![
+            finstack_quant_statements::capital_structure::PaymentPriority::Fees,
+            finstack_quant_statements::capital_structure::PaymentPriority::Interest,
+            finstack_quant_statements::capital_structure::PaymentPriority::Amortization,
+        ],
+        available_cash_node: "cash".into(),
+        ecf_sweep: None,
+        pik_toggle: None,
+        ..Default::default()
+    };
+    let json = serde_json::to_string(&spec).expect("serialize");
+    let out =
+        validate_waterfall_spec_json(JsValue::from(&json)).expect("should accept default spec");
+    assert!(out.contains("priority_of_payments"));
+}
+
+#[wasm_bindgen_test]
+fn parse_formula_returns_canonical_text_binding() {
+    let out = parse_formula(JsValue::from("revenue-cogs")).expect("parse_formula should succeed");
+    assert_eq!(out, "revenue - cogs");
+    // The canonical text parses back to itself.
+    assert_eq!(parse_formula(JsValue::from(&out)).expect("reparse"), out);
+}
+
+#[wasm_bindgen_test]
+fn parse_and_compile_accepts_valid_binding() {
+    parse_and_compile(JsValue::from("revenue * 0.5")).expect("should accept valid formula");
 }

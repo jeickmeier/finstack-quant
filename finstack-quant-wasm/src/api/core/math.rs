@@ -1,6 +1,7 @@
 //! WASM bindings for `finstack_quant_core::math` — linear algebra, statistics,
 //! special functions, and compensated summation.
 
+use crate::utils::input::js_uint;
 use crate::utils::to_js_err;
 use finstack_quant_core::math::{self, linalg, special_functions, stats, summation};
 use wasm_bindgen::prelude::*;
@@ -21,7 +22,8 @@ use wasm_bindgen::prelude::*;
 /// exactly `n * n` entries, or the matrix contains a non-finite value, is
 /// singular, or is not positive definite.
 #[wasm_bindgen(js_name = choleskyDecomposition)]
-pub fn cholesky_decomposition(matrix: &[f64], n: usize) -> Result<Box<[f64]>, JsValue> {
+pub fn cholesky_decomposition(matrix: &[f64], n: JsValue) -> Result<Box<[f64]>, JsValue> {
+    let n: usize = js_uint(&n, "n")?;
     validate_flat_matrix_len(matrix, n)?;
     linalg::cholesky_decomposition(matrix, n)
         .map(Vec::into_boxed_slice)
@@ -39,7 +41,8 @@ pub fn cholesky_decomposition(matrix: &[f64], n: usize) -> Result<Box<[f64]>, Js
 /// exactly `n * n` entries, `b` does not contain `n` entries, or a diagonal
 /// factor is singular.
 #[wasm_bindgen(js_name = choleskySolve)]
-pub fn cholesky_solve(chol: &[f64], b: &[f64], n: usize) -> Result<Box<[f64]>, JsValue> {
+pub fn cholesky_solve(chol: &[f64], b: &[f64], n: JsValue) -> Result<Box<[f64]>, JsValue> {
+    let n: usize = js_uint(&n, "n")?;
     validate_flat_matrix_len(chol, n)?;
     if b.len() != n {
         return Err(to_js_err(format!(
@@ -67,7 +70,8 @@ pub fn cholesky_solve(chol: &[f64], b: &[f64], n: usize) -> Result<Box<[f64]>, J
 /// Throws a JavaScript exception if `n * n` overflows, `l` does not contain
 /// exactly `n * n` entries, or `z` does not contain exactly `n` entries.
 #[wasm_bindgen(js_name = applyLowerTriangular)]
-pub fn apply_lower_triangular(l: &[f64], n: usize, z: &[f64]) -> Result<Box<[f64]>, JsValue> {
+pub fn apply_lower_triangular(l: &[f64], n: JsValue, z: &[f64]) -> Result<Box<[f64]>, JsValue> {
+    let n: usize = js_uint(&n, "n")?;
     validate_flat_matrix_len(l, n)?;
     linalg::apply_lower_triangular(l, n, z)
         .map(Vec::into_boxed_slice)

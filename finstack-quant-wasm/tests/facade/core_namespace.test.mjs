@@ -285,7 +285,7 @@ test('core.Money formatWith rejects invalid options and still frees the handle',
     for (const decimals of [-1, 1.5, Number.NaN, Infinity, '2', 1_000_001]) {
       assert.throws(
         () => m.formatWith(decimals),
-        /non-negative integer|precision/,
+        /decimals: expected a non-negative whole number|decimals: expected a number|precision/,
         `decimals=${decimals}`
       );
     }

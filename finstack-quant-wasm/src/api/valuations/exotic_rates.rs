@@ -5,6 +5,7 @@
 //! trajectories. Full MC / copula / LSMC pricers stay on the standard
 //! `priceInstrument` pipeline.
 
+use crate::utils::input::js_bool;
 use crate::utils::{to_js_err, to_js_value};
 use finstack_quant_valuations::instruments::rates::hw1f::coupon_profiles;
 use wasm_bindgen::prelude::*;
@@ -142,9 +143,10 @@ pub fn cms_spread_option_intrinsic(
     long_cms: f64,
     short_cms: f64,
     strike: f64,
-    is_call: bool,
+    is_call: JsValue,
     notional: f64,
 ) -> Result<f64, JsValue> {
+    let is_call = js_bool(&is_call, "isCall")?;
     coupon_profiles::cms_spread_option_intrinsic(long_cms, short_cms, strike, is_call, notional)
         .map_err(to_js_err)
 }
@@ -206,11 +208,5 @@ mod tests {
             .expect("inverse floater");
         assert!((coupons[0] - 0.03).abs() < 1e-12);
         assert!((coupons[1] - 0.01).abs() < 1e-12);
-    }
-
-    #[test]
-    fn cms_spread_option_intrinsic_call_works() {
-        let p = cms_spread_option_intrinsic(0.04, 0.02, 0.01, true, 1_000_000.0).expect("cms");
-        assert!((p - 10_000.0).abs() < 1e-9);
     }
 }

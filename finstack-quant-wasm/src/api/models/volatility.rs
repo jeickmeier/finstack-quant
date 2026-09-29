@@ -6,6 +6,7 @@
 //! Hagan SABR (2002): see docs/REFERENCES.md#hagan-2002-sabr.
 
 use crate::api::core::market_data::{JsFxDeltaVolSurface, JsVolCube};
+use crate::utils::input::{from_js_json, js_bool, js_uint};
 use crate::utils::{to_js_err, to_js_value};
 use finstack_quant_models::volatility as vol;
 use finstack_quant_models::volatility::sabr::{
@@ -309,10 +310,14 @@ impl JsSabrCalibrator {
     /// @param max_iterations - Positive cap on solver iterations before a
     /// non-convergence error; pair a tight tolerance with a larger budget.
     #[wasm_bindgen(js_name = withMaxIterations)]
-    pub fn with_max_iterations(&self, max_iterations: usize) -> JsSabrCalibrator {
-        Self {
+    pub fn with_max_iterations(
+        &self,
+        max_iterations: JsValue,
+    ) -> Result<JsSabrCalibrator, JsValue> {
+        let max_iterations: usize = js_uint(&max_iterations, "maxIterations")?;
+        Ok(Self {
             inner: self.inner.clone().with_max_iterations(max_iterations),
-        }
+        })
     }
 
     /// Calibrate `(alpha, nu, rho)` to market vols with `beta` fixed.
@@ -373,10 +378,11 @@ impl JsSabrCalibrator {
     /// model reproduces the ATM volatility interpolated from the quotes
     /// exactly, and only nu and rho are fitted to the smile.
     #[wasm_bindgen(js_name = withAtmPinning)]
-    pub fn with_atm_pinning(&self, atm_pinning: bool) -> JsSabrCalibrator {
-        Self {
+    pub fn with_atm_pinning(&self, atm_pinning: JsValue) -> Result<JsSabrCalibrator, JsValue> {
+        let atm_pinning = js_bool(&atm_pinning, "atmPinning")?;
+        Ok(Self {
             inner: self.inner.clone().with_atm_pinning(atm_pinning),
-        }
+        })
     }
 }
 
@@ -435,10 +441,8 @@ pub fn convert_atm_volatility(
     forward_rate: f64,
     time_to_expiry: f64,
 ) -> Result<f64, JsValue> {
-    let from: vol::VolatilityConvention = serde_wasm_bindgen::from_value(from_convention)
-        .map_err(|e| to_js_err(format!("invalid from_convention: {e}")))?;
-    let to: vol::VolatilityConvention = serde_wasm_bindgen::from_value(to_convention)
-        .map_err(|e| to_js_err(format!("invalid to_convention: {e}")))?;
+    let from: vol::VolatilityConvention = from_js_json(&from_convention, "fromConvention")?;
+    let to: vol::VolatilityConvention = from_js_json(&to_convention, "toConvention")?;
     vol::convert_atm_volatility(vol, from, to, forward_rate, time_to_expiry).map_err(to_js_err)
 }
 
@@ -486,8 +490,7 @@ pub fn calibrate_svi(
 #[wasm_bindgen(js_name = sviImpliedVol)]
 pub fn svi_implied_vol(params: JsValue, k: f64, t: f64) -> Result<f64, JsValue> {
     let params: finstack_quant_models::volatility::svi::SviParams =
-        serde_wasm_bindgen::from_value(params)
-            .map_err(|e| to_js_err(format!("invalid SVI params: {e}")))?;
+        from_js_json(&params, "params")?;
     params.implied_vol(k, t).map_err(to_js_err)
 }
 
@@ -576,8 +579,9 @@ pub fn get_cube_normal_vol_clamped(cube: &JsVolCube, expiry: f64, tenor: f64, st
 #[wasm_bindgen(js_name = getFxDeltaPillarVols)]
 pub fn get_fx_delta_pillar_vols(
     surface: &JsFxDeltaVolSurface,
-    expiry_index: usize,
+    expiry_index: JsValue,
 ) -> Result<Box<[f64]>, JsValue> {
+    let expiry_index: usize = js_uint(&expiry_index, "expiryIndex")?;
     vol::get_fx_delta_pillar_vols(&surface.inner, expiry_index)
         .map(|(atm, put, call)| Box::new([atm, put, call]) as Box<[f64]>)
         .map_err(to_js_err)

@@ -4,6 +4,9 @@
 //! crate's canonical inputs, and delegates all transform behavior to
 //! `finstack-quant-features`.
 
+use crate::utils::input::{
+    from_js_json, js_nullable_f64_matrix, js_nullable_f64_seq, js_string, js_string_seq, json_text,
+};
 use crate::utils::{to_js_err, to_js_value};
 use serde_json::Value;
 use wasm_bindgen::prelude::*;
@@ -37,12 +40,13 @@ pub fn transform_timeseries(
     values: JsValue,
     entity: JsValue,
     order: JsValue,
-    op: &str,
+    op: JsValue,
     params: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
-    let values: Vec<Option<f64>> = serde_wasm_bindgen::from_value(values).map_err(to_js_err)?;
-    let entity: Vec<String> = serde_wasm_bindgen::from_value(entity).map_err(to_js_err)?;
-    let order: Vec<String> = serde_wasm_bindgen::from_value(order).map_err(to_js_err)?;
+    let op: &str = &js_string(&op, "op")?;
+    let values = js_nullable_f64_seq(&values, "values")?;
+    let entity = js_string_seq(&entity, "entity")?;
+    let order = js_string_seq(&order, "order")?;
     let params = parse_params(params)?;
     let result = finstack_quant_features::transform_timeseries(
         &values,
@@ -75,11 +79,12 @@ pub fn transform_timeseries(
 pub fn transform_cross_sectional(
     values: JsValue,
     time_key: JsValue,
-    op: &str,
+    op: JsValue,
     params: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
-    let values: Vec<Option<f64>> = serde_wasm_bindgen::from_value(values).map_err(to_js_err)?;
-    let time_key: Vec<String> = serde_wasm_bindgen::from_value(time_key).map_err(to_js_err)?;
+    let op: &str = &js_string(&op, "op")?;
+    let values = js_nullable_f64_seq(&values, "values")?;
+    let time_key = js_string_seq(&time_key, "timeKey")?;
     let params = parse_params(params)?;
     let result =
         finstack_quant_features::transform_cross_sectional(&values, &time_key, op, params.as_ref())
@@ -105,12 +110,13 @@ pub fn transform_cross_sectional_grouped(
     values: JsValue,
     time_key: JsValue,
     groups: JsValue,
-    op: &str,
+    op: JsValue,
     params: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
-    let values: Vec<Option<f64>> = serde_wasm_bindgen::from_value(values).map_err(to_js_err)?;
-    let time_key: Vec<String> = serde_wasm_bindgen::from_value(time_key).map_err(to_js_err)?;
-    let groups: Vec<String> = serde_wasm_bindgen::from_value(groups).map_err(to_js_err)?;
+    let op: &str = &js_string(&op, "op")?;
+    let values = js_nullable_f64_seq(&values, "values")?;
+    let time_key = js_string_seq(&time_key, "timeKey")?;
+    let groups = js_string_seq(&groups, "groups")?;
     let params = parse_params(params)?;
     let result = finstack_quant_features::transform_cross_sectional_grouped(
         &values,
@@ -145,10 +151,9 @@ pub fn neutralize(
     exposures: JsValue,
     params: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
-    let values: Vec<Option<f64>> = serde_wasm_bindgen::from_value(values).map_err(to_js_err)?;
-    let time_key: Vec<String> = serde_wasm_bindgen::from_value(time_key).map_err(to_js_err)?;
-    let exposures: Vec<Vec<Option<f64>>> =
-        serde_wasm_bindgen::from_value(exposures).map_err(to_js_err)?;
+    let values = js_nullable_f64_seq(&values, "values")?;
+    let time_key = js_string_seq(&time_key, "timeKey")?;
+    let exposures = js_nullable_f64_matrix(&exposures, "exposures")?;
     let params = parse_params(params)?;
     let result =
         finstack_quant_features::neutralize(&values, &time_key, &exposures, params.as_ref())
@@ -180,13 +185,14 @@ pub fn transform_timeseries_pairwise(
     other: JsValue,
     entity: JsValue,
     order: JsValue,
-    op: &str,
+    op: JsValue,
     params: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
-    let values: Vec<Option<f64>> = serde_wasm_bindgen::from_value(values).map_err(to_js_err)?;
-    let other: Vec<Option<f64>> = serde_wasm_bindgen::from_value(other).map_err(to_js_err)?;
-    let entity: Vec<String> = serde_wasm_bindgen::from_value(entity).map_err(to_js_err)?;
-    let order: Vec<String> = serde_wasm_bindgen::from_value(order).map_err(to_js_err)?;
+    let op: &str = &js_string(&op, "op")?;
+    let values = js_nullable_f64_seq(&values, "values")?;
+    let other = js_nullable_f64_seq(&other, "other")?;
+    let entity = js_string_seq(&entity, "entity")?;
+    let order = js_string_seq(&order, "order")?;
     let params = parse_params(params)?;
     let result = finstack_quant_features::transform_timeseries_pairwise(
         &values,
@@ -228,11 +234,10 @@ pub fn rolling_regression_residual(
     order: JsValue,
     params: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
-    let values: Vec<Option<f64>> = serde_wasm_bindgen::from_value(values).map_err(to_js_err)?;
-    let exposures: Vec<Vec<Option<f64>>> =
-        serde_wasm_bindgen::from_value(exposures).map_err(to_js_err)?;
-    let entity: Vec<String> = serde_wasm_bindgen::from_value(entity).map_err(to_js_err)?;
-    let order: Vec<String> = serde_wasm_bindgen::from_value(order).map_err(to_js_err)?;
+    let values = js_nullable_f64_seq(&values, "values")?;
+    let exposures = js_nullable_f64_matrix(&exposures, "exposures")?;
+    let entity = js_string_seq(&entity, "entity")?;
+    let order = js_string_seq(&order, "order")?;
     let params = parse_params(params)?;
     let result = finstack_quant_features::rolling_regression_residual(
         &values,
@@ -265,10 +270,9 @@ pub fn risk_scaled_weights(
     time_key: JsValue,
     volatility: JsValue,
 ) -> Result<JsValue, JsValue> {
-    let values: Vec<Option<f64>> = serde_wasm_bindgen::from_value(values).map_err(to_js_err)?;
-    let time_key: Vec<String> = serde_wasm_bindgen::from_value(time_key).map_err(to_js_err)?;
-    let volatility: Vec<Option<f64>> =
-        serde_wasm_bindgen::from_value(volatility).map_err(to_js_err)?;
+    let values = js_nullable_f64_seq(&values, "values")?;
+    let time_key = js_string_seq(&time_key, "timeKey")?;
+    let volatility = js_nullable_f64_seq(&volatility, "volatility")?;
     let result = finstack_quant_features::risk_scaled_weights(&values, &time_key, &volatility)
         .map_err(to_js_err)?;
     to_js_value(&result)
@@ -285,8 +289,8 @@ pub fn risk_scaled_weights(
 /// @param time_key - Cross-sectional time key shared by values evaluated in the same slice.
 #[wasm_bindgen(js_name = rankToWeights)]
 pub fn rank_to_weights(values: JsValue, time_key: JsValue) -> Result<JsValue, JsValue> {
-    let values: Vec<Option<f64>> = serde_wasm_bindgen::from_value(values).map_err(to_js_err)?;
-    let time_key: Vec<String> = serde_wasm_bindgen::from_value(time_key).map_err(to_js_err)?;
+    let values = js_nullable_f64_seq(&values, "values")?;
+    let time_key = js_string_seq(&time_key, "timeKey")?;
     let result = finstack_quant_features::rank_to_weights(&values, &time_key).map_err(to_js_err)?;
     to_js_value(&result)
 }
@@ -310,10 +314,9 @@ pub fn neutralize_and_zscore(
     exposures: JsValue,
     params: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
-    let values: Vec<Option<f64>> = serde_wasm_bindgen::from_value(values).map_err(to_js_err)?;
-    let time_key: Vec<String> = serde_wasm_bindgen::from_value(time_key).map_err(to_js_err)?;
-    let exposures: Vec<Vec<Option<f64>>> =
-        serde_wasm_bindgen::from_value(exposures).map_err(to_js_err)?;
+    let values = js_nullable_f64_seq(&values, "values")?;
+    let time_key = js_string_seq(&time_key, "timeKey")?;
+    let exposures = js_nullable_f64_matrix(&exposures, "exposures")?;
     let params = parse_params(params)?;
     let result = finstack_quant_features::neutralize_and_zscore(
         &values,
@@ -338,14 +341,14 @@ pub fn neutralize_and_zscore(
 /// that cannot be evaluated, non-finite arithmetic, or a result that cannot be serialized to JSON.
 /// @param spec_json - Canonical panel-transformation JSON. Each operation may set optional `input` (`undefined` default: previous column, or raw `values` for the first op).
 #[wasm_bindgen(js_name = transformPanelJson)]
-pub fn transform_panel_json(spec_json: &str) -> Result<String, JsValue> {
+pub fn transform_panel_json(spec_json: JsValue) -> Result<String, JsValue> {
+    let spec_json: &str = &json_text(&spec_json, "specJson")?;
     finstack_quant_features::transform_panel_json(spec_json).map_err(to_js_err)
 }
 
 fn parse_params(params: Option<JsValue>) -> Result<Option<Value>, JsValue> {
     params
         .filter(|value| !value.is_null() && !value.is_undefined())
-        .map(serde_wasm_bindgen::from_value)
+        .map(|value| from_js_json(&value, "params"))
         .transpose()
-        .map_err(to_js_err)
 }

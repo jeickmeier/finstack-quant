@@ -1,5 +1,6 @@
 //! WASM bindings for `finstack_quant_core::market_data` term structures and FX.
 
+use crate::utils::input::{from_js_json, js_opt_string, js_string, json_text};
 use std::sync::Arc;
 
 use crate::api::core::currency::JsCurrency;
@@ -102,15 +103,21 @@ impl JsDiscountCurve {
         reason = "preserves existing positional constructor arguments and appends validation options compatibly"
     )]
     pub fn new(
-        id: &str,
-        base_date: &str,
+        id: JsValue,
+        base_date: JsValue,
         knots: &[f64],
-        interp: Option<String>,
-        extrapolation: Option<String>,
-        day_count: Option<String>,
-        validation_mode: Option<String>,
+        interp: Option<JsValue>,
+        extrapolation: Option<JsValue>,
+        day_count: Option<JsValue>,
+        validation_mode: Option<JsValue>,
         forward_floor: Option<f64>,
     ) -> Result<JsDiscountCurve, JsValue> {
+        let id: &str = &js_string(&id, "id")?;
+        let base_date: &str = &js_string(&base_date, "baseDate")?;
+        let interp = js_opt_string(interp.as_ref(), "interp")?;
+        let extrapolation = js_opt_string(extrapolation.as_ref(), "extrapolation")?;
+        let day_count = js_opt_string(day_count.as_ref(), "dayCount")?;
+        let validation_mode = js_opt_string(validation_mode.as_ref(), "validationMode")?;
         let base = parse_iso_date(base_date)?;
         if !knots.len().is_multiple_of(2) {
             return Err(to_js_err("knots array must have even length (t, df pairs)"));
@@ -154,10 +161,12 @@ impl JsDiscountCurve {
     /// finite and strictly positive.
     #[wasm_bindgen(js_name = flat)]
     pub fn flat(
-        id: &str,
-        base_date: &str,
+        id: JsValue,
+        base_date: JsValue,
         continuous_rate: f64,
     ) -> Result<JsDiscountCurve, JsValue> {
+        let id: &str = &js_string(&id, "id")?;
+        let base_date: &str = &js_string(&base_date, "baseDate")?;
         let curve = RustDiscountCurve::flat(id, parse_iso_date(base_date)?, continuous_rate)
             .map_err(to_js_err)?;
         Ok(Self {
@@ -246,12 +255,15 @@ impl JsHazardCurve {
     /// or the curve otherwise fails validation.
     #[wasm_bindgen(constructor)]
     pub fn new(
-        id: &str,
-        base_date: &str,
+        id: JsValue,
+        base_date: JsValue,
         knots: &[f64],
         recovery_rate: f64,
-        day_count: Option<String>,
+        day_count: Option<JsValue>,
     ) -> Result<JsHazardCurve, JsValue> {
+        let id: &str = &js_string(&id, "id")?;
+        let base_date: &str = &js_string(&base_date, "baseDate")?;
+        let day_count = js_opt_string(day_count.as_ref(), "dayCount")?;
         let base = parse_iso_date(base_date)?;
         if !knots.len().is_multiple_of(2) {
             return Err(to_js_err(
@@ -391,7 +403,7 @@ impl JsForwardCurve {
     /// Throws Error when options cannot be decoded or canonical curve validation rejects dates, conventions, knots, tenor, reset lag, or projection grid.
     #[wasm_bindgen(constructor)]
     pub fn new(options: JsValue) -> Result<JsForwardCurve, JsValue> {
-        let options = serde_wasm_bindgen::from_value(options).map_err(to_js_err)?;
+        let options = from_js_json(&options, "options")?;
         Self::build(options)
     }
 
@@ -484,7 +496,8 @@ impl JsFxConversionPolicy {
     /// Throws a JavaScript exception unless `name` is `cashflow_date`,
     /// `period_end`, or `period_average`.
     #[wasm_bindgen(js_name = fromName)]
-    pub fn from_name(name: &str) -> Result<Self, JsValue> {
+    pub fn from_name(name: JsValue) -> Result<Self, JsValue> {
+        let name: &str = &js_string(&name, "name")?;
         Ok(Self {
             inner: name.parse().map_err(to_js_err)?,
         })
@@ -561,7 +574,8 @@ impl JsFxQuoteConvention {
     ///
     /// Throws a JavaScript exception unless `name` is `direct` or `indirect`.
     #[wasm_bindgen(js_name = fromName)]
-    pub fn from_name(name: &str) -> Result<Self, JsValue> {
+    pub fn from_name(name: JsValue) -> Result<Self, JsValue> {
+        let name: &str = &js_string(&name, "name")?;
         Ok(Self {
             inner: name.parse().map_err(to_js_err)?,
         })
@@ -648,7 +662,9 @@ impl JsFxPairConvention {
 /// Throws a JavaScript exception if either code is not a recognized ISO-4217
 /// alphabetic currency.
 #[wasm_bindgen(js_name = fxMarketPair)]
-pub fn fx_market_pair(a: &str, b: &str) -> Result<Array, JsValue> {
+pub fn fx_market_pair(a: JsValue, b: JsValue) -> Result<Array, JsValue> {
+    let a: &str = &js_string(&a, "a")?;
+    let b: &str = &js_string(&b, "b")?;
     let a: RustCurrency = a.parse().map_err(to_js_err)?;
     let b: RustCurrency = b.parse().map_err(to_js_err)?;
     let (base, quote) = rust_fx_market_pair(a, b);
@@ -671,7 +687,9 @@ pub fn fx_market_pair(a: &str, b: &str) -> Result<Array, JsValue> {
 /// Throws a JavaScript exception if either code is not a recognized ISO-4217
 /// alphabetic currency.
 #[wasm_bindgen(js_name = fxPairConvention)]
-pub fn fx_pair_convention(base: &str, quote: &str) -> Result<JsFxPairConvention, JsValue> {
+pub fn fx_pair_convention(base: JsValue, quote: JsValue) -> Result<JsFxPairConvention, JsValue> {
+    let base: &str = &js_string(&base, "base")?;
+    let quote: &str = &js_string(&quote, "quote")?;
     let base: RustCurrency = base.parse().map_err(to_js_err)?;
     let quote: RustCurrency = quote.parse().map_err(to_js_err)?;
     Ok(JsFxPairConvention {
@@ -692,7 +710,9 @@ pub fn fx_pair_convention(base: &str, quote: &str) -> Result<JsFxPairConvention,
 /// Throws a JavaScript exception if either code is not a recognized ISO-4217
 /// alphabetic currency.
 #[wasm_bindgen(js_name = fxPipSize)]
-pub fn fx_pip_size(base: &str, quote: &str) -> Result<f64, JsValue> {
+pub fn fx_pip_size(base: JsValue, quote: JsValue) -> Result<f64, JsValue> {
+    let base: &str = &js_string(&base, "base")?;
+    let quote: &str = &js_string(&quote, "quote")?;
     let base: RustCurrency = base.parse().map_err(to_js_err)?;
     let quote: RustCurrency = quote.parse().map_err(to_js_err)?;
     Ok(rust_fx_pip_size(base, quote))
@@ -748,7 +768,9 @@ impl JsFxMatrix {
     /// Throws a JavaScript exception if either currency code is invalid or
     /// `rate` is non-finite or not strictly positive.
     #[wasm_bindgen(js_name = setQuote)]
-    pub fn set_quote(&self, base: &str, quote: &str, rate: f64) -> Result<(), JsValue> {
+    pub fn set_quote(&self, base: JsValue, quote: JsValue, rate: f64) -> Result<(), JsValue> {
+        let base: &str = &js_string(&base, "base")?;
+        let quote: &str = &js_string(&quote, "quote")?;
         let base_currency: RustCurrency = base.parse().map_err(to_js_err)?;
         let quote_currency: RustCurrency = quote.parse().map_err(to_js_err)?;
         self.inner
@@ -773,12 +795,15 @@ impl JsFxMatrix {
     #[wasm_bindgen(js_name = setQuoteOn)]
     pub fn set_quote_on(
         &self,
-        base: &str,
-        quote: &str,
-        date: &str,
+        base: JsValue,
+        quote: JsValue,
+        date: JsValue,
         policy: &JsFxConversionPolicy,
         rate: f64,
     ) -> Result<(), JsValue> {
+        let base: &str = &js_string(&base, "base")?;
+        let quote: &str = &js_string(&quote, "quote")?;
+        let date: &str = &js_string(&date, "date")?;
         let base_currency: RustCurrency = base.parse().map_err(to_js_err)?;
         let quote_currency: RustCurrency = quote.parse().map_err(to_js_err)?;
         let d = parse_iso_date(date)?;
@@ -804,11 +829,14 @@ impl JsFxMatrix {
     /// is non-finite or non-positive.
     pub fn rate(
         &self,
-        base: &str,
-        quote: &str,
-        date: &str,
+        base: JsValue,
+        quote: JsValue,
+        date: JsValue,
         policy: &JsFxConversionPolicy,
     ) -> Result<JsFxRateResult, JsValue> {
+        let base: &str = &js_string(&base, "base")?;
+        let quote: &str = &js_string(&quote, "quote")?;
+        let date: &str = &js_string(&date, "date")?;
         let base_currency: RustCurrency = base.parse().map_err(to_js_err)?;
         let quote_currency: RustCurrency = quote.parse().map_err(to_js_err)?;
         let d = parse_iso_date(date)?;
@@ -830,10 +858,13 @@ impl JsFxMatrix {
     #[wasm_bindgen(js_name = rateDefault)]
     pub fn rate_default(
         &self,
-        base: &str,
-        quote: &str,
-        date: &str,
+        base: JsValue,
+        quote: JsValue,
+        date: JsValue,
     ) -> Result<JsFxRateResult, JsValue> {
+        let base: &str = &js_string(&base, "base")?;
+        let quote: &str = &js_string(&quote, "quote")?;
+        let date: &str = &js_string(&date, "date")?;
         let base_currency: RustCurrency = base.parse().map_err(to_js_err)?;
         let quote_currency: RustCurrency = quote.parse().map_err(to_js_err)?;
         let d = parse_iso_date(date)?;
@@ -884,13 +915,15 @@ impl JsVolCube {
     /// nor `total_variance`.
     #[wasm_bindgen(constructor)]
     pub fn new(
-        id: &str,
+        id: JsValue,
         expiries: &[f64],
         tenors: &[f64],
         params_flat: &[f64],
         forwards: &[f64],
-        interpolation_mode: Option<String>,
+        interpolation_mode: Option<JsValue>,
     ) -> Result<JsVolCube, JsValue> {
+        let id: &str = &js_string(&id, "id")?;
+        let interpolation_mode = js_opt_string(interpolation_mode.as_ref(), "interpolationMode")?;
         let n_nodes = expiries.len() * tenors.len();
         if params_flat.len() != n_nodes * 5 {
             return Err(to_js_err(format!(
@@ -935,7 +968,8 @@ impl JsVolCube {
     /// @returns A validated VolCube handle owned by the caller; release it with free().
     /// @throws Error - Throws when JSON is malformed, fields are unknown, or native axis, parameter, or forward validation fails.
     #[wasm_bindgen(js_name = fromJson)]
-    pub fn from_json(json: &str) -> Result<JsVolCube, JsValue> {
+    pub fn from_json(json: JsValue) -> Result<JsVolCube, JsValue> {
+        let json: &str = &json_text(&json, "json")?;
         let inner = serde_json::from_str::<RustVolCube>(json).map_err(to_js_err)?;
         Ok(Self {
             inner: Arc::new(inner),
@@ -992,7 +1026,7 @@ impl JsFxDeltaVolSurface {
     /// not finite and positive; or any risk reversal or butterfly is non-finite.
     #[wasm_bindgen(constructor)]
     pub fn new(
-        id: &str,
+        id: JsValue,
         expiries: &[f64],
         atm_vols: &[f64],
         rr25d: &[f64],
@@ -1000,6 +1034,7 @@ impl JsFxDeltaVolSurface {
         rr10d: Option<Vec<f64>>,
         bf10d: Option<Vec<f64>>,
     ) -> Result<JsFxDeltaVolSurface, JsValue> {
+        let id: &str = &js_string(&id, "id")?;
         let wings_10d = match (rr10d, bf10d) {
             (Some(rr), Some(bf)) => Some((rr, bf)),
             (None, None) => None,
@@ -1033,7 +1068,8 @@ impl JsFxDeltaVolSurface {
     /// @returns A validated FxDeltaVolSurface handle owned by the caller; release it with free().
     /// @throws Error - Throws when JSON is malformed, fields are unknown, or native expiry, quote, or wing validation fails.
     #[wasm_bindgen(js_name = fromJson)]
-    pub fn from_json(json: &str) -> Result<JsFxDeltaVolSurface, JsValue> {
+    pub fn from_json(json: JsValue) -> Result<JsFxDeltaVolSurface, JsValue> {
+        let json: &str = &json_text(&json, "json")?;
         let inner = serde_json::from_str::<RustFxDeltaVolSurface>(json).map_err(to_js_err)?;
         Ok(Self {
             inner: Arc::new(inner),
@@ -1115,39 +1151,6 @@ mod tests {
     }
 
     #[test]
-    fn discount_curve_new_and_accessors() {
-        let curve = JsDiscountCurve::new(
-            "USD-OIS",
-            "2024-01-15",
-            &[0.5, 0.99, 1.0, 0.98, 2.0, 0.96],
-            None,
-            None,
-            None,
-            None,
-            None,
-        )
-        .expect("discount curve");
-        assert_eq!(curve.id(), "USD-OIS");
-        assert_eq!(curve.base_date(), "2024-01-15");
-        assert!((curve.df(0.5) - 0.99).abs() < 1e-6);
-        assert!((curve.df(1.0) - 0.98).abs() < 1e-6);
-        assert!(curve.zero(1.0) > 0.0);
-        let f = curve.forward(0.5, 1.0).expect("forward rate");
-        assert!(f > 0.0);
-    }
-
-    #[test]
-    fn discount_curve_flat_uses_continuous_compounding() {
-        let curve =
-            JsDiscountCurve::flat("USD-OIS", "2024-01-15", 0.04).expect("flat discount curve");
-
-        for t in [0.0_f64, 0.25, 1.0, 5.0, 30.0] {
-            assert!((curve.df(t) - (-0.04 * t).exp()).abs() < 1e-12);
-        }
-        assert!((curve.forward(2.0, 9.0).expect("flat forward") - 0.04).abs() < 1e-12);
-    }
-
-    #[test]
     fn forward_curve_new_and_accessors() {
         let curve = JsForwardCurve::build(ForwardCurveOptions {
             id: "USD-3M".into(),
@@ -1164,34 +1167,6 @@ mod tests {
         assert_eq!(curve.id(), "USD-3M");
         assert_eq!(curve.base_date(), "2024-01-15");
         assert!((curve.rate(1.0) - 0.045).abs() < 1e-6);
-    }
-
-    #[test]
-    fn fx_matrix_quote_and_rate() {
-        let m = JsFxMatrix::new();
-        m.set_quote("USD", "EUR", 0.92).expect("set quote");
-        let r = m.rate_default("USD", "EUR", "2024-01-15").expect("fx rate");
-        assert!((r.rate() - 0.92).abs() < 1e-9);
-        assert!(!r.triangulated());
-    }
-
-    #[test]
-    fn fx_pair_convention_helpers() {
-        let conv = fx_pair_convention("USD", "JPY").expect("USDJPY convention");
-        assert_eq!(conv.base().code(), "USD");
-        assert_eq!(conv.quote().code(), "JPY");
-        assert_eq!(conv.usd_quotation().to_string(), "indirect");
-        assert!((conv.pip_size() - 0.01).abs() < 1e-12);
-        assert_eq!(conv.settlement_days(), 2);
-        assert!((fx_pip_size("EUR", "USD").expect("EURUSD pip") - 0.0001).abs() < 1e-12);
-        let inverted = invert_fx_rate(1.10).expect("positive rate");
-        assert!((inverted - 1.0 / 1.10).abs() < 1e-12);
-        assert_eq!(
-            JsFxQuoteConvention::from_name("direct")
-                .expect("direct")
-                .to_string(),
-            "direct"
-        );
     }
 
     // JsVolCube tests require a WASM runtime (JsValue) — run via wasm-pack test.

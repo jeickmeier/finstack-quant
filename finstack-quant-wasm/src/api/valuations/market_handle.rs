@@ -3,6 +3,7 @@
 //! Avoids repeated `serde_json::from_str` on the full MarketContext JSON
 //! in bulk-pricing and sensitivity-sweep workloads.
 
+use crate::utils::input::json_text;
 use crate::utils::to_js_err;
 use finstack_quant_core::market_data::context::MarketContext;
 use std::sync::Arc;
@@ -35,7 +36,8 @@ impl JsMarket {
     /// @returns A `Market` handle that can be reused across pricing calls.
     /// @throws If the JSON is malformed or does not match the MarketContext schema.
     #[wasm_bindgen(constructor)]
-    pub fn new(json: &str) -> Result<JsMarket, JsValue> {
+    pub fn new(json: JsValue) -> Result<JsMarket, JsValue> {
+        let json: &str = &json_text(&json, "json")?;
         let inner: MarketContext = serde_json::from_str(json).map_err(to_js_err)?;
         Ok(JsMarket {
             inner: Arc::new(inner),

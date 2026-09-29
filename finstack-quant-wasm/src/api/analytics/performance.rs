@@ -5,13 +5,17 @@
 //! serialized to plain JS objects via `serde_wasm_bindgen` rather than
 //! exposed as classes, keeping the JS facade simple.
 
+use crate::utils::input::{
+    js_f64_matrix, js_f64_seq, js_opt_bool, js_opt_string, js_opt_uint, js_string, js_string_seq,
+    js_uint,
+};
 use crate::utils::{date_to_iso, to_js_err};
 use finstack_quant_analytics as fa;
 use finstack_quant_core::dates::{calendar_by_id, FiscalConfig, HolidayCalendar, PeriodKind};
 use js_sys::{Array, Float64Array, Reflect};
 use wasm_bindgen::prelude::*;
 
-use super::support::{parse_f64_matrix, parse_f64_vec, parse_iso_date, parse_iso_dates};
+use super::support::{parse_iso_date, parse_iso_dates};
 
 const DEFAULT_FREQ: &str = "daily";
 const DEFAULT_ROLLING_WINDOW: usize = 63;
@@ -31,37 +35,27 @@ fn parse_frequency(frequency: &str) -> Result<PeriodKind, JsValue> {
     frequency.parse::<PeriodKind>().map_err(to_js_err)
 }
 
-/// Validate JavaScript numbers before the WASM ABI can truncate or wrap them.
-fn parse_usize(value: f64, name: &str) -> Result<usize, JsValue> {
-    if !value.is_finite() || value < 0.0 || value.fract() != 0.0 || value > f64::from(u32::MAX) {
-        return Err(to_js_err(format!(
-            "{name} must be a finite non-negative integer no greater than 4294967295"
-        )));
-    }
-    Ok(value as usize)
-}
-
 /// `None` when both parts are omitted so the Rust default (calendar year)
 /// applies; a partial start fills the other half with `1`.
 fn make_fiscal_config(
-    month: Option<f64>,
-    day: Option<f64>,
+    month: Option<&JsValue>,
+    day: Option<&JsValue>,
 ) -> Result<Option<FiscalConfig>, JsValue> {
+    let month: Option<u8> = js_opt_uint(month, "fiscalYearStartMonth")?;
+    let day: Option<u8> = js_opt_uint(day, "fiscalYearStartDay")?;
     if month.is_none() && day.is_none() {
         return Ok(None);
     }
-    let month = parse_usize(month.unwrap_or(1.0), "fiscalYearStartMonth")?;
-    let day = parse_usize(day.unwrap_or(1.0), "fiscalYearStartDay")?;
-    FiscalConfig::new(
-        u8::try_from(month).map_err(|_| to_js_err("fiscalYearStartMonth exceeds 255"))?,
-        u8::try_from(day).map_err(|_| to_js_err("fiscalYearStartDay exceeds 255"))?,
-    )
-    .map(Some)
-    .map_err(to_js_err)
+    FiscalConfig::new(month.unwrap_or(1), day.unwrap_or(1))
+        .map(Some)
+        .map_err(to_js_err)
 }
 
 /// Lookback returns always need a fiscal config: default January 1.
-fn lookback_fiscal_config(month: Option<f64>, day: Option<f64>) -> Result<FiscalConfig, JsValue> {
+fn lookback_fiscal_config(
+    month: Option<&JsValue>,
+    day: Option<&JsValue>,
+) -> Result<FiscalConfig, JsValue> {
     match make_fiscal_config(month, day)? {
         Some(config) => Ok(config),
         None => FiscalConfig::new(1, 1).map_err(to_js_err),
@@ -98,7 +92,7 @@ fn parse_return_kind(
 }
 
 fn parse_dates(dates: JsValue) -> Result<Vec<time::Date>, JsValue> {
-    let strs: Vec<String> = serde_wasm_bindgen::from_value(dates).map_err(to_js_err)?;
+    let strs = js_string_seq(&dates, "dates")?;
     parse_iso_dates(&strs)
 }
 
@@ -110,8 +104,8 @@ fn parse_panel_inputs(
 ) -> Result<PanelInputs, JsValue> {
     Ok(PanelInputs {
         dates: parse_dates(dates)?,
-        values: parse_f64_matrix(values)?,
-        ticker_names: serde_wasm_bindgen::from_value(ticker_names).map_err(to_js_err)?,
+        values: js_f64_matrix(&values, "values")?,
+        ticker_names: js_string_seq(&ticker_names, "tickerNames")?,
         frequency: parse_frequency(frequency.as_deref().unwrap_or(DEFAULT_FREQ))?,
     })
 }
@@ -266,9 +260,11 @@ impl JsPerformance {
         dates: JsValue,
         prices: JsValue,
         ticker_names: JsValue,
-        benchmark_ticker: Option<String>,
-        frequency: Option<String>,
+        benchmark_ticker: Option<JsValue>,
+        frequency: Option<JsValue>,
     ) -> Result<JsPerformance, JsValue> {
+        let benchmark_ticker = js_opt_string(benchmark_ticker.as_ref(), "benchmarkTicker")?;
+        let frequency = js_opt_string(frequency.as_ref(), "frequency")?;
         let panel = parse_panel_inputs(dates, prices, ticker_names, frequency)?;
         let inner = fa::Performance::new(
             panel.dates,
@@ -298,9 +294,11 @@ impl JsPerformance {
         dates: JsValue,
         returns: JsValue,
         ticker_names: JsValue,
-        benchmark_ticker: Option<String>,
-        frequency: Option<String>,
+        benchmark_ticker: Option<JsValue>,
+        frequency: Option<JsValue>,
     ) -> Result<JsPerformance, JsValue> {
+        let benchmark_ticker = js_opt_string(benchmark_ticker.as_ref(), "benchmarkTicker")?;
+        let frequency = js_opt_string(frequency.as_ref(), "frequency")?;
         let panel = parse_panel_inputs(dates, returns, ticker_names, frequency)?;
         let inner = fa::Performance::from_returns(
             panel.dates,
@@ -321,7 +319,9 @@ impl JsPerformance {
     /// @param start - Inclusive ISO-8601 start date for the active analysis window.
     /// @param end - Inclusive ISO-8601 end date for the active analysis window.
     #[wasm_bindgen(js_name = resetDateRange)]
-    pub fn reset_date_range(&mut self, start: &str, end: &str) -> Result<(), JsValue> {
+    pub fn reset_date_range(&mut self, start: JsValue, end: JsValue) -> Result<(), JsValue> {
+        let start: &str = &js_string(&start, "start")?;
+        let end: &str = &js_string(&end, "end")?;
         self.inner
             .reset_date_range(parse_iso_date(start)?, parse_iso_date(end)?);
         Ok(())
@@ -334,7 +334,8 @@ impl JsPerformance {
     /// Rejects `ticker` when it does not match a loaded ticker name.
     /// @param ticker - Existing ticker label to use as the benchmark return series.
     #[wasm_bindgen(js_name = resetBenchTicker)]
-    pub fn reset_bench_ticker(&mut self, ticker: &str) -> Result<(), JsValue> {
+    pub fn reset_bench_ticker(&mut self, ticker: JsValue) -> Result<(), JsValue> {
+        let ticker: &str = &js_string(&ticker, "ticker")?;
         self.inner.reset_bench_ticker(ticker).map_err(to_js_err)
     }
 
@@ -391,8 +392,8 @@ impl JsPerformance {
     /// @param ticker_idx - Finite non-negative integer column index in tickerNames order; fractional or out-of-range values are rejected.
     /// @returns ISO-8601 dates for that ticker's active return series, in chronological order.
     #[wasm_bindgen(js_name = activeDatesForTicker)]
-    pub fn active_dates_for_ticker(&self, ticker_idx: f64) -> Result<Vec<String>, JsValue> {
-        let ticker_idx = parse_usize(ticker_idx, "tickerIdx")?;
+    pub fn active_dates_for_ticker(&self, ticker_idx: JsValue) -> Result<Vec<String>, JsValue> {
+        let ticker_idx = js_uint(&ticker_idx, "tickerIdx")?;
         Ok(self
             .inner
             .active_dates_for_ticker(ticker_idx)
@@ -418,9 +419,11 @@ impl JsPerformance {
     /// @returns Per-ticker values as a Float64Array in `tickerNames()` order.
     pub fn cagr(
         &self,
-        day_count: Option<String>,
-        calendar_id: Option<String>,
+        day_count: Option<JsValue>,
+        calendar_id: Option<JsValue>,
     ) -> Result<JsValue, JsValue> {
+        let day_count = js_opt_string(day_count.as_ref(), "dayCount")?;
+        let calendar_id = js_opt_string(calendar_id.as_ref(), "calendarId")?;
         let day_count = parse_cagr_day_count(day_count.as_deref())?;
         let calendar = resolve_optional_calendar(calendar_id.as_deref())?;
         result_vec_f64_to_js(self.inner.cagr(day_count, calendar))
@@ -430,15 +433,21 @@ impl JsPerformance {
     /// @param annualize - Whether to annualize by the configured frequency; defaults to true.
     /// @returns Per-ticker values as a Float64Array in `tickerNames()` order.
     #[wasm_bindgen(js_name = meanReturn)]
-    pub fn mean_return(&self, annualize: Option<bool>) -> JsValue {
-        vec_f64_to_js(&self.inner.mean_return(annualize.unwrap_or(true)))
+    pub fn mean_return(&self, annualize: Option<JsValue>) -> Result<JsValue, JsValue> {
+        let annualize = js_opt_bool(annualize.as_ref(), "annualize")?;
+        Ok(vec_f64_to_js(
+            &self.inner.mean_return(annualize.unwrap_or(true)),
+        ))
     }
 
     /// Return volatility per asset (annualized by default).
     /// @param annualize - Whether to annualize by the configured frequency; defaults to true.
     /// @returns Per-ticker values as a Float64Array in `tickerNames()` order.
-    pub fn volatility(&self, annualize: Option<bool>) -> JsValue {
-        vec_f64_to_js(&self.inner.volatility(annualize.unwrap_or(true)))
+    pub fn volatility(&self, annualize: Option<JsValue>) -> Result<JsValue, JsValue> {
+        let annualize = js_opt_bool(annualize.as_ref(), "annualize")?;
+        Ok(vec_f64_to_js(
+            &self.inner.volatility(annualize.unwrap_or(true)),
+        ))
     }
 
     /// Sharpe ratio per asset for the given risk-free rate.
@@ -770,9 +779,9 @@ impl JsPerformance {
     pub fn sterling_ratio(
         &self,
         risk_free_rate: Option<f64>,
-        n: Option<f64>,
+        n: Option<JsValue>,
     ) -> Result<JsValue, JsValue> {
-        let n = n.map(|value| parse_usize(value, "n")).transpose()?;
+        let n = js_opt_uint(n.as_ref(), "n")?;
         result_vec_f64_to_js(
             self.inner
                 .sterling_ratio(risk_free_rate.unwrap_or(0.0), n.unwrap_or(5)),
@@ -792,9 +801,9 @@ impl JsPerformance {
     pub fn burke_ratio(
         &self,
         risk_free_rate: Option<f64>,
-        n: Option<f64>,
+        n: Option<JsValue>,
     ) -> Result<JsValue, JsValue> {
-        let n = n.map(|value| parse_usize(value, "n")).transpose()?;
+        let n = js_opt_uint(n.as_ref(), "n")?;
         result_vec_f64_to_js(
             self.inner
                 .burke_ratio(risk_free_rate.unwrap_or(0.0), n.unwrap_or(5)),
@@ -821,8 +830,8 @@ impl JsPerformance {
     /// @param ticker_idx - Finite non-negative integer column index in tickerNames order; fractional or out-of-range values are rejected.
     /// @returns Simple decimal returns for the selected ticker, in date order.
     #[wasm_bindgen(js_name = returnsForTicker)]
-    pub fn returns_for_ticker(&self, ticker_idx: f64) -> Result<JsValue, JsValue> {
-        let ticker_idx = parse_usize(ticker_idx, "tickerIdx")?;
+    pub fn returns_for_ticker(&self, ticker_idx: JsValue) -> Result<JsValue, JsValue> {
+        let ticker_idx = js_uint(&ticker_idx, "tickerIdx")?;
         let series = self
             .inner
             .returns_for_ticker(ticker_idx)
@@ -890,7 +899,8 @@ impl JsPerformance {
     /// property on the JavaScript result object.
     /// @returns Ticker-major nested arrays of chronological period-end points with simple decimal returns.
     #[wasm_bindgen(js_name = periodicReturns)]
-    pub fn periodic_returns(&self, frequency: Option<String>) -> Result<JsValue, JsValue> {
+    pub fn periodic_returns(&self, frequency: Option<JsValue>) -> Result<JsValue, JsValue> {
+        let frequency = js_opt_string(frequency.as_ref(), "frequency")?;
         let kind = parse_frequency(frequency.as_deref().unwrap_or("monthly"))?;
         periodic_panel_to_js(self.inner.periodic_returns(kind))
     }
@@ -965,7 +975,7 @@ impl JsPerformance {
     /// @returns One Float64Array per ticker in `tickerNames()` order.
     #[wasm_bindgen(js_name = excessReturns)]
     pub fn excess_returns(&self, rf: JsValue, nperiods: Option<f64>) -> Result<JsValue, JsValue> {
-        let rf = parse_f64_vec(rf)?;
+        let rf = js_f64_seq(&rf, "rf")?;
         let excess = self
             .inner
             .excess_returns(&rf, nperiods)
@@ -1007,14 +1017,12 @@ impl JsPerformance {
     #[wasm_bindgen(js_name = rollingGreeks)]
     pub fn rolling_greeks(
         &self,
-        ticker_idx: f64,
-        window: Option<f64>,
+        ticker_idx: JsValue,
+        window: Option<JsValue>,
         risk_free_rate: Option<f64>,
     ) -> Result<JsValue, JsValue> {
-        let ticker_idx = parse_usize(ticker_idx, "tickerIdx")?;
-        let window = window
-            .map(|value| parse_usize(value, "window"))
-            .transpose()?;
+        let ticker_idx = js_uint(&ticker_idx, "tickerIdx")?;
+        let window = js_opt_uint(window.as_ref(), "window")?;
         let rg = self
             .inner
             .rolling_greeks(
@@ -1038,13 +1046,11 @@ impl JsPerformance {
     #[wasm_bindgen(js_name = rollingVolatility)]
     pub fn rolling_volatility(
         &self,
-        ticker_idx: f64,
-        window: Option<f64>,
+        ticker_idx: JsValue,
+        window: Option<JsValue>,
     ) -> Result<JsValue, JsValue> {
-        let ticker_idx = parse_usize(ticker_idx, "tickerIdx")?;
-        let window = window
-            .map(|value| parse_usize(value, "window"))
-            .transpose()?;
+        let ticker_idx = js_uint(&ticker_idx, "tickerIdx")?;
+        let window = js_opt_uint(window.as_ref(), "window")?;
         let series = self
             .inner
             .rolling_volatility(ticker_idx, window.unwrap_or(DEFAULT_ROLLING_WINDOW))
@@ -1065,14 +1071,12 @@ impl JsPerformance {
     #[wasm_bindgen(js_name = rollingSortino)]
     pub fn rolling_sortino(
         &self,
-        ticker_idx: f64,
-        window: Option<f64>,
+        ticker_idx: JsValue,
+        window: Option<JsValue>,
         mar: Option<f64>,
     ) -> Result<JsValue, JsValue> {
-        let ticker_idx = parse_usize(ticker_idx, "tickerIdx")?;
-        let window = window
-            .map(|value| parse_usize(value, "window"))
-            .transpose()?;
+        let ticker_idx = js_uint(&ticker_idx, "tickerIdx")?;
+        let window = js_opt_uint(window.as_ref(), "window")?;
         let series = self
             .inner
             .rolling_sortino(
@@ -1097,14 +1101,12 @@ impl JsPerformance {
     #[wasm_bindgen(js_name = rollingSharpe)]
     pub fn rolling_sharpe(
         &self,
-        ticker_idx: f64,
-        window: Option<f64>,
+        ticker_idx: JsValue,
+        window: Option<JsValue>,
         risk_free_rate: Option<f64>,
     ) -> Result<JsValue, JsValue> {
-        let ticker_idx = parse_usize(ticker_idx, "tickerIdx")?;
-        let window = window
-            .map(|value| parse_usize(value, "window"))
-            .transpose()?;
+        let ticker_idx = js_uint(&ticker_idx, "tickerIdx")?;
+        let window = js_opt_uint(window.as_ref(), "window")?;
         let series = self
             .inner
             .rolling_sharpe(
@@ -1127,9 +1129,13 @@ impl JsPerformance {
     /// @param window - Finite positive integer observation count. Zero, fractional, non-finite, and out-of-range values are rejected.
     /// @returns `{ dates, return }` series for the selected ticker.
     #[wasm_bindgen(js_name = rollingReturns)]
-    pub fn rolling_returns(&self, ticker_idx: f64, window: f64) -> Result<JsValue, JsValue> {
-        let ticker_idx = parse_usize(ticker_idx, "tickerIdx")?;
-        let window = parse_usize(window, "window")?;
+    pub fn rolling_returns(
+        &self,
+        ticker_idx: JsValue,
+        window: JsValue,
+    ) -> Result<JsValue, JsValue> {
+        let ticker_idx = js_uint(&ticker_idx, "tickerIdx")?;
+        let window = js_uint(&window, "window")?;
         let series = self
             .inner
             .rolling_returns(ticker_idx, window)
@@ -1147,9 +1153,13 @@ impl JsPerformance {
     /// @param n - Finite non-negative integer count of episodes; defaults to 5. Invalid numeric values are rejected.
     /// @returns Drawdown episode objects for the selected ticker, largest first.
     #[wasm_bindgen(js_name = drawdownDetails)]
-    pub fn drawdown_details(&self, ticker_idx: f64, n: Option<f64>) -> Result<JsValue, JsValue> {
-        let ticker_idx = parse_usize(ticker_idx, "tickerIdx")?;
-        let n = n.map(|value| parse_usize(value, "n")).transpose()?;
+    pub fn drawdown_details(
+        &self,
+        ticker_idx: JsValue,
+        n: Option<JsValue>,
+    ) -> Result<JsValue, JsValue> {
+        let ticker_idx = js_uint(&ticker_idx, "tickerIdx")?;
+        let n = js_opt_uint(n.as_ref(), "n")?;
         to_js(
             &self
                 .inner
@@ -1178,13 +1188,14 @@ impl JsPerformance {
     #[wasm_bindgen(js_name = multiFactorGreeks)]
     pub fn multi_factor_greeks(
         &self,
-        ticker_idx: f64,
+        ticker_idx: JsValue,
         factor_returns: JsValue,
-        return_kind: Option<String>,
+        return_kind: Option<JsValue>,
         risk_free_rate: Option<f64>,
     ) -> Result<JsValue, JsValue> {
-        let ticker_idx = parse_usize(ticker_idx, "tickerIdx")?;
-        let factors = parse_f64_matrix(factor_returns)?;
+        let return_kind = js_opt_string(return_kind.as_ref(), "returnKind")?;
+        let ticker_idx = js_uint(&ticker_idx, "tickerIdx")?;
+        let factors = js_f64_matrix(&factor_returns, "factorReturns")?;
         let refs: Vec<&[f64]> = factors.iter().map(|v| v.as_slice()).collect();
         let kind = parse_return_kind(return_kind.as_deref(), risk_free_rate)?;
         let result = self
@@ -1233,12 +1244,16 @@ impl JsPerformance {
     #[wasm_bindgen(js_name = lookbackReturns)]
     pub fn lookback_returns(
         &self,
-        ref_date: &str,
-        fiscal_year_start_month: Option<f64>,
-        fiscal_year_start_day: Option<f64>,
+        ref_date: JsValue,
+        fiscal_year_start_month: Option<JsValue>,
+        fiscal_year_start_day: Option<JsValue>,
     ) -> Result<JsValue, JsValue> {
+        let ref_date: &str = &js_string(&ref_date, "refDate")?;
         let d = parse_iso_date(ref_date)?;
-        let fc = lookback_fiscal_config(fiscal_year_start_month, fiscal_year_start_day)?;
+        let fc = lookback_fiscal_config(
+            fiscal_year_start_month.as_ref(),
+            fiscal_year_start_day.as_ref(),
+        )?;
         to_js(&self.inner.lookback_returns(d, fc))
     }
 
@@ -1257,14 +1272,19 @@ impl JsPerformance {
     #[wasm_bindgen(js_name = periodStats)]
     pub fn period_stats(
         &self,
-        ticker_idx: f64,
-        aggregation_frequency: Option<String>,
-        fiscal_year_start_month: Option<f64>,
-        fiscal_year_start_day: Option<f64>,
+        ticker_idx: JsValue,
+        aggregation_frequency: Option<JsValue>,
+        fiscal_year_start_month: Option<JsValue>,
+        fiscal_year_start_day: Option<JsValue>,
     ) -> Result<JsValue, JsValue> {
-        let ticker_idx = parse_usize(ticker_idx, "tickerIdx")?;
+        let aggregation_frequency =
+            js_opt_string(aggregation_frequency.as_ref(), "aggregationFrequency")?;
+        let ticker_idx = js_uint(&ticker_idx, "tickerIdx")?;
         let pk = parse_frequency(aggregation_frequency.as_deref().unwrap_or("monthly"))?;
-        let fc = make_fiscal_config(fiscal_year_start_month, fiscal_year_start_day)?;
+        let fc = make_fiscal_config(
+            fiscal_year_start_month.as_ref(),
+            fiscal_year_start_day.as_ref(),
+        )?;
         let stats = self
             .inner
             .period_stats(ticker_idx, pk, fc)

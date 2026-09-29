@@ -3,6 +3,7 @@
 //! Exposes peer statistics, percentile rank, z-score, OLS fair-value regression,
 //! canonical valuation multiples, and composite rich/cheap scoring.
 
+use crate::utils::input::{from_js_json, js_f64_seq, js_string};
 use crate::utils::to_js_err;
 use finstack_quant_statements_analytics::analysis as fc;
 use wasm_bindgen::prelude::*;
@@ -20,7 +21,7 @@ use wasm_bindgen::prelude::*;
 /// @param value - Subject-company metric value to rank against the peer sample.
 #[wasm_bindgen(js_name = percentileRank)]
 pub fn percentile_rank(data: JsValue, value: f64) -> Result<Option<JsValue>, JsValue> {
-    let d: Vec<f64> = serde_wasm_bindgen::from_value(data).map_err(to_js_err)?;
+    let d = js_f64_seq(&data, "data")?;
     match fc::percentile_rank(&d, value) {
         Some(rank) => crate::utils::to_js_value(&rank).map(Some),
         None => Ok(None),
@@ -41,7 +42,7 @@ pub fn percentile_rank(data: JsValue, value: f64) -> Result<Option<JsValue>, JsV
 /// @param value - Subject-company metric value to standardize against the peer sample.
 #[wasm_bindgen(js_name = zScore)]
 pub fn z_score(data: JsValue, value: f64) -> Result<Option<JsValue>, JsValue> {
-    let d: Vec<f64> = serde_wasm_bindgen::from_value(data).map_err(to_js_err)?;
+    let d = js_f64_seq(&data, "data")?;
     match fc::z_score(&d, value) {
         Some(z) => crate::utils::to_js_value(&z).map(Some),
         None => Ok(None),
@@ -59,7 +60,7 @@ pub fn z_score(data: JsValue, value: f64) -> Result<Option<JsValue>, JsValue> {
 /// @param data - Non-empty numeric observation array used by the requested statistic.
 #[wasm_bindgen(js_name = peerStats)]
 pub fn peer_stats(data: JsValue) -> Result<Option<JsValue>, JsValue> {
-    let d: Vec<f64> = serde_wasm_bindgen::from_value(data).map_err(to_js_err)?;
+    let d = js_f64_seq(&data, "data")?;
     match fc::peer_stats(&d) {
         Some(stats) => crate::utils::to_js_value(&stats).map(Some),
         None => Ok(None),
@@ -85,8 +86,8 @@ pub fn regression_fair_value(
     subject_x: f64,
     subject_y: f64,
 ) -> Result<Option<JsValue>, JsValue> {
-    let x: Vec<f64> = serde_wasm_bindgen::from_value(x_values).map_err(to_js_err)?;
-    let y: Vec<f64> = serde_wasm_bindgen::from_value(y_values).map_err(to_js_err)?;
+    let x = js_f64_seq(&x_values, "xValues")?;
+    let y = js_f64_seq(&y_values, "yValues")?;
     match fc::regression_fair_value(&x, &y, subject_x, subject_y) {
         Some(result) => crate::utils::to_js_value(&result).map(Some),
         None => Ok(None),
@@ -106,10 +107,11 @@ pub fn regression_fair_value(
 #[wasm_bindgen(js_name = computeMultiple)]
 pub fn compute_multiple(
     company_metrics: JsValue,
-    multiple: &str,
+    multiple: JsValue,
 ) -> Result<Option<JsValue>, JsValue> {
+    let multiple: &str = &js_string(&multiple, "multiple")?;
     let metrics_map: std::collections::BTreeMap<String, f64> =
-        serde_wasm_bindgen::from_value(company_metrics).map_err(to_js_err)?;
+        from_js_json(&company_metrics, "companyMetrics")?;
     let metrics = fc::CompanyMetrics::from_flat_metrics("subject", metrics_map);
     let multiple = multiple.parse::<fc::Multiple>().map_err(to_js_err)?;
     match fc::compute_multiple(&metrics, multiple) {
@@ -129,12 +131,8 @@ pub fn compute_multiple(
 /// @param dimensions - Metric dimensions and weights; each has one optional `x_extractor` for single-factor regression, or null for distribution scoring.
 #[wasm_bindgen(js_name = scoreRelativeValue)]
 pub fn score_relative_value(peer_set: JsValue, dimensions: JsValue) -> Result<JsValue, JsValue> {
-    let ps: fc::PeerSet = serde_wasm_bindgen::from_value(peer_set).map_err(to_js_err)?;
-    // Decode the full object before the typed contract: serde-wasm-bindgen's
-    // struct visitor reads declared properties and can omit unknown fields.
-    let dimensions: serde_json::Value =
-        serde_wasm_bindgen::from_value(dimensions).map_err(to_js_err)?;
-    let dims: Vec<fc::ScoringDimension> = serde_json::from_value(dimensions).map_err(to_js_err)?;
+    let ps: fc::PeerSet = from_js_json(&peer_set, "peerSet")?;
+    let dims: Vec<fc::ScoringDimension> = from_js_json(&dimensions, "dimensions")?;
     let result = fc::score_relative_value(&ps, &dims).map_err(to_js_err)?;
     crate::utils::to_js_value(&result)
 }

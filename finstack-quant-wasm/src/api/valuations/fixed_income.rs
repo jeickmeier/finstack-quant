@@ -15,6 +15,7 @@
 use crate::api::core::dates::{JsDayCount, JsTenor};
 use crate::api::core::money::JsMoney;
 use crate::api::core::types::{JsBps, JsRate};
+use crate::utils::input::{js_string, json_text};
 use crate::utils::{parse_iso_date, to_js_err, to_js_value};
 use finstack_quant_core::dates::StubKind;
 use finstack_quant_valuations::instruments::{InstrumentEnvelope, InstrumentJson};
@@ -48,14 +49,19 @@ impl JsBond {
     /// @returns The validated fixed-rate bond.
     /// @throws If validation fails (e.g. maturity not after issue_date).
     pub fn fixed(
-        id: &str,
+        id: JsValue,
         notional: &JsMoney,
         coupon_rate: &JsRate,
-        issue_date: &str,
-        maturity: &str,
-        stub: &str,
-        discount_curve_id: &str,
+        issue_date: JsValue,
+        maturity: JsValue,
+        stub: JsValue,
+        discount_curve_id: JsValue,
     ) -> Result<JsBond, JsValue> {
+        let id: &str = &js_string(&id, "id")?;
+        let issue_date: &str = &js_string(&issue_date, "issueDate")?;
+        let maturity: &str = &js_string(&maturity, "maturity")?;
+        let stub: &str = &js_string(&stub, "stub")?;
+        let discount_curve_id: &str = &js_string(&discount_curve_id, "discountCurveId")?;
         let inner = finstack_quant_valuations::instruments::Bond::fixed(
             id,
             notional.inner,
@@ -91,16 +97,21 @@ impl JsBond {
     /// or validation fails.
     #[allow(clippy::too_many_arguments)]
     pub fn floating(
-        id: &str,
+        id: JsValue,
         notional: &JsMoney,
-        forward_curve_id: &str,
+        forward_curve_id: JsValue,
         spread_bp: &JsBps,
-        issue_date: &str,
-        maturity: &str,
+        issue_date: JsValue,
+        maturity: JsValue,
         frequency: &JsTenor,
         day_count: &JsDayCount,
-        discount_curve_id: &str,
+        discount_curve_id: JsValue,
     ) -> Result<JsBond, JsValue> {
+        let id: &str = &js_string(&id, "id")?;
+        let forward_curve_id: &str = &js_string(&forward_curve_id, "forwardCurveId")?;
+        let issue_date: &str = &js_string(&issue_date, "issueDate")?;
+        let maturity: &str = &js_string(&maturity, "maturity")?;
+        let discount_curve_id: &str = &js_string(&discount_curve_id, "discountCurveId")?;
         let inner = finstack_quant_valuations::instruments::Bond::floating(
             id,
             notional.inner,
@@ -123,7 +134,8 @@ impl JsBond {
     /// @returns The validated bond.
     /// @throws If the JSON is malformed, has a different instrument type, or fails validation.
     #[wasm_bindgen(js_name = fromJson)]
-    pub fn from_json(json: &str) -> Result<JsBond, JsValue> {
+    pub fn from_json(json: JsValue) -> Result<JsBond, JsValue> {
+        let json: &str = &json_text(&json, "json")?;
         match parse_envelope(json)? {
             InstrumentJson::Bond(inner) => Ok(JsBond { inner }),
             other => Err(to_js_err(finstack_quant_core::Error::Validation(format!(
@@ -174,7 +186,8 @@ impl JsTermLoan {
     /// @returns The validated term loan.
     /// @throws If the JSON is malformed, has a different instrument type, or fails validation.
     #[wasm_bindgen(js_name = fromJson)]
-    pub fn from_json(json: &str) -> Result<JsTermLoan, JsValue> {
+    pub fn from_json(json: JsValue) -> Result<JsTermLoan, JsValue> {
+        let json: &str = &json_text(&json, "json")?;
         match parse_envelope(json)? {
             InstrumentJson::TermLoan(inner) => Ok(JsTermLoan { inner }),
             other => Err(to_js_err(finstack_quant_core::Error::Validation(format!(
@@ -238,7 +251,8 @@ impl JsAssetBackedFacility {
     /// @returns The typed facility.
     /// @throws If the JSON is malformed, has a different instrument type, or fails validation.
     #[wasm_bindgen(js_name = fromJson)]
-    pub fn from_json(json: &str) -> Result<JsAssetBackedFacility, JsValue> {
+    pub fn from_json(json: JsValue) -> Result<JsAssetBackedFacility, JsValue> {
+        let json: &str = &json_text(&json, "json")?;
         match parse_envelope(json)? {
             InstrumentJson::AssetBackedFacility(inner) => {
                 Ok(JsAssetBackedFacility { inner: *inner })
@@ -309,7 +323,8 @@ impl JsRevolvingCredit {
     /// @returns The validated facility.
     /// @throws If the JSON is malformed, has a different instrument type, or fails validation.
     #[wasm_bindgen(js_name = fromJson)]
-    pub fn from_json(json: &str) -> Result<JsRevolvingCredit, JsValue> {
+    pub fn from_json(json: JsValue) -> Result<JsRevolvingCredit, JsValue> {
+        let json: &str = &json_text(&json, "json")?;
         match parse_envelope(json)? {
             InstrumentJson::RevolvingCredit(inner) => Ok(JsRevolvingCredit { inner }),
             other => Err(to_js_err(finstack_quant_core::Error::Validation(format!(
@@ -364,7 +379,13 @@ impl JsRevolvingCredit {
     /// @returns Plain `EnhancedMonteCarloResult` object with `mc_result`, one `path_results` entry per simulated path and the `draw_option_cost` estimate; path counts are plain numbers and `mc_result.run` is `null`.
     /// @throws If the market JSON or date is malformed, a required curve or fixing is missing, or the facility has a deterministic draw schedule (only stochastic facilities simulate paths).
     #[wasm_bindgen(js_name = priceWithPaths)]
-    pub fn price_with_paths(&self, market_json: &str, as_of: &str) -> Result<JsValue, JsValue> {
+    pub fn price_with_paths(
+        &self,
+        market_json: JsValue,
+        as_of: JsValue,
+    ) -> Result<JsValue, JsValue> {
+        let market_json: &str = &json_text(&market_json, "marketJson")?;
+        let as_of: &str = &js_string(&as_of, "asOf")?;
         let market = super::pricing::parse_market_json(market_json)?;
         let as_of = parse_iso_date(as_of)?;
         let result =

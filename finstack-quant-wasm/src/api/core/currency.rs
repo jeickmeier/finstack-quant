@@ -1,5 +1,6 @@
 //! WASM bindings for [`finstack_quant_core::currency::Currency`].
 
+use crate::utils::input::json_text;
 use crate::utils::to_js_err;
 use finstack_quant_core::currency::Currency as RustCurrency;
 use std::str::FromStr;
@@ -40,7 +41,8 @@ impl JsCurrency {
     /// eur.code; // "EUR"
     /// ```
     #[wasm_bindgen(constructor)]
-    pub fn new(code: &str) -> Result<JsCurrency, JsValue> {
+    pub fn new(code: JsValue) -> Result<JsCurrency, JsValue> {
+        let code = crate::utils::input::js_string(&code, "code")?;
         RustCurrency::from_str(code.trim())
             .map(|inner| JsCurrency { inner })
             .map_err(to_js_err)
@@ -94,7 +96,8 @@ impl JsCurrency {
     /// @returns The parsed `Currency`.
     /// @throws If `json` is malformed or contains an unknown code.
     #[wasm_bindgen(js_name = fromJson)]
-    pub fn from_json(json: &str) -> Result<JsCurrency, JsValue> {
+    pub fn from_json(json: JsValue) -> Result<JsCurrency, JsValue> {
+        let json: &str = &json_text(&json, "json")?;
         let inner: RustCurrency = serde_json::from_str(json).map_err(to_js_err)?;
         Ok(JsCurrency { inner })
     }
@@ -104,9 +107,17 @@ impl JsCurrency {
 mod tests {
     use super::*;
 
+    /// Native tests cannot build a `JsValue`, so fixtures wrap the Rust
+    /// currency directly; argument conversion is covered by the facade tests.
+    fn currency(code: &str) -> JsCurrency {
+        JsCurrency {
+            inner: code.parse().expect("valid currency code"),
+        }
+    }
+
     #[test]
     fn construct_usd() {
-        let c = JsCurrency::new("USD").expect("valid");
+        let c = currency("USD");
         assert_eq!(c.code(), "USD");
         assert_eq!(c.to_string(), "USD");
         assert_eq!(c.decimals(), 2);
@@ -114,28 +125,20 @@ mod tests {
 
     #[test]
     fn numeric_code() {
-        let c = JsCurrency::new("EUR").expect("valid");
+        let c = currency("EUR");
         assert_eq!(c.numeric(), 978);
     }
 
     #[test]
-    fn json_roundtrip() {
-        let c = JsCurrency::new("GBP").expect("valid");
-        let json = c.to_json().expect("serialize");
-        let c2 = JsCurrency::from_json(&json).expect("deserialize");
-        assert_eq!(c2.code(), "GBP");
-    }
-
-    #[test]
     fn case_insensitive() {
-        let c = JsCurrency::new("usd").expect("valid");
+        let c = currency("usd");
         assert_eq!(c.code(), "USD");
     }
 
     #[test]
     fn multiple_currencies() {
         for code in &["USD", "EUR", "GBP", "JPY", "CHF"] {
-            let c = JsCurrency::new(code).expect("valid");
+            let c = currency(code);
             assert_eq!(c.code(), *code);
             assert_eq!(c.to_string(), *code);
         }

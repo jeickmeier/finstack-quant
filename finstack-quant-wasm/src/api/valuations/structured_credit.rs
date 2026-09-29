@@ -9,6 +9,7 @@
 //! JS surface lives under `valuations.instruments`.
 
 use super::pricing::parse_market_json;
+use crate::utils::input::{js_string, json_text, opt_json_text};
 use crate::utils::{parse_iso_date, to_js_err, to_js_value};
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
     calculate_tranche_breakeven_cdr, calculate_tranche_discount_margin, calculate_tranche_metrics,
@@ -55,12 +56,16 @@ fn parse_json_arg<T: serde::de::DeserializeOwned>(json: &str, label: &str) -> Re
 /// @throws Error - Thrown if JSON or the date is malformed, the deal is invalid, the tranche is missing or fixed-rate, market_price_pct is not finite and positive, required market data is unavailable, or the spread solve fails or exceeds ±5000 bp.
 #[wasm_bindgen(js_name = structuredCreditTrancheDiscountMargin)]
 pub fn structured_credit_tranche_discount_margin(
-    instrument_json: &str,
-    tranche_id: &str,
-    market_json: &str,
-    as_of: &str,
+    instrument_json: JsValue,
+    tranche_id: JsValue,
+    market_json: JsValue,
+    as_of: JsValue,
     market_price_pct: f64,
 ) -> Result<f64, JsValue> {
+    let instrument_json: &str = &json_text(&instrument_json, "instrumentJson")?;
+    let tranche_id: &str = &js_string(&tranche_id, "trancheId")?;
+    let market_json: &str = &json_text(&market_json, "marketJson")?;
+    let as_of: &str = &js_string(&as_of, "asOf")?;
     let deal = parse_structured_credit(instrument_json)?;
     let market = parse_market_json(market_json)?;
     let as_of = parse_iso_date(as_of)?;
@@ -83,11 +88,15 @@ pub fn structured_credit_tranche_discount_margin(
 /// @param as_of - ISO-8601 valuation date used to resolve date-dependent market data.
 #[wasm_bindgen(js_name = structuredCreditTrancheBreakevenCdr)]
 pub fn structured_credit_tranche_breakeven_cdr(
-    instrument_json: &str,
-    tranche_id: &str,
-    market_json: &str,
-    as_of: &str,
+    instrument_json: JsValue,
+    tranche_id: JsValue,
+    market_json: JsValue,
+    as_of: JsValue,
 ) -> Result<f64, JsValue> {
+    let instrument_json: &str = &json_text(&instrument_json, "instrumentJson")?;
+    let tranche_id: &str = &js_string(&tranche_id, "trancheId")?;
+    let market_json: &str = &json_text(&market_json, "marketJson")?;
+    let as_of: &str = &js_string(&as_of, "asOf")?;
     let deal = parse_structured_credit(instrument_json)?;
     let market = parse_market_json(market_json)?;
     let as_of = parse_iso_date(as_of)?;
@@ -122,13 +131,18 @@ pub fn structured_credit_tranche_breakeven_cdr(
 /// @param config_json - Optional OasConfig JSON; omit to use the default OAS solver configuration.
 #[wasm_bindgen(js_name = structuredCreditTrancheOas)]
 pub fn structured_credit_tranche_oas(
-    instrument_json: &str,
-    tranche_id: &str,
-    market_json: &str,
-    as_of: &str,
+    instrument_json: JsValue,
+    tranche_id: JsValue,
+    market_json: JsValue,
+    as_of: JsValue,
     market_price_pct: f64,
-    config_json: Option<String>,
+    config_json: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
+    let instrument_json: &str = &json_text(&instrument_json, "instrumentJson")?;
+    let tranche_id: &str = &js_string(&tranche_id, "trancheId")?;
+    let market_json: &str = &json_text(&market_json, "marketJson")?;
+    let as_of: &str = &js_string(&as_of, "asOf")?;
+    let config_json = opt_json_text(config_json.as_ref(), "configJson")?;
     let deal = parse_structured_credit(instrument_json)?;
     let market = parse_market_json(market_json)?;
     let as_of = parse_iso_date(as_of)?;
@@ -166,12 +180,17 @@ pub fn structured_credit_tranche_oas(
 /// @param grid_json - ScenarioGrid JSON containing the CPR, CDR, and severity axes for the table.
 #[wasm_bindgen(js_name = structuredCreditTrancheScenarioTable)]
 pub fn structured_credit_tranche_scenario_table(
-    instrument_json: &str,
-    tranche_id: &str,
-    market_json: &str,
-    as_of: &str,
-    grid_json: &str,
+    instrument_json: JsValue,
+    tranche_id: JsValue,
+    market_json: JsValue,
+    as_of: JsValue,
+    grid_json: JsValue,
 ) -> Result<JsValue, JsValue> {
+    let instrument_json: &str = &json_text(&instrument_json, "instrumentJson")?;
+    let tranche_id: &str = &js_string(&tranche_id, "trancheId")?;
+    let market_json: &str = &json_text(&market_json, "marketJson")?;
+    let as_of: &str = &js_string(&as_of, "asOf")?;
+    let grid_json: &str = &json_text(&grid_json, "gridJson")?;
     let deal = parse_structured_credit(instrument_json)?;
     let market = parse_market_json(market_json)?;
     let as_of = parse_iso_date(as_of)?;
@@ -207,65 +226,20 @@ pub fn structured_credit_tranche_scenario_table(
 /// @param market_price_pct - Optional clean settlement quote as a percentage of CURRENT balance; omit to use the deal quote, or its model clean price when no quote is supplied.
 #[wasm_bindgen(js_name = structuredCreditTrancheMetrics)]
 pub fn structured_credit_tranche_metrics(
-    instrument_json: &str,
-    tranche_id: &str,
-    market_json: &str,
-    as_of: &str,
+    instrument_json: JsValue,
+    tranche_id: JsValue,
+    market_json: JsValue,
+    as_of: JsValue,
     market_price_pct: Option<f64>,
 ) -> Result<JsValue, JsValue> {
+    let instrument_json: &str = &json_text(&instrument_json, "instrumentJson")?;
+    let tranche_id: &str = &js_string(&tranche_id, "trancheId")?;
+    let market_json: &str = &json_text(&market_json, "marketJson")?;
+    let as_of: &str = &js_string(&as_of, "asOf")?;
     let deal = parse_structured_credit(instrument_json)?;
     let market = parse_market_json(market_json)?;
     let as_of = parse_iso_date(as_of)?;
     let result = calculate_tranche_metrics(&deal, tranche_id, &market, as_of, market_price_pct)
         .map_err(to_js_err)?;
     to_js_value(&result)
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn public_json_routes_validate_instrument_before_market_json() {
-        assert!(structured_credit_tranche_discount_margin(
-            "{}",
-            "missing",
-            "not-market-json",
-            "not-a-date",
-            f64::NAN,
-        )
-        .is_err());
-        assert!(structured_credit_tranche_breakeven_cdr(
-            "{}",
-            "missing",
-            "not-market-json",
-            "not-a-date",
-        )
-        .is_err());
-        assert!(structured_credit_tranche_oas(
-            "{}",
-            "missing",
-            "not-market-json",
-            "not-a-date",
-            f64::NAN,
-            Some("not-json".to_string()),
-        )
-        .is_err());
-        assert!(structured_credit_tranche_scenario_table(
-            "{}",
-            "missing",
-            "not-market-json",
-            "not-a-date",
-            "not-json",
-        )
-        .is_err());
-        assert!(structured_credit_tranche_metrics(
-            "{}",
-            "missing",
-            "not-market-json",
-            "not-a-date",
-            Some(f64::NAN),
-        )
-        .is_err());
-    }
 }

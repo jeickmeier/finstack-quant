@@ -6,6 +6,7 @@ use finstack_quant_wasm::api::{
     cashflows,
     valuations::pricing::{bond_from_cashflows_json, price_instrument},
 };
+use wasm_bindgen::JsValue;
 use wasm_bindgen_test::*;
 
 fn cashflow_spec_json() -> String {
@@ -190,30 +191,44 @@ fn floating_market_context_json() -> String {
 
 #[wasm_bindgen_test]
 fn cashflows_json_bridge_builds_accrues_and_prices_custom_bond() {
-    let schedule_json = cashflows::build_cashflow_schedule_json(&cashflow_spec_json(), None)
-        .expect("schedule should build");
-    let validated =
-        cashflows::validate_cashflow_schedule_json(&schedule_json).expect("valid schedule");
+    let schedule_json =
+        cashflows::build_cashflow_schedule_json(JsValue::from(&cashflow_spec_json()), None)
+            .expect("schedule should build");
+    let validated = cashflows::validate_cashflow_schedule_json(JsValue::from(&schedule_json))
+        .expect("valid schedule");
     assert_eq!(
         serde_json::from_str::<serde_json::Value>(&schedule_json).unwrap(),
         serde_json::from_str::<serde_json::Value>(&validated).unwrap()
     );
-    let flows_json = cashflows::dated_flows_json(&schedule_json).expect("dated flows");
+    let flows_json =
+        cashflows::dated_flows_json(JsValue::from(&schedule_json)).expect("dated flows");
     let flows: Vec<serde_json::Value> = serde_json::from_str(&flows_json).unwrap();
     let schedule: serde_json::Value = serde_json::from_str(&schedule_json).unwrap();
     assert_eq!(flows.len(), schedule["flows"].as_array().unwrap().len());
-    assert!(cashflows::accrued_interest(&schedule_json, "2025-02-28", None).unwrap() > 0.0);
+    assert!(
+        cashflows::accrued_interest(
+            JsValue::from(&schedule_json),
+            JsValue::from("2025-02-28"),
+            None
+        )
+        .unwrap()
+            > 0.0
+    );
 
-    let instrument_json =
-        bond_from_cashflows_json("CUSTOM-CF", &schedule_json, "USD-OIS", Some(99.0))
-            .expect("bond JSON");
+    let instrument_json = bond_from_cashflows_json(
+        JsValue::from("CUSTOM-CF"),
+        JsValue::from(&schedule_json),
+        JsValue::from("USD-OIS"),
+        Some(99.0),
+    )
+    .expect("bond JSON");
     // `priceInstrument` hands back a structured JS object; stringify to decode
     // it (a `Map` would collapse to `{}` and fail the assertion below).
     let priced = price_instrument(
-        &instrument_json,
-        &market_context_json(),
-        "2024-09-03",
-        Some("discounting".to_string()),
+        JsValue::from(&instrument_json),
+        JsValue::from(&market_context_json()),
+        JsValue::from("2024-09-03"),
+        Some(JsValue::from("discounting".to_string())),
         None,
         None,
         None,
@@ -229,8 +244,8 @@ fn cashflows_json_bridge_builds_accrues_and_prices_custom_bond() {
 #[wasm_bindgen_test]
 fn cashflows_json_bridge_builds_floating_schedule_with_market_json() {
     let schedule_json = cashflows::build_cashflow_schedule_json(
-        &floating_cashflow_spec_json(),
-        Some(floating_market_context_json()),
+        JsValue::from(&floating_cashflow_spec_json()),
+        Some(JsValue::from(floating_market_context_json())),
     )
     .expect("floating schedule should build with market");
     let schedule: serde_json::Value = serde_json::from_str(&schedule_json).unwrap();
@@ -250,7 +265,7 @@ fn cashflows_json_bridge_builds_floating_schedule_with_market_json() {
 #[wasm_bindgen_test]
 fn cashflows_json_bridge_builds_step_up_with_payment_program() {
     let schedule_json =
-        cashflows::build_cashflow_schedule_json(&step_up_cashflow_spec_json(), None)
+        cashflows::build_cashflow_schedule_json(JsValue::from(&step_up_cashflow_spec_json()), None)
             .expect("step-up schedule builds");
     let schedule: serde_json::Value =
         serde_json::from_str(&schedule_json).expect("schedule JSON parses");
@@ -275,7 +290,7 @@ fn cashflows_json_bridge_builds_fixed_to_float_and_explicit_windows() {
         }]),
         serde_json::json!([]),
     );
-    let schedule = cashflows::build_cashflow_schedule_json(&fixed_to_float, None)
+    let schedule = cashflows::build_cashflow_schedule_json(JsValue::from(&fixed_to_float), None)
         .expect("fixed-to-float schedule builds");
     let schedule: serde_json::Value = serde_json::from_str(&schedule).expect("schedule parses");
     let kinds: std::collections::HashSet<_> = schedule["flows"]
@@ -312,7 +327,7 @@ fn cashflows_json_bridge_builds_fixed_to_float_and_explicit_windows() {
         ]),
         serde_json::json!([]),
     );
-    cashflows::build_cashflow_schedule_json(&explicit_windows, None)
+    cashflows::build_cashflow_schedule_json(JsValue::from(&explicit_windows), None)
         .expect("explicit fixed/floating windows build");
 }
 
@@ -346,15 +361,16 @@ fn cashflows_json_bridge_reports_overlapping_payment_windows() {
             },
         ]),
     );
-    let error = cashflows::build_cashflow_schedule_json(&spec, None)
+    let error = cashflows::build_cashflow_schedule_json(JsValue::from(&spec), None)
         .expect_err("overlapping payment windows fail");
     assert!(format!("{error:?}").contains("overlapping payment windows"));
 }
 
 #[wasm_bindgen_test]
 fn cashflows_json_bridge_accepts_config_and_missing_quoted_clean_price_pct() {
-    let schedule_json = cashflows::build_cashflow_schedule_json(&cashflow_spec_json(), None)
-        .expect("schedule should build");
+    let schedule_json =
+        cashflows::build_cashflow_schedule_json(JsValue::from(&cashflow_spec_json()), None)
+            .expect("schedule should build");
     let config_json = serde_json::json!({
         "method": "linear",
         "include_pik": true,
@@ -363,29 +379,46 @@ fn cashflows_json_bridge_accepts_config_and_missing_quoted_clean_price_pct() {
     .to_string();
 
     assert!(
-        cashflows::accrued_interest(&schedule_json, "2025-02-28", Some(config_json)).unwrap() > 0.0
+        cashflows::accrued_interest(
+            JsValue::from(&schedule_json),
+            JsValue::from("2025-02-28"),
+            Some(JsValue::from(config_json))
+        )
+        .unwrap()
+            > 0.0
     );
 
-    let instrument_json =
-        bond_from_cashflows_json("CUSTOM-CF-NO-QUOTE", &schedule_json, "USD-OIS", None)
-            .expect("bond JSON");
+    let instrument_json = bond_from_cashflows_json(
+        JsValue::from("CUSTOM-CF-NO-QUOTE"),
+        JsValue::from(&schedule_json),
+        JsValue::from("USD-OIS"),
+        None,
+    )
+    .expect("bond JSON");
     let instrument: serde_json::Value = serde_json::from_str(&instrument_json).unwrap();
     assert_eq!(instrument["instrument"]["spec"]["id"], "CUSTOM-CF-NO-QUOTE");
 }
 
 #[wasm_bindgen_test]
 fn cashflows_json_bridge_rejects_bad_inputs() {
-    let schedule_json = cashflows::build_cashflow_schedule_json(&cashflow_spec_json(), None)
-        .expect("schedule should build");
+    let schedule_json =
+        cashflows::build_cashflow_schedule_json(JsValue::from(&cashflow_spec_json()), None)
+            .expect("schedule should build");
 
-    assert!(cashflows::validate_cashflow_schedule_json("{not json").is_err());
-    assert!(cashflows::accrued_interest(&schedule_json, "2025-02-30", None).is_err());
+    assert!(cashflows::validate_cashflow_schedule_json(JsValue::from("{not json")).is_err());
+    assert!(cashflows::accrued_interest(
+        JsValue::from(&schedule_json),
+        JsValue::from("2025-02-30"),
+        None
+    )
+    .is_err());
 }
 
 #[wasm_bindgen_test]
 fn cashflows_json_bridge_rejects_amortization_over_notional() {
-    let schedule_json = cashflows::build_cashflow_schedule_json(&cashflow_spec_json(), None)
-        .expect("schedule should build");
+    let schedule_json =
+        cashflows::build_cashflow_schedule_json(JsValue::from(&cashflow_spec_json()), None)
+            .expect("schedule should build");
     let mut schedule: serde_json::Value = serde_json::from_str(&schedule_json).unwrap();
     schedule["flows"]
         .as_array_mut()
@@ -399,5 +432,7 @@ fn cashflows_json_bridge_rejects_amortization_over_notional() {
             "rate": null,
         }));
 
-    assert!(cashflows::validate_cashflow_schedule_json(&schedule.to_string()).is_err());
+    assert!(
+        cashflows::validate_cashflow_schedule_json(JsValue::from(&schedule.to_string())).is_err()
+    );
 }

@@ -1,5 +1,6 @@
 //! WASM bindings for date utilities from [`finstack_quant_core::dates`].
 
+use crate::utils::input::{js_bool, js_epoch_days, js_int, js_string, js_uint};
 use crate::utils::to_js_err;
 use finstack_quant_core::dates::{
     adjust as core_adjust, available_calendars as core_available_calendars,
@@ -54,10 +55,11 @@ impl JsDayCountContext {
     /// @param calendar_code - Registered holiday-calendar identifier used by the Bus/252 convention.
     /// @returns A new `DayCountContext` handle.
     #[wasm_bindgen(js_name = withCalendar)]
-    pub fn with_calendar(&self, calendar_code: &str) -> JsDayCountContext {
+    pub fn with_calendar(&self, calendar_code: JsValue) -> Result<JsDayCountContext, JsValue> {
+        let calendar_code: &str = &js_string(&calendar_code, "calendarCode")?;
         let mut next = self.clone();
         next.inner.calendar_id = Some(calendar_code.to_string());
-        next
+        Ok(next)
     }
 
     /// Return a copy with the coupon frequency used by Act/Act ISMA.
@@ -74,10 +76,11 @@ impl JsDayCountContext {
     /// @param bus_basis - Business-day denominator for Bus/252, normally 252.
     /// @returns A new `DayCountContext` handle.
     #[wasm_bindgen(js_name = withBusBasis)]
-    pub fn with_bus_basis(&self, bus_basis: u16) -> JsDayCountContext {
+    pub fn with_bus_basis(&self, bus_basis: JsValue) -> Result<JsDayCountContext, JsValue> {
+        let bus_basis: u16 = js_uint(&bus_basis, "busBasis")?;
         let mut next = self.clone();
         next.inner.bus_basis = Some(bus_basis);
-        next
+        Ok(next)
     }
 
     /// Return a copy with the reference coupon period (epoch days) used by
@@ -94,11 +97,11 @@ impl JsDayCountContext {
     #[wasm_bindgen(js_name = withCouponPeriod)]
     pub fn with_coupon_period(
         &self,
-        start_epoch_days: i32,
-        end_epoch_days: i32,
+        start_epoch_days: JsValue,
+        end_epoch_days: JsValue,
     ) -> Result<JsDayCountContext, JsValue> {
-        let start = epoch_to_date(start_epoch_days)?;
-        let end = epoch_to_date(end_epoch_days)?;
+        let start = js_epoch_days(&start_epoch_days, "startEpochDays")?;
+        let end = js_epoch_days(&end_epoch_days, "endEpochDays")?;
         let validated = RustDayCountContext::default()
             .with_coupon_period(start, end)
             .map_err(to_js_err)?;
@@ -112,10 +115,14 @@ impl JsDayCountContext {
     /// @param value - Whether the accrual end is the contractual termination date for 30E/360 ISDA.
     /// @returns A new `DayCountContext` handle.
     #[wasm_bindgen(js_name = withEndIsTerminationDate)]
-    pub fn with_end_is_termination_date(&self, value: bool) -> JsDayCountContext {
+    pub fn with_end_is_termination_date(
+        &self,
+        value: JsValue,
+    ) -> Result<JsDayCountContext, JsValue> {
+        let value = js_bool(&value, "value")?;
         let mut next = self.clone();
         next.inner.end_is_termination_date = value;
-        next
+        Ok(next)
     }
 }
 
@@ -160,7 +167,8 @@ impl JsDayCount {
     /// @returns The parsed `DayCount`.
     /// @throws If `name` is not a recognized day-count convention.
     #[wasm_bindgen(constructor)]
-    pub fn new(name: &str) -> Result<JsDayCount, JsValue> {
+    pub fn new(name: JsValue) -> Result<JsDayCount, JsValue> {
+        let name: &str = &js_string(&name, "name")?;
         name.parse::<RustDayCount>()
             .map(|inner| JsDayCount { inner })
             .map_err(to_js_err)
@@ -297,11 +305,11 @@ impl JsDayCount {
     #[wasm_bindgen(js_name = yearFraction)]
     pub fn year_fraction(
         &self,
-        start_epoch_days: i32,
-        end_epoch_days: i32,
+        start_epoch_days: JsValue,
+        end_epoch_days: JsValue,
     ) -> Result<f64, JsValue> {
-        let start = epoch_to_date(start_epoch_days)?;
-        let end = epoch_to_date(end_epoch_days)?;
+        let start = crate::utils::input::js_epoch_days(&start_epoch_days, "startEpochDays")?;
+        let end = crate::utils::input::js_epoch_days(&end_epoch_days, "endEpochDays")?;
         self.inner
             .year_fraction(start, end, RustDayCountContext::default())
             .map_err(to_js_err)
@@ -320,11 +328,11 @@ impl JsDayCount {
     #[wasm_bindgen(js_name = signedYearFraction)]
     pub fn signed_year_fraction(
         &self,
-        start_epoch_days: i32,
-        end_epoch_days: i32,
+        start_epoch_days: JsValue,
+        end_epoch_days: JsValue,
     ) -> Result<f64, JsValue> {
-        let start = epoch_to_date(start_epoch_days)?;
-        let end = epoch_to_date(end_epoch_days)?;
+        let start = js_epoch_days(&start_epoch_days, "startEpochDays")?;
+        let end = js_epoch_days(&end_epoch_days, "endEpochDays")?;
         self.inner
             .signed_year_fraction(start, end, RustDayCountContext::default())
             .map_err(to_js_err)
@@ -344,12 +352,12 @@ impl JsDayCount {
     #[wasm_bindgen(js_name = yearFractionWithContext)]
     pub fn year_fraction_with_context(
         &self,
-        start_epoch_days: i32,
-        end_epoch_days: i32,
+        start_epoch_days: JsValue,
+        end_epoch_days: JsValue,
         ctx: &JsDayCountContext,
     ) -> Result<f64, JsValue> {
-        let start = epoch_to_date(start_epoch_days)?;
-        let end = epoch_to_date(end_epoch_days)?;
+        let start = js_epoch_days(&start_epoch_days, "startEpochDays")?;
+        let end = js_epoch_days(&end_epoch_days, "endEpochDays")?;
         self.inner
             .year_fraction(start, end, ctx.to_rust_ctx()?)
             .map_err(to_js_err)
@@ -367,11 +375,11 @@ impl JsDayCount {
     #[wasm_bindgen(js_name = calendarDays)]
     pub fn calendar_days(
         &self,
-        start_epoch_days: i32,
-        end_epoch_days: i32,
+        start_epoch_days: JsValue,
+        end_epoch_days: JsValue,
     ) -> Result<i64, JsValue> {
-        let start = epoch_to_date(start_epoch_days)?;
-        let end = epoch_to_date(end_epoch_days)?;
+        let start = js_epoch_days(&start_epoch_days, "startEpochDays")?;
+        let end = js_epoch_days(&end_epoch_days, "endEpochDays")?;
         Ok(RustDayCount::calendar_days(start, end))
     }
 
@@ -415,7 +423,8 @@ impl JsTenor {
     /// @returns The parsed `Tenor`.
     /// @throws If `s` cannot be parsed (unknown unit, missing count).
     #[wasm_bindgen(constructor)]
-    pub fn new(s: &str) -> Result<JsTenor, JsValue> {
+    pub fn new(s: JsValue) -> Result<JsTenor, JsValue> {
+        let s: &str = &js_string(&s, "s")?;
         RustTenor::parse(s)
             .map(|inner| JsTenor { inner })
             .map_err(to_js_err)
@@ -499,7 +508,10 @@ impl JsTenor {
 /// Throws a JavaScript exception if `month` is outside `1..=12` or the supplied
 /// year, month, and day do not form a representable calendar date.
 #[wasm_bindgen(js_name = createDate)]
-pub fn create_date(year: i32, month: u8, day: u8) -> Result<i32, JsValue> {
+pub fn create_date(year: JsValue, month: JsValue, day: JsValue) -> Result<i32, JsValue> {
+    let year: i32 = js_int(&year, "year")?;
+    let month: u8 = js_uint(&month, "month")?;
+    let day: u8 = js_uint(&day, "day")?;
     let m = time::Month::try_from(month).map_err(to_js_err)?;
     let date = finstack_quant_core::dates::create_date(year, m, day).map_err(to_js_err)?;
     Ok(finstack_quant_core::dates::days_since_epoch(date))
@@ -513,9 +525,8 @@ pub fn create_date(year: i32, month: u8, day: u8) -> Result<i32, JsValue> {
 /// Throws a JavaScript exception if `days` is outside the representable date
 /// range.
 #[wasm_bindgen(js_name = dateFromEpochDays)]
-pub fn date_from_epoch_days(days: i32) -> Result<Vec<i32>, JsValue> {
-    let date = finstack_quant_core::dates::date_from_epoch_days(days)
-        .ok_or_else(|| to_js_err("epoch days out of valid date range"))?;
+pub fn date_from_epoch_days(days: JsValue) -> Result<Vec<i32>, JsValue> {
+    let date = js_epoch_days(&days, "days")?;
     Ok(vec![date.year(), date.month() as i32, date.day() as i32])
 }
 
@@ -532,8 +543,14 @@ pub fn date_from_epoch_days(days: i32) -> Result<Vec<i32>, JsValue> {
 /// range, `convention` is unrecognized, `calendarCode` is unknown, or adjustment
 /// cannot produce a representable business date.
 #[wasm_bindgen(js_name = adjust)]
-pub fn adjust(epoch_days: i32, convention: &str, calendar_code: &str) -> Result<i32, JsValue> {
-    let date = epoch_to_date(epoch_days)?;
+pub fn adjust(
+    epoch_days: JsValue,
+    convention: JsValue,
+    calendar_code: JsValue,
+) -> Result<i32, JsValue> {
+    let convention: &str = &js_string(&convention, "convention")?;
+    let calendar_code: &str = &js_string(&calendar_code, "calendarCode")?;
+    let date = js_epoch_days(&epoch_days, "epochDays")?;
     let business_day_convention: BusinessDayConvention =
         convention.parse().map_err(|e: String| to_js_err(e))?;
     let cal = rust_resolve_calendar(Some(calendar_code)).map_err(to_js_err)?;
@@ -549,30 +566,9 @@ pub fn available_calendars() -> Vec<String> {
         .map(|s| s.to_string())
         .collect()
 }
-
-/// Convert epoch days to a `time::Date`.
-fn epoch_to_date(days: i32) -> Result<time::Date, JsValue> {
-    finstack_quant_core::dates::date_from_epoch_days(days)
-        .ok_or_else(|| to_js_err("epoch days out of valid date range"))
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    fn epoch(y: i32, m: u8, d: u8) -> i32 {
-        let month = time::Month::try_from(m).expect("valid month");
-        let date = finstack_quant_core::dates::create_date(y, month, d).expect("valid date");
-        finstack_quant_core::dates::days_since_epoch(date)
-    }
-
-    fn jan15() -> i32 {
-        epoch(2024, 1, 15)
-    }
-
-    fn jul15() -> i32 {
-        epoch(2024, 7, 15)
-    }
 
     // -- JsDayCount -----------------------------------------------------------
 
@@ -600,43 +596,6 @@ mod tests {
         assert_eq!(day_count.to_string(), "bus_252");
     }
 
-    #[test]
-    fn thirty_e_360_isda_uses_termination_context() {
-        let start = epoch(2025, 1, 31);
-        let end = epoch(2025, 2, 28);
-        let day_count = JsDayCount::thirty_e360_isda();
-        let regular = day_count
-            .year_fraction_with_context(start, end, &JsDayCountContext::new())
-            .expect("regular period");
-        let terminal_ctx = JsDayCountContext::new().with_end_is_termination_date(true);
-        let terminal = day_count
-            .year_fraction_with_context(start, end, &terminal_ctx)
-            .expect("terminal period");
-
-        assert!((regular - 30.0 / 360.0).abs() < 1e-12);
-        assert!((terminal - 28.0 / 360.0).abs() < 1e-12);
-    }
-
-    #[test]
-    fn daycount_from_string() {
-        let day_count = JsDayCount::new("act_360").expect("valid");
-        assert_eq!(day_count.to_string(), "act_360");
-    }
-
-    #[test]
-    fn year_fraction_act365f() {
-        let day_count = JsDayCount::act365f();
-        let yf = day_count.year_fraction(jan15(), jul15()).expect("valid");
-        assert!(yf > 0.49 && yf < 0.51, "yf={yf}");
-    }
-
-    #[test]
-    fn calendar_days() {
-        let day_count = JsDayCount::act365f();
-        let days = day_count.calendar_days(jan15(), jul15()).expect("valid");
-        assert_eq!(days, (jul15() - jan15()) as i64);
-    }
-
     // -- JsTenor --------------------------------------------------------------
 
     #[test]
@@ -650,19 +609,6 @@ mod tests {
     }
 
     #[test]
-    fn tenor_parse() {
-        let t = JsTenor::new("3M").expect("valid");
-        assert_eq!(t.count(), 3);
-        assert!(t.to_years() > 0.24 && t.to_years() < 0.26);
-    }
-
-    #[test]
-    fn tenor_parse_year() {
-        let t = JsTenor::new("1Y").expect("valid");
-        assert!((t.to_years() - 1.0).abs() < 0.01);
-    }
-
-    #[test]
     fn tenor_to_string() {
         let t = JsTenor::quarterly();
         let s = t.to_string();
@@ -672,42 +618,9 @@ mod tests {
     // -- Free functions -----------------------------------------------------
 
     #[test]
-    fn create_date_valid() {
-        let e = create_date(2024, 1, 15).expect("valid");
-        assert_eq!(e, jan15());
-    }
-
-    #[test]
-    fn date_from_epoch_days_roundtrip() {
-        let parts = date_from_epoch_days(jan15()).expect("valid");
-        assert_eq!(parts, vec![2024, 1, 15]);
-    }
-
-    #[test]
     fn available_calendars_not_empty() {
         let cals = available_calendars();
         assert!(!cals.is_empty());
-    }
-
-    #[test]
-    fn epoch_to_date_via_core() {
-        let d = finstack_quant_core::dates::date_from_epoch_days(jan15()).expect("valid");
-        assert_eq!(d.year(), 2024);
-    }
-
-    #[test]
-    fn year_fraction_act360() {
-        let day_count = JsDayCount::act360();
-        let yf = day_count.year_fraction(jan15(), jul15()).expect("valid");
-        let days = (jul15() - jan15()) as f64;
-        assert!((yf - days / 360.0).abs() < 1e-10);
-    }
-
-    #[test]
-    fn year_fraction_thirty360() {
-        let day_count = JsDayCount::thirty360();
-        let yf = day_count.year_fraction(jan15(), jul15()).expect("valid");
-        assert!(yf > 0.0);
     }
 
     #[test]

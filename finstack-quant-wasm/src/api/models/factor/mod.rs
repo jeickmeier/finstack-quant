@@ -13,6 +13,7 @@
 //!   model).
 //! - JSON string `'{"n_steps": N}'` — variance scaled by `N`.
 
+use crate::utils::input::{js_opt_bool, js_string, js_uint, json_text, opt_json_text};
 use crate::utils::{to_js_err, to_js_value};
 use wasm_bindgen::prelude::*;
 
@@ -64,7 +65,8 @@ impl JsCreditFactorModel {
     /// Throws if the JSON is malformed or fails validation.
     /// @param json - JSON-serialized CreditFactorModel to deserialize.
     #[wasm_bindgen(js_name = fromJson)]
-    pub fn from_json(json: &str) -> Result<JsCreditFactorModel, JsValue> {
+    pub fn from_json(json: JsValue) -> Result<JsCreditFactorModel, JsValue> {
+        let json: &str = &json_text(&json, "json")?;
         let inner: finstack_quant_models::factor::credit::hierarchy::CreditFactorModel =
             serde_json::from_str(json).map_err(to_js_err)?;
         inner.validate().map_err(to_js_err)?;
@@ -106,7 +108,8 @@ impl JsCreditCalibrator {
     /// Throws if `config_json` is not a valid `CreditCalibrationConfig`.
     /// @param config_json - Credit-factor calibration configuration JSON controlling model fitting.
     #[wasm_bindgen(constructor)]
-    pub fn new(config_json: &str) -> Result<JsCreditCalibrator, JsValue> {
+    pub fn new(config_json: JsValue) -> Result<JsCreditCalibrator, JsValue> {
+        let config_json: &str = &json_text(&config_json, "configJson")?;
         let config: finstack_quant_models::factor::credit::calibration::CreditCalibrationConfig =
             serde_json::from_str(config_json).map_err(to_js_err)?;
         Ok(Self {
@@ -123,7 +126,8 @@ impl JsCreditCalibrator {
     /// # Errors
     /// Throws if inputs are structurally invalid or calibration fails.
     /// @param inputs_json - Credit-factor calibration input JSON containing issuers, spreads, and observations.
-    pub fn calibrate(&self, inputs_json: &str) -> Result<JsCreditFactorModel, JsValue> {
+    pub fn calibrate(&self, inputs_json: JsValue) -> Result<JsCreditFactorModel, JsValue> {
+        let inputs_json: &str = &json_text(&inputs_json, "inputsJson")?;
         let inputs: finstack_quant_models::factor::credit::calibration::CreditCalibrationInputs =
             serde_json::from_str(inputs_json).map_err(to_js_err)?;
         let model = self.inner.calibrate(inputs).map_err(to_js_err)?;
@@ -158,7 +162,8 @@ impl JsLevelsAtDate {
     /// @param json - Canonical `LevelsAtDate` JSON.
     /// @returns A validated `LevelsAtDate` handle.
     #[wasm_bindgen(js_name = fromJson)]
-    pub fn from_json(json: &str) -> Result<JsLevelsAtDate, JsValue> {
+    pub fn from_json(json: JsValue) -> Result<JsLevelsAtDate, JsValue> {
+        let json: &str = &json_text(&json, "json")?;
         let inner: finstack_quant_models::factor::credit::decomposition::LevelsAtDate =
             serde_json::from_str(json).map_err(to_js_err)?;
         inner.validate().map_err(to_js_err)?;
@@ -208,7 +213,8 @@ impl JsLevelsAtDate {
     /// @param levelIndex - Zero-based hierarchy level index.
     /// @returns A bucket-name to factor-level mapping in basis points.
     #[wasm_bindgen(js_name = levelValues)]
-    pub fn level_values(&self, level_index: usize) -> Result<JsValue, JsValue> {
+    pub fn level_values(&self, level_index: JsValue) -> Result<JsValue, JsValue> {
+        let level_index: usize = js_uint(&level_index, "levelIndex")?;
         let level = self.inner.level(level_index).map_err(to_js_err)?;
         to_js_value(&level.values)
     }
@@ -249,7 +255,8 @@ impl JsPeriodDecomposition {
     /// @param json - Canonical `PeriodDecomposition` JSON.
     /// @returns A validated `PeriodDecomposition` handle.
     #[wasm_bindgen(js_name = fromJson)]
-    pub fn from_json(json: &str) -> Result<JsPeriodDecomposition, JsValue> {
+    pub fn from_json(json: JsValue) -> Result<JsPeriodDecomposition, JsValue> {
+        let json: &str = &json_text(&json, "json")?;
         let inner: finstack_quant_models::factor::credit::decomposition::PeriodDecomposition =
             serde_json::from_str(json).map_err(to_js_err)?;
         inner.validate().map_err(to_js_err)?;
@@ -305,7 +312,8 @@ impl JsPeriodDecomposition {
     /// @param levelIndex - Zero-based hierarchy level index.
     /// @returns A bucket-name to factor-change mapping in basis points.
     #[wasm_bindgen(js_name = levelDeltas)]
-    pub fn level_deltas(&self, level_index: usize) -> Result<JsValue, JsValue> {
+    pub fn level_deltas(&self, level_index: JsValue) -> Result<JsValue, JsValue> {
+        let level_index: usize = js_uint(&level_index, "levelIndex")?;
         let level = self.inner.level(level_index).map_err(to_js_err)?;
         to_js_value(&level.deltas)
     }
@@ -354,11 +362,14 @@ impl JsPeriodDecomposition {
 #[wasm_bindgen(js_name = decomposeLevels)]
 pub fn decompose_levels(
     model: &JsCreditFactorModel,
-    observed_spreads_json: &str,
+    observed_spreads_json: JsValue,
     observed_generic: f64,
-    as_of: &str,
-    runtime_tags_json: Option<String>,
+    as_of: JsValue,
+    runtime_tags_json: Option<JsValue>,
 ) -> Result<JsLevelsAtDate, JsValue> {
+    let observed_spreads_json: &str = &json_text(&observed_spreads_json, "observedSpreadsJson")?;
+    let as_of: &str = &js_string(&as_of, "asOf")?;
+    let runtime_tags_json = opt_json_text(runtime_tags_json.as_ref(), "runtimeTagsJson")?;
     let observed_spreads: std::collections::BTreeMap<finstack_quant_core::types::IssuerId, f64> =
         serde_json::from_str(observed_spreads_json).map_err(to_js_err)?;
 
@@ -445,7 +456,8 @@ impl JsFactorCovarianceForecast {
     /// @returns Structured covariance matrix with ordered factor axes and row-major data.
     /// @param horizon_json - JSON-serialized forecast horizon defining the future covariance date or period.
     #[wasm_bindgen(js_name = covarianceAt)]
-    pub fn covariance_at(&self, horizon_json: &str) -> Result<JsValue, JsValue> {
+    pub fn covariance_at(&self, horizon_json: JsValue) -> Result<JsValue, JsValue> {
+        let horizon_json: &str = &json_text(&horizon_json, "horizonJson")?;
         let h = parse_vol_horizon(horizon_json)?;
         let forecast =
             finstack_quant_models::factor::credit::FactorCovarianceForecast::new(&self.model);
@@ -463,7 +475,13 @@ impl JsFactorCovarianceForecast {
     /// @param issuer_id - Stable issuer identifier used to select the required domain object.
     /// @param horizon_json - JSON-serialized forecast horizon defining the future covariance date or period.
     #[wasm_bindgen(js_name = idiosyncraticVol)]
-    pub fn idiosyncratic_vol(&self, issuer_id: &str, horizon_json: &str) -> Result<f64, JsValue> {
+    pub fn idiosyncratic_vol(
+        &self,
+        issuer_id: JsValue,
+        horizon_json: JsValue,
+    ) -> Result<f64, JsValue> {
+        let issuer_id: &str = &js_string(&issuer_id, "issuerId")?;
+        let horizon_json: &str = &json_text(&horizon_json, "horizonJson")?;
         let h = parse_vol_horizon(horizon_json)?;
         let id = finstack_quant_core::types::IssuerId::new(issuer_id);
         let forecast =
@@ -485,9 +503,11 @@ impl JsFactorCovarianceForecast {
     #[wasm_bindgen(js_name = factorModelAt)]
     pub fn factor_model_at(
         &self,
-        horizon_json: &str,
-        risk_measure_json: &str,
+        horizon_json: JsValue,
+        risk_measure_json: JsValue,
     ) -> Result<JsValue, JsValue> {
+        let horizon_json: &str = &json_text(&horizon_json, "horizonJson")?;
+        let risk_measure_json: &str = &json_text(&risk_measure_json, "riskMeasureJson")?;
         let h = parse_vol_horizon(horizon_json)?;
         let measure: finstack_quant_models::factor::RiskMeasure =
             serde_json::from_str(risk_measure_json).map_err(to_js_err)?;
@@ -528,12 +548,16 @@ impl JsFactorCovarianceForecast {
 /// in `(0.5, 1)`; or the result cannot be converted to a JavaScript value.
 #[wasm_bindgen(js_name = parametricVarDecomposition)]
 pub fn parametric_var_decomposition(
-    position_ids_json: &str,
-    weights_json: &str,
-    covariance_json: &str,
+    position_ids_json: JsValue,
+    weights_json: JsValue,
+    covariance_json: JsValue,
     confidence: f64,
-    compute_incremental: Option<bool>,
+    compute_incremental: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
+    let position_ids_json: &str = &json_text(&position_ids_json, "positionIdsJson")?;
+    let weights_json: &str = &json_text(&weights_json, "weightsJson")?;
+    let covariance_json: &str = &json_text(&covariance_json, "covarianceJson")?;
+    let compute_incremental = js_opt_bool(compute_incremental.as_ref(), "computeIncremental")?;
     use finstack_quant_models::factor::risk::{
         parametric_var_decomposition_view, DecompositionConfig, ParametricPositionDecomposer,
     };
@@ -579,11 +603,14 @@ pub fn parametric_var_decomposition(
 /// in `(0.5, 1)`; or the result cannot be converted to a JavaScript value.
 #[wasm_bindgen(js_name = parametricEsDecomposition)]
 pub fn parametric_es_decomposition(
-    position_ids_json: &str,
-    weights_json: &str,
-    covariance_json: &str,
+    position_ids_json: JsValue,
+    weights_json: JsValue,
+    covariance_json: JsValue,
     confidence: f64,
 ) -> Result<JsValue, JsValue> {
+    let position_ids_json: &str = &json_text(&position_ids_json, "positionIdsJson")?;
+    let weights_json: &str = &json_text(&weights_json, "weightsJson")?;
+    let covariance_json: &str = &json_text(&covariance_json, "covarianceJson")?;
     use finstack_quant_models::factor::risk::{
         parametric_es_decomposition_view, DecompositionConfig, ParametricPositionDecomposer,
     };
@@ -621,10 +648,12 @@ pub fn parametric_es_decomposition(
 /// or the result cannot be converted to a JavaScript value.
 #[wasm_bindgen(js_name = historicalVarDecomposition)]
 pub fn historical_var_decomposition(
-    position_ids_json: &str,
-    position_pnls_json: &str,
+    position_ids_json: JsValue,
+    position_pnls_json: JsValue,
     confidence: f64,
 ) -> Result<JsValue, JsValue> {
+    let position_ids_json: &str = &json_text(&position_ids_json, "positionIdsJson")?;
+    let position_pnls_json: &str = &json_text(&position_pnls_json, "positionPnlsJson")?;
     use finstack_quant_models::factor::risk::{
         flatten_position_pnls, parametric_var_decomposition_view, DecompositionConfig,
         HistoricalPositionDecomposer,
@@ -666,12 +695,15 @@ pub fn historical_var_decomposition(
 /// cannot be converted to a JavaScript value.
 #[wasm_bindgen(js_name = evaluateRiskBudget)]
 pub fn evaluate_risk_budget(
-    position_ids_json: &str,
-    actual_var_json: &str,
-    target_var_pct_json: &str,
+    position_ids_json: JsValue,
+    actual_var_json: JsValue,
+    target_var_pct_json: JsValue,
     portfolio_var: f64,
     utilization_threshold: Option<f64>,
 ) -> Result<JsValue, JsValue> {
+    let position_ids_json: &str = &json_text(&position_ids_json, "positionIdsJson")?;
+    let actual_var_json: &str = &json_text(&actual_var_json, "actualVarJson")?;
+    let target_var_pct_json: &str = &json_text(&target_var_pct_json, "targetVarPctJson")?;
     use finstack_quant_models::factor::risk::{
         evaluate_risk_budget_arrays, risk_budget_result_view, DEFAULT_UTILIZATION_THRESHOLD,
     };

@@ -1,5 +1,6 @@
 //! WASM bindings for the `finstack-quant-covenants` crate.
 
+use crate::utils::input::{js_string, json_text};
 use crate::utils::to_js_err;
 use wasm_bindgen::prelude::*;
 
@@ -12,7 +13,8 @@ use wasm_bindgen::prelude::*;
 /// covenant-spec schema, violates covenant threshold or frequency invariants, or
 /// cannot be serialized to canonical JSON.
 #[wasm_bindgen(js_name = validateCovenantSpecJson)]
-pub fn validate_covenant_spec_json(spec_json: &str) -> Result<String, JsValue> {
+pub fn validate_covenant_spec_json(spec_json: JsValue) -> Result<String, JsValue> {
+    let spec_json: &str = &json_text(&spec_json, "specJson")?;
     finstack_quant_covenants::validate_covenant_spec_json(spec_json).map_err(to_js_err)
 }
 
@@ -24,7 +26,8 @@ pub fn validate_covenant_spec_json(spec_json: &str) -> Result<String, JsValue> {
 /// Throws a JavaScript exception if `reportJson` is malformed, does not match the
 /// covenant-report schema, or cannot be serialized to canonical JSON.
 #[wasm_bindgen(js_name = validateCovenantReportJson)]
-pub fn validate_covenant_report_json(report_json: &str) -> Result<String, JsValue> {
+pub fn validate_covenant_report_json(report_json: JsValue) -> Result<String, JsValue> {
+    let report_json: &str = &json_text(&report_json, "reportJson")?;
     finstack_quant_covenants::validate_covenant_report_json(report_json).map_err(to_js_err)
 }
 
@@ -37,7 +40,8 @@ pub fn validate_covenant_report_json(report_json: &str) -> Result<String, JsValu
 /// covenant-engine schema, contains an invalid covenant package, violates engine
 /// invariants, or cannot be serialized to canonical JSON.
 #[wasm_bindgen(js_name = validateCovenantEngineJson)]
-pub fn validate_covenant_engine_json(engine_json: &str) -> Result<String, JsValue> {
+pub fn validate_covenant_engine_json(engine_json: JsValue) -> Result<String, JsValue> {
+    let engine_json: &str = &json_text(&engine_json, "engineJson")?;
     finstack_quant_covenants::validate_covenant_engine_json(engine_json).map_err(to_js_err)
 }
 
@@ -61,10 +65,13 @@ pub fn validate_covenant_engine_json(engine_json: &str) -> Result<String, JsValu
 /// serialized to JavaScript.
 #[wasm_bindgen(js_name = evaluateEngine)]
 pub fn evaluate_engine(
-    engine_json: &str,
-    metrics_json: &str,
-    as_of: &str,
+    engine_json: JsValue,
+    metrics_json: JsValue,
+    as_of: JsValue,
 ) -> Result<JsValue, JsValue> {
+    let engine_json: &str = &json_text(&engine_json, "engineJson")?;
+    let metrics_json: &str = &json_text(&metrics_json, "metricsJson")?;
+    let as_of: &str = &js_string(&as_of, "asOf")?;
     let reports = finstack_quant_covenants::evaluate_engine_map(engine_json, metrics_json, as_of)
         .map_err(to_js_err)?;
     crate::utils::to_js_value(&reports)

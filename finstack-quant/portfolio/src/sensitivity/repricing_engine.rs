@@ -39,19 +39,29 @@ impl ScenarioGrid {
     /// extraction (need at least -1, 0, +1).
     pub const MIN_POINTS: usize = 3;
 
+    /// Maximum number of grid points. Every point is a full portfolio
+    /// repricing per factor, so larger grids are rejected rather than run.
+    pub const MAX_POINTS: usize = 1_001;
+
     /// Create a grid centered on zero, e.g. `5 -> [-2, -1, 0, 1, 2]`.
     ///
     /// # Errors
     ///
-    /// Returns a validation error when `n_points < 3` or when `n_points` is
-    /// even, because an even number of points cannot include a center point and
-    /// symmetric `-1` / `+1` shocks.
+    /// Returns a validation error when `n_points` is outside
+    /// `MIN_POINTS..=MAX_POINTS` or even, because an even number of points
+    /// cannot include a center point and symmetric `-1` / `+1` shocks.
     ///
     /// # Arguments
     ///
     /// * `n_points` - Odd number of grid points, including the unshocked center;
-    ///   must be at least three.
+    ///   must be in `3..=1001`.
     pub fn new(n_points: usize) -> Result<Self> {
+        if n_points > Self::MAX_POINTS {
+            return Err(Error::Validation(format!(
+                "ScenarioGrid accepts at most {} points, got {n_points}",
+                Self::MAX_POINTS,
+            )));
+        }
         if n_points < Self::MIN_POINTS {
             return Err(Error::Validation(format!(
                 "ScenarioGrid requires at least {} points for central-difference delta extraction, got {n_points}",
@@ -514,6 +524,13 @@ mod tests {
     #[test]
     fn test_scenario_grid_rejects_too_few_points() {
         assert!(ScenarioGrid::new(2).is_err());
+    }
+
+    #[test]
+    fn scenario_grid_rejects_more_than_max_points() {
+        assert!(ScenarioGrid::new(ScenarioGrid::MAX_POINTS).is_ok());
+        let err = ScenarioGrid::new(ScenarioGrid::MAX_POINTS + 2).expect_err("over the cap");
+        assert!(err.to_string().contains("at most 1001 points"));
     }
 
     #[test]

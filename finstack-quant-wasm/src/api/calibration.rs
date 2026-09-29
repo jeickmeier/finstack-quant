@@ -8,12 +8,8 @@
 //! Counts (`iterations`, `residual_evals`, `lm_jacobian_evals`) are embedded
 //! inside the JSON result envelope rather than crossed as raw `usize`. JS's
 //! `JSON.parse` reads them as IEEE-754 doubles; values above
-//! `Number.MAX_SAFE_INTEGER` (2^53 − 1) would round silently. In practice
-//! iteration counts stay under ~10⁴ for any non-pathological calibration, so
-//! the [`crate::utils::check_js_safe_count`] guard is not threaded through
-//! the JSON path. If a future getter exposes a raw `usize` across the
-//! boundary (e.g. a `report.iterations() -> usize` accessor), route it
-//! through that guard first.
+//! `Number.MAX_SAFE_INTEGER` (2^53 − 1) would round silently; in practice
+//! iteration counts stay under ~10⁴ for any non-pathological calibration.
 //!
 //! On error, the host functions throw a JS `Error` with `name =
 //! "CalibrationEnvelopeError"`. The error exposes `kind`, `stage`, `step_id`,
@@ -38,6 +34,7 @@
 // allowance — keep the binding layer consistent.
 #![allow(clippy::result_large_err)]
 
+use crate::utils::input::{js_string, json_text};
 #[cfg(target_arch = "wasm32")]
 use crate::utils::structured_js_error;
 use crate::utils::to_js_value;
@@ -71,7 +68,8 @@ fn validate_calibration_json_inner(json: &str) -> Result<String, ExecuteError> {
 /// validation fails (fail-fast: first error; `dryRun` lists every static
 /// error), or the canonical envelope cannot be serialized.
 #[wasm_bindgen(js_name = validateCalibrationJson)]
-pub fn validate_calibration_json(json: &str) -> Result<String, JsValue> {
+pub fn validate_calibration_json(json: JsValue) -> Result<String, JsValue> {
+    let json: &str = &json_text(&json, "json")?;
     validate_calibration_json_inner(json).map_err(execute_error_to_js)
 }
 
@@ -101,7 +99,8 @@ fn calibrate_inner(envelope_json: &str) -> Result<CalibrationResultEnvelope, Exe
 /// or a calibration step fails, a solver does not converge, or the result
 /// envelope cannot be converted to a JavaScript value.
 #[wasm_bindgen(js_name = calibrate)]
-pub fn calibrate(envelope_json: &str) -> Result<JsValue, JsValue> {
+pub fn calibrate(envelope_json: JsValue) -> Result<JsValue, JsValue> {
+    let envelope_json: &str = &json_text(&envelope_json, "envelopeJson")?;
     let result = calibrate_inner(envelope_json).map_err(execute_error_to_js)?;
     to_js_value(&result)
 }
@@ -119,7 +118,8 @@ pub fn calibrate(envelope_json: &str) -> Result<JsValue, JsValue> {
 /// invalid, or the validation report cannot be serialized. Semantic findings
 /// are returned in the report rather than thrown.
 #[wasm_bindgen(js_name = dryRun)]
-pub fn dry_run(envelope_json: &str) -> Result<String, JsValue> {
+pub fn dry_run(envelope_json: JsValue) -> Result<String, JsValue> {
+    let envelope_json: &str = &json_text(&envelope_json, "envelopeJson")?;
     validate::dry_run(envelope_json).map_err(|error| execute_error_to_js(error.into()))
 }
 
@@ -138,10 +138,12 @@ pub fn dry_run(envelope_json: &str) -> Result<String, JsValue> {
 /// inputs are invalid, or the Rebonato calibration cannot be completed.
 #[wasm_bindgen(js_name = calibrateBermudanLmmBaseVol)]
 pub fn calibrate_bermudan_lmm_base_vol(
-    instrument_json: &str,
+    instrument_json: JsValue,
     market: &crate::api::valuations::market_handle::JsMarket,
-    as_of: &str,
+    as_of: JsValue,
 ) -> Result<f64, JsValue> {
+    let instrument_json: &str = &json_text(&instrument_json, "instrumentJson")?;
+    let as_of: &str = &js_string(&as_of, "asOf")?;
     let as_of = crate::utils::parse_iso_date(as_of)?;
     finstack_quant_calibration::calibrate_bermudan_lmm_base_vol_from_json(
         instrument_json,
@@ -236,7 +238,7 @@ mod tests {
     #[test]
     fn validate_calibration_json_accepts_empty_plan() {
         let json = empty_envelope_json();
-        let canonical = validate_calibration_json(&json).expect("validate");
+        let canonical = validate_calibration_json_inner(&json).expect("validate");
         assert!(!canonical.is_empty());
     }
 
@@ -280,7 +282,7 @@ mod tests {
     #[test]
     fn dry_run_accepts_empty_plan() {
         let json = empty_envelope_json();
-        let report_json = dry_run(&json).expect("dry_run");
+        let report_json = validate::dry_run(&json).expect("dry_run");
         let parsed: serde_json::Value = serde_json::from_str(&report_json).expect("json");
         assert!(parsed.get("errors").is_some());
         assert!(parsed.get("dependency_graph").is_some());
@@ -288,10 +290,7 @@ mod tests {
 
     #[test]
     fn dry_run_rejects_malformed_json() {
-        // The `#[wasm_bindgen]` wrapper must still return `Err` (not panic) on
-        // a native build; the diagnostic itself is asserted via the `*_inner`
-        // helpers below.
-        assert!(dry_run("not json").is_err());
+        assert!(validate::dry_run("not json").is_err());
     }
 
     #[test]

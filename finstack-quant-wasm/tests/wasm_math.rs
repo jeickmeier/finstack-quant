@@ -5,6 +5,7 @@
 #![cfg(target_arch = "wasm32")]
 
 use finstack_quant_wasm::api::core::math::*;
+use wasm_bindgen::JsValue;
 use wasm_bindgen_test::*;
 
 // ---- Linear algebra ----
@@ -12,29 +13,29 @@ use wasm_bindgen_test::*;
 #[wasm_bindgen_test]
 fn cholesky_decomposition_returns_row_major_factor() {
     let matrix = [4.0, 2.0, 2.0, 3.0];
-    let result = cholesky_decomposition(&matrix, 2).unwrap();
+    let result = cholesky_decomposition(&matrix, JsValue::from(2)).unwrap();
     assert_eq!(result.len(), 4);
     assert!((result[0] - 2.0).abs() < 1e-10);
 }
 
 #[wasm_bindgen_test]
 fn cholesky_decomposition_identity() {
-    let result = cholesky_decomposition(&[1.0, 0.0, 0.0, 1.0], 2).unwrap();
+    let result = cholesky_decomposition(&[1.0, 0.0, 0.0, 1.0], JsValue::from(2)).unwrap();
     assert!((result[0] - 1.0).abs() < 1e-10);
     assert!((result[3] - 1.0).abs() < 1e-10);
 }
 
 #[wasm_bindgen_test]
 fn cholesky_solve_solves_system() {
-    let chol = cholesky_decomposition(&[4.0, 2.0, 2.0, 3.0], 2).unwrap();
-    let x = cholesky_solve(&chol, &[2.0, 1.0], 2).unwrap();
+    let chol = cholesky_decomposition(&[4.0, 2.0, 2.0, 3.0], JsValue::from(2)).unwrap();
+    let x = cholesky_solve(&chol, &[2.0, 1.0], JsValue::from(2)).unwrap();
     assert_eq!(x.len(), 2);
     assert!((x[0] - 0.5).abs() < 1e-10);
 }
 
 #[wasm_bindgen_test]
 fn cholesky_solve_rejects_wrong_rhs_length() {
-    assert!(cholesky_solve(&[1.0, 0.0, 0.0, 1.0], &[1.0], 2).is_err());
+    assert!(cholesky_solve(&[1.0, 0.0, 0.0, 1.0], &[1.0], JsValue::from(2)).is_err());
 }
 
 // ---- Statistics ----

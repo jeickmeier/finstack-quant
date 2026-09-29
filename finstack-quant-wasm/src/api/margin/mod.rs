@@ -5,6 +5,7 @@
 //! consumers.
 
 use crate::api::core::market_data::{JsDiscountCurve, JsHazardCurve};
+use crate::utils::input::{js_string, json_text, opt_json_text};
 use crate::utils::{parse_iso_date, to_js_err, to_js_value};
 use wasm_bindgen::prelude::*;
 
@@ -51,7 +52,8 @@ pub fn csa_eur_regulatory_json() -> Result<String, JsValue> {
 /// the decoded CSA specification; also rejects invalid CSA terms or calendar identifiers.
 /// @param json - CSA specification JSON to validate and normalize into canonical form.
 #[wasm_bindgen(js_name = validateCsaJson)]
-pub fn validate_csa_json(json: &str) -> Result<String, JsValue> {
+pub fn validate_csa_json(json: JsValue) -> Result<String, JsValue> {
+    let json: &str = &json_text(&json, "json")?;
     let csa: finstack_quant_margin::CsaSpec = serde_json::from_str(json).map_err(to_js_err)?;
     csa.validate().map_err(to_js_err)?;
     serialize_csa(&csa)
@@ -77,12 +79,15 @@ pub fn validate_csa_json(json: &str) -> Result<String, JsValue> {
 /// settlement-date adjustment failures, or failure to serialize the result.
 #[wasm_bindgen(js_name = calculateVm)]
 pub fn calculate_vm(
-    csa_json: &str,
+    csa_json: JsValue,
     exposure: f64,
     posted_collateral: f64,
-    currency: &str,
-    as_of: &str,
+    currency: JsValue,
+    as_of: JsValue,
 ) -> Result<JsValue, JsValue> {
+    let csa_json: &str = &json_text(&csa_json, "csaJson")?;
+    let currency: &str = &js_string(&currency, "currency")?;
+    let as_of: &str = &js_string(&as_of, "asOf")?;
     let csa: finstack_quant_margin::CsaSpec = serde_json::from_str(csa_json).map_err(to_js_err)?;
     let ccy: finstack_quant_core::currency::Currency = currency.parse().map_err(to_js_err)?;
     let exp = finstack_quant_core::money::Money::new(exposure, ccy)
@@ -148,14 +153,16 @@ pub fn calculate_vm(
 /// ```
 #[wasm_bindgen(js_name = computeBilateralXva)]
 pub fn compute_bilateral_xva(
-    exposure_profile_json: &str,
+    exposure_profile_json: JsValue,
     counterparty_hazard_curve: &JsHazardCurve,
     own_hazard_curve: &JsHazardCurve,
     discount_curve: &JsDiscountCurve,
     counterparty_recovery_rate: f64,
     own_recovery_rate: f64,
-    funding_json: Option<String>,
+    funding_json: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
+    let exposure_profile_json: &str = &json_text(&exposure_profile_json, "exposureProfileJson")?;
+    let funding_json = opt_json_text(funding_json.as_ref(), "fundingJson")?;
     let exposure: finstack_quant_margin::xva::types::ExposureProfile =
         serde_json::from_str(exposure_profile_json).map_err(to_js_err)?;
     let funding: Option<finstack_quant_margin::xva::types::FundingConfig> = funding_json
@@ -216,24 +223,5 @@ mod tests {
             panic!("csa_eur_regulatory should succeed");
         };
         assert_csa_json_shape(&json, "EUR");
-    }
-
-    #[test]
-    fn validate_csa_json_round_trips_usd_regulatory() {
-        let Ok(original) = csa_usd_regulatory_json() else {
-            panic!("csa_usd_regulatory should succeed");
-        };
-        let Ok(parsed_once) = serde_json::from_str::<finstack_quant_margin::CsaSpec>(&original)
-        else {
-            panic!("original JSON should deserialize to CsaSpec");
-        };
-        let Ok(canonical) = validate_csa_json(&original) else {
-            panic!("validate_csa_json should succeed on regulatory CSA JSON");
-        };
-        let Ok(parsed_twice) = serde_json::from_str::<finstack_quant_margin::CsaSpec>(&canonical)
-        else {
-            panic!("canonical JSON should deserialize to CsaSpec");
-        };
-        assert_eq!(parsed_once, parsed_twice);
     }
 }

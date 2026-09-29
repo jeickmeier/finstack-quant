@@ -27,7 +27,7 @@ enforces.
 | `models/liability_management.rs`   | `models.credit`                        | `analyzeExchangeOffer`, `analyzeLme` (liability management)                                                                                                                                                                                |
 | `analytics/performance.rs`         | `analytics`                            | `JsPerformance` → JS `Performance`; the only class in the analytics namespace                                                                                                                                                              |
 | `analytics/regression.rs`          | `analytics`                            | `constrainedLeastSquares`                                                                                                                                                                                                                  |
-| `analytics/support.rs`             | —                                      | `pub(super)` argument parsing (`parse_f64_vec`, `parse_f64_matrix`) with a `Float64Array` fast path                                                                                                                                        |
+| `analytics/support.rs`             | —                                      | `pub(super)` re-export of the ISO date helpers                                                                                                                                                                                             |
 | `attribution/mod.rs`               | `attribution`                          | `attributePnl`, `attributePnlJson`, waterfall/metric defaults, schema validation                                                                                                                                                           |
 | `cashflows/mod.rs`                 | `cashflows`                            | Schedule build/validate, accrual, dated flows, CPR↔SMM / CDR↔MDR                                                                                                                                                                           |
 | `covenants/mod.rs`                 | `covenants`                            | Spec/report/engine validation, `evaluateEngine`, preset packages                                                                                                                                                                           |
@@ -65,8 +65,12 @@ re-export their children.
 
 Shared conversion helpers are one level up in [`../utils/`](../utils): `to_js_value`,
 `to_js_err`, `to_js_error`, `structured_js_error`, `contract_to_js_error`,
-`materialization_to_js_error`, `check_js_safe_count`, `MAX_SAFE_JS_INTEGER`, and the
-date helpers `parse_iso_date`, `parse_iso_dates`, `date_to_iso`.
+`materialization_to_js_error`, and the date helpers `parse_iso_date`,
+`parse_iso_dates`, `date_to_iso`. Argument conversion lives in
+[`../utils/input.rs`](../utils/input.rs): `js_string`, `js_bool`, `js_uint`,
+`js_int`, `js_u64`, `js_epoch_days`, the `js_opt_*` twins, `js_string_seq`,
+`js_f64_seq`, `js_f64_matrix`, the nullable sequence helpers, `json_text` and
+`from_js_json`.
 
 ## Reaching JavaScript
 
@@ -146,11 +150,16 @@ export that is not in it is invisible to TypeScript users, and
 - **`unwrap`, `expect`, and `panic` are denied at the crate root** (`../lib.rs`)
   outside `#[cfg(test)]`, alongside `#![forbid(unsafe_code)]`.
 
-- **Integer widths.** `u64`/`i64` cross as `BigInt`. `usize` marshals as an f64, so
-  any count that can plausibly grow must be guarded with
-  `utils::check_js_safe_count` rather than silently rounding past
-  `Number.MAX_SAFE_INTEGER`. `attribution/mod.rs` documents why it is exempt.
-  For LSMC valuations, `standard_error` measures pricing-path sampling uncertainty
+- **Take host values as `JsValue`.** Exported functions never declare `&str`,
+  `String`, `bool`, integer or `Vec<String>` parameters: wasm-bindgen's glue for
+  those traps on a wrong type or coerces it silently (`ToInt32`, truthiness).
+  Declare `JsValue` (`Option<JsValue>` when optional, so the generated d.ts keeps
+  `?`) and convert with `utils::input`; `tests/boundary_signatures.rs` enforces
+  this. Structured inputs go through `json_text`/`from_js_json`, never
+  `serde_wasm_bindgen::from_value`, whose struct visitor ignores
+  `deny_unknown_fields` and turns `NaN` into `null`.
+
+- **Integer widths.** Returned `u64`/`i64` values cross as `BigInt`. For LSMC valuations, `standard_error` measures pricing-path sampling uncertainty
   under the frozen fitted exercise policy and excludes regression approximation,
   time-grid discretization, and model error. Structured valuation results follow
   this rule for Monte Carlo `seed`: every payload that embeds a `ValuationResult`

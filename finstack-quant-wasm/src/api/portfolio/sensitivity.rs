@@ -2,6 +2,7 @@
 
 use crate::api::valuations::market_handle::JsMarket;
 use crate::utils::date::parse_iso_date;
+use crate::utils::input::{js_opt_uint, js_string, json_text, opt_json_text};
 use crate::utils::{to_js_err, to_js_value};
 use wasm_bindgen::prelude::*;
 
@@ -27,13 +28,19 @@ use wasm_bindgen::prelude::*;
 /// converted to a JavaScript value.
 #[wasm_bindgen(js_name = computeFactorSensitivities)]
 pub fn compute_factor_sensitivities(
-    positions_json: &str,
-    factors_json: &str,
-    market_json: &str,
-    as_of: &str,
-    base_currency: &str,
-    bump_config_json: Option<String>,
+    positions_json: JsValue,
+    factors_json: JsValue,
+    market_json: JsValue,
+    as_of: JsValue,
+    base_currency: JsValue,
+    bump_config_json: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
+    let positions_json: &str = &json_text(&positions_json, "positionsJson")?;
+    let factors_json: &str = &json_text(&factors_json, "factorsJson")?;
+    let market_json: &str = &json_text(&market_json, "marketJson")?;
+    let as_of: &str = &js_string(&as_of, "asOf")?;
+    let base_currency: &str = &js_string(&base_currency, "baseCurrency")?;
+    let bump_config_json = opt_json_text(bump_config_json.as_ref(), "bumpConfigJson")?;
     let as_of = parse_iso_date(as_of)?;
     let base_currency = base_currency
         .parse::<finstack_quant_core::currency::Currency>()
@@ -74,13 +81,18 @@ pub fn compute_factor_sensitivities(
 /// matrix cannot be converted to a JavaScript value.
 #[wasm_bindgen(js_name = computeFactorSensitivitiesWithMarket)]
 pub fn compute_factor_sensitivities_with_market(
-    positions_json: &str,
-    factors_json: &str,
+    positions_json: JsValue,
+    factors_json: JsValue,
     market: &JsMarket,
-    as_of: &str,
-    base_currency: &str,
-    bump_config_json: Option<String>,
+    as_of: JsValue,
+    base_currency: JsValue,
+    bump_config_json: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
+    let positions_json: &str = &json_text(&positions_json, "positionsJson")?;
+    let factors_json: &str = &json_text(&factors_json, "factorsJson")?;
+    let as_of: &str = &js_string(&as_of, "asOf")?;
+    let base_currency: &str = &js_string(&base_currency, "baseCurrency")?;
+    let bump_config_json = opt_json_text(bump_config_json.as_ref(), "bumpConfigJson")?;
     let as_of = parse_iso_date(as_of)?;
     let base_currency = base_currency
         .parse::<finstack_quant_core::currency::Currency>()
@@ -122,14 +134,22 @@ pub fn compute_factor_sensitivities_with_market(
 /// be converted to a JavaScript value.
 #[wasm_bindgen(js_name = computePnlProfiles)]
 pub fn compute_pnl_profiles(
-    positions_json: &str,
-    factors_json: &str,
-    market_json: &str,
-    as_of: &str,
-    base_currency: &str,
-    bump_config_json: Option<String>,
-    n_scenario_points: Option<usize>,
+    positions_json: JsValue,
+    factors_json: JsValue,
+    market_json: JsValue,
+    as_of: JsValue,
+    base_currency: JsValue,
+    bump_config_json: Option<JsValue>,
+    n_scenario_points: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
+    let positions_json: &str = &json_text(&positions_json, "positionsJson")?;
+    let factors_json: &str = &json_text(&factors_json, "factorsJson")?;
+    let market_json: &str = &json_text(&market_json, "marketJson")?;
+    let as_of: &str = &js_string(&as_of, "asOf")?;
+    let base_currency: &str = &js_string(&base_currency, "baseCurrency")?;
+    let bump_config_json = opt_json_text(bump_config_json.as_ref(), "bumpConfigJson")?;
+    let n_scenario_points: Option<usize> =
+        js_opt_uint(n_scenario_points.as_ref(), "nScenarioPoints")?;
     let as_of = parse_iso_date(as_of)?;
     let base_currency = base_currency
         .parse::<finstack_quant_core::currency::Currency>()
@@ -171,14 +191,21 @@ pub fn compute_pnl_profiles(
 /// cannot be converted to a JavaScript value.
 #[wasm_bindgen(js_name = computePnlProfilesWithMarket)]
 pub fn compute_pnl_profiles_with_market(
-    positions_json: &str,
-    factors_json: &str,
+    positions_json: JsValue,
+    factors_json: JsValue,
     market: &JsMarket,
-    as_of: &str,
-    base_currency: &str,
-    bump_config_json: Option<String>,
-    n_scenario_points: Option<usize>,
+    as_of: JsValue,
+    base_currency: JsValue,
+    bump_config_json: Option<JsValue>,
+    n_scenario_points: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
+    let positions_json: &str = &json_text(&positions_json, "positionsJson")?;
+    let factors_json: &str = &json_text(&factors_json, "factorsJson")?;
+    let as_of: &str = &js_string(&as_of, "asOf")?;
+    let base_currency: &str = &js_string(&base_currency, "baseCurrency")?;
+    let bump_config_json = opt_json_text(bump_config_json.as_ref(), "bumpConfigJson")?;
+    let n_scenario_points: Option<usize> =
+        js_opt_uint(n_scenario_points.as_ref(), "nScenarioPoints")?;
     let as_of = parse_iso_date(as_of)?;
     let base_currency = base_currency
         .parse::<finstack_quant_core::currency::Currency>()
@@ -228,10 +255,13 @@ pub fn compute_pnl_profiles_with_market(
 /// value; or the result cannot be converted to a JavaScript value.
 #[wasm_bindgen(js_name = decomposeFactorRisk)]
 pub fn decompose_factor_risk(
-    sensitivities_json: &str,
-    covariance_json: &str,
-    risk_measure_json: Option<String>,
+    sensitivities_json: JsValue,
+    covariance_json: JsValue,
+    risk_measure_json: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
+    let sensitivities_json: &str = &json_text(&sensitivities_json, "sensitivitiesJson")?;
+    let covariance_json: &str = &json_text(&covariance_json, "covarianceJson")?;
+    let risk_measure_json = opt_json_text(risk_measure_json.as_ref(), "riskMeasureJson")?;
     #[derive(serde::Deserialize)]
     struct SensInput {
         position_ids: Vec<String>,

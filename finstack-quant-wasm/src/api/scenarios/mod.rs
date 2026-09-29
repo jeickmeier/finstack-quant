@@ -3,6 +3,9 @@
 //! Exposes scenario specification parsing, validation, composition,
 //! and built-in template access via structured JavaScript values.
 
+use crate::utils::input::{
+    from_js_json, js_opt_int, js_opt_string, js_string, json_text, opt_json_text,
+};
 use crate::utils::{parse_iso_date, to_js_err};
 use wasm_bindgen::prelude::*;
 
@@ -50,7 +53,8 @@ fn apply_with_context(
 /// fields, variant-specific operation violations, or serialization failure.
 /// @param json_str - Canonical JSON string to validate and re-serialize.
 #[wasm_bindgen(js_name = parseScenarioSpec)]
-pub fn parse_scenario_spec(json_str: &str) -> Result<JsValue, JsValue> {
+pub fn parse_scenario_spec(json_str: JsValue) -> Result<JsValue, JsValue> {
+    let json_str: &str = &json_text(&json_str, "jsonStr")?;
     let spec = finstack_quant_scenarios::ScenarioSpec::from_json(json_str).map_err(to_js_err)?;
     crate::utils::to_js_value(&spec)
 }
@@ -67,8 +71,7 @@ pub fn parse_scenario_spec(json_str: &str) -> Result<JsValue, JsValue> {
 /// @param specs - Validated ScenarioSpec objects to compose in priority order.
 #[wasm_bindgen(js_name = composeScenarios)]
 pub fn compose_scenarios(specs: JsValue) -> Result<JsValue, JsValue> {
-    let specs: Vec<finstack_quant_scenarios::ScenarioSpec> =
-        serde_wasm_bindgen::from_value(specs).map_err(to_js_err)?;
+    let specs: Vec<finstack_quant_scenarios::ScenarioSpec> = from_js_json(&specs, "specs")?;
     let composed = finstack_quant_scenarios::ScenarioSpec::compose(specs).map_err(to_js_err)?;
     crate::utils::to_js_value(&composed)
 }
@@ -87,7 +90,8 @@ pub fn compose_scenarios(specs: JsValue) -> Result<JsValue, JsValue> {
 /// fields, or variant-specific operation violations.
 /// @param json_str - Canonical JSON string to validate and re-serialize.
 #[wasm_bindgen(js_name = validateScenarioSpec)]
-pub fn validate_scenario_spec(json_str: &str) -> Result<(), JsValue> {
+pub fn validate_scenario_spec(json_str: JsValue) -> Result<(), JsValue> {
+    let json_str: &str = &json_text(&json_str, "jsonStr")?;
     let spec: finstack_quant_scenarios::ScenarioSpec =
         serde_json::from_str(json_str).map_err(to_js_err)?;
 
@@ -133,7 +137,8 @@ pub fn list_builtin_template_metadata() -> Result<JsValue, JsValue> {
 /// the scenario.
 /// @param template_id - Identifier of a built-in scenario template in the embedded registry.
 #[wasm_bindgen(js_name = buildFromTemplate)]
-pub fn build_from_template(template_id: &str) -> Result<JsValue, JsValue> {
+pub fn build_from_template(template_id: JsValue) -> Result<JsValue, JsValue> {
+    let template_id: &str = &js_string(&template_id, "templateId")?;
     let spec = builtin_registry()?.build(template_id).map_err(to_js_err)?;
     crate::utils::to_js_value(&spec)
 }
@@ -148,7 +153,8 @@ pub fn build_from_template(template_id: &str) -> Result<JsValue, JsValue> {
 /// or component identifiers that cannot be serialized to JavaScript.
 /// @param template_id - Identifier of a built-in scenario template in the embedded registry.
 #[wasm_bindgen(js_name = listTemplateComponents)]
-pub fn list_template_components(template_id: &str) -> Result<JsValue, JsValue> {
+pub fn list_template_components(template_id: JsValue) -> Result<JsValue, JsValue> {
+    let template_id: &str = &js_string(&template_id, "templateId")?;
     let ids: Vec<String> = builtin_registry()?
         .component_ids(template_id)
         .map_err(to_js_err)?
@@ -168,7 +174,12 @@ pub fn list_template_components(template_id: &str) -> Result<JsValue, JsValue> {
 /// @param template_id - Identifier of a built-in scenario template in the embedded registry.
 /// @param component_id - Identifier of a component within the selected composite template.
 #[wasm_bindgen(js_name = buildTemplateComponent)]
-pub fn build_template_component(template_id: &str, component_id: &str) -> Result<JsValue, JsValue> {
+pub fn build_template_component(
+    template_id: JsValue,
+    component_id: JsValue,
+) -> Result<JsValue, JsValue> {
+    let template_id: &str = &js_string(&template_id, "templateId")?;
+    let component_id: &str = &js_string(&component_id, "componentId")?;
     let spec = builtin_registry()?
         .build_component(template_id, component_id)
         .map_err(to_js_err)?;
@@ -197,16 +208,22 @@ pub fn build_template_component(template_id: &str, component_id: &str) -> Result
 ///   delta hazard = delta spread / (1 - recovery) and reports an approximation warning.
 #[wasm_bindgen(js_name = buildScenarioSpec)]
 pub fn build_scenario_spec(
-    id: &str,
+    id: JsValue,
     operations: JsValue,
-    name: Option<String>,
-    description: Option<String>,
-    priority: Option<i32>,
-    resolution_mode: Option<String>,
-    hazard_bump_mode: Option<String>,
+    name: Option<JsValue>,
+    description: Option<JsValue>,
+    priority: Option<JsValue>,
+    resolution_mode: Option<JsValue>,
+    hazard_bump_mode: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
+    let id: &str = &js_string(&id, "id")?;
+    let name = js_opt_string(name.as_ref(), "name")?;
+    let description = js_opt_string(description.as_ref(), "description")?;
+    let priority: Option<i32> = js_opt_int(priority.as_ref(), "priority")?;
+    let resolution_mode = js_opt_string(resolution_mode.as_ref(), "resolutionMode")?;
+    let hazard_bump_mode = js_opt_string(hazard_bump_mode.as_ref(), "hazardBumpMode")?;
     let operations: Vec<finstack_quant_scenarios::OperationSpec> =
-        serde_wasm_bindgen::from_value(operations).map_err(to_js_err)?;
+        from_js_json(&operations, "operations")?;
     let resolution_mode = resolution_mode
         .map(|value| serde_json::from_value(serde_json::Value::String(value)))
         .transpose()
@@ -271,12 +288,17 @@ fn extract_instruments(
 /// @param instruments_json - Optional JSON array of canonical instrument envelopes; required for instrument shocks and returned as shocked copies in input order.
 #[wasm_bindgen(js_name = applyScenario)]
 pub fn apply_scenario(
-    scenario_json: &str,
-    market_json: &str,
-    model_json: &str,
-    as_of: &str,
-    instruments_json: Option<String>,
+    scenario_json: JsValue,
+    market_json: JsValue,
+    model_json: JsValue,
+    as_of: JsValue,
+    instruments_json: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
+    let scenario_json: &str = &json_text(&scenario_json, "scenarioJson")?;
+    let market_json: &str = &json_text(&market_json, "marketJson")?;
+    let model_json: &str = &json_text(&model_json, "modelJson")?;
+    let as_of: &str = &js_string(&as_of, "asOf")?;
+    let instruments_json = opt_json_text(instruments_json.as_ref(), "instrumentsJson")?;
     let spec: finstack_quant_scenarios::ScenarioSpec =
         serde_json::from_str(scenario_json).map_err(to_js_err)?;
     let mut market: finstack_quant_core::market_data::context::MarketContext =
@@ -319,11 +341,15 @@ pub fn apply_scenario(
 /// @param instruments_json - Optional JSON array of canonical instrument envelopes; required for instrument shocks and returned as shocked copies in input order.
 #[wasm_bindgen(js_name = applyScenarioToMarket)]
 pub fn apply_scenario_to_market(
-    scenario_json: &str,
-    market_json: &str,
-    as_of: &str,
-    instruments_json: Option<String>,
+    scenario_json: JsValue,
+    market_json: JsValue,
+    as_of: JsValue,
+    instruments_json: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
+    let scenario_json: &str = &json_text(&scenario_json, "scenarioJson")?;
+    let market_json: &str = &json_text(&market_json, "marketJson")?;
+    let as_of: &str = &js_string(&as_of, "asOf")?;
+    let instruments_json = opt_json_text(instruments_json.as_ref(), "instrumentsJson")?;
     let spec: finstack_quant_scenarios::ScenarioSpec =
         serde_json::from_str(scenario_json).map_err(to_js_err)?;
     let mut market: finstack_quant_core::market_data::context::MarketContext =
@@ -372,14 +398,21 @@ pub fn apply_scenario_to_market(
 ///   Omit for a weekends-only calendar; unknown identifiers throw.
 #[wasm_bindgen(js_name = computeHorizonReturn)]
 pub fn compute_horizon_return(
-    instrument_json: &str,
-    market_json: &str,
-    as_of: &str,
-    scenario_json: &str,
-    method: Option<String>,
-    config_json: Option<String>,
-    calendar_id: Option<String>,
+    instrument_json: JsValue,
+    market_json: JsValue,
+    as_of: JsValue,
+    scenario_json: JsValue,
+    method: Option<JsValue>,
+    config_json: Option<JsValue>,
+    calendar_id: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
+    let instrument_json: &str = &json_text(&instrument_json, "instrumentJson")?;
+    let market_json: &str = &json_text(&market_json, "marketJson")?;
+    let as_of: &str = &js_string(&as_of, "asOf")?;
+    let scenario_json: &str = &json_text(&scenario_json, "scenarioJson")?;
+    let method = js_opt_string(method.as_ref(), "method")?;
+    let config_json = opt_json_text(config_json.as_ref(), "configJson")?;
+    let calendar_id = js_opt_string(calendar_id.as_ref(), "calendarId")?;
     use std::sync::Arc;
 
     let boxed = finstack_quant_valuations::pricer::json::parse_boxed_instrument_from_json(

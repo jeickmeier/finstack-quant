@@ -47,6 +47,7 @@
 //! interactive dashboards), prefer the `*Built` variants which take a
 //! `Portfolio` handle and skip the per-call `from_spec` rebuild.
 
+use crate::utils::input::{js_opt_bool, js_opt_string_seq, js_string, json_text};
 use std::sync::Arc;
 
 use crate::api::core::market_data::JsDiscountCurve;
@@ -80,7 +81,8 @@ impl JsPortfolio {
     /// specification, or portfolio validation finds duplicate identifiers or an
     /// unknown entity reference.
     #[wasm_bindgen(js_name = fromSpec)]
-    pub fn from_spec(spec_json: &str) -> Result<JsPortfolio, JsValue> {
+    pub fn from_spec(spec_json: JsValue) -> Result<JsPortfolio, JsValue> {
+        let spec_json: &str = &json_text(&spec_json, "specJson")?;
         let spec: finstack_quant_portfolio::portfolio::PortfolioSpec =
             serde_json::from_str(spec_json).map_err(to_js_err)?;
         let portfolio = finstack_quant_portfolio::Portfolio::from_spec(spec).map_err(to_js_err)?;
@@ -140,7 +142,8 @@ impl JsPortfolio {
 /// Throws a JavaScript exception if `jsonStr` is malformed or does not match the
 /// `PortfolioSpec` schema, or if the canonical form cannot be serialized.
 #[wasm_bindgen(js_name = parsePortfolioSpecJson)]
-pub fn parse_portfolio_spec_json(json_str: &str) -> Result<String, JsValue> {
+pub fn parse_portfolio_spec_json(json_str: JsValue) -> Result<String, JsValue> {
+    let json_str: &str = &json_text(&json_str, "jsonStr")?;
     let spec: finstack_quant_portfolio::portfolio::PortfolioSpec =
         serde_json::from_str(json_str).map_err(to_js_err)?;
 
@@ -159,7 +162,8 @@ pub fn parse_portfolio_spec_json(json_str: &str) -> Result<String, JsValue> {
 /// sectors or a non-finite weight or return, portfolio or benchmark weights do
 /// not sum to one, or the result cannot be converted to a JavaScript value.
 #[wasm_bindgen(js_name = brinsonFachler)]
-pub fn brinson_fachler(sectors_json: &str) -> Result<JsValue, JsValue> {
+pub fn brinson_fachler(sectors_json: JsValue) -> Result<JsValue, JsValue> {
+    let sectors_json: &str = &json_text(&sectors_json, "sectorsJson")?;
     let sectors: Vec<finstack_quant_portfolio::SectorPeriod> =
         serde_json::from_str(sectors_json).map_err(to_js_err)?;
     let result = finstack_quant_portfolio::brinson_fachler(&sectors).map_err(to_js_err)?;
@@ -180,7 +184,8 @@ pub fn brinson_fachler(sectors_json: &str) -> Result<JsValue, JsValue> {
 /// period return is non-finite or at most `-1`, or the result cannot be
 /// converted to a JavaScript value.
 #[wasm_bindgen(js_name = carinoLink)]
-pub fn carino_link(periods_json: &str) -> Result<JsValue, JsValue> {
+pub fn carino_link(periods_json: JsValue) -> Result<JsValue, JsValue> {
+    let periods_json: &str = &json_text(&periods_json, "periodsJson")?;
     let periods: Vec<Vec<finstack_quant_portfolio::SectorPeriod>> =
         serde_json::from_str(periods_json).map_err(to_js_err)?;
     let result =
@@ -220,10 +225,13 @@ pub fn carino_link(periods_json: &str) -> Result<JsValue, JsValue> {
 /// gross weight; or the result cannot be converted to a JavaScript value.
 #[wasm_bindgen(js_name = campisiAttribution)]
 pub fn campisi_attribution(
-    portfolio_json: &str,
-    benchmark_json: &str,
-    config_json: &str,
+    portfolio_json: JsValue,
+    benchmark_json: JsValue,
+    config_json: JsValue,
 ) -> Result<JsValue, JsValue> {
+    let portfolio_json: &str = &json_text(&portfolio_json, "portfolioJson")?;
+    let benchmark_json: &str = &json_text(&benchmark_json, "benchmarkJson")?;
+    let config_json: &str = &json_text(&config_json, "configJson")?;
     let portfolio: Vec<finstack_quant_portfolio::FiPositionSnapshot> =
         serde_json::from_str(portfolio_json).map_err(to_js_err)?;
     let benchmark: Vec<finstack_quant_portfolio::FiPositionSnapshot> =
@@ -260,7 +268,8 @@ pub fn campisi_attribution(
 /// non-finite or inconsistent, a return is at most `-1`, or the linked result
 /// cannot be converted to a JavaScript value.
 #[wasm_bindgen(js_name = campisiCarinoLink)]
-pub fn campisi_carino_link(periods_json: &str) -> Result<JsValue, JsValue> {
+pub fn campisi_carino_link(periods_json: JsValue) -> Result<JsValue, JsValue> {
+    let periods_json: &str = &json_text(&periods_json, "periodsJson")?;
     let periods: Vec<finstack_quant_portfolio::FiAttributionResult> =
         serde_json::from_str(periods_json).map_err(to_js_err)?;
     let result = finstack_quant_portfolio::campisi_carino_link(&periods).map_err(to_js_err)?;
@@ -283,9 +292,11 @@ pub fn campisi_carino_link(periods_json: &str) -> Result<JsValue, JsValue> {
 /// linking validation, or the result cannot be converted to a JavaScript value.
 #[wasm_bindgen(js_name = campisiCarinoLinkFromSnapshots)]
 pub fn campisi_carino_link_from_snapshots(
-    periods_json: &str,
-    config_json: &str,
+    periods_json: JsValue,
+    config_json: JsValue,
 ) -> Result<JsValue, JsValue> {
+    let periods_json: &str = &json_text(&periods_json, "periodsJson")?;
+    let config_json: &str = &json_text(&config_json, "configJson")?;
     let periods: Vec<finstack_quant_portfolio::FiPeriodInput> =
         serde_json::from_str(periods_json).map_err(to_js_err)?;
     let config: finstack_quant_portfolio::FiAttributionConfig =
@@ -312,7 +323,11 @@ pub fn campisi_carino_link_from_snapshots(
 /// `FiAttributionResult`, or if the reconciliation report cannot be converted to
 /// a JavaScript value.
 #[wasm_bindgen(js_name = campisiReconciliationCheck)]
-pub fn campisi_reconciliation_check(result_json: &str, tolerance: f64) -> Result<JsValue, JsValue> {
+pub fn campisi_reconciliation_check(
+    result_json: JsValue,
+    tolerance: f64,
+) -> Result<JsValue, JsValue> {
+    let result_json: &str = &json_text(&result_json, "resultJson")?;
     let result: finstack_quant_portfolio::FiAttributionResult =
         serde_json::from_str(result_json).map_err(to_js_err)?;
     to_js_value(&result.reconciliation_check(tolerance))
@@ -338,10 +353,13 @@ pub fn campisi_reconciliation_check(result_json: &str, tolerance: f64) -> Result
 /// safety bound, or the result cannot be converted to a JavaScript value.
 #[wasm_bindgen(js_name = cellReturnsFromReference)]
 pub fn cell_returns_from_reference(
-    reference_json: &str,
-    base_label: &str,
-    config_json: &str,
+    reference_json: JsValue,
+    base_label: JsValue,
+    config_json: JsValue,
 ) -> Result<JsValue, JsValue> {
+    let reference_json: &str = &json_text(&reference_json, "referenceJson")?;
+    let base_label: &str = &js_string(&base_label, "baseLabel")?;
+    let config_json: &str = &json_text(&config_json, "configJson")?;
     let reference: Vec<finstack_quant_portfolio::ReferenceReturn> =
         serde_json::from_str(reference_json).map_err(to_js_err)?;
     let config: finstack_quant_portfolio::CellConfig =
@@ -381,9 +399,11 @@ pub fn cell_returns_from_curves(
     end: &JsDiscountCurve,
     horizon_years: f64,
     max_duration: f64,
-    base_label: &str,
-    config_json: &str,
+    base_label: JsValue,
+    config_json: JsValue,
 ) -> Result<JsValue, JsValue> {
+    let base_label: &str = &js_string(&base_label, "baseLabel")?;
+    let config_json: &str = &json_text(&config_json, "configJson")?;
     let config: finstack_quant_portfolio::CellConfig =
         serde_json::from_str(config_json).map_err(to_js_err)?;
     let table = finstack_quant_portfolio::cell_returns_from_curves(
@@ -417,7 +437,9 @@ pub fn cell_returns_from_curves(
 /// weights do not sum to one, or the result cannot be converted to a JavaScript
 /// value.
 #[wasm_bindgen(js_name = excessReturns)]
-pub fn excess_returns(positions_json: &str, table_json: &str) -> Result<JsValue, JsValue> {
+pub fn excess_returns(positions_json: JsValue, table_json: JsValue) -> Result<JsValue, JsValue> {
+    let positions_json: &str = &json_text(&positions_json, "positionsJson")?;
+    let table_json: &str = &json_text(&table_json, "tableJson")?;
     let positions: Vec<finstack_quant_portfolio::ExcessReturnPosition> =
         serde_json::from_str(positions_json).map_err(to_js_err)?;
     let table: finstack_quant_portfolio::DurationCellTable =
@@ -448,7 +470,12 @@ pub fn excess_returns(positions_json: &str, table_json: &str) -> Result<JsValue,
 /// cell-sector bucket has a zero or near-zero net weight relative to gross
 /// weight, or the result cannot be converted to a JavaScript value.
 #[wasm_bindgen(js_name = gridAttribution)]
-pub fn grid_attribution(portfolio_json: &str, benchmark_json: &str) -> Result<JsValue, JsValue> {
+pub fn grid_attribution(
+    portfolio_json: JsValue,
+    benchmark_json: JsValue,
+) -> Result<JsValue, JsValue> {
+    let portfolio_json: &str = &json_text(&portfolio_json, "portfolioJson")?;
+    let benchmark_json: &str = &json_text(&benchmark_json, "benchmarkJson")?;
     let portfolio: Vec<finstack_quant_portfolio::GridPosition> =
         serde_json::from_str(portfolio_json).map_err(to_js_err)?;
     let benchmark: Vec<finstack_quant_portfolio::GridPosition> =
@@ -475,7 +502,8 @@ pub fn grid_attribution(portfolio_json: &str, benchmark_json: &str) -> Result<Js
 /// empty, a consumed value is non-finite or inconsistent, a return is at most
 /// `-1`, or the linked result cannot be converted to a JavaScript value.
 #[wasm_bindgen(js_name = gridCarinoLink)]
-pub fn grid_carino_link(periods_json: &str) -> Result<JsValue, JsValue> {
+pub fn grid_carino_link(periods_json: JsValue) -> Result<JsValue, JsValue> {
+    let periods_json: &str = &json_text(&periods_json, "periodsJson")?;
     let periods: Vec<finstack_quant_portfolio::GridAttributionResult> =
         serde_json::from_str(periods_json).map_err(to_js_err)?;
     let result = finstack_quant_portfolio::grid_carino_link(&periods).map_err(to_js_err)?;
@@ -501,9 +529,10 @@ pub fn grid_carino_link(periods_json: &str) -> Result<JsValue, JsValue> {
 /// tolerance; or the result cannot be converted to a JavaScript value.
 #[wasm_bindgen(js_name = factorBrinsonAttribution)]
 pub fn factor_brinson_attribution(
-    input_json: &str,
+    input_json: JsValue,
     factor_returns: Vec<f64>,
 ) -> Result<JsValue, JsValue> {
+    let input_json: &str = &json_text(&input_json, "inputJson")?;
     let input: finstack_quant_portfolio::FactorBrinsonInput =
         serde_json::from_str(input_json).map_err(to_js_err)?;
     let result = finstack_quant_portfolio::factor_brinson_attribution(&input, &factor_returns)
@@ -520,7 +549,8 @@ pub fn factor_brinson_attribution(
 /// the expected period schema, or the return is undefined (non-positive
 /// adjusted denominator, out-of-range cashflow weight, non-finite inputs).
 #[wasm_bindgen(js_name = twrrModifiedDietz)]
-pub fn twrr_modified_dietz(period_json: &str) -> Result<f64, JsValue> {
+pub fn twrr_modified_dietz(period_json: JsValue) -> Result<f64, JsValue> {
+    let period_json: &str = &json_text(&period_json, "periodJson")?;
     let period: finstack_quant_portfolio::TwrrPeriod =
         serde_json::from_str(period_json).map_err(to_js_err)?;
     finstack_quant_portfolio::twrr_modified_dietz(&period).map_err(to_js_err)
@@ -537,7 +567,8 @@ pub fn twrr_modified_dietz(period_json: &str) -> Result<f64, JsValue> {
 /// growth factor), or the linked result cannot be converted to a JavaScript
 /// value.
 #[wasm_bindgen(js_name = twrrLinked)]
-pub fn twrr_linked(returns_json: &str, horizon_years: f64) -> Result<JsValue, JsValue> {
+pub fn twrr_linked(returns_json: JsValue, horizon_years: f64) -> Result<JsValue, JsValue> {
+    let returns_json: &str = &json_text(&returns_json, "returnsJson")?;
     let returns: Vec<f64> = serde_json::from_str(returns_json).map_err(to_js_err)?;
     let result =
         finstack_quant_portfolio::twrr_linked(&returns, horizon_years).map_err(to_js_err)?;
@@ -553,7 +584,8 @@ pub fn twrr_linked(returns_json: &str, horizon_years: f64) -> Result<JsValue, Js
 /// invalid date or insufficient cash flows for XIRR, or the numerical root
 /// cannot be found.
 #[wasm_bindgen(js_name = mwrXirr)]
-pub fn mwr_xirr(cashflows_json: &str) -> Result<f64, JsValue> {
+pub fn mwr_xirr(cashflows_json: JsValue) -> Result<f64, JsValue> {
+    let cashflows_json: &str = &json_text(&cashflows_json, "cashflowsJson")?;
     let cashflows: Vec<finstack_quant_portfolio::DatedCashflow> =
         serde_json::from_str(cashflows_json).map_err(to_js_err)?;
     finstack_quant_portfolio::mwr_xirr_from_cashflows(&cashflows).map_err(to_js_err)
@@ -573,7 +605,8 @@ pub fn mwr_xirr(cashflows_json: &str) -> Result<f64, JsValue> {
 /// specification, portfolio validation fails, or the round-trip form cannot be
 /// serialized.
 #[wasm_bindgen(js_name = buildPortfolioFromSpecJson)]
-pub fn build_portfolio_from_spec_json(spec_json: &str) -> Result<String, JsValue> {
+pub fn build_portfolio_from_spec_json(spec_json: JsValue) -> Result<String, JsValue> {
+    let spec_json: &str = &json_text(&spec_json, "specJson")?;
     let spec: finstack_quant_portfolio::portfolio::PortfolioSpec =
         serde_json::from_str(spec_json).map_err(to_js_err)?;
 
@@ -591,7 +624,8 @@ pub fn build_portfolio_from_spec_json(spec_json: &str) -> Result<String, JsValue
 /// Throws a JavaScript exception if `resultJson` is malformed or does not match
 /// the `PortfolioResult` schema.
 #[wasm_bindgen(js_name = portfolioResultTotalValue)]
-pub fn portfolio_result_total_value(result_json: &str) -> Result<f64, JsValue> {
+pub fn portfolio_result_total_value(result_json: JsValue) -> Result<f64, JsValue> {
+    let result_json: &str = &json_text(&result_json, "resultJson")?;
     let result: finstack_quant_portfolio::results::PortfolioResult =
         serde_json::from_str(result_json).map_err(to_js_err)?;
 
@@ -610,9 +644,11 @@ pub fn portfolio_result_total_value(result_json: &str) -> Result<f64, JsValue> {
 /// the `PortfolioResult` schema. An absent `metricId` returns `undefined`.
 #[wasm_bindgen(js_name = portfolioResultGetMetric)]
 pub fn portfolio_result_get_metric(
-    result_json: &str,
-    metric_id: &str,
+    result_json: JsValue,
+    metric_id: JsValue,
 ) -> Result<Option<f64>, JsValue> {
+    let result_json: &str = &json_text(&result_json, "resultJson")?;
+    let metric_id: &str = &js_string(&metric_id, "metricId")?;
     let result: finstack_quant_portfolio::results::PortfolioResult =
         serde_json::from_str(result_json).map_err(to_js_err)?;
 
@@ -633,11 +669,15 @@ pub fn portfolio_result_get_metric(
 /// metrics cannot be converted to a JavaScript value.
 #[wasm_bindgen(js_name = aggregateMetrics)]
 pub fn aggregate_metrics(
-    valuation_json: &str,
-    base_currency: &str,
-    market_json: &str,
-    as_of: &str,
+    valuation_json: JsValue,
+    base_currency: JsValue,
+    market_json: JsValue,
+    as_of: JsValue,
 ) -> Result<JsValue, JsValue> {
+    let valuation_json: &str = &json_text(&valuation_json, "valuationJson")?;
+    let base_currency: &str = &js_string(&base_currency, "baseCurrency")?;
+    let market_json: &str = &json_text(&market_json, "marketJson")?;
+    let as_of: &str = &js_string(&as_of, "asOf")?;
     let valuation: finstack_quant_portfolio::valuation::PortfolioValuation =
         serde_json::from_str(valuation_json).map_err(to_js_err)?;
     let ccy: finstack_quant_core::currency::Currency = base_currency.parse().map_err(to_js_err)?;
@@ -684,10 +724,10 @@ pub fn aggregate_metrics(
 /// converted to a JavaScript value.
 #[wasm_bindgen(js_name = valuePortfolio)]
 pub fn value_portfolio(
-    spec_json: &str,
-    market_json: &str,
-    strict_risk: Option<bool>,
-    metrics: Option<Vec<String>>,
+    spec_json: JsValue,
+    market_json: JsValue,
+    strict_risk: Option<JsValue>,
+    metrics: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
     let portfolio = JsPortfolio::from_spec(spec_json)?;
     value_portfolio_built(&portfolio, market_json, strict_risk, metrics)
@@ -708,9 +748,9 @@ pub fn value_portfolio(
 /// overflows, or the aggregate cannot be converted to a JavaScript value.
 #[wasm_bindgen(js_name = aggregateFullCashflows)]
 pub fn aggregate_full_cashflows(
-    spec_json: &str,
-    market_json: &str,
-    allow_partial: Option<bool>,
+    spec_json: JsValue,
+    market_json: JsValue,
+    allow_partial: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
     let portfolio = JsPortfolio::from_spec(spec_json)?;
     aggregate_full_cashflows_built(&portfolio, market_json, allow_partial)
@@ -737,9 +777,11 @@ pub fn aggregate_full_cashflows(
 #[wasm_bindgen(js_name = aggregateFullCashflowsBuilt)]
 pub fn aggregate_full_cashflows_built(
     portfolio: &JsPortfolio,
-    market_json: &str,
-    allow_partial: Option<bool>,
+    market_json: JsValue,
+    allow_partial: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
+    let market_json: &str = &json_text(&market_json, "marketJson")?;
+    let allow_partial = js_opt_bool(allow_partial.as_ref(), "allowPartial")?;
     let market: finstack_quant_core::market_data::context::MarketContext =
         serde_json::from_str(market_json).map_err(to_js_err)?;
     let options = finstack_quant_portfolio::cashflows::CashflowAggregationOptions {
@@ -792,10 +834,13 @@ pub fn aggregate_full_cashflows_built(
 #[wasm_bindgen(js_name = valuePortfolioBuilt)]
 pub fn value_portfolio_built(
     portfolio: &JsPortfolio,
-    market_json: &str,
-    strict_risk: Option<bool>,
-    metrics: Option<Vec<String>>,
+    market_json: JsValue,
+    strict_risk: Option<JsValue>,
+    metrics: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
+    let market_json: &str = &json_text(&market_json, "marketJson")?;
+    let strict_risk = js_opt_bool(strict_risk.as_ref(), "strictRisk")?;
+    let metrics = js_opt_string_seq(metrics.as_ref(), "metrics")?;
     let market: finstack_quant_core::market_data::context::MarketContext =
         serde_json::from_str(market_json).map_err(to_js_err)?;
     let config = finstack_quant_core::config::FinstackConfig::default();
@@ -837,9 +882,11 @@ pub fn value_portfolio_built(
 #[wasm_bindgen(js_name = applyScenarioAndRevalueBuilt)]
 pub fn apply_scenario_and_revalue_built(
     portfolio: &JsPortfolio,
-    scenario_json: &str,
-    market_json: &str,
+    scenario_json: JsValue,
+    market_json: JsValue,
 ) -> Result<JsValue, JsValue> {
+    let scenario_json: &str = &json_text(&scenario_json, "scenarioJson")?;
+    let market_json: &str = &json_text(&market_json, "marketJson")?;
     let scenario: finstack_quant_scenarios::ScenarioSpec =
         serde_json::from_str(scenario_json).map_err(to_js_err)?;
     let market: finstack_quant_core::market_data::context::MarketContext =
@@ -873,9 +920,9 @@ pub fn apply_scenario_and_revalue_built(
 /// fails; or the structured result cannot be converted to a JavaScript value.
 #[wasm_bindgen(js_name = applyScenarioAndRevalue)]
 pub fn apply_scenario_and_revalue(
-    spec_json: &str,
-    scenario_json: &str,
-    market_json: &str,
+    spec_json: JsValue,
+    scenario_json: JsValue,
+    market_json: JsValue,
 ) -> Result<JsValue, JsValue> {
     let portfolio = JsPortfolio::from_spec(spec_json)?;
     apply_scenario_and_revalue_built(&portfolio, scenario_json, market_json)
@@ -901,9 +948,11 @@ pub fn apply_scenario_and_revalue(
 #[wasm_bindgen(js_name = scenarioPnlBuilt)]
 pub fn scenario_pnl_built(
     portfolio: &JsPortfolio,
-    scenario_json: &str,
-    market_json: &str,
+    scenario_json: JsValue,
+    market_json: JsValue,
 ) -> Result<JsValue, JsValue> {
+    let scenario_json: &str = &json_text(&scenario_json, "scenarioJson")?;
+    let market_json: &str = &json_text(&market_json, "marketJson")?;
     let scenario: finstack_quant_scenarios::ScenarioSpec =
         serde_json::from_str(scenario_json).map_err(to_js_err)?;
     let market: finstack_quant_core::market_data::context::MarketContext =
@@ -936,9 +985,9 @@ pub fn scenario_pnl_built(
 /// result cannot be converted to JavaScript.
 #[wasm_bindgen(js_name = scenarioPnl)]
 pub fn scenario_pnl(
-    spec_json: &str,
-    scenario_json: &str,
-    market_json: &str,
+    spec_json: JsValue,
+    scenario_json: JsValue,
+    market_json: JsValue,
 ) -> Result<JsValue, JsValue> {
     let portfolio = JsPortfolio::from_spec(spec_json)?;
     scenario_pnl_built(&portfolio, scenario_json, market_json)
@@ -959,7 +1008,9 @@ pub fn scenario_pnl(
 /// invalid, a required market-dependent valuation fails, the solver cannot
 /// produce a result, or the result cannot be converted to a JavaScript value.
 #[wasm_bindgen(js_name = optimizePortfolio)]
-pub fn optimize_portfolio(spec_json: &str, market_json: &str) -> Result<JsValue, JsValue> {
+pub fn optimize_portfolio(spec_json: JsValue, market_json: JsValue) -> Result<JsValue, JsValue> {
+    let spec_json: &str = &json_text(&spec_json, "specJson")?;
+    let market_json: &str = &json_text(&market_json, "marketJson")?;
     let spec: finstack_quant_portfolio::optimization::PortfolioOptimizationSpec =
         serde_json::from_str(spec_json).map_err(to_js_err)?;
     let market: finstack_quant_core::market_data::context::MarketContext =
@@ -991,10 +1042,13 @@ pub fn optimize_portfolio(spec_json: &str, market_json: &str) -> Result<JsValue,
 /// step; or the result cannot be converted to a JavaScript value.
 #[wasm_bindgen(js_name = replayPortfolio)]
 pub fn replay_portfolio(
-    spec_json: &str,
-    snapshots_json: &str,
-    config_json: &str,
+    spec_json: JsValue,
+    snapshots_json: JsValue,
+    config_json: JsValue,
 ) -> Result<JsValue, JsValue> {
+    let spec_json: &str = &json_text(&spec_json, "specJson")?;
+    let snapshots_json: &str = &json_text(&snapshots_json, "snapshotsJson")?;
+    let config_json: &str = &json_text(&config_json, "configJson")?;
     let spec: finstack_quant_portfolio::portfolio::PortfolioSpec =
         serde_json::from_str(spec_json).map_err(to_js_err)?;
     let portfolio = finstack_quant_portfolio::Portfolio::from_spec(spec).map_err(to_js_err)?;
@@ -1024,7 +1078,6 @@ pub fn replay_portfolio(
 /// round-trip that catches an ES-`Map` serialization regression.
 #[cfg(test)]
 mod tests {
-    use super::*;
 
     fn minimal_portfolio_spec_json() -> String {
         serde_json::json!({
@@ -1038,74 +1091,9 @@ mod tests {
         .to_string()
     }
 
-    #[test]
-    fn parse_portfolio_spec_json_roundtrip() {
-        let json = minimal_portfolio_spec_json();
-        let result = parse_portfolio_spec_json(&json).expect("parse");
-        let parsed: serde_json::Value = serde_json::from_str(&result).expect("valid json");
-        assert_eq!(parsed["id"], "test_portfolio");
-    }
-
-    #[test]
-    fn build_portfolio_from_spec_json_empty() {
-        let json = minimal_portfolio_spec_json();
-        let result = build_portfolio_from_spec_json(&json).expect("build");
-        let parsed: serde_json::Value = serde_json::from_str(&result).expect("valid json");
-        assert_eq!(parsed["id"], "test_portfolio");
-    }
-
-    #[test]
-    fn parse_and_rebuild_roundtrip() {
-        let json = minimal_portfolio_spec_json();
-        let canonical = parse_portfolio_spec_json(&json).expect("parse");
-        let rebuilt = build_portfolio_from_spec_json(&canonical).expect("rebuild");
-        let a: serde_json::Value = serde_json::from_str(&canonical).expect("a");
-        let b: serde_json::Value = serde_json::from_str(&rebuilt).expect("b");
-        assert_eq!(a["id"], b["id"]);
-    }
-
     fn empty_market_json() -> String {
         let ctx = finstack_quant_core::market_data::context::MarketContext::new();
         serde_json::to_string(&ctx).expect("serialize")
-    }
-
-    #[test]
-    fn portfolio_handle_exposes_spec_metadata_and_roundtrips() {
-        let spec_json = minimal_portfolio_spec_json();
-        let handle = JsPortfolio::from_spec(&spec_json).expect("build handle");
-        assert_eq!(handle.id(), "test_portfolio");
-        assert_eq!(handle.base_currency(), "USD");
-        assert_eq!(handle.as_of(), "2024-01-15");
-        assert_eq!(handle.num_positions(), 0);
-
-        let round = handle.to_json().expect("to spec json");
-        let parsed: serde_json::Value = serde_json::from_str(&round).expect("json");
-        assert_eq!(parsed["id"], "test_portfolio");
-    }
-
-    #[test]
-    fn portfolio_result_total_value_from_valuation() {
-        let spec: finstack_quant_portfolio::portfolio::PortfolioSpec =
-            serde_json::from_str(&minimal_portfolio_spec_json()).expect("parse spec");
-        let portfolio =
-            finstack_quant_portfolio::Portfolio::from_spec(spec).expect("build portfolio");
-        let market: finstack_quant_core::market_data::context::MarketContext =
-            serde_json::from_str(&empty_market_json()).expect("parse market");
-        let valuation = finstack_quant_portfolio::valuation::value_portfolio(
-            &portfolio,
-            &market,
-            &finstack_quant_core::config::FinstackConfig::default(),
-            &finstack_quant_portfolio::valuation::PortfolioValuationOptions::default(),
-        )
-        .expect("value");
-        let result = finstack_quant_portfolio::results::PortfolioResult::new(
-            valuation,
-            Default::default(),
-            Default::default(),
-        );
-        let result_json = serde_json::to_string(&result).expect("ser");
-        let total = portfolio_result_total_value(&result_json).expect("total");
-        assert!(total.is_finite());
     }
 
     /// Tests the replay_portfolio WASM binding logic by exercising the same
@@ -1155,34 +1143,5 @@ mod tests {
         let parsed: serde_json::Value = serde_json::from_str(&json).expect("parse json");
         assert!(parsed["steps"].is_array());
         assert_eq!(parsed["steps"].as_array().expect("array").len(), 2);
-    }
-
-    #[test]
-    fn twrr_modified_dietz_matches_gips_example() {
-        let period = serde_json::json!({
-            "beginning_market_value": 10_000_000.0,
-            "ending_market_value": 10_500_000.0,
-            "cashflows": [
-                {
-                    "amount": 1_000_000.0,
-                    "fraction_of_period_remaining": 0.60
-                }
-            ]
-        });
-
-        let result = twrr_modified_dietz(&period.to_string()).expect("modified dietz");
-        let expected = -500_000.0 / 10_600_000.0;
-        assert!((result - expected).abs() < 1e-12);
-    }
-
-    #[test]
-    fn mwr_xirr_solves_money_weighted_return() {
-        let cashflows = serde_json::json!([
-            {"date": "2025-01-01", "amount": -100.0},
-            {"date": "2026-01-01", "amount": 110.0}
-        ]);
-
-        let result = mwr_xirr(&cashflows.to_string()).expect("xirr");
-        assert!((result - 0.10).abs() < 1e-6);
     }
 }

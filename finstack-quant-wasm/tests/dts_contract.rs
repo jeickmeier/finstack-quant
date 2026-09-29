@@ -59,15 +59,18 @@ fn credit_factor_hierarchy_dts_exposes_public_surface() {
     assert!(dts.contains("declare class CreditFactorModel {"));
     assert!(contains_signature(
         &dts,
-        "static fromJson(json: string): CreditFactorModel;"
+        "static fromJson(json: JsonInput): CreditFactorModel;"
     ));
     assert!(contains_signature(&dts, "toJson(): string;"));
 
     assert!(dts.contains("declare class CreditCalibrator {"));
-    assert!(contains_signature(&dts, "constructor(configJson: string);"));
     assert!(contains_signature(
         &dts,
-        "calibrate(inputsJson: string): CreditFactorModel;"
+        "constructor(configJson: JsonInput);"
+    ));
+    assert!(contains_signature(
+        &dts,
+        "calibrate(inputsJson: JsonInput): CreditFactorModel;"
     ));
 
     assert!(dts.contains("declare class LevelsAtDate {"));
@@ -82,15 +85,15 @@ fn credit_factor_hierarchy_dts_exposes_public_surface() {
     ));
     assert!(contains_signature(
         &dts,
-        "covarianceAt(horizonJson: string): FactorCovarianceMatrix;"
+        "covarianceAt(horizonJson: JsonInput): FactorCovarianceMatrix;"
     ));
     assert!(contains_signature(
         &dts,
-        "idiosyncraticVol(issuerId: string, horizonJson: string): number;"
+        "idiosyncraticVol(issuerId: string, horizonJson: JsonInput): number;"
     ));
     assert!(contains_signature(
         &dts,
-        "factorModelAt(horizonJson: string, riskMeasureJson: string): FactorModelConfig;"
+        "factorModelAt(horizonJson: JsonInput, riskMeasureJson: JsonInput): FactorModelConfig;"
     ));
 
     // The decomposition functions live on `models.factor.credit`; the package
@@ -383,13 +386,13 @@ fn cashflows_dts_matches_json_bridge_surface() {
 
     assert!(dts.contains("export interface CashflowsNamespace"));
     assert!(dts.contains(
-        "buildCashflowScheduleJson(specJson: string, marketJson?: string | null): string;"
+        "buildCashflowScheduleJson(specJson: JsonInput, marketJson?: JsonInput | null): string;"
     ));
-    assert!(dts.contains("validateCashflowScheduleJson(scheduleJson: string): string;"));
+    assert!(dts.contains("validateCashflowScheduleJson(scheduleJson: JsonInput): string;"));
     assert!(!dts.contains("CashflowScheduleEnvelope"));
     assert!(!dts.contains("buildCashflowScheduleEnvelopeJson"));
     assert!(!dts.contains("validateCashflowScheduleEnvelopeJson"));
-    assert!(dts.contains("datedFlowsJson(scheduleJson: string): string;"));
+    assert!(dts.contains("datedFlowsJson(scheduleJson: JsonInput): string;"));
     assert!(dts.contains("accruedInterest("));
     let cashflows_start = dts.find("export interface CashflowsNamespace").unwrap();
     let cashflows_end = dts[cashflows_start..]
@@ -418,11 +421,12 @@ fn valuations_dts_exposes_direct_fx_instruments() {
     assert!(dts.contains("FxTouchOption: FxInstrumentConstructor<FxTouchOptionInstrument>;"));
     assert!(dts.contains("QuantoOption: FxInstrumentConstructor<FxOptionInstrument>;"));
     assert!(dts.contains("fx: FxNamespace;"));
-    assert!(dts
-        .contains("foreignRho(marketJson: string, asOf: string, model?: string | null): number;"));
+    assert!(dts.contains(
+        "foreignRho(marketJson: JsonInput, asOf: string, model?: string | null): number;"
+    ));
     assert!(contains_ignoring_ws(
         &dts,
-        "greeks(marketJson: string, asOf: string, model?: string | null): Record<string, number>;",
+        "greeks(marketJson: JsonInput, asOf: string, model?: string | null): Record<string, number>;",
     ));
     // Every FX class carries an `id` getter, mirroring the Python typed
     // wrappers' `id` property.
@@ -430,7 +434,7 @@ fn valuations_dts_exposes_direct_fx_instruments() {
     assert!(fx_instrument.contains("readonly id: string;"));
     assert!(contains_ignoring_ws(
         fx_instrument,
-        "price(marketJson: string, asOf: string, model?: string | null, metrics?: string[] | null, metricPricingOverrides?: string | null, marketHistory?: string | null): ValuationResult;",
+        "price(marketJson: JsonInput, asOf: string, model?: string | null, metrics?: string[] | null, metricPricingOverrides?: JsonInput | null, marketHistory?: JsonInput | null): ValuationResult;",
     ));
 }
 
@@ -441,11 +445,11 @@ fn valuations_dts_exposes_reusable_market_handle_pricing() {
     assert!(dts.contains("declare class Market {"));
     assert!(contains_ignoring_ws(
         &dts,
-        "priceInstrumentWithMarket(instrumentJson: string, market: Market, asOf: string, model: string, metrics?: string[] | null, metricPricingOverrides?: string | null, marketHistory?: string | null): ValuationResult;",
+        "priceInstrumentWithMarket(instrumentJson: JsonInput, market: Market, asOf: string, model: string, metrics?: string[] | null, metricPricingOverrides?: JsonInput | null, marketHistory?: JsonInput | null): ValuationResult;",
     ));
     assert!(contains_ignoring_ws(
         &dts,
-        "instrumentCashflowsWithMarketJson(instrumentJson: string, market: Market, asOf: string, model: string): string;",
+        "instrumentCashflowsWithMarketJson(instrumentJson: JsonInput, market: Market, asOf: string, model: string): string;",
     ));
 }
 
@@ -536,7 +540,7 @@ fn pricing_entry_points_declare_structured_valuation_results() {
     ));
     assert!(contains_ignoring_ws(
         &dts,
-        "priceInstrument(instrumentJson: string, marketJson: string, asOf: string, model?: string | null, metrics?: string[] | null, metricPricingOverrides?: string | null, marketHistory?: string | null): ValuationResult;",
+        "priceInstrument(instrumentJson: JsonInput, marketJson: JsonInput, asOf: string, model?: string | null, metrics?: string[] | null, metricPricingOverrides?: JsonInput | null, marketHistory?: JsonInput | null): ValuationResult;",
     ));
     let pricing_doc = preceding_jsdoc(&dts, "  priceInstrument(");
     for model in ["discounting", "hazard_rate", "tree", "rates_credit"] {
@@ -549,7 +553,7 @@ fn pricing_entry_points_declare_structured_valuation_results() {
     // The valuation-result *validator* still takes and returns a wire string.
     assert!(contains_ignoring_ws(
         &dts,
-        "validateValuationResultJson(json: string): string;",
+        "validateValuationResultJson(json: JsonInput): string;",
     ));
 }
 
@@ -567,23 +571,23 @@ fn structured_credit_tranche_analytics_declare_typed_results() {
     assert!(dts.contains("export interface TrancheScenarioCell {"));
     assert!(contains_ignoring_ws(
         &dts,
-        "structuredCreditTrancheOas(instrumentJson: string, trancheId: string, marketJson: string, asOf: string, marketPricePct: number, config?: string | null): OasResult;",
+        "structuredCreditTrancheOas(instrumentJson: JsonInput, trancheId: string, marketJson: JsonInput, asOf: string, marketPricePct: number, config?: string | null): OasResult;",
     ));
     assert!(contains_ignoring_ws(
         &dts,
-        "structuredCreditTrancheMetrics(instrumentJson: string, trancheId: string, marketJson: string, asOf: string, marketPricePct?: number | null): TrancheMetrics;",
+        "structuredCreditTrancheMetrics(instrumentJson: JsonInput, trancheId: string, marketJson: JsonInput, asOf: string, marketPricePct?: number | null): TrancheMetrics;",
     ));
     assert!(contains_ignoring_ws(
         &dts,
-        "structuredCreditTrancheScenarioTable(instrumentJson: string, trancheId: string, marketJson: string, asOf: string, grid: string): ScenarioTable;",
+        "structuredCreditTrancheScenarioTable(instrumentJson: JsonInput, trancheId: string, marketJson: JsonInput, asOf: string, grid: string): ScenarioTable;",
     ));
     assert!(contains_ignoring_ws(
         &dts,
-        "structuredCreditTrancheDiscountMargin(instrumentJson: string, trancheId: string, marketJson: string, asOf: string, marketPricePct: number): number;",
+        "structuredCreditTrancheDiscountMargin(instrumentJson: JsonInput, trancheId: string, marketJson: JsonInput, asOf: string, marketPricePct: number): number;",
     ));
     assert!(contains_ignoring_ws(
         &dts,
-        "structuredCreditTrancheBreakevenCdr(instrumentJson: string, trancheId: string, marketJson: string, asOf: string): number;",
+        "structuredCreditTrancheBreakevenCdr(instrumentJson: JsonInput, trancheId: string, marketJson: JsonInput, asOf: string): number;",
     ));
 }
 
@@ -594,11 +598,11 @@ fn portfolio_cashflow_api_uses_full_cashflow_name_everywhere() {
 
     assert!(contains_signature(
         &dts,
-        "aggregateFullCashflows(specJson: string, marketJson: string, allowPartial?: boolean): Record<string, unknown>;",
+        "aggregateFullCashflows(specJson: JsonInput, marketJson: JsonInput, allowPartial?: boolean): Record<string, unknown>;",
     ));
     assert!(contains_signature(
         &dts,
-        "aggregateFullCashflowsBuilt(portfolio: Portfolio, marketJson: string, allowPartial?: boolean): Record<string, unknown>;",
+        "aggregateFullCashflowsBuilt(portfolio: Portfolio, marketJson: JsonInput, allowPartial?: boolean): Record<string, unknown>;",
     ));
     assert!(!dts.contains("aggregateCashflows("));
     assert!(bench.contains("aggregateFullCashflows"));
@@ -630,7 +634,7 @@ fn scenarios_dts_matches_structured_surface() {
     assert!(contains_ignoring_ws(&dts, "warnings: ScenarioWarning[];"));
     assert!(contains_ignoring_ws(
         &dts,
-        "computeHorizonReturn(instrumentJson: string, marketJson: string, asOf: string, scenarioJson: string, method?: string, configJson?: string, calendarId?: string): Record<string, unknown>;",
+        "computeHorizonReturn(instrumentJson: JsonInput, marketJson: JsonInput, asOf: string, scenarioJson: JsonInput, method?: string, configJson?: JsonInput, calendarId?: string): Record<string, unknown>;",
     ));
     // `priority` mirrors the Rust serde default (0) and the Python keyword
     // default, so it must stay optional.
@@ -662,19 +666,19 @@ fn portfolio_dts_pins_python_parity_optional_parameters() {
 
     assert!(contains_ignoring_ws(
         &dts,
-        "valuePortfolio(specJson: string, marketJson: string, strictRisk?: boolean, metrics?: string[]): Record<string, unknown>;",
+        "valuePortfolio(specJson: JsonInput, marketJson: JsonInput, strictRisk?: boolean, metrics?: string[]): Record<string, unknown>;",
     ));
     assert!(contains_ignoring_ws(
         &dts,
-        "valuePortfolioBuilt(portfolio: Portfolio, marketJson: string, strictRisk?: boolean, metrics?: string[]): Record<string, unknown>;",
+        "valuePortfolioBuilt(portfolio: Portfolio, marketJson: JsonInput, strictRisk?: boolean, metrics?: string[]): Record<string, unknown>;",
     ));
     assert!(contains_ignoring_ws(
         &dts,
-        "parametricVarDecomposition(positionIdsJson: string, weightsJson: string, covarianceJson: string, confidence: number, computeIncremental?: boolean): VarDecompositionResult;",
+        "parametricVarDecomposition(positionIdsJson: JsonInput, weightsJson: JsonInput, covarianceJson: JsonInput, confidence: number, computeIncremental?: boolean): VarDecompositionResult;",
     ));
     assert!(contains_ignoring_ws(
         &dts,
-        "evaluateRiskBudget(positionIdsJson: string, actualVarJson: string, targetVarPctJson: string, portfolioVar: number, utilizationThreshold?: number): RiskBudgetResult;",
+        "evaluateRiskBudget(positionIdsJson: JsonInput, actualVarJson: JsonInput, targetVarPctJson: JsonInput, portfolioVar: number, utilizationThreshold?: number): RiskBudgetResult;",
     ));
     assert!(contains_ignoring_ws(&dts, "execution_risk: number;"));
 }
@@ -701,26 +705,26 @@ fn campisi_dts_declarations_pin_their_argument_lists() {
     );
     assert!(contains_signature(
         &dts,
-        "campisiAttribution(portfolioJson: string, benchmarkJson: string, configJson: string): Record<string, unknown>;",
+        "campisiAttribution(portfolioJson: JsonInput, benchmarkJson: JsonInput, configJson: JsonInput): Record<string, unknown>;",
     ));
     assert!(contains_signature(
         &dts,
-        "campisiCarinoLink(periodsJson: string): Record<string, unknown>;",
+        "campisiCarinoLink(periodsJson: JsonInput): Record<string, unknown>;",
     ));
     assert!(contains_signature(
         &dts,
-        "campisiCarinoLinkFromSnapshots(periodsJson: string, configJson: string): Record<string, unknown>;",
+        "campisiCarinoLinkFromSnapshots(periodsJson: JsonInput, configJson: JsonInput): Record<string, unknown>;",
     ));
     assert!(contains_signature(
         &dts,
-        "campisiReconciliationCheck(resultJson: string, tolerance: number): Record<string, unknown>;",
+        "campisiReconciliationCheck(resultJson: JsonInput, tolerance: number): Record<string, unknown>;",
     ));
 
     // The results-based linker must not grow a config argument: it links
     // periods that already carry their own `period_years`.
     assert!(!contains_ignoring_ws(
         &dts,
-        "campisiCarinoLink(periodsJson: string, configJson: string)",
+        "campisiCarinoLink(periodsJson: JsonInput, configJson: JsonInput)",
     ));
 }
 
@@ -757,7 +761,7 @@ fn models_liquidity_dts_requires_reference_price_for_kyle_lambda() {
 
     assert!(contains_signature(
         liquidity,
-        "kyleLambda(returnsJson: string, volumesJson: string, referencePrice: number): number | undefined;",
+        "kyleLambda(returnsJson: JsonInput, volumesJson: JsonInput, referencePrice: number): number | undefined;",
     ));
     assert!(!interface_block(&dts, "PortfolioNamespace").contains("kyleLambda("));
 }
@@ -852,19 +856,19 @@ fn statements_dts_matches_runtime_exports() {
     let dts = index_dts();
 
     assert!(dts.contains("export interface StatementsNamespace"));
-    assert!(dts.contains("validateFinancialModelJson(json: string): string;"));
-    assert!(dts.contains("modelNodeIds(json: string): string[];"));
-    assert!(dts.contains("validateCheckSuiteSpecJson(json: string): string;"));
+    assert!(dts.contains("validateFinancialModelJson(json: JsonInput): string;"));
+    assert!(dts.contains("modelNodeIds(json: JsonInput): string[];"));
+    assert!(dts.contains("validateCheckSuiteSpecJson(json: JsonInput): string;"));
     // Computation results are structured objects, not JSON strings: a string
     // return here would put JS out of step with the typed Python result.
-    assert!(dts.contains("evaluateModel(modelJson: string): StatementResultJson;"));
+    assert!(dts.contains("evaluateModel(modelJson: JsonInput): StatementResultJson;"));
     assert!(contains_ignoring_ws(
         &dts,
-        "evaluateModelWithMarket(modelJson: string, marketJson: string, asOf: string): StatementResultJson;",
+        "evaluateModelWithMarket(modelJson: JsonInput, marketJson: JsonInput, asOf: string): StatementResultJson;",
     ));
     assert!(contains_ignoring_ws(
         &dts,
-        "evaluateMonteCarlo(modelJson: string, configJson: string): Record<string, unknown>;",
+        "evaluateMonteCarlo(modelJson: JsonInput, configJson: JsonInput): Record<string, unknown>;",
     ));
     assert!(dts.contains("export interface StatementResultJson"));
     assert!(dts.contains("export declare const statements: StatementsNamespace;"));
@@ -880,12 +884,12 @@ fn covenants_dts_separates_typed_results_from_json_bridges() {
     assert!(dts.contains("export interface CovenantReport"));
     assert!(contains_ignoring_ws(
         &dts,
-        "evaluateEngine(engineJson: string, metricsJson: string, asOf: string): Record<string, CovenantReport>;",
+        "evaluateEngine(engineJson: JsonInput, metricsJson: JsonInput, asOf: string): Record<string, CovenantReport>;",
     ));
     for wire in [
-        "validateCovenantSpecJson(specJson: string): string;",
-        "validateCovenantReportJson(reportJson: string): string;",
-        "validateCovenantEngineJson(engineJson: string): string;",
+        "validateCovenantSpecJson(specJson: JsonInput): string;",
+        "validateCovenantReportJson(reportJson: JsonInput): string;",
+        "validateCovenantEngineJson(engineJson: JsonInput): string;",
         "covLiteJson(maxLeverage: number, maxSeniorLeverage: number): string;",
         "realEstateJson(minDscr: number, minDebtYield: number, maxLtv: number): string;",
     ] {
@@ -903,47 +907,47 @@ fn statements_analytics_dts_matches_runtime_exports() {
     assert!(dts.contains("updated_model_json?: string;"));
     assert!(contains_ignoring_ws(
         &dts,
-        "goalSeek(modelJson: string, targetNode: string, targetPeriod: string, targetValue: number, driverNode: string, driverPeriod: string, updateModel: boolean, boundsLo?: number | null, boundsHi?: number | null): GoalSeekResult;",
+        "goalSeek(modelJson: JsonInput, targetNode: string, targetPeriod: string, targetValue: number, driverNode: string, driverPeriod: string, updateModel: boolean, boundsLo?: number | null, boundsHi?: number | null): GoalSeekResult;",
     ));
     assert!(dts.contains("export interface FormulaExplanationJson"));
     assert!(contains_ignoring_ws(
         &dts,
-        "explainFormula(modelJson: string, resultsJson: string, nodeId: string, period: string): FormulaExplanationJson;"
+        "explainFormula(modelJson: JsonInput, resultsJson: JsonInput, nodeId: string, period: string): FormulaExplanationJson;"
     ));
     assert!(contains_ignoring_ws(
         &dts,
-        "explainFormulaText(modelJson: string, resultsJson: string, nodeId: string, period: string): string;"
+        "explainFormulaText(modelJson: JsonInput, resultsJson: JsonInput, nodeId: string, period: string): string;"
     ));
     // Converted computation results: object returns, matching the typed
     // Python results for the same Rust calls.
     assert!(contains_ignoring_ws(
         &dts,
-        "runSensitivity(modelJson: string, configJson: string): Record<string, unknown>;",
+        "runSensitivity(modelJson: JsonInput, configJson: JsonInput): Record<string, unknown>;",
     ));
     assert!(contains_ignoring_ws(
         &dts,
-        "runVariance(baseJson: string, comparisonJson: string, configJson: string): Record<string, unknown>;",
+        "runVariance(baseJson: JsonInput, comparisonJson: JsonInput, configJson: JsonInput): Record<string, unknown>;",
     ));
     assert!(contains_ignoring_ws(
         &dts,
-        "evaluateScenarioSet(modelJson: string, scenarioSetJson: string): Record<string, StatementResultJson>;",
+        "evaluateScenarioSet(modelJson: JsonInput, scenarioSetJson: JsonInput): Record<string, StatementResultJson>;",
     ));
     assert!(contains_ignoring_ws(
         &dts,
-        "creditAssessment(resultsJson: string, period: string): Record<string, unknown>;",
+        "creditAssessment(resultsJson: JsonInput, period: string): Record<string, unknown>;",
     ));
     assert!(dts.contains("export interface DcfSensitivityResult"));
     // dcfSensitivity carries the same optional mid-year-convention and market
     // parameters as the Python twin (contracted 1:1 in parity_contract.toml).
     assert!(contains_ignoring_ws(
         &dts,
-        "dcfSensitivity(modelJson: string, wacc: number, terminalValueJson: string, ufcfNode: string, netDebtOverride?: number | null, waccSensitivityBump?: number | null, waccDenominatorEpsilon?: number | null, maxStableGrowthRate?: number | null, exitMultipleBump?: number | null, midYearConvention?: boolean | null, marketJson?: string | null): DcfSensitivityResult;",
+        "dcfSensitivity(modelJson: JsonInput, wacc: number, terminalValueJson: JsonInput, ufcfNode: string, netDebtOverride?: number | null, waccSensitivityBump?: number | null, waccDenominatorEpsilon?: number | null, maxStableGrowthRate?: number | null, exitMultipleBump?: number | null, midYearConvention?: boolean | null, marketJson?: JsonInput | null): DcfSensitivityResult;",
     ));
     assert!(dts.contains("export interface LboResult"));
     assert!(dts.contains("export interface TornadoEntry"));
     assert!(contains_ignoring_ws(
         &dts,
-        "generateTornadoEntries(resultJson: string, metricNode: string, period?: string): TornadoEntry[];"
+        "generateTornadoEntries(resultJson: JsonInput, metricNode: string, period?: string): TornadoEntry[];"
     ));
     assert!(dts.contains("export interface CheckReport"));
     assert!(dts.contains("export interface CheckResult"));
@@ -951,18 +955,18 @@ fn statements_analytics_dts_matches_runtime_exports() {
     assert!(dts.contains("export interface CheckSummary"));
     assert!(contains_ignoring_ws(
         &dts,
-        "runChecks(modelJson: string, suiteSpecJson: string, resultsJson?: string | null): CheckReport;"
+        "runChecks(modelJson: JsonInput, suiteSpecJson: JsonInput, resultsJson?: JsonInput | null): CheckReport;"
     ));
     assert!(contains_ignoring_ws(
         &dts,
-        "runThreeStatementChecks(modelJson: string, mappingJson: string, resultsJson?: string | null): CheckReport;"
+        "runThreeStatementChecks(modelJson: JsonInput, mappingJson: JsonInput, resultsJson?: JsonInput | null): CheckReport;"
     ));
     assert!(contains_ignoring_ws(
         &dts,
-        "runCreditUnderwritingChecks(modelJson: string, mappingJson: string, resultsJson?: string | null): CheckReport;"
+        "runCreditUnderwritingChecks(modelJson: JsonInput, mappingJson: JsonInput, resultsJson?: JsonInput | null): CheckReport;"
     ));
-    assert!(dts.contains("renderCheckReportText(reportJson: string): string;"));
-    assert!(dts.contains("renderCheckReportHtml(reportJson: string): string;"));
+    assert!(dts.contains("renderCheckReportText(reportJson: JsonInput): string;"));
+    assert!(dts.contains("renderCheckReportHtml(reportJson: JsonInput): string;"));
     assert!(
         dts.contains("export declare const statements_analytics: StatementsAnalyticsNamespace;")
     );
@@ -983,9 +987,9 @@ fn models_and_valuations_dts_expose_owned_credit_namespaces() {
     assert!(
         dts.contains("mertonKmvDefaultPoint(shortTermDebt: number, longTermDebt: number): number;")
     );
-    assert!(dts.contains("mertonDebtSpread(modelJson: string, horizon: number): number;"));
+    assert!(dts.contains("mertonDebtSpread(modelJson: JsonInput, horizon: number): number;"));
     assert!(dts.contains(
-        "mertonCdsParSpread(modelJson: string, maturity: number, recovery: number): number;"
+        "mertonCdsParSpread(modelJson: JsonInput, maturity: number, recovery: number): number;"
     ));
     assert!(dts.contains("creditGradesModelJson("));
     assert!(dts.contains("toggleExerciseOptimalJson("));
@@ -1087,7 +1091,7 @@ fn features_dts_matches_transform_surface() {
     ));
     assert!(contains_signature(
         features,
-        "transformPanelJson(specJson: string): string;"
+        "transformPanelJson(specJson: JsonInput): string;"
     ));
     assert!(dts.contains("export declare const features: FeaturesNamespace;"));
 }
@@ -1292,8 +1296,8 @@ fn attribution_dts_matches_json_pipeline_surface() {
     assert!(dts.contains("attributePnl(params: AttributionParams): PnlAttribution;"));
     assert!(dts.contains("attributePnlJson(params: AttributionParams): string;"));
     assert!(dts.contains("AttributionParams: new ("));
-    assert!(dts.contains("attributePnlEnvelopeJson(specJson: string): string;"));
-    assert!(dts.contains("validateAttributionJson(json: string): string;"));
+    assert!(dts.contains("attributePnlEnvelopeJson(specJson: JsonInput): string;"));
+    assert!(dts.contains("validateAttributionJson(json: JsonInput): string;"));
     assert!(dts.contains("defaultWaterfallOrder(): string[];"));
     assert!(dts.contains("defaultAttributionMetrics(): string[];"));
     assert!(dts.contains("export declare const attribution: AttributionNamespace;"));
@@ -1312,7 +1316,7 @@ fn credit_excess_grid_factor_brinson_dts_declarations_pin_their_argument_lists()
 
     assert!(contains_signature(
         &dts,
-        "cellReturnsFromReference(referenceJson: string, baseLabel: string, configJson: string): Record<string, unknown>;",
+        "cellReturnsFromReference(referenceJson: JsonInput, baseLabel: string, configJson: JsonInput): Record<string, unknown>;",
     ));
     assert!(contains_signature(
         &dts,
@@ -1322,24 +1326,24 @@ fn credit_excess_grid_factor_brinson_dts_declarations_pin_their_argument_lists()
            horizonYears: number, \
            maxDuration: number, \
            baseLabel: string, \
-           configJson: string\
+           configJson: JsonInput\
          ): Record<string, unknown>;",
     ));
     assert!(contains_signature(
         &dts,
-        "excessReturns(positionsJson: string, tableJson: string): Record<string, unknown>;",
+        "excessReturns(positionsJson: JsonInput, tableJson: JsonInput): Record<string, unknown>;",
     ));
     assert!(contains_signature(
         &dts,
-        "gridAttribution(portfolioJson: string, benchmarkJson: string): Record<string, unknown>;",
+        "gridAttribution(portfolioJson: JsonInput, benchmarkJson: JsonInput): Record<string, unknown>;",
     ));
     assert!(contains_signature(
         &dts,
-        "gridCarinoLink(periodsJson: string): Record<string, unknown>;",
+        "gridCarinoLink(periodsJson: JsonInput): Record<string, unknown>;",
     ));
     assert!(contains_signature(
         &dts,
-        "factorBrinsonAttribution(inputJson: string, factorReturns: NumericArray): Record<string, unknown>;",
+        "factorBrinsonAttribution(inputJson: JsonInput, factorReturns: NumericArray): Record<string, unknown>;",
     ));
 
     let analytics = interface_block(&dts, "AnalyticsNamespace");

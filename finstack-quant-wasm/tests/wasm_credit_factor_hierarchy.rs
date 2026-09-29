@@ -8,6 +8,7 @@
 use finstack_quant_wasm::api::models::factor::{
     JsCreditCalibrator, JsCreditFactorModel, JsFactorCovarianceForecast,
 };
+use wasm_bindgen::JsValue;
 use wasm_bindgen_test::*;
 
 // ---- helpers ----------------------------------------------------------------
@@ -99,8 +100,8 @@ fn minimal_inputs_json() -> String {
 fn credit_factor_model_round_trips_through_json() {
     let json =
         include_str!("../../finstack-quant/models/tests/data/canonical/credit_factor_model.json");
-    let model =
-        JsCreditFactorModel::from_json(json).expect("from_json must succeed on golden artifact");
+    let model = JsCreditFactorModel::from_json(JsValue::from(json))
+        .expect("from_json must succeed on golden artifact");
     let out = model.to_json().expect("to_json must succeed");
 
     let parsed_in: serde_json::Value = serde_json::from_str(json).unwrap();
@@ -119,10 +120,10 @@ fn calibrate_then_decompose_round_trip() {
     let config_json = minimal_config_json();
     let inputs_json = minimal_inputs_json();
 
-    let calibrator =
-        JsCreditCalibrator::new(&config_json).expect("JsCreditCalibrator::new must succeed");
+    let calibrator = JsCreditCalibrator::new(JsValue::from(&config_json))
+        .expect("JsCreditCalibrator::new must succeed");
     let model = calibrator
-        .calibrate(&inputs_json)
+        .calibrate(JsValue::from(&inputs_json))
         .expect("calibrate must succeed on minimal inputs");
     let model_json = model.to_json().expect("to_json must succeed");
 
@@ -137,17 +138,22 @@ fn calibrate_then_decompose_round_trip() {
 
 #[wasm_bindgen_test]
 fn covariance_forecast_returns_structured_objects() {
-    let calibrator = JsCreditCalibrator::new(&minimal_config_json()).expect("calibrator");
-    let model = calibrator.calibrate(&minimal_inputs_json()).expect("model");
+    let calibrator =
+        JsCreditCalibrator::new(JsValue::from(&minimal_config_json())).expect("calibrator");
+    let model = calibrator
+        .calibrate(JsValue::from(&minimal_inputs_json()))
+        .expect("model");
     let forecast = JsFactorCovarianceForecast::new(&model);
 
-    let covariance = forecast.covariance_at("one_step").expect("covariance");
+    let covariance = forecast
+        .covariance_at(JsValue::from("one_step"))
+        .expect("covariance");
     let covariance: serde_json::Value = serde_wasm_bindgen::from_value(covariance).unwrap();
     assert!(covariance["factor_ids"].is_array());
     assert!(covariance["data"].is_array());
 
     let config = forecast
-        .factor_model_at("one_step", "\"variance\"")
+        .factor_model_at(JsValue::from("one_step"), JsValue::from("\"variance\""))
         .expect("factor model");
     let config: serde_json::Value = serde_wasm_bindgen::from_value(config).unwrap();
     assert!(config["factors"].is_array());

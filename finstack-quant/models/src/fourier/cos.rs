@@ -23,12 +23,19 @@ use std::f64::consts::PI;
 /// COS method configuration.
 #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
 pub struct CosConfig {
-    /// Positive number of cosine terms (default: 128).
+    /// Number of cosine terms in `1..=`[`CosConfig::MAX_TERMS`] (default: 128).
     /// More terms = higher accuracy for non-smooth or heavy-tailed densities.
     pub num_terms: usize,
     /// Finite positive truncation range multiplier L (default: 10.0).
     /// Integration domain is [c1 - L*sqrt(c2 + sqrt(|c4|)), c1 + L*sqrt(c2 + sqrt(|c4|))].
     pub truncation_l: f64,
+}
+
+impl CosConfig {
+    /// Largest accepted `num_terms` (`65_536`); each term costs one
+    /// characteristic-function evaluation, so larger series are rejected
+    /// rather than allocated.
+    pub const MAX_TERMS: usize = 1 << 16;
 }
 
 impl Default for CosConfig {
@@ -57,7 +64,8 @@ pub struct BlackScholesCosParams {
     pub expiry: f64,
     /// `true` for call, `false` for put.
     pub is_call: bool,
-    /// Optional positive COS term count; defaults to [`CosConfig::default`].
+    /// Optional COS term count in `1..=`[`CosConfig::MAX_TERMS`]; defaults to
+    /// [`CosConfig::default`].
     pub n_terms: Option<usize>,
 }
 
@@ -82,7 +90,8 @@ pub struct VarianceGammaCosParams {
     pub expiry: f64,
     /// `true` for call, `false` for put.
     pub is_call: bool,
-    /// Optional positive COS term count; defaults to [`CosConfig::default`].
+    /// Optional COS term count in `1..=`[`CosConfig::MAX_TERMS`]; defaults to
+    /// [`CosConfig::default`].
     pub n_terms: Option<usize>,
 }
 
@@ -109,7 +118,8 @@ pub struct MertonJumpCosParams {
     pub expiry: f64,
     /// `true` for call, `false` for put.
     pub is_call: bool,
-    /// Optional positive COS term count; defaults to [`CosConfig::default`].
+    /// Optional COS term count in `1..=`[`CosConfig::MAX_TERMS`]; defaults to
+    /// [`CosConfig::default`].
     pub n_terms: Option<usize>,
 }
 
@@ -341,10 +351,12 @@ impl<'a> CosPricer<'a> {
         t: f64,
         is_call: bool,
     ) -> Result<Vec<f64>, FourierError> {
-        if self.config.num_terms == 0 {
-            return Err(FourierError::model_failure(
-                "COS method: num_terms must be positive",
-            ));
+        if self.config.num_terms == 0 || self.config.num_terms > CosConfig::MAX_TERMS {
+            return Err(FourierError::model_failure(format!(
+                "COS method: num_terms must be in 1..={}, got {}",
+                CosConfig::MAX_TERMS,
+                self.config.num_terms
+            )));
         }
         if !self.config.truncation_l.is_finite() || self.config.truncation_l <= 0.0 {
             return Err(FourierError::model_failure(
@@ -886,6 +898,28 @@ mod tests {
             "Merton should be in BS neighborhood: merton={call}, bs={bs_price}"
         );
         Ok(())
+    }
+
+    #[test]
+    fn cos_term_count_must_be_in_range() {
+        let params = |n_terms| BlackScholesCosParams {
+            spot: 100.0,
+            strike: 100.0,
+            rate: 0.03,
+            div_yield: 0.0,
+            vol: 0.2,
+            expiry: 1.0,
+            is_call: true,
+            n_terms: Some(n_terms),
+        };
+        assert!(bs_cos_price(params(CosConfig::MAX_TERMS)).is_ok());
+        for n_terms in [0, CosConfig::MAX_TERMS + 1] {
+            let err = bs_cos_price(params(n_terms)).expect_err("out-of-range term count");
+            assert!(
+                err.message.contains("num_terms must be in 1..=65536"),
+                "{err}"
+            );
+        }
     }
 
     /// Item 1: a non-finite characteristic-function result must surface as an

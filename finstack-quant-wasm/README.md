@@ -213,11 +213,16 @@ functions (`createDate`, `dateFromEpochDays`, `adjust`) speak signed epoch-day
 integers. Instrument, market, and pricing entry points take ISO-8601 date strings
 (`'2025-06-15'`). Calendar codes come from `core.availableCalendars()`.
 
-**Integer widths.** `u64`/`i64` arguments and returns cross as `BigInt`
-(Monte Carlo seeds, `DayCount.calendarDays`). `usize` counts marshal as IEEE-754
-doubles; where a count can plausibly get large, the binding calls
-`utils::check_js_safe_count` and throws above `Number.MAX_SAFE_INTEGER` rather than
-returning a silently rounded value.
+**Argument types are checked, not coerced.** Every string, boolean and integer
+argument is validated before Rust runs: a wrong type throws a `TypeError` with
+`kind: "invalid_type"` and a message that starts with the argument name
+(`"asOf: expected a string, got number"`). Integers must be whole numbers in range
+(`1.5`, `-1`, `NaN` and `"5"` throw rather than truncate or wrap); 64-bit seeds take a
+safe-integer `number` or an exact `bigint`; booleans must be `true` or `false`.
+JSON inputs (`*Json` parameters, typed `JsonInput`) take JSON text or the equivalent
+plain object/array, and objects get the same unknown-field checks as text;
+`NaN`, `Infinity`, `Map`s, class instances and WASM handles inside them throw.
+Returned 64-bit values (Monte Carlo seeds, `DayCount.calendarDays`) are `bigint`.
 
 **Determinism.** Simulation entry points take an explicit seed; the same seed and
 path count reproduce the same estimate.

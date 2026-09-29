@@ -1,6 +1,7 @@
 //! WASM bindings for [`finstack_quant_core::money::Money`].
 
 use crate::api::core::currency::JsCurrency;
+use crate::utils::input::{js_opt_bool, js_opt_string, js_opt_uint, js_string, json_text};
 use crate::utils::to_js_err;
 use finstack_quant_core::config::RoundingMode;
 use finstack_quant_core::currency::Currency;
@@ -214,19 +215,14 @@ impl JsMoney {
     pub fn format_with(
         &self,
         decimals: JsValue,
-        show_currency: Option<bool>,
-        group: Option<String>,
-        rounding: Option<String>,
+        show_currency: Option<JsValue>,
+        group: Option<JsValue>,
+        rounding: Option<JsValue>,
     ) -> Result<String, JsValue> {
-        let decimals = if decimals.is_null() || decimals.is_undefined() {
-            None
-        } else {
-            let value = decimals
-                .as_f64()
-                .filter(|v| v.is_finite() && *v >= 0.0 && v.fract() == 0.0 && *v <= u32::MAX as f64)
-                .ok_or_else(|| to_js_err("decimals must be a non-negative integer"))?;
-            Some(value as usize)
-        };
+        let show_currency = js_opt_bool(show_currency.as_ref(), "showCurrency")?;
+        let group = js_opt_string(group.as_ref(), "group")?;
+        let rounding = js_opt_string(rounding.as_ref(), "rounding")?;
+        let decimals: Option<usize> = js_opt_uint(Some(&decimals), "decimals")?;
         let group = match group {
             None => None,
             Some(sep) => {
@@ -272,7 +268,8 @@ impl JsMoney {
     /// @returns The parsed `Money`.
     /// @throws If `json` is malformed or fails strict schema validation.
     #[wasm_bindgen(js_name = fromJson)]
-    pub fn from_json(json: &str) -> Result<JsMoney, JsValue> {
+    pub fn from_json(json: JsValue) -> Result<JsMoney, JsValue> {
+        let json: &str = &json_text(&json, "json")?;
         let inner: RustMoney = serde_json::from_str(json).map_err(to_js_err)?;
         Ok(JsMoney { inner })
     }
@@ -304,7 +301,9 @@ impl JsMoney {
     /// }
     /// ```
     #[wasm_bindgen(js_name = fromDecimalStr)]
-    pub fn from_decimal_str(amount: &str, currency: &str) -> Result<JsMoney, JsValue> {
+    pub fn from_decimal_str(amount: JsValue, currency: JsValue) -> Result<JsMoney, JsValue> {
+        let amount: &str = &js_string(&amount, "amount")?;
+        let currency: &str = &js_string(&currency, "currency")?;
         let ccy = currency.trim().parse::<Currency>().map_err(to_js_err)?;
         RustMoney::from_decimal_str(amount, ccy)
             .map(|inner| JsMoney { inner })
@@ -317,7 +316,9 @@ mod tests {
     use super::*;
 
     fn usd() -> JsCurrency {
-        JsCurrency::new("USD").expect("USD")
+        JsCurrency {
+            inner: finstack_quant_core::currency::Currency::USD,
+        }
     }
 
     #[test]
@@ -373,15 +374,6 @@ mod tests {
         let s = m.to_string();
         assert!(s.contains("USD"), "expected USD in: {s}");
         assert!(s.contains("10"), "expected 10 in: {s}");
-    }
-
-    #[test]
-    fn json_roundtrip() {
-        let m = JsMoney::new(1234.56, &usd()).expect("valid");
-        let json = m.to_json().expect("serialize");
-        let back = JsMoney::from_json(&json).expect("deserialize");
-        assert_eq!(back.amount_decimal(), m.amount_decimal());
-        assert_eq!(back.currency().code(), "USD");
     }
 
     #[test]

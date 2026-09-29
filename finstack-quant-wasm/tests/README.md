@@ -15,6 +15,7 @@ tests/
   wasm_*.rs              wasm-bindgen-test modules (run on wasm32 under Node)
   dts_contract.rs        host test: index.d.ts matches the facade surface
   return_shapes.rs       host test: declared return shapes, mirror of the Python file
+  boundary_signatures.rs host test: exports take host values as JsValue
   facade/*.test.mjs      Node tests against the built package via the JS facade
   typescript/            tsc compile checks of index.d.ts under two lib targets
   scripts/               tests for the JSDoc/TypeScript doc tooling in ../scripts/
@@ -22,12 +23,15 @@ tests/
 
 ## Layer 1 — `wasm_*.rs` (wasm-bindgen-test, wasm32)
 
-Fifteen suites, one per binding domain, compiled as modules of `tests/wasm.rs`.
+Twenty-one suites, one per binding domain, compiled as modules of `tests/wasm.rs`.
 Each is gated with `#![cfg(target_arch = "wasm32")]` and written with
 `#[wasm_bindgen_test]`. They
 call the Rust binding types directly (`finstack_quant_wasm::api::…`) and inspect
 the returned `JsValue` with `js_sys`, which is the only place the `JsValue`
-contract can be exercised at all.
+contract can be exercised at all. Native `#[test]` functions cannot build a
+`JsValue`, so a binding test that has to pass one (every exported function
+takes its host arguments as `JsValue`) lives here; native unit tests next to
+the bindings exercise the typed Rust helpers instead.
 
 | Suite                             | Surface                                                                      |
 | --------------------------------- | ---------------------------------------------------------------------------- |
@@ -35,17 +39,23 @@ contract can be exercised at all.
 | `wasm_attribution.rs`             | `attributePnl` / `attributePnlJson` and the schema gate                      |
 | `wasm_cashflows.rs`               | `api::cashflows` build/validate/flows/accrual                                |
 | `wasm_core_market_data.rs`        | market-data and date bindings                                                |
+| `wasm_core_primitives.rs`         | `Currency`, `DayCount`/`DayCountContext`, `Money` and epoch-day helpers      |
 | `wasm_credit_factor_hierarchy.rs` | `CreditFactorModel` round-trip and calibrate → decompose                     |
 | `wasm_features.rs`                | panel feature transforms                                                     |
 | `wasm_fixed_income.rs`            | the typed `Bond` / `TermLoan` classes                                        |
+| `wasm_implied_vol.rs`             | implied-volatility adapters                                                  |
 | `wasm_margin.rs`                  | `calculate_vm`                                                               |
 | `wasm_math.rs`                    | linear algebra, statistics, summation wrappers                               |
-| `wasm_models.rs`                  | Consolidated model and Monte Carlo entry points                              |
+| `wasm_metric_keys.rs`             | canonical valuation metric-key validation                                    |
+| `wasm_models_analytic.rs`         | closed-form and COS option kernels                                           |
+| `wasm_models_correlation.rs`      | correlation-matrix validation and repair                                     |
+| `wasm_models_credit.rs`           | Merton, recovery, endogenous hazard and toggle-exercise models               |
+| `wasm_models_liquidity.rs`        | liquidity estimators                                                         |
 | `wasm_portfolio.rs`               | every portfolio computation result, asserted to be a plain structured object |
 | `wasm_scenarios.rs`               | template listing and `apply_scenario` / `apply_scenario_to_market`           |
 | `wasm_statements.rs`              | node enumeration, evaluator, validator, DSL                                  |
 | `wasm_statements_analytics.rs`    | `goal_seek`, `backtest_forecast`, `pl_summary_report_text`                   |
-| `wasm_valuations.rs`              | `list_standard_metrics` and `price_instrument`                               |
+| `wasm_valuations.rs`              | `list_standard_metrics`, `price_instrument` and the FX classes               |
 
 Two suites — `wasm_analytics.rs` and `wasm_credit_factor_hierarchy.rs` —
 `include_str!` a fixture straight out of the corresponding Rust crate's test
@@ -59,7 +69,7 @@ Run:
 npm --prefix finstack-quant-wasm run test     # wasm-pack test --node
 ```
 
-## Layer 2 — host tests (`dts_contract.rs`, `return_shapes.rs`)
+## Layer 2 — host tests (`dts_contract.rs`, `return_shapes.rs`, `boundary_signatures.rs`)
 
 Ordinary `#[test]` functions compiled for the host. They read
 [`../index.d.ts`](../index.d.ts) and the binding sources as text and assert
@@ -80,6 +90,12 @@ TypeScript consumer.
   exports are named `*Text`, numeric vector exports declare `Float64Array`, and
   the facade does no JSON parsing of its own.
 
+- **`boundary_signatures.rs`** scans every `#[wasm_bindgen]` export under
+  `src/api` and rejects `&str`, `String`, `bool`, integer and `Vec<String>`
+  parameters: their generated glue traps the instance or coerces silently
+  (`ToInt32`, truthiness). Exports take `JsValue` and convert through
+  `src/utils/input.rs`.
+
 `return_shapes.rs` is the deliberate mirror of
 [`../../finstack-quant-py/tests/parity/test_return_shapes.py`](../../finstack-quant-py/tests/parity/test_return_shapes.py)
 — same entries, same order — so a cross-language divergence reads as a
@@ -90,7 +106,8 @@ Run:
 ```bash
 # `mise run rust-test` selects both host targets for this crate:
 # dts_contract, and the consolidated `wasm` binary, whose only host-runnable
-# module is return_shapes (the wasm_* modules are wasm32-gated).
+# modules are return_shapes and boundary_signatures (the wasm_* modules are
+# wasm32-gated).
 mise run rust-test-integration -- finstack-quant-wasm dts_contract
 mise run rust-test-filter -- finstack-quant-wasm return_shapes --integration wasm
 ```
@@ -104,18 +121,19 @@ silently exporting `undefined`. `plain_object_returns.test.mjs` is the one
 exception — it imports the generated Node module directly, because the bug it
 hunts lives below the facade (see below).
 
-| File                                                       | Asserts                                                                                                             |
-| ---------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
-| `core_namespace.test.mjs`                                  | `Currency`, `Money` (including lossless `amountDecimal()`), `FxDeltaVolSurface`, `FxMatrix`, `FxRateResult` getters |
-| `cashflows.test.mjs`                                       | every exported key is a live function, plus an end-to-end build/validate/flows/accrual round trip                   |
-| `covenants.test.mjs`                                       | the covenants namespace                                                                                             |
-| `statements.test.mjs`                                      | statements / statements-analytics results come back as structured objects, matching the Python twins                |
-| `portfolio.test.mjs`, `portfolio_materialization.test.mjs` | portfolio runtime contract and the materialization API                                                              |
-| `valuations_instruments.test.mjs`                          | typed `Bond` / `TermLoan`                                                                                           |
-| `margin_xva.test.mjs`                                      | `computeBilateralXva` through `core.HazardCurve`, against a fixture byte-equivalent to the Rust integration test    |
-| `return_floor.test.mjs`                                    | `moic` / `moic_to_worst` / `xirr` / `xirr_to_worst` through the JSON-native Bond path                               |
-| `analytics_period_stats.test.mjs`                          | non-finite ratio round-tripping in `Performance.periodStats`                                                        |
-| `plain_object_returns.test.mjs`                            | map-returning functions produce plain objects, not ES2015 `Map`s                                                    |
+| File                                                       | Asserts                                                                                                                                           |
+| ---------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `core_namespace.test.mjs`                                  | `Currency`, `Money` (including lossless `amountDecimal()`), `FxDeltaVolSurface`, `FxMatrix`, `FxRateResult` getters                               |
+| `cashflows.test.mjs`                                       | every exported key is a live function, plus an end-to-end build/validate/flows/accrual round trip                                                 |
+| `covenants.test.mjs`                                       | the covenants namespace                                                                                                                           |
+| `statements.test.mjs`                                      | statements / statements-analytics results come back as structured objects, matching the Python twins                                              |
+| `portfolio.test.mjs`, `portfolio_materialization.test.mjs` | portfolio runtime contract and the materialization API                                                                                            |
+| `valuations_instruments.test.mjs`                          | typed `Bond` / `TermLoan`                                                                                                                         |
+| `margin_xva.test.mjs`                                      | `computeBilateralXva` through `core.HazardCurve`, against a fixture byte-equivalent to the Rust integration test                                  |
+| `return_floor.test.mjs`                                    | `moic` / `moic_to_worst` / `xirr` / `xirr_to_worst` through the JSON-native Bond path                                                             |
+| `analytics_period_stats.test.mjs`                          | non-finite ratio round-tripping in `Performance.periodStats`                                                                                      |
+| `plain_object_returns.test.mjs`                            | map-returning functions produce plain objects, not ES2015 `Map`s                                                                                  |
+| `boundary_input.test.mjs`                                  | wrong argument types throw `TypeError` (`kind: "invalid_type"`) without trapping or leaking; JSON inputs accept objects with unknown-field checks |
 
 **These need a build.** All of them except `plain_object_returns.test.mjs` load
 the web target from `pkg/finstack_quant_wasm_bg.wasm` (Node has no fetchable

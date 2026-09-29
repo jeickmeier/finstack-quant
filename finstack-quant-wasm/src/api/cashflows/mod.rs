@@ -1,5 +1,6 @@
 //! WASM bindings for the `finstack-quant-cashflows` crate.
 
+use crate::utils::input::{js_string, json_text, opt_json_text};
 use crate::utils::to_js_err;
 use wasm_bindgen::prelude::*;
 
@@ -13,9 +14,11 @@ use wasm_bindgen::prelude::*;
 /// @throws If the spec or market JSON is malformed, or schedule construction fails.
 #[wasm_bindgen(js_name = buildCashflowScheduleJson)]
 pub fn build_cashflow_schedule_json(
-    spec_json: &str,
-    market_json: Option<String>,
+    spec_json: JsValue,
+    market_json: Option<JsValue>,
 ) -> Result<String, JsValue> {
+    let spec_json: &str = &json_text(&spec_json, "specJson")?;
+    let market_json = opt_json_text(market_json.as_ref(), "marketJson")?;
     finstack_quant_cashflows::build_cashflow_schedule_json(spec_json, market_json.as_deref())
         .map_err(to_js_err)
 }
@@ -26,7 +29,8 @@ pub fn build_cashflow_schedule_json(
 /// @returns Canonicalized JSON-encoded `CashFlowSchedule`.
 /// @throws If the schedule JSON is malformed or fails validation.
 #[wasm_bindgen(js_name = validateCashflowScheduleJson)]
-pub fn validate_cashflow_schedule_json(schedule_json: &str) -> Result<String, JsValue> {
+pub fn validate_cashflow_schedule_json(schedule_json: JsValue) -> Result<String, JsValue> {
+    let schedule_json: &str = &json_text(&schedule_json, "scheduleJson")?;
     finstack_quant_cashflows::validate_cashflow_schedule_json(schedule_json).map_err(to_js_err)
 }
 
@@ -38,7 +42,8 @@ pub fn validate_cashflow_schedule_json(schedule_json: &str) -> Result<String, Js
 ///   when flow classification is required.
 /// @throws If the schedule JSON is malformed.
 #[wasm_bindgen(js_name = datedFlowsJson)]
-pub fn dated_flows_json(schedule_json: &str) -> Result<String, JsValue> {
+pub fn dated_flows_json(schedule_json: JsValue) -> Result<String, JsValue> {
+    let schedule_json: &str = &json_text(&schedule_json, "scheduleJson")?;
     finstack_quant_cashflows::dated_flows_json(schedule_json).map_err(to_js_err)
 }
 
@@ -55,10 +60,13 @@ pub fn dated_flows_json(schedule_json: &str) -> Result<String, JsValue> {
 /// @throws If any JSON input is malformed or the accrual computation fails.
 #[wasm_bindgen(js_name = accruedInterest)]
 pub fn accrued_interest(
-    schedule_json: &str,
-    as_of: &str,
-    config_json: Option<String>,
+    schedule_json: JsValue,
+    as_of: JsValue,
+    config_json: Option<JsValue>,
 ) -> Result<f64, JsValue> {
+    let schedule_json: &str = &json_text(&schedule_json, "scheduleJson")?;
+    let as_of: &str = &js_string(&as_of, "asOf")?;
+    let config_json = opt_json_text(config_json.as_ref(), "configJson")?;
     finstack_quant_cashflows::accrued_interest(schedule_json, as_of, config_json.as_deref())
         .map_err(to_js_err)
 }

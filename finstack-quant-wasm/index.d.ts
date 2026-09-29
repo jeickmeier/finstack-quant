@@ -282,7 +282,7 @@ export interface CurrencyConstructor {
    * @returns The parsed `Currency`.
    * @throws If `json` is malformed or contains an unknown code.
    */
-  fromJson(json: string): Currency;
+  fromJson(json: JsonInput): Currency;
 }
 
 /**
@@ -479,7 +479,7 @@ export interface MoneyConstructor {
    * @returns The parsed `Money`.
    * @throws If `json` is malformed or fails strict schema validation.
    */
-  fromJson(json: string): Money;
+  fromJson(json: JsonInput): Money;
   /**
    * Construct from exact decimal text, rejecting inexact amounts.
    *
@@ -1485,7 +1485,7 @@ export interface VolCubeConstructor {
    * @returns A validated VolCube handle owned by the caller; release it with free().
    * @throws Error - Throws when JSON is malformed, fields are unknown, or native axis, parameter, or forward validation fails.
    */
-  fromJson(json: string): VolCube;
+  fromJson(json: JsonInput): VolCube;
 }
 
 /**
@@ -1850,7 +1850,7 @@ export interface FxDeltaVolSurfaceConstructor {
    * @returns A validated FxDeltaVolSurface handle owned by the caller; release it with free().
    * @throws Error - Throws when JSON is malformed, fields are unknown, or native expiry, quote, or wing validation fails.
    */
-  fromJson(json: string): FxDeltaVolSurface;
+  fromJson(json: JsonInput): FxDeltaVolSurface;
 }
 
 /**
@@ -3586,7 +3586,7 @@ declare class CreditFactorModel {
    * @param json - JSON-serialized CreditFactorModel to deserialize.
    * @throws Error - Throws if the JSON is malformed or fails validation.
    */
-  static fromJson(json: string): CreditFactorModel;
+  static fromJson(json: JsonInput): CreditFactorModel;
   /**
    * Exact namespaced credit-factor-model schema marker.
    * @returns The string `"finstack_quant.credit_factor_model/1"`.
@@ -3615,14 +3615,14 @@ declare class CreditCalibrator {
    * @param configJson - Credit-factor calibration configuration JSON controlling model fitting.
    * @throws Error - Throws if `config_json` is not a valid `CreditCalibrationConfig`.
    */
-  constructor(configJson: string);
+  constructor(configJson: JsonInput);
   /**
    * Run the calibration pipeline and return a `CreditFactorModel`.
    * @returns A calibrated `CreditFactorModel` handle.
    * @param inputsJson - Credit-factor calibration input JSON containing issuers, spreads, and observations.
    * @throws Error - Throws if inputs are structurally invalid or calibration fails.
    */
-  calibrate(inputsJson: string): CreditFactorModel;
+  calibrate(inputsJson: JsonInput): CreditFactorModel;
   /**
    * Release the underlying wasm heap allocation. Do not use this handle after calling `free()`.
    */
@@ -3644,7 +3644,7 @@ declare class LevelsAtDate {
    * @returns A validated `LevelsAtDate` handle.
    * @throws Error - Throws when the JSON is malformed or a numeric field is non-finite.
    */
-  static fromJson(json: string): LevelsAtDate;
+  static fromJson(json: JsonInput): LevelsAtDate;
   /**
    * Observation date as an ISO-8601 string.
    */
@@ -3697,7 +3697,7 @@ declare class PeriodDecomposition {
    * @returns A validated `PeriodDecomposition` handle.
    * @throws Error - Throws when the JSON is malformed or a numeric field is non-finite.
    */
-  static fromJson(json: string): PeriodDecomposition;
+  static fromJson(json: JsonInput): PeriodDecomposition;
   /**
    * Earlier snapshot date as an ISO-8601 string.
    */
@@ -3889,7 +3889,7 @@ declare class FactorCovarianceForecast {
    * @returns Structured covariance matrix with ordered factor axes and row-major data.
    * @throws Error - Throws if the horizon string is invalid or the model data is inconsistent.
    */
-  covarianceAt(horizonJson: string): FactorCovarianceMatrix;
+  covarianceAt(horizonJson: JsonInput): FactorCovarianceMatrix;
   /**
    * Idiosyncratic vol (std dev) for a specific issuer at the requested horizon.
    * @returns Issuer idiosyncratic volatility as a decimal standard deviation at `horizonJson`.
@@ -3897,7 +3897,7 @@ declare class FactorCovarianceForecast {
    * @param horizonJson - JSON-serialized forecast horizon defining the future covariance date or period.
    * @throws Error - Throws if the issuer is not present in the model's vol state or the calibrated variance is negative.
    */
-  idiosyncraticVol(issuerId: string, horizonJson: string): number;
+  idiosyncraticVol(issuerId: string, horizonJson: JsonInput): number;
   /**
    * Build a portfolio-level `FactorModelConfig` at the given horizon and risk measure.
    * @param horizonJson - JSON-serialized forecast horizon defining the future covariance date or period.
@@ -3905,7 +3905,7 @@ declare class FactorCovarianceForecast {
    * @returns Structured factor-model configuration ready for portfolio risk workflows.
    * @throws Error - Throws if the horizon or risk measure is invalid, or the model builder rejects the assembled configuration.
    */
-  factorModelAt(horizonJson: string, riskMeasureJson: string): FactorModelConfig;
+  factorModelAt(horizonJson: JsonInput, riskMeasureJson: JsonInput): FactorModelConfig;
   /**
    * Release the underlying wasm heap allocation. Do not use this handle after calling `free()`.
    */
@@ -3981,10 +3981,10 @@ export interface FactorModelCreditNamespace {
    */
   decomposeLevels(
     model: CreditFactorModel,
-    observedSpreadsJson: string,
+    observedSpreadsJson: JsonInput,
     observedGeneric: number,
     asOf: string,
-    runtimeTagsJson?: string
+    runtimeTagsJson?: JsonInput
   ): LevelsAtDate;
   /**
    * Difference two `LevelsAtDate` snapshots component-wise.
@@ -4029,9 +4029,9 @@ export interface FactorRiskNamespace {
    * @throws Error - Throws a JavaScript exception if any JSON input is malformed; identifier, weight, or covariance dimensions disagree; the covariance matrix is not finite, symmetric, and positive semidefinite; `confidence` is not finite and in `(0.5, 1)`; or the result cannot be converted to a JavaScript value.
    */
   parametricVarDecomposition(
-    positionIdsJson: string,
-    weightsJson: string,
-    covarianceJson: string,
+    positionIdsJson: JsonInput,
+    weightsJson: JsonInput,
+    covarianceJson: JsonInput,
     confidence: number,
     computeIncremental?: boolean
   ): VarDecompositionResult;
@@ -4046,9 +4046,9 @@ export interface FactorRiskNamespace {
    * @throws Error - Throws a JavaScript exception if any JSON input is malformed; identifier, weight, or covariance dimensions disagree; the covariance matrix is not finite, symmetric, and positive semidefinite; `confidence` is not finite and in `(0.5, 1)`; or the result cannot be converted to a JavaScript value.
    */
   parametricEsDecomposition(
-    positionIdsJson: string,
-    weightsJson: string,
-    covarianceJson: string,
+    positionIdsJson: JsonInput,
+    weightsJson: JsonInput,
+    covarianceJson: JsonInput,
     confidence: number
   ): EsDecompositionResult;
   /**
@@ -4061,8 +4061,8 @@ export interface FactorRiskNamespace {
    * @throws Error - Throws a JavaScript exception if either JSON input is malformed, position or scenario dimensions disagree, `confidence` is not finite and in `(0.5, 1)`, too few scenarios resolve the requested tail, a P-and-L value is non-finite, or the result cannot be converted to a JavaScript value.
    */
   historicalVarDecomposition(
-    positionIdsJson: string,
-    positionPnlsJson: string,
+    positionIdsJson: JsonInput,
+    positionPnlsJson: JsonInput,
     confidence: number
   ): VarDecompositionResult;
   /**
@@ -4076,9 +4076,9 @@ export interface FactorRiskNamespace {
    * @throws Error - Throws a JavaScript exception if any JSON input is malformed, actual or target arrays do not match the identifier count, a position id is duplicated, non-empty target shares do not sum to one within tolerance, nonzero component risk is paired with zero `portfolioVar`, or the result cannot be converted to a JavaScript value.
    */
   evaluateRiskBudget(
-    positionIdsJson: string,
-    actualVarJson: string,
-    targetVarPctJson: string,
+    positionIdsJson: JsonInput,
+    actualVarJson: JsonInput,
+    targetVarPctJson: JsonInput,
     portfolioVar: number,
     utilizationThreshold?: number
   ): RiskBudgetResult;
@@ -4298,7 +4298,7 @@ export interface FeaturesNamespace {
    * @param specJson - Canonical panel-transformation JSON. Each operation may set optional `input` (`undefined` default: previous column, or raw `values` for the first op).
    * @throws Error - Rejects malformed JSON or panel specifications, blank, reserved (`values`), or duplicate operation names, unknown `input` columns, missing partition columns, unequal row counts, malformed operation parameters, operations that cannot be evaluated, non-finite arithmetic, or a result that cannot be serialized to JSON.
    */
-  transformPanelJson(specJson: string): string;
+  transformPanelJson(specJson: JsonInput): string;
 }
 
 /**
@@ -4847,7 +4847,7 @@ export interface MarginNamespace {
    * @param json - CSA specification JSON to validate and normalize into canonical form.
    * @throws Error - Rejects malformed or schema-incompatible `json`, or failure to serialize the decoded CSA specification; also rejects invalid CSA terms or calendar identifiers.
    */
-  validateCsaJson(json: string): string;
+  validateCsaJson(json: JsonInput): string;
   /**
    * Calculate variation margin given exposure, posted collateral, and CSA JSON.
    *
@@ -4863,7 +4863,7 @@ export interface MarginNamespace {
    * @throws Error - Rejects malformed or schema-incompatible `csa_json`, an unknown `currency`, non-finite exposure or collateral amounts, an invalid calendar date, a currency mismatch with the CSA, invalid VM parameters, calendar lookup or settlement-date adjustment failures, or failure to serialize the result.
    */
   calculateVm(
-    csaJson: string,
+    csaJson: JsonInput,
     exposure: number,
     postedCollateral: number,
     currency: string,
@@ -4904,13 +4904,13 @@ export interface MarginNamespace {
    * @throws Error - If JSON is malformed or has unknown funding fields, a recovery rate is outside `[0, 1]`, a profile is invalid or has a mismatched IM horizon, or a curve evaluation is non-finite.
    */
   computeBilateralXva(
-    exposureProfileJson: string,
+    exposureProfileJson: JsonInput,
     counterpartyHazardCurve: HazardCurve,
     ownHazardCurve: HazardCurve,
     discountCurve: DiscountCurve,
     counterpartyRecoveryRate: number,
     ownRecoveryRate: number,
-    fundingJson?: string | null
+    fundingJson?: JsonInput | null
   ): XvaResultJson;
 }
 
@@ -4962,7 +4962,7 @@ export interface CashflowsNamespace {
    * @returns JSON-encoded `CashFlowSchedule`.
    * @throws If the spec or market JSON is malformed, or schedule construction fails.
    */
-  buildCashflowScheduleJson(specJson: string, marketJson?: string | null): string;
+  buildCashflowScheduleJson(specJson: JsonInput, marketJson?: JsonInput | null): string;
 
   /**
    * Validate a cashflow schedule JSON string and return it canonicalized.
@@ -4971,7 +4971,7 @@ export interface CashflowsNamespace {
    * @returns Canonicalized JSON-encoded `CashFlowSchedule`.
    * @throws If the schedule JSON is malformed or fails validation.
    */
-  validateCashflowScheduleJson(scheduleJson: string): string;
+  validateCashflowScheduleJson(scheduleJson: JsonInput): string;
 
   /**
    * Extract dated flows from a cashflow schedule JSON string.
@@ -4980,7 +4980,7 @@ export interface CashflowsNamespace {
    * @returns JSON array of settlement cash entries. PIK and `DefaultedNotional` state rows are omitted; parse the full schedule JSON when flow classification is required.
    * @throws If the schedule JSON is malformed.
    */
-  datedFlowsJson(scheduleJson: string): string;
+  datedFlowsJson(scheduleJson: JsonInput): string;
 
   /**
    * Compute accrued interest from a cashflow schedule JSON string as of a given date.
@@ -4991,7 +4991,7 @@ export interface CashflowsNamespace {
    * @returns Accrued interest in the schedule's settlement currency as a JS number. The Rust engine computes from the canonical schedule and then crosses the WASM boundary as `f64`; for large notionals, compare with an absolute tolerance scaled to the schedule notional rather than expecting decimal-string equality.
    * @throws If any JSON input is malformed or the accrual computation fails.
    */
-  accruedInterest(scheduleJson: string, asOf: string, configJson?: string | null): number;
+  accruedInterest(scheduleJson: JsonInput, asOf: string, configJson?: JsonInput | null): number;
 
   /**
    * Convert an annual CPR (constant prepayment rate) to a monthly SMM.
@@ -5107,21 +5107,21 @@ export interface CovenantsNamespace {
    * @param specJson - JSON-serialized covenant specification to validate.
    * @throws Error - Throws a JavaScript exception if `specJson` is malformed, does not match the covenant-spec schema, violates covenant threshold or frequency invariants, or cannot be serialized to canonical JSON.
    */
-  validateCovenantSpecJson(specJson: string): string;
+  validateCovenantSpecJson(specJson: JsonInput): string;
   /**
    * Validate and canonicalize a covenant report JSON string.
    * @returns Canonical covenant-report JSON after schema validation.
    * @param reportJson - JSON-serialized covenant evaluation report to validate.
    * @throws Error - Throws a JavaScript exception if `reportJson` is malformed, does not match the covenant-report schema, or cannot be serialized to canonical JSON.
    */
-  validateCovenantReportJson(reportJson: string): string;
+  validateCovenantReportJson(reportJson: JsonInput): string;
   /**
    * Validate and canonicalize a covenant engine JSON string.
    * @returns Canonical covenant-engine JSON after schema validation.
    * @param engineJson - JSON-serialized covenant engine and its covenant definitions.
    * @throws Error - Throws a JavaScript exception if `engineJson` is malformed, does not match the covenant-engine schema, contains an invalid covenant package, violates engine invariants, or cannot be serialized to canonical JSON.
    */
-  validateCovenantEngineJson(engineJson: string): string;
+  validateCovenantEngineJson(engineJson: JsonInput): string;
   /**
    * Evaluate a covenant engine JSON string against a JSON metric map.
    * @returns A plain object keyed by covenant instance key, each value a `CovenantReport`.
@@ -5131,8 +5131,8 @@ export interface CovenantsNamespace {
    * @throws Error - Throws a JavaScript exception if either JSON input is malformed or has the wrong schema, a metric is non-numeric, `asOf` is not a valid ISO date, the engine or required metrics fail validation, or the reports cannot be serialized to JavaScript.
    */
   evaluateEngine(
-    engineJson: string,
-    metricsJson: string,
+    engineJson: JsonInput,
+    metricsJson: JsonInput,
     asOf: string
   ): Record<string, CovenantReport>;
   /**
@@ -5214,7 +5214,7 @@ declare class Market {
    * @returns A `Market` handle that can be reused across pricing calls.
    * @throws If the JSON is malformed or does not match the MarketContext schema.
    */
-  constructor(json: string);
+  constructor(json: JsonInput);
   /**
    * Serialize the wrapped MarketContext back to JSON.
    * @returns Canonical JSON string.
@@ -5326,7 +5326,7 @@ export interface BondConstructor {
    * @returns The validated bond.
    * @throws If the JSON is malformed, has a different instrument type, or fails validation.
    */
-  fromJson(json: string): Bond;
+  fromJson(json: JsonInput): Bond;
 }
 
 /**
@@ -5380,7 +5380,7 @@ export interface TermLoanConstructor {
    * @returns The validated term loan.
    * @throws If the JSON is malformed, has a different instrument type, or fails validation.
    */
-  fromJson(json: string): TermLoan;
+  fromJson(json: JsonInput): TermLoan;
   /**
    * Canonical example term loan (mirrors Rust `TermLoan::example`).
    *
@@ -5468,7 +5468,7 @@ export interface AssetBackedFacilityConstructor {
    * @returns The typed facility.
    * @throws If the JSON is malformed, has a different instrument type, or fails validation.
    */
-  fromJson(json: string): AssetBackedFacility;
+  fromJson(json: JsonInput): AssetBackedFacility;
   /**
    * The canonical example facility: the example CLO pool financed by a USD 80M commitment drawn USD 70M.
    * @returns The example facility.
@@ -5513,7 +5513,7 @@ export interface RevolvingCredit extends WasmOwned {
    * @returns Plain `EnhancedMonteCarloResult` object with `mc_result`, one `path_results` entry per simulated path and the `draw_option_cost` estimate; path counts are plain numbers and `mc_result.run` is `null`.
    * @throws If the market JSON or date is malformed, a required curve or fixing is missing, or the facility has a deterministic draw schedule (only stochastic facilities simulate paths).
    */
-  priceWithPaths(marketJson: string, asOf: string): EnhancedMonteCarloResult;
+  priceWithPaths(marketJson: JsonInput, asOf: string): EnhancedMonteCarloResult;
 }
 
 /**
@@ -5569,7 +5569,7 @@ export interface RevolvingCreditConstructor {
    * @returns The validated facility.
    * @throws If the JSON is malformed, has a different instrument type, or fails validation.
    */
-  fromJson(json: string): RevolvingCredit;
+  fromJson(json: JsonInput): RevolvingCredit;
   /**
    * Canonical example facility (mirrors Rust `RevolvingCredit::example`).
    *
@@ -5799,7 +5799,7 @@ export interface ValuationInstrumentsNamespace {
    */
   bondFromCashflowsJson(
     instrumentId: string,
-    scheduleJson: string,
+    scheduleJson: JsonInput,
     discountCurveId: string,
     quotedCleanPricePct?: number | null
   ): string;
@@ -5813,7 +5813,7 @@ export interface ValuationInstrumentsNamespace {
    * @param metricPricingOverrides - Serialized metric-pricing override object merged before native instrument validation; `None` (omitted or null in JavaScript) retains the envelope configuration.
    * @throws Error - Throws a JavaScript exception if the instrument or override JSON is malformed, the merged payload is not a canonical v1 instrument envelope, instrument validation fails, or the envelope cannot be canonically serialized.
    */
-  validateInstrumentJson(json: string, metricPricingOverrides?: string | null): string;
+  validateInstrumentJson(json: JsonInput, metricPricingOverrides?: JsonInput | null): string;
   /**
    * Price an instrument from its canonical envelope and return a `ValuationResult` object.
    *
@@ -5837,13 +5837,13 @@ export interface ValuationInstrumentsNamespace {
    * @throws Error - Throws a JavaScript exception if an instrument, market, metric-pricing-override, or market-history payload is invalid; `metrics` is not a string array; `asOf`, `model`, or a metric identifier is invalid; required market data is missing; pricing or a metric calculation fails; or the valuation cannot be converted to a JavaScript value.
    */
   priceInstrument(
-    instrumentJson: string,
-    marketJson: string,
+    instrumentJson: JsonInput,
+    marketJson: JsonInput,
     asOf: string,
     model?: string | null,
     metrics?: string[] | null,
-    metricPricingOverrides?: string | null,
-    marketHistory?: string | null
+    metricPricingOverrides?: JsonInput | null,
+    marketHistory?: JsonInput | null
   ): ValuationResult;
   /**
    * Price an instrument using a pre-parsed [`Market`].
@@ -5867,13 +5867,13 @@ export interface ValuationInstrumentsNamespace {
    * @throws Error - Throws a JavaScript exception if an instrument, metric-pricing-override, or market- history payload is invalid; `metrics` is not a string array; `asOf`, `model`, or a metric identifier is invalid; required market data is missing; pricing or a metric calculation fails; or the valuation cannot be converted to a JavaScript value.
    */
   priceInstrumentWithMarket(
-    instrumentJson: string,
+    instrumentJson: JsonInput,
     market: Market,
     asOf: string,
     model: string,
     metrics?: string[] | null,
-    metricPricingOverrides?: string | null,
-    marketHistory?: string | null
+    metricPricingOverrides?: JsonInput | null,
+    marketHistory?: JsonInput | null
   ): ValuationResult;
   /**
    * Per-flow cashflow envelope (DF / survival / PV) for a discountable instrument.
@@ -5891,8 +5891,8 @@ export interface ValuationInstrumentsNamespace {
    * @throws Error - Throws a JavaScript exception if the instrument or market JSON or `asOf` is invalid, `model` is unsupported or incompatible with the instrument, a bond with embedded exercise rights is requested under a static cashflow model, required curves are missing, the schedule mixes currencies, canonical pricing fails, or the cash-flow envelope cannot be serialized.
    */
   instrumentCashflowsJson(
-    instrumentJson: string,
-    marketJson: string,
+    instrumentJson: JsonInput,
+    marketJson: JsonInput,
     asOf: string,
     model: string
   ): string;
@@ -5908,7 +5908,7 @@ export interface ValuationInstrumentsNamespace {
    * @throws Error - Throws a JavaScript exception if `instrumentJson` or `asOf` is invalid, `model` is unsupported or incompatible with the instrument, a bond with embedded exercise rights is requested under a static cashflow model, required curves are missing, the schedule mixes currencies, canonical pricing fails, or the cash-flow envelope cannot be serialized.
    */
   instrumentCashflowsWithMarketJson(
-    instrumentJson: string,
+    instrumentJson: JsonInput,
     market: Market,
     asOf: string,
     model: string
@@ -5987,9 +5987,9 @@ export interface ValuationInstrumentsNamespace {
    * @throws Error - Thrown if JSON or the date is malformed, the deal is invalid, the tranche is missing or fixed-rate, market_price_pct is not finite and positive, required market data is unavailable, or the spread solve fails or exceeds ±5000 bp.
    */
   structuredCreditTrancheDiscountMargin(
-    instrumentJson: string,
+    instrumentJson: JsonInput,
     trancheId: string,
-    marketJson: string,
+    marketJson: JsonInput,
     asOf: string,
     marketPricePct: number
   ): number;
@@ -6004,9 +6004,9 @@ export interface ValuationInstrumentsNamespace {
    * @throws Error - Throws a JavaScript exception if the instrument or market JSON is malformed; the instrument fails pricing validation or is not a structured-credit deal; `as_of` is invalid; the tranche or required market data is missing; or the break-even calculation fails.
    */
   structuredCreditTrancheBreakevenCdr(
-    instrumentJson: string,
+    instrumentJson: JsonInput,
     trancheId: string,
-    marketJson: string,
+    marketJson: JsonInput,
     asOf: string
   ): number;
   /**
@@ -6028,9 +6028,9 @@ export interface ValuationInstrumentsNamespace {
    * @param config - Config used by this call.
    */
   structuredCreditTrancheOas(
-    instrumentJson: string,
+    instrumentJson: JsonInput,
     trancheId: string,
-    marketJson: string,
+    marketJson: JsonInput,
     asOf: string,
     marketPricePct: number,
     config?: string | null
@@ -6052,9 +6052,9 @@ export interface ValuationInstrumentsNamespace {
    * @param grid - Grid as a string.
    */
   structuredCreditTrancheScenarioTable(
-    instrumentJson: string,
+    instrumentJson: JsonInput,
     trancheId: string,
-    marketJson: string,
+    marketJson: JsonInput,
     asOf: string,
     grid: string
   ): ScenarioTable;
@@ -6077,9 +6077,9 @@ export interface ValuationInstrumentsNamespace {
    * @throws Error - Throws a JavaScript exception if the instrument or market JSON is malformed; the instrument fails pricing validation; `as_of` is invalid; the tranche or discount curve is missing; a metric fails or is non-finite; or the result cannot be converted to a JavaScript value.
    */
   structuredCreditTrancheMetrics(
-    instrumentJson: string,
+    instrumentJson: JsonInput,
     trancheId: string,
-    marketJson: string,
+    marketJson: JsonInput,
     asOf: string,
     marketPricePct?: number | null
   ): TrancheMetrics;
@@ -6278,12 +6278,12 @@ export interface FxInstrument extends WasmOwned {
    * @throws Error - Throws a JavaScript exception if the instrument, market, metric-pricing-override, or market-history JSON is invalid; `metrics` is not a string array; `asOf`, `model`, or a metric identifier is invalid; required market data is missing; pricing or a metric calculation fails; or the valuation cannot be converted to JavaScript.
    */
   price(
-    marketJson: string,
+    marketJson: JsonInput,
     asOf: string,
     model?: string | null,
     metrics?: string[] | null,
-    metricPricingOverrides?: string | null,
-    marketHistory?: string | null
+    metricPricingOverrides?: JsonInput | null,
+    marketHistory?: JsonInput | null
   ): ValuationResult;
 }
 
@@ -6298,7 +6298,7 @@ export interface FxOptionInstrument extends FxInstrument {
    * @param model - Optional pricing-model identifier; omit to use the instrument's default model.
    * @returns Spot delta: change in value per unit spot.
    */
-  delta(marketJson: string, asOf: string, model?: string | null): number;
+  delta(marketJson: JsonInput, asOf: string, model?: string | null): number;
   /**
    * Spot gamma of the option under the selected model.
    * @param marketJson - Canonical market-context JSON supplying curves, quotes, and FX data.
@@ -6306,7 +6306,7 @@ export interface FxOptionInstrument extends FxInstrument {
    * @param model - Optional pricing-model identifier; omit to use the instrument's default model.
    * @returns Spot gamma: change in delta per unit spot.
    */
-  gamma(marketJson: string, asOf: string, model?: string | null): number;
+  gamma(marketJson: JsonInput, asOf: string, model?: string | null): number;
   /**
    * Vega of the option under the selected model.
    * @param marketJson - Canonical market-context JSON supplying curves, quotes, and FX data.
@@ -6314,7 +6314,7 @@ export interface FxOptionInstrument extends FxInstrument {
    * @param model - Optional pricing-model identifier; omit to use the instrument's default model.
    * @returns Vega: change in value per 1.0 absolute move in implied volatility.
    */
-  vega(marketJson: string, asOf: string, model?: string | null): number;
+  vega(marketJson: JsonInput, asOf: string, model?: string | null): number;
   /**
    * Theta of the option under the selected model.
    * @param marketJson - Canonical market-context JSON supplying curves, quotes, and FX data.
@@ -6322,7 +6322,7 @@ export interface FxOptionInstrument extends FxInstrument {
    * @param model - Optional pricing-model identifier; omit to use the instrument's default model.
    * @returns Theta: change in value per year of calendar time.
    */
-  theta(marketJson: string, asOf: string, model?: string | null): number;
+  theta(marketJson: JsonInput, asOf: string, model?: string | null): number;
   /**
    * Domestic-rate rho of the option under the selected model.
    * @param marketJson - Canonical market-context JSON supplying curves, quotes, and FX data.
@@ -6330,7 +6330,7 @@ export interface FxOptionInstrument extends FxInstrument {
    * @param model - Optional pricing-model identifier; omit to use the instrument's default model.
    * @returns Domestic rho: change in value per 1.0 absolute move in the domestic rate.
    */
-  rho(marketJson: string, asOf: string, model?: string | null): number;
+  rho(marketJson: JsonInput, asOf: string, model?: string | null): number;
   /**
    * Foreign-rate rho of the option under the selected model.
    * @param marketJson - Canonical market-context JSON supplying curves, quotes, and FX data.
@@ -6338,7 +6338,7 @@ export interface FxOptionInstrument extends FxInstrument {
    * @param model - Optional pricing-model identifier; omit to use the instrument's default model.
    * @returns Foreign rho: change in value per 1.0 absolute move in the foreign rate.
    */
-  foreignRho(marketJson: string, asOf: string, model?: string | null): number;
+  foreignRho(marketJson: JsonInput, asOf: string, model?: string | null): number;
   /**
    * Vanna of the option under the selected model.
    * @param marketJson - Canonical market-context JSON supplying curves, quotes, and FX data.
@@ -6346,7 +6346,7 @@ export interface FxOptionInstrument extends FxInstrument {
    * @param model - Optional pricing-model identifier; omit to use the instrument's default model.
    * @returns Vanna: cross sensitivity of delta to implied volatility.
    */
-  vanna(marketJson: string, asOf: string, model?: string | null): number;
+  vanna(marketJson: JsonInput, asOf: string, model?: string | null): number;
   /**
    * Volga of the option under the selected model.
    * @param marketJson - Canonical market-context JSON supplying curves, quotes, and FX data.
@@ -6354,7 +6354,7 @@ export interface FxOptionInstrument extends FxInstrument {
    * @param model - Optional pricing-model identifier; omit to use the instrument's default model.
    * @returns Volga: change in vega per 1.0 absolute move in implied volatility.
    */
-  volga(marketJson: string, asOf: string, model?: string | null): number;
+  volga(marketJson: JsonInput, asOf: string, model?: string | null): number;
   /**
    * Named first-order greeks produced by the selected model.
    * @param marketJson - Canonical market-context JSON supplying curves, quotes, and FX data.
@@ -6362,7 +6362,7 @@ export interface FxOptionInstrument extends FxInstrument {
    * @param model - Optional pricing-model identifier; omit to use the instrument's default model.
    * @returns Map of greek name to value, such as `delta`, `gamma`, and `vega`.
    */
-  greeks(marketJson: string, asOf: string, model?: string | null): Record<string, number>;
+  greeks(marketJson: JsonInput, asOf: string, model?: string | null): Record<string, number>;
 }
 
 /**
@@ -6376,7 +6376,7 @@ export interface FxDigitalOptionInstrument extends FxInstrument {
    * @param model - Optional pricing-model identifier; omit to use the instrument's default model.
    * @returns Spot delta: change in value per unit spot.
    */
-  delta(marketJson: string, asOf: string, model?: string | null): number;
+  delta(marketJson: JsonInput, asOf: string, model?: string | null): number;
   /**
    * Spot gamma of the option under the selected model.
    * @param marketJson - Canonical market-context JSON supplying curves, quotes, and FX data.
@@ -6384,7 +6384,7 @@ export interface FxDigitalOptionInstrument extends FxInstrument {
    * @param model - Optional pricing-model identifier; omit to use the instrument's default model.
    * @returns Spot gamma: change in delta per unit spot.
    */
-  gamma(marketJson: string, asOf: string, model?: string | null): number;
+  gamma(marketJson: JsonInput, asOf: string, model?: string | null): number;
   /**
    * Vega of the option under the selected model.
    * @param marketJson - Canonical market-context JSON supplying curves, quotes, and FX data.
@@ -6392,7 +6392,7 @@ export interface FxDigitalOptionInstrument extends FxInstrument {
    * @param model - Optional pricing-model identifier; omit to use the instrument's default model.
    * @returns Vega: change in value per 1.0 absolute move in implied volatility.
    */
-  vega(marketJson: string, asOf: string, model?: string | null): number;
+  vega(marketJson: JsonInput, asOf: string, model?: string | null): number;
   /**
    * Theta of the option under the selected model.
    * @param marketJson - Canonical market-context JSON supplying curves, quotes, and FX data.
@@ -6400,7 +6400,7 @@ export interface FxDigitalOptionInstrument extends FxInstrument {
    * @param model - Optional pricing-model identifier; omit to use the instrument's default model.
    * @returns Theta: change in value per year of calendar time.
    */
-  theta(marketJson: string, asOf: string, model?: string | null): number;
+  theta(marketJson: JsonInput, asOf: string, model?: string | null): number;
   /**
    * Domestic-rate rho of the option under the selected model.
    * @param marketJson - Canonical market-context JSON supplying curves, quotes, and FX data.
@@ -6408,7 +6408,7 @@ export interface FxDigitalOptionInstrument extends FxInstrument {
    * @param model - Optional pricing-model identifier; omit to use the instrument's default model.
    * @returns Domestic rho: change in value per 1.0 absolute move in the domestic rate.
    */
-  rho(marketJson: string, asOf: string, model?: string | null): number;
+  rho(marketJson: JsonInput, asOf: string, model?: string | null): number;
   /**
    * Named first-order greeks produced by the selected model.
    * @param marketJson - Canonical market-context JSON supplying curves, quotes, and FX data.
@@ -6416,7 +6416,7 @@ export interface FxDigitalOptionInstrument extends FxInstrument {
    * @param model - Optional pricing-model identifier; omit to use the instrument's default model.
    * @returns Map of greek name to value, such as `delta`, `gamma`, and `vega`.
    */
-  greeks(marketJson: string, asOf: string, model?: string | null): Record<string, number>;
+  greeks(marketJson: JsonInput, asOf: string, model?: string | null): Record<string, number>;
 }
 
 /**
@@ -6430,7 +6430,7 @@ export interface FxTouchOptionInstrument extends FxInstrument {
    * @param model - Optional pricing-model identifier; omit to use the instrument's default model.
    * @returns Spot delta: change in value per unit spot.
    */
-  delta(marketJson: string, asOf: string, model?: string | null): number;
+  delta(marketJson: JsonInput, asOf: string, model?: string | null): number;
   /**
    * Spot gamma of the option under the selected model.
    * @param marketJson - Canonical market-context JSON supplying curves, quotes, and FX data.
@@ -6438,7 +6438,7 @@ export interface FxTouchOptionInstrument extends FxInstrument {
    * @param model - Optional pricing-model identifier; omit to use the instrument's default model.
    * @returns Spot gamma: change in delta per unit spot.
    */
-  gamma(marketJson: string, asOf: string, model?: string | null): number;
+  gamma(marketJson: JsonInput, asOf: string, model?: string | null): number;
   /**
    * Vega of the option under the selected model.
    * @param marketJson - Canonical market-context JSON supplying curves, quotes, and FX data.
@@ -6446,7 +6446,7 @@ export interface FxTouchOptionInstrument extends FxInstrument {
    * @param model - Optional pricing-model identifier; omit to use the instrument's default model.
    * @returns Vega: change in value per 1.0 absolute move in implied volatility.
    */
-  vega(marketJson: string, asOf: string, model?: string | null): number;
+  vega(marketJson: JsonInput, asOf: string, model?: string | null): number;
   /**
    * Domestic-rate rho of the option under the selected model.
    * @param marketJson - Canonical market-context JSON supplying curves, quotes, and FX data.
@@ -6454,7 +6454,7 @@ export interface FxTouchOptionInstrument extends FxInstrument {
    * @param model - Optional pricing-model identifier; omit to use the instrument's default model.
    * @returns Domestic rho: change in value per 1.0 absolute move in the domestic rate.
    */
-  rho(marketJson: string, asOf: string, model?: string | null): number;
+  rho(marketJson: JsonInput, asOf: string, model?: string | null): number;
   /**
    * Named first-order greeks produced by the selected model.
    * @param marketJson - Canonical market-context JSON supplying curves, quotes, and FX data.
@@ -6462,7 +6462,7 @@ export interface FxTouchOptionInstrument extends FxInstrument {
    * @param model - Optional pricing-model identifier; omit to use the instrument's default model.
    * @returns Map of greek name to value, such as `delta`, `gamma`, and `vega`.
    */
-  greeks(marketJson: string, asOf: string, model?: string | null): Record<string, number>;
+  greeks(marketJson: JsonInput, asOf: string, model?: string | null): Record<string, number>;
 }
 
 /**
@@ -6476,7 +6476,7 @@ export interface FxBarrierOptionInstrument extends FxTouchOptionInstrument {
    * @param model - Optional pricing-model identifier; omit to use the instrument's default model.
    * @returns Vanna: cross sensitivity of delta to implied volatility.
    */
-  vanna(marketJson: string, asOf: string, model?: string | null): number;
+  vanna(marketJson: JsonInput, asOf: string, model?: string | null): number;
   /**
    * Volga of the option under the selected model.
    * @param marketJson - Canonical market-context JSON supplying curves, quotes, and FX data.
@@ -6484,7 +6484,7 @@ export interface FxBarrierOptionInstrument extends FxTouchOptionInstrument {
    * @param model - Optional pricing-model identifier; omit to use the instrument's default model.
    * @returns Volga: change in vega per 1.0 absolute move in implied volatility.
    */
-  volga(marketJson: string, asOf: string, model?: string | null): number;
+  volga(marketJson: JsonInput, asOf: string, model?: string | null): number;
 }
 
 /**
@@ -6518,7 +6518,7 @@ export interface FxInstrumentConstructor<T extends FxInstrument> {
    * @param json - Canonical FX instrument JSON accepted by `fromJson`.
    * @returns A typed FX instrument handle.
    */
-  fromJson(json: string): T;
+  fromJson(json: JsonInput): T;
 }
 
 /**
@@ -6970,7 +6970,7 @@ export interface ModelCreditNamespace {
    * @param horizon - Forward-looking model horizon measured in years.
    * @throws Error - Throws a JavaScript exception if `model_json` is malformed or does not deserialize as a Merton model.
    */
-  mertonDefaultProbability(modelJson: string, horizon: number): number;
+  mertonDefaultProbability(modelJson: JsonInput, horizon: number): number;
   /**
    * Compute the physical-measure (Moody's KMV) default probability, the theoretical EDF, from a Merton model JSON payload.
    * @returns Physical-measure default probability in `[0, 1]` over `horizon` years.
@@ -6979,7 +6979,11 @@ export interface ModelCreditNamespace {
    * @param horizon - Forward-looking model horizon measured in years.
    * @throws Error - Throws a JavaScript exception if `model_json` is malformed, if `asset_drift` is not finite, or if the model uses driftless CreditGrades dynamics.
    */
-  mertonDefaultProbabilityWithDrift(modelJson: string, assetDrift: number, horizon: number): number;
+  mertonDefaultProbabilityWithDrift(
+    modelJson: JsonInput,
+    assetDrift: number,
+    horizon: number
+  ): number;
   /**
    * Compute distance-to-default from a Merton model JSON payload.
    *
@@ -6991,7 +6995,7 @@ export interface ModelCreditNamespace {
    * @param horizon - Forward-looking model horizon measured in years.
    * @throws Error - Throws a JavaScript exception if `model_json` is malformed or does not deserialize as a Merton model.
    */
-  mertonDistanceToDefault(modelJson: string, horizon: number): number;
+  mertonDistanceToDefault(modelJson: JsonInput, horizon: number): number;
   /**
    * Compute the physical-measure (Moody's KMV) distance-to-default from a Merton model JSON payload.
    * @returns Physical-measure distance-to-default in standard-deviation units over `horizon` years.
@@ -7000,7 +7004,11 @@ export interface ModelCreditNamespace {
    * @param horizon - Forward-looking model horizon measured in years.
    * @throws Error - Throws a JavaScript exception if `model_json` is malformed, if `asset_drift` is not finite, or if the model uses driftless CreditGrades dynamics.
    */
-  mertonDistanceToDefaultWithDrift(modelJson: string, assetDrift: number, horizon: number): number;
+  mertonDistanceToDefaultWithDrift(
+    modelJson: JsonInput,
+    assetDrift: number,
+    horizon: number
+  ): number;
   /**
    * Compute the Moody's KMV default point, short-term debt plus half of long-term debt, for use as a structural default barrier.
    * @returns Default point in the same monetary units as the debt inputs.
@@ -7018,7 +7026,7 @@ export interface ModelCreditNamespace {
    * @param recovery - Recovery rate at default expressed as a fraction of par from 0 through 1.
    * @throws Error - Throws a JavaScript exception if `model_json` is malformed or does not deserialize as a Merton model, `horizon` is non-finite or non-positive, or `recovery` is outside `[0, 1]`.
    */
-  mertonImpliedSpread(modelJson: string, horizon: number, recovery: number): number;
+  mertonImpliedSpread(modelJson: JsonInput, horizon: number, recovery: number): number;
   /**
    * Compute the Merton (1974) endogenous debt spread (per year) from a Merton
    * model JSON payload, where recovery is the firm's own terminal asset value.
@@ -7027,7 +7035,7 @@ export interface ModelCreditNamespace {
    * @param horizon - Maturity of the firm's debt measured in years.
    * @throws Error - Throws a JavaScript exception if `model_json` is malformed, if `horizon` is non-positive, if the barrier type is not terminal, or if the implied debt value is non-positive.
    */
-  mertonDebtSpread(modelJson: string, horizon: number): number;
+  mertonDebtSpread(modelJson: JsonInput, horizon: number): number;
   /**
    * Compute the ISDA-style CDS par spread (per year, as a decimal) implied by a Merton model's survival curve.
    * @returns CDS par spread per year as a decimal, such as `0.015` for 150 bp.
@@ -7036,7 +7044,7 @@ export interface ModelCreditNamespace {
    * @param recovery - Recovery rate at default expressed as a fraction of par from 0 through 1.
    * @throws Error - Throws a JavaScript exception if `model_json` is malformed, if `maturity` is non-positive, if `recovery` is outside `[0, 1]` or contradicts the model's CreditGrades `mean_recovery`, or if the implied survival curve cannot be bootstrapped.
    */
-  mertonCdsParSpread(modelJson: string, maturity: number, recovery: number): number;
+  mertonCdsParSpread(modelJson: JsonInput, maturity: number, recovery: number): number;
   /**
    * Build a Merton model JSON payload from observable equity inputs (KMV calibration).
    * @returns Canonical Merton model JSON calibrated from equity observables.
@@ -7119,8 +7127,8 @@ export interface ModelCreditNamespace {
     debtBarrier: number,
     riskFreeRate: number,
     payoutRate: number,
-    barrierTypeJson: string,
-    dynamicsJson: string
+    barrierTypeJson: JsonInput,
+    dynamicsJson: JsonInput
   ): string;
   /**
    * Compute implied equity value and equity volatility from a Merton model JSON payload.
@@ -7129,7 +7137,7 @@ export interface ModelCreditNamespace {
    * @returns A `Float64Array` of length 2: `[equityValue, equityVolatility]`.
    * @throws Error - Throws a JavaScript exception if `model_json` is malformed, if `horizon` is non-positive or non-finite, or if the inversion is numerically ill-conditioned.
    */
-  mertonTryImpliedEquity(modelJson: string, horizon: number): Float64Array;
+  mertonTryImpliedEquity(modelJson: JsonInput, horizon: number): Float64Array;
   /**
    * Bootstrap a hazard-curve JSON payload from structural default probabilities.
    * @returns Hazard-curve JSON bootstrapped from structural default probabilities.
@@ -7142,7 +7150,7 @@ export interface ModelCreditNamespace {
    * @throws Error - Throws a JavaScript exception if `model_json` is malformed, if `base_date` is not a valid ISO-8601 calendar date (`YYYY-MM-DD`), if `tenors` is empty or contains non-positive values, if `recovery` is out of range or contradicts the model's CreditGrades `mean_recovery`, if `day_count` is not a recognized convention, if the implied survival curve is non-monotonic, or if the hazard curve cannot be serialized to JSON.
    */
   mertonToHazardCurveJson(
-    modelJson: string,
+    modelJson: JsonInput,
     id: string,
     baseDate: string,
     tenors: NumericArray,
@@ -7161,7 +7169,7 @@ export interface ModelCreditNamespace {
    * @throws Error - Throws a JavaScript exception if `model_json` is malformed, if path or step counts exceed the safe-integer range, if `num_steps` is zero, if `horizon` is non-positive or non-finite, or if the result cannot be serialized to JSON.
    */
   mertonSimulatePathsJson(
-    modelJson: string,
+    modelJson: JsonInput,
     numPaths: number,
     numSteps: number,
     horizon: number,
@@ -7177,7 +7185,7 @@ export interface ModelCreditNamespace {
    * @param notional - Signed trade notional in the instrument's native currency units.
    * @throws Error - Throws a JavaScript exception if `spec_json` is malformed or does not deserialize as a dynamic-recovery specification.
    */
-  dynamicRecoveryAtNotional(specJson: string, notional: number): number;
+  dynamicRecoveryAtNotional(specJson: JsonInput, notional: number): number;
   /**
    * Evaluate an `EndogenousHazardSpec` JSON payload at a given leverage
    * level, returning the implied hazard rate. Floored at 0.
@@ -7186,7 +7194,7 @@ export interface ModelCreditNamespace {
    * @param leverage - Debt-to-assets leverage ratio used by the structural credit model.
    * @throws Error - Throws a JavaScript exception if `spec_json` is malformed or does not deserialize as an endogenous-hazard specification.
    */
-  endogenousHazardAtLeverage(specJson: string, leverage: number): number;
+  endogenousHazardAtLeverage(specJson: JsonInput, leverage: number): number;
   /**
    * Convenience evaluator: hazard rate after a PIK accrual updates the
    * outstanding notional. Computes leverage = `accreted_notional / asset_value`
@@ -7198,7 +7206,7 @@ export interface ModelCreditNamespace {
    * @throws Error - Throws a JavaScript exception if `spec_json` is malformed or does not deserialize as an endogenous-hazard specification.
    */
   endogenousHazardAfterPikAccrual(
-    specJson: string,
+    specJson: JsonInput,
     accretedNotional: number,
     assetValue: number
   ): number;
@@ -7316,9 +7324,15 @@ export interface CreditDerivativesNamespace {
 }
 
 /**
- * JSON object or pre-serialized JSON accepted by composite façade methods.
+ * A structured input: JSON text, or the equivalent plain object or array.
+ *
+ * Objects are written to JSON by the binding before Rust parses them, so the
+ * Rust type's unknown-field checks apply either way. `NaN`/`Infinity`, array
+ * holes, functions, `Map`/`Date`/class instances and WASM handles throw a
+ * `TypeError` with `kind: "invalid_type"`; `bigint` values are written as
+ * exact integers and typed arrays as arrays.
  */
-export type CompositeJsonInput = Record<string, unknown> | string;
+export type JsonInput = string | Record<string, unknown> | readonly unknown[];
 
 /**
  * Primitive execution delta emitted by composite initialization or rebalance.
@@ -7448,8 +7462,8 @@ export interface CompositeNamespace {
    * @throws Error - Throws when JSON, dates, specifications, market inputs, history, metrics, notionals, or resolved quantities are invalid.
    */
   initialize(
-    spec: CompositeJsonInput,
-    market: CompositeJsonInput,
+    spec: JsonInput,
+    market: JsonInput,
     asOf: string,
     history?: Record<string, unknown>[] | string
   ): CompositeRebalanceResult;
@@ -7465,8 +7479,8 @@ export interface CompositeNamespace {
    * @throws Error - Throws for malformed inputs, invalid history, missing market data, or quantity-resolution failures.
    */
   rebalance(
-    instrument: CompositeJsonInput,
-    market: CompositeJsonInput,
+    instrument: JsonInput,
+    market: JsonInput,
     asOf: string,
     history?: Record<string, unknown>[] | string
   ): CompositeRebalanceResult;
@@ -7483,8 +7497,8 @@ export interface CompositeNamespace {
    * @throws Error - Throws for non-additive metrics, invalid state, missing market data, FX failures, or primitive pricing failures.
    */
   primitiveExposures(
-    instrument: CompositeJsonInput,
-    market: CompositeJsonInput,
+    instrument: JsonInput,
+    market: JsonInput,
     asOf: string,
     metrics?: string[]
   ): CompositeExposureReport;
@@ -7495,7 +7509,7 @@ export interface CompositeNamespace {
    * @returns Net primitive quantity-delta array.
    * @throws Error - Throws for malformed envelopes, invalid frozen states, or conflicting primitive definitions.
    */
-  executionTrades(instrument: CompositeJsonInput, previous?: CompositeJsonInput): CompositeTrade[];
+  executionTrades(instrument: JsonInput, previous?: JsonInput): CompositeTrade[];
   /**
    * Initialize on the first supplied snapshot and calculate dated history.
    *
@@ -7509,7 +7523,7 @@ export interface CompositeNamespace {
    * @throws Error - Throws for empty, duplicate, unordered, or overlapping observations and any initialization, pricing, FX, or rebalance failure.
    */
   historyFromSpec(
-    spec: CompositeJsonInput,
+    spec: JsonInput,
     observations: Record<string, unknown>[] | string,
     warmup?: Record<string, unknown>[] | string,
     metrics?: string[]
@@ -7526,7 +7540,7 @@ export interface CompositeNamespace {
    * @throws Error - Throws for invalid states or observations, missing inputs, or valuation and rebalance failures.
    */
   history(
-    instrument: CompositeJsonInput,
+    instrument: JsonInput,
     observations: Record<string, unknown>[] | string,
     metrics?: string[]
   ): CompositeHistoryRow[];
@@ -7795,7 +7809,7 @@ export interface LiquidityNamespace {
    * @returns Effective spread in return units, or `undefined` when it cannot be estimated.
    * @throws Error - Throws a JavaScript exception if `returnsJson` is malformed or is not a numeric array. Invalid estimator samples return `undefined`.
    */
-  rollEffectiveSpread(returnsJson: string): number | undefined;
+  rollEffectiveSpread(returnsJson: JsonInput): number | undefined;
   /**
    * Compute Amihud illiquidity from aligned returns and volumes.
    * @param returnsJson - JSON array of decimal returns in time order.
@@ -7803,7 +7817,7 @@ export interface LiquidityNamespace {
    * @returns Mean absolute return per unit volume, or `undefined` for an invalid sample.
    * @throws Error - Throws a JavaScript exception if either JSON input is malformed or is not a numeric array. Invalid estimator samples return `undefined`.
    */
-  amihudIlliquidity(returnsJson: string, volumesJson: string): number | undefined;
+  amihudIlliquidity(returnsJson: JsonInput, volumesJson: JsonInput): number | undefined;
   /**
    * Calculate the trading days required to liquidate a position.
    * @param positionQuantity - Shares or contracts to liquidate; the absolute value is used.
@@ -7866,7 +7880,11 @@ export interface LiquidityNamespace {
    * @returns Estimated price-space impact coefficient, or `undefined` for invalid inputs.
    * @throws Error - Throws a JavaScript exception if either JSON input is malformed or is not a numeric array. Invalid estimator samples return `undefined`.
    */
-  kyleLambda(returnsJson: string, volumesJson: string, referencePrice: number): number | undefined;
+  kyleLambda(
+    returnsJson: JsonInput,
+    volumesJson: JsonInput,
+    referencePrice: number
+  ): number | undefined;
 }
 
 /**
@@ -8586,7 +8604,7 @@ export interface ValuationsNamespace {
    * @param json - Canonical valuation-result JSON to validate and reserialize.
    * @throws Error - Throws a JavaScript exception if `json` is malformed or does not match the `ValuationResult` schema, or the canonical result cannot be serialized.
    */
-  validateValuationResultJson(json: string): string;
+  validateValuationResultJson(json: JsonInput): string;
   /**
    * Serialize a structured `ValuationResult` object to canonical JSON.
    *
@@ -8898,13 +8916,13 @@ export interface AttributionNamespace {
    * to attach an opening model-parameter snapshot or credit-factor model.
    */
   AttributionParams: new (
-    instrumentJson: string,
-    marketT0Json: string,
-    marketT1Json: string,
+    instrumentJson: JsonInput,
+    marketT0Json: JsonInput,
+    marketT1Json: JsonInput,
     asOfT0: string,
     asOfT1: string,
-    methodJson: string,
-    configJson?: string,
+    methodJson: JsonInput,
+    configJson?: JsonInput,
     fullCrossAttribution?: boolean
   ) => AttributionParams;
   /**
@@ -8941,7 +8959,7 @@ export interface AttributionNamespace {
    * @param specJson - JSON-serialized AttributionParams specification to validate and execute.
    * @throws Error - Rejects malformed, schema-incompatible, or unsupported-version `spec_json`; instrument or market reconstruction, pricing, FX, rounding, metric, or method-specific attribution failures; a caught execution panic; or failure to serialize the result envelope.
    */
-  attributePnlEnvelopeJson(specJson: string): string;
+  attributePnlEnvelopeJson(specJson: JsonInput): string;
   /**
    * Validate an attribution specification JSON.
    *
@@ -8953,7 +8971,7 @@ export interface AttributionNamespace {
    * @param json - Canonical JSON string defining the object to deserialize or normalize.
    * @throws Error - Rejects malformed, schema-incompatible, or unsupported-version `json`, or failure to serialize the canonical attribution envelope.
    */
-  validateAttributionJson(json: string): string;
+  validateAttributionJson(json: JsonInput): string;
   /**
    * Return the default waterfall factor ordering as canonical snake-case values.
    * @returns Default waterfall factor names in execution order.
@@ -9015,7 +9033,7 @@ export interface StatementsNamespace {
    * @param json - Canonical JSON string defining the object to deserialize or normalize.
    * @throws Error - Rejects malformed or schema-incompatible `json`, an empty or invalid period timeline, reserved node identifiers, incompatible node fields or value types, invalid formulas or dimensions, an invalid waterfall, or failure to serialize the normalized model.
    */
-  validateFinancialModelJson(json: string): string;
+  validateFinancialModelJson(json: JsonInput): string;
   /**
    * Get the node identifiers from a model specification JSON.
    *
@@ -9024,7 +9042,7 @@ export interface StatementsNamespace {
    * @param json - Canonical JSON string defining the object to deserialize or normalize.
    * @throws Error - Rejects malformed or schema-incompatible `json`, or if the node identifiers cannot be serialized to JavaScript.
    */
-  modelNodeIds(json: string): string[];
+  modelNodeIds(json: JsonInput): string[];
   /**
    * Validate a `CheckSuiteSpec` JSON string.
    *
@@ -9034,14 +9052,14 @@ export interface StatementsNamespace {
    * @param json - Canonical JSON string defining the object to deserialize or normalize.
    * @throws Error - Rejects malformed or schema-incompatible `json`, or failure to serialize the decoded check-suite specification.
    */
-  validateCheckSuiteSpecJson(json: string): string;
+  validateCheckSuiteSpecJson(json: JsonInput): string;
   /**
    * Validate a `CapitalStructureSpec` JSON string.
    * @returns Canonical capital-structure JSON after schema validation.
    * @param json - Canonical JSON string defining the object to deserialize or normalize.
    * @throws Error - Rejects malformed or schema-incompatible `json`, or failure to serialize the decoded capital-structure specification.
    */
-  validateCapitalStructureSpecJson(json: string): string;
+  validateCapitalStructureSpecJson(json: JsonInput): string;
   /**
    * Validate a `WaterfallSpec` JSON string.
    *
@@ -9053,28 +9071,28 @@ export interface StatementsNamespace {
    * @param json - Canonical JSON string defining the object to deserialize or normalize.
    * @throws Error - Rejects malformed or schema-incompatible `json`; duplicate or inconsistent payment priorities; incomplete available-cash priorities; invalid PIK, payment-class, prepay-node, or ECF-sweep settings; or failure to serialize the validated waterfall.
    */
-  validateWaterfallSpecJson(json: string): string;
+  validateWaterfallSpecJson(json: JsonInput): string;
   /**
    * Validate an `EcfSweepSpec` JSON string.
    * @returns Canonical ECF-sweep JSON after schema validation.
    * @param json - Canonical JSON string defining the object to deserialize or normalize.
    * @throws Error - Rejects malformed or schema-incompatible `json`, or failure to serialize the decoded ECF-sweep specification.
    */
-  validateEcfSweepSpecJson(json: string): string;
+  validateEcfSweepSpecJson(json: JsonInput): string;
   /**
    * Validate a `PikToggleSpec` JSON string.
    * @returns Canonical PIK-toggle JSON after schema validation.
    * @param json - Canonical JSON string defining the object to deserialize or normalize.
    * @throws Error - Rejects malformed or schema-incompatible `json`, or failure to serialize the decoded PIK-toggle specification.
    */
-  validatePikToggleSpecJson(json: string): string;
+  validatePikToggleSpecJson(json: JsonInput): string;
   /**
    * Evaluate a `FinancialModelSpec` and return the `StatementResult` JSON.
    * @returns Evaluated statement result with node values and optional audit metadata.
    * @param modelJson - JSON-serialized FinancialModelSpec to evaluate across its statement periods.
    * @throws Error - Rejects malformed `model_json`, model semantic failures, invalid formula or dependency graphs, missing evaluation inputs, unsupported capital-structure requirements, or failure to serialize the statement result to JavaScript.
    */
-  evaluateModel(modelJson: string): StatementResultJson;
+  evaluateModel(modelJson: JsonInput): StatementResultJson;
   /**
    * Evaluate a `FinancialModelSpec` against a `MarketContext` as of a given date.
    *
@@ -9086,7 +9104,11 @@ export interface StatementsNamespace {
    * @param asOf - ISO-8601 valuation date used to resolve date-dependent market data.
    * @throws Error - Rejects malformed model or market JSON, model semantic failures, an invalid ISO `as_of` date, invalid formulas or dependencies, missing market data, or failure to serialize the statement result to JavaScript.
    */
-  evaluateModelWithMarket(modelJson: string, marketJson: string, asOf: string): StatementResultJson;
+  evaluateModelWithMarket(
+    modelJson: JsonInput,
+    marketJson: JsonInput,
+    asOf: string
+  ): StatementResultJson;
   /**
    * Evaluate a financial model under Monte Carlo simulation (JSON in, structured object out).
    *
@@ -9096,7 +9118,7 @@ export interface StatementsNamespace {
    * @param configJson - Monte Carlo configuration JSON.
    * @throws Error - Rejects malformed model or configuration JSON, model semantic failures, zero simulation paths, a model containing capital structure, model compilation or dependency failures, any path-evaluation failure, or failure to serialize the results to JavaScript.
    */
-  evaluateMonteCarlo(modelJson: string, configJson: string): Record<string, unknown>;
+  evaluateMonteCarlo(modelJson: JsonInput, configJson: JsonInput): Record<string, unknown>;
   /**
    * Parse a DSL formula and return its canonical source text.
    *
@@ -9428,7 +9450,7 @@ export interface StatementsAnalyticsNamespace {
    * @param configJson - Configuration JSON for this call.
    * @throws Error - Rejects malformed model or configuration JSON, invalid sensitivity modes or parameter perturbations, missing model nodes or periods, model-evaluation failures, or failure to serialize the sensitivity result to JavaScript.
    */
-  runSensitivity(modelJson: string, configJson: string): Record<string, unknown>;
+  runSensitivity(modelJson: JsonInput, configJson: JsonInput): Record<string, unknown>;
   /**
    * Run a variance analysis comparing two evaluated statement results.
    *
@@ -9440,9 +9462,9 @@ export interface StatementsAnalyticsNamespace {
    * @throws Error - Rejects malformed result or configuration JSON, empty metric or period selections, mismatched metric types or currencies, a requested value missing from either result, or failure to serialize the variance report to JavaScript.
    */
   runVariance(
-    baseJson: string,
-    comparisonJson: string,
-    configJson: string
+    baseJson: JsonInput,
+    comparisonJson: JsonInput,
+    configJson: JsonInput
   ): Record<string, unknown>;
   /**
    * Evaluate all scenarios in a scenario set against a base model.
@@ -9454,8 +9476,8 @@ export interface StatementsAnalyticsNamespace {
    * @throws Error - Rejects malformed model or scenario-set JSON, an empty scenario set, invalid parent chains, overrides of missing nodes, failure to evaluate any scenario, or failure to serialize the result map to JavaScript.
    */
   evaluateScenarioSet(
-    modelJson: string,
-    scenarioSetJson: string
+    modelJson: JsonInput,
+    scenarioSetJson: JsonInput
   ): Record<string, StatementResultJson>;
   /**
    * Compute forecast accuracy metrics (MAE, MAPE, RMSE).
@@ -9477,7 +9499,11 @@ export interface StatementsAnalyticsNamespace {
    * @returns Structured tornado entries sorted by descending absolute swing.
    * @throws Error - Rejects malformed `result_json`, an invalid optional `period` identifier, or failure to convert the entries to JavaScript. A missing metric produces no entry rather than rejecting.
    */
-  generateTornadoEntries(resultJson: string, metricNode: string, period?: string): TornadoEntry[];
+  generateTornadoEntries(
+    resultJson: JsonInput,
+    metricNode: string,
+    period?: string
+  ): TornadoEntry[];
   /**
    * Find the driver value that makes a target node reach a target value.
    * @returns Solved input value and optional updated model JSON.
@@ -9493,7 +9519,7 @@ export interface StatementsAnalyticsNamespace {
    * @throws Error - Rejects malformed `model_json`, invalid target or driver period identifiers, exactly one supplied bound, missing target or driver nodes or periods, non-finite or unordered bounds, model-evaluation or solver-convergence failures, or failure to serialize the result or updated model.
    */
   goalSeek(
-    modelJson: string,
+    modelJson: JsonInput,
     targetNode: string,
     targetPeriod: string,
     targetValue: number,
@@ -9525,9 +9551,9 @@ export interface StatementsAnalyticsNamespace {
    * @throws Error - Rejects malformed model or terminal-value JSON, model-evaluation failures, a missing UFCF series or model currency, inconsistent WACC or terminal-value assumptions, missing bridge inputs, valuation failures, or failure to serialize the sensitivity result.
    */
   dcfSensitivity(
-    modelJson: string,
+    modelJson: JsonInput,
     wacc: number,
-    terminalValueJson: string,
+    terminalValueJson: JsonInput,
     ufcfNode: string,
     netDebtOverride?: number | null,
     waccSensitivityBump?: number | null,
@@ -9535,7 +9561,7 @@ export interface StatementsAnalyticsNamespace {
     maxStableGrowthRate?: number | null,
     exitMultipleBump?: number | null,
     midYearConvention?: boolean | null,
-    marketJson?: string | null
+    marketJson?: JsonInput | null
   ): DcfSensitivityResult;
   /**
    * Evaluate a leveraged-buyout transaction against a statement model.
@@ -9558,14 +9584,14 @@ export interface StatementsAnalyticsNamespace {
    * @throws Error - Rejects malformed model or tranche JSON, an invalid `exit_period`, model evaluation or lookup failures, a missing model currency or period, non-finite transaction inputs or model values, negative tranche amounts, a non-positive sponsor equity check, check-suite failures, or failure to serialize the result to JavaScript. The result is a structured JavaScript object.
    */
   evaluateLbo(
-    modelJson: string,
+    modelJson: JsonInput,
     entryMultiple: number,
     entryMetricNode: string,
     exitMultiple: number,
     exitMetricNode: string,
     exitNetDebtNode: string,
     exitPeriod: string,
-    sourcesJson: string,
+    sourcesJson: JsonInput,
     transactionFees: number
   ): LboResult;
   /**
@@ -9595,7 +9621,7 @@ export interface StatementsAnalyticsNamespace {
    * @param nodeId - Stable node identifier used to select the required domain object.
    * @throws Error - Rejects malformed `model_json`, formulas or clauses whose dependencies cannot be parsed, unknown formula references, a missing `node_id` or reachable dependency, or a dependency cycle.
    */
-  traceDependencies(modelJson: string, nodeId: string): string;
+  traceDependencies(modelJson: JsonInput, nodeId: string): string;
   /**
    * Explain a formula for a specific node and period (JSON in/out).
    * @returns Structured formula breakdown for the selected node and period.
@@ -9606,8 +9632,8 @@ export interface StatementsAnalyticsNamespace {
    * @throws Error - Rejects malformed model or result JSON, an invalid `period` identifier, a missing model node or node-period result, an invalid formula used to build the breakdown, or failure to serialize the explanation to JavaScript.
    */
   explainFormula(
-    modelJson: string,
-    resultsJson: string,
+    modelJson: JsonInput,
+    resultsJson: JsonInput,
     nodeId: string,
     period: string
   ): FormulaExplanationJson;
@@ -9621,8 +9647,8 @@ export interface StatementsAnalyticsNamespace {
    * @throws Error - Rejects malformed model or result JSON, an invalid `period` identifier, a missing model node or node-period result, or an invalid formula used to build the explanation breakdown.
    */
   explainFormulaText(
-    modelJson: string,
-    resultsJson: string,
+    modelJson: JsonInput,
+    resultsJson: JsonInput,
     nodeId: string,
     period: string
   ): string;
@@ -9634,7 +9660,7 @@ export interface StatementsAnalyticsNamespace {
    * @param periods - Ordered period labels or observations aligned with the supplied data.
    * @throws Error - Rejects malformed `results_json`, `line_items` or `periods` values that are not JavaScript string arrays, or any period string that is not a valid statement period identifier.
    */
-  plSummaryReportText(resultsJson: string, lineItems: string[], periods: string[]): string;
+  plSummaryReportText(resultsJson: JsonInput, lineItems: string[], periods: string[]): string;
   /**
    * Generate a credit assessment report as formatted text.
    * @returns Returns a human-readable text report, not JSON.
@@ -9642,7 +9668,7 @@ export interface StatementsAnalyticsNamespace {
    * @param period - Statement period identifier, such as `2025Q4` or `2025A`.
    * @throws Error - Rejects malformed `results_json` or an `period` value that is not a valid statement period identifier.
    */
-  creditAssessmentReportText(resultsJson: string, period: string): string;
+  creditAssessmentReportText(resultsJson: JsonInput, period: string): string;
   /**
    * Compute a credit assessment from statement results (JSON in/out).
    * @returns Credit-assessment result object from the statement results.
@@ -9650,7 +9676,7 @@ export interface StatementsAnalyticsNamespace {
    * @param period - Statement period identifier, such as `2025Q4` or `2025A`.
    * @throws Error - Rejects malformed `results_json`, an `period` value that is not a valid statement period identifier, or failure to serialize the assessment to JavaScript.
    */
-  creditAssessment(resultsJson: string, period: string): Record<string, unknown>;
+  creditAssessment(resultsJson: JsonInput, period: string): Record<string, unknown>;
   /**
    * Run checks from a suite spec against a model.
    *
@@ -9662,7 +9688,11 @@ export interface StatementsAnalyticsNamespace {
    * @returns Structured check report with individual results and aggregate summary.
    * @throws Error - Rejects malformed model, suite, or supplied result JSON; check-suite resolution failures; model-evaluation failures when results are omitted; missing nodes, incompatible data, or invalid check configuration during execution; or failure to convert the report to JavaScript.
    */
-  runChecks(modelJson: string, suiteSpecJson: string, resultsJson?: string | null): CheckReport;
+  runChecks(
+    modelJson: JsonInput,
+    suiteSpecJson: JsonInput,
+    resultsJson?: JsonInput | null
+  ): CheckReport;
   /**
    * Run three-statement checks using node mappings.
    *
@@ -9675,9 +9705,9 @@ export interface StatementsAnalyticsNamespace {
    * @throws Error - Rejects malformed model, mapping, or supplied result JSON; model-evaluation failures when results are omitted; missing mapped nodes, incompatible data, or invalid check configuration; or failure to convert the report to JavaScript.
    */
   runThreeStatementChecks(
-    modelJson: string,
-    mappingJson: string,
-    resultsJson?: string | null
+    modelJson: JsonInput,
+    mappingJson: JsonInput,
+    resultsJson?: JsonInput | null
   ): CheckReport;
   /**
    * Run credit underwriting checks using credit-specific mappings.
@@ -9688,9 +9718,9 @@ export interface StatementsAnalyticsNamespace {
    * @throws Error - Rejects malformed model, mapping, or supplied result JSON; model-evaluation failures when results are omitted; missing mapped nodes, incompatible data, or invalid check configuration; or failure to convert the report to JavaScript.
    */
   runCreditUnderwritingChecks(
-    modelJson: string,
-    mappingJson: string,
-    resultsJson?: string | null
+    modelJson: JsonInput,
+    mappingJson: JsonInput,
+    resultsJson?: JsonInput | null
   ): CheckReport;
   /**
    * Render a check report as plain text.
@@ -9698,14 +9728,14 @@ export interface StatementsAnalyticsNamespace {
    * @param reportJson - Check-report JSON.
    * @throws Error - Rejects `report_json` when it is malformed or incompatible with the check report schema.
    */
-  renderCheckReportText(reportJson: string): string;
+  renderCheckReportText(reportJson: JsonInput): string;
   /**
    * Render a check report as HTML.
    * @returns HTML check report.
    * @param reportJson - Check-report JSON.
    * @throws Error - Rejects `report_json` when it is malformed or incompatible with the check report schema.
    */
-  renderCheckReportHtml(reportJson: string): string;
+  renderCheckReportHtml(reportJson: JsonInput): string;
   // Comps — comparable company analysis
   /**
    * Percentile rank of `value` within `data` on a 0-1 scale (Rust `percentile_rank(values, value)` argument order).
@@ -10242,7 +10272,7 @@ declare class Portfolio {
    * @param specJson - Canonical portfolio specification JSON defining positions, quantities, and base currency.
    * @throws Error - Throws a JavaScript exception if `specJson` is malformed or does not match the portfolio schema, a position has an invalid quantity or instrument specification, or portfolio validation finds duplicate identifiers or an unknown entity reference.
    */
-  static fromSpec(specJson: string): Portfolio;
+  static fromSpec(specJson: JsonInput): Portfolio;
   /**
    * Build a runtime portfolio from one strict persisted materialization bundle.
    * @param bundle - Complete UTF-8 materialization JSON string or `Uint8Array`.
@@ -10326,7 +10356,7 @@ export interface PortfolioNamespace {
    * @param jsonStr - Canonical JSON string to validate and re-serialize.
    * @throws Error - Throws a JavaScript exception if `jsonStr` is malformed or does not match the `PortfolioSpec` schema, or if the canonical form cannot be serialized.
    */
-  parsePortfolioSpecJson(jsonStr: string): string;
+  parsePortfolioSpecJson(jsonStr: JsonInput): string;
   /**
    * Compute a single-period Brinson-Fachler attribution from sector JSON.
    *
@@ -10336,7 +10366,7 @@ export interface PortfolioNamespace {
    * @param sectorsJson - Sector-classification JSON.
    * @throws Error - Throws a JavaScript exception if `sectorsJson` is malformed, contains no sectors or a non-finite weight or return, portfolio or benchmark weights do not sum to one, or the result cannot be converted to a JavaScript value.
    */
-  brinsonFachler(sectorsJson: string): Record<string, unknown>;
+  brinsonFachler(sectorsJson: JsonInput): Record<string, unknown>;
   /**
    * Compute Carino-linked multi-period Brinson attribution from period JSON.
    *
@@ -10347,7 +10377,7 @@ export interface PortfolioNamespace {
    * @param periodsJson - Chronological period-result JSON array.
    * @throws Error - Throws a JavaScript exception if `periodsJson` is malformed, any period fails Brinson validation, the sequence is empty or changes sector ordering, a period return is non-finite or at most `-1`, or the result cannot be converted to a JavaScript value.
    */
-  carinoLink(periodsJson: string): Record<string, unknown>;
+  carinoLink(periodsJson: JsonInput): Record<string, unknown>;
   /**
    * Compute a single-period Campisi fixed-income attribution from JSON.
    *
@@ -10375,9 +10405,9 @@ export interface PortfolioNamespace {
    * @throws Error - Throws a JavaScript exception if any JSON input is malformed; either side is empty; a value is non-finite; weights do not sum to one; `periodYears` is not finite and positive; a sector has a zero or near-zero net weight relative to gross weight; or the result cannot be converted to a JavaScript value.
    */
   campisiAttribution(
-    portfolioJson: string,
-    benchmarkJson: string,
-    configJson: string
+    portfolioJson: JsonInput,
+    benchmarkJson: JsonInput,
+    configJson: JsonInput
   ): Record<string, unknown>;
   /**
    * Carino-link already-computed single-period Campisi results.
@@ -10400,7 +10430,7 @@ export interface PortfolioNamespace {
    * @param periodsJson - Canonical JSON array of `FiAttributionResult` objects in chronological order, as returned by `campisiAttribution`.
    * @throws Error - Throws a JavaScript exception if `periodsJson` is malformed, the sequence is empty or changes sector ordering, a consumed value or reconciliation is non-finite or inconsistent, a return is at most `-1`, or the linked result cannot be converted to a JavaScript value.
    */
-  campisiCarinoLink(periodsJson: string): Record<string, unknown>;
+  campisiCarinoLink(periodsJson: JsonInput): Record<string, unknown>;
   /**
    * Compute per-period Campisi attributions from snapshots and Carino-link them.
    *
@@ -10413,7 +10443,10 @@ export interface PortfolioNamespace {
    * @param configJson - Canonical JSON `FiAttributionConfig` applied to every period; `period_years` is its only field and is required (no default).
    * @throws Error - Throws a JavaScript exception if either JSON input is malformed, any period fails Campisi attribution validation, the computed periods fail Carino linking validation, or the result cannot be converted to a JavaScript value.
    */
-  campisiCarinoLinkFromSnapshots(periodsJson: string, configJson: string): Record<string, unknown>;
+  campisiCarinoLinkFromSnapshots(
+    periodsJson: JsonInput,
+    configJson: JsonInput
+  ): Record<string, unknown>;
   /**
    * Reconcile the five Campisi effect totals against the active return.
    *
@@ -10428,7 +10461,7 @@ export interface PortfolioNamespace {
    * @param tolerance - Absolute reconciliation tolerance in return units; `1e-10` suits return-space values.
    * @throws Error - Throws a JavaScript exception if `resultJson` is malformed or does not match `FiAttributionResult`, or if the reconciliation report cannot be converted to a JavaScript value.
    */
-  campisiReconciliationCheck(resultJson: string, tolerance: number): Record<string, unknown>;
+  campisiReconciliationCheck(resultJson: JsonInput, tolerance: number): Record<string, unknown>;
   /**
    * Build a duration-cell base-return table from a reference universe.
    *
@@ -10445,9 +10478,9 @@ export interface PortfolioNamespace {
    * @throws Error - Throws a JavaScript exception if either JSON input is malformed, the reference universe is empty or contains an invalid duration or return, the cell width is not finite and positive, labels collide, the grid exceeds its safety bound, or the result cannot be converted to a JavaScript value.
    */
   cellReturnsFromReference(
-    referenceJson: string,
+    referenceJson: JsonInput,
     baseLabel: string,
-    configJson: string
+    configJson: JsonInput
   ): Record<string, unknown>;
   /**
    * Build a duration-cell base-return table from start/end discount curves.
@@ -10474,7 +10507,7 @@ export interface PortfolioNamespace {
     horizonYears: number,
     maxDuration: number,
     baseLabel: string,
-    configJson: string
+    configJson: JsonInput
   ): Record<string, unknown>;
   /**
    * Compute duration-matched credit excess returns against a base-return table.
@@ -10496,7 +10529,7 @@ export interface PortfolioNamespace {
    * @param tableJson - Canonical JSON `DurationCellTable`; `JSON.stringify` the structured table returned by `cellReturnsFromReference` or `cellReturnsFromCurves`.
    * @throws Error - Throws a JavaScript exception if either JSON input is malformed, the cell table is invalid, a position is invalid or falls in no cell, position weights do not sum to one, or the result cannot be converted to a JavaScript value.
    */
-  excessReturns(positionsJson: string, tableJson: string): Record<string, unknown>;
+  excessReturns(positionsJson: JsonInput, tableJson: JsonInput): Record<string, unknown>;
   /**
    * Compute a single-period hierarchical duration-cell x sector grid attribution.
    *
@@ -10516,7 +10549,7 @@ export interface PortfolioNamespace {
    * @param benchmarkJson - Canonical JSON array of `GridPosition` objects for the benchmark side; same weight-sum requirement.
    * @throws Error - Throws a JavaScript exception if either JSON input is malformed, a weight or return is non-finite, either side's weights do not sum to one, a cell or cell-sector bucket has a zero or near-zero net weight relative to gross weight, or the result cannot be converted to a JavaScript value.
    */
-  gridAttribution(portfolioJson: string, benchmarkJson: string): Record<string, unknown>;
+  gridAttribution(portfolioJson: JsonInput, benchmarkJson: JsonInput): Record<string, unknown>;
   /**
    * Carino-link multi-period hierarchical grid attribution results.
    *
@@ -10538,7 +10571,7 @@ export interface PortfolioNamespace {
    * @param periodsJson - Canonical JSON array of `GridAttributionResult` objects, in chronological order; `JSON.stringify` the structured results returned by `gridAttribution`.
    * @throws Error - Throws a JavaScript exception if `periodsJson` is malformed, the sequence is empty, a consumed value is non-finite or inconsistent, a return is at most `-1`, or the linked result cannot be converted to a JavaScript value.
    */
-  gridCarinoLink(periodsJson: string): Record<string, unknown>;
+  gridCarinoLink(periodsJson: JsonInput): Record<string, unknown>;
   /**
    * Compute Jeet-Partani (2023) factor-Brinson unified attribution.
    *
@@ -10553,14 +10586,17 @@ export interface PortfolioNamespace {
    * @param factorReturns - Caller-supplied benchmark factor returns `f_b` as a `number[]` or `Float64Array`, length `input.factor_names`; the `Float64Array` returned by `analytics.constrainedLeastSquares` can be passed directly.
    * @throws Error - Throws a JavaScript exception if `inputJson` is malformed; the asset or factor sets are empty; dimensions disagree; a value is non-finite; either weight vector does not sum to one; benchmark factor completeness is outside tolerance; or the result cannot be converted to a JavaScript value.
    */
-  factorBrinsonAttribution(inputJson: string, factorReturns: NumericArray): Record<string, unknown>;
+  factorBrinsonAttribution(
+    inputJson: JsonInput,
+    factorReturns: NumericArray
+  ): Record<string, unknown>;
   /**
    * Compute a Modified-Dietz TWRR sub-period return from period JSON.
    * @returns Sub-period time-weighted return as a decimal.
    * @param periodJson - Single-period result JSON.
    * @throws Error - Throws a JavaScript exception if `periodJson` is malformed, does not match the expected period schema, or the return is undefined (non-positive adjusted denominator, out-of-range cashflow weight, non-finite inputs).
    */
-  twrrModifiedDietz(periodJson: string): number;
+  twrrModifiedDietz(periodJson: JsonInput): number;
   /**
    * Geometrically link TWRR sub-period returns from returns JSON.
    * @returns Linked time-weighted return object, including the annualized rate over `horizonYears`.
@@ -10568,14 +10604,14 @@ export interface PortfolioNamespace {
    * @param horizonYears - Return-linking horizon measured in years for annualization.
    * @throws Error - Throws a JavaScript exception if `returnsJson` is malformed, the return series is invalid (non-finite sub-period return or return at most -1, non-positive compounded growth factor), or the linked result cannot be converted to a JavaScript value.
    */
-  twrrLinked(returnsJson: string, horizonYears: number): Record<string, unknown>;
+  twrrLinked(returnsJson: JsonInput, horizonYears: number): Record<string, unknown>;
   /**
    * Compute money-weighted return via XIRR from dated cashflow JSON.
    * @returns Annualized money-weighted return as a decimal.
    * @param cashflowsJson - Dated cashflow JSON.
    * @throws Error - Throws a JavaScript exception if `cashflowsJson` is malformed, contains an invalid date or insufficient cash flows for XIRR, or the numerical root cannot be found.
    */
-  mwrXirr(cashflowsJson: string): number;
+  mwrXirr(cashflowsJson: JsonInput): number;
   /**
    * Build a runtime portfolio from a JSON spec, validate, and round-trip.
    *
@@ -10587,14 +10623,14 @@ export interface PortfolioNamespace {
    * @param specJson - Canonical portfolio specification JSON defining positions, quantities, and base currency.
    * @throws Error - Throws a JavaScript exception if `specJson` is malformed or violates the portfolio schema, a position has an invalid quantity or instrument specification, portfolio validation fails, or the round-trip form cannot be serialized.
    */
-  buildPortfolioFromSpecJson(specJson: string): string;
+  buildPortfolioFromSpecJson(specJson: JsonInput): string;
   /**
    * Extract the total portfolio value from a JSON result.
    * @returns Total portfolio market value in the result's reporting currency.
    * @param resultJson - Result JSON produced by a prior call.
    * @throws Error - Throws a JavaScript exception if `resultJson` is malformed or does not match the `PortfolioResult` schema.
    */
-  portfolioResultTotalValue(resultJson: string): number;
+  portfolioResultTotalValue(resultJson: JsonInput): number;
   /**
    * Extract a specific metric from a portfolio result JSON.
    *
@@ -10604,7 +10640,7 @@ export interface PortfolioNamespace {
    * @param metricId - Stable metric identifier used to select the required domain object.
    * @throws Error - Throws a JavaScript exception if `resultJson` is malformed or does not match the `PortfolioResult` schema. An absent `metricId` returns `undefined`.
    */
-  portfolioResultGetMetric(resultJson: string, metricId: string): number | undefined;
+  portfolioResultGetMetric(resultJson: JsonInput, metricId: string): number | undefined;
   /**
    * Aggregate portfolio metrics from a valuation JSON.
    * @returns Returns a plain structured JavaScript object; `JSON.stringify` it for a canonical JSON string.
@@ -10615,9 +10651,9 @@ export interface PortfolioNamespace {
    * @throws Error - Throws a JavaScript exception if either JSON input is malformed, `baseCurrency` or `asOf` is invalid, valuation currency or date metadata is inconsistent, a required FX conversion is unavailable or invalid, or the metrics cannot be converted to a JavaScript value.
    */
   aggregateMetrics(
-    valuationJson: string,
+    valuationJson: JsonInput,
     baseCurrency: string,
-    marketJson: string,
+    marketJson: JsonInput,
     asOf: string
   ): Record<string, unknown>;
   /**
@@ -10630,8 +10666,8 @@ export interface PortfolioNamespace {
    * @throws Error - Throws a JavaScript exception if the portfolio or market JSON is malformed, a requested metric name is unknown, portfolio construction or valuation fails, strict risk calculation cannot produce a requested metric, a required FX conversion is unavailable, or the valuation cannot be converted to a JavaScript value.
    */
   valuePortfolio(
-    specJson: string,
-    marketJson: string,
+    specJson: JsonInput,
+    marketJson: JsonInput,
     strictRisk?: boolean,
     metrics?: string[]
   ): Record<string, unknown>;
@@ -10649,7 +10685,7 @@ export interface PortfolioNamespace {
    */
   valuePortfolioBuilt(
     portfolio: Portfolio,
-    marketJson: string,
+    marketJson: JsonInput,
     strictRisk?: boolean,
     metrics?: string[]
   ): Record<string, unknown>;
@@ -10662,8 +10698,8 @@ export interface PortfolioNamespace {
    * @throws Error - Throws a JavaScript exception if the portfolio or market JSON is malformed, portfolio construction fails, any position fails schedule construction while `allowPartial` is not `true`, monetary cash-flow aggregation overflows, or the aggregate cannot be converted to a JavaScript value.
    */
   aggregateFullCashflows(
-    specJson: string,
-    marketJson: string,
+    specJson: JsonInput,
+    marketJson: JsonInput,
     allowPartial?: boolean
   ): Record<string, unknown>;
   /**
@@ -10681,7 +10717,7 @@ export interface PortfolioNamespace {
    */
   aggregateFullCashflowsBuilt(
     portfolio: Portfolio,
-    marketJson: string,
+    marketJson: JsonInput,
     allowPartial?: boolean
   ): Record<string, unknown>;
   /**
@@ -10695,9 +10731,9 @@ export interface PortfolioNamespace {
    * @throws Error - Throws a JavaScript exception if the portfolio, scenario, or market JSON is malformed; portfolio construction, scenario application, or revaluation fails; or the structured result cannot be converted to a JavaScript value.
    */
   applyScenarioAndRevalue(
-    specJson: string,
-    scenarioJson: string,
-    marketJson: string
+    specJson: JsonInput,
+    scenarioJson: JsonInput,
+    marketJson: JsonInput
   ): ScenarioRevalueResult;
   /**
    * Apply a scenario to an already-built [`Portfolio`] handle and revalue.
@@ -10710,8 +10746,8 @@ export interface PortfolioNamespace {
    */
   applyScenarioAndRevalueBuilt(
     portfolio: Portfolio,
-    scenarioJson: string,
-    marketJson: string
+    scenarioJson: JsonInput,
+    marketJson: JsonInput
   ): ScenarioRevalueResult;
   /**
    * Compute the profit and loss attributable to a scenario.
@@ -10725,7 +10761,11 @@ export interface PortfolioNamespace {
    * @param marketJson - Canonical market-context JSON supplying the unshocked curves, quotes, and FX data used for the base leg.
    * @throws Error - Throws a JavaScript exception if the portfolio, scenario, or market JSON is malformed; portfolio construction, scenario application, or either valuation fails; valuation currencies are inconsistent; or the structured result cannot be converted to JavaScript.
    */
-  scenarioPnl(specJson: string, scenarioJson: string, marketJson: string): ScenarioPnlResult;
+  scenarioPnl(
+    specJson: JsonInput,
+    scenarioJson: JsonInput,
+    marketJson: JsonInput
+  ): ScenarioPnlResult;
   /**
    * Compute the profit and loss attributable to a scenario for an
    * already-built [`Portfolio`] handle.
@@ -10743,8 +10783,8 @@ export interface PortfolioNamespace {
    */
   scenarioPnlBuilt(
     portfolio: Portfolio,
-    scenarioJson: string,
-    marketJson: string
+    scenarioJson: JsonInput,
+    marketJson: JsonInput
   ): ScenarioPnlResult;
   /**
    * Optimize portfolio weights using the LP-based optimizer.
@@ -10757,7 +10797,7 @@ export interface PortfolioNamespace {
    * @param marketJson - Canonical market-context JSON supplying curves, quotes, and FX data.
    * @throws Error - Throws a JavaScript exception if either JSON input is malformed, the portfolio, objective, constraints, weighting, or missing-metric policy is invalid, a required market-dependent valuation fails, the solver cannot produce a result, or the result cannot be converted to a JavaScript value.
    */
-  optimizePortfolio(specJson: string, marketJson: string): Record<string, unknown>;
+  optimizePortfolio(specJson: JsonInput, marketJson: JsonInput): Record<string, unknown>;
   /**
    * Replay a portfolio through dated market snapshots.
    *
@@ -10770,9 +10810,9 @@ export interface PortfolioNamespace {
    * @throws Error - Throws a JavaScript exception if any JSON input is malformed; the portfolio, replay configuration, or snapshot dates and ordering are invalid; valuation, attribution, or currency conversion fails; best-effort replay retains no step; or the result cannot be converted to a JavaScript value.
    */
   replayPortfolio(
-    specJson: string,
-    snapshotsJson: string,
-    configJson: string
+    specJson: JsonInput,
+    snapshotsJson: JsonInput,
+    configJson: JsonInput
   ): Record<string, unknown>;
   /**
    * Compute first-order factor sensitivities and return the matrix.
@@ -10792,12 +10832,12 @@ export interface PortfolioNamespace {
    * @throws Error - Throws a JavaScript exception if `asOf` is not a valid ISO date; any JSON input is malformed; a factor definition or bump configuration is invalid or unsupported; bumping or repricing fails; or the sensitivity matrix cannot be converted to a JavaScript value.
    */
   computeFactorSensitivities(
-    positionsJson: string,
-    factorsJson: string,
-    marketJson: string,
+    positionsJson: JsonInput,
+    factorsJson: JsonInput,
+    marketJson: JsonInput,
     asOf: string,
     baseCurrency: string,
-    bumpConfigJson?: string
+    bumpConfigJson?: JsonInput
   ): SensitivityMatrixResult;
   /**
    * Compute first-order factor sensitivities using a pre-parsed [`Market`].
@@ -10813,12 +10853,12 @@ export interface PortfolioNamespace {
    * @throws Error - Throws a JavaScript exception if `asOf` is not a valid ISO date; a position, factor, or bump-config JSON input is malformed; a factor definition is invalid or unsupported; bumping or repricing fails; or the sensitivity matrix cannot be converted to a JavaScript value.
    */
   computeFactorSensitivitiesWithMarket(
-    positionsJson: string,
-    factorsJson: string,
+    positionsJson: JsonInput,
+    factorsJson: JsonInput,
     market: Market,
     asOf: string,
     baseCurrency: string,
-    bumpConfigJson?: string
+    bumpConfigJson?: JsonInput
   ): SensitivityMatrixResult;
   /**
    * Compute scenario P&L profiles via full repricing.
@@ -10837,12 +10877,12 @@ export interface PortfolioNamespace {
    * @throws Error - Throws a JavaScript exception if `asOf` is not a valid ISO date; any JSON input is malformed; a factor, bump configuration, or scenario-point count is invalid or unsupported; bumping or repricing fails; or the profiles cannot be converted to a JavaScript value.
    */
   computePnlProfiles(
-    positionsJson: string,
-    factorsJson: string,
-    marketJson: string,
+    positionsJson: JsonInput,
+    factorsJson: JsonInput,
+    marketJson: JsonInput,
     asOf: string,
     baseCurrency: string,
-    bumpConfigJson?: string,
+    bumpConfigJson?: JsonInput,
     nScenarioPoints?: number
   ): FactorPnlProfile[];
   /**
@@ -10858,12 +10898,12 @@ export interface PortfolioNamespace {
    * @throws Error - Throws a JavaScript exception if `asOf` is not a valid ISO date; a position, factor, or bump-config JSON input is malformed; a factor or scenario-point count is invalid or unsupported; bumping or repricing fails; or the profiles cannot be converted to a JavaScript value.
    */
   computePnlProfilesWithMarket(
-    positionsJson: string,
-    factorsJson: string,
+    positionsJson: JsonInput,
+    factorsJson: JsonInput,
     market: Market,
     asOf: string,
     baseCurrency: string,
-    bumpConfigJson?: string,
+    bumpConfigJson?: JsonInput,
     nScenarioPoints?: number
   ): FactorPnlProfile[];
   /**
@@ -10889,9 +10929,9 @@ export interface PortfolioNamespace {
    * @throws Error - Throws a JavaScript exception if any JSON input is malformed; sensitivity dimensions or factor axes disagree; the covariance matrix or risk measure is invalid; decomposition produces invalid variance or another non-finite value; or the result cannot be converted to a JavaScript value.
    */
   decomposeFactorRisk(
-    sensitivitiesJson: string,
-    covarianceJson: string,
-    riskMeasureJson?: string
+    sensitivitiesJson: JsonInput,
+    covarianceJson: JsonInput,
+    riskMeasureJson?: JsonInput
   ): FactorRiskDecomposition;
 }
 
@@ -11172,7 +11212,7 @@ export interface ScenariosNamespace {
    * @param jsonStr - Canonical JSON string to validate and re-serialize.
    * @throws Error - Rejects malformed or schema-incompatible `json_str`, a blank scenario ID, multiple time-roll operations, invalid operation identifiers or numeric fields, variant-specific operation violations, or serialization failure.
    */
-  parseScenarioSpec(jsonStr: string): ScenarioSpec;
+  parseScenarioSpec(jsonStr: JsonInput): ScenarioSpec;
   /**
    * Compose multiple structured scenario specs into a single scenario.
    *
@@ -11193,7 +11233,7 @@ export interface ScenariosNamespace {
    * @param jsonStr - Canonical JSON string to validate and re-serialize.
    * @throws Error - Rejects malformed or schema-incompatible `json_str`, a blank scenario ID, multiple time-roll operations, invalid operation identifiers or numeric fields, or variant-specific operation violations.
    */
-  validateScenarioSpec(jsonStr: string): void;
+  validateScenarioSpec(jsonStr: JsonInput): void;
   /**
    * List all built-in template identifiers.
    *
@@ -11278,11 +11318,11 @@ export interface ScenariosNamespace {
    * @throws Error - Rejects malformed scenario, market, or model JSON, an invalid ISO `as_of` date, an invalid scenario operation, missing market objects or hierarchy context, statement-model execution failures, failure to encode the mutated contexts, or failure to serialize the application envelope to JavaScript.
    */
   applyScenario(
-    scenarioJson: string,
-    marketJson: string,
-    modelJson: string,
+    scenarioJson: JsonInput,
+    marketJson: JsonInput,
+    modelJson: JsonInput,
     asOf: string,
-    instrumentsJson?: string
+    instrumentsJson?: JsonInput
   ): ScenarioApplyResult;
   /**
    * Apply a scenario to a market context only (no model mutations).
@@ -11297,10 +11337,10 @@ export interface ScenariosNamespace {
    * @throws Error - Rejects malformed scenario or market JSON, an invalid ISO `as_of` date, an invalid scenario operation, missing market objects or hierarchy context, failure to encode the mutated market, or failure to serialize the application envelope to JavaScript.
    */
   applyScenarioToMarket(
-    scenarioJson: string,
-    marketJson: string,
+    scenarioJson: JsonInput,
+    marketJson: JsonInput,
     asOf: string,
-    instrumentsJson?: string
+    instrumentsJson?: JsonInput
   ): ScenarioApplyMarketResult;
   /**
    * Compute horizon total return under a scenario.
@@ -11319,12 +11359,12 @@ export interface ScenariosNamespace {
    * @throws Error - Rejects malformed instrument, market, scenario, or configuration JSON; an invalid ISO `as_of` date; an unsupported attribution `method`; an unknown `calendar_id`; invalid, unsupported, or unresolved scenario operations; missing market data; pricing or attribution failures; or failure to serialize the horizon result to JavaScript.
    */
   computeHorizonReturn(
-    instrumentJson: string,
-    marketJson: string,
+    instrumentJson: JsonInput,
+    marketJson: JsonInput,
     asOf: string,
-    scenarioJson: string,
+    scenarioJson: JsonInput,
     method?: string,
-    configJson?: string,
+    configJson?: JsonInput,
     calendarId?: string
   ): Record<string, unknown>;
 }

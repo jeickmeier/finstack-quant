@@ -6,12 +6,11 @@
 //! portfolio, sector, or attribution concepts are involved, so numeric
 //! vectors travel as `Float64Array` rather than through a JSON envelope.
 
+use crate::utils::input::{js_f64_seq, js_uint};
 use js_sys::Float64Array;
 use wasm_bindgen::prelude::*;
 
 use crate::utils::to_js_err;
-
-use super::support::parse_f64_vec;
 
 /// Fit factor returns satisfying the equality constraint `w'Xf = w'r`.
 ///
@@ -30,23 +29,14 @@ use super::support::parse_f64_vec;
 #[wasm_bindgen(js_name = constrainedLeastSquares)]
 pub fn constrained_least_squares(
     exposures: JsValue,
-    n_factors: f64,
+    n_factors: JsValue,
     returns: JsValue,
     weights: JsValue,
 ) -> Result<Float64Array, JsValue> {
-    if !n_factors.is_finite()
-        || n_factors <= 0.0
-        || n_factors.fract() != 0.0
-        || n_factors > f64::from(u32::MAX)
-    {
-        return Err(to_js_err(
-            "nFactors must be a positive integer no greater than 4294967295",
-        ));
-    }
-    let n_factors = n_factors as usize;
-    let exposures = parse_f64_vec(exposures)?;
-    let returns = parse_f64_vec(returns)?;
-    let weights = parse_f64_vec(weights)?;
+    let n_factors: usize = js_uint(&n_factors, "nFactors")?;
+    let exposures = js_f64_seq(&exposures, "exposures")?;
+    let returns = js_f64_seq(&returns, "returns")?;
+    let weights = js_f64_seq(&weights, "weights")?;
     let f = finstack_quant_analytics::regression::constrained_least_squares(
         &exposures, n_factors, &returns, &weights,
     )

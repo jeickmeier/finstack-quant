@@ -159,14 +159,14 @@ pub fn barrier_put_str(
 /// * `rate` - Risk-free rate, continuously compounded decimal.
 /// * `div_yield` - Continuous dividend yield, decimal.
 /// * `vol` - Annualized volatility, decimal.
-/// * `num_fixings` - Number of equally spaced averaging observations.
+/// * `num_fixings` - Positive number of equally spaced averaging observations.
 /// * `averaging` - `"arithmetic"` (Turnbull-Wakeman) or `"geometric"` (Kemna-Vorst).
 /// * `option_type` - Call or put payoff convention.
 ///
 /// # Errors
 ///
-/// Returns `Error::Validation` if `averaging` is not a supported convention,
-/// or if the resulting option price is non-finite.
+/// Returns `Error::Validation` if `num_fixings` is zero, `averaging` is not a
+/// supported convention, or the resulting option price is non-finite.
 #[allow(clippy::too_many_arguments)]
 pub fn asian_option_price_str(
     spot: f64,
@@ -179,6 +179,11 @@ pub fn asian_option_price_str(
     averaging: &str,
     option_type: OptionType,
 ) -> Result<f64> {
+    if num_fixings == 0 {
+        return Err(Error::Validation(
+            "asian option num_fixings must be positive".to_string(),
+        ));
+    }
     let value = match (averaging, option_type) {
         ("arithmetic", OptionType::Call) => {
             arithmetic_asian_call_tw(spot, strike, expiry, rate, div_yield, vol, num_fixings)
@@ -389,6 +394,25 @@ mod tests {
             asian_option_price_str(s, k, t, r, q, sigma, n, "geometric", OptionType::Put).unwrap(),
             geometric_asian_put(s, k, t, r, q, sigma, n)
         );
+    }
+
+    #[test]
+    fn asian_dispatch_rejects_zero_fixings() {
+        for averaging in ["arithmetic", "geometric"] {
+            let err = asian_option_price_str(
+                100.0,
+                100.0,
+                1.0,
+                0.05,
+                0.02,
+                0.20,
+                0,
+                averaging,
+                OptionType::Call,
+            )
+            .unwrap_err();
+            assert!(err.to_string().contains("num_fixings must be positive"));
+        }
     }
 
     #[test]

@@ -6,6 +6,7 @@
 //! Rust-only.
 //!
 
+use crate::utils::input::{js_opt_string, js_opt_uint, js_u64, js_uint};
 use std::str::FromStr;
 
 use crate::utils::to_js_err;
@@ -120,11 +121,15 @@ pub fn price_heston_call(
     rho: f64,
     v0: f64,
     expiry: f64,
-    num_paths: usize,
-    seed: u64,
-    num_steps: Option<usize>,
-    currency: Option<String>,
+    num_paths: JsValue,
+    seed: JsValue,
+    num_steps: Option<JsValue>,
+    currency: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
+    let num_paths: usize = js_uint(&num_paths, "numPaths")?;
+    let seed = js_u64(&seed, "seed")?;
+    let num_steps: Option<usize> = js_opt_uint(num_steps.as_ref(), "numSteps")?;
+    let currency = js_opt_string(currency.as_ref(), "currency")?;
     price_heston(
         true, spot, strike, rate, div_yield, kappa, theta, vol_of_vol, rho, v0, expiry, num_paths,
         seed, num_steps, currency,
@@ -168,11 +173,15 @@ pub fn price_heston_put(
     rho: f64,
     v0: f64,
     expiry: f64,
-    num_paths: usize,
-    seed: u64,
-    num_steps: Option<usize>,
-    currency: Option<String>,
+    num_paths: JsValue,
+    seed: JsValue,
+    num_steps: Option<JsValue>,
+    currency: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
+    let num_paths: usize = js_uint(&num_paths, "numPaths")?;
+    let seed = js_u64(&seed, "seed")?;
+    let num_steps: Option<usize> = js_opt_uint(num_steps.as_ref(), "numSteps")?;
+    let currency = js_opt_string(currency.as_ref(), "currency")?;
     price_heston(
         false, spot, strike, rate, div_yield, kappa, theta, vol_of_vol, rho, v0, expiry, num_paths,
         seed, num_steps, currency,

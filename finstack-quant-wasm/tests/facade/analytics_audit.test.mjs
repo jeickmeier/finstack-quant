@@ -58,7 +58,7 @@ test('integer arguments reject truncation, wrapping and non-finite values', () =
       () => perf.periodStats(bad),
       () => perf.periodStats(0, 'monthly', bad),
     ])
-      assert.throws(call, /integer|range/);
+      assert.throws(call, (error) => error instanceof TypeError && error.kind === 'invalid_type');
   }
   assert.deepEqual(Array.from(perf.returnsForTicker(0)), [0.01, -0.02, 0.03]);
   assert.throws(() => perf.rollingReturns(0, 0), /at least 1/);

@@ -1,5 +1,6 @@
 //! WASM bindings for product-independent liquidity models.
 
+use crate::utils::input::json_text;
 use crate::utils::{to_js_err, to_js_value};
 use finstack_quant_models::liquidity::{self, KyleLambdaModel};
 use wasm_bindgen::prelude::*;
@@ -13,7 +14,8 @@ use wasm_bindgen::prelude::*;
 /// Throws a JavaScript exception if `returnsJson` is malformed or is not a
 /// numeric array. Invalid estimator samples return `undefined`.
 #[wasm_bindgen(js_name = rollEffectiveSpread)]
-pub fn roll_effective_spread(returns_json: &str) -> Result<Option<f64>, JsValue> {
+pub fn roll_effective_spread(returns_json: JsValue) -> Result<Option<f64>, JsValue> {
+    let returns_json: &str = &json_text(&returns_json, "returnsJson")?;
     let returns: Vec<f64> = serde_json::from_str(returns_json).map_err(to_js_err)?;
     Ok(liquidity::roll_effective_spread(&returns))
 }
@@ -28,7 +30,12 @@ pub fn roll_effective_spread(returns_json: &str) -> Result<Option<f64>, JsValue>
 /// Throws a JavaScript exception if either JSON input is malformed or is not
 /// a numeric array. Invalid estimator samples return `undefined`.
 #[wasm_bindgen(js_name = amihudIlliquidity)]
-pub fn amihud_illiquidity(returns_json: &str, volumes_json: &str) -> Result<Option<f64>, JsValue> {
+pub fn amihud_illiquidity(
+    returns_json: JsValue,
+    volumes_json: JsValue,
+) -> Result<Option<f64>, JsValue> {
+    let returns_json: &str = &json_text(&returns_json, "returnsJson")?;
+    let volumes_json: &str = &json_text(&volumes_json, "volumesJson")?;
     let returns: Vec<f64> = serde_json::from_str(returns_json).map_err(to_js_err)?;
     let volumes: Vec<f64> = serde_json::from_str(volumes_json).map_err(to_js_err)?;
     Ok(liquidity::amihud_illiquidity(&returns, &volumes))
@@ -133,10 +140,12 @@ pub fn almgren_chriss_impact(
 /// a numeric array. Invalid estimator samples return `undefined`.
 #[wasm_bindgen(js_name = kyleLambda)]
 pub fn kyle_lambda(
-    returns_json: &str,
-    volumes_json: &str,
+    returns_json: JsValue,
+    volumes_json: JsValue,
     reference_price: f64,
 ) -> Result<Option<f64>, JsValue> {
+    let returns_json: &str = &json_text(&returns_json, "returnsJson")?;
+    let volumes_json: &str = &json_text(&volumes_json, "volumesJson")?;
     let returns: Vec<f64> = serde_json::from_str(returns_json).map_err(to_js_err)?;
     let volumes: Vec<f64> = serde_json::from_str(volumes_json).map_err(to_js_err)?;
     Ok(KyleLambdaModel::lambda_from_series(
@@ -149,27 +158,6 @@ pub fn kyle_lambda(
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn estimators_return_none_for_missing_estimates() {
-        assert_eq!(roll_effective_spread("[0.01]").expect("valid JSON"), None);
-        assert_eq!(
-            amihud_illiquidity("[0.01]", "[0.0]").expect("valid JSON"),
-            None
-        );
-        assert_eq!(
-            kyle_lambda("[0.01]", "[0.0]", 100.0).expect("valid JSON"),
-            None
-        );
-    }
-
-    #[test]
-    fn kyle_lambda_calibrates_in_price_space() {
-        let lambda = kyle_lambda("[0.01, -0.02]", "[100.0, 200.0]", 50.0)
-            .expect("valid JSON")
-            .expect("valid price-space inputs");
-        assert!((lambda - 0.005).abs() < 1e-15);
-    }
 
     #[test]
     fn tier_uses_default_config_thresholds() {

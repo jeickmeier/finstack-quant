@@ -8,23 +8,24 @@ use finstack_quant_wasm::api::core::money::JsMoney;
 use finstack_quant_wasm::api::core::types::{JsBps, JsRate};
 use finstack_quant_wasm::api::valuations::fixed_income::{JsBond, JsRevolvingCredit, JsTermLoan};
 use finstack_quant_wasm::api::valuations::pricing::price_instrument;
+use wasm_bindgen::JsValue;
 use wasm_bindgen_test::*;
 
 fn usd_money(amount: f64) -> JsMoney {
-    let usd =
-        finstack_quant_wasm::api::core::currency::JsCurrency::new("USD").expect("USD currency");
+    let usd = finstack_quant_wasm::api::core::currency::JsCurrency::new(JsValue::from("USD"))
+        .expect("USD currency");
     JsMoney::new(amount, &usd).expect("money")
 }
 
 fn fixed_bond() -> JsBond {
     JsBond::fixed(
-        "BOND-1",
+        JsValue::from("BOND-1"),
         &usd_money(1_000_000.0),
         &JsRate::new(0.05).expect("rate"),
-        "2024-01-01",
-        "2034-01-01",
-        "short_front",
-        "USD-OIS",
+        JsValue::from("2024-01-01"),
+        JsValue::from("2034-01-01"),
+        JsValue::from("short_front"),
+        JsValue::from("USD-OIS"),
     )
     .expect("fixed bond")
 }
@@ -172,22 +173,25 @@ fn bond_fixed_to_json_is_tagged_and_matches_rust() {
 #[wasm_bindgen_test]
 fn bond_from_json_round_trip_preserves_fields() {
     let original = fixed_bond().to_json().unwrap();
-    let round_tripped = JsBond::from_json(&original).unwrap().to_json().unwrap();
+    let round_tripped = JsBond::from_json(JsValue::from(&original))
+        .unwrap()
+        .to_json()
+        .unwrap();
     assert_eq!(original, round_tripped);
 }
 
 #[wasm_bindgen_test]
 fn bond_floating_constructor_builds_frn() {
     let frn = JsBond::floating(
-        "FRN-1",
+        JsValue::from("FRN-1"),
         &usd_money(1_000_000.0),
-        "USD-SOFR-3M",
+        JsValue::from("USD-SOFR-3M"),
         &JsBps::new(200.0).unwrap(),
-        "2024-01-01",
-        "2030-01-01",
+        JsValue::from("2024-01-01"),
+        JsValue::from("2030-01-01"),
         &JsTenor::quarterly(),
         &JsDayCount::act360(),
-        "USD-OIS",
+        JsValue::from("USD-OIS"),
     )
     .expect("floating bond");
     assert_eq!(frn.id(), "FRN-1");
@@ -197,9 +201,9 @@ fn bond_floating_constructor_builds_frn() {
 
 #[wasm_bindgen_test]
 fn bond_from_json_rejects_invalid_json_and_wrong_type() {
-    assert!(JsBond::from_json("{not valid json").is_err());
+    assert!(JsBond::from_json(JsValue::from("{not valid json")).is_err());
     let loan_json = JsTermLoan::example().unwrap().to_json().unwrap();
-    assert!(JsBond::from_json(&loan_json).is_err());
+    assert!(JsBond::from_json(JsValue::from(&loan_json)).is_err());
 }
 
 #[wasm_bindgen_test]
@@ -207,23 +211,25 @@ fn bond_typed_to_json_prices_identically_to_handwritten_json() {
     let bond = fixed_bond();
     let market = market_context_json();
     let typed = price_instrument(
-        &bond.to_json().unwrap(),
-        &market,
-        "2024-06-30",
-        Some("default".to_string()),
+        JsValue::from(&bond.to_json().unwrap()),
+        JsValue::from(&market),
+        JsValue::from("2024-06-30"),
+        Some(JsValue::from("default".to_string())),
         None,
         None,
         None,
     )
     .expect("price typed");
     let via_json = price_instrument(
-        &JsBond::from_json(&bond.to_json().unwrap())
-            .unwrap()
-            .to_json()
-            .unwrap(),
-        &market,
-        "2024-06-30",
-        Some("default".to_string()),
+        JsValue::from(
+            &JsBond::from_json(JsValue::from(&bond.to_json().unwrap()))
+                .unwrap()
+                .to_json()
+                .unwrap(),
+        ),
+        JsValue::from(&market),
+        JsValue::from("2024-06-30"),
+        Some(JsValue::from("default".to_string())),
         None,
         None,
         None,
@@ -236,10 +242,10 @@ fn bond_typed_to_json_prices_identically_to_handwritten_json() {
 fn rates_credit_values_bond_call_and_put_rights() {
     fn price(instrument_json: &str, market_json: &str, model: &str) -> f64 {
         let result = price_instrument(
-            instrument_json,
-            market_json,
-            "2024-06-30",
-            Some(model.to_string()),
+            JsValue::from(instrument_json),
+            JsValue::from(market_json),
+            JsValue::from("2024-06-30"),
+            Some(JsValue::from(model.to_string())),
             None,
             None,
             None,
@@ -277,10 +283,10 @@ fn rates_credit_values_bond_call_and_put_rights() {
 
     let callable_json = explicit_credit_bond_json("WASM-HAZARD-REJECTS-CALL", Some(80.0), None);
     let error = price_instrument(
-        &callable_json,
-        &market,
-        "2024-06-30",
-        Some("hazard_rate".to_string()),
+        JsValue::from(&callable_json),
+        JsValue::from(&market),
+        JsValue::from("2024-06-30"),
+        Some(JsValue::from("hazard_rate".to_string())),
         None,
         None,
         None,
@@ -312,10 +318,10 @@ fn stochastic_rates_credit_result_exports_full_width_seed_as_bigint() {
     });
 
     let result = price_instrument(
-        &serde_json::to_string(&instrument).unwrap(),
-        &credit_market_context_json(),
-        "2024-06-30",
-        Some("rates_credit".to_string()),
+        JsValue::from(&serde_json::to_string(&instrument).unwrap()),
+        JsValue::from(&credit_market_context_json()),
+        JsValue::from("2024-06-30"),
+        Some(JsValue::from("rates_credit".to_string())),
         None,
         None,
         None,
@@ -364,15 +370,18 @@ fn term_loan_example_round_trips_and_prices() {
     let value: serde_json::Value = serde_json::from_str(&json).unwrap();
     assert_eq!(value["instrument"]["type"], "term_loan");
 
-    let round_tripped = JsTermLoan::from_json(&json).unwrap().to_json().unwrap();
+    let round_tripped = JsTermLoan::from_json(JsValue::from(&json))
+        .unwrap()
+        .to_json()
+        .unwrap();
     assert_eq!(json, round_tripped);
 
     let market = market_context_json();
     let priced = price_instrument(
-        &json,
-        &market,
-        "2024-06-30",
-        Some("default".to_string()),
+        JsValue::from(&json),
+        JsValue::from(&market),
+        JsValue::from("2024-06-30"),
+        Some(JsValue::from("default".to_string())),
         None,
         None,
         None,
@@ -384,9 +393,9 @@ fn term_loan_example_round_trips_and_prices() {
 
 #[wasm_bindgen_test]
 fn term_loan_from_json_rejects_invalid_json_and_wrong_type() {
-    assert!(JsTermLoan::from_json("[1, 2").is_err());
+    assert!(JsTermLoan::from_json(JsValue::from("[1, 2")).is_err());
     let bond_json = fixed_bond().to_json().unwrap();
-    assert!(JsTermLoan::from_json(&bond_json).is_err());
+    assert!(JsTermLoan::from_json(JsValue::from(&bond_json)).is_err());
 }
 
 #[wasm_bindgen_test]
@@ -396,13 +405,13 @@ fn revolving_credit_example_round_trips_through_the_envelope() {
     let json = facility.to_json().expect("serialize");
     let value: serde_json::Value = serde_json::from_str(&json).expect("valid json");
     assert_eq!(value["instrument"]["type"], "revolving_credit");
-    let back = JsRevolvingCredit::from_json(&json).expect("parse");
+    let back = JsRevolvingCredit::from_json(JsValue::from(&json)).expect("parse");
     assert_eq!(back.to_json().expect("serialize again"), json);
 }
 
 #[wasm_bindgen_test]
 fn revolving_credit_from_json_rejects_other_instrument_types() {
-    assert!(JsRevolvingCredit::from_json("{not valid json").is_err());
+    assert!(JsRevolvingCredit::from_json(JsValue::from("{not valid json")).is_err());
     let loan_json = JsTermLoan::example().unwrap().to_json().unwrap();
-    assert!(JsRevolvingCredit::from_json(&loan_json).is_err());
+    assert!(JsRevolvingCredit::from_json(JsValue::from(&loan_json)).is_err());
 }

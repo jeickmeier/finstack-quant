@@ -11,6 +11,7 @@ use finstack_quant_core::money::Money;
 use finstack_quant_core::types::Rate;
 use finstack_quant_wasm::api::attribution::*;
 use wasm_bindgen::JsCast;
+use wasm_bindgen::JsValue;
 use wasm_bindgen_test::*;
 
 fn bond_json() -> String {
@@ -53,15 +54,16 @@ fn market_json(as_of: time::Date, rate: f64) -> String {
 fn params(method_json: &str) -> JsAttributionParams {
     use time::macros::date;
     JsAttributionParams::new(
-        bond_json(),
-        market_json(date!(2025 - 01 - 15), 0.04),
-        market_json(date!(2025 - 01 - 16), 0.042),
-        "2025-01-15".to_string(),
-        "2025-01-16".to_string(),
-        method_json.to_string(),
+        JsValue::from(bond_json()),
+        JsValue::from(market_json(date!(2025 - 01 - 15), 0.04)),
+        JsValue::from(market_json(date!(2025 - 01 - 16), 0.042)),
+        JsValue::from("2025-01-15".to_string()),
+        JsValue::from("2025-01-16".to_string()),
+        JsValue::from(method_json.to_string()),
         None,
         None,
     )
+    .expect("valid attribution params")
 }
 
 #[wasm_bindgen_test]
@@ -147,7 +149,7 @@ fn validate_attribution_json_rejects_wrong_schema() {
         market_json(time::macros::date!(2025 - 01 - 15), 0.04),
         market_json(time::macros::date!(2025 - 01 - 16), 0.042),
     );
-    let err = validate_attribution_json(&envelope)
+    let err = validate_attribution_json(JsValue::from(&envelope))
         .expect_err("wrong schema must be rejected by validation, not just by execute");
     let msg: String = err
         .dyn_into::<js_sys::Error>()
@@ -164,15 +166,16 @@ fn validate_attribution_json_rejects_wrong_schema() {
 fn attribute_pnl_missing_market_data_yields_structured_error() {
     let empty = serde_json::to_string(&MarketContextState::from(&MarketContext::new())).unwrap();
     let p = JsAttributionParams::new(
-        bond_json(),
-        empty.clone(),
-        empty,
-        "2025-01-15".to_string(),
-        "2025-01-16".to_string(),
-        "\"parallel\"".to_string(),
+        JsValue::from(bond_json()),
+        JsValue::from(empty.clone()),
+        JsValue::from(empty),
+        JsValue::from("2025-01-15".to_string()),
+        JsValue::from("2025-01-16".to_string()),
+        JsValue::from("\"parallel\"".to_string()),
         None,
         None,
-    );
+    )
+    .expect("valid attribution params");
     let err = attribute_pnl(&p).expect_err("missing curves must error");
     let kind = js_sys::Reflect::get(&err, &"kind".into())
         .ok()
@@ -187,15 +190,16 @@ fn attribute_pnl_missing_market_data_yields_structured_error() {
 fn requested_reporting_currency_requires_fx() {
     use time::macros::date;
     let inputs = JsAttributionParams::new(
-        bond_json(),
-        market_json(date!(2025 - 01 - 15), 0.04),
-        market_json(date!(2025 - 01 - 16), 0.04),
+        JsValue::from(bond_json()),
+        JsValue::from(market_json(date!(2025 - 01 - 15), 0.04)),
+        JsValue::from(market_json(date!(2025 - 01 - 16), 0.04)),
         "2025-01-15".into(),
         "2025-01-16".into(),
         "\"parallel\"".into(),
         Some(r#"{"target_currency":"EUR"}"#.into()),
         None,
-    );
+    )
+    .expect("valid attribution params");
     assert!(attribute_pnl_json(&inputs).is_err());
 }
 
@@ -204,15 +208,16 @@ fn metrics_and_taylor_preserve_rounding() {
     use time::macros::date;
     for method in [r#""metrics_based""#, r#"{"taylor":{}}"#] {
         let inputs = JsAttributionParams::new(
-            bond_json(),
-            market_json(date!(2025 - 01 - 15), 0.04),
-            market_json(date!(2025 - 01 - 16), 0.04),
+            JsValue::from(bond_json()),
+            JsValue::from(market_json(date!(2025 - 01 - 15), 0.04)),
+            JsValue::from(market_json(date!(2025 - 01 - 16), 0.04)),
             "2025-01-15".into(),
             "2025-01-16".into(),
             method.into(),
             Some(r#"{"rounding_scale":4,"metrics":["dv01"]}"#.into()),
             None,
-        );
+        )
+        .expect("valid attribution params");
         let result: serde_json::Value =
             serde_json::from_str(&attribute_pnl_json(&inputs).unwrap()).unwrap();
         assert_eq!(

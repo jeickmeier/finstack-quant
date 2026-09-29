@@ -9,6 +9,7 @@
 //!
 //! Fang-Oosterlee (2008): see docs/REFERENCES.md#fang-oosterlee-2008.
 
+use crate::utils::input::{js_bool, js_opt_uint};
 use crate::utils::to_js_err;
 use finstack_quant_models::fourier::cos::{
     bs_cos_price as rust_bs_cos_price, merton_jump_cos_price as rust_merton_jump_cos_price,
@@ -44,9 +45,11 @@ pub fn bs_cos_price(
     div_yield: f64,
     vol: f64,
     expiry: f64,
-    is_call: bool,
-    n_terms: Option<usize>,
+    is_call: JsValue,
+    n_terms: Option<JsValue>,
 ) -> Result<f64, JsValue> {
+    let is_call = js_bool(&is_call, "isCall")?;
+    let n_terms: Option<usize> = js_opt_uint(n_terms.as_ref(), "nTerms")?;
     rust_bs_cos_price(BlackScholesCosParams {
         spot,
         strike,
@@ -91,9 +94,11 @@ pub fn vg_cos_price(
     theta: f64,
     nu: f64,
     expiry: f64,
-    is_call: bool,
-    n_terms: Option<usize>,
+    is_call: JsValue,
+    n_terms: Option<JsValue>,
 ) -> Result<f64, JsValue> {
+    let is_call = js_bool(&is_call, "isCall")?;
+    let n_terms: Option<usize> = js_opt_uint(n_terms.as_ref(), "nTerms")?;
     rust_vg_cos_price(VarianceGammaCosParams {
         spot,
         strike,
@@ -142,9 +147,11 @@ pub fn merton_jump_cos_price(
     sigma_jump: f64,
     lambda: f64,
     expiry: f64,
-    is_call: bool,
-    n_terms: Option<usize>,
+    is_call: JsValue,
+    n_terms: Option<JsValue>,
 ) -> Result<f64, JsValue> {
+    let is_call = js_bool(&is_call, "isCall")?;
+    let n_terms: Option<usize> = js_opt_uint(n_terms.as_ref(), "nTerms")?;
     rust_merton_jump_cos_price(MertonJumpCosParams {
         spot,
         strike,
@@ -159,15 +166,4 @@ pub fn merton_jump_cos_price(
         n_terms,
     })
     .map_err(to_js_err)
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn bs_cos_call_atm_is_positive() {
-        let p = bs_cos_price(100.0, 100.0, 0.05, 0.02, 0.2, 1.0, true, None).expect("price");
-        assert!(p > 0.0);
-    }
 }

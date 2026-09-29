@@ -74,8 +74,8 @@ fn build_perf() -> JsPerformance {
         to_js(&fx.dates),
         to_f64_matrix(&returns),
         to_js(&names),
-        Some("BENCH".to_string()),
-        Some("daily".to_string()),
+        Some(JsValue::from("BENCH".to_string())),
+        Some(JsValue::from("daily".to_string())),
     )
     .unwrap()
 }
@@ -110,13 +110,13 @@ fn from_returns_exposes_ticker_specific_active_dates() {
         to_js(&dates),
         to_f64_matrix(&returns),
         to_js(&names),
-        Some("BENCH".to_string()),
-        Some("daily".to_string()),
+        Some(JsValue::from("BENCH".to_string())),
+        Some(JsValue::from("daily".to_string())),
     )
     .unwrap();
 
     assert_eq!(
-        perf.active_dates_for_ticker(1.0).unwrap(),
+        perf.active_dates_for_ticker(JsValue::from(1.0)).unwrap(),
         vec!["2025-01-02".to_string(), "2025-01-03".to_string()]
     );
 }
@@ -146,8 +146,8 @@ fn sharpe_sortino_volatility_finite() {
     for raw in [
         perf.sharpe(Some(0.0)),
         perf.sortino(Some(0.0)),
-        perf.volatility(Some(true)),
-        perf.mean_return(Some(true)),
+        perf.volatility(Some(JsValue::from(true))).unwrap(),
+        perf.mean_return(Some(JsValue::from(true))).unwrap(),
     ] {
         let v = typed_vec(raw);
         assert_eq!(v.len(), 2);
@@ -212,8 +212,8 @@ fn periodic_returns_are_ticker_major_points_and_reconcile() {
         to_js(&dates),
         to_f64_matrix(&returns),
         to_js(&names),
-        Some("BENCH".to_string()),
-        Some("daily".to_string()),
+        Some(JsValue::from("BENCH".to_string())),
+        Some(JsValue::from("daily".to_string())),
     )
     .unwrap();
 
@@ -257,7 +257,7 @@ fn periodic_returns_are_ticker_major_points_and_reconcile() {
 #[wasm_bindgen_test]
 fn periodic_returns_reject_unknown_frequency() {
     let error = build_perf()
-        .periodic_returns(Some("hourly".to_string()))
+        .periodic_returns(Some(JsValue::from("hourly".to_string())))
         .expect_err("hourly must not be accepted");
     let message: String = error
         .dyn_into::<js_sys::Error>()
@@ -301,8 +301,8 @@ fn degenerate_beta_and_greeks_preserve_javascript_nan() {
         to_js(&dates),
         to_f64_matrix(&returns),
         to_js(&names),
-        Some("BENCH".to_string()),
-        Some("daily".to_string()),
+        Some(JsValue::from("BENCH".to_string())),
+        Some(JsValue::from("daily".to_string())),
     )
     .unwrap();
 
@@ -357,8 +357,8 @@ fn greeks_optional_risk_free_rate_changes_alpha() {
         to_js(&dates),
         to_f64_matrix(&[target, benchmark]),
         to_js(&names),
-        Some("BENCH".to_string()),
-        Some("monthly".to_string()),
+        Some(JsValue::from("BENCH".to_string())),
+        Some(JsValue::from("monthly".to_string())),
     )
     .unwrap();
 
@@ -376,7 +376,9 @@ fn greeks_optional_risk_free_rate_changes_alpha() {
 #[wasm_bindgen_test]
 fn rolling_greeks_emit_dates_alphas_betas() {
     let perf = build_perf();
-    let raw = perf.rolling_greeks(0.0, Some(5.0), None).unwrap();
+    let raw = perf
+        .rolling_greeks(JsValue::from(0.0), Some(JsValue::from(5.0)), None)
+        .unwrap();
     let date_array: Array = Reflect::get(&raw, &JsValue::from_str("dates"))
         .unwrap()
         .dyn_into()
@@ -391,7 +393,9 @@ fn rolling_greeks_emit_dates_alphas_betas() {
 #[wasm_bindgen_test]
 fn rolling_returns_match_dated_series_shape() {
     let perf = build_perf();
-    let raw = perf.rolling_returns(0.0, 3.0).unwrap();
+    let raw = perf
+        .rolling_returns(JsValue::from(0.0), JsValue::from(3.0))
+        .unwrap();
     let date_array: Array = Reflect::get(&raw, &JsValue::from_str("dates"))
         .unwrap()
         .dyn_into()
@@ -406,7 +410,7 @@ fn multi_factor_greeks_resolves_to_struct() {
     let perf = build_perf();
     let fx = fixture();
     let raw = perf
-        .multi_factor_greeks(0.0, to_f64_matrix(&fx.factors), None, None)
+        .multi_factor_greeks(JsValue::from(0.0), to_f64_matrix(&fx.factors), None, None)
         .unwrap();
     let value: serde_json::Value = serde_wasm_bindgen::from_value(raw).unwrap();
     assert!(value["alpha"].is_number());
@@ -419,7 +423,9 @@ fn multi_factor_greeks_resolves_to_struct() {
 #[wasm_bindgen_test]
 fn lookback_returns_emit_mtd_qtd_ytd_fytd_arrays() {
     let perf = build_perf();
-    let raw = perf.lookback_returns("2025-01-12", None, None).unwrap();
+    let raw = perf
+        .lookback_returns(JsValue::from("2025-01-12"), None, None)
+        .unwrap();
     let value: serde_json::Value = serde_wasm_bindgen::from_value(raw).unwrap();
     assert_eq!(value["mtd"].as_array().unwrap().len(), 2);
     assert_eq!(value["qtd"].as_array().unwrap().len(), 2);
@@ -431,7 +437,12 @@ fn lookback_returns_emit_mtd_qtd_ytd_fytd_arrays() {
 fn period_stats_emit_win_rate() {
     let perf = build_perf();
     let raw = perf
-        .period_stats(0.0, Some("weekly".to_string()), None, None)
+        .period_stats(
+            JsValue::from(0.0),
+            Some(JsValue::from("weekly".to_string())),
+            None,
+            None,
+        )
         .unwrap();
     let value: serde_json::Value = serde_wasm_bindgen::from_value(raw).unwrap();
     assert!(value["win_rate"].as_f64().is_some());
@@ -443,7 +454,8 @@ fn period_stats_emit_win_rate() {
 fn reset_date_range_narrows_active_dates() {
     let mut perf = build_perf();
     let full_len = perf.dates().len();
-    perf.reset_date_range("2025-01-05", "2025-01-10").unwrap();
+    perf.reset_date_range(JsValue::from("2025-01-05"), JsValue::from("2025-01-10"))
+        .unwrap();
     let active = perf.active_dates();
     assert!(active.first().map(String::as_str) == Some("2025-01-05"));
     assert!(active.last().map(String::as_str) == Some("2025-01-10"));
@@ -454,6 +466,6 @@ fn reset_date_range_narrows_active_dates() {
 #[wasm_bindgen_test]
 fn reset_bench_ticker_updates_index() {
     let mut perf = build_perf();
-    perf.reset_bench_ticker("TARGET").unwrap();
+    perf.reset_bench_ticker(JsValue::from("TARGET")).unwrap();
     assert_eq!(perf.benchmark_idx(), 0);
 }

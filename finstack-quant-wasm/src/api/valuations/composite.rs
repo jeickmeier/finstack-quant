@@ -6,6 +6,7 @@
 //! at the post-trade financed value. There is no separate `initializeFixed`
 //! export; `initialize` resolves `fixed_quantity` without history.
 
+use crate::utils::input::{from_js_json, js_string, json_text, opt_json_text};
 use crate::utils::{to_js_err, to_js_value};
 use finstack_quant_valuations::instruments::composite::{
     history, history_from_spec, CompositeInstrument, CompositeMarketObservation,
@@ -46,7 +47,7 @@ fn parse_metrics(metrics: Option<JsValue>) -> Result<Vec<MetricId>, JsValue> {
     match metrics {
         None => Ok(Vec::new()),
         Some(value) if value.is_null() || value.is_undefined() => Ok(Vec::new()),
-        Some(value) => serde_wasm_bindgen::from_value::<Vec<MetricId>>(value).map_err(to_js_err),
+        Some(value) => from_js_json::<Vec<MetricId>>(&value, "metrics"),
     }
 }
 
@@ -84,11 +85,15 @@ fn rebalance_value(result: CompositeRebalanceResult) -> Result<JsValue, JsValue>
 /// inputs, unsupported metrics/notionals, or non-finite resolved quantities.
 #[wasm_bindgen(js_name = initializeComposite)]
 pub fn initialize_composite(
-    spec_json: &str,
-    market_json: &str,
-    as_of: &str,
-    history_json: Option<String>,
+    spec_json: JsValue,
+    market_json: JsValue,
+    as_of: JsValue,
+    history_json: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
+    let spec_json: &str = &json_text(&spec_json, "specJson")?;
+    let market_json: &str = &json_text(&market_json, "marketJson")?;
+    let as_of: &str = &js_string(&as_of, "asOf")?;
+    let history_json = opt_json_text(history_json.as_ref(), "historyJson")?;
     let spec = parse_spec(spec_json)?;
     let market = super::pricing::parse_market_json(market_json)?;
     let date = finstack_quant_core::dates::parse_iso_date(as_of).map_err(to_js_err)?;
@@ -125,11 +130,15 @@ pub fn initialize_composite(
 /// missing market data, or quantity-resolution failures.
 #[wasm_bindgen(js_name = rebalanceComposite)]
 pub fn rebalance_composite(
-    instrument_json: &str,
-    market_json: &str,
-    as_of: &str,
-    history_json: Option<String>,
+    instrument_json: JsValue,
+    market_json: JsValue,
+    as_of: JsValue,
+    history_json: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
+    let instrument_json: &str = &json_text(&instrument_json, "instrumentJson")?;
+    let market_json: &str = &json_text(&market_json, "marketJson")?;
+    let as_of: &str = &js_string(&as_of, "asOf")?;
+    let history_json = opt_json_text(history_json.as_ref(), "historyJson")?;
     let instrument = parse_composite(instrument_json)?;
     let market = super::pricing::parse_market_json(market_json)?;
     let date = finstack_quant_core::dates::parse_iso_date(as_of).map_err(to_js_err)?;
@@ -166,11 +175,14 @@ pub fn rebalance_composite(
 /// primitive valuation failures.
 #[wasm_bindgen(js_name = compositePrimitiveExposures)]
 pub fn composite_primitive_exposures(
-    instrument_json: &str,
-    market_json: &str,
-    as_of: &str,
+    instrument_json: JsValue,
+    market_json: JsValue,
+    as_of: JsValue,
     metrics: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
+    let instrument_json: &str = &json_text(&instrument_json, "instrumentJson")?;
+    let market_json: &str = &json_text(&market_json, "marketJson")?;
+    let as_of: &str = &js_string(&as_of, "asOf")?;
     let instrument = parse_composite(instrument_json)?;
     let market = super::pricing::parse_market_json(market_json)?;
     let date = finstack_quant_core::dates::parse_iso_date(as_of).map_err(to_js_err)?;
@@ -198,9 +210,12 @@ pub fn composite_primitive_exposures(
 /// definitions, or invalid frozen states.
 #[wasm_bindgen(js_name = compositeExecutionTrades)]
 pub fn composite_execution_trades(
-    instrument_json: &str,
-    previous_instrument_json: Option<String>,
+    instrument_json: JsValue,
+    previous_instrument_json: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
+    let instrument_json: &str = &json_text(&instrument_json, "instrumentJson")?;
+    let previous_instrument_json =
+        opt_json_text(previous_instrument_json.as_ref(), "previousInstrumentJson")?;
     let instrument = parse_composite(instrument_json)?;
     let previous = previous_instrument_json
         .as_deref()
@@ -243,11 +258,14 @@ pub fn composite_execution_trades(
 /// noncanonical metric keys; initialization/rebalance failures; or missing market/history inputs.
 #[wasm_bindgen(js_name = compositeHistoryFromSpec)]
 pub fn composite_history_from_spec(
-    spec_json: &str,
-    observations_json: &str,
-    warmup_json: Option<String>,
+    spec_json: JsValue,
+    observations_json: JsValue,
+    warmup_json: Option<JsValue>,
     metrics: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
+    let spec_json: &str = &json_text(&spec_json, "specJson")?;
+    let observations_json: &str = &json_text(&observations_json, "observationsJson")?;
+    let warmup_json = opt_json_text(warmup_json.as_ref(), "warmupJson")?;
     let spec = parse_spec(spec_json)?;
     let observations = parse_observations(Some(observations_json))?;
     let warmup = parse_observations(warmup_json.as_deref())?;
@@ -282,10 +300,12 @@ pub fn composite_history_from_spec(
 /// market data, or valuation and rebalance failures.
 #[wasm_bindgen(js_name = compositeHistory)]
 pub fn composite_history(
-    instrument_json: &str,
-    observations_json: &str,
+    instrument_json: JsValue,
+    observations_json: JsValue,
     metrics: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
+    let instrument_json: &str = &json_text(&instrument_json, "instrumentJson")?;
+    let observations_json: &str = &json_text(&observations_json, "observationsJson")?;
     let instrument = parse_composite(instrument_json)?;
     let observations = parse_observations(Some(observations_json))?;
     let metrics = parse_metrics(metrics)?;

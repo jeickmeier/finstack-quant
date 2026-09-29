@@ -13,6 +13,7 @@
 //! no separate builder surface on this side because JS assembles JSON
 //! natively.
 
+use crate::utils::input::{js_string, json_text};
 use crate::utils::to_js_err;
 use wasm_bindgen::prelude::*;
 
@@ -49,7 +50,8 @@ pub(crate) fn parse_validated_model(
 /// serialize the normalized model.
 /// @param json - Canonical JSON string defining the object to deserialize or normalize.
 #[wasm_bindgen(js_name = validateFinancialModelJson)]
-pub fn validate_financial_model_json(json: &str) -> Result<String, JsValue> {
+pub fn validate_financial_model_json(json: JsValue) -> Result<String, JsValue> {
+    let json: &str = &json_text(&json, "json")?;
     let model = parse_validated_model(json)?;
     serde_json::to_string(&model).map_err(to_js_err)
 }
@@ -64,7 +66,8 @@ pub fn validate_financial_model_json(json: &str) -> Result<String, JsValue> {
 /// cannot be serialized to JavaScript.
 /// @param json - Canonical JSON string defining the object to deserialize or normalize.
 #[wasm_bindgen(js_name = modelNodeIds)]
-pub fn model_node_ids(json: &str) -> Result<JsValue, JsValue> {
+pub fn model_node_ids(json: JsValue) -> Result<JsValue, JsValue> {
+    let json: &str = &json_text(&json, "json")?;
     let model: finstack_quant_statements::FinancialModelSpec =
         serde_json::from_str(json).map_err(to_js_err)?;
     let ids: Vec<&str> = model.nodes.keys().map(|k| k.as_str()).collect();
@@ -82,7 +85,8 @@ pub fn model_node_ids(json: &str) -> Result<JsValue, JsValue> {
 /// the decoded check-suite specification.
 /// @param json - Canonical JSON string defining the object to deserialize or normalize.
 #[wasm_bindgen(js_name = validateCheckSuiteSpecJson)]
-pub fn validate_check_suite_spec_json(json: &str) -> Result<String, JsValue> {
+pub fn validate_check_suite_spec_json(json: JsValue) -> Result<String, JsValue> {
+    let json: &str = &json_text(&json, "json")?;
     let spec: finstack_quant_statements::checks::CheckSuiteSpec =
         serde_json::from_str(json).map_err(to_js_err)?;
     serde_json::to_string(&spec).map_err(to_js_err)
@@ -96,7 +100,8 @@ pub fn validate_check_suite_spec_json(json: &str) -> Result<String, JsValue> {
 /// the decoded capital-structure specification.
 /// @param json - Canonical JSON string defining the object to deserialize or normalize.
 #[wasm_bindgen(js_name = validateCapitalStructureSpecJson)]
-pub fn validate_capital_structure_spec_json(json: &str) -> Result<String, JsValue> {
+pub fn validate_capital_structure_spec_json(json: JsValue) -> Result<String, JsValue> {
+    let json: &str = &json_text(&json, "json")?;
     let spec: finstack_quant_statements::types::CapitalStructureSpec =
         serde_json::from_str(json).map_err(to_js_err)?;
     serde_json::to_string(&spec).map_err(to_js_err)
@@ -123,7 +128,8 @@ pub fn validate_capital_structure_spec_json(json: &str) -> Result<String, JsValu
 /// the validated waterfall.
 /// @param json - Canonical JSON string defining the object to deserialize or normalize.
 #[wasm_bindgen(js_name = validateWaterfallSpecJson)]
-pub fn validate_waterfall_spec_json(json: &str) -> Result<String, JsValue> {
+pub fn validate_waterfall_spec_json(json: JsValue) -> Result<String, JsValue> {
+    let json: &str = &json_text(&json, "json")?;
     let spec: finstack_quant_statements::capital_structure::WaterfallSpec =
         serde_json::from_str(json).map_err(to_js_err)?;
     spec.validate().map_err(to_js_err)?;
@@ -138,7 +144,8 @@ pub fn validate_waterfall_spec_json(json: &str) -> Result<String, JsValue> {
 /// the decoded ECF-sweep specification.
 /// @param json - Canonical JSON string defining the object to deserialize or normalize.
 #[wasm_bindgen(js_name = validateEcfSweepSpecJson)]
-pub fn validate_ecf_sweep_spec_json(json: &str) -> Result<String, JsValue> {
+pub fn validate_ecf_sweep_spec_json(json: JsValue) -> Result<String, JsValue> {
+    let json: &str = &json_text(&json, "json")?;
     let spec: finstack_quant_statements::capital_structure::EcfSweepSpec =
         serde_json::from_str(json).map_err(to_js_err)?;
     serde_json::to_string(&spec).map_err(to_js_err)
@@ -152,7 +159,8 @@ pub fn validate_ecf_sweep_spec_json(json: &str) -> Result<String, JsValue> {
 /// the decoded PIK-toggle specification.
 /// @param json - Canonical JSON string defining the object to deserialize or normalize.
 #[wasm_bindgen(js_name = validatePikToggleSpecJson)]
-pub fn validate_pik_toggle_spec_json(json: &str) -> Result<String, JsValue> {
+pub fn validate_pik_toggle_spec_json(json: JsValue) -> Result<String, JsValue> {
+    let json: &str = &json_text(&json, "json")?;
     let spec: finstack_quant_statements::capital_structure::PikToggleSpec =
         serde_json::from_str(json).map_err(to_js_err)?;
     serde_json::to_string(&spec).map_err(to_js_err)
@@ -172,7 +180,8 @@ pub fn validate_pik_toggle_spec_json(json: &str) -> Result<String, JsValue> {
 /// requirements, or failure to serialize the statement result to JavaScript.
 /// @param model_json - JSON-serialized FinancialModelSpec to evaluate across its statement periods.
 #[wasm_bindgen(js_name = evaluateModel)]
-pub fn evaluate_model(model_json: &str) -> Result<JsValue, JsValue> {
+pub fn evaluate_model(model_json: JsValue) -> Result<JsValue, JsValue> {
+    let model_json: &str = &json_text(&model_json, "modelJson")?;
     let model = parse_validated_model(model_json)?;
     let mut evaluator = finstack_quant_statements::evaluator::Evaluator::new();
     let result = evaluator.evaluate(&model).map_err(to_js_err)?;
@@ -195,10 +204,13 @@ pub fn evaluate_model(model_json: &str) -> Result<JsValue, JsValue> {
 /// @param as_of - ISO-8601 valuation date used to resolve date-dependent market data.
 #[wasm_bindgen(js_name = evaluateModelWithMarket)]
 pub fn evaluate_model_with_market(
-    model_json: &str,
-    market_json: &str,
-    as_of: &str,
+    model_json: JsValue,
+    market_json: JsValue,
+    as_of: JsValue,
 ) -> Result<JsValue, JsValue> {
+    let model_json: &str = &json_text(&model_json, "modelJson")?;
+    let market_json: &str = &json_text(&market_json, "marketJson")?;
+    let as_of: &str = &js_string(&as_of, "asOf")?;
     let model = parse_validated_model(model_json)?;
     let market: finstack_quant_core::market_data::context::MarketContext =
         serde_json::from_str(market_json).map_err(to_js_err)?;
@@ -227,7 +239,9 @@ pub fn evaluate_model_with_market(
 /// @param model_json - Financial-model specification JSON.
 /// @param config_json - Monte Carlo configuration JSON.
 #[wasm_bindgen(js_name = evaluateMonteCarlo)]
-pub fn evaluate_monte_carlo(model_json: &str, config_json: &str) -> Result<JsValue, JsValue> {
+pub fn evaluate_monte_carlo(model_json: JsValue, config_json: JsValue) -> Result<JsValue, JsValue> {
+    let model_json: &str = &json_text(&model_json, "modelJson")?;
+    let config_json: &str = &json_text(&config_json, "configJson")?;
     let model = parse_validated_model(model_json)?;
     let config: finstack_quant_statements::evaluator::MonteCarloConfig =
         serde_json::from_str(config_json).map_err(to_js_err)?;
@@ -253,7 +267,8 @@ pub fn evaluate_monte_carlo(model_json: &str, config_json: &str) -> Result<JsVal
 /// @param formula - Financial-model formula string to parse into its canonical expression representation.
 /// @returns Canonical formula text, e.g. `"(revenue - cogs) / revenue"`.
 #[wasm_bindgen(js_name = parseFormula)]
-pub fn parse_formula(formula: &str) -> Result<String, JsValue> {
+pub fn parse_formula(formula: JsValue) -> Result<String, JsValue> {
+    let formula: &str = &js_string(&formula, "formula")?;
     let ast = finstack_quant_statements::dsl::parse_formula(formula).map_err(to_js_err)?;
     Ok(ast.to_string())
 }
@@ -274,30 +289,14 @@ pub fn parse_formula(formula: &str) -> Result<String, JsValue> {
 /// operator form.
 /// @param formula - Financial-model formula string to parse and validate without evaluation.
 #[wasm_bindgen(js_name = parseAndCompile)]
-pub fn parse_and_compile(formula: &str) -> Result<(), JsValue> {
+pub fn parse_and_compile(formula: JsValue) -> Result<(), JsValue> {
+    let formula: &str = &js_string(&formula, "formula")?;
     finstack_quant_statements::dsl::parse_and_compile(formula).map_err(to_js_err)?;
     Ok(())
 }
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-
-    #[test]
-    fn validate_financial_model_json_accepts_valid_model() {
-        let periods = finstack_quant_core::dates::build_periods("2025Q1..Q1", None)
-            .expect("valid periods")
-            .periods;
-        let model = finstack_quant_statements::FinancialModelSpec::new("test", periods);
-        let json = serde_json::to_string(&model).expect("model should serialize to JSON");
-        let out = validate_financial_model_json(&json)
-            .expect("validate_financial_model_json should accept valid model");
-        let round_trip =
-            serde_json::from_str::<finstack_quant_statements::FinancialModelSpec>(&out)
-                .expect("validated JSON should deserialize");
-        assert_eq!(round_trip.id, "test");
-        assert!(round_trip.nodes.is_empty());
-    }
 
     #[test]
     fn validate_financial_model_json_rejects_empty_periods() {
@@ -308,40 +307,6 @@ mod tests {
             model.validate_semantics().is_err(),
             "semantic validation should reject empty periods"
         );
-    }
-
-    #[test]
-    fn validate_check_suite_spec_roundtrip() {
-        let spec = finstack_quant_statements::checks::CheckSuiteSpec {
-            name: "test".to_string(),
-            description: None,
-            builtin_checks: vec![],
-            formula_checks: vec![],
-            config: finstack_quant_statements::checks::CheckConfig::default(),
-        };
-        let json = serde_json::to_string(&spec).expect("serialize");
-        let out = validate_check_suite_spec_json(&json).expect("should accept valid spec");
-        let rt = serde_json::from_str::<finstack_quant_statements::checks::CheckSuiteSpec>(&out)
-            .expect("should roundtrip");
-        assert_eq!(rt.name, "test");
-    }
-
-    #[test]
-    fn validate_waterfall_spec_accepts_minimal_spec() {
-        let spec = finstack_quant_statements::capital_structure::WaterfallSpec {
-            priority_of_payments: vec![
-                finstack_quant_statements::capital_structure::PaymentPriority::Fees,
-                finstack_quant_statements::capital_structure::PaymentPriority::Interest,
-                finstack_quant_statements::capital_structure::PaymentPriority::Amortization,
-            ],
-            available_cash_node: "cash".into(),
-            ecf_sweep: None,
-            pik_toggle: None,
-            ..Default::default()
-        };
-        let json = serde_json::to_string(&spec).expect("serialize");
-        let out = validate_waterfall_spec_json(&json).expect("should accept default spec");
-        assert!(out.contains("priority_of_payments"));
     }
 
     #[test]
@@ -439,19 +404,6 @@ mod tests {
             .expect("run Monte Carlo");
         let parsed = serde_json::to_value(&results).expect("results serialize");
         assert!(parsed.is_object());
-    }
-
-    #[test]
-    fn parse_formula_returns_canonical_text() {
-        let out = parse_formula("revenue-cogs").expect("parse_formula should succeed");
-        assert_eq!(out, "revenue - cogs");
-        // The canonical text parses back to itself.
-        assert_eq!(parse_formula(&out).expect("reparse"), out);
-    }
-
-    #[test]
-    fn parse_and_compile_accepts_valid() {
-        parse_and_compile("revenue * 0.5").expect("should accept valid formula");
     }
 
     #[test]

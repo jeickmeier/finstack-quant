@@ -8,10 +8,9 @@
 //! above `Number.MAX_SAFE_INTEGER` (2^53 − 1) would silently round in the
 //! consumer. Today every count in the attribution surface is bounded by a
 //! handful of factors (≤ 12) and a handful of repricings (≤ ~30), well under
-//! the safe-integer ceiling. The [`crate::utils::check_js_safe_count`] guard
-//! is therefore not wired in here; if a future getter exposes a raw `usize`
-//! across the boundary, route it through that guard first.
+//! the safe-integer ceiling.
 
+use crate::utils::input::{js_opt_bool, js_string, json_text, opt_json_text};
 use crate::utils::{structured_js_error, to_js_err};
 use wasm_bindgen::prelude::*;
 
@@ -61,16 +60,25 @@ impl JsAttributionParams {
     #[wasm_bindgen(constructor)]
     #[allow(clippy::too_many_arguments)]
     pub fn new(
-        instrument_json: String,
-        market_t0_json: String,
-        market_t1_json: String,
-        as_of_t0: String,
-        as_of_t1: String,
-        method_json: String,
-        config_json: Option<String>,
-        full_cross_attribution: Option<bool>,
-    ) -> Self {
-        Self {
+        instrument_json: JsValue,
+        market_t0_json: JsValue,
+        market_t1_json: JsValue,
+        as_of_t0: JsValue,
+        as_of_t1: JsValue,
+        method_json: JsValue,
+        config_json: Option<JsValue>,
+        full_cross_attribution: Option<JsValue>,
+    ) -> Result<Self, JsValue> {
+        let instrument_json = json_text(&instrument_json, "instrumentJson")?;
+        let market_t0_json = json_text(&market_t0_json, "marketT0Json")?;
+        let market_t1_json = json_text(&market_t1_json, "marketT1Json")?;
+        let as_of_t0 = js_string(&as_of_t0, "asOfT0")?;
+        let as_of_t1 = js_string(&as_of_t1, "asOfT1")?;
+        let method_json = json_text(&method_json, "methodJson")?;
+        let config_json = opt_json_text(config_json.as_ref(), "configJson")?;
+        let full_cross_attribution =
+            js_opt_bool(full_cross_attribution.as_ref(), "fullCrossAttribution")?;
+        Ok(Self {
             instrument_json,
             market_t0_json,
             market_t1_json,
@@ -81,7 +89,7 @@ impl JsAttributionParams {
             full_cross_attribution,
             model_params_t0_json: None,
             credit_factor_model_json: None,
-        }
+        })
     }
 
     /// Optional serialized opening `ModelParamsSnapshot`.
@@ -92,8 +100,9 @@ impl JsAttributionParams {
     ///
     /// @param value - Optional serialized opening ModelParamsSnapshot JSON.
     #[wasm_bindgen(setter, js_name = modelParamsT0Json)]
-    pub fn set_model_params_t0_json(&mut self, value: Option<String>) {
-        self.model_params_t0_json = value;
+    pub fn set_model_params_t0_json(&mut self, value: Option<JsValue>) -> Result<(), JsValue> {
+        self.model_params_t0_json = opt_json_text(value.as_ref(), "modelParamsT0Json")?;
+        Ok(())
     }
 
     /// Optional serialized opening `ModelParamsSnapshot`.
@@ -116,8 +125,9 @@ impl JsAttributionParams {
     ///
     /// @param value - Optional serialized CreditFactorModel JSON.
     #[wasm_bindgen(setter, js_name = creditFactorModelJson)]
-    pub fn set_credit_factor_model_json(&mut self, value: Option<String>) {
-        self.credit_factor_model_json = value;
+    pub fn set_credit_factor_model_json(&mut self, value: Option<JsValue>) -> Result<(), JsValue> {
+        self.credit_factor_model_json = opt_json_text(value.as_ref(), "creditFactorModelJson")?;
+        Ok(())
     }
 
     /// Optional serialized `CreditFactorModel`.
@@ -260,7 +270,8 @@ pub fn attribute_pnl_json(params: &JsAttributionParams) -> Result<String, JsValu
 /// failure to serialize the result envelope.
 /// @param spec_json - JSON-serialized AttributionParams specification to validate and execute.
 #[wasm_bindgen(js_name = attributePnlEnvelopeJson)]
-pub fn attribute_pnl_envelope_json(spec_json: &str) -> Result<String, JsValue> {
+pub fn attribute_pnl_envelope_json(spec_json: JsValue) -> Result<String, JsValue> {
+    let spec_json: &str = &json_text(&spec_json, "specJson")?;
     let envelope: finstack_quant_attribution::AttributionEnvelope =
         serde_json::from_str(spec_json).map_err(to_js_err)?;
     let result_envelope = envelope
@@ -282,7 +293,8 @@ pub fn attribute_pnl_envelope_json(spec_json: &str) -> Result<String, JsValue> {
 /// failure to serialize the canonical attribution envelope.
 /// @param json - Canonical JSON string defining the object to deserialize or normalize.
 #[wasm_bindgen(js_name = validateAttributionJson)]
-pub fn validate_attribution_json(json: &str) -> Result<String, JsValue> {
+pub fn validate_attribution_json(json: JsValue) -> Result<String, JsValue> {
+    let json: &str = &json_text(&json, "json")?;
     finstack_quant_attribution::validate_attribution_json(json).map_err(to_js_err)
 }
 

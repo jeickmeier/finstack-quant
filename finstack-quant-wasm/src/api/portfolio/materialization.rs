@@ -1,5 +1,6 @@
 //! Browser-safe WASM wrappers for strict portfolio materialization.
 
+use crate::utils::input::js_opt_uint;
 use std::sync::Arc;
 
 use finstack_quant_core::contract::LoadLimits;
@@ -40,14 +41,15 @@ impl JsInstrumentArtifactCache {
     /// `undefined` to use the native default of 4,096.
     /// @returns A reusable cache with a 64 MiB encoded-source byte bound.
     #[wasm_bindgen(constructor)]
-    pub fn new(capacity: Option<usize>) -> JsInstrumentArtifactCache {
-        Self {
+    pub fn new(capacity: Option<JsValue>) -> Result<JsInstrumentArtifactCache, JsValue> {
+        let capacity: Option<usize> = js_opt_uint(capacity.as_ref(), "capacity")?;
+        Ok(Self {
             inner: Arc::new(
                 capacity
                     .map(InstrumentArtifactCache::with_capacity)
                     .unwrap_or_default(),
             ),
-        }
+        })
     }
 
     /// Number of decoded artifacts currently retained.

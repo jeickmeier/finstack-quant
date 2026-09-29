@@ -14,6 +14,7 @@
 //! `docs/REFERENCES.md#merton-1973`, `docs/REFERENCES.md#garman-kohlhagen-1983`,
 //! `docs/REFERENCES.md#black-1976`.
 
+use crate::utils::input::{js_bool, js_opt_bool, js_opt_string, js_string, js_uint};
 use crate::utils::to_js_err;
 use finstack_quant_models::closed_form::implied_vol::{
     black76_implied_vol as black76_implied_vol_core, bs_implied_vol as bs_implied_vol_core,
@@ -76,8 +77,9 @@ pub fn bs_price(
     div_yield: f64,
     vol: f64,
     expiry: f64,
-    is_call: bool,
+    is_call: JsValue,
 ) -> Result<f64, JsValue> {
+    let is_call = js_bool(&is_call, "isCall")?;
     bs_price_core(
         spot,
         strike,
@@ -110,7 +112,8 @@ pub fn bs_price(
 /// @throws If `spot` is non-finite or negative, or `strike` is non-finite or
 /// not strictly positive.
 #[wasm_bindgen(js_name = vanillaExpiryPayoff)]
-pub fn vanilla_expiry_payoff(spot: f64, strike: f64, is_call: bool) -> Result<f64, JsValue> {
+pub fn vanilla_expiry_payoff(spot: f64, strike: f64, is_call: JsValue) -> Result<f64, JsValue> {
+    let is_call = js_bool(&is_call, "isCall")?;
     vanilla_expiry_payoff_core(spot, strike, OptionType::from(is_call)).map_err(to_js_err)
 }
 
@@ -150,9 +153,10 @@ pub fn bs_greeks(
     div_yield: f64,
     vol: f64,
     expiry: f64,
-    is_call: bool,
+    is_call: JsValue,
     theta_days_per_year: Option<f64>,
 ) -> Result<JsValue, JsValue> {
+    let is_call = js_bool(&is_call, "isCall")?;
     // theta_days_per_year validation (finite, > 0) lives in canonical `bs_greeks`.
     let theta_days_per_year = theta_days_per_year.unwrap_or(DEFAULT_THETA_DAYS_PER_YEAR);
     let g = bs_greeks_core(
@@ -201,8 +205,9 @@ pub fn bs_implied_vol(
     div_yield: f64,
     expiry: f64,
     price: f64,
-    is_call: bool,
+    is_call: JsValue,
 ) -> Result<f64, JsValue> {
+    let is_call = js_bool(&is_call, "isCall")?;
     bs_implied_vol_core(
         spot,
         strike,
@@ -238,8 +243,9 @@ pub fn black76_implied_vol(
     df: f64,
     expiry: f64,
     price: f64,
-    is_call: bool,
+    is_call: JsValue,
 ) -> Result<f64, JsValue> {
+    let is_call = js_bool(&is_call, "isCall")?;
     black76_implied_vol_core(
         forward,
         strike,
@@ -271,8 +277,9 @@ pub fn black76_price(
     df: f64,
     expiry: f64,
     vol: f64,
-    is_call: bool,
+    is_call: JsValue,
 ) -> Result<f64, JsValue> {
+    let is_call = js_bool(&is_call, "isCall")?;
     let undiscounted = if is_call {
         black_call(forward, strike, vol, expiry)
     } else {
@@ -301,8 +308,9 @@ pub fn black76_greeks(
     strike: f64,
     expiry: f64,
     vol: f64,
-    is_call: bool,
+    is_call: JsValue,
 ) -> Result<JsValue, JsValue> {
+    let is_call = js_bool(&is_call, "isCall")?;
     let delta = if is_call {
         black_delta_call(forward, strike, vol, expiry)
     } else {
@@ -335,8 +343,9 @@ pub fn bachelier_price(
     strike: f64,
     normal_vol: f64,
     expiry: f64,
-    is_call: bool,
+    is_call: JsValue,
 ) -> Result<f64, JsValue> {
+    let is_call = js_bool(&is_call, "isCall")?;
     let value = if is_call {
         bachelier_call(forward, strike, normal_vol, expiry)
     } else {
@@ -364,8 +373,9 @@ pub fn bachelier_greeks(
     strike: f64,
     normal_vol: f64,
     expiry: f64,
-    is_call: bool,
+    is_call: JsValue,
 ) -> Result<JsValue, JsValue> {
+    let is_call = js_bool(&is_call, "isCall")?;
     let delta = if is_call {
         bachelier_delta_call(forward, strike, normal_vol, expiry)
     } else {
@@ -414,8 +424,9 @@ pub fn black_shifted_price(
     vol: f64,
     expiry: f64,
     shift: f64,
-    is_call: bool,
+    is_call: JsValue,
 ) -> Result<f64, JsValue> {
+    let is_call = js_bool(&is_call, "isCall")?;
     let value = if is_call {
         black_shifted_call(forward, strike, vol, expiry, shift)
     } else {
@@ -477,9 +488,11 @@ pub fn barrier_call(
     div_yield: f64,
     vol: f64,
     expiry: f64,
-    direction: &str,
-    knock: &str,
+    direction: JsValue,
+    knock: JsValue,
 ) -> Result<f64, JsValue> {
+    let direction: &str = &js_string(&direction, "direction")?;
+    let knock: &str = &js_string(&knock, "knock")?;
     barrier_call_str(
         spot, strike, barrier, expiry, rate, div_yield, vol, direction, knock,
     )
@@ -514,9 +527,11 @@ pub fn barrier_put(
     div_yield: f64,
     vol: f64,
     expiry: f64,
-    direction: &str,
-    knock: &str,
+    direction: JsValue,
+    knock: JsValue,
 ) -> Result<f64, JsValue> {
+    let direction: &str = &js_string(&direction, "direction")?;
+    let knock: &str = &js_string(&knock, "knock")?;
     barrier_put_str(
         spot, strike, barrier, expiry, rate, div_yield, vol, direction, knock,
     )
@@ -551,10 +566,13 @@ pub fn asian_option_price(
     div_yield: f64,
     vol: f64,
     expiry: f64,
-    num_fixings: usize,
-    averaging: Option<String>,
-    is_call: Option<bool>,
+    num_fixings: JsValue,
+    averaging: Option<JsValue>,
+    is_call: Option<JsValue>,
 ) -> Result<f64, JsValue> {
+    let num_fixings: usize = js_uint(&num_fixings, "numFixings")?;
+    let averaging = js_opt_string(averaging.as_ref(), "averaging")?;
+    let is_call = js_opt_bool(is_call.as_ref(), "isCall")?;
     let averaging = averaging.as_deref().unwrap_or("arithmetic");
     let option_type = OptionType::from(is_call.unwrap_or(true));
     asian_option_price_str(
@@ -601,9 +619,11 @@ pub fn lookback_option_price(
     vol: f64,
     expiry: f64,
     extremum: f64,
-    strike_type: Option<String>,
-    is_call: Option<bool>,
+    strike_type: Option<JsValue>,
+    is_call: Option<JsValue>,
 ) -> Result<f64, JsValue> {
+    let strike_type = js_opt_string(strike_type.as_ref(), "strikeType")?;
+    let is_call = js_opt_bool(is_call.as_ref(), "isCall")?;
     let strike_type = strike_type.as_deref().unwrap_or("fixed");
     let option_type = OptionType::from(is_call.unwrap_or(true));
     lookback_option_price_str(
@@ -648,8 +668,9 @@ pub fn quanto_option_price(
     vol_asset: f64,
     vol_fx: f64,
     correlation: f64,
-    is_call: Option<bool>,
+    is_call: Option<JsValue>,
 ) -> Result<f64, JsValue> {
+    let is_call = js_opt_bool(is_call.as_ref(), "isCall")?;
     quanto_option_price_core(
         spot,
         strike,
@@ -698,8 +719,9 @@ pub fn heston_price(
     sigma_v: f64,
     rho: f64,
     v0: f64,
-    is_call: Option<bool>,
+    is_call: Option<JsValue>,
 ) -> Result<f64, JsValue> {
+    let is_call = js_opt_bool(is_call.as_ref(), "isCall")?;
     let params = HestonPricingParams::new(rate, div_yield, kappa, theta, sigma_v, rho, v0)
         .map_err(to_js_err)?;
     if is_call.unwrap_or(true) {
@@ -721,99 +743,5 @@ mod tests {
         )
         .expect("finite price");
         assert!(p > 5.0 && p < 15.0, "price={p}");
-    }
-
-    #[test]
-    fn barrier_put_dispatches() {
-        let p = barrier_put(100.0, 100.0, 80.0, 0.05, 0.0, 0.2, 1.0, "down", "out")
-            .expect("finite price");
-        assert!(p > 0.0);
-        assert!(barrier_put(100.0, 100.0, 80.0, 0.05, 0.0, 0.2, 1.0, "sideways", "out").is_err());
-    }
-
-    #[test]
-    fn black76_and_bachelier_prices_are_positive() {
-        assert!(black76_price(100.0, 100.0, 0.95, 1.0, 0.2, true).expect("price") > 0.0);
-        assert!(bachelier_price(0.03, 0.03, 0.0075, 1.0, true).expect("price") > 0.0);
-        assert!(black_shifted_price(-0.005, -0.005, 0.25, 1.0, 0.03, true).expect("price") > 0.0);
-        assert!(black_shifted_vega_js(-0.005, -0.005, 0.25, 1.0, 0.03).expect("vega") > 0.0);
-    }
-
-    #[test]
-    fn bs_price_call_atm_is_positive() {
-        let p = bs_price(100.0, 100.0, 0.05, 0.02, 0.2, 1.0, true).expect("finite price");
-        assert!(p > 0.0);
-    }
-
-    #[test]
-    fn vanilla_expiry_payoff_call_itm() {
-        let payoff = vanilla_expiry_payoff(110.0, 100.0, true).expect("finite payoff");
-        assert!((payoff - 10.0).abs() < 1e-12);
-    }
-
-    #[test]
-    fn vanilla_expiry_payoff_rejects_negative_spot() {
-        assert!(vanilla_expiry_payoff(-1.0, 100.0, true).is_err());
-        let put = vanilla_expiry_payoff(0.0, 100.0, false).expect("zero spot put");
-        assert!((put - 100.0).abs() < 1e-12);
-    }
-
-    #[test]
-    fn bs_implied_vol_recovers_sigma() {
-        let sigma = 0.25;
-        let price = bs_price(100.0, 110.0, 0.03, 0.01, sigma, 0.75, true).expect("finite price");
-        let iv = bs_implied_vol(100.0, 110.0, 0.03, 0.01, 0.75, price, true)
-            .expect("solver should converge");
-        assert!((iv - sigma).abs() < 1e-6, "iv={iv} sigma={sigma}");
-    }
-
-    #[test]
-    fn bs_price_rejects_non_finite_result() {
-        // A degenerate input (huge maturity with a negative rate) drives
-        // `exp(-r*t)` to `+inf`, which escapes the core's `.max(0.0)` clamp.
-        // The binding guard must surface that as a thrown error rather than a
-        // silent non-finite value crossing the wasm boundary.
-        let result = bs_price(100.0, 100.0, -1.0, 0.0, 0.2, 1.0e6, false);
-        assert!(
-            result.is_err(),
-            "a non-finite Black-Scholes price must produce an error"
-        );
-        // A well-posed input still returns a finite price unchanged.
-        assert!(bs_price(100.0, 100.0, 0.05, 0.02, 0.2, 1.0, true).is_ok());
-    }
-
-    #[test]
-    fn quanto_option_price_rejects_non_finite_result() {
-        // Same degenerate-maturity path: a non-finite quanto price must throw.
-        let result = quanto_option_price(
-            100.0,
-            100.0,
-            1.0e6,
-            -1.0,
-            0.01,
-            0.0,
-            0.20,
-            0.10,
-            0.3,
-            Some(false),
-        );
-        assert!(
-            result.is_err(),
-            "a non-finite quanto option price must produce an error"
-        );
-        // A well-posed input still returns a finite price.
-        assert!(quanto_option_price(
-            100.0,
-            100.0,
-            1.0,
-            0.03,
-            0.01,
-            0.0,
-            0.20,
-            0.10,
-            0.3,
-            Some(true)
-        )
-        .is_ok());
     }
 }

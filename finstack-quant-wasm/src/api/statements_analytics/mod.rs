@@ -11,6 +11,10 @@ pub use comps::{
 };
 
 use crate::api::statements::parse_validated_model;
+use crate::utils::input::{
+    js_bool, js_f64_seq, js_opt_bool, js_opt_string, js_string, js_string_seq, json_text,
+    opt_json_text,
+};
 use crate::utils::{to_js_err, to_js_value};
 use wasm_bindgen::prelude::*;
 
@@ -29,7 +33,9 @@ use wasm_bindgen::prelude::*;
 /// @param model_json - Financial-model specification JSON.
 /// @param config_json - Configuration JSON for this call.
 #[wasm_bindgen(js_name = runSensitivity)]
-pub fn run_sensitivity(model_json: &str, config_json: &str) -> Result<JsValue, JsValue> {
+pub fn run_sensitivity(model_json: JsValue, config_json: JsValue) -> Result<JsValue, JsValue> {
+    let model_json: &str = &json_text(&model_json, "modelJson")?;
+    let config_json: &str = &json_text(&config_json, "configJson")?;
     let model = parse_validated_model(model_json)?;
 
     let config: finstack_quant_statements_analytics::analysis::SensitivityConfig =
@@ -56,10 +62,13 @@ pub fn run_sensitivity(model_json: &str, config_json: &str) -> Result<JsValue, J
 /// @param config_json - Configuration JSON for this call.
 #[wasm_bindgen(js_name = runVariance)]
 pub fn run_variance(
-    base_json: &str,
-    comparison_json: &str,
-    config_json: &str,
+    base_json: JsValue,
+    comparison_json: JsValue,
+    config_json: JsValue,
 ) -> Result<JsValue, JsValue> {
+    let base_json: &str = &json_text(&base_json, "baseJson")?;
+    let comparison_json: &str = &json_text(&comparison_json, "comparisonJson")?;
+    let config_json: &str = &json_text(&config_json, "configJson")?;
     let base: finstack_quant_statements::evaluator::StatementResult =
         serde_json::from_str(base_json).map_err(to_js_err)?;
 
@@ -90,9 +99,11 @@ pub fn run_variance(
 /// @param scenario_set_json - Scenario-set JSON keyed by scenario name.
 #[wasm_bindgen(js_name = evaluateScenarioSet)]
 pub fn evaluate_scenario_set(
-    model_json: &str,
-    scenario_set_json: &str,
+    model_json: JsValue,
+    scenario_set_json: JsValue,
 ) -> Result<JsValue, JsValue> {
+    let model_json: &str = &json_text(&model_json, "modelJson")?;
+    let scenario_set_json: &str = &json_text(&scenario_set_json, "scenarioSetJson")?;
     let model = parse_validated_model(model_json)?;
 
     let scenario_set: finstack_quant_statements_analytics::analysis::ScenarioSet =
@@ -120,8 +131,8 @@ pub fn evaluate_scenario_set(
 /// @param forecast - Forecast values aligned one-for-one with the actual realized series.
 #[wasm_bindgen(js_name = backtestForecast)]
 pub fn backtest_forecast(actual: JsValue, forecast: JsValue) -> Result<JsValue, JsValue> {
-    let actual_vec: Vec<f64> = serde_wasm_bindgen::from_value(actual).map_err(to_js_err)?;
-    let forecast_vec: Vec<f64> = serde_wasm_bindgen::from_value(forecast).map_err(to_js_err)?;
+    let actual_vec = js_f64_seq(&actual, "actual")?;
+    let forecast_vec = js_f64_seq(&forecast, "forecast")?;
 
     let metrics = finstack_quant_statements_analytics::analysis::backtest_forecast(
         &actual_vec,
@@ -144,10 +155,13 @@ pub fn backtest_forecast(actual: JsValue, forecast: JsValue) -> Result<JsValue, 
 /// @param period - Model period label for the requested statement value or calculation.
 #[wasm_bindgen(js_name = generateTornadoEntries)]
 pub fn generate_tornado_entries(
-    result_json: &str,
-    metric_node: &str,
-    period: Option<String>,
+    result_json: JsValue,
+    metric_node: JsValue,
+    period: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
+    let result_json: &str = &json_text(&result_json, "resultJson")?;
+    let metric_node: &str = &js_string(&metric_node, "metricNode")?;
+    let period = js_opt_string(period.as_ref(), "period")?;
     let result: finstack_quant_statements_analytics::analysis::SensitivityResult =
         serde_json::from_str(result_json).map_err(to_js_err)?;
     let period_id: Option<finstack_quant_core::dates::PeriodId> =
@@ -188,18 +202,23 @@ pub fn generate_tornado_entries(
 #[wasm_bindgen(js_name = dcfSensitivity)]
 #[allow(clippy::too_many_arguments)]
 pub fn dcf_sensitivity(
-    model_json: &str,
+    model_json: JsValue,
     wacc: f64,
-    terminal_value_json: &str,
-    ufcf_node: &str,
+    terminal_value_json: JsValue,
+    ufcf_node: JsValue,
     net_debt_override: Option<f64>,
     wacc_sensitivity_bump: Option<f64>,
     wacc_denominator_epsilon: Option<f64>,
     max_stable_growth_rate: Option<f64>,
     exit_multiple_bump: Option<f64>,
-    mid_year_convention: Option<bool>,
-    market_json: Option<String>,
+    mid_year_convention: Option<JsValue>,
+    market_json: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
+    let model_json: &str = &json_text(&model_json, "modelJson")?;
+    let terminal_value_json: &str = &json_text(&terminal_value_json, "terminalValueJson")?;
+    let ufcf_node: &str = &js_string(&ufcf_node, "ufcfNode")?;
+    let mid_year_convention = js_opt_bool(mid_year_convention.as_ref(), "midYearConvention")?;
+    let market_json = opt_json_text(market_json.as_ref(), "marketJson")?;
     use finstack_quant_statements_analytics::analysis::{DcfOptions, ExitMultipleBump};
 
     let model = parse_validated_model(model_json)?;
@@ -265,16 +284,22 @@ pub fn dcf_sensitivity(
 #[wasm_bindgen(js_name = evaluateLbo)]
 #[allow(clippy::too_many_arguments)]
 pub fn evaluate_lbo(
-    model_json: &str,
+    model_json: JsValue,
     entry_multiple: f64,
-    entry_metric_node: &str,
+    entry_metric_node: JsValue,
     exit_multiple: f64,
-    exit_metric_node: &str,
-    exit_net_debt_node: &str,
-    exit_period: &str,
-    sources_json: &str,
+    exit_metric_node: JsValue,
+    exit_net_debt_node: JsValue,
+    exit_period: JsValue,
+    sources_json: JsValue,
     transaction_fees: f64,
 ) -> Result<JsValue, JsValue> {
+    let model_json: &str = &json_text(&model_json, "modelJson")?;
+    let entry_metric_node: &str = &js_string(&entry_metric_node, "entryMetricNode")?;
+    let exit_metric_node: &str = &js_string(&exit_metric_node, "exitMetricNode")?;
+    let exit_net_debt_node: &str = &js_string(&exit_net_debt_node, "exitNetDebtNode")?;
+    let exit_period: &str = &js_string(&exit_period, "exitPeriod")?;
+    let sources_json: &str = &json_text(&sources_json, "sourcesJson")?;
     use finstack_quant_statements_analytics::analysis::{LboConfig, LboTranche};
 
     let model = parse_validated_model(model_json)?;
@@ -354,16 +379,22 @@ pub fn wacc(
 #[wasm_bindgen(js_name = goalSeek)]
 #[allow(clippy::too_many_arguments)]
 pub fn goal_seek(
-    model_json: &str,
-    target_node: &str,
-    target_period: &str,
+    model_json: JsValue,
+    target_node: JsValue,
+    target_period: JsValue,
     target_value: f64,
-    driver_node: &str,
-    driver_period: &str,
-    update_model: bool,
+    driver_node: JsValue,
+    driver_period: JsValue,
+    update_model: JsValue,
     bounds_lo: Option<f64>,
     bounds_hi: Option<f64>,
 ) -> Result<JsValue, JsValue> {
+    let model_json: &str = &json_text(&model_json, "modelJson")?;
+    let target_node: &str = &js_string(&target_node, "targetNode")?;
+    let target_period: &str = &js_string(&target_period, "targetPeriod")?;
+    let driver_node: &str = &js_string(&driver_node, "driverNode")?;
+    let driver_period: &str = &js_string(&driver_period, "driverPeriod")?;
+    let update_model = js_bool(&update_model, "updateModel")?;
     let mut model = parse_validated_model(model_json)?;
     let tp: finstack_quant_core::dates::PeriodId = target_period.parse().map_err(to_js_err)?;
     let dp: finstack_quant_core::dates::PeriodId = driver_period.parse().map_err(to_js_err)?;
@@ -425,7 +456,9 @@ fn goal_seek_bounds(
 /// @param model_json - Financial-model specification JSON.
 /// @param node_id - Stable node identifier used to select the required domain object.
 #[wasm_bindgen(js_name = traceDependencies)]
-pub fn trace_dependencies(model_json: &str, node_id: &str) -> Result<String, JsValue> {
+pub fn trace_dependencies(model_json: JsValue, node_id: JsValue) -> Result<String, JsValue> {
+    let model_json: &str = &json_text(&model_json, "modelJson")?;
+    let node_id: &str = &js_string(&node_id, "nodeId")?;
     let model = parse_validated_model(model_json)?;
     let graph = finstack_quant_statements::evaluator::DependencyGraph::from_model(&model)
         .map_err(to_js_err)?;
@@ -448,11 +481,15 @@ pub fn trace_dependencies(model_json: &str, node_id: &str) -> Result<String, JsV
 /// @param period - Model period label for the requested statement value or calculation.
 #[wasm_bindgen(js_name = explainFormula)]
 pub fn explain_formula(
-    model_json: &str,
-    results_json: &str,
-    node_id: &str,
-    period: &str,
+    model_json: JsValue,
+    results_json: JsValue,
+    node_id: JsValue,
+    period: JsValue,
 ) -> Result<JsValue, JsValue> {
+    let model_json: &str = &json_text(&model_json, "modelJson")?;
+    let results_json: &str = &json_text(&results_json, "resultsJson")?;
+    let node_id: &str = &js_string(&node_id, "nodeId")?;
+    let period: &str = &js_string(&period, "period")?;
     let model = parse_validated_model(model_json)?;
     let results: finstack_quant_statements::evaluator::StatementResult =
         serde_json::from_str(results_json).map_err(to_js_err)?;
@@ -476,11 +513,15 @@ pub fn explain_formula(
 /// @param period - Model period label for the requested statement value or calculation.
 #[wasm_bindgen(js_name = explainFormulaText)]
 pub fn explain_formula_text(
-    model_json: &str,
-    results_json: &str,
-    node_id: &str,
-    period: &str,
+    model_json: JsValue,
+    results_json: JsValue,
+    node_id: JsValue,
+    period: JsValue,
 ) -> Result<String, JsValue> {
+    let model_json: &str = &json_text(&model_json, "modelJson")?;
+    let results_json: &str = &json_text(&results_json, "resultsJson")?;
+    let node_id: &str = &js_string(&node_id, "nodeId")?;
+    let period: &str = &js_string(&period, "period")?;
     let model = parse_validated_model(model_json)?;
     let results: finstack_quant_statements::evaluator::StatementResult =
         serde_json::from_str(results_json).map_err(to_js_err)?;
@@ -503,14 +544,15 @@ pub fn explain_formula_text(
 /// @param periods - Ordered period labels or observations aligned with the supplied data.
 #[wasm_bindgen(js_name = plSummaryReportText)]
 pub fn pl_summary_report_text(
-    results_json: &str,
+    results_json: JsValue,
     line_items: JsValue,
     periods: JsValue,
 ) -> Result<String, JsValue> {
+    let results_json: &str = &json_text(&results_json, "resultsJson")?;
     let results: finstack_quant_statements::evaluator::StatementResult =
         serde_json::from_str(results_json).map_err(to_js_err)?;
-    let items: Vec<String> = serde_wasm_bindgen::from_value(line_items).map_err(to_js_err)?;
-    let period_strs: Vec<String> = serde_wasm_bindgen::from_value(periods).map_err(to_js_err)?;
+    let items = js_string_seq(&line_items, "lineItems")?;
+    let period_strs = js_string_seq(&periods, "periods")?;
     let period_ids: Vec<finstack_quant_core::dates::PeriodId> = period_strs
         .iter()
         .map(|p| p.parse().map_err(to_js_err))
@@ -530,7 +572,12 @@ pub fn pl_summary_report_text(
 /// @param results_json - Evaluated statement-result JSON.
 /// @param period - Statement period identifier, such as `2025Q4` or `2025A`.
 #[wasm_bindgen(js_name = creditAssessmentReportText)]
-pub fn credit_assessment_report_text(results_json: &str, period: &str) -> Result<String, JsValue> {
+pub fn credit_assessment_report_text(
+    results_json: JsValue,
+    period: JsValue,
+) -> Result<String, JsValue> {
+    let results_json: &str = &json_text(&results_json, "resultsJson")?;
+    let period: &str = &js_string(&period, "period")?;
     let results: finstack_quant_statements::evaluator::StatementResult =
         serde_json::from_str(results_json).map_err(to_js_err)?;
     let period: finstack_quant_core::dates::PeriodId = period.parse().map_err(to_js_err)?;
@@ -552,7 +599,9 @@ pub fn credit_assessment_report_text(results_json: &str, period: &str) -> Result
 /// @param results_json - Evaluated statement-result JSON.
 /// @param period - Statement period identifier, such as `2025Q4` or `2025A`.
 #[wasm_bindgen(js_name = creditAssessment)]
-pub fn credit_assessment(results_json: &str, period: &str) -> Result<JsValue, JsValue> {
+pub fn credit_assessment(results_json: JsValue, period: JsValue) -> Result<JsValue, JsValue> {
+    let results_json: &str = &json_text(&results_json, "resultsJson")?;
+    let period: &str = &js_string(&period, "period")?;
     let results: finstack_quant_statements::evaluator::StatementResult =
         serde_json::from_str(results_json).map_err(to_js_err)?;
     let period: finstack_quant_core::dates::PeriodId = period.parse().map_err(to_js_err)?;
@@ -578,10 +627,13 @@ pub fn credit_assessment(results_json: &str, period: &str) -> Result<JsValue, Js
 /// @param results_json - Evaluated statement-result JSON.
 #[wasm_bindgen(js_name = runChecks)]
 pub fn run_checks(
-    model_json: &str,
-    suite_spec_json: &str,
-    results_json: Option<String>,
+    model_json: JsValue,
+    suite_spec_json: JsValue,
+    results_json: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
+    let model_json: &str = &json_text(&model_json, "modelJson")?;
+    let suite_spec_json: &str = &json_text(&suite_spec_json, "suiteSpecJson")?;
+    let results_json = opt_json_text(results_json.as_ref(), "resultsJson")?;
     let model = parse_validated_model(model_json)?;
     let spec: finstack_quant_statements::checks::CheckSuiteSpec =
         serde_json::from_str(suite_spec_json).map_err(to_js_err)?;
@@ -609,10 +661,13 @@ pub fn run_checks(
 /// @param results_json - Evaluated statement-result JSON.
 #[wasm_bindgen(js_name = runThreeStatementChecks)]
 pub fn run_three_statement_checks(
-    model_json: &str,
-    mapping_json: &str,
-    results_json: Option<String>,
+    model_json: JsValue,
+    mapping_json: JsValue,
+    results_json: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
+    let model_json: &str = &json_text(&model_json, "modelJson")?;
+    let mapping_json: &str = &json_text(&mapping_json, "mappingJson")?;
+    let results_json = opt_json_text(results_json.as_ref(), "resultsJson")?;
     let model = parse_validated_model(model_json)?;
     let mapping: finstack_quant_statements_analytics::analysis::ThreeStatementMapping =
         serde_json::from_str(mapping_json).map_err(to_js_err)?;
@@ -637,10 +692,13 @@ pub fn run_three_statement_checks(
 /// @param results_json - Evaluated statement-result JSON.
 #[wasm_bindgen(js_name = runCreditUnderwritingChecks)]
 pub fn run_credit_underwriting_checks(
-    model_json: &str,
-    mapping_json: &str,
-    results_json: Option<String>,
+    model_json: JsValue,
+    mapping_json: JsValue,
+    results_json: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
+    let model_json: &str = &json_text(&model_json, "modelJson")?;
+    let mapping_json: &str = &json_text(&mapping_json, "mappingJson")?;
+    let results_json = opt_json_text(results_json.as_ref(), "resultsJson")?;
     let model = parse_validated_model(model_json)?;
     let mapping: finstack_quant_statements_analytics::analysis::CreditMapping =
         serde_json::from_str(mapping_json).map_err(to_js_err)?;
@@ -668,7 +726,8 @@ fn parse_optional_results(
 /// report schema.
 /// @param report_json - Check-report JSON.
 #[wasm_bindgen(js_name = renderCheckReportText)]
-pub fn render_check_report_text(report_json: &str) -> Result<String, JsValue> {
+pub fn render_check_report_text(report_json: JsValue) -> Result<String, JsValue> {
+    let report_json: &str = &json_text(&report_json, "reportJson")?;
     let report: finstack_quant_statements::checks::CheckReport =
         serde_json::from_str(report_json).map_err(to_js_err)?;
     Ok(finstack_quant_statements_analytics::analysis::CheckReportRenderer::render_text(&report))
@@ -682,7 +741,8 @@ pub fn render_check_report_text(report_json: &str) -> Result<String, JsValue> {
 /// report schema.
 /// @param report_json - Check-report JSON.
 #[wasm_bindgen(js_name = renderCheckReportHtml)]
-pub fn render_check_report_html(report_json: &str) -> Result<String, JsValue> {
+pub fn render_check_report_html(report_json: JsValue) -> Result<String, JsValue> {
+    let report_json: &str = &json_text(&report_json, "reportJson")?;
     let report: finstack_quant_statements::checks::CheckReport =
         serde_json::from_str(report_json).map_err(to_js_err)?;
     Ok(finstack_quant_statements_analytics::analysis::CheckReportRenderer::render_html(&report))
@@ -693,7 +753,6 @@ mod tests {
     use super::*;
     use finstack_quant_core::dates::PeriodId;
     use finstack_quant_statements::builder::ModelBuilder;
-    use finstack_quant_statements::evaluator::StatementResult;
     use finstack_quant_statements::types::AmountOrScalar;
 
     fn test_model_json() -> String {
@@ -736,38 +795,6 @@ mod tests {
         let results = evaluator.evaluate(&model).expect("evaluate");
         let results_json = serde_json::to_string(&results).expect("serialize results");
         (model_json, results_json)
-    }
-
-    #[test]
-    fn credit_assessment_report_accepts_minimal_results() {
-        let results = StatementResult::default();
-        let results_json = serde_json::to_string(&results).expect("serialize results");
-        let text = credit_assessment_report_text(&results_json, "2024").expect("report");
-        assert!(text.contains("Credit Assessment"));
-    }
-
-    #[test]
-    fn trace_dependencies_renders_for_simple_model() {
-        let model_json = test_model_json();
-        let tree = trace_dependencies(&model_json, "gross_profit").expect("trace");
-        assert!(!tree.is_empty());
-        assert!(tree.contains("revenue") || tree.contains("gross_profit"));
-    }
-
-    #[test]
-    fn explain_formula_text_succeeds() {
-        let (model_json, results_json) = evaluated_results();
-        let explanation =
-            explain_formula_text(&model_json, &results_json, "gross_profit", "2024Q1")
-                .expect("explain");
-        assert!(!explanation.is_empty());
-    }
-
-    #[test]
-    fn credit_assessment_report_with_data() {
-        let (_, results_json) = evaluated_results();
-        let text = credit_assessment_report_text(&results_json, "2024Q1").expect("report");
-        assert!(text.contains("Credit Assessment"));
     }
 
     #[test]

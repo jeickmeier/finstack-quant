@@ -3,6 +3,7 @@
 #![cfg(target_arch = "wasm32")]
 
 use finstack_quant_wasm::api::core::dates::{create_date, JsDayCount, JsDayCountContext, JsTenor};
+use finstack_quant_wasm::api::core::market_data::*;
 use finstack_quant_wasm::api::core::market_data::{
     JsDiscountCurve, JsForwardCurve, JsFxConversionPolicy, JsFxDeltaVolSurface, JsFxMatrix,
     JsVolCube,
@@ -11,18 +12,21 @@ use finstack_quant_wasm::api::models::volatility::{
     get_cube_normal_vol, get_cube_normal_vol_clamped, get_fx_delta_pillar_vols, get_fx_delta_vol,
 };
 use js_sys::Float64Array;
+use wasm_bindgen::JsValue;
 use wasm_bindgen_test::*;
 
 #[wasm_bindgen_test]
 fn fx_matrix_rate_returns_structured_result() {
     let matrix = JsFxMatrix::new();
-    matrix.set_quote("EUR", "USD", 1.10).unwrap();
+    matrix
+        .set_quote(JsValue::from("EUR"), JsValue::from("USD"), 1.10)
+        .unwrap();
 
     let result = matrix
         .rate(
-            "EUR",
-            "USD",
-            "2024-01-02",
+            JsValue::from("EUR"),
+            JsValue::from("USD"),
+            JsValue::from("2024-01-02"),
             &JsFxConversionPolicy::cashflow_date(),
         )
         .unwrap();
@@ -66,8 +70,8 @@ fn forward_curve_projection_grid_and_rate_between() {
 #[wasm_bindgen_test]
 fn discount_curve_negative_rate_validation_mode_is_explicit() {
     assert!(JsDiscountCurve::new(
-        "CHF-OIS",
-        "2025-01-01",
+        JsValue::from("CHF-OIS"),
+        JsValue::from("2025-01-01"),
         &[0.0, 1.0, 1.0, 1.002],
         None,
         None,
@@ -78,13 +82,13 @@ fn discount_curve_negative_rate_validation_mode_is_explicit() {
     .is_err());
 
     let curve = JsDiscountCurve::new(
-        "CHF-OIS",
-        "2025-01-01",
+        JsValue::from("CHF-OIS"),
+        JsValue::from("2025-01-01"),
         &[0.0, 1.0, 1.0, 1.002],
         None,
         None,
         None,
-        Some("negative_rate_friendly".to_string()),
+        Some(JsValue::from("negative_rate_friendly".to_string())),
         Some(-0.01),
     )
     .expect("negative-rate-friendly curve");
@@ -92,13 +96,13 @@ fn discount_curve_negative_rate_validation_mode_is_explicit() {
 
     for floor in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
         assert!(JsDiscountCurve::new(
-            "CHF-OIS",
-            "2025-01-01",
+            JsValue::from("CHF-OIS"),
+            JsValue::from("2025-01-01"),
             &[0.0, 1.0, 1.0, 1.002],
             None,
             None,
             None,
-            Some("negative_rate_friendly".to_string()),
+            Some(JsValue::from("negative_rate_friendly".to_string())),
             Some(floor),
         )
         .is_err());
@@ -108,9 +112,17 @@ fn discount_curve_negative_rate_validation_mode_is_explicit() {
 #[wasm_bindgen_test]
 fn fx_matrix_rate_defaults_policy_to_cashflow_date() {
     let matrix = JsFxMatrix::new();
-    matrix.set_quote("GBP", "USD", 1.25).unwrap();
+    matrix
+        .set_quote(JsValue::from("GBP"), JsValue::from("USD"), 1.25)
+        .unwrap();
 
-    let result = matrix.rate_default("GBP", "USD", "2024-01-02").unwrap();
+    let result = matrix
+        .rate_default(
+            JsValue::from("GBP"),
+            JsValue::from("USD"),
+            JsValue::from("2024-01-02"),
+        )
+        .unwrap();
 
     assert!((result.rate() - 1.25).abs() < 1e-12);
     assert!(!result.triangulated());
@@ -121,17 +133,37 @@ fn fx_matrix_policy_can_be_reused() {
     let matrix = JsFxMatrix::new();
     let policy = JsFxConversionPolicy::cashflow_date();
     matrix
-        .set_quote_on("EUR", "USD", "2024-01-02", &policy, 1.10)
+        .set_quote_on(
+            JsValue::from("EUR"),
+            JsValue::from("USD"),
+            JsValue::from("2024-01-02"),
+            &policy,
+            1.10,
+        )
         .unwrap();
-    let first = matrix.rate("EUR", "USD", "2024-01-02", &policy).unwrap();
-    let second = matrix.rate("EUR", "USD", "2024-01-02", &policy).unwrap();
+    let first = matrix
+        .rate(
+            JsValue::from("EUR"),
+            JsValue::from("USD"),
+            JsValue::from("2024-01-02"),
+            &policy,
+        )
+        .unwrap();
+    let second = matrix
+        .rate(
+            JsValue::from("EUR"),
+            JsValue::from("USD"),
+            JsValue::from("2024-01-02"),
+            &policy,
+        )
+        .unwrap();
     assert_eq!(first.rate(), second.rate());
 }
 
 #[wasm_bindgen_test]
 fn fx_delta_vol_surface_basic_accessors_and_implied_vol() {
     let surface = JsFxDeltaVolSurface::new(
-        "EURUSD-DELTA-VOL",
+        JsValue::from("EURUSD-DELTA-VOL"),
         &[0.25, 0.5, 1.0],
         &[0.08, 0.085, 0.09],
         &[0.01, 0.012, 0.015],
@@ -145,7 +177,7 @@ fn fx_delta_vol_surface_basic_accessors_and_implied_vol() {
     assert_eq!(surface.num_expiries(), 3);
     assert_eq!(surface.expiries().as_ref(), [0.25, 0.5, 1.0]);
 
-    let pillar = get_fx_delta_pillar_vols(&surface, 0).unwrap();
+    let pillar = get_fx_delta_pillar_vols(&surface, JsValue::from(0)).unwrap();
     assert!((pillar[0] - 0.08).abs() < 1e-12);
 
     // ATM-DNS strike at expiry 1.0 should recover the 0.09 ATM vol.
@@ -159,7 +191,7 @@ fn fx_delta_vol_surface_basic_accessors_and_implied_vol() {
 #[wasm_bindgen_test]
 fn fx_delta_vol_surface_rejects_mixed_10d_arguments() {
     match JsFxDeltaVolSurface::new(
-        "BAD",
+        JsValue::from("BAD"),
         &[0.25, 0.5],
         &[0.08, 0.085],
         &[0.01, 0.012],
@@ -188,7 +220,7 @@ fn fx_delta_vol_surface_rejects_mixed_10d_arguments() {
 #[wasm_bindgen_test]
 fn normal_sabr_requires_positive_shifted_levels_when_beta_is_positive() {
     let cev = JsVolCube::new(
-        "CEV",
+        JsValue::from("CEV"),
         &[1.0],
         &[2.0],
         &[0.01, 0.5, -0.2, 0.4, f64::NAN],
@@ -200,7 +232,7 @@ fn normal_sabr_requires_positive_shifted_levels_when_beta_is_positive() {
     assert!(get_cube_normal_vol_clamped(&cev, 1.0, 2.0, -0.01).is_nan());
 
     let normal = JsVolCube::new(
-        "NORMAL",
+        JsValue::from("NORMAL"),
         &[1.0],
         &[2.0],
         &[0.01, 0.0, -0.2, 0.4, f64::NAN],
@@ -215,40 +247,115 @@ fn normal_sabr_requires_positive_shifted_levels_when_beta_is_positive() {
 
 #[wasm_bindgen_test]
 fn day_count_context_supports_context_dependent_conventions() {
-    let start = create_date(2024, 1, 1).unwrap();
-    let end = create_date(2024, 7, 1).unwrap();
+    let start = create_date(JsValue::from(2024), JsValue::from(1), JsValue::from(1)).unwrap();
+    let end = create_date(JsValue::from(2024), JsValue::from(7), JsValue::from(1)).unwrap();
 
     assert!(JsDayCount::act_act_isma()
-        .year_fraction(start, end)
+        .year_fraction(JsValue::from(start), JsValue::from(end))
         .is_err());
 
     let isma_ctx = JsDayCountContext::new().with_frequency(&JsTenor::semi_annual());
     let isma = JsDayCount::act_act_isma()
-        .year_fraction_with_context(start, end, &isma_ctx)
+        .year_fraction_with_context(JsValue::from(start), JsValue::from(end), &isma_ctx)
         .unwrap();
     assert!((isma - 0.5).abs() < 1e-12);
 
-    let bus_ctx = JsDayCountContext::new().with_calendar("target2");
+    let bus_ctx = JsDayCountContext::new()
+        .with_calendar(JsValue::from("target2"))
+        .expect("context");
     let bus = JsDayCount::bus252()
-        .year_fraction_with_context(start, end, &bus_ctx)
+        .year_fraction_with_context(JsValue::from(start), JsValue::from(end), &bus_ctx)
         .unwrap();
     assert!(bus > 0.0);
 }
 
 #[wasm_bindgen_test]
 fn day_count_exposes_act365l_and_signed_fraction() {
-    let start = create_date(2024, 1, 1).unwrap();
-    let end = create_date(2025, 1, 1).unwrap();
+    let start = create_date(JsValue::from(2024), JsValue::from(1), JsValue::from(1)).unwrap();
+    let end = create_date(JsValue::from(2025), JsValue::from(1), JsValue::from(1)).unwrap();
     assert_eq!(
         JsDayCount::act365l()
-            .signed_year_fraction(start, end)
+            .signed_year_fraction(JsValue::from(start), JsValue::from(end))
             .unwrap(),
         1.0
     );
     assert_eq!(
         JsDayCount::act365l()
-            .signed_year_fraction(end, start)
+            .signed_year_fraction(JsValue::from(end), JsValue::from(start))
             .unwrap(),
         -1.0
+    );
+}
+
+#[wasm_bindgen_test]
+fn discount_curve_new_and_accessors() {
+    let curve = JsDiscountCurve::new(
+        JsValue::from("USD-OIS"),
+        JsValue::from("2024-01-15"),
+        &[0.5, 0.99, 1.0, 0.98, 2.0, 0.96],
+        None,
+        None,
+        None,
+        None,
+        None,
+    )
+    .expect("discount curve");
+    assert_eq!(curve.id(), "USD-OIS");
+    assert_eq!(curve.base_date(), "2024-01-15");
+    assert!((curve.df(0.5) - 0.99).abs() < 1e-6);
+    assert!((curve.df(1.0) - 0.98).abs() < 1e-6);
+    assert!(curve.zero(1.0) > 0.0);
+    let f = curve.forward(0.5, 1.0).expect("forward rate");
+    assert!(f > 0.0);
+}
+
+#[wasm_bindgen_test]
+fn discount_curve_flat_uses_continuous_compounding() {
+    let curve = JsDiscountCurve::flat(JsValue::from("USD-OIS"), JsValue::from("2024-01-15"), 0.04)
+        .expect("flat discount curve");
+
+    for t in [0.0_f64, 0.25, 1.0, 5.0, 30.0] {
+        assert!((curve.df(t) - (-0.04 * t).exp()).abs() < 1e-12);
+    }
+    assert!((curve.forward(2.0, 9.0).expect("flat forward") - 0.04).abs() < 1e-12);
+}
+
+#[wasm_bindgen_test]
+fn fx_matrix_quote_and_rate() {
+    let m = JsFxMatrix::new();
+    m.set_quote(JsValue::from("USD"), JsValue::from("EUR"), 0.92)
+        .expect("set quote");
+    let r = m
+        .rate_default(
+            JsValue::from("USD"),
+            JsValue::from("EUR"),
+            JsValue::from("2024-01-15"),
+        )
+        .expect("fx rate");
+    assert!((r.rate() - 0.92).abs() < 1e-9);
+    assert!(!r.triangulated());
+}
+
+#[wasm_bindgen_test]
+fn fx_pair_convention_helpers() {
+    let conv =
+        fx_pair_convention(JsValue::from("USD"), JsValue::from("JPY")).expect("USDJPY convention");
+    assert_eq!(conv.base().code(), "USD");
+    assert_eq!(conv.quote().code(), "JPY");
+    assert_eq!(conv.usd_quotation().to_string(), "indirect");
+    assert!((conv.pip_size() - 0.01).abs() < 1e-12);
+    assert_eq!(conv.settlement_days(), 2);
+    assert!(
+        (fx_pip_size(JsValue::from("EUR"), JsValue::from("USD")).expect("EURUSD pip") - 0.0001)
+            .abs()
+            < 1e-12
+    );
+    let inverted = invert_fx_rate(1.10).expect("positive rate");
+    assert!((inverted - 1.0 / 1.10).abs() < 1e-12);
+    assert_eq!(
+        JsFxQuoteConvention::from_name(JsValue::from("direct"))
+            .expect("direct")
+            .to_string(),
+        "direct"
     );
 }

@@ -27,16 +27,29 @@ fn get_f64(value: &JsValue, key: &str) -> f64 {
 
 #[wasm_bindgen_test]
 fn estimators_return_none_for_missing_estimates() {
-    assert_eq!(roll_effective_spread("[0.01]").unwrap(), None);
-    assert_eq!(amihud_illiquidity("[0.01]", "[0.0]").unwrap(), None);
-    assert_eq!(kyle_lambda("[0.01]", "[0.0]", 100.0).unwrap(), None);
+    assert_eq!(
+        roll_effective_spread(JsValue::from("[0.01]")).unwrap(),
+        None
+    );
+    assert_eq!(
+        amihud_illiquidity(JsValue::from("[0.01]"), JsValue::from("[0.0]")).unwrap(),
+        None
+    );
+    assert_eq!(
+        kyle_lambda(JsValue::from("[0.01]"), JsValue::from("[0.0]"), 100.0).unwrap(),
+        None
+    );
 }
 
 #[wasm_bindgen_test]
 fn kyle_lambda_calibrates_in_price_space() {
-    let lambda = kyle_lambda("[0.01, -0.02]", "[100.0, 200.0]", 50.0)
-        .unwrap()
-        .expect("valid price-space inputs");
+    let lambda = kyle_lambda(
+        JsValue::from("[0.01, -0.02]"),
+        JsValue::from("[100.0, 200.0]"),
+        50.0,
+    )
+    .unwrap()
+    .expect("valid price-space inputs");
     assert!((lambda - 0.005).abs() < 1e-15);
 }
 
@@ -78,4 +91,32 @@ fn almgren_chriss_impact_preserves_fields_and_price_scaling() {
     let unit_cost = get_f64(&unit, "total_cost");
     let priced_cost = get_f64(&priced, "total_cost");
     assert!((priced_cost - 100.0 * unit_cost).abs() < 1e-9 * priced_cost.abs().max(1.0));
+}
+
+#[wasm_bindgen_test]
+fn estimators_return_none_for_missing_estimates_binding() {
+    assert_eq!(
+        roll_effective_spread(JsValue::from("[0.01]")).expect("valid JSON"),
+        None
+    );
+    assert_eq!(
+        amihud_illiquidity(JsValue::from("[0.01]"), JsValue::from("[0.0]")).expect("valid JSON"),
+        None
+    );
+    assert_eq!(
+        kyle_lambda(JsValue::from("[0.01]"), JsValue::from("[0.0]"), 100.0).expect("valid JSON"),
+        None
+    );
+}
+
+#[wasm_bindgen_test]
+fn kyle_lambda_calibrates_in_price_space_binding() {
+    let lambda = kyle_lambda(
+        JsValue::from("[0.01, -0.02]"),
+        JsValue::from("[100.0, 200.0]"),
+        50.0,
+    )
+    .expect("valid JSON")
+    .expect("valid price-space inputs");
+    assert!((lambda - 0.005).abs() < 1e-15);
 }

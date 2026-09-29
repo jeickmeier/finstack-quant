@@ -5,6 +5,7 @@
 //! [`finstack_quant_models::correlation`]. The JS facade nests these exports
 //! under `models.correlation`.
 
+use crate::utils::input::{js_opt_uint, js_uint};
 use crate::utils::to_js_err;
 use finstack_quant_models::correlation::{self as corr, Copula, CopulaSpec, RecoveryModel};
 use wasm_bindgen::prelude::*;
@@ -346,7 +347,8 @@ pub fn joint_probabilities(p1: f64, p2: f64, correlation: f64) -> Result<Box<[f6
 /// entry is not one, an entry is outside the correlation bounds, the matrix is
 /// not symmetric, or the matrix is not positive semidefinite.
 #[wasm_bindgen(js_name = validateCorrelationMatrix)]
-pub fn validate_correlation_matrix(matrix: &[f64], n: usize) -> Result<(), JsValue> {
+pub fn validate_correlation_matrix(matrix: &[f64], n: JsValue) -> Result<(), JsValue> {
+    let n: usize = js_uint(&n, "n")?;
     corr::validate_correlation_matrix(matrix, n).map_err(to_js_err)
 }
 
@@ -369,10 +371,12 @@ pub fn validate_correlation_matrix(matrix: &[f64], n: usize) -> Result<(), JsVal
 #[wasm_bindgen(js_name = nearestCorrelation)]
 pub fn nearest_correlation(
     matrix: Vec<f64>,
-    n: usize,
-    max_iter: Option<usize>,
+    n: JsValue,
+    max_iter: Option<JsValue>,
     tol: Option<f64>,
 ) -> Result<Box<[f64]>, JsValue> {
+    let n: usize = js_uint(&n, "n")?;
+    let max_iter: Option<usize> = js_opt_uint(max_iter.as_ref(), "maxIter")?;
     // Single source of truth for the defaults: the Rust
     // `NearestCorrelationOpts::default()` (max_iter = 200, tol = 1e-10).
     let defaults = corr::NearestCorrelationOpts::default();
@@ -576,43 +580,5 @@ mod tests {
         assert_eq!(j.len(), 4);
         let sum: f64 = j.iter().sum();
         assert!((sum - 1.0).abs() < 1e-9);
-    }
-
-    #[test]
-    fn validate_correlation_matrix_accepts_valid_and_rejects_invalid() {
-        #[rustfmt::skip]
-        let good = vec![
-            1.0, 0.5, 0.3,
-            0.5, 1.0, 0.4,
-            0.3, 0.4, 1.0,
-        ];
-        assert!(validate_correlation_matrix(&good, 3).is_ok());
-
-        // Off-diagonal outside [-1, 1] must be rejected.
-        #[rustfmt::skip]
-        let bad = vec![
-            1.0, 1.5,
-            1.5, 1.0,
-        ];
-        assert!(validate_correlation_matrix(&bad, 2).is_err());
-
-        // Length / dimension mismatch must be rejected, not panic.
-        assert!(validate_correlation_matrix(&good, 2).is_err());
-    }
-
-    #[test]
-    fn nearest_correlation_repairs_near_psd_input() {
-        // Valid correlation matrix passes through unchanged.
-        #[rustfmt::skip]
-        let good = vec![
-            1.0, 0.5, 0.3,
-            0.5, 1.0, 0.4,
-            0.3, 0.4, 1.0,
-        ];
-        let out = nearest_correlation(good, 3, None, None).expect("good matrix should project");
-        assert_eq!(out.len(), 9);
-        for i in 0..3 {
-            assert!((out[i * 3 + i] - 1.0).abs() < 1e-9);
-        }
     }
 }
