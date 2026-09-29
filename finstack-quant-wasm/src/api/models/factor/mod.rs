@@ -62,11 +62,11 @@ impl JsCreditFactorModel {
     ///
     /// # Errors
     /// Throws if the JSON is malformed or fails validation.
-    /// @param s - JSON-serialized CreditFactorModel to deserialize.
+    /// @param json - JSON-serialized CreditFactorModel to deserialize.
     #[wasm_bindgen(js_name = fromJson)]
-    pub fn from_json(s: &str) -> Result<JsCreditFactorModel, JsValue> {
+    pub fn from_json(json: &str) -> Result<JsCreditFactorModel, JsValue> {
         let inner: finstack_quant_models::factor::credit::hierarchy::CreditFactorModel =
-            serde_json::from_str(s).map_err(to_js_err)?;
+            serde_json::from_str(json).map_err(to_js_err)?;
         inner.validate().map_err(to_js_err)?;
         Ok(Self { inner })
     }

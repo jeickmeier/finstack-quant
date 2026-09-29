@@ -59,7 +59,7 @@ fn credit_factor_hierarchy_dts_exposes_public_surface() {
     assert!(dts.contains("declare class CreditFactorModel {"));
     assert!(contains_signature(
         &dts,
-        "static fromJson(s: string): CreditFactorModel;"
+        "static fromJson(json: string): CreditFactorModel;"
     ));
     assert!(contains_signature(&dts, "toJson(): string;"));
 
@@ -841,9 +841,7 @@ fn dts_documents_wasm_owned_handles_and_dispose_contract() {
         "Portfolio",
     ] {
         assert!(
-            dts.contains(&format!(
-                "interface {class_name} extends WasmOwned {{}}"
-            )),
+            dts.contains(&format!("interface {class_name} extends WasmOwned {{}}")),
             "{class_name} must merge the wasm ownership contract"
         );
     }

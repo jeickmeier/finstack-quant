@@ -50,9 +50,9 @@ impl JsRate {
 
     /// Create a rate from a percent figure.
     ///
-    /// @param pct - Percent value (e.g. `5.0` for 5%).
+    /// @param percent - Percent value (e.g. `5.0` for 5%).
     /// @returns The constructed `Rate`.
-    /// @throws If `pct` is non-finite.
+    /// @throws If `percent` is non-finite.
     ///
     /// @example
     /// ```javascript
@@ -60,8 +60,8 @@ impl JsRate {
     /// r.asDecimal;  // 0.05
     /// ```
     #[wasm_bindgen(js_name = fromPercent)]
-    pub fn from_percent(pct: f64) -> Result<JsRate, JsValue> {
-        RustRate::from_percent(pct)
+    pub fn from_percent(percent: f64) -> Result<JsRate, JsValue> {
+        RustRate::from_percent(percent)
             .map(|inner| JsRate { inner })
             .map_err(to_js_err)
     }
@@ -137,14 +137,14 @@ impl JsBps {
     /// Delegates to the canonical Rust `Bps::try_new`, which rejects
     /// fractional basis points.
     ///
-    /// @param value - Value in whole basis points (e.g. `25` for 25 bp).
+    /// @param bp - Value in whole basis points (e.g. `25` for 25 bp).
     /// @returns The constructed `Bps`.
-    /// @throws If `value` is non-finite or not a whole number of basis
+    /// @throws If `bp` is non-finite or not a whole number of basis
     /// points. Sub-bp spreads must use the JSON instrument path (which
     /// preserves fractional values) or a decimal `Rate`.
     #[wasm_bindgen(constructor)]
-    pub fn new(value: f64) -> Result<JsBps, JsValue> {
-        RustBps::try_new(value)
+    pub fn new(bp: f64) -> Result<JsBps, JsValue> {
+        RustBps::try_new(bp)
             .map(|inner| JsBps { inner })
             .map_err(to_js_err)
     }
@@ -188,12 +188,12 @@ pub struct JsPercentage {
 impl JsPercentage {
     /// Create a percentage.
     ///
-    /// @param value - Value in percent (e.g. `5.0` for 5%).
+    /// @param percent - Value in percent (e.g. `5.0` for 5%).
     /// @returns The constructed `Percentage`.
-    /// @throws If `value` is non-finite.
+    /// @throws If `percent` is non-finite.
     #[wasm_bindgen(constructor)]
-    pub fn new(value: f64) -> Result<JsPercentage, JsValue> {
-        RustPercentage::new(value)
+    pub fn new(percent: f64) -> Result<JsPercentage, JsValue> {
+        RustPercentage::new(percent)
             .map(|inner| JsPercentage { inner })
             .map_err(to_js_err)
     }

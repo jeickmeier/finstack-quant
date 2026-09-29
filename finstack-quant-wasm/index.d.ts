@@ -592,11 +592,11 @@ export interface RateConstructor {
    * const r = core.Rate.fromPercent(5.0);
    * r.asDecimal;  // 0.05
    * ```
-   * @param pct - Percent value (e.g. `5.0` for 5%).
+   * @param percent - Percent value (e.g. `5.0` for 5%).
    * @returns The constructed `Rate`.
-   * @throws If `pct` is non-finite.
+   * @throws If `percent` is non-finite.
    */
-  fromPercent(pct: number): Rate;
+  fromPercent(percent: number): Rate;
   /**
    * Create a rate from a whole number of basis points.
    *
@@ -666,11 +666,11 @@ export interface BpsConstructor {
   /**
    * Create basis points from a whole-number value.
    *
-   * @param value - Value in whole basis points (e.g. `25` for 25 bp).
+   * @param bp - Value in whole basis points (e.g. `25` for 25 bp).
    * @returns The constructed `Bps`.
-   * @throws If `value` is non-finite or not a whole number of basis points. Sub-bp spreads must use the JSON instrument path (which preserves fractional values) or a decimal `Rate`.
+   * @throws If `bp` is non-finite or not a whole number of basis points. Sub-bp spreads must use the JSON instrument path (which preserves fractional values) or a decimal `Rate`.
    */
-  new (value: number): Bps;
+  new (bp: number): Bps;
 }
 
 /**
@@ -722,11 +722,11 @@ export interface PercentageConstructor {
   /**
    * Create a percentage.
    *
-   * @param value - Value in percent (e.g. `5.0` for 5%).
+   * @param percent - Value in percent (e.g. `5.0` for 5%).
    * @returns The constructed `Percentage`.
-   * @throws If `value` is non-finite.
+   * @throws If `percent` is non-finite.
    */
-  new (value: number): Percentage;
+  new (percent: number): Percentage;
 }
 
 /**
@@ -3583,10 +3583,10 @@ declare class CreditFactorModel {
   /**
    * Deserialize and validate a `CreditFactorModel` from JSON.
    * @returns A calibrated `CreditFactorModel` handle.
-   * @param s - JSON-serialized CreditFactorModel to deserialize.
+   * @param json - JSON-serialized CreditFactorModel to deserialize.
    * @throws Error - Throws if the JSON is malformed or fails validation.
    */
-  static fromJson(s: string): CreditFactorModel;
+  static fromJson(json: string): CreditFactorModel;
   /**
    * Exact namespaced credit-factor-model schema marker.
    * @returns The string `"finstack_quant.credit_factor_model/1"`.
@@ -8939,7 +8939,7 @@ export interface AttributionNamespace {
    * Power-user variant for full envelope round-trip workflows.
    * @returns JSON attribution result envelope for the supplied spec.
    * @param specJson - JSON-serialized AttributionParams specification to validate and execute.
-   * @throws Error - Rejects malformed, schema-incompatible, or unsupported-version `spec_json`; instrument or market reconstruction, pricing, FX, rounding, metric, or method-specific attribution failures; a caught parse or execution panic; or failure to serialize the result envelope.
+   * @throws Error - Rejects malformed, schema-incompatible, or unsupported-version `spec_json`; instrument or market reconstruction, pricing, FX, rounding, metric, or method-specific attribution failures; a caught execution panic; or failure to serialize the result envelope.
    */
   attributePnlEnvelopeJson(specJson: string): string;
   /**

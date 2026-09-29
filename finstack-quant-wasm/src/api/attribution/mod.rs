@@ -256,7 +256,7 @@ pub fn attribute_pnl_json(params: &JsAttributionParams) -> Result<String, JsValu
 ///
 /// Rejects malformed, schema-incompatible, or unsupported-version `spec_json`;
 /// instrument or market reconstruction, pricing, FX, rounding, metric, or
-/// method-specific attribution failures; a caught parse or execution panic; or
+/// method-specific attribution failures; a caught execution panic; or
 /// failure to serialize the result envelope.
 /// @param spec_json - JSON-serialized AttributionParams specification to validate and execute.
 #[wasm_bindgen(js_name = attributePnlEnvelopeJson)]
