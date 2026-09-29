@@ -39,6 +39,7 @@ __all__ = [
     "CreditScorecardExtension",
     "DcfSensitivityResult",
     "DependencyTracer",
+    "DependencyTree",
     "DimensionScore",
     "EclBucket",
     "EclResult",
@@ -169,9 +170,38 @@ class DependencyTracer:
 
         """
         ...
-    def dependency_tree(self, node_id: str) -> str:
+    def dependency_tree(self, node_id: str) -> DependencyTree:
         """
-        Return an ASCII dependency tree for ``node_id``.
+        Return the dependency tree for ``node_id`` (Rust ``DependencyTracer::dependency_tree``).
+
+        Parameters
+        ----------
+        node_id : str
+            Root node to trace.
+
+        Returns
+        -------
+        DependencyTree
+            Typed tree rooted at ``node_id`` with its complete upstream
+            dependency hierarchy; ``to_json()`` matches the WASM
+            ``dependencyTree`` result.
+
+        Raises
+        ------
+        KeyError
+            If ``node_id`` or a reachable dependency is not in the model.
+        ValueError
+            If the dependency graph is invalid.
+
+        """
+        ...
+    def dependency_tree_text(self, node_id: str) -> str:
+        """
+        Return the ASCII rendering of ``node_id``'s dependency tree.
+
+        The root is on the first line; every dependency follows on its own
+        line behind ``├──`` / ``└──`` connectors, indented by depth, with its
+        formula in parentheses. Identical to the WASM ``dependencyTreeText``.
 
         Parameters
         ----------
@@ -181,13 +211,14 @@ class DependencyTracer:
         Returns
         -------
         str
-            Multi-line ASCII tree rooted at ``node_id`` and containing its
-            complete upstream dependency hierarchy.
+            Multi-line ASCII tree ending with a newline.
 
         Raises
         ------
+        KeyError
+            If ``node_id`` or a reachable dependency is not in the model.
         ValueError
-            If node_id is unknown or its dependency graph is invalid.
+            If the dependency graph is invalid.
 
         """
         ...
@@ -287,6 +318,104 @@ class DependencyTracer:
 # Comparable-company analysis
 
 # Credit scorecard extension
+
+class DependencyTree:
+    """
+    Dependency tree of one statement node (the Rust ``DependencyTree``).
+
+    Returned by :meth:`DependencyTracer.dependency_tree`; its JSON form is the
+    WASM ``dependencyTree`` result.
+
+    Examples
+    --------
+    >>> from finstack_quant.statements_analytics import DependencyTree
+    >>> tree = DependencyTree.from_json(
+    ...     '{"node_id":"profit","formula":"revenue * 0.5","children":'
+    ...     '[{"node_id":"revenue","formula":null,"children":[]}]}'
+    ... )
+    >>> tree.node_id, tree.formula, [child.node_id for child in tree.children]
+    ('profit', 'revenue * 0.5', ['revenue'])
+    """
+    @property
+    def node_id(self) -> str:
+        """
+        Node identifier.
+
+        A dependency already on the current path appears as a leaf named
+        ``"<id> (cycle)"``. This property does not raise.
+
+        Returns
+        -------
+        str
+            Node identifier of this tree's root.
+        """
+    @property
+    def formula(self) -> str | None:
+        """
+        Formula text of the node.
+
+        This property does not raise.
+
+        Returns
+        -------
+        str | None
+            Formula text when the node is calculated, ``None`` for a value node.
+        """
+    @property
+    def children(self) -> list[DependencyTree]:
+        """
+        Direct dependencies of the node.
+
+        This property does not raise.
+
+        Returns
+        -------
+        list[DependencyTree]
+            One tree per direct dependency, in formula reference order.
+        """
+    def to_json(self) -> str:
+        """
+        Serialize to canonical JSON.
+
+        Returns
+        -------
+        str
+            Canonical JSON encoding (``node_id``, ``formula``, ``children``),
+            accepted by :meth:`from_json`.
+
+        Raises
+        ------
+        ValueError
+            If the value cannot be serialized to JSON.
+        """
+    @staticmethod
+    def from_json(json: str) -> DependencyTree:
+        """
+        Deserialize from canonical JSON.
+
+        Parameters
+        ----------
+        json : str
+            JSON document produced by :meth:`to_json` or the WASM
+            ``dependencyTree`` result; unknown fields are rejected.
+
+        Returns
+        -------
+        DependencyTree
+            The tree decoded from the supplied JSON document.
+
+        Raises
+        ------
+        ValueError
+            If ``json`` is not a valid ``DependencyTree`` document.
+
+        Examples
+        --------
+        >>> from finstack_quant.statements_analytics import DependencyTree
+        >>> DependencyTree.from_json("{")
+        Traceback (most recent call last):
+        ValueError: ...
+        """
 
 class ScorecardMetric:
     """
@@ -5151,6 +5280,9 @@ class Explanation:
         """
         Serialize to canonical JSON (identical to the WASM ``explainFormula`` output).
 
+        A non-finite ``final_value`` or step ``value`` is written as
+        ``"nan"``, ``"inf"`` or ``"-inf"`` so the document round-trips.
+
         Returns
         -------
         str
@@ -5640,6 +5772,9 @@ class ForecastMetrics:
         """
         Serialize to canonical JSON.
 
+        A non-finite metric (``mape`` when no actual is non-zero) is written
+        as ``"nan"``, ``"inf"`` or ``"-inf"`` so the document round-trips.
+
         Returns
         -------
         str
@@ -5682,18 +5817,29 @@ class ForecastMetrics:
 
 class GoalSeekResult:
     """
-    Result of a goal-seek solve.
+    Result of a goal-seek solve (the Rust ``GoalSeekResult``).
+
+    Its JSON form ``{"solved_value", "model"}`` is the WASM ``goalSeek``
+    result; ``model`` is ``null`` when it was not requested.
 
     Examples
     --------
-    >>> from finstack_quant.statements_analytics import GoalSeekResult
-    >>> [field for field in ("solved_value", "model") if hasattr(GoalSeekResult, field)]
-    ['solved_value', 'model']
+    >>> from finstack_quant.statements import ModelBuilder
+    >>> from finstack_quant.statements_analytics import GoalSeekResult, goal_seek
+    >>> b = ModelBuilder("m")
+    >>> _ = b.periods("2025Q1..Q1", None)
+    >>> _ = b.value("revenue", [("2025Q1", 100.0)])
+    >>> _ = b.compute("profit", "revenue * 0.5")
+    >>> result = goal_seek(b.build(), "profit", "2025Q1", 60.0, "revenue", "2025Q1", True)
+    >>> round(result.solved_value, 6), result.model is None
+    (120.0, False)
+    >>> round(GoalSeekResult.from_json(result.to_json()).solved_value, 6)
+    120.0
     """
     @property
     def solved_value(self) -> float:
         """
-        Driver value that reaches the target.
+        Driver value that reaches the target, in the driver node's units.
 
         This property does not raise.
 
@@ -5705,15 +5851,57 @@ class GoalSeekResult:
     @property
     def model(self) -> FinancialModelSpec | None:
         """
-                Model with the solved driver written in, or ``None`` when
-        ``update_model=False``.
+        Model with the solved driver written in.
 
-                This property does not raise.
+        This property does not raise.
 
-                Returns
-                -------
-                FinancialModelSpec | None
-                    Model with the solved driver written in, or ``None`` when ``update_model=False``.
+        Returns
+        -------
+        FinancialModelSpec | None
+            The updated model, or ``None`` when ``update_model=False``.
+        """
+    def to_json(self) -> str:
+        """
+        Serialize to canonical JSON.
+
+        Returns
+        -------
+        str
+            ``{"solved_value": ..., "model": ...}`` with ``model`` ``null``
+            when it was not requested; identical to the WASM ``goalSeek``
+            result and accepted by :meth:`from_json`.
+
+        Raises
+        ------
+        ValueError
+            If the value cannot be serialized to JSON.
+        """
+    @staticmethod
+    def from_json(json: str) -> GoalSeekResult:
+        """
+        Deserialize from canonical JSON.
+
+        Parameters
+        ----------
+        json : str
+            JSON document produced by :meth:`to_json` or the WASM ``goalSeek``
+            result; unknown fields are rejected.
+
+        Returns
+        -------
+        GoalSeekResult
+            The value decoded from the supplied JSON document.
+
+        Raises
+        ------
+        ValueError
+            If ``json`` is not a valid ``GoalSeekResult`` document.
+
+        Examples
+        --------
+        >>> from finstack_quant.statements_analytics import GoalSeekResult
+        >>> GoalSeekResult.from_json('{"solved_value": 1.5, "model": null}').solved_value
+        1.5
         """
 
 class LboCheckMappings:
@@ -5732,7 +5920,8 @@ class LboCheckMappings:
     Examples
     --------
     >>> from finstack_quant.statements_analytics import CreditMapping, LboCheckMappings, ThreeStatementMapping
-    >>> m = LboCheckMappings(ThreeStatementMapping("cash", "re", "ni"), CreditMapping("debt", "ebitda", "interest"))
+    >>> three = ThreeStatementMapping("cash", "re", "ni", ["assets"], ["liabilities"], ["equity"])
+    >>> m = LboCheckMappings(three, CreditMapping("debt", "ebitda", "interest"))
     >>> m.credit.debt_node
     'debt'
     """
@@ -8745,11 +8934,11 @@ class ThreeStatementMapping:
     net_income_node : str
         Net-income node.
     assets_nodes : list[str]
-        Nodes summed to total assets.
+        Nodes summed to total assets. Required, as in the Rust/JSON form.
     liabilities_nodes : list[str]
-        Nodes summed to total liabilities.
+        Nodes summed to total liabilities. Required, as in the Rust/JSON form.
     equity_nodes : list[str]
-        Nodes summed to total equity.
+        Nodes summed to total equity. Required, as in the Rust/JSON form.
     ppe_node : str | None
         Net PP&E balance node.
     depreciation_node : str | None
@@ -8801,9 +8990,9 @@ class ThreeStatementMapping:
         cash_node: str,
         retained_earnings_node: str,
         net_income_node: str,
-        assets_nodes: list[str] = ...,
-        liabilities_nodes: list[str] = ...,
-        equity_nodes: list[str] = ...,
+        assets_nodes: list[str],
+        liabilities_nodes: list[str],
+        equity_nodes: list[str],
         ppe_node: str | None = None,
         depreciation_node: str | None = None,
         interest_expense_node: str | None = None,
@@ -10028,9 +10217,11 @@ def compute_multiple(company_metrics: Any, multiple: str) -> float | None:
 
     Parameters
     ----------
-    company_metrics : CompanyMetrics | dict[str, float]
+    company_metrics : CompanyMetrics | dict[str, float | None]
         Typed metrics or a flat ``{metric_name: value}`` dict; only the fields
-        the multiple needs must be populated.
+        the multiple needs must be populated. A ``None`` value is a missing
+        metric (the Rust ``CompanyMetrics::from_flat_metrics`` rule), as a
+        ``null`` is in the WASM ``computeMultiple``.
     multiple : str
         Serde name of the multiple: ``ev_ebitda``, ``ev_revenue``, ``ev_ebit``,
         ``ev_fcf``, ``pe``, ``pb``, ``ptbv``, ``p_fcf``, ``dividend_yield``,
@@ -10127,13 +10318,8 @@ def dcf_sensitivity(
     terminal_value: Any,
     ufcf_node: str = "ufcf",
     net_debt_override: float | None = None,
-    wacc_sensitivity_bump: float | None = None,
-    wacc_denominator_epsilon: float | None = None,
-    max_stable_growth_rate: float | None = None,
-    exit_multiple_bump: float | None = None,
-    mid_year_convention: bool = False,
+    options: Mapping[str, Any] | str | None = None,
     market: Any | None = None,
-    exit_multiple_metric_node: str | None = None,
 ) -> DcfSensitivityResult:
     """Rank the headline DCF assumptions by enterprise-value impact.
 
@@ -10152,28 +10338,28 @@ def dcf_sensitivity(
         Terminal value method; selects whether the growth rate or the exit
         multiple is shocked.
     ufcf_node : str
-        Node id containing unlevered free cash flow. Default ``"ufcf"``.
+        Node id containing unlevered free cash flow. Defaults to the Rust
+        ``DEFAULT_UFCF_NODE`` (``"ufcf"``).
     net_debt_override : float | None
         Flat net-debt amount in model currency. Without an override, debt and
         cash must be monetary in model currency and available at a period
         ending on or before the inclusive valuation date; future balances are
         rejected.
-    wacc_sensitivity_bump : float | None
-        Absolute shock to WACC and terminal growth in decimal (``0.01`` =
-        +/-100bp); ``None`` uses the Rust ``DcfOptions`` default.
-    wacc_denominator_epsilon : float | None
-        Minimum ``wacc - g`` spread preserved, in decimal; ``None`` uses the
-        Rust default.
-    max_stable_growth_rate : float | None
-        Maximum perpetual growth (decimal); ``None`` uses the 5% default.
-    exit_multiple_bump : float | None
-        Absolute exit-multiple shock in turns; ``None`` uses the Rust default.
-    mid_year_convention : bool
-        Mid-year discounting for every re-run. Default ``False``.
+    options : dict | str | None
+        The Rust ``DcfOptions`` serde form (the document WASM
+        ``dcfSensitivity`` takes as ``optionsJson``). Every key is optional
+        and a missing one takes its Rust default: ``wacc_sensitivity_bump``
+        (``0.01`` = +/-100bp on WACC and terminal growth),
+        ``wacc_denominator_epsilon`` (``0.005``), ``max_stable_growth_rate``
+        (``0.05``), ``exit_multiple_bump`` (``{"absolute": 1.0}`` turns or
+        ``{"relative": 0.10}``), ``mid_year_convention`` (``False``),
+        ``exit_multiple_metric_node`` (statement monetary flow node supplying
+        the complete trailing-year terminal metric), ``equity_bridge``,
+        ``shares_outstanding``, ``valuation_discounts`` and
+        ``discount_curve_id``. Typed ``EquityBridge`` / ``ValuationDiscounts``
+        values may sit in place of their dicts. ``None`` uses every default.
     market : MarketContext | str | None
         Market context for statement evaluation (not WACC discounting).
-    exit_multiple_metric_node : str | None
-        Statement monetary flow node supplying the complete trailing-year terminal metric; insufficient or noncontiguous history raises ValueError.
 
     Returns
     -------
@@ -10184,7 +10370,9 @@ def dcf_sensitivity(
     Raises
     ------
     ValueError
-        If a payload is malformed or the model or DCF inputs are invalid.
+        If a payload or ``options`` is malformed (an unknown ``options`` key
+        included), or the model or DCF inputs are invalid (including an
+        exit-multiple node with insufficient or noncontiguous history).
     KeyError
         If ``ufcf_node`` or ``exit_multiple_metric_node`` is missing.
 
@@ -10197,7 +10385,13 @@ def dcf_sensitivity(
     >>> _ = b.periods("2025..2026")
     >>> _ = b.value_money("ufcf", [("2025", Money(100.0, "USD")), ("2026", Money(110.0, "USD"))])
     >>> _ = b.with_meta("currency", '"USD"')
-    >>> sens = dcf_sensitivity(b.build(), 0.10, TerminalValueSpec.gordon_growth(0.02), net_debt_override=0.0)
+    >>> sens = dcf_sensitivity(
+    ...     b.build(),
+    ...     0.10,
+    ...     TerminalValueSpec.gordon_growth(0.02),
+    ...     net_debt_override=0.0,
+    ...     options={"wacc_sensitivity_bump": 0.02},
+    ... )
     >>> list(sens.to_dataframe().columns)
     ['parameter_id', 'downside', 'upside', 'swing']
     """
@@ -10208,14 +10402,9 @@ def evaluate_dcf(
     terminal_value: Any,
     ufcf_node: str = "ufcf",
     net_debt_override: float | None = None,
-    mid_year_convention: bool = False,
-    max_stable_growth_rate: float | None = None,
-    shares_outstanding: float | None = None,
-    equity_bridge: Any | None = None,
-    valuation_discounts: Any | None = None,
+    options: Mapping[str, Any] | str | None = None,
     market: Any | None = None,
     as_of: Any | None = None,
-    exit_multiple_metric_node: str | None = None,
 ) -> CorporateValuationResult:
     """Evaluate DCF valuation on a financial model.
 
@@ -10230,32 +10419,30 @@ def evaluate_dcf(
         Terminal value method (typed, serde dict, or tagged JSON such as
         ``{"type": "gordon_growth", "stable_growth_rate": 0.02}``).
     ufcf_node : str
-        Node id containing unlevered free cash flow. Default ``"ufcf"``.
+        Node id containing unlevered free cash flow. Defaults to the Rust
+        ``DEFAULT_UFCF_NODE`` (``"ufcf"``).
     net_debt_override : float | None
         Flat net-debt amount in model currency. Without an override, debt and
         cash must be monetary in model currency and available at a period
         ending on or before the inclusive valuation date; future balances are
         rejected.
-    mid_year_convention : bool
-        Mid-year discounting. Default ``False`` (year-end).
-    max_stable_growth_rate : float | None
-        Maximum perpetual growth accepted for Gordon Growth / H-Model
-        (decimal); ``None`` uses the canonical 5% default.
-    shares_outstanding : float | None
-        Basic shares outstanding for per-share equity value.
-    equity_bridge : EquityBridge | dict | str | None
-        Structured EV-to-equity bridge.
-    valuation_discounts : ValuationDiscounts | dict | str | None
-        DLOM / DLOC / other discounts.
+    options : dict | str | None
+        The Rust ``DcfOptions`` serde form. Every key is optional and a
+        missing one takes its Rust default: ``mid_year_convention``
+        (``False``), ``max_stable_growth_rate`` (``0.05``),
+        ``shares_outstanding``, ``equity_bridge`` / ``valuation_discounts``
+        (serde dicts or the typed ``EquityBridge`` / ``ValuationDiscounts``),
+        ``exit_multiple_metric_node`` (statement monetary flow node whose
+        complete trailing-year sum replaces ``terminal_metric`` on an
+        exit-multiple terminal; actual period boundaries must cover one
+        complete contiguous calendar year), ``discount_curve_id`` and the
+        sensitivity knobs. ``None`` uses every default.
     market : MarketContext | str | None
         Market context used for statement evaluation (capital-structure curve
         lookups); DCF discounting stays WACC-only. Requires ``as_of``.
     as_of : datetime.date | str | None
         DCF valuation date and, with ``market``, the statement visibility and
         market-data date. Defaults to the first forecast boundary.
-    exit_multiple_metric_node : str | None
-        Statement monetary flow node whose complete trailing-year sum replaces
-        ``terminal_metric`` on an exit-multiple terminal. Actual period boundaries must cover one complete contiguous calendar year; otherwise omit this node and supply an explicit annual metric.
 
     Returns
     -------
@@ -10266,8 +10453,9 @@ def evaluate_dcf(
     Raises
     ------
     ValueError
-        If ``market`` is set without ``as_of``, a payload is malformed, or the
-        model, cash-flow node, exit-multiple node or DCF inputs are invalid.
+        If ``market`` is set without ``as_of``, a payload or ``options`` is
+        malformed (an unknown ``options`` key included), or the model,
+        cash-flow node, exit-multiple node or DCF inputs are invalid.
     KeyError
         If ``ufcf_node`` or ``exit_multiple_metric_node`` is missing from the model.
 
@@ -10285,18 +10473,7 @@ def evaluate_dcf(
     'USD'
     """
 
-def evaluate_lbo(
-    model: Any,
-    entry_multiple: float,
-    entry_metric_node: str,
-    exit_multiple: float,
-    exit_metric_node: str,
-    exit_net_debt_node: str,
-    exit_period: str,
-    sources: list[tuple[str, float]],
-    transaction_fees: float = 0.0,
-    check_mappings: Any | None = None,
-) -> LboResult:
+def evaluate_lbo(model: Any, config: Mapping[str, Any] | str) -> LboResult:
     """Evaluate a leveraged-buyout transaction against a statement model.
 
     Entry enterprise value is priced at the model's first period, the sponsor
@@ -10310,26 +10487,18 @@ def evaluate_lbo(
     model : FinancialModelSpec | str
         A ``FinancialModelSpec`` object or a JSON string; metadata must include
         a ``"currency"`` key.
-    entry_multiple : float
-        Entry multiple in turns (``8.5`` = 8.5x).
-    entry_metric_node : str
-        Monetary node in model currency supplying the entry metric at the
-        first period (e.g. ``"ebitda"``).
-    exit_multiple : float
-        Exit multiple in turns.
-    exit_metric_node : str
-        Monetary node in model currency supplying the exit metric at ``exit_period``.
-    exit_net_debt_node : str
-        Monetary node in model currency supplying net debt at ``exit_period``.
-    exit_period : str
-        Exit period label (``"2029"`` or ``"2029Q4"``).
-    sources : list[tuple[str, float]]
-        Funded debt tranches at close as ``(name, amount)`` in model currency.
-    transaction_fees : float
-        Fees funded at close, in model currency. Default ``0.0``.
-    check_mappings : LboCheckMappings | dict | str | None
-        When supplied, runs the LBO model check suite against the same
-        evaluation and populates ``LboResult.checks``.
+    config : dict | str
+        The Rust ``LboConfig`` serde form (the document WASM ``evaluateLbo``
+        takes as ``configJson``): ``entry_multiple`` (turns, ``8.5`` = 8.5x),
+        ``entry_metric_node`` (monetary node read at the first period),
+        ``transaction_fees`` (model currency), ``sources``
+        (``[{"name": ..., "amount": ...}]`` funded at close, model currency),
+        ``exit_multiple``, ``exit_metric_node``, ``exit_net_debt_node``,
+        ``exit_period`` (``"2029"`` or ``"2029Q4"``) and the optional
+        ``check_mappings`` (a serde dict or a typed ``LboCheckMappings``),
+        which runs the LBO model check suite against the same evaluation and
+        populates ``LboResult.checks``. Every key except ``check_mappings`` is
+        required.
 
     Returns
     -------
@@ -10340,17 +10509,35 @@ def evaluate_lbo(
     Raises
     ------
     ValueError
-        If a tranche amount is invalid, ``exit_period`` does not parse, sources
-        and uses cannot balance, or the model fails to evaluate.
+        If ``config`` is malformed (a missing or unknown key included), a
+        tranche amount is invalid, ``exit_period`` does not parse, sources and
+        uses cannot balance, or the model fails to evaluate.
     KeyError
         If a metric or net-debt node is missing at the required period.
 
     Examples
     --------
+    >>> from finstack_quant.core.money import Money
+    >>> from finstack_quant.statements import ModelBuilder
     >>> from finstack_quant.statements_analytics import evaluate_lbo
-    >>> evaluate_lbo("{}", 8.0, "ebitda", 9.0, "ebitda", "net_debt", "2029Q4", [])
-    Traceback (most recent call last):
-    ValueError: ...
+    >>> b = ModelBuilder("m")
+    >>> _ = b.periods("2025Q1..2026Q1", None)
+    >>> _ = b.with_meta("currency", '"USD"')
+    >>> quarters = ["2025Q1", "2025Q2", "2025Q3", "2025Q4", "2026Q1"]
+    >>> _ = b.value_money("ebitda", [(q, Money(v, "USD")) for q, v in zip(quarters, [100.0] * 4 + [120.0])])
+    >>> _ = b.value_money("net_debt", [(q, Money(v, "USD")) for q, v in zip(quarters, [300.0] * 4 + [200.0])])
+    >>> config = {
+    ...     "entry_multiple": 8.0,
+    ...     "entry_metric_node": "ebitda",
+    ...     "transaction_fees": 0.0,
+    ...     "sources": [{"name": "debt", "amount": 500.0}],
+    ...     "exit_multiple": 9.0,
+    ...     "exit_metric_node": "ebitda",
+    ...     "exit_net_debt_node": "net_debt",
+    ...     "exit_period": "2026Q1",
+    ... }
+    >>> round(evaluate_lbo(b.build(), config).moic, 4)
+    2.9333
     """
 
 def evaluate_scenario_set(model: Any, scenario_set: Any) -> ScenarioResults:
@@ -10499,7 +10686,7 @@ def goal_seek(
     target_value: float,
     driver_node: str,
     driver_period: str,
-    update_model: bool = True,
+    update_model: bool,
     bounds: tuple[float, float] | None = None,
 ) -> GoalSeekResult:
     """Find the driver value that makes a target node reach a target value.
@@ -10519,24 +10706,26 @@ def goal_seek(
     driver_period : str
         Period string for the driver.
     update_model : bool
-        If ``True``, the solved value is written back into the returned model.
-        Default ``True``.
+        If ``True``, the result's ``model`` is a copy of ``model`` with the
+        solved value written in; if ``False`` it is ``None``. Required, as in
+        Rust and WASM.
     bounds : tuple[float, float] | None
-        Optional search bounds ``(lo, hi)``; bisection is used when set.
+        Optional search bracket ``(lo, hi)`` in the driver node's units.
 
     Returns
     -------
     GoalSeekResult
         ``solved_value`` plus ``model`` (the updated ``FinancialModelSpec`` or
-        ``None``). ``float(result)`` yields the solved value.
+        ``None``). ``float(result)`` yields the solved value. The input model
+        is never modified.
 
     Raises
     ------
     ValueError
-        If a period does not parse, the solver fails to converge, or the
-        bracket does not contain a root, or the final objective residual exceeds 1e-9 times max(1, abs(target_value)). Failure leaves the model unchanged.
-    KeyError
-        If ``target_node`` or ``driver_node`` is missing from the model.
+        If a period does not parse, ``target_node`` or ``driver_node`` is
+        missing, the solver fails to converge, the bracket does not contain a
+        root, or the final objective residual exceeds 1e-9 times
+        max(1, abs(target_value)).
 
     Examples
     --------
@@ -10546,19 +10735,19 @@ def goal_seek(
     >>> _ = b.periods("2025Q1..Q1", None)
     >>> _ = b.value("revenue", [("2025Q1", 100.0)])
     >>> _ = b.compute("profit", "revenue * 0.5")
-    >>> round(goal_seek(b.build(), "profit", "2025Q1", 60.0, "revenue", "2025Q1").solved_value, 6)
+    >>> round(goal_seek(b.build(), "profit", "2025Q1", 60.0, "revenue", "2025Q1", False).solved_value, 6)
     120.0
     """
 
-def peer_stats(peer_values: list[float]) -> PeerStats | None:
-    """Descriptive statistics for a peer distribution.
+def peer_stats(values: list[float]) -> PeerStats | None:
+    """Descriptive statistics for a peer distribution (Rust ``peer_stats(values)``).
 
     Degenerate input yields ``None``, so this function does not raise.
 
     Parameters
     ----------
-    peer_values : list[float]
-        Peer distribution (need not be sorted).
+    values : list[float]
+        Peer distribution (need not be sorted); non-finite entries are ignored.
 
     Returns
     -------
@@ -10573,25 +10762,25 @@ def peer_stats(peer_values: list[float]) -> PeerStats | None:
     5
     """
 
-def percentile_rank(peer_values: list[float], value: float) -> float | None:
-    """Percentile rank of ``value`` within ``peer_values`` (0-1 scale).
+def percentile_rank(values: list[float], value: float) -> float | None:
+    """Percentile rank of ``value`` within ``values`` (0-1 scale).
 
     Uses the "fraction of values less than or equal" convention (Rust
-    ``percentile_rank(values, value)`` argument order).
+    ``percentile_rank(values, value)``).
 
     Degenerate input yields ``None``, so this function does not raise.
 
     Parameters
     ----------
-    peer_values : list[float]
-        Peer distribution (need not be sorted).
+    values : list[float]
+        Peer distribution (need not be sorted); non-finite entries are ignored.
     value : float
         The subject value to rank.
 
     Returns
     -------
     float | None
-        Percentile rank in ``[0, 1]``, or ``None`` when ``peer_values`` is empty.
+        Percentile rank in ``[0, 1]``, or ``None`` when ``values`` is empty.
 
     Examples
     --------
@@ -10974,7 +11163,9 @@ def run_three_statement_checks(model: Any, mapping: Any, results: Any | None = N
     Examples
     --------
     >>> from finstack_quant.statements_analytics import ThreeStatementMapping, run_three_statement_checks
-    >>> mapping = ThreeStatementMapping("cash", "retained_earnings", "net_income")
+    >>> mapping = ThreeStatementMapping(
+    ...     "cash", "retained_earnings", "net_income", ["assets"], ["liabilities"], ["equity"]
+    ... )
     >>> callable(run_three_statement_checks)
     True
     """
@@ -11182,15 +11373,15 @@ def wacc(
     0.075
     """
 
-def z_score(peer_values: list[float], value: float) -> float | None:
-    """Standard (z-) score of ``value`` in the peer distribution.
+def z_score(values: list[float], value: float) -> float | None:
+    """Standard (z-) score of ``value`` in the peer distribution (Rust ``z_score(values, value)``).
 
     Degenerate input yields ``None``, so this function does not raise.
 
     Parameters
     ----------
-    peer_values : list[float]
-        Peer distribution.
+    values : list[float]
+        Peer distribution; non-finite entries are ignored.
     value : float
         The subject value.
 

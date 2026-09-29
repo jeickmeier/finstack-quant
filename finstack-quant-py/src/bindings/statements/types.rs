@@ -1037,10 +1037,8 @@ impl PyFinancialModelSpec {
     #[staticmethod]
     #[pyo3(text_signature = "(json, /)")]
     fn from_json(json: &str) -> PyResult<Self> {
-        let mut inner: finstack_quant_statements::FinancialModelSpec =
-            serde_json::from_str(json)
-                .map_err(|e| serde_json_to_py(e, "invalid FinancialModelSpec JSON"))?;
-        inner.validate_semantics().map_err(statements_to_py)?;
+        let inner = finstack_quant_statements::FinancialModelSpec::from_json(json)
+            .map_err(statements_to_py)?;
         Ok(Self { inner })
     }
 

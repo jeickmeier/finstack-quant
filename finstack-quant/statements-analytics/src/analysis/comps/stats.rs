@@ -155,7 +155,7 @@ pub struct RegressionResult {
     pub n: usize,
 }
 
-/// Single-factor OLS regression of `y` on `x`, evaluated at `subject_x`.
+/// Single-factor OLS regression of `y_values` on `x_values`, evaluated at `subject_x`.
 ///
 /// Typical usage: regress OAS spread (y) against leverage (x) across
 /// peers, then evaluate the fitted spread for the subject's leverage to
@@ -169,24 +169,29 @@ pub struct RegressionResult {
 ///
 /// # Arguments
 ///
-/// * `x` - Peer explanatory-variable observations, aligned by index with `y`.
-/// * `y` - Peer dependent-variable observations, aligned by index with `x`.
+/// * `x_values` - Peer explanatory-variable observations, aligned by index
+///   with `y_values`.
+/// * `y_values` - Peer dependent-variable observations, aligned by index with
+///   `x_values`.
 /// * `subject_x` - Subject explanatory-variable value at which the fair value
 ///   is fitted.
 /// * `subject_y` - Observed subject dependent-variable value used to calculate
 ///   the rich/cheap residual.
 pub fn regression_fair_value(
-    x: &[f64],
-    y: &[f64],
+    x_values: &[f64],
+    y_values: &[f64],
     subject_x: f64,
     subject_y: f64,
 ) -> Option<RegressionResult> {
-    let n = x.len();
-    if n != y.len()
+    let n = x_values.len();
+    if n != y_values.len()
         || n < 3
         || !subject_x.is_finite()
         || !subject_y.is_finite()
-        || x.iter().chain(y).any(|value| !value.is_finite())
+        || x_values
+            .iter()
+            .chain(y_values)
+            .any(|value| !value.is_finite())
     {
         return None;
     }
@@ -194,8 +199,8 @@ pub fn regression_fair_value(
     // OnlineCovariance.optimal_beta() returns Cov(X,Y)/Var(Y), so pass
     // (y_i, x_i) to get slope = Cov(Y,X)/Var(X).
     let mut oc = OnlineCovariance::new();
-    for i in 0..n {
-        oc.update(y[i], x[i]);
+    for (x, y) in x_values.iter().zip(y_values) {
+        oc.update(*y, *x);
     }
 
     if !oc.variance_y().is_finite() || oc.variance_y() <= 0.0 {

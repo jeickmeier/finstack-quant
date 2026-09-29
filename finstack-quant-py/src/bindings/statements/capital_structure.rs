@@ -136,6 +136,20 @@ impl PyEcfSweepSpec {
             .map_err(|e| serde_json_to_py(e, "failed to serialize EcfSweepSpec"))
     }
 
+    /// Validate the sweep on its own (the Rust ``EcfSweepSpec::validate``).
+    ///
+    /// The waterfall-level rule that a positive sweep needs a prepayment
+    /// priority is checked by :meth:`WaterfallSpec.validate`.
+    ///
+    /// Raises
+    /// ------
+    /// ValueError
+    ///     If ``sweep_percentage`` is outside ``[0.0, 1.0]`` or not finite.
+    #[pyo3(text_signature = "($self)")]
+    fn validate(&self) -> PyResult<()> {
+        self.inner.validate().map_err(statements_to_py)
+    }
+
     /// Node reference or DSL formula supplying EBITDA, the ECF starting
     /// point.
     ///
@@ -245,9 +259,11 @@ impl PyPikToggleSpec {
     ///     units as ``liquidity_metric`` — currency amount for a balance,
     ///     unitless for a ratio.
     /// target_instrument_ids : list[str] | None
-    ///     If set, PIK toggles only these instruments; otherwise every
-    ///     PIK-capable instrument. An explicitly empty list is rejected by
-    ///     :meth:`WaterfallSpec.validate`.
+    ///     Instruments that switch to PIK when the toggle triggers. Must be a
+    ///     non-empty list: instrument-level PIK capability is not modeled, so
+    ///     ``None`` or an empty list is rejected by :meth:`validate` and
+    ///     :meth:`WaterfallSpec.validate` (it does not mean "every
+    ///     instrument").
     /// min_periods_in_pik : int
     ///     Hysteresis floor counted in **periods** on the model's own cadence
     ///     (not months): once triggered, PIK stays on for at least this many
@@ -304,6 +320,17 @@ impl PyPikToggleSpec {
             .map_err(|e| serde_json_to_py(e, "failed to serialize PikToggleSpec"))
     }
 
+    /// Validate the toggle on its own (the Rust ``PikToggleSpec::validate``).
+    ///
+    /// Raises
+    /// ------
+    /// ValueError
+    ///     If ``target_instrument_ids`` is ``None`` or empty.
+    #[pyo3(text_signature = "($self)")]
+    fn validate(&self) -> PyResult<()> {
+        self.inner.validate().map_err(statements_to_py)
+    }
+
     /// Node reference or DSL formula producing the liquidity signal.
     ///
     /// Returns
@@ -332,8 +359,8 @@ impl PyPikToggleSpec {
         self.inner.threshold
     }
 
-    /// Instruments the toggle applies to, or ``None`` for every PIK-capable
-    /// instrument.
+    /// Instruments the toggle applies to; ``None`` (or an empty list) does
+    /// not validate.
     #[getter]
     fn target_instrument_ids(&self) -> Option<Vec<String>> {
         self.inner.target_instrument_ids.clone()

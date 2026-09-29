@@ -140,7 +140,7 @@ it("routes formula, explanation and check semantics to WASM", async () => {
     native.explainFormula(modelJson, resultsJson, "margin", "2025Q1"),
   );
   expect(unwrap(await harness.proxy.traceStatement(modelJson, "margin"))).toBe(
-    native.traceDependencies(modelJson, "margin"),
+    native.dependencyTreeText(modelJson, "margin"),
   );
   const configJson = JSON.stringify({
     name: "empty",

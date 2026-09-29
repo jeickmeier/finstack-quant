@@ -335,4 +335,18 @@ impl CheckReport {
     pub fn has_warnings(&self) -> bool {
         self.summary.warnings > 0
     }
+
+    /// Number of retained findings across all checks.
+    ///
+    /// Counts the findings that survived the suite's `min_severity` and
+    /// `materiality_threshold` reporting filters, read from `results`, so it
+    /// equals the number of findings a host lists for the report (and the
+    /// summary's `errors + warnings + infos` for a report produced by a run).
+    #[must_use]
+    pub fn total_findings(&self) -> usize {
+        self.results
+            .iter()
+            .map(|result| result.findings.len())
+            .sum()
+    }
 }

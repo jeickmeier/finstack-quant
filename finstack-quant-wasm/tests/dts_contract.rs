@@ -909,12 +909,27 @@ fn statements_analytics_dts_matches_runtime_exports() {
     let dts = index_dts();
 
     assert!(dts.contains("export interface StatementsAnalyticsNamespace"));
+    // goalSeek returns the Rust `GoalSeekResult`: the updated model is an
+    // object under `model` (the Python field name), never a nested JSON string.
     assert!(dts.contains("solved_value: number;"));
-    assert!(dts.contains("updated_model_json?: string;"));
+    assert!(dts.contains("model: Record<string, unknown> | null;"));
+    assert!(!dts.contains("updated_model_json"));
     assert!(contains_ignoring_ws(
         &dts,
-        "goalSeek(modelJson: JsonInput, targetNode: string, targetPeriod: string, targetValue: number, driverNode: string, driverPeriod: string, updateModel: boolean, boundsLo?: number | null, boundsHi?: number | null): GoalSeekResult;",
+        "goalSeek(modelJson: JsonInput, targetNode: string, targetPeriod: string, targetValue: number, driverNode: string, driverPeriod: string, updateModel: boolean, bounds?: [number, number] | null): GoalSeekResult;",
     ));
+    // The dependency tree is the Rust `DependencyTree`; the ASCII rendering
+    // says so in its name.
+    assert!(dts.contains("export interface DependencyTree"));
+    assert!(contains_ignoring_ws(
+        &dts,
+        "dependencyTree(modelJson: JsonInput, nodeId: string): DependencyTree;"
+    ));
+    assert!(contains_ignoring_ws(
+        &dts,
+        "dependencyTreeText(modelJson: JsonInput, nodeId: string): string;"
+    ));
+    assert!(!dts.contains("traceDependencies"));
     assert!(dts.contains("export interface FormulaExplanationJson"));
     assert!(contains_ignoring_ws(
         &dts,
@@ -943,13 +958,20 @@ fn statements_analytics_dts_matches_runtime_exports() {
         "creditAssessment(resultsJson: JsonInput, period: string): Record<string, unknown>;",
     ));
     assert!(dts.contains("export interface DcfSensitivityResult"));
-    // dcfSensitivity carries the same optional mid-year-convention and market
-    // parameters as the Python twin (contracted 1:1 in parity_contract.toml).
+    // dcfSensitivity mirrors the Rust signature: the DCF knobs arrive as one
+    // Rust `DcfOptions` document, not a hand-picked subset of scalars.
     assert!(contains_ignoring_ws(
         &dts,
-        "dcfSensitivity(modelJson: JsonInput, wacc: number, terminalValueJson: JsonInput, ufcfNode: string, netDebtOverride?: number | null, waccSensitivityBump?: number | null, waccDenominatorEpsilon?: number | null, maxStableGrowthRate?: number | null, exitMultipleBump?: number | null, midYearConvention?: boolean | null, marketJson?: JsonInput | null): DcfSensitivityResult;",
+        "dcfSensitivity(modelJson: JsonInput, wacc: number, terminalValueJson: JsonInput, ufcfNode?: string | null, netDebtOverride?: number | null, optionsJson?: JsonInput | null, marketJson?: JsonInput | null): DcfSensitivityResult;",
     ));
+    // evaluateLbo takes the Rust `LboConfig` (check mappings included) and
+    // returns its check report.
     assert!(dts.contains("export interface LboResult"));
+    assert!(dts.contains("checks: CheckReport | null;"));
+    assert!(contains_ignoring_ws(
+        &dts,
+        "evaluateLbo(modelJson: JsonInput, configJson: JsonInput): LboResult;"
+    ));
     assert!(dts.contains("export interface TornadoEntry"));
     assert!(contains_ignoring_ws(
         &dts,

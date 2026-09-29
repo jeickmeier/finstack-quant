@@ -13386,7 +13386,11 @@ export interface D_321Bf35B4A9Ae99F3Cf3 {
    */
   min_periods_in_pik?: number;
   /**
-   * Target instrument IDs (if None, applies to all instruments with PIK capability)
+   * Instruments that switch to PIK when the toggle triggers.
+   *
+   * Must be a non-empty list: instrument-level PIK capability is not
+   * modeled, so `None` or an empty list is rejected by
+   * [`PikToggleSpec::validate`] rather than meaning "every instrument".
    */
   target_instrument_ids?: string[] | null;
   /**

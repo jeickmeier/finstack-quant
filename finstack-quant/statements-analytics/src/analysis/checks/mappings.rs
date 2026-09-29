@@ -12,8 +12,11 @@ use serde::{Deserialize, Serialize};
 ///
 /// Required nodes must always be populated. Optional nodes (`Option<NodeId>`)
 /// enable additional checks when present; the suite factory will skip the
-/// corresponding check when the node is `None`.
+/// corresponding check when the node is `None`. Unknown JSON keys are
+/// rejected, so a misspelled optional key fails instead of silently
+/// disabling its check.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct ThreeStatementMapping {
     /// Total-assets nodes (balance sheet).
     pub assets_nodes: Vec<NodeId>,
@@ -127,8 +130,10 @@ impl ThreeStatementMapping {
 /// Maps node IDs for credit underwriting analysis.
 ///
 /// Used by [`super::suites::credit_underwriting_checks`] to build leverage,
-/// coverage, cash-flow, and trend checks.
+/// coverage, cash-flow, and trend checks. Unknown JSON keys are rejected, so
+/// a misspelled optional key fails instead of silently disabling its check.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct CreditMapping {
     /// Total debt node.
     pub debt_node: NodeId,
@@ -146,4 +151,28 @@ pub struct CreditMapping {
     pub leverage_warn: Option<(f64, f64)>,
     /// Minimum coverage ratio that triggers a warning; defaults to `1.5`.
     pub coverage_min_warn: Option<f64>,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// A misspelled optional key must fail to parse: silently dropping it
+    /// would disable the check it configures.
+    #[test]
+    fn mappings_reject_unknown_keys() {
+        let credit = r#"{"debt_node": "debt", "ebitda_node": "ebitda",
+            "interest_expense_node": "interest", "fcf_nodes": "free_cash_flow"}"#;
+        let err = serde_json::from_str::<CreditMapping>(credit).expect_err("typo rejected");
+        assert!(err.to_string().contains("fcf_nodes"), "{err}");
+        let credit = r#"{"debt_node": "debt", "ebitda_node": "ebitda",
+            "interest_expense_node": "interest", "fcf_node": "free_cash_flow"}"#;
+        serde_json::from_str::<CreditMapping>(credit).expect("correct keys parse");
+
+        let three = r#"{"assets_nodes": ["assets"], "liabilities_nodes": [],
+            "equity_nodes": ["equity"], "cash_node": "cash",
+            "retained_earnings_node": "re", "net_income_node": "ni", "cfo_nodes": "cfo"}"#;
+        let err = serde_json::from_str::<ThreeStatementMapping>(three).expect_err("typo rejected");
+        assert!(err.to_string().contains("cfo_nodes"), "{err}");
+    }
 }

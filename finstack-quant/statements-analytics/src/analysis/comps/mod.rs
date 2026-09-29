@@ -412,11 +412,14 @@ mod tests {
         let metrics = CompanyMetrics::from_flat_metrics(
             "SUBJECT",
             [
-                ("enterprise_value".to_string(), 100.0),
-                ("ebitda".to_string(), 20.0),
-                ("custom_signal".to_string(), 3.0),
+                ("enterprise_value".to_string(), Some(100.0)),
+                ("ebitda".to_string(), Some(20.0)),
+                ("custom_signal".to_string(), Some(3.0)),
+                ("revenue".to_string(), None),
             ],
         );
+        assert_eq!(metrics.revenue, None, "a None value is a missing metric");
+        assert_eq!(compute_multiple(&metrics, Multiple::EvEbitda), Some(5.0));
 
         assert_eq!(metrics.named_metric("enterprise_value"), Some(100.0));
         assert_eq!(metrics.named_metric("ebitda"), Some(20.0));

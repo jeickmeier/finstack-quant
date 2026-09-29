@@ -383,6 +383,14 @@ RUNTIME_RESULT_EXCEPTIONS = (
         "Round-trippable valuation output; no published JSON schema.",
         frozenset({"JsonSchema"}),
     ),
+    *_exception(
+        "statements-analytics",
+        "src/analysis/goal_seek.rs",
+        ("GoalSeekResult",),
+        "runtime-result",
+        "Round-trippable goal-seek output (Python `GoalSeekResult.from_json`); no published JSON schema.",
+        frozenset({"JsonSchema"}),
+    ),
     *_runtime_exception(
         "valuations",
         "src/instruments/credit_derivatives/cds_index/types.rs",

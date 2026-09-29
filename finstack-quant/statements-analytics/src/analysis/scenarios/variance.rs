@@ -55,23 +55,21 @@ use serde_json::json;
 
 /// Configuration for variance analysis between two `StatementResult`.
 ///
-/// This is a lightweight configuration that mirrors the JSON example in the
-/// design docs:
+/// The serde form names one baseline / comparison pair; every field is
+/// required and unknown keys are rejected:
 ///
 /// ```json
 /// {
-///   "variance_config": {
-///     "baseline": "management_case",
-///     "comparisons": ["bank_case", "actuals"],
-///     "metrics": ["revenue", "ebitda", "free_cash_flow"],
-///     "periods": ["2025Q1", "2025Q2"]
-///   }
+///   "baseline_label": "management_case",
+///   "comparison_label": "bank_case",
+///   "metrics": ["revenue", "ebitda", "free_cash_flow"],
+///   "periods": ["2025Q1", "2025Q2"]
 /// }
 /// ```
 ///
-/// The Rust implementation focuses on a single baseline / comparison pair.
 /// Multi-comparison workflows can be built by running multiple analyzers.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct VarianceConfig {
     /// Human-readable name for the baseline (e.g. `"management_case"`).
     pub baseline_label: String,
@@ -472,6 +470,17 @@ impl VarianceReport {
 mod tests {
     use super::*;
     use finstack_quant_core::dates::PeriodId;
+
+    #[test]
+    fn variance_config_rejects_unknown_keys() {
+        let ok = r#"{"baseline_label": "base", "comparison_label": "bank",
+            "metrics": ["revenue"], "periods": ["2025Q1"]}"#;
+        serde_json::from_str::<VarianceConfig>(ok).expect("documented form parses");
+        let extra = r#"{"baseline_label": "base", "comparison_label": "bank",
+            "metrics": ["revenue"], "metric": ["ebitda"], "periods": ["2025Q1"]}"#;
+        let err = serde_json::from_str::<VarianceConfig>(extra).expect_err("unknown key rejected");
+        assert!(err.to_string().contains("metric"), "{err}");
+    }
 
     fn make_results(values: &[(&str, PeriodId, f64)]) -> StatementResult {
         let mut results = StatementResult::new();

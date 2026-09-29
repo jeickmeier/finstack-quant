@@ -231,17 +231,16 @@ impl PyMonteCarloResults {
         self.inner.percentile_results.keys().cloned().collect()
     }
 
-    /// Warnings raised while evaluating paths, as human-readable strings.
+    /// Warnings raised while evaluating paths, in their serde form.
     ///
-    /// Each entry is the debug form of an ``EvalWarning`` (division by zero,
-    /// non-finite value, ...). Empty when every path evaluated cleanly.
+    /// One dict per ``EvalWarning`` with a single snake_case variant key
+    /// (``"division_by_zero"``, ``"non_finite_value"``, ...) whose value holds
+    /// the variant fields (periods as ``"2025Q1"``-style ids, non-finite
+    /// numbers as ``"nan"`` / ``"inf"`` / ``"-inf"``), identical to the WASM
+    /// ``evaluateMonteCarlo`` result. Empty when every path evaluated cleanly.
     #[getter]
-    fn warnings(&self) -> Vec<String> {
-        self.inner
-            .warnings
-            .iter()
-            .map(|w| format!("{w:?}"))
-            .collect()
+    fn warnings<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        crate::bindings::pandas_utils::serde_to_py(py, &self.inner.warnings)
     }
 
     /// Look up one percentile of one metric as a period-keyed dict.

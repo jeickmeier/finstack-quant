@@ -15,32 +15,15 @@
 
 use crate::utils::input::{js_string, json_text};
 use crate::utils::to_js_err;
+use finstack_quant_statements::FinancialModelSpec;
 use wasm_bindgen::prelude::*;
-
-/// Deserialize a `FinancialModelSpec` JSON string and run semantic validation.
-///
-/// Every WASM entry point that ingests a model routes through this helper so
-/// structurally invalid specs (empty periods, invalid node ids, bad formulas)
-/// are rejected identically here and in the typed Python `from_json` path —
-/// otherwise the same input would diverge between the two bindings.
-///
-/// # Errors
-///
-/// Rejects malformed or schema-incompatible `json` and any semantic-validation
-/// failure, with the same error shaping as the other statements entry points.
-pub(crate) fn parse_validated_model(
-    json: &str,
-) -> Result<finstack_quant_statements::FinancialModelSpec, JsValue> {
-    let mut model: finstack_quant_statements::FinancialModelSpec =
-        serde_json::from_str(json).map_err(to_js_err)?;
-    model.validate_semantics().map_err(to_js_err)?;
-    Ok(model)
-}
 
 /// Validate a `FinancialModelSpec` JSON string.
 ///
-/// Deserializes the input against the model schema, runs semantic validation,
-/// and returns the canonical (re-serialized) JSON.
+/// Parses the input with the Rust `FinancialModelSpec::from_json` (schema
+/// plus semantic validation, the same entry point every model-taking export
+/// and the Python bindings use) and returns the canonical (re-serialized)
+/// JSON.
 ///
 /// # Errors
 ///
@@ -52,24 +35,27 @@ pub(crate) fn parse_validated_model(
 #[wasm_bindgen(js_name = validateFinancialModelJson)]
 pub fn validate_financial_model_json(json: JsValue) -> Result<String, JsValue> {
     let json: &str = &json_text(&json, "json")?;
-    let model = parse_validated_model(json)?;
+    let model = FinancialModelSpec::from_json(json).map_err(to_js_err)?;
     serde_json::to_string(&model).map_err(to_js_err)
 }
 
 /// Get the node identifiers from a model specification JSON.
 ///
-/// Returns a JS array of node ID strings in declaration order.
+/// Returns a JS array of node ID strings in declaration order. The model is
+/// validated first (Rust `FinancialModelSpec::from_json`), so a model that
+/// `validateFinancialModelJson` rejects is rejected here too.
 ///
 /// # Errors
 ///
-/// Rejects malformed or schema-incompatible `json`, or if the node identifiers
-/// cannot be serialized to JavaScript.
+/// Rejects malformed or schema-incompatible `json`; an empty or invalid period
+/// timeline, reserved node identifiers, incompatible node fields or value
+/// types, invalid formulas, or an invalid capital structure; or failure to
+/// serialize the node identifiers to JavaScript.
 /// @param json - Canonical JSON string defining the object to deserialize or normalize.
 #[wasm_bindgen(js_name = modelNodeIds)]
 pub fn model_node_ids(json: JsValue) -> Result<JsValue, JsValue> {
     let json: &str = &json_text(&json, "json")?;
-    let model: finstack_quant_statements::FinancialModelSpec =
-        serde_json::from_str(json).map_err(to_js_err)?;
+    let model = FinancialModelSpec::from_json(json).map_err(to_js_err)?;
     let ids: Vec<&str> = model.nodes.keys().map(|k| k.as_str()).collect();
     crate::utils::to_js_value(&ids)
 }
@@ -94,16 +80,23 @@ pub fn validate_check_suite_spec_json(json: JsValue) -> Result<String, JsValue> 
 
 /// Validate a `CapitalStructureSpec` JSON string.
 ///
+/// Deserializes the spec, runs the Rust `CapitalStructureSpec::validate`
+/// (waterfall consistency, instrument compatibility with prepayment rungs,
+/// and swap side), and returns the canonical JSON.
+///
 /// # Errors
 ///
-/// Rejects malformed or schema-incompatible `json`, or failure to serialize
-/// the decoded capital-structure specification.
+/// Rejects malformed or schema-incompatible `json`; an invalid waterfall; a
+/// bond, convertible, swap, cap/floor, or swaption instrument alongside a
+/// prepayment rung; an interest-rate swap with side `Receive`; or failure to
+/// serialize the validated capital-structure specification.
 /// @param json - Canonical JSON string defining the object to deserialize or normalize.
 #[wasm_bindgen(js_name = validateCapitalStructureSpecJson)]
 pub fn validate_capital_structure_spec_json(json: JsValue) -> Result<String, JsValue> {
     let json: &str = &json_text(&json, "json")?;
     let spec: finstack_quant_statements::types::CapitalStructureSpec =
         serde_json::from_str(json).map_err(to_js_err)?;
+    spec.validate().map_err(to_js_err)?;
     serde_json::to_string(&spec).map_err(to_js_err)
 }
 
@@ -138,31 +131,42 @@ pub fn validate_waterfall_spec_json(json: JsValue) -> Result<String, JsValue> {
 
 /// Validate an `EcfSweepSpec` JSON string.
 ///
+/// Deserializes the spec, runs the Rust `EcfSweepSpec::validate`, and returns
+/// the canonical JSON. The waterfall-level rule that a positive sweep needs a
+/// prepayment priority is checked by `validateWaterfallSpecJson`.
+///
 /// # Errors
 ///
-/// Rejects malformed or schema-incompatible `json`, or failure to serialize
-/// the decoded ECF-sweep specification.
+/// Rejects malformed or schema-incompatible `json`, a `sweep_percentage`
+/// outside `[0.0, 1.0]`, or failure to serialize the validated ECF-sweep
+/// specification.
 /// @param json - Canonical JSON string defining the object to deserialize or normalize.
 #[wasm_bindgen(js_name = validateEcfSweepSpecJson)]
 pub fn validate_ecf_sweep_spec_json(json: JsValue) -> Result<String, JsValue> {
     let json: &str = &json_text(&json, "json")?;
     let spec: finstack_quant_statements::capital_structure::EcfSweepSpec =
         serde_json::from_str(json).map_err(to_js_err)?;
+    spec.validate().map_err(to_js_err)?;
     serde_json::to_string(&spec).map_err(to_js_err)
 }
 
 /// Validate a `PikToggleSpec` JSON string.
 ///
+/// Deserializes the spec, runs the Rust `PikToggleSpec::validate`, and returns
+/// the canonical JSON.
+///
 /// # Errors
 ///
-/// Rejects malformed or schema-incompatible `json`, or failure to serialize
-/// the decoded PIK-toggle specification.
+/// Rejects malformed or schema-incompatible `json`, a missing or empty
+/// `target_instrument_ids` list, or failure to serialize the validated
+/// PIK-toggle specification.
 /// @param json - Canonical JSON string defining the object to deserialize or normalize.
 #[wasm_bindgen(js_name = validatePikToggleSpecJson)]
 pub fn validate_pik_toggle_spec_json(json: JsValue) -> Result<String, JsValue> {
     let json: &str = &json_text(&json, "json")?;
     let spec: finstack_quant_statements::capital_structure::PikToggleSpec =
         serde_json::from_str(json).map_err(to_js_err)?;
+    spec.validate().map_err(to_js_err)?;
     serde_json::to_string(&spec).map_err(to_js_err)
 }
 
@@ -182,7 +186,7 @@ pub fn validate_pik_toggle_spec_json(json: JsValue) -> Result<String, JsValue> {
 #[wasm_bindgen(js_name = evaluateModel)]
 pub fn evaluate_model(model_json: JsValue) -> Result<JsValue, JsValue> {
     let model_json: &str = &json_text(&model_json, "modelJson")?;
-    let model = parse_validated_model(model_json)?;
+    let model = FinancialModelSpec::from_json(model_json).map_err(to_js_err)?;
     let mut evaluator = finstack_quant_statements::evaluator::Evaluator::new();
     let result = evaluator.evaluate(&model).map_err(to_js_err)?;
     crate::utils::to_js_value(&result)
@@ -211,7 +215,7 @@ pub fn evaluate_model_with_market(
     let model_json: &str = &json_text(&model_json, "modelJson")?;
     let market_json: &str = &json_text(&market_json, "marketJson")?;
     let as_of: &str = &js_string(&as_of, "asOf")?;
-    let model = parse_validated_model(model_json)?;
+    let model = FinancialModelSpec::from_json(model_json).map_err(to_js_err)?;
     let market: finstack_quant_core::market_data::context::MarketContext =
         serde_json::from_str(market_json).map_err(to_js_err)?;
     // Use the shared ISO date parser for a consistent `YYYY-MM-DD` grammar and
@@ -242,7 +246,7 @@ pub fn evaluate_model_with_market(
 pub fn evaluate_monte_carlo(model_json: JsValue, config_json: JsValue) -> Result<JsValue, JsValue> {
     let model_json: &str = &json_text(&model_json, "modelJson")?;
     let config_json: &str = &json_text(&config_json, "configJson")?;
-    let model = parse_validated_model(model_json)?;
+    let model = FinancialModelSpec::from_json(model_json).map_err(to_js_err)?;
     let config: finstack_quant_statements::evaluator::MonteCarloConfig =
         serde_json::from_str(config_json).map_err(to_js_err)?;
     let mut evaluator = finstack_quant_statements::evaluator::Evaluator::new();

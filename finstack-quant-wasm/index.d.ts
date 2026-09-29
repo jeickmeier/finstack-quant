@@ -2033,18 +2033,19 @@ export interface XvaResultJson {
 }
 
 /**
- * Forecast backtest metrics (JSON object from Rust).
+ * Forecast backtest metrics (JSON object from Rust). A non-finite metric is the
+ * string `"nan"`, `"inf"` or `"-inf"`, so the object survives `JSON.stringify`.
  */
 export interface BacktestForecastMetricsJson {
   /**
    * Mean absolute error of the forecast versus realized values.
    */
-  mae: number;
+  mae: number | 'nan' | 'inf' | '-inf';
   /**
-   * Mean absolute percentage error, in percent; `NaN` when no sample had a
+   * Mean absolute percentage error, in percent; `"nan"` when no sample had a
    * non-zero actual (see `mape_effective_n`).
    */
-  mape: number;
+  mape: number | 'nan' | 'inf' | '-inf';
   /**
    * Number of samples that contributed to `mape` (those with a non-zero actual).
    */
@@ -2052,11 +2053,11 @@ export interface BacktestForecastMetricsJson {
   /**
    * Symmetric mean absolute percentage error, in percent, bounded in `[0, 200]`.
    */
-  smape: number;
+  smape: number | 'nan' | 'inf' | '-inf';
   /**
    * Root-mean-square error of the forecast versus realized values.
    */
-  rmse: number;
+  rmse: number | 'nan' | 'inf' | '-inf';
   /**
    * Number of forecast observations in the backtest window.
    */
@@ -2600,9 +2601,10 @@ export interface FormulaExplanationJson {
    */
   period_id: string;
   /**
-   * Evaluated node value after applying the formula in this period.
+   * Evaluated node value after applying the formula in this period; a
+   * non-finite value is `"nan"`, `"inf"` or `"-inf"`.
    */
-  final_value: number;
+  final_value: number | 'nan' | 'inf' | '-inf';
   /**
    * Node kind in the statement model, such as input, formula, or calculated.
    */
@@ -2626,9 +2628,10 @@ export interface FormulaExplanationStepJson {
    */
   component: string;
   /**
-   * Numeric contribution of this term in the explained period.
+   * Numeric contribution of this term in the explained period; a non-finite
+   * value is `"nan"`, `"inf"` or `"-inf"`.
    */
-  value: number;
+  value: number | 'nan' | 'inf' | '-inf';
   /**
    * Operator that combines this term with the running total, when present.
    */
@@ -9059,7 +9062,7 @@ export interface StatementsNamespace {
    * Returns a JS array of node ID strings in declaration order.
    * @returns Node identifiers in model-declaration order.
    * @param json - Canonical JSON string defining the object to deserialize or normalize.
-   * @throws Error - Rejects malformed or schema-incompatible `json`, or if the node identifiers cannot be serialized to JavaScript.
+   * @throws Error - Rejects malformed or schema-incompatible `json`; an empty or invalid period timeline, reserved node identifiers, incompatible node fields or value types, invalid formulas, or an invalid capital structure; or failure to serialize the node identifiers to JavaScript.
    */
   modelNodeIds(json: JsonInput): string[];
   /**
@@ -9076,7 +9079,7 @@ export interface StatementsNamespace {
    * Validate a `CapitalStructureSpec` JSON string.
    * @returns Canonical capital-structure JSON after schema validation.
    * @param json - Canonical JSON string defining the object to deserialize or normalize.
-   * @throws Error - Rejects malformed or schema-incompatible `json`, or failure to serialize the decoded capital-structure specification.
+   * @throws Error - Rejects malformed or schema-incompatible `json`; an invalid waterfall; a bond, convertible, swap, cap/floor, or swaption instrument alongside a prepayment rung; an interest-rate swap with side `Receive`; or failure to serialize the validated capital-structure specification.
    */
   validateCapitalStructureSpecJson(json: JsonInput): string;
   /**
@@ -9095,14 +9098,14 @@ export interface StatementsNamespace {
    * Validate an `EcfSweepSpec` JSON string.
    * @returns Canonical ECF-sweep JSON after schema validation.
    * @param json - Canonical JSON string defining the object to deserialize or normalize.
-   * @throws Error - Rejects malformed or schema-incompatible `json`, or failure to serialize the decoded ECF-sweep specification.
+   * @throws Error - Rejects malformed or schema-incompatible `json`, a `sweep_percentage` outside `[0.0, 1.0]`, or failure to serialize the validated ECF-sweep specification.
    */
   validateEcfSweepSpecJson(json: JsonInput): string;
   /**
    * Validate a `PikToggleSpec` JSON string.
    * @returns Canonical PIK-toggle JSON after schema validation.
    * @param json - Canonical JSON string defining the object to deserialize or normalize.
-   * @throws Error - Rejects malformed or schema-incompatible `json`, or failure to serialize the decoded PIK-toggle specification.
+   * @throws Error - Rejects malformed or schema-incompatible `json`, a missing or empty `target_instrument_ids` list, or failure to serialize the validated PIK-toggle specification.
    */
   validatePikToggleSpecJson(json: JsonInput): string;
   /**
@@ -9278,10 +9281,16 @@ export interface LboResult {
    * Multiple on invested capital.
    */
   moic: number;
+  /**
+   * Report from the Rust LBO check suite when the config carried
+   * `check_mappings`; `null` otherwise.
+   */
+  checks: CheckReport | null;
 }
 
 /**
- * Solved input and optional updated model from a goal-seek.
+ * Solved input and optional updated model from a goal-seek (the Rust
+ * `GoalSeekResult`).
  */
 export interface GoalSeekResult {
   /**
@@ -9289,9 +9298,30 @@ export interface GoalSeekResult {
    */
   solved_value: number;
   /**
-   * Canonical model JSON with the solved input substituted, when a model was supplied.
+   * `FinancialModelSpec` object with the solved input written in when
+   * `updateModel` is `true`; `null` otherwise. Pass it back as `modelJson`.
    */
-  updated_model_json?: string;
+  model: Record<string, unknown> | null;
+}
+
+/**
+ * Dependency tree of one statement node (the Rust `DependencyTree`), as
+ * returned by `statements_analytics.dependencyTree`.
+ */
+export interface DependencyTree {
+  /**
+   * Node identifier; a dependency already on the current path appears as a
+   * leaf named `"<id> (cycle)"`.
+   */
+  node_id: string;
+  /**
+   * Formula text when the node is calculated; `null` for a value node.
+   */
+  formula: string | null;
+  /**
+   * One tree per direct dependency, in formula reference order.
+   */
+  children: DependencyTree[];
 }
 
 /**
@@ -9503,7 +9533,9 @@ export interface StatementsAnalyticsNamespace {
    *
    * Takes two float arrays (actual, forecast) and returns the serde form of
    * the Rust `ForecastMetrics` (`mae`, `mape`, `mape_effective_n`, `smape`,
-   * `rmse`, `n`).
+   * `rmse`, `n`). A non-finite metric is the string `"nan"`, `"inf"` or
+   * `"-inf"` (for example `mape` when every actual is zero), matching the
+   * statement-result convention, so the object survives a JSON round trip.
    * @returns Backtest forecast accuracy metrics for the selected series.
    * @param actual - Actual realized values aligned one-for-one with the forecast series.
    * @param forecast - Forecast values aligned one-for-one with the actual realized series.
@@ -9525,17 +9557,21 @@ export interface StatementsAnalyticsNamespace {
   ): TornadoEntry[];
   /**
    * Find the driver value that makes a target node reach a target value.
-   * @returns Solved input value and optional updated model JSON.
+   *
+   * Returns the serde form of the Rust `GoalSeekResult`: `solved_value` plus
+   * `model`, the input model with the solved driver written in when
+   * `update_model` is `true` and `null` otherwise. The input model is never
+   * modified; pass `model` straight back as the `modelJson` of another call.
+   * @returns Solved driver value and the updated model (or `null`).
    * @param modelJson - Financial-model specification JSON.
    * @param targetNode - Statement node identifier whose value is driven toward the target.
    * @param targetPeriod - Model period label in which the goal-seek target is evaluated.
    * @param targetValue - Numeric target value the goal-seek routine attempts to reach.
    * @param driverNode - Statement node identifier adjusted by the goal-seek routine.
    * @param driverPeriod - Model period label of the adjustable goal-seek driver.
-   * @param updateModel - Whether to return the model with the solved driver value applied.
-   * @param boundsLo - Lower numeric bound allowed for the goal-seek driver.
-   * @param boundsHi - Upper numeric bound allowed for the goal-seek driver.
-   * @throws Error - Rejects malformed `model_json`, invalid target or driver period identifiers, exactly one supplied bound, missing target or driver nodes or periods, non-finite or unordered bounds, model-evaluation or solver-convergence failures, or failure to serialize the result or updated model.
+   * @param updateModel - Whether the result carries the model with the solved driver value applied.
+   * @param bounds - Optional `[lower, upper]` search bracket for the driver, in the driver node's units.
+   * @throws Error - Rejects malformed `model_json`, invalid target or driver period identifiers, `bounds` that is not a two-number array, missing target or driver nodes or periods, non-finite or unordered bounds, model-evaluation or solver-convergence failures, or failure to serialize the result.
    */
   goalSeek(
     modelJson: JsonInput,
@@ -9545,8 +9581,7 @@ export interface StatementsAnalyticsNamespace {
     driverNode: string,
     driverPeriod: string,
     updateModel: boolean,
-    boundsLo?: number | null,
-    boundsHi?: number | null
+    bounds?: [number, number] | null
   ): GoalSeekResult;
   /**
    * Rank the headline DCF assumptions by enterprise-value impact.
@@ -9559,27 +9594,19 @@ export interface StatementsAnalyticsNamespace {
    * @param modelJson - Financial-model specification JSON.
    * @param wacc - Baseline weighted average cost of capital in decimal form (0.10 = 10%).
    * @param terminalValueJson - Terminal-value spec JSON selecting whether growth or the exit multiple is shocked.
-   * @param ufcfNode - Node identifier holding unlevered free cash flow for the forecast periods.
+   * @param ufcfNode - Node identifier holding unlevered free cash flow for the forecast periods; omitted uses the canonical "ufcf" node.
    * @param netDebtOverride - Optional net debt in model currency; otherwise requires debt and cash in that currency from a period ending on or before valuation.
-   * @param waccSensitivityBump - Absolute shock applied to WACC and to the terminal growth rate, in decimal (0.01 = +/-100 bp).
-   * @param waccDenominatorEpsilon - Minimum spread preserved between WACC and the terminal growth rate so 1/(wacc - g) stays defined, in decimal.
-   * @param maxStableGrowthRate - Maximum perpetual stable growth rate; omitted uses the canonical 5% default.
-   * @param exitMultipleBump - Absolute shock applied to an exit multiple, in turns of the multiple (1.0 = +/-1.0x).
-   * @param midYearConvention - Whether every DCF re-run uses the mid-year discounting convention.
+   * @param optionsJson - Optional Rust `DcfOptions` JSON; every field is optional and a missing one takes its default: `mid_year_convention` (false), `wacc_sensitivity_bump` (0.01 = +/-100 bp), `wacc_denominator_epsilon` (0.005), `max_stable_growth_rate` (0.05), `exit_multiple_bump` (`{"absolute": 1.0}` turns or `{"relative": 0.10}`), `exit_multiple_metric_node` (flow node whose complete trailing year supplies the exit-multiple metric), `equity_bridge`, `shares_outstanding`, `valuation_discounts`, `discount_curve_id`. Unknown keys are rejected.
    * @param marketJson - Optional canonical market-context JSON used for statement evaluation, not WACC discounting.
-   * @throws Error - Rejects malformed model or terminal-value JSON, model-evaluation failures, a missing UFCF series or model currency, inconsistent WACC or terminal-value assumptions, missing bridge inputs, valuation failures, or failure to serialize the sensitivity result.
+   * @throws Error - Rejects malformed model, terminal-value, options, or market JSON (an unknown options key included), model-evaluation failures, a missing UFCF series or model currency, inconsistent WACC or terminal-value assumptions, a missing or incomplete exit-multiple metric node, missing bridge inputs, valuation failures, or failure to serialize the sensitivity result.
    */
   dcfSensitivity(
     modelJson: JsonInput,
     wacc: number,
     terminalValueJson: JsonInput,
-    ufcfNode: string,
+    ufcfNode?: string | null,
     netDebtOverride?: number | null,
-    waccSensitivityBump?: number | null,
-    waccDenominatorEpsilon?: number | null,
-    maxStableGrowthRate?: number | null,
-    exitMultipleBump?: number | null,
-    midYearConvention?: boolean | null,
+    optionsJson?: JsonInput | null,
     marketJson?: JsonInput | null
   ): DcfSensitivityResult;
   /**
@@ -9588,31 +9615,16 @@ export interface StatementsAnalyticsNamespace {
    * Entry enterprise value is priced at the model's first period, the sponsor
    * equity check is solved as the sources-and-uses residual, and exit proceeds
    * are the exit enterprise value less the modelled net debt at the exit
-   * period. IRR is out of scope: pair the returned `exit_equity_proceeds` with
+   * period. When the config carries `check_mappings`, the Rust LBO check suite
+   * runs against the same evaluation and fills `checks`; otherwise `checks` is
+   * `null`. IRR is out of scope: pair the returned `exit_equity_proceeds` with
    * the equity outflow at close and call `portfolio.mwrXirr`.
    * @returns Leveraged-buyout evaluation result against the statement model.
    * @param modelJson - Financial-model specification JSON.
-   * @param entryMultiple - Entry valuation multiple applied to the entry metric (8.5 = 8.5x).
-   * @param entryMetricNode - Monetary node in model currency supplying the entry metric at the first period.
-   * @param exitMultiple - Exit valuation multiple applied to the exit metric (9.5 = 9.5x).
-   * @param exitMetricNode - Monetary node in model currency supplying the exit metric at the exit period.
-   * @param exitNetDebtNode - Monetary node in model currency supplying net debt at the exit period.
-   * @param exitPeriod - Model period label at which the sponsor exits, e.g. "2029".
-   * @param sourcesJson - Canonical JSON array of funded debt tranches at close, each {"name", "amount"} in the model currency.
-   * @param transactionFees - Transaction fees and expenses funded at close, in the model currency.
-   * @throws Error - Rejects malformed model or tranche JSON, an invalid `exit_period`, model evaluation or lookup failures, a missing model currency or period, non-finite transaction inputs or model values, negative tranche amounts, a non-positive sponsor equity check, check-suite failures, or failure to serialize the result to JavaScript. The result is a structured JavaScript object.
+   * @param configJson - Rust `LboConfig` JSON: `entry_multiple` (8.5 = 8.5x), `entry_metric_node`, `transaction_fees` (model currency), `sources` (`[{"name", "amount"}]` funded at close, model currency), `exit_multiple`, `exit_metric_node`, `exit_net_debt_node`, `exit_period` (e.g. "2029"), and optional `check_mappings` (`{"three_statement", "credit"}`). Every field except `check_mappings` is required.
+   * @throws Error - Rejects malformed model or config JSON (unknown config or mapping keys included), an invalid `exit_period`, model evaluation or lookup failures, a missing model currency or period, non-finite transaction inputs or model values, negative tranche amounts, a non-positive sponsor equity check, check-suite failures, or failure to serialize the result to JavaScript. The result is a structured JavaScript object.
    */
-  evaluateLbo(
-    modelJson: JsonInput,
-    entryMultiple: number,
-    entryMetricNode: string,
-    exitMultiple: number,
-    exitMetricNode: string,
-    exitNetDebtNode: string,
-    exitPeriod: string,
-    sourcesJson: JsonInput,
-    transactionFees: number
-  ): LboResult;
+  evaluateLbo(modelJson: JsonInput, configJson: JsonInput): LboResult;
   /**
    * Weighted-average cost of capital (WACC).
    *
@@ -9634,15 +9646,39 @@ export interface StatementsAnalyticsNamespace {
     taxRate: number
   ): number;
   /**
-   * Trace dependencies for a node and return ASCII tree.
-   * @returns ASCII dependency tree for the selected node.
+   * Build a node's dependency tree.
+   *
+   * Returns the serde form of the Rust `DependencyTree`: `node_id`, `formula`
+   * (the node's formula text, or `null` for a value node) and `children`, one
+   * tree per direct dependency. A dependency already on the current path
+   * appears once more as a leaf named `"<id> (cycle)"`. Twin of Python
+   * `DependencyTracer.dependency_tree`.
+   * @returns Dependency tree rooted at the selected node.
    * @param modelJson - Financial-model specification JSON.
-   * @param nodeId - Stable node identifier used to select the required domain object.
-   * @throws Error - Rejects malformed `model_json`, formulas or clauses whose dependencies cannot be parsed, unknown formula references, a missing `node_id` or reachable dependency, or a dependency cycle.
+   * @param nodeId - Root node whose dependencies are traced.
+   * @throws Error - Rejects malformed `model_json`, a model that fails semantic validation, formulas or clauses whose dependencies cannot be parsed, unknown formula references, a missing `node_id` or reachable dependency, or a dependency cycle.
    */
-  traceDependencies(modelJson: JsonInput, nodeId: string): string;
+  dependencyTree(modelJson: JsonInput, nodeId: string): DependencyTree;
+  /**
+   * Render a node's dependency tree as ASCII text.
+   *
+   * The root on the first line, then one line per dependency drawn with
+   * `├──` / `└──` connectors and indented by depth, each followed by its
+   * formula in parentheses. Twin of Python
+   * `DependencyTracer.dependency_tree_text` (Rust
+   * `DependencyTracer::dependency_tree_text`).
+   * @returns ASCII dependency tree, one node per line.
+   * @param modelJson - Financial-model specification JSON.
+   * @param nodeId - Root node whose dependencies are traced.
+   * @throws Error - Rejects malformed `model_json`, a model that fails semantic validation, formulas or clauses whose dependencies cannot be parsed, unknown formula references, a missing `node_id` or reachable dependency, or a dependency cycle.
+   */
+  dependencyTreeText(modelJson: JsonInput, nodeId: string): string;
   /**
    * Explain a formula for a specific node and period (JSON in/out).
+   *
+   * Returns the serde form of the Rust `Explanation`; a non-finite
+   * `final_value` or breakdown `value` is the string `"nan"`, `"inf"` or
+   * `"-inf"` (for example a `lag` node at the first period).
    * @returns Structured formula breakdown for the selected node and period.
    * @param modelJson - Financial-model specification JSON.
    * @param resultsJson - Evaluated statement-result JSON.
@@ -9757,37 +9793,39 @@ export interface StatementsAnalyticsNamespace {
   renderCheckReportHtml(reportJson: JsonInput): string;
   // Comps — comparable company analysis
   /**
-   * Percentile rank of `value` within `data` on a 0-1 scale (Rust `percentile_rank(values, value)` argument order).
+   * Percentile rank of `value` within `values` on a 0-1 scale (Rust `percentile_rank(values, value)`).
    *
-   * Returns `undefined` when `data` is empty rather than a synthetic 0.5.
-   * @returns Percentile rank in `[0, 1]`, or `undefined` when `data` is empty.
-   * @param data - Non-empty numeric observation array used by the requested statistic.
+   * Returns `undefined` when `values` is empty rather than a synthetic 0.5.
+   * @returns Percentile rank in `[0, 1]`, or `undefined` when `values` is empty.
+   * @param values - Peer observations forming the comparison universe; non-finite entries are ignored.
    * @param value - Subject-company metric value to rank against the peer sample.
-   * @throws Error - Rejects when `data` is not a numeric JavaScript array or the finite rank cannot be serialized. Empty/non-finite peer data or a non-finite `value` return `undefined` rather than rejecting.
+   * @throws Error - Rejects when `values` is not a numeric JavaScript array or the finite rank cannot be serialized. Empty/non-finite peer data or a non-finite `value` return `undefined` rather than rejecting.
    */
-  percentileRank(data: number[], value: number): number | undefined;
+  percentileRank(values: number[], value: number): number | undefined;
   /**
-   * Z-score of `value` within `data` (Rust `z_score(values, value)` argument order).
+   * Z-score of `value` within `values` (Rust `z_score(values, value)`).
    *
    * Returns `undefined` when fewer than two observations are provided or the
    * peer variance is zero, instead of a synthetic zero.
    * @returns Standardized z-score, or `undefined` when variance is zero or the sample is too small.
-   * @param data - Non-empty numeric observation array used by the requested statistic.
+   * @param values - Peer observations the subject is standardized against; non-finite entries are ignored.
    * @param value - Subject-company metric value to standardize against the peer sample.
-   * @throws Error - Rejects when `data` is not a numeric JavaScript array or the computed score cannot be serialized. Insufficient data, zero variance, or a non-finite `value` return `undefined` rather than rejecting.
+   * @throws Error - Rejects when `values` is not a numeric JavaScript array or the computed score cannot be serialized. Insufficient data, zero variance, or a non-finite `value` return `undefined` rather than rejecting.
    */
-  zScore(data: number[], value: number): number | undefined;
+  zScore(values: number[], value: number): number | undefined;
   /**
-   * Descriptive statistics over a peer distribution.
+   * Descriptive statistics over a peer distribution (Rust `peer_stats(values)`).
    *
-   * Returns `undefined` (matching the other comps helpers) when `data` is empty.
-   * @returns Descriptive peer statistics, or `undefined` when `data` is empty.
-   * @param data - Non-empty numeric observation array used by the requested statistic.
-   * @throws Error - Rejects when `data` is not a numeric JavaScript array or the statistics cannot be serialized. No finite observations return `undefined`.
+   * Returns `undefined` (matching the other comps helpers) when `values` is
+   * empty.
+   * @returns Descriptive peer statistics, or `undefined` when `values` is empty.
+   * @param values - Peer metric observations; non-finite entries are ignored.
+   * @throws Error - Rejects when `values` is not a numeric JavaScript array or the statistics cannot be serialized. No finite observations return `undefined`.
    */
-  peerStats(data: number[]): PeerStatsJson | undefined;
+  peerStats(values: number[]): PeerStatsJson | undefined;
   /**
-   * Single-factor OLS fit of `y` on `x` evaluated at the subject observation.
+   * Single-factor OLS fit of `y_values` on `x_values` evaluated at the subject
+   * observation (Rust `regression_fair_value(x_values, y_values, subject_x, subject_y)`).
    * @returns Fitted intercept, slope, R², subject fitted value and residual, or `undefined` if unidentifiable.
    * @param xValues - Comparable-company independent-variable values aligned with y_values.
    * @param yValues - Comparable-company dependent-variable values aligned with x_values.
@@ -9804,11 +9842,14 @@ export interface StatementsAnalyticsNamespace {
   /**
    * Compute a canonical valuation multiple for a company-metric bag.
    * @returns The requested multiple, or `undefined` when inputs are missing or the denominator is not positive.
-   * @param companyMetrics - Company financial-metric object supplying numerator and denominator inputs.
+   * @param companyMetrics - Flat snake_case metric object (`enterprise_value`, `ebitda`, ...) supplying numerator and denominator inputs; a `null` value means the metric is missing.
    * @param multiple - Supported valuation multiple identifier, such as EV/EBITDA or P/E.
-   * @throws Error - Rejects when `company_metrics` is not a string-to-number JavaScript object, `multiple` is not a supported canonical identifier, or the computed value cannot be serialized. Missing or non-finite inputs and non-positive denominators return `undefined`.
+   * @throws Error - Rejects when `company_metrics` is not an object of numbers (or `null`), `multiple` is not a supported canonical identifier, or the computed value cannot be serialized. Missing, `null` or non-finite inputs and non-positive denominators return `undefined`.
    */
-  computeMultiple(companyMetrics: unknown, multiple: string): number | undefined;
+  computeMultiple(
+    companyMetrics: Record<string, number | null | undefined> | string,
+    multiple: string
+  ): number | undefined;
   /**
    * Composite rich/cheap scoring across multiple dimensions.
    * @returns Composite rich/cheap score with per-dimension diagnostics.
@@ -11332,7 +11373,7 @@ export interface ScenariosNamespace {
    * @param modelJson - JSON-serialized FinancialModelSpec that scenario operations may mutate.
    * @param asOf - ISO-8601 valuation date used to resolve date-dependent market data.
    * @param instrumentsJson - Optional JSON array of canonical instrument envelopes; required for instrument shocks and returned as shocked copies in input order.
-   * @throws Error - Rejects malformed scenario, market, or model JSON, an invalid ISO `as_of` date, an invalid scenario operation, missing market objects or hierarchy context, statement-model execution failures, failure to encode the mutated contexts, or failure to serialize the application envelope to JavaScript.
+   * @throws Error - Rejects malformed scenario, market, or model JSON, a model that fails semantic validation (the same `FinancialModelSpec::from_json` check the statements exports and Python `apply_scenario` apply), an invalid ISO `as_of` date, an invalid scenario operation, missing market objects or hierarchy context, statement-model execution failures, failure to encode the mutated contexts, or failure to serialize the application envelope to JavaScript.
    */
   applyScenario(
     scenarioJson: JsonInput,

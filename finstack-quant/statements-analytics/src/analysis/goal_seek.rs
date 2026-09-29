@@ -12,7 +12,7 @@
 //! use finstack_quant_core::dates::PeriodId;
 //!
 //! # fn main() -> Result<()> {
-//! let mut model = ModelBuilder::new("goal_seek_test")
+//! let model = ModelBuilder::new("goal_seek_test")
 //!     .periods("2025Q1..Q4", None)?
 //!     .value("revenue", &[
 //!         (PeriodId::quarter(2025, 1).expect("valid period fixture"), AmountOrScalar::scalar(100_000.0)),
@@ -25,18 +25,19 @@
 //!
 //! // Solve for Q4 revenue that achieves 2.0x interest coverage
 //! let target_period = PeriodId::quarter(2025, 4).expect("valid period fixture");
-//! let solved_revenue = goal_seek(
-//!     &mut model,
+//! let result = goal_seek(
+//!     &model,
 //!     "interest_coverage",
 //!     target_period,
 //!     2.0,
 //!     "revenue",
 //!     target_period,
-//!     true,  // Update model with solution
+//!     true,  // Return the model with the solution written in
 //!     None,
 //! )?;
 //!
-//! println!("Revenue needed: ${:.2}", solved_revenue);
+//! println!("Revenue needed: ${:.2}", result.solved_value);
+//! assert!(result.model.is_some());
 //! # Ok(())
 //! # }
 //! ```
@@ -50,34 +51,63 @@ use finstack_quant_statements::types::{
 };
 use std::cell::RefCell;
 
+/// Outcome of a [`goal_seek`] solve.
+///
+/// The serde form is `{"solved_value": <number>, "model": <FinancialModelSpec
+/// or null>}`; `model` is always present and is `null` unless the solve was
+/// asked to return the updated model.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct GoalSeekResult {
+    /// Driver value, in the driver node's own units (the currency amount for
+    /// a monetary node), that brings the target node to the target value
+    /// within tolerance.
+    pub solved_value: f64,
+    /// Copy of the input model with `solved_value` written into the driver
+    /// node at the driver period, re-validated; `None` when `update_model`
+    /// was `false`.
+    pub model: Option<FinancialModelSpec>,
+}
+
 /// Perform goal seek on a financial model.
 ///
 /// Solves for the driver node value that achieves a target metric value in a specific period.
-/// This uses Brent's method for robust root-finding.
+/// This uses Brent's method for robust root-finding. The input model is never
+/// modified; when `update_model` is `true` the result carries a copy with the
+/// solved driver written in.
 ///
 /// # Arguments
 ///
-/// * `model` - Mutable reference to the financial model
+/// * `model` - Financial model to solve against; left unchanged
 /// * `target_node` - Node identifier for the target metric
 /// * `target_period` - Period in which to evaluate the target
-/// * `target_value` - Desired value for the target metric
+/// * `target_value` - Desired value for the target metric, in the target
+///   node's units; must be finite
 /// * `driver_node` - Node identifier for the driver input to vary
 /// * `driver_period` - Period in which to vary the driver
-/// * `update_model` - If true, update the model with the solved driver value
-/// * `bounds` - Optional `(lower, upper)` bracket to constrain the search
+/// * `update_model` - When `true`, [`GoalSeekResult::model`] holds a copy of
+///   `model` with the solved driver value written in; when `false` it is
+///   `None`
+/// * `bounds` - Optional `(lower, upper)` bracket, in the driver node's
+///   units, to constrain the search; both ends must be finite and
+///   `lower < upper`
 ///
 /// # Returns
 ///
-/// Returns the solved driver value after re-evaluating its objective and
-/// requiring absolute target residual <= `1e-9 * max(1, abs(target_value))`.
-/// Bracket-width convergence alone is insufficient; failure leaves `model` unchanged.
+/// Returns a [`GoalSeekResult`] whose `solved_value` has been re-evaluated
+/// against the objective, requiring absolute target residual
+/// <= `1e-9 * max(1, abs(target_value))`. Bracket-width convergence alone is
+/// insufficient.
 ///
 /// # Errors
 ///
 /// Returns an error if:
+/// - `target_value` is not finite
 /// - The target or driver node doesn't exist
 /// - The specified periods are not in the model
-/// - No solution exists within reasonable bounds
+/// - `bounds` are non-finite, unordered, or do not bracket a root
+/// - No solution exists within reasonable bounds, or the final residual
+///   exceeds the tolerance
 /// - The model evaluation fails
 ///
 /// # Examples
@@ -88,7 +118,7 @@ use std::cell::RefCell;
 /// use finstack_quant_core::dates::PeriodId;
 ///
 /// # fn main() -> Result<()> {
-/// let mut model = ModelBuilder::new("example")
+/// let model = ModelBuilder::new("example")
 ///     .periods("2025Q1..Q1", None)?
 ///     .value("revenue", &[(PeriodId::quarter(2025, 1).expect("valid period fixture"), AmountOrScalar::scalar(100_000.0))])
 ///     .compute("profit_margin", "0.15")?
@@ -105,7 +135,7 @@ use std::cell::RefCell;
 /// // give the root-finder a bracket that is guaranteed to contain the solution.
 /// let period = PeriodId::quarter(2025, 1).expect("valid period fixture");
 /// let solved = goal_seek(
-///     &mut model,
+///     &model,
 ///     "net_income",
 ///     period,
 ///     18_000.0,
@@ -115,7 +145,8 @@ use std::cell::RefCell;
 ///     Some((50_000.0, 200_000.0)),
 /// )?;
 /// // Expected: 18_000 / 0.15 = 120_000
-/// assert!((solved - 120_000.0).abs() < 10.0);
+/// assert!((solved.solved_value - 120_000.0).abs() < 10.0);
+/// assert!(solved.model.is_none());
 /// # Ok(())
 /// # }
 /// ```
@@ -125,7 +156,7 @@ use std::cell::RefCell;
 /// - Root-finding background: `docs/REFERENCES.md#press-numerical-recipes`
 #[allow(clippy::too_many_arguments)]
 pub fn goal_seek(
-    model: &mut FinancialModelSpec,
+    model: &FinancialModelSpec,
     target_node: &str,
     target_period: PeriodId,
     target_value: f64,
@@ -133,7 +164,7 @@ pub fn goal_seek(
     driver_period: PeriodId,
     update_model: bool,
     bounds: Option<(f64, f64)>,
-) -> Result<f64> {
+) -> Result<GoalSeekResult> {
     if !target_value.is_finite() {
         return Err(Error::invalid_input("Goal-seek target must be finite"));
     }
@@ -317,13 +348,13 @@ fn amount_for_node(node: &NodeSpec, value: f64) -> Result<AmountOrScalar> {
 }
 
 fn apply_solution(
-    model: &mut FinancialModelSpec,
+    model: &FinancialModelSpec,
     driver_node: &str,
     driver_period: PeriodId,
     update_model: bool,
     value: f64,
-) -> Result<f64> {
-    if update_model {
+) -> Result<GoalSeekResult> {
+    let model = if update_model {
         let mut solved = model.clone();
         if let Some(node) = solved.nodes.get_mut(driver_node) {
             let mut values = node.values.clone().unwrap_or_default();
@@ -331,9 +362,14 @@ fn apply_solution(
             node.values = Some(values);
         }
         solved.validate_semantics()?;
-        *model = solved;
-    }
-    Ok(value)
+        Some(solved)
+    } else {
+        None
+    };
+    Ok(GoalSeekResult {
+        solved_value: value,
+        model,
+    })
 }
 
 fn solve_with_bounds<F>(f: &F, lower: f64, upper: f64) -> Result<f64>

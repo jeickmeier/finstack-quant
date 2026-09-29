@@ -17,7 +17,7 @@ def test_goal_seek_rejects_unattainable_target_without_mutation() -> None:
     before = model.to_json()
     for bounds in [None, (-1.0, 1.0)]:
         with pytest.raises(ValueError, match="residual"):
-            goal_seek(model, "target", "2025Q1", 0.5, "driver", "2025Q1", bounds=bounds)
+            goal_seek(model, "target", "2025Q1", 0.5, "driver", "2025Q1", True, bounds=bounds)
         assert model.to_json() == before
 
 

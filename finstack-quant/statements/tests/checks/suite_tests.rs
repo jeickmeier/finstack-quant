@@ -295,6 +295,29 @@ fn run_model_uses_supplied_results_without_recomputation() {
     assert!(report.has_errors());
 }
 
+/// `total_findings` counts retained findings from `results`, so it matches the
+/// summary's severity counts for a run and survives a JSON round trip.
+#[test]
+fn total_findings_counts_retained_findings() {
+    let model = ModelBuilder::new("findings")
+        .periods("2025Q1..Q2", None)
+        .unwrap()
+        .value("revenue", &[(q(1), s(-1.0)), (q(2), s(-2.0))])
+        .build()
+        .unwrap();
+    let report = positive_revenue_suite().run_model(&model, None).unwrap();
+
+    assert_eq!(report.total_findings(), 2);
+    assert_eq!(
+        report.total_findings(),
+        report.summary.errors + report.summary.warnings + report.summary.infos
+    );
+    let json = serde_json::to_string(&report).unwrap();
+    let parsed: finstack_quant_statements::checks::CheckReport =
+        serde_json::from_str(&json).unwrap();
+    assert_eq!(parsed.total_findings(), 2);
+}
+
 // Materiality is a reporting filter, not a verdict knob: an Error finding
 // must never be suppressed in a way that flips a failing check to passed.
 

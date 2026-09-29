@@ -1338,9 +1338,10 @@ templates                   = { python = "finstack_quant.statements_analytics", 
 #   forecast_covenant, compute_credit_context with per-period
 #   reference_values, CreditContextMetrics including dscr_incl_fees,
 #   CorporateAnalysisBuilder.ltv_value_node — the last is bound on
-#   run_corporate_analysis), StatementsAdapter, lbo_model_checks,
-#   compute_peer_multiples, and the comps/scenarios/reports/valuation typed
-#   result surfaces beyond the bound entry points.
+#   run_corporate_analysis), StatementsAdapter, compute_peer_multiples, and
+#   the comps/scenarios/reports/valuation typed result surfaces beyond the
+#   bound entry points. lbo_model_checks is reached in both hosts through the
+#   `check_mappings` of the LboConfig that evaluate_lbo / evaluateLbo take.
 
 [crates.statements_analytics.symbols]
 public = [
@@ -1360,6 +1361,7 @@ public = [
     "CreditScorecardExtension",
     "DcfSensitivityResult",
     "DependencyTracer",
+    "DependencyTree",
     "DimensionScore",
     "EclBucket",
     "EclResult",
@@ -2806,7 +2808,7 @@ backlog = [
 
 [parity.modules."finstack_quant.statements_analytics"]
 js = "statements_analytics"
-types = { DcfSensitivityResult = "DcfSensitivityResult", GoalSeekResult = "GoalSeekResult", LboResult = "LboResult", TornadoEntry = "TornadoEntry" }
+types = { DcfSensitivityResult = "DcfSensitivityResult", DependencyTree = "DependencyTree", GoalSeekResult = "GoalSeekResult", LboResult = "LboResult", TornadoEntry = "TornadoEntry" }
 backlog = [
     "AccountType",
     "BridgeChart",
@@ -3072,15 +3074,16 @@ evaluateModel = "twin of Python Evaluator.evaluate"
 evaluateModelWithMarket = "twin of Python Evaluator.evaluate_with_market"
 evaluateMonteCarlo = "twin of Python Evaluator.evaluate_monte_carlo"
 modelNodeIds = "twin of the Python FinancialModelSpec node ids"
-validateCapitalStructureSpecJson = "JSON wire validation twin of the Python typed spec class from_json"
+validateCapitalStructureSpecJson = "JSON wire validation through Rust CapitalStructureSpec::validate; Python has no CapitalStructureSpec class and runs the same check inside FinancialModelSpec.from_json"
 validateCheckSuiteSpecJson = "JSON wire validation twin of the Python typed spec class from_json"
-validateEcfSweepSpecJson = "JSON wire validation twin of the Python typed spec class from_json"
-validateFinancialModelJson = "JSON wire validation twin of the Python typed spec class from_json"
-validatePikToggleSpecJson = "JSON wire validation twin of the Python typed spec class from_json"
+validateEcfSweepSpecJson = "JSON wire validation twin of Python EcfSweepSpec.from_json + validate() (Rust EcfSweepSpec::validate)"
+validateFinancialModelJson = "JSON wire validation twin of Python FinancialModelSpec.from_json (both call Rust FinancialModelSpec::from_json)"
+validatePikToggleSpecJson = "JSON wire validation twin of Python PikToggleSpec.from_json + validate() (Rust PikToggleSpec::validate)"
 validateWaterfallSpecJson = "JSON wire validation twin of the Python typed spec class from_json"
 
 [parity.js."statements_analytics".wasm_only]
-traceDependencies = "S11: twin of Python DependencyTracer.dependency_tree; becomes a structured tree"
+dependencyTree = "free-function twin of Python DependencyTracer.dependency_tree (Rust DependencyTracer::dependency_tree); P9 binds the DependencyTracer class"
+dependencyTreeText = "free-function twin of Python DependencyTracer.dependency_tree_text (Rust DependencyTracer::dependency_tree_text); P9 binds the DependencyTracer class"
 
 [parity.js."valuations".wasm_only]
 Market = "S16: becomes core.MarketContext (Python MarketContext)"

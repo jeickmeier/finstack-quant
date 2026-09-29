@@ -10,12 +10,11 @@ pub use comps::{
     z_score,
 };
 
-use crate::api::statements::parse_validated_model;
 use crate::utils::input::{
-    js_bool, js_f64_seq, js_opt_bool, js_opt_string, js_string, js_string_seq, json_text,
-    opt_json_text,
+    js_bool, js_f64_seq, js_opt_string, js_string, js_string_seq, json_text, opt_json_text,
 };
 use crate::utils::{to_js_err, to_js_value};
+use finstack_quant_statements::FinancialModelSpec;
 use wasm_bindgen::prelude::*;
 
 /// Run a sensitivity analysis on a financial model.
@@ -36,7 +35,7 @@ use wasm_bindgen::prelude::*;
 pub fn run_sensitivity(model_json: JsValue, config_json: JsValue) -> Result<JsValue, JsValue> {
     let model_json: &str = &json_text(&model_json, "modelJson")?;
     let config_json: &str = &json_text(&config_json, "configJson")?;
-    let model = parse_validated_model(model_json)?;
+    let model = FinancialModelSpec::from_json(model_json).map_err(to_js_err)?;
 
     let config: finstack_quant_statements_analytics::analysis::SensitivityConfig =
         serde_json::from_str(config_json).map_err(to_js_err)?;
@@ -104,23 +103,24 @@ pub fn evaluate_scenario_set(
 ) -> Result<JsValue, JsValue> {
     let model_json: &str = &json_text(&model_json, "modelJson")?;
     let scenario_set_json: &str = &json_text(&scenario_set_json, "scenarioSetJson")?;
-    let model = parse_validated_model(model_json)?;
+    let model = FinancialModelSpec::from_json(model_json).map_err(to_js_err)?;
 
     let scenario_set: finstack_quant_statements_analytics::analysis::ScenarioSet =
         serde_json::from_str(scenario_set_json).map_err(to_js_err)?;
 
     let results = scenario_set.evaluate_all(&model).map_err(to_js_err)?;
-
-    let map: indexmap::IndexMap<&String, &finstack_quant_statements::evaluator::StatementResult> =
-        results.scenarios.iter().collect();
-    to_js_value(&map)
+    // `ScenarioResults` is `#[serde(transparent)]`: its wire form is the
+    // `{scenario_name: StatementResult}` map.
+    to_js_value(&results)
 }
 
 /// Compute forecast accuracy metrics (MAE, MAPE, sMAPE, RMSE).
 ///
 /// Takes two float arrays (actual, forecast) and returns the serde form of
 /// the Rust `ForecastMetrics` (`mae`, `mape`, `mape_effective_n`, `smape`,
-/// `rmse`, `n`).
+/// `rmse`, `n`). A non-finite metric is the string `"nan"`, `"inf"` or
+/// `"-inf"` (for example `mape` when every actual is zero), matching the
+/// statement-result convention, so the object survives a JSON round trip.
 ///
 /// # Errors
 ///
@@ -184,67 +184,52 @@ pub fn generate_tornado_entries(
 ///
 /// # Errors
 ///
-/// Rejects malformed model or terminal-value JSON, model-evaluation failures,
-/// a missing UFCF series or model currency, inconsistent WACC or terminal-value
-/// assumptions, missing bridge inputs, valuation failures, or failure to
-/// serialize the sensitivity result.
+/// Rejects malformed model, terminal-value, options, or market JSON (an
+/// unknown options key included), model-evaluation failures, a missing UFCF
+/// series or model currency, inconsistent WACC or terminal-value assumptions,
+/// a missing or incomplete exit-multiple metric node, missing bridge inputs,
+/// valuation failures, or failure to serialize the sensitivity result.
 /// @param model_json - Financial-model specification JSON.
 /// @param wacc - Baseline weighted average cost of capital in decimal form (0.10 = 10%).
 /// @param terminal_value_json - Terminal-value spec JSON selecting whether growth or the exit multiple is shocked.
-/// @param ufcf_node - Node identifier holding unlevered free cash flow for the forecast periods.
+/// @param ufcf_node - Node identifier holding unlevered free cash flow for the forecast periods; omitted uses the canonical "ufcf" node.
 /// @param net_debt_override - Optional net debt in model currency; otherwise requires debt and cash in that currency from a period ending on or before valuation.
-/// @param wacc_sensitivity_bump - Absolute shock applied to WACC and to the terminal growth rate, in decimal (0.01 = +/-100 bp).
-/// @param wacc_denominator_epsilon - Minimum spread preserved between WACC and the terminal growth rate so 1/(wacc - g) stays defined, in decimal.
-/// @param max_stable_growth_rate - Maximum perpetual stable growth rate; omitted uses the canonical 5% default.
-/// @param exit_multiple_bump - Absolute shock applied to an exit multiple, in turns of the multiple (1.0 = +/-1.0x).
-/// @param mid_year_convention - Whether every DCF re-run uses the mid-year discounting convention.
+/// @param options_json - Optional Rust `DcfOptions` JSON; every field is optional and a missing one takes its default: `mid_year_convention` (false), `wacc_sensitivity_bump` (0.01 = +/-100 bp), `wacc_denominator_epsilon` (0.005), `max_stable_growth_rate` (0.05), `exit_multiple_bump` (`{"absolute": 1.0}` turns or `{"relative": 0.10}`), `exit_multiple_metric_node` (flow node whose complete trailing year supplies the exit-multiple metric), `equity_bridge`, `shares_outstanding`, `valuation_discounts`, `discount_curve_id`. Unknown keys are rejected.
 /// @param market_json - Optional canonical market-context JSON used for statement evaluation, not WACC discounting.
 #[wasm_bindgen(js_name = dcfSensitivity)]
-#[allow(clippy::too_many_arguments)]
 pub fn dcf_sensitivity(
     model_json: JsValue,
     wacc: f64,
     terminal_value_json: JsValue,
-    ufcf_node: JsValue,
+    ufcf_node: Option<JsValue>,
     net_debt_override: Option<f64>,
-    wacc_sensitivity_bump: Option<f64>,
-    wacc_denominator_epsilon: Option<f64>,
-    max_stable_growth_rate: Option<f64>,
-    exit_multiple_bump: Option<f64>,
-    mid_year_convention: Option<JsValue>,
+    options_json: Option<JsValue>,
     market_json: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
+    use finstack_quant_statements_analytics::analysis::{DcfOptions, DEFAULT_UFCF_NODE};
+
     let model_json: &str = &json_text(&model_json, "modelJson")?;
     let terminal_value_json: &str = &json_text(&terminal_value_json, "terminalValueJson")?;
-    let ufcf_node: &str = &js_string(&ufcf_node, "ufcfNode")?;
-    let mid_year_convention = js_opt_bool(mid_year_convention.as_ref(), "midYearConvention")?;
+    let ufcf_node = js_opt_string(ufcf_node.as_ref(), "ufcfNode")?;
+    let options_json = opt_json_text(options_json.as_ref(), "optionsJson")?;
     let market_json = opt_json_text(market_json.as_ref(), "marketJson")?;
-    use finstack_quant_statements_analytics::analysis::{DcfOptions, ExitMultipleBump};
 
-    let model = parse_validated_model(model_json)?;
+    let model = FinancialModelSpec::from_json(model_json).map_err(to_js_err)?;
     let terminal_value: finstack_quant_valuations::instruments::equity::dcf_equity::TerminalValueSpec =
         serde_json::from_str(terminal_value_json).map_err(to_js_err)?;
+    let options: DcfOptions = options_json
+        .map(|json| serde_json::from_str(&json).map_err(to_js_err))
+        .transpose()?
+        .unwrap_or_default();
     let market: Option<finstack_quant_core::market_data::context::MarketContext> = market_json
         .map(|json| serde_json::from_str(&json).map_err(to_js_err))
         .transpose()?;
-
-    let defaults = DcfOptions::default();
-    let options = DcfOptions {
-        mid_year_convention: mid_year_convention.unwrap_or(defaults.mid_year_convention),
-        wacc_sensitivity_bump: wacc_sensitivity_bump.unwrap_or(defaults.wacc_sensitivity_bump),
-        wacc_denominator_epsilon: wacc_denominator_epsilon
-            .unwrap_or(defaults.wacc_denominator_epsilon),
-        max_stable_growth_rate: max_stable_growth_rate.unwrap_or(defaults.max_stable_growth_rate),
-        exit_multiple_bump: exit_multiple_bump
-            .map_or(defaults.exit_multiple_bump, ExitMultipleBump::Absolute),
-        ..DcfOptions::default()
-    };
 
     let result = finstack_quant_statements_analytics::analysis::dcf_sensitivity(
         &model,
         wacc,
         terminal_value,
-        ufcf_node,
+        ufcf_node.as_deref().unwrap_or(DEFAULT_UFCF_NODE),
         net_debt_override,
         &options,
         market.as_ref(),
@@ -261,63 +246,28 @@ pub fn dcf_sensitivity(
 /// Entry enterprise value is priced at the model's first period, the sponsor
 /// equity check is solved as the sources-and-uses residual, and exit proceeds
 /// are the exit enterprise value less the modelled net debt at the exit
-/// period. IRR is out of scope: pair the returned `exit_equity_proceeds` with
+/// period. When the config carries `check_mappings`, the Rust LBO check suite
+/// runs against the same evaluation and fills `checks`; otherwise `checks` is
+/// `null`. IRR is out of scope: pair the returned `exit_equity_proceeds` with
 /// the equity outflow at close and call `portfolio.mwrXirr`.
 ///
 /// # Errors
 ///
-/// Rejects malformed model or tranche JSON, an invalid `exit_period`, model
-/// evaluation or lookup failures, a missing model currency or period,
-/// non-finite transaction inputs or model values, negative tranche amounts, a
-/// non-positive sponsor equity check, check-suite failures, or failure to
-/// serialize the result to JavaScript. The result is a structured JavaScript
-/// object.
+/// Rejects malformed model or config JSON (unknown config or mapping keys
+/// included), an invalid `exit_period`, model evaluation or lookup failures, a
+/// missing model currency or period, non-finite transaction inputs or model
+/// values, negative tranche amounts, a non-positive sponsor equity check,
+/// check-suite failures, or failure to serialize the result to JavaScript.
+/// The result is a structured JavaScript object.
 /// @param model_json - Financial-model specification JSON.
-/// @param entry_multiple - Entry valuation multiple applied to the entry metric (8.5 = 8.5x).
-/// @param entry_metric_node - Monetary node in model currency supplying the entry metric at the first period.
-/// @param exit_multiple - Exit valuation multiple applied to the exit metric (9.5 = 9.5x).
-/// @param exit_metric_node - Monetary node in model currency supplying the exit metric at the exit period.
-/// @param exit_net_debt_node - Monetary node in model currency supplying net debt at the exit period.
-/// @param exit_period - Model period label at which the sponsor exits, e.g. "2029".
-/// @param sources_json - Canonical JSON array of funded debt tranches at close, each {"name", "amount"} in the model currency.
-/// @param transaction_fees - Transaction fees and expenses funded at close, in the model currency.
+/// @param config_json - Rust `LboConfig` JSON: `entry_multiple` (8.5 = 8.5x), `entry_metric_node`, `transaction_fees` (model currency), `sources` (`[{"name", "amount"}]` funded at close, model currency), `exit_multiple`, `exit_metric_node`, `exit_net_debt_node`, `exit_period` (e.g. "2029"), and optional `check_mappings` (`{"three_statement", "credit"}`). Every field except `check_mappings` is required.
 #[wasm_bindgen(js_name = evaluateLbo)]
-#[allow(clippy::too_many_arguments)]
-pub fn evaluate_lbo(
-    model_json: JsValue,
-    entry_multiple: f64,
-    entry_metric_node: JsValue,
-    exit_multiple: f64,
-    exit_metric_node: JsValue,
-    exit_net_debt_node: JsValue,
-    exit_period: JsValue,
-    sources_json: JsValue,
-    transaction_fees: f64,
-) -> Result<JsValue, JsValue> {
+pub fn evaluate_lbo(model_json: JsValue, config_json: JsValue) -> Result<JsValue, JsValue> {
     let model_json: &str = &json_text(&model_json, "modelJson")?;
-    let entry_metric_node: &str = &js_string(&entry_metric_node, "entryMetricNode")?;
-    let exit_metric_node: &str = &js_string(&exit_metric_node, "exitMetricNode")?;
-    let exit_net_debt_node: &str = &js_string(&exit_net_debt_node, "exitNetDebtNode")?;
-    let exit_period: &str = &js_string(&exit_period, "exitPeriod")?;
-    let sources_json: &str = &json_text(&sources_json, "sourcesJson")?;
-    use finstack_quant_statements_analytics::analysis::{LboConfig, LboTranche};
-
-    let model = parse_validated_model(model_json)?;
-    let sources: Vec<LboTranche> = serde_json::from_str(sources_json).map_err(to_js_err)?;
-    let exit_period: finstack_quant_core::dates::PeriodId =
-        exit_period.parse().map_err(to_js_err)?;
-
-    let config = LboConfig {
-        entry_multiple,
-        entry_metric_node: entry_metric_node.to_owned(),
-        transaction_fees,
-        sources,
-        exit_multiple,
-        exit_metric_node: exit_metric_node.to_owned(),
-        exit_net_debt_node: exit_net_debt_node.to_owned(),
-        exit_period,
-        check_mappings: None,
-    };
+    let config_json: &str = &json_text(&config_json, "configJson")?;
+    let model = FinancialModelSpec::from_json(model_json).map_err(to_js_err)?;
+    let config: finstack_quant_statements_analytics::analysis::LboConfig =
+        serde_json::from_str(config_json).map_err(to_js_err)?;
 
     let result = finstack_quant_statements_analytics::analysis::evaluate_lbo(&model, &config)
         .map_err(to_js_err)?;
@@ -361,21 +311,25 @@ pub fn wacc(
 
 /// Find the driver value that makes a target node reach a target value.
 ///
+/// Returns the serde form of the Rust `GoalSeekResult`: `solved_value` plus
+/// `model`, the input model with the solved driver written in when
+/// `update_model` is `true` and `null` otherwise. The input model is never
+/// modified; pass `model` straight back as the `modelJson` of another call.
+///
 /// # Errors
 ///
 /// Rejects malformed `model_json`, invalid target or driver period identifiers,
-/// exactly one supplied bound, missing target or driver nodes or periods,
-/// non-finite or unordered bounds, model-evaluation or solver-convergence
-/// failures, or failure to serialize the result or updated model.
+/// `bounds` that is not a two-number array, missing target or driver nodes or
+/// periods, non-finite or unordered bounds, model-evaluation or
+/// solver-convergence failures, or failure to serialize the result.
 /// @param model_json - Financial-model specification JSON.
 /// @param target_node - Statement node identifier whose value is driven toward the target.
 /// @param target_period - Model period label in which the goal-seek target is evaluated.
 /// @param target_value - Numeric target value the goal-seek routine attempts to reach.
 /// @param driver_node - Statement node identifier adjusted by the goal-seek routine.
 /// @param driver_period - Model period label of the adjustable goal-seek driver.
-/// @param update_model - Whether to return the model with the solved driver value applied.
-/// @param bounds_lo - Lower numeric bound allowed for the goal-seek driver.
-/// @param bounds_hi - Upper numeric bound allowed for the goal-seek driver.
+/// @param update_model - Whether the result carries the model with the solved driver value applied.
+/// @param bounds - Optional `[lower, upper]` search bracket for the driver, in the driver node's units.
 #[wasm_bindgen(js_name = goalSeek)]
 #[allow(clippy::too_many_arguments)]
 pub fn goal_seek(
@@ -386,8 +340,7 @@ pub fn goal_seek(
     driver_node: JsValue,
     driver_period: JsValue,
     update_model: JsValue,
-    bounds_lo: Option<f64>,
-    bounds_hi: Option<f64>,
+    bounds: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
     let model_json: &str = &json_text(&model_json, "modelJson")?;
     let target_node: &str = &js_string(&target_node, "targetNode")?;
@@ -395,13 +348,15 @@ pub fn goal_seek(
     let driver_node: &str = &js_string(&driver_node, "driverNode")?;
     let driver_period: &str = &js_string(&driver_period, "driverPeriod")?;
     let update_model = js_bool(&update_model, "updateModel")?;
-    let mut model = parse_validated_model(model_json)?;
+    let bounds: Option<(f64, f64)> = opt_json_text(bounds.as_ref(), "bounds")?
+        .map(|json| serde_json::from_str(&json).map_err(to_js_err))
+        .transpose()?;
+    let model = FinancialModelSpec::from_json(model_json).map_err(to_js_err)?;
     let tp: finstack_quant_core::dates::PeriodId = target_period.parse().map_err(to_js_err)?;
     let dp: finstack_quant_core::dates::PeriodId = driver_period.parse().map_err(to_js_err)?;
-    let bounds = goal_seek_bounds(bounds_lo, bounds_hi).map_err(to_js_err)?;
 
     let result = finstack_quant_statements_analytics::analysis::goal_seek(
-        &mut model,
+        &model,
         target_node,
         tp,
         target_value,
@@ -411,64 +366,71 @@ pub fn goal_seek(
         bounds,
     )
     .map_err(to_js_err)?;
-
-    // Only re-serialize the (potentially mutated) model when the caller
-    // asked for the update; otherwise `model` is unchanged and the JSON is
-    // wasted work + a confusing `updated_model_json` on non-updating calls.
-    let out = if update_model {
-        let updated_json = serde_json::to_string(&model).map_err(to_js_err)?;
-        serde_json::json!({
-            "solved_value": result,
-            "updated_model_json": updated_json,
-        })
-    } else {
-        serde_json::json!({ "solved_value": result })
-    };
-    to_js_value(&out)
+    to_js_value(&result)
 }
 
-/// Validate that goal-seek bounds are either both present or both absent.
+/// Build a node's dependency tree.
 ///
-/// Kept JsValue-free so the rejection logic is unit-testable on native
-/// targets (constructing a `JsValue` aborts off-wasm32).
-fn goal_seek_bounds(
-    bounds_lo: Option<f64>,
-    bounds_hi: Option<f64>,
-) -> Result<Option<(f64, f64)>, String> {
-    match (bounds_lo, bounds_hi) {
-        (Some(lo), Some(hi)) => Ok(Some((lo, hi))),
-        (None, None) => Ok(None),
-        _ => Err(
-            "goalSeek: bounds_lo and bounds_hi must be provided together \
-             (got exactly one bound)"
-                .to_string(),
-        ),
-    }
-}
-
-/// Trace dependencies for a node and return ASCII tree.
+/// Returns the serde form of the Rust `DependencyTree`: `node_id`, `formula`
+/// (the node's formula text, or `null` for a value node) and `children`, one
+/// tree per direct dependency. A dependency already on the current path
+/// appears once more as a leaf named `"<id> (cycle)"`. Twin of Python
+/// `DependencyTracer.dependency_tree`.
 ///
 /// # Errors
 ///
-/// Rejects malformed `model_json`, formulas or clauses whose dependencies
-/// cannot be parsed, unknown formula references, a missing `node_id` or
-/// reachable dependency, or a dependency cycle.
+/// Rejects malformed `model_json`, a model that fails semantic validation,
+/// formulas or clauses whose dependencies cannot be parsed, unknown formula
+/// references, a missing `node_id` or reachable dependency, or a dependency
+/// cycle.
 /// @param model_json - Financial-model specification JSON.
-/// @param node_id - Stable node identifier used to select the required domain object.
-#[wasm_bindgen(js_name = traceDependencies)]
-pub fn trace_dependencies(model_json: JsValue, node_id: JsValue) -> Result<String, JsValue> {
+/// @param node_id - Root node whose dependencies are traced.
+#[wasm_bindgen(js_name = dependencyTree)]
+pub fn dependency_tree(model_json: JsValue, node_id: JsValue) -> Result<JsValue, JsValue> {
     let model_json: &str = &json_text(&model_json, "modelJson")?;
     let node_id: &str = &js_string(&node_id, "nodeId")?;
-    let model = parse_validated_model(model_json)?;
+    let model = FinancialModelSpec::from_json(model_json).map_err(to_js_err)?;
     let graph = finstack_quant_statements::evaluator::DependencyGraph::from_model(&model)
         .map_err(to_js_err)?;
-    let tracer =
-        finstack_quant_statements_analytics::analysis::DependencyTracer::new(&model, &graph);
-    let tree = tracer.dependency_tree(node_id).map_err(to_js_err)?;
-    Ok(finstack_quant_statements_analytics::analysis::render_tree_ascii(&tree))
+    let tree = finstack_quant_statements_analytics::analysis::DependencyTracer::new(&model, &graph)
+        .dependency_tree(node_id)
+        .map_err(to_js_err)?;
+    to_js_value(&tree)
+}
+
+/// Render a node's dependency tree as ASCII text.
+///
+/// The root on the first line, then one line per dependency drawn with
+/// `├──` / `└──` connectors and indented by depth, each followed by its
+/// formula in parentheses. Twin of Python
+/// `DependencyTracer.dependency_tree_text` (Rust
+/// `DependencyTracer::dependency_tree_text`).
+///
+/// # Errors
+///
+/// Rejects malformed `model_json`, a model that fails semantic validation,
+/// formulas or clauses whose dependencies cannot be parsed, unknown formula
+/// references, a missing `node_id` or reachable dependency, or a dependency
+/// cycle.
+/// @param model_json - Financial-model specification JSON.
+/// @param node_id - Root node whose dependencies are traced.
+#[wasm_bindgen(js_name = dependencyTreeText)]
+pub fn dependency_tree_text(model_json: JsValue, node_id: JsValue) -> Result<String, JsValue> {
+    let model_json: &str = &json_text(&model_json, "modelJson")?;
+    let node_id: &str = &js_string(&node_id, "nodeId")?;
+    let model = FinancialModelSpec::from_json(model_json).map_err(to_js_err)?;
+    let graph = finstack_quant_statements::evaluator::DependencyGraph::from_model(&model)
+        .map_err(to_js_err)?;
+    finstack_quant_statements_analytics::analysis::DependencyTracer::new(&model, &graph)
+        .dependency_tree_text(node_id)
+        .map_err(to_js_err)
 }
 
 /// Explain a formula for a specific node and period (JSON in/out).
+///
+/// Returns the serde form of the Rust `Explanation`; a non-finite
+/// `final_value` or breakdown `value` is the string `"nan"`, `"inf"` or
+/// `"-inf"` (for example a `lag` node at the first period).
 ///
 /// # Errors
 ///
@@ -490,7 +452,7 @@ pub fn explain_formula(
     let results_json: &str = &json_text(&results_json, "resultsJson")?;
     let node_id: &str = &js_string(&node_id, "nodeId")?;
     let period: &str = &js_string(&period, "period")?;
-    let model = parse_validated_model(model_json)?;
+    let model = FinancialModelSpec::from_json(model_json).map_err(to_js_err)?;
     let results: finstack_quant_statements::evaluator::StatementResult =
         serde_json::from_str(results_json).map_err(to_js_err)?;
     let pid: finstack_quant_core::dates::PeriodId = period.parse().map_err(to_js_err)?;
@@ -522,7 +484,7 @@ pub fn explain_formula_text(
     let results_json: &str = &json_text(&results_json, "resultsJson")?;
     let node_id: &str = &js_string(&node_id, "nodeId")?;
     let period: &str = &js_string(&period, "period")?;
-    let model = parse_validated_model(model_json)?;
+    let model = FinancialModelSpec::from_json(model_json).map_err(to_js_err)?;
     let results: finstack_quant_statements::evaluator::StatementResult =
         serde_json::from_str(results_json).map_err(to_js_err)?;
     let pid: finstack_quant_core::dates::PeriodId = period.parse().map_err(to_js_err)?;
@@ -634,7 +596,7 @@ pub fn run_checks(
     let model_json: &str = &json_text(&model_json, "modelJson")?;
     let suite_spec_json: &str = &json_text(&suite_spec_json, "suiteSpecJson")?;
     let results_json = opt_json_text(results_json.as_ref(), "resultsJson")?;
-    let model = parse_validated_model(model_json)?;
+    let model = FinancialModelSpec::from_json(model_json).map_err(to_js_err)?;
     let spec: finstack_quant_statements::checks::CheckSuiteSpec =
         serde_json::from_str(suite_spec_json).map_err(to_js_err)?;
     let suite = spec.resolve().map_err(to_js_err)?;
@@ -668,7 +630,7 @@ pub fn run_three_statement_checks(
     let model_json: &str = &json_text(&model_json, "modelJson")?;
     let mapping_json: &str = &json_text(&mapping_json, "mappingJson")?;
     let results_json = opt_json_text(results_json.as_ref(), "resultsJson")?;
-    let model = parse_validated_model(model_json)?;
+    let model = FinancialModelSpec::from_json(model_json).map_err(to_js_err)?;
     let mapping: finstack_quant_statements_analytics::analysis::ThreeStatementMapping =
         serde_json::from_str(mapping_json).map_err(to_js_err)?;
     let suite = finstack_quant_statements_analytics::analysis::three_statement_checks(mapping);
@@ -699,7 +661,7 @@ pub fn run_credit_underwriting_checks(
     let model_json: &str = &json_text(&model_json, "modelJson")?;
     let mapping_json: &str = &json_text(&mapping_json, "mappingJson")?;
     let results_json = opt_json_text(results_json.as_ref(), "resultsJson")?;
-    let model = parse_validated_model(model_json)?;
+    let model = FinancialModelSpec::from_json(model_json).map_err(to_js_err)?;
     let mapping: finstack_quant_statements_analytics::analysis::CreditMapping =
         serde_json::from_str(mapping_json).map_err(to_js_err)?;
     let suite = finstack_quant_statements_analytics::analysis::credit_underwriting_checks(mapping);
@@ -750,7 +712,6 @@ pub fn render_check_report_html(report_json: JsValue) -> Result<String, JsValue>
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use finstack_quant_core::dates::PeriodId;
     use finstack_quant_statements::builder::ModelBuilder;
     use finstack_quant_statements::types::AmountOrScalar;
@@ -913,8 +874,13 @@ mod tests {
         let model: finstack_quant_statements::FinancialModelSpec =
             serde_json::from_str(&model_json).expect("parse model");
         let results = scenario_set.evaluate_all(&model).expect("eval");
-        let parsed = serde_json::to_value(&results.scenarios).expect("serialize");
-        assert!(parsed.is_object());
+        // `ScenarioResults` is `#[serde(transparent)]`, so the value the
+        // binding hands to `to_js_value` is the name -> result map itself.
+        let parsed = serde_json::to_value(&results).expect("serialize");
+        assert_eq!(
+            parsed,
+            serde_json::to_value(&results.scenarios).expect("serialize map")
+        );
         assert!(parsed.get("upside").is_some());
     }
 
@@ -958,18 +924,5 @@ mod tests {
             .expect("run checks");
 
         assert_eq!(report.results[0].check_id, "revenue_positive");
-    }
-
-    #[test]
-    fn goal_seek_rejects_half_specified_bounds() {
-        let msg = goal_seek_bounds(Some(0.0), None).expect_err("half-specified bounds must error");
-        assert!(msg.contains("bounds_lo and bounds_hi"), "got: {msg}");
-        let msg = goal_seek_bounds(None, Some(1.0)).expect_err("half-specified bounds must error");
-        assert!(msg.contains("bounds_lo and bounds_hi"), "got: {msg}");
-        assert_eq!(
-            goal_seek_bounds(Some(0.0), Some(1.0)).expect("both bounds valid"),
-            Some((0.0, 1.0))
-        );
-        assert_eq!(goal_seek_bounds(None, None).expect("no bounds valid"), None);
     }
 }

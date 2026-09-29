@@ -11,6 +11,10 @@ use finstack_quant_statements::error::{Error, Result};
 /// Standard error metrics used to evaluate forecast quality by comparing
 /// predictions against actual outcomes.
 ///
+/// In the serde form a non-finite metric (for example `mape` when no actual is
+/// non-zero) is written as the string `"nan"`, `"inf"` or `"-inf"`, so the
+/// document round-trips; finite values are plain numbers.
+///
 /// # Example
 ///
 /// ```rust
@@ -31,6 +35,7 @@ pub struct ForecastMetrics {
     ///
     /// Interpretation: Average magnitude of errors in the same units as the data.
     /// Lower is better. Not sensitive to outliers.
+    #[serde(with = "finstack_quant_core::wire::non_finite_f64")]
     pub mae: f64,
 
     /// Mean Absolute Percentage Error: average of |actual - forecast| / |actual| × 100
@@ -45,6 +50,7 @@ pub struct ForecastMetrics {
     /// metric. If `mape_effective_n == 0`, `mape` is `NaN`; prefer
     /// [`ForecastMetrics::smape`] in that case.
     /// Lower is better.
+    #[serde(with = "finstack_quant_core::wire::non_finite_f64")]
     pub mape: f64,
 
     /// Number of samples that actually contributed to MAPE (i.e. had
@@ -58,6 +64,7 @@ pub struct ForecastMetrics {
     /// and always bounded in `[0, 200]`. Preferred over MAPE when the actual
     /// series contains zeros or near-zeros. Terms where both `a` and `f`
     /// are within `ZERO_TOLERANCE` of zero are skipped.
+    #[serde(with = "finstack_quant_core::wire::non_finite_f64")]
     pub smape: f64,
 
     /// Root Mean Squared Error: sqrt(average((actual - forecast)²))
@@ -65,6 +72,7 @@ pub struct ForecastMetrics {
     /// Interpretation: Penalizes larger errors more heavily than MAE.
     /// Same units as the data. Always >= MAE.
     /// Lower is better.
+    #[serde(with = "finstack_quant_core::wire::non_finite_f64")]
     pub rmse: f64,
 
     /// Number of data points used in the calculation
@@ -222,6 +230,20 @@ pub fn backtest_forecast(actual: &[f64], forecast: &[f64]) -> Result<ForecastMet
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// A NaN metric (MAPE with every actual at zero) writes the `"nan"`
+    /// sentinel, so the serde form round-trips instead of degrading to `null`.
+    #[test]
+    fn non_finite_metrics_round_trip_through_json() {
+        let metrics = backtest_forecast(&[0.0, 0.0], &[1.0, 2.0]).expect("metrics");
+        assert!(metrics.mape.is_nan());
+        let json = serde_json::to_value(&metrics).expect("serialize");
+        assert_eq!(json["mape"], serde_json::json!("nan"));
+        assert_eq!(json["mae"], serde_json::json!(1.5));
+        let back: ForecastMetrics = serde_json::from_value(json).expect("sentinel deserializes");
+        assert!(back.mape.is_nan());
+        assert_eq!(back.mape_effective_n, 0);
+    }
 
     #[test]
     fn test_perfect_forecast() {

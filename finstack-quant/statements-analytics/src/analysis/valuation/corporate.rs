@@ -46,12 +46,25 @@ pub struct CorporateValuationResult {
     pub dcf_instrument: Option<DiscountedCashFlow>,
 }
 
+/// Node id the DCF entry points read unlevered free cash flow from when the
+/// caller names none (`"ufcf"`).
+///
+/// The `dcf` step of [`CorporateAnalysisBuilder`](crate::analysis::CorporateAnalysisBuilder)
+/// reads this node, and the host bindings use it as the default `ufcf_node`
+/// of `dcf_sensitivity` / `evaluate_dcf`.
+pub const DEFAULT_UFCF_NODE: &str = "ufcf";
+
 /// Optional configuration for DCF valuation beyond the core WACC/terminal parameters.
 ///
 /// Percentage-style inputs use decimal form, so `0.10` means `10%`.
 /// [`Default`] caps perpetual stable growth at 5%.
+///
+/// The serde form is the host input for DCF options: every field is optional
+/// and a missing field takes its [`Default`] value, while an unknown field is
+/// rejected. For example `{"exit_multiple_bump": {"relative": 0.10}}` keeps
+/// every other default and shocks the exit multiple by ±10%.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-#[serde(deny_unknown_fields)]
+#[serde(default, deny_unknown_fields)]
 pub struct DcfOptions {
     /// Enable mid-year discounting convention (default: false).
     pub mid_year_convention: bool,
@@ -1127,6 +1140,29 @@ mod tests {
     use finstack_quant_core::money::Money;
     use finstack_quant_statements::builder::ModelBuilder;
     use finstack_quant_statements::types::AmountOrScalar;
+
+    /// `DcfOptions` is the host input for DCF options: a partial document
+    /// fills the rest from `Default`, and an unknown key is rejected.
+    #[test]
+    fn dcf_options_partial_json_fills_defaults() {
+        let options: DcfOptions = serde_json::from_str(
+            r#"{"exit_multiple_metric_node": "ebitda", "exit_multiple_bump": {"relative": 0.1}}"#,
+        )
+        .expect("partial options parse");
+        let defaults = DcfOptions::default();
+        assert_eq!(options.exit_multiple_metric_node.as_deref(), Some("ebitda"));
+        assert!(matches!(
+            options.exit_multiple_bump,
+            ExitMultipleBump::Relative(bump) if (bump - 0.1).abs() < 1e-12
+        ));
+        assert_eq!(options.mid_year_convention, defaults.mid_year_convention);
+        assert!((options.wacc_sensitivity_bump - defaults.wacc_sensitivity_bump).abs() < 1e-12);
+        assert!((options.max_stable_growth_rate - defaults.max_stable_growth_rate).abs() < 1e-12);
+
+        let empty: DcfOptions = serde_json::from_str("{}").expect("empty options parse");
+        assert!(empty.exit_multiple_metric_node.is_none());
+        assert!(serde_json::from_str::<DcfOptions>(r#"{"exit_multiple_node": "ebitda"}"#).is_err());
+    }
 
     #[test]
     fn evaluate_dcf_requires_explicit_currency_metadata() {

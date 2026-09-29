@@ -195,7 +195,7 @@ impl CorporateAnalysisBuilder {
         self.dcf = Some(DcfSpec {
             wacc,
             terminal_value,
-            ufcf_node: "ufcf".to_string(),
+            ufcf_node: super::corporate::DEFAULT_UFCF_NODE.to_string(),
             net_debt_override: None,
             dcf_options: DcfOptions::default(),
         });

@@ -148,6 +148,48 @@ impl<'a> DependencyTracer<'a> {
         self.build_tree(node_id, &mut visited)
     }
 
+    /// Render a node's dependency tree as ASCII text.
+    ///
+    /// Equivalent to [`render_tree_ascii`] applied to [`Self::dependency_tree`]:
+    /// the root on the first line, then one line per dependency drawn with
+    /// `├──` / `└──` connectors and indented by depth, each followed by its
+    /// formula in parentheses when it has one.
+    ///
+    /// # Arguments
+    ///
+    /// * `node_id` - Root node for the dependency tree
+    ///
+    /// # Returns
+    ///
+    /// Multi-line ASCII tree, one node per line, ending with a newline.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// # use finstack_quant_statements::builder::ModelBuilder;
+    /// # use finstack_quant_statements::evaluator::DependencyGraph;
+    /// # use finstack_quant_statements_analytics::analysis::DependencyTracer;
+    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// # let model = ModelBuilder::new("demo")
+    /// #     .periods("2025Q1..Q2", None)?
+    /// #     .compute("a", "10")?
+    /// #     .compute("b", "a * 2")?
+    /// #     .build()?;
+    /// # let graph = DependencyGraph::from_model(&model)?;
+    /// let tracer = DependencyTracer::new(&model, &graph);
+    /// assert_eq!(tracer.dependency_tree_text("b")?, "b (a * 2)\n└── a (10)\n");
+    /// # Ok(())
+    /// # }
+    /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when `node_id` or a reachable dependency is absent, or
+    /// when a cycle prevents construction of a finite tree.
+    pub fn dependency_tree_text(&self, node_id: &str) -> Result<String> {
+        Ok(render_tree_ascii(&self.dependency_tree(node_id)?))
+    }
+
     /// Get nodes that depend on this node (reverse dependencies).
     ///
     /// # Arguments
@@ -229,7 +271,8 @@ impl<'a> DependencyTracer<'a> {
 ///
 /// Represents the complete dependency hierarchy for a node, suitable for
 /// visualization and analysis.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct DependencyTree {
     /// Node identifier
     pub node_id: String,
@@ -295,18 +338,22 @@ impl DependencyTree {
 /// let tree = tracer.dependency_tree("gross_profit")?;
 ///
 /// let ascii = render_tree_ascii(&tree);
-/// println!("{}", ascii);
-/// // Output:
-/// // gross_profit
-/// // ├── revenue
-/// // └── cogs
-/// //     └── revenue
+/// assert_eq!(
+///     ascii,
+///     "gross_profit (revenue - cogs)\n\
+///      ├── revenue (100000)\n\
+///      └── cogs (revenue * 0.4)\n    \
+///      └── revenue (100000)\n"
+/// );
 /// # Ok(())
 /// # }
 /// ```
 pub fn render_tree_ascii(tree: &DependencyTree) -> String {
     let mut output = String::new();
-    render_tree_recursive(tree, &mut output, "", true);
+    render_tree_lines(tree, &mut output, "", None, &|node| match &node.formula {
+        Some(formula) => format!("{} ({})", node.node_id, formula),
+        None => node.node_id.clone(),
+    });
     output
 }
 
@@ -344,12 +391,13 @@ pub fn render_tree_ascii(tree: &DependencyTree) -> String {
 ///
 /// let period = PeriodId::quarter(2025, 1).expect("valid period fixture");
 /// let detailed = render_tree_detailed(&tree, &results, &period);
-/// println!("{}", detailed);
-/// // Output:
-/// // gross_profit = 60,000.00
-/// // ├── revenue = 100,000.00
-/// // └── cogs = 40,000.00
-/// //     └── revenue = 100,000.00
+/// assert_eq!(
+///     detailed,
+///     "gross_profit = 60000.00\n\
+///      ├── revenue = 100000.00\n\
+///      └── cogs = 40000.00\n    \
+///      └── revenue = 100000.00\n"
+/// );
 /// # Ok(())
 /// # }
 /// ```
@@ -359,76 +407,49 @@ pub fn render_tree_detailed(
     period: &PeriodId,
 ) -> String {
     let mut output = String::new();
-    render_tree_with_values(tree, results, period, &mut output, "", true);
+    render_tree_lines(
+        tree,
+        &mut output,
+        "",
+        None,
+        &|node| match results.get(&node.node_id, period) {
+            Some(value) => format!("{} = {:.2}", node.node_id, value),
+            None => node.node_id.clone(),
+        },
+    );
     output
 }
 
-fn render_tree_recursive(tree: &DependencyTree, output: &mut String, prefix: &str, is_last: bool) {
-    let connector = if is_last { "└── " } else { "├── " };
-    let node_name = if prefix.is_empty() {
-        tree.node_id.clone()
-    } else {
-        format!("{}{}", connector, tree.node_id)
-    };
-
-    output.push_str(&node_name);
-    if let Some(formula) = &tree.formula {
-        output.push_str(&format!(" ({})", formula));
-    }
-    output.push('\n');
-
-    let child_count = tree.children.len();
-    for (i, child) in tree.children.iter().enumerate() {
-        let is_last_child = i == child_count - 1;
-        let new_prefix = if prefix.is_empty() {
-            String::new()
-        } else {
-            format!("{}{}", prefix, if is_last { "    " } else { "│   " })
-        };
-
-        render_tree_recursive(child, output, &new_prefix, is_last_child);
-    }
-}
-
-fn render_tree_with_values(
+/// Write `tree` as one line per node: the root bare, every descendant behind
+/// its parent's `prefix` plus a `├── ` / `└── ` connector. `is_last` is `None`
+/// for the root and `Some(last)` for a child.
+fn render_tree_lines(
     tree: &DependencyTree,
-    results: &StatementResult,
-    period: &PeriodId,
     output: &mut String,
     prefix: &str,
-    is_last: bool,
+    is_last: Option<bool>,
+    label: &dyn Fn(&DependencyTree) -> String,
 ) {
-    let value = results.get(&tree.node_id, period);
-
-    let connector = if is_last { "└── " } else { "├── " };
-    let node_display = if prefix.is_empty() {
-        if let Some(v) = value {
-            format!("{} = {:.2}", tree.node_id, v)
-        } else {
-            tree.node_id.clone()
-        }
-    } else {
-        let base = format!("{}{}", connector, tree.node_id);
-        if let Some(v) = value {
-            format!("{} = {:.2}", base, v)
-        } else {
-            base
-        }
-    };
-
-    output.push_str(&node_display);
+    if let Some(last) = is_last {
+        output.push_str(prefix);
+        output.push_str(if last { "└── " } else { "├── " });
+    }
+    output.push_str(&label(tree));
     output.push('\n');
 
+    let child_prefix = match is_last {
+        None => String::new(),
+        Some(last) => format!("{prefix}{}", if last { "    " } else { "│   " }),
+    };
     let child_count = tree.children.len();
     for (i, child) in tree.children.iter().enumerate() {
-        let is_last_child = i == child_count - 1;
-        let new_prefix = if prefix.is_empty() {
-            String::new()
-        } else {
-            format!("{}{}", prefix, if is_last { "    " } else { "│   " })
-        };
-
-        render_tree_with_values(child, results, period, output, &new_prefix, is_last_child);
+        render_tree_lines(
+            child,
+            output,
+            &child_prefix,
+            Some(i + 1 == child_count),
+            label,
+        );
     }
 }
 
@@ -566,7 +587,9 @@ pub struct Explanation {
     /// Period being explained
     pub period_id: PeriodId,
 
-    /// Final calculated value
+    /// Final calculated value; non-finite values serialize as `"nan"`,
+    /// `"inf"` or `"-inf"`.
+    #[serde(with = "finstack_quant_core::wire::non_finite_f64")]
     pub final_value: f64,
 
     /// Type of node (Value, Calculated, etc.)
@@ -616,7 +639,9 @@ pub struct ExplanationStep {
     /// Component identifier (e.g., "revenue")
     pub component: String,
 
-    /// Value of the component
+    /// Value of the component; non-finite values serialize as `"nan"`,
+    /// `"inf"` or `"-inf"`.
+    #[serde(with = "finstack_quant_core::wire::non_finite_f64")]
     pub value: f64,
 
     /// Operation applied (e.g., "+", "-", "*", "/")
@@ -783,10 +808,44 @@ mod tests {
         let tree = tracer.dependency_tree("c").expect("test should succeed");
 
         let ascii = render_tree_ascii(&tree);
-        assert!(ascii.contains("c"));
-        assert!(ascii.contains("a"));
-        assert!(ascii.contains("b"));
+        assert_eq!(
+            ascii, "c (a + b)\n├── a (10)\n└── b (a * 2)\n    └── a (10)\n",
+            "children carry connectors and grandchildren are indented"
+        );
+        assert_eq!(tracer.dependency_tree_text("c").expect("text"), ascii);
         assert_eq!(tree.children.len(), 2);
+    }
+
+    /// A deeper tree keeps a `│` rail under a non-last branch.
+    #[test]
+    fn test_render_tree_ascii_rails_under_open_branches() {
+        let tree = DependencyTree {
+            node_id: "root".into(),
+            formula: None,
+            children: vec![
+                DependencyTree {
+                    node_id: "left".into(),
+                    formula: None,
+                    children: vec![DependencyTree {
+                        node_id: "leaf".into(),
+                        formula: None,
+                        children: Vec::new(),
+                    }],
+                },
+                DependencyTree {
+                    node_id: "right".into(),
+                    formula: None,
+                    children: Vec::new(),
+                },
+            ],
+        };
+        assert_eq!(
+            render_tree_ascii(&tree),
+            "root\n├── left\n│   └── leaf\n└── right\n"
+        );
+        let json = serde_json::to_string(&tree).expect("serialize");
+        let back: DependencyTree = serde_json::from_str(&json).expect("round trip");
+        assert_eq!(back, tree);
     }
 
     #[test]
@@ -904,6 +963,44 @@ mod tests {
         assert!(matches!(explanation.node_type, NodeType::Calculated));
         assert_eq!(explanation.formula_text, Some("revenue - cogs".to_string()));
         assert_eq!(explanation.breakdown.len(), 2);
+    }
+
+    /// A `lag` node has no value at the first period; the explanation keeps
+    /// the NaN as the `"nan"` sentinel so its serde form round-trips.
+    #[test]
+    fn test_explain_non_finite_value_round_trips() {
+        let period = PeriodId::quarter(2025, 1).expect("valid period fixture");
+        let period2 = PeriodId::quarter(2025, 2).expect("valid period fixture");
+        let model = ModelBuilder::new("test")
+            .periods("2025Q1..Q2", None)
+            .expect("test should succeed")
+            .value(
+                "revenue",
+                &[
+                    (period, AmountOrScalar::scalar(100.0)),
+                    (period2, AmountOrScalar::scalar(110.0)),
+                ],
+            )
+            .compute("lagged", "lag(revenue, 1)")
+            .expect("test should succeed")
+            .build()
+            .expect("test should succeed");
+        let results = Evaluator::new()
+            .evaluate(&model)
+            .expect("test should succeed");
+        let explanation = FormulaExplainer::new(&model, &results)
+            .explain("lagged", &period)
+            .expect("test should succeed");
+        assert!(explanation.final_value.is_nan());
+
+        let json = serde_json::to_value(&explanation).expect("serialize");
+        assert_eq!(json["final_value"], serde_json::json!("nan"));
+        let back: Explanation = serde_json::from_value(json).expect("sentinel round-trips");
+        assert!(back.final_value.is_nan());
+
+        let step: ExplanationStep =
+            serde_json::from_str(r#"{"component": "x", "value": "inf"}"#).expect("sentinel step");
+        assert_eq!(step.value, f64::INFINITY);
     }
 
     #[test]

@@ -7,7 +7,7 @@
 //! point accepts the typed object or its canonical JSON string.
 
 use crate::bindings::extract::{extract_model_ref, extract_results_ref};
-use crate::bindings::statements::checks::PyCheckReport;
+use crate::bindings::statements::checks::{PyCheckReport, PyCheckSuiteSpec};
 use crate::bindings::statements_analytics::extract_serde_any;
 use crate::errors::{serde_json_to_py, statements_to_py};
 use finstack_quant_statements::checks::{CheckReport, CheckSuite, CheckSuiteSpec};
@@ -44,11 +44,11 @@ fn opt_node_str(value: &Option<NodeId>) -> Option<&str> {
 /// net_income_node : str
 ///     Net-income node.
 /// assets_nodes : list[str]
-///     Nodes summed to total assets.
+///     Nodes summed to total assets. Required, as in the Rust/JSON form.
 /// liabilities_nodes : list[str]
-///     Nodes summed to total liabilities.
+///     Nodes summed to total liabilities. Required, as in the Rust/JSON form.
 /// equity_nodes : list[str]
-///     Nodes summed to total equity.
+///     Nodes summed to total equity. Required, as in the Rust/JSON form.
 /// ppe_node : str | None
 ///     Net PP&E balance node.
 /// depreciation_node : str | None
@@ -111,9 +111,9 @@ impl PyThreeStatementMapping {
         cash_node,
         retained_earnings_node,
         net_income_node,
-        assets_nodes=Vec::new(),
-        liabilities_nodes=Vec::new(),
-        equity_nodes=Vec::new(),
+        assets_nodes,
+        liabilities_nodes,
+        equity_nodes,
         ppe_node=None,
         depreciation_node=None,
         interest_expense_node=None,
@@ -559,21 +559,13 @@ pub(crate) fn extract_credit_mapping(
 }
 
 /// Extract a `CheckSuiteSpec` from the typed `finstack_quant.statements.CheckSuiteSpec`,
-/// a dict, or JSON. The typed wrapper is read through its own ``to_json`` so
-/// this module never touches the statements binding internals.
+/// a dict, or JSON.
 pub(crate) fn extract_check_suite_spec(
     py: Python<'_>,
     obj: &Bound<'_, PyAny>,
 ) -> PyResult<CheckSuiteSpec> {
-    if obj
-        .get_type()
-        .name()
-        .map(|name| name == "CheckSuiteSpec")
-        .unwrap_or(false)
-    {
-        let json: String = obj.call_method0("to_json")?.extract()?;
-        return serde_json::from_str(&json)
-            .map_err(|e| serde_json_to_py(e, "invalid CheckSuiteSpec JSON"));
+    if let Ok(typed) = obj.extract::<PyRef<'_, PyCheckSuiteSpec>>() {
+        return Ok(typed.inner.clone());
     }
     extract_serde_any(py, obj, "CheckSuiteSpec")
 }

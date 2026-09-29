@@ -253,8 +253,6 @@ fn bare_string_returns_are_named_or_allowlisted() {
     const RATCHET: &[(&str, &str)] = &[
         // S14: becomes a typed report with a `dryRunJson` sibling.
         ("CalibrationNamespace", "dryRun"),
-        // S11: becomes a structured dependency tree plus a `*Text` rendering.
-        ("StatementsAnalyticsNamespace", "traceDependencies"),
     ];
     let dts = index_dts();
     let offenders: Vec<String> = members(&dts)

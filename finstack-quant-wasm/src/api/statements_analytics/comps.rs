@@ -8,66 +8,68 @@ use crate::utils::to_js_err;
 use finstack_quant_statements_analytics::analysis as fc;
 use wasm_bindgen::prelude::*;
 
-/// Percentile rank of `value` within `data` on a 0-1 scale (Rust `percentile_rank(values, value)` argument order).
+/// Percentile rank of `value` within `values` on a 0-1 scale (Rust `percentile_rank(values, value)`).
 ///
-/// Returns `undefined` when `data` is empty rather than a synthetic 0.5.
+/// Returns `undefined` when `values` is empty rather than a synthetic 0.5.
 ///
 /// # Errors
 ///
-/// Rejects when `data` is not a numeric JavaScript array or the finite rank
+/// Rejects when `values` is not a numeric JavaScript array or the finite rank
 /// cannot be serialized. Empty/non-finite peer data or a non-finite `value`
 /// return `undefined` rather than rejecting.
-/// @param data - Non-empty numeric observation array used by the requested statistic.
+/// @param values - Peer observations forming the comparison universe; non-finite entries are ignored.
 /// @param value - Subject-company metric value to rank against the peer sample.
 #[wasm_bindgen(js_name = percentileRank)]
-pub fn percentile_rank(data: JsValue, value: f64) -> Result<Option<JsValue>, JsValue> {
-    let d = js_f64_seq(&data, "data")?;
-    match fc::percentile_rank(&d, value) {
+pub fn percentile_rank(values: JsValue, value: f64) -> Result<Option<JsValue>, JsValue> {
+    let values = js_f64_seq(&values, "values")?;
+    match fc::percentile_rank(&values, value) {
         Some(rank) => crate::utils::to_js_value(&rank).map(Some),
         None => Ok(None),
     }
 }
 
-/// Z-score of `value` within `data` (Rust `z_score(values, value)` argument order).
+/// Z-score of `value` within `values` (Rust `z_score(values, value)`).
 ///
 /// Returns `undefined` when fewer than two observations are provided or the
 /// peer variance is zero, instead of a synthetic zero.
 ///
 /// # Errors
 ///
-/// Rejects when `data` is not a numeric JavaScript array or the computed score
-/// cannot be serialized. Insufficient data, zero variance, or a non-finite
-/// `value` return `undefined` rather than rejecting.
-/// @param data - Non-empty numeric observation array used by the requested statistic.
+/// Rejects when `values` is not a numeric JavaScript array or the computed
+/// score cannot be serialized. Insufficient data, zero variance, or a
+/// non-finite `value` return `undefined` rather than rejecting.
+/// @param values - Peer observations the subject is standardized against; non-finite entries are ignored.
 /// @param value - Subject-company metric value to standardize against the peer sample.
 #[wasm_bindgen(js_name = zScore)]
-pub fn z_score(data: JsValue, value: f64) -> Result<Option<JsValue>, JsValue> {
-    let d = js_f64_seq(&data, "data")?;
-    match fc::z_score(&d, value) {
+pub fn z_score(values: JsValue, value: f64) -> Result<Option<JsValue>, JsValue> {
+    let values = js_f64_seq(&values, "values")?;
+    match fc::z_score(&values, value) {
         Some(z) => crate::utils::to_js_value(&z).map(Some),
         None => Ok(None),
     }
 }
 
-/// Descriptive statistics over a peer distribution.
+/// Descriptive statistics over a peer distribution (Rust `peer_stats(values)`).
 ///
-/// Returns `undefined` (matching the other comps helpers) when `data` is empty.
+/// Returns `undefined` (matching the other comps helpers) when `values` is
+/// empty.
 ///
 /// # Errors
 ///
-/// Rejects when `data` is not a numeric JavaScript array or the statistics
+/// Rejects when `values` is not a numeric JavaScript array or the statistics
 /// cannot be serialized. No finite observations return `undefined`.
-/// @param data - Non-empty numeric observation array used by the requested statistic.
+/// @param values - Peer metric observations; non-finite entries are ignored.
 #[wasm_bindgen(js_name = peerStats)]
-pub fn peer_stats(data: JsValue) -> Result<Option<JsValue>, JsValue> {
-    let d = js_f64_seq(&data, "data")?;
-    match fc::peer_stats(&d) {
+pub fn peer_stats(values: JsValue) -> Result<Option<JsValue>, JsValue> {
+    let values = js_f64_seq(&values, "values")?;
+    match fc::peer_stats(&values) {
         Some(stats) => crate::utils::to_js_value(&stats).map(Some),
         None => Ok(None),
     }
 }
 
-/// Single-factor OLS fit of `y` on `x` evaluated at the subject observation.
+/// Single-factor OLS fit of `y_values` on `x_values` evaluated at the subject
+/// observation (Rust `regression_fair_value(x_values, y_values, subject_x, subject_y)`).
 ///
 /// # Errors
 ///
@@ -98,11 +100,11 @@ pub fn regression_fair_value(
 ///
 /// # Errors
 ///
-/// Rejects when `company_metrics` is not a string-to-number JavaScript object,
+/// Rejects when `company_metrics` is not an object of numbers (or `null`),
 /// `multiple` is not a supported canonical identifier, or the computed value
-/// cannot be serialized. Missing or non-finite inputs and non-positive
-/// denominators return `undefined`.
-/// @param company_metrics - Company financial-metric object supplying numerator and denominator inputs.
+/// cannot be serialized. Missing, `null` or non-finite inputs and
+/// non-positive denominators return `undefined`.
+/// @param company_metrics - Flat snake_case metric object (`enterprise_value`, `ebitda`, ...) supplying numerator and denominator inputs; a `null` value means the metric is missing.
 /// @param multiple - Supported valuation multiple identifier, such as EV/EBITDA or P/E.
 #[wasm_bindgen(js_name = computeMultiple)]
 pub fn compute_multiple(
@@ -110,7 +112,7 @@ pub fn compute_multiple(
     multiple: JsValue,
 ) -> Result<Option<JsValue>, JsValue> {
     let multiple: &str = &js_string(&multiple, "multiple")?;
-    let metrics_map: std::collections::BTreeMap<String, f64> =
+    let metrics_map: std::collections::BTreeMap<String, Option<f64>> =
         from_js_json(&company_metrics, "companyMetrics")?;
     let metrics = fc::CompanyMetrics::from_flat_metrics("subject", metrics_map);
     let multiple = multiple.parse::<fc::Multiple>().map_err(to_js_err)?;

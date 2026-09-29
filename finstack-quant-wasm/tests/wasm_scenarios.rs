@@ -15,8 +15,13 @@ fn empty_market_json() -> String {
     serde_json::to_string(&ctx).unwrap()
 }
 
+/// A model with one period and no nodes: the smallest model that passes the
+/// Rust `FinancialModelSpec::from_json` validation `applyScenario` applies.
 fn empty_model_json() -> String {
-    let model = finstack_quant_statements::FinancialModelSpec::new("test", vec![]);
+    let periods = finstack_quant_core::dates::build_periods("2024Q1..Q1", None)
+        .unwrap()
+        .periods;
+    let model = finstack_quant_statements::FinancialModelSpec::new("test", periods);
     serde_json::to_string(&model).unwrap()
 }
 
@@ -73,6 +78,24 @@ fn apply_scenario_empty_spec() {
     );
     assert!(obj["model"].is_object(), "model should be a nested object");
     assert_eq!(obj["operations_applied"].as_u64().unwrap(), 0);
+}
+
+#[wasm_bindgen_test]
+fn apply_scenario_rejects_a_model_without_periods() {
+    let model = finstack_quant_statements::FinancialModelSpec::new("test", vec![]);
+    let err = apply_scenario(
+        JsValue::from(&built_scenario_json(None)),
+        JsValue::from(&empty_market_json()),
+        JsValue::from(&serde_json::to_string(&model).unwrap()),
+        JsValue::from("2024-01-15"),
+        None,
+    )
+    .expect_err("applyScenario validates the model like Python apply_scenario");
+    let message = js_sys::Reflect::get(&err, &JsValue::from("message"))
+        .unwrap()
+        .as_string()
+        .unwrap();
+    assert!(message.contains("at least one period"), "{message}");
 }
 
 #[wasm_bindgen_test]

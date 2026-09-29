@@ -294,21 +294,26 @@ impl CompanyMetrics {
     /// Construct metrics from a flat host-language field map.
     ///
     /// Canonical named fields populate their dedicated slots. Unknown names
-    /// are retained in [`CompanyMetrics::custom`].
+    /// are retained in [`CompanyMetrics::custom`]. A `None` value means the
+    /// metric is missing and leaves its slot empty, exactly as if the name
+    /// were absent, so hosts can pass `null` / `None` for unknown figures.
     ///
     /// # Arguments
     ///
     /// * `id` - Company identifier stored on the resulting record.
-    /// * `values` - Flat snake_case metric names and finite or non-finite
-    ///   numeric values supplied by the caller. Numeric validation remains the
-    ///   responsibility of the consuming analysis.
+    /// * `values` - Flat snake_case metric names with `Some(value)` for a
+    ///   supplied figure (finite or non-finite; numeric validation remains the
+    ///   responsibility of the consuming analysis) or `None` for a missing
+    ///   one.
     pub fn from_flat_metrics(
         id: impl Into<String>,
-        values: impl IntoIterator<Item = (String, f64)>,
+        values: impl IntoIterator<Item = (String, Option<f64>)>,
     ) -> Self {
         let mut metrics = Self::new(id);
         for (name, value) in values {
-            metrics.insert_flat_metric(name, value);
+            if let Some(value) = value {
+                metrics.insert_flat_metric(name, value);
+            }
         }
         metrics
     }

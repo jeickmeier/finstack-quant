@@ -3,8 +3,10 @@
 //! Typed inputs (`TerminalValueSpec`, `EquityBridge`, `ValuationDiscounts`,
 //! `LboCheckMappings`) and typed results (`CorporateValuationResult`,
 //! `DcfSensitivityResult`, `LboResult`, `CorporateAnalysis`) wrap the Rust
-//! types one-to-one. Every entry point also accepts the canonical JSON string
-//! where a typed input is taken.
+//! types one-to-one. The Rust config types (`DcfOptions`, `LboConfig`) are
+//! taken in their serde form (dict or JSON string), where a typed input may
+//! sit in place of its nested dict; every other structured input also accepts
+//! the canonical JSON string.
 
 use crate::bindings::core::money::PyMoney;
 use crate::bindings::extract::{extract_market_opt, extract_model_ref};
@@ -23,7 +25,7 @@ use crate::bindings::statements_analytics::typed::PyTornadoEntry;
 use crate::errors::{serde_json_to_py, statements_to_py};
 use finstack_quant_statements_analytics::analysis::{
     CorporateAnalysis, CorporateValuationResult, DcfOptions, DcfSensitivityResult,
-    ExitMultipleBump, LboCheckMappings, LboConfig, LboResult, LboTranche,
+    LboCheckMappings, LboConfig, LboResult, DEFAULT_UFCF_NODE,
 };
 use finstack_quant_valuations::instruments::equity::dcf_equity::{
     EquityBridge, TerminalValueSpec, ValuationDiscounts,
@@ -420,21 +422,12 @@ fn extract_terminal_value(py: Python<'_>, obj: &Bound<'_, PyAny>) -> PyResult<Te
     extract_serde_any(py, obj, "terminal_value")
 }
 
-fn extract_equity_bridge(py: Python<'_>, obj: &Bound<'_, PyAny>) -> PyResult<EquityBridge> {
-    if let Ok(typed) = obj.extract::<PyRef<'_, PyEquityBridge>>() {
-        return Ok(typed.inner.clone());
-    }
-    extract_serde_any(py, obj, "equity_bridge")
-}
-
-fn extract_valuation_discounts(
-    py: Python<'_>,
-    obj: &Bound<'_, PyAny>,
-) -> PyResult<ValuationDiscounts> {
-    if let Ok(typed) = obj.extract::<PyRef<'_, PyValuationDiscounts>>() {
-        return Ok(typed.inner.clone());
-    }
-    extract_serde_any(py, obj, "valuation_discounts")
+/// Rust `DcfOptions` from its serde form (a dict or JSON string, missing
+/// fields taking their Rust defaults); `None` is `DcfOptions::default()`.
+fn extract_dcf_options(py: Python<'_>, obj: Option<&Bound<'_, PyAny>>) -> PyResult<DcfOptions> {
+    obj.map(|obj| extract_serde_any(py, obj, "options"))
+        .transpose()
+        .map(Option::unwrap_or_default)
 }
 
 /// DCF outputs in the model currency.
@@ -696,7 +689,8 @@ impl PyDcfSensitivityResult {
 /// Examples
 /// --------
 /// >>> from finstack_quant.statements_analytics import CreditMapping, LboCheckMappings, ThreeStatementMapping
-/// >>> m = LboCheckMappings(ThreeStatementMapping("cash", "re", "ni"), CreditMapping("debt", "ebitda", "interest"))
+/// >>> three = ThreeStatementMapping("cash", "re", "ni", ["assets"], ["liabilities"], ["equity"])
+/// >>> m = LboCheckMappings(three, CreditMapping("debt", "ebitda", "interest"))
 /// >>> m.credit.debt_node
 /// 'debt'
 #[pyclass(
@@ -1093,29 +1087,26 @@ impl PyCorporateAnalysis {
 ///     Terminal value method (typed, serde dict, or tagged JSON such as
 ///     ``{"type": "gordon_growth", "stable_growth_rate": 0.02}``).
 /// ufcf_node : str
-///     Node id containing unlevered free cash flow. Default ``"ufcf"``.
+///     Node id containing unlevered free cash flow. Defaults to the Rust
+///     ``DEFAULT_UFCF_NODE`` (``"ufcf"``).
 /// net_debt_override : float | None
 ///     Flat net-debt amount used instead of the model-derived bridge.
-/// mid_year_convention : bool
-///     Mid-year discounting. Default ``False`` (year-end).
-/// max_stable_growth_rate : float | None
-///     Maximum perpetual growth accepted for Gordon Growth / H-Model
-///     (decimal); ``None`` uses the canonical 5% default.
-/// shares_outstanding : float | None
-///     Basic shares outstanding for per-share equity value.
-/// equity_bridge : EquityBridge | dict | str | None
-///     Structured EV-to-equity bridge.
-/// valuation_discounts : ValuationDiscounts | dict | str | None
-///     DLOM / DLOC / other discounts.
+/// options : dict | str | None
+///     The Rust ``DcfOptions`` serde form; every key is optional and a missing
+///     one takes its Rust default: ``mid_year_convention`` (``False``),
+///     ``max_stable_growth_rate`` (``0.05``), ``shares_outstanding``,
+///     ``equity_bridge`` / ``valuation_discounts`` (serde dicts or the typed
+///     ``EquityBridge`` / ``ValuationDiscounts``), ``exit_multiple_metric_node``
+///     (statement monetary flow node whose complete trailing-year sum replaces
+///     ``terminal_metric`` on an exit-multiple terminal), ``discount_curve_id``
+///     and the sensitivity knobs. Unknown keys raise ``ValueError``. ``None``
+///     uses every default.
 /// market : MarketContext | str | None
 ///     Market context used for statement evaluation (capital-structure curve
 ///     lookups); DCF discounting stays WACC-only. Requires ``as_of``.
 /// as_of : datetime.date | str | None
 ///     DCF valuation date and, with ``market``, the statement visibility and
 ///     market-data date. Defaults to the first forecast boundary.
-/// exit_multiple_metric_node : str | None
-///     Statement monetary flow node whose complete trailing-year sum replaces
-///     ``terminal_metric`` on an exit-multiple terminal. Actual period boundaries must cover one complete contiguous calendar year; otherwise omit this node and supply an explicit annual metric.
 ///
 /// Returns
 /// -------
@@ -1126,8 +1117,9 @@ impl PyCorporateAnalysis {
 /// Raises
 /// ------
 /// ValueError
-///     If ``market`` is set without ``as_of``, a payload is malformed, or the
-///     model, cash-flow node, exit-multiple node or DCF inputs are invalid.
+///     If ``market`` is set without ``as_of``, a payload or ``options`` is
+///     malformed, or the model, cash-flow node, exit-multiple node or DCF
+///     inputs are invalid.
 /// KeyError
 ///     If ``ufcf_node`` or ``exit_multiple_metric_node`` is missing from the model.
 ///
@@ -1147,16 +1139,11 @@ impl PyCorporateAnalysis {
     model,
     wacc,
     terminal_value,
-    ufcf_node="ufcf",
+    ufcf_node=DEFAULT_UFCF_NODE,
     net_debt_override=None,
-    mid_year_convention=false,
-    max_stable_growth_rate=None,
-    shares_outstanding=None,
-    equity_bridge=None,
-    valuation_discounts=None,
+    options=None,
     market=None,
     as_of=None,
-    exit_multiple_metric_node=None,
 ))]
 #[allow(clippy::too_many_arguments)]
 fn evaluate_dcf<'py>(
@@ -1166,36 +1153,14 @@ fn evaluate_dcf<'py>(
     terminal_value: &Bound<'py, PyAny>,
     ufcf_node: &str,
     net_debt_override: Option<f64>,
-    mid_year_convention: bool,
-    max_stable_growth_rate: Option<f64>,
-    shares_outstanding: Option<f64>,
-    equity_bridge: Option<&Bound<'py, PyAny>>,
-    valuation_discounts: Option<&Bound<'py, PyAny>>,
+    options: Option<&Bound<'py, PyAny>>,
     market: Option<&Bound<'py, PyAny>>,
     as_of: Option<&Bound<'py, PyAny>>,
-    exit_multiple_metric_node: Option<&str>,
 ) -> PyResult<PyCorporateValuationResult> {
     let model = extract_model_ref(model)?.into_owned();
     let terminal_value = extract_terminal_value(py, terminal_value)?;
     let ufcf_node = ufcf_node.to_owned();
-    let equity_bridge = equity_bridge
-        .map(|obj| extract_equity_bridge(py, obj))
-        .transpose()?;
-    let valuation_discounts = valuation_discounts
-        .map(|obj| extract_valuation_discounts(py, obj))
-        .transpose()?;
-
-    let options = DcfOptions {
-        mid_year_convention,
-        max_stable_growth_rate: max_stable_growth_rate
-            .unwrap_or_else(|| DcfOptions::default().max_stable_growth_rate),
-        equity_bridge,
-        shares_outstanding,
-        valuation_discounts,
-        exit_multiple_metric_node: exit_multiple_metric_node.map(str::to_owned),
-        ..Default::default()
-    };
-
+    let options = extract_dcf_options(py, options)?;
     let market = extract_market_opt(py, market)?;
     let as_of = as_of
         .map(crate::bindings::date_utils::extract_date)
@@ -1235,25 +1200,24 @@ fn evaluate_dcf<'py>(
 ///     Terminal value method; selects whether the growth rate or the exit
 ///     multiple is shocked.
 /// ufcf_node : str
-///     Node id containing unlevered free cash flow. Default ``"ufcf"``.
+///     Node id containing unlevered free cash flow. Defaults to the Rust
+///     ``DEFAULT_UFCF_NODE`` (``"ufcf"``).
 /// net_debt_override : float | None
 ///     Flat net-debt amount used instead of the model-derived bridge.
-/// wacc_sensitivity_bump : float | None
-///     Absolute shock to WACC and terminal growth in decimal (``0.01`` =
-///     +/-100bp); ``None`` uses the Rust ``DcfOptions`` default.
-/// wacc_denominator_epsilon : float | None
-///     Minimum ``wacc - g`` spread preserved, in decimal; ``None`` uses the
-///     Rust default.
-/// max_stable_growth_rate : float | None
-///     Maximum perpetual growth (decimal); ``None`` uses the 5% default.
-/// exit_multiple_bump : float | None
-///     Absolute exit-multiple shock in turns; ``None`` uses the Rust default.
-/// mid_year_convention : bool
-///     Mid-year discounting for every re-run. Default ``False``.
+/// options : dict | str | None
+///     The Rust ``DcfOptions`` serde form (the same document WASM
+///     ``dcfSensitivity`` takes); every key is optional and a missing one
+///     takes its Rust default: ``wacc_sensitivity_bump`` (``0.01`` = +/-100bp
+///     on WACC and terminal growth), ``wacc_denominator_epsilon``
+///     (``0.005``), ``max_stable_growth_rate`` (``0.05``),
+///     ``exit_multiple_bump`` (``{"absolute": 1.0}`` turns or
+///     ``{"relative": 0.10}``), ``mid_year_convention`` (``False``),
+///     ``exit_multiple_metric_node`` (statement monetary flow node supplying
+///     the complete trailing-year terminal metric), ``equity_bridge``,
+///     ``shares_outstanding``, ``valuation_discounts`` and
+///     ``discount_curve_id``. Unknown keys raise ``ValueError``.
 /// market : MarketContext | str | None
 ///     Market context for statement evaluation (not WACC discounting).
-/// exit_multiple_metric_node : str | None
-///     Statement monetary flow node supplying the complete trailing-year terminal metric; insufficient or noncontiguous history raises ValueError.
 ///
 /// Returns
 /// -------
@@ -1264,7 +1228,9 @@ fn evaluate_dcf<'py>(
 /// Raises
 /// ------
 /// ValueError
-///     If a payload is malformed or the model or DCF inputs are invalid.
+///     If a payload or ``options`` is malformed, or the model or DCF inputs
+///     are invalid (including an exit-multiple node with insufficient or
+///     noncontiguous history).
 /// KeyError
 ///     If ``ufcf_node`` or ``exit_multiple_metric_node`` is missing.
 ///
@@ -1284,15 +1250,10 @@ fn evaluate_dcf<'py>(
     model,
     wacc,
     terminal_value,
-    ufcf_node="ufcf",
+    ufcf_node=DEFAULT_UFCF_NODE,
     net_debt_override=None,
-    wacc_sensitivity_bump=None,
-    wacc_denominator_epsilon=None,
-    max_stable_growth_rate=None,
-    exit_multiple_bump=None,
-    mid_year_convention=false,
+    options=None,
     market=None,
-    exit_multiple_metric_node=None,
 ))]
 #[allow(clippy::too_many_arguments)]
 fn dcf_sensitivity<'py>(
@@ -1302,33 +1263,14 @@ fn dcf_sensitivity<'py>(
     terminal_value: &Bound<'py, PyAny>,
     ufcf_node: &str,
     net_debt_override: Option<f64>,
-    wacc_sensitivity_bump: Option<f64>,
-    wacc_denominator_epsilon: Option<f64>,
-    max_stable_growth_rate: Option<f64>,
-    exit_multiple_bump: Option<f64>,
-    mid_year_convention: bool,
+    options: Option<&Bound<'py, PyAny>>,
     market: Option<&Bound<'py, PyAny>>,
-    exit_multiple_metric_node: Option<&str>,
 ) -> PyResult<PyDcfSensitivityResult> {
     let model = extract_model_ref(model)?.into_owned();
     let terminal_value = extract_terminal_value(py, terminal_value)?;
     let ufcf_node = ufcf_node.to_owned();
+    let options = extract_dcf_options(py, options)?;
     let market = extract_market_opt(py, market)?;
-
-    // Defaults come from the canonical Rust `DcfOptions` at runtime rather
-    // than duplicated signature literals.
-    let defaults = DcfOptions::default();
-    let options = DcfOptions {
-        mid_year_convention,
-        wacc_sensitivity_bump: wacc_sensitivity_bump.unwrap_or(defaults.wacc_sensitivity_bump),
-        wacc_denominator_epsilon: wacc_denominator_epsilon
-            .unwrap_or(defaults.wacc_denominator_epsilon),
-        max_stable_growth_rate: max_stable_growth_rate.unwrap_or(defaults.max_stable_growth_rate),
-        exit_multiple_bump: exit_multiple_bump
-            .map_or(defaults.exit_multiple_bump, ExitMultipleBump::Absolute),
-        exit_multiple_metric_node: exit_multiple_metric_node.map(str::to_owned),
-        ..DcfOptions::default()
-    };
 
     let inner = py
         .detach(move || {
@@ -1359,25 +1301,17 @@ fn dcf_sensitivity<'py>(
 /// model : FinancialModelSpec | str
 ///     A ``FinancialModelSpec`` object or a JSON string; metadata must include
 ///     a ``"currency"`` key.
-/// entry_multiple : float
-///     Entry multiple in turns (``8.5`` = 8.5x).
-/// entry_metric_node : str
-///     Node supplying the entry metric at the first period (e.g. ``"ebitda"``).
-/// exit_multiple : float
-///     Exit multiple in turns.
-/// exit_metric_node : str
-///     Node supplying the exit metric at ``exit_period``.
-/// exit_net_debt_node : str
-///     Node supplying net debt at ``exit_period``.
-/// exit_period : str
-///     Exit period label (``"2029"`` or ``"2029Q4"``).
-/// sources : list[tuple[str, float]]
-///     Funded debt tranches at close as ``(name, amount)`` in model currency.
-/// transaction_fees : float
-///     Fees funded at close, in model currency. Default ``0.0``.
-/// check_mappings : LboCheckMappings | dict | str | None
-///     When supplied, runs the LBO model check suite against the same
-///     evaluation and populates ``LboResult.checks``.
+/// config : dict | str
+///     The Rust ``LboConfig`` serde form (the same document WASM
+///     ``evaluateLbo`` takes): ``entry_multiple`` (turns, ``8.5`` = 8.5x),
+///     ``entry_metric_node``, ``transaction_fees`` (model currency),
+///     ``sources`` (``[{"name": ..., "amount": ...}]`` funded at close, model
+///     currency), ``exit_multiple``, ``exit_metric_node``,
+///     ``exit_net_debt_node``, ``exit_period`` (``"2029"`` or ``"2029Q4"``)
+///     and the optional ``check_mappings`` (a serde dict or a typed
+///     ``LboCheckMappings``), which runs the LBO model check suite against the
+///     same evaluation and populates ``LboResult.checks``. Every key except
+///     ``check_mappings`` is required; unknown keys raise ``ValueError``.
 ///
 /// Returns
 /// -------
@@ -1388,77 +1322,37 @@ fn dcf_sensitivity<'py>(
 /// Raises
 /// ------
 /// ValueError
-///     If a tranche amount is invalid, ``exit_period`` does not parse, sources
-///     and uses cannot balance, or the model fails to evaluate.
+///     If ``config`` is malformed, a tranche amount is invalid,
+///     ``exit_period`` does not parse, sources and uses cannot balance, or
+///     the model fails to evaluate.
 /// KeyError
 ///     If a metric or net-debt node is missing at the required period.
 ///
 /// Examples
 /// --------
+/// >>> from finstack_quant.core.money import Money
 /// >>> from finstack_quant.statements import ModelBuilder
 /// >>> from finstack_quant.statements_analytics import evaluate_lbo
 /// >>> b = ModelBuilder("m")
 /// >>> _ = b.periods("2025Q1..2026Q1", None)
-/// >>> _ = b.with_meta("currency", "USD")
-/// >>> _ = b.value("ebitda", [("2025Q1", 100.0), ("2025Q2", 100.0), ("2025Q3", 100.0), ("2025Q4", 100.0), ("2026Q1", 120.0)])
-/// >>> _ = b.value("net_debt", [("2025Q1", 300.0), ("2025Q2", 300.0), ("2025Q3", 300.0), ("2025Q4", 300.0), ("2026Q1", 200.0)])
-/// >>> lbo = evaluate_lbo(b.build(), 8.0, "ebitda", 9.0, "ebitda", "net_debt", "2026Q1", [("debt", 500.0)])
-/// >>> round(lbo.moic, 4)
+/// >>> _ = b.with_meta("currency", '"USD"')
+/// >>> quarters = ["2025Q1", "2025Q2", "2025Q3", "2025Q4", "2026Q1"]
+/// >>> _ = b.value_money("ebitda", [(q, Money(v, "USD")) for q, v in zip(quarters, [100.0] * 4 + [120.0])])
+/// >>> _ = b.value_money("net_debt", [(q, Money(v, "USD")) for q, v in zip(quarters, [300.0] * 4 + [200.0])])
+/// >>> config = {"entry_multiple": 8.0, "entry_metric_node": "ebitda", "transaction_fees": 0.0,
+/// ...     "sources": [{"name": "debt", "amount": 500.0}], "exit_multiple": 9.0,
+/// ...     "exit_metric_node": "ebitda", "exit_net_debt_node": "net_debt", "exit_period": "2026Q1"}
+/// >>> round(evaluate_lbo(b.build(), config).moic, 4)
 /// 2.9333
 #[pyfunction]
-#[pyo3(signature = (
-    model,
-    entry_multiple,
-    entry_metric_node,
-    exit_multiple,
-    exit_metric_node,
-    exit_net_debt_node,
-    exit_period,
-    sources,
-    transaction_fees=0.0,
-    check_mappings=None,
-))]
-#[allow(clippy::too_many_arguments)]
+#[pyo3(signature = (model, config))]
 fn evaluate_lbo<'py>(
     py: Python<'py>,
     model: &Bound<'py, PyAny>,
-    entry_multiple: f64,
-    entry_metric_node: &str,
-    exit_multiple: f64,
-    exit_metric_node: &str,
-    exit_net_debt_node: &str,
-    exit_period: &str,
-    sources: Vec<(String, f64)>,
-    transaction_fees: f64,
-    check_mappings: Option<&Bound<'py, PyAny>>,
+    config: &Bound<'py, PyAny>,
 ) -> PyResult<PyLboResult> {
     let model = extract_model_ref(model)?.into_owned();
-    let exit_period: finstack_quant_core::dates::PeriodId =
-        exit_period.parse().map_err(crate::errors::display_to_py)?;
-    let check_mappings = check_mappings
-        .map(|obj| {
-            if let Ok(typed) = obj.extract::<PyRef<'_, PyLboCheckMappings>>() {
-                Ok(typed.inner.clone())
-            } else {
-                extract_serde_any(py, obj, "check_mappings")
-            }
-        })
-        .transpose()?;
-
-    let config = LboConfig {
-        entry_multiple,
-        entry_metric_node: entry_metric_node.to_owned(),
-        transaction_fees,
-        sources: sources
-            .into_iter()
-            .map(|(name, amount)| LboTranche { name, amount })
-            .collect(),
-        exit_multiple,
-        exit_metric_node: exit_metric_node.to_owned(),
-        exit_net_debt_node: exit_net_debt_node.to_owned(),
-        exit_period,
-        check_mappings,
-    };
+    let config: LboConfig = extract_serde_any(py, config, "config")?;
 
     let inner = py
         .detach(move || {

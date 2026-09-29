@@ -354,20 +354,17 @@ impl PyStatementResult {
         self.inner.meta.warnings.len()
     }
 
-    /// Evaluation warnings as human-readable strings.
+    /// Evaluation warnings in their serde form, one dict per ``EvalWarning``.
     ///
-    /// Each entry is the debug form of an ``EvalWarning`` (division by zero,
-    /// non-finite value, skipped non-finite aggregate input, ignored
-    /// capital-structure cashflow, ...), so audit tooling can see *what* was
-    /// flagged rather than only a count.
+    /// Each dict has a single snake_case variant key (``"division_by_zero"``,
+    /// ``"non_finite_value"``, ``"non_finite_aggregate_input"``, ...) whose
+    /// value holds the variant fields: node ids as strings, periods as
+    /// ``"2025Q1"``-style ids and non-finite numbers as ``"nan"`` / ``"inf"``
+    /// / ``"-inf"``. The same objects appear in ``to_json()["meta"]`` and in
+    /// the WASM ``evaluateModel`` result.
     #[getter]
-    fn warnings(&self) -> Vec<String> {
-        self.inner
-            .meta
-            .warnings
-            .iter()
-            .map(|w| format!("{w:?}"))
-            .collect()
+    fn warnings<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        crate::bindings::pandas_utils::serde_to_py(py, &self.inner.meta.warnings)
     }
 
     /// Numeric mode stamped into the result envelope (policy visibility).

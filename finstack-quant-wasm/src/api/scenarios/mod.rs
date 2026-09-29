@@ -279,10 +279,13 @@ fn extract_instruments(
 ///
 /// # Errors
 ///
-/// Rejects malformed scenario, market, or model JSON, an invalid ISO `as_of`
-/// date, an invalid scenario operation, missing market objects or hierarchy
-/// context, statement-model execution failures, failure to encode the mutated
-/// contexts, or failure to serialize the application envelope to JavaScript.
+/// Rejects malformed scenario, market, or model JSON, a model that fails
+/// semantic validation (the same `FinancialModelSpec::from_json` check the
+/// statements exports and Python `apply_scenario` apply), an invalid ISO
+/// `as_of` date, an invalid scenario operation, missing market objects or
+/// hierarchy context, statement-model execution failures, failure to encode
+/// the mutated contexts, or failure to serialize the application envelope to
+/// JavaScript.
 /// @param scenario_json - JSON-serialized ScenarioSpec to validate and apply.
 /// @param market_json - Canonical market-context JSON supplying curves, quotes, and FX data.
 /// @param model_json - JSON-serialized FinancialModelSpec that scenario operations may mutate.
@@ -305,8 +308,8 @@ pub fn apply_scenario(
         serde_json::from_str(scenario_json).map_err(to_js_err)?;
     let mut market: finstack_quant_core::market_data::context::MarketContext =
         serde_json::from_str(market_json).map_err(to_js_err)?;
-    let mut model: finstack_quant_statements::FinancialModelSpec =
-        serde_json::from_str(model_json).map_err(to_js_err)?;
+    let mut model =
+        finstack_quant_statements::FinancialModelSpec::from_json(model_json).map_err(to_js_err)?;
     let date = parse_iso_date(as_of)?;
     let mut instruments = extract_instruments(instruments_json)?;
     let report = apply_with_context(

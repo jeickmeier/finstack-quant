@@ -1303,6 +1303,8 @@
       "creditAssessment",
       "creditAssessmentReportText",
       "dcfSensitivity",
+      "dependencyTree",
+      "dependencyTreeText",
       "evaluateLbo",
       "evaluateScenarioSet",
       "explainFormula",
@@ -1321,7 +1323,6 @@
       "runThreeStatementChecks",
       "runVariance",
       "scoreRelativeValue",
-      "traceDependencies",
       "wacc",
       "zScore"
     ]
@@ -1353,7 +1354,10 @@
   "statements_analytics.wacc": {
     "kind": "function"
   },
-  "statements_analytics.traceDependencies": {
+  "statements_analytics.dependencyTree": {
+    "kind": "function"
+  },
+  "statements_analytics.dependencyTreeText": {
     "kind": "function"
   },
   "statements_analytics.explainFormula": {

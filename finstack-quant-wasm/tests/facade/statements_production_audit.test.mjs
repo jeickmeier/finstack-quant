@@ -129,8 +129,7 @@ test('goal seek rejects a discontinuity that brackets the target without reachin
         'revenue',
         '2025Q4',
         true,
-        -1,
-        1
+        [-1, 1]
       ),
     /residual|target.*tolerance/i
   );

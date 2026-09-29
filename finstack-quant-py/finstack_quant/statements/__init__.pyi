@@ -358,6 +358,75 @@ class MonteCarloResults:
         """
         ...
 
+    @property
+    def metrics(self) -> list[str]:
+        """
+        Metric (node) identifiers that were simulated, in model order.
+
+        Returns
+        -------
+        list[str]
+            Node identifiers with percentile summaries.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+
+    @property
+    def warnings(self) -> list[dict[str, Any]]:
+        """
+        Warnings raised while evaluating paths, in their serde form.
+
+        One dict per ``EvalWarning`` with a single snake_case variant key
+        (``"division_by_zero"``, ``"non_finite_value"``, ...) whose value holds
+        the variant fields (periods as ``"2025Q1"``-style ids, non-finite
+        numbers as ``"nan"`` / ``"inf"`` / ``"-inf"``), identical to the WASM
+        ``evaluateMonteCarlo`` result.
+
+        Returns
+        -------
+        list[dict[str, Any]]
+            One dict per recorded warning; empty when every path evaluated
+            cleanly.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+
+    def breach_probability(self, metric: str, threshold: float) -> float | None:
+        """
+        Probability that ``metric`` exceeds ``threshold`` in any forecast period.
+
+        Counts upside breaches only (``value > threshold``) across the
+        simulated paths; for a downside test simulate a negated metric or a
+        derived node that flips the sign.
+
+        Parameters
+        ----------
+        metric : str
+            Simulated node identifier.
+        threshold : float
+            Breach level in the metric's own units.
+
+        Returns
+        -------
+        float | None
+            Fraction of paths in ``[0, 1]`` with at least one breach, or
+            ``None`` when the metric was not simulated, there are no forecast
+            periods, the path buffer is incomplete, or the result was
+            reconstructed from JSON / pickle (the per-path buffer is not
+            serialized).
+
+        Notes
+        -----
+        This method reads already-computed state and does not raise.
+        """
+        ...
+
     def percentile_by_period(self, metric: str, percentile: float) -> dict[str, float] | None:
         """
         Look up one percentile of one metric as a period-keyed dict.
@@ -2947,19 +3016,21 @@ class StatementResult:
         ...
 
     @property
-    def warnings(self) -> list[str]:
+    def warnings(self) -> list[dict[str, Any]]:
         """
-        Evaluation warnings as human-readable strings.
+        Evaluation warnings in their serde form, one dict per ``EvalWarning``.
 
-        Each entry is the debug form of an ``EvalWarning`` (division by zero,
-        non-finite value, skipped non-finite aggregate input, ignored
-        capital-structure cashflow, ...), so audit tooling can see *what* was
-        flagged rather than only a count.
+        Each dict has a single snake_case variant key (``"division_by_zero"``,
+        ``"non_finite_value"``, ``"non_finite_aggregate_input"``, ...) whose
+        value holds the variant fields: node ids as strings, periods as
+        ``"2025Q1"``-style ids and non-finite numbers as ``"nan"`` / ``"inf"``
+        / ``"-inf"``. The same objects appear in ``to_json()["meta"]`` and in
+        the WASM ``evaluateModel`` result.
 
         Returns
         -------
-        list[str]
-            One string per recorded warning.
+        list[dict[str, Any]]
+            One dict per recorded warning.
 
         Notes
         -----
@@ -3751,6 +3822,43 @@ class CheckSuiteSpec:
 
     """
 
+    def __init__(
+        self,
+        name: str,
+        builtin_checks: list[dict[str, Any]] | None = None,
+        formula_checks: list[FormulaCheckSpec] | None = None,
+        config: CheckConfig | None = None,
+        description: str | None = None,
+    ) -> None:
+        """
+        Build a check suite specification.
+
+        Parameters
+        ----------
+        name : str
+            Suite name for display and logging.
+        builtin_checks : list[dict] | None
+            Built-in checks to run, each the Rust ``BuiltinCheckSpec`` serde
+            form: a dict with the check's ``type`` tag plus its fields, e.g.
+            ``{"type": "non_finite"}`` or ``{"type":
+            "balance_sheet_articulation", "assets_nodes": ["assets"],
+            "liabilities_nodes": ["liabilities"], "equity_nodes":
+            ["equity"]}``.
+        formula_checks : list[FormulaCheckSpec] | None
+            User-defined DSL predicate checks.
+        config : CheckConfig | None
+            Tolerance and reporting filters; ``None`` uses the Rust defaults.
+        description : str | None
+            Optional suite description.
+
+        Raises
+        ------
+        ValueError
+            If a built-in check ``type`` is unknown, a dict lacks a required
+            field, or an entry is not a ``dict``.
+        """
+        ...
+
     @staticmethod
     def from_json(json: str) -> CheckSuiteSpec:
         """
@@ -3820,7 +3928,7 @@ class CheckSuiteSpec:
         Number of built-in checks the spec will materialize.
 
         Built-ins are the crate-provided accounting-identity, reconciliation,
-        and data-quality checks, selected by name in the spec.
+        and data-quality checks, selected by their ``type`` tag in the spec.
 
         Returns
         -------
@@ -4062,7 +4170,8 @@ class CheckReport:
         Counts what survived the suite's ``min_severity`` and
         ``materiality_threshold`` reporting filters, not every raw diagnostic
         the checks produced — it matches the row count of
-        :meth:`to_findings_dataframe`.
+        :meth:`to_findings_dataframe`. Delegates to the Rust
+        ``CheckReport::total_findings``.
 
         Returns
         -------
@@ -4260,6 +4369,21 @@ class EcfSweepSpec:
 
         """
         ...
+    def validate(self) -> None:
+        """
+        Validate the sweep on its own (the Rust ``EcfSweepSpec::validate``).
+
+        The waterfall-level rule that a positive sweep needs a prepayment
+        priority is checked by :meth:`WaterfallSpec.validate`. Twin of the WASM
+        ``statements.validateEcfSweepSpecJson``.
+
+        Raises
+        ------
+        ValueError
+            If ``sweep_percentage`` is outside ``[0.0, 1.0]`` or not finite.
+        """
+        ...
+
     def to_json(self) -> str:
         """
         Serialize `EcfSweepSpec` to canonical JSON.
@@ -4364,8 +4488,11 @@ class PikToggleSpec:
         threshold : float
             Liquidity threshold in the metric's units that activates PIK logic.
         target_instrument_ids : list[str] or None, default None
-            Optional debt instruments subject to the toggle; ``None`` targets
-            all eligible instruments in the waterfall.
+            Debt instruments that switch to PIK when the toggle triggers. Must
+            be a non-empty list: instrument-level PIK capability is not
+            modeled, so ``None`` or an empty list is rejected by
+            :meth:`validate` and :meth:`WaterfallSpec.validate` (it does not
+            mean "every instrument").
         min_periods_in_pik : int, default 0
             Hysteresis floor counted in **periods** on the model's own cadence
             (not months): once triggered, PIK stays on for at least this many
@@ -4405,6 +4532,19 @@ class PikToggleSpec:
 
         """
         ...
+    def validate(self) -> None:
+        """
+        Validate the toggle on its own (the Rust ``PikToggleSpec::validate``).
+
+        Twin of the WASM ``statements.validatePikToggleSpecJson``.
+
+        Raises
+        ------
+        ValueError
+            If ``target_instrument_ids`` is ``None`` or empty.
+        """
+        ...
+
     def to_json(self) -> str:
         """
         Serialize `PikToggleSpec` to canonical JSON.
@@ -5613,23 +5753,30 @@ class CheckConfig:
 
     def __init__(
         self,
-        default_tolerance: float = 0.01,
-        default_relative_tolerance: float = 1e-9,
-        materiality_threshold: float = 0.0,
-        min_severity: str = "info",
+        default_tolerance: float | None = None,
+        default_relative_tolerance: float | None = None,
+        materiality_threshold: float | None = None,
+        min_severity: str | None = None,
     ) -> None:
         """Configure check tolerances.
 
+        Every parameter defaults to the Rust ``CheckConfig::default()`` value
+        when omitted or ``None``.
+
         Parameters
         ----------
-        default_tolerance : float
-            Absolute tolerance in the checked node's units.
-        default_relative_tolerance : float
-            Relative tolerance as a decimal fraction of the reference value.
-        materiality_threshold : float
-            Absolute magnitude below which a breach is not reported.
-        min_severity : str
-            Lowest severity retained: ``"info"``, ``"warning"`` or ``"error"``.
+        default_tolerance : float | None
+            Absolute tolerance in the checked node's units (Rust default
+            ``0.01``).
+        default_relative_tolerance : float | None
+            Relative tolerance as a decimal fraction of the reference value
+            (Rust default ``1e-9``).
+        materiality_threshold : float | None
+            Absolute magnitude below which an advisory breach is not reported
+            (Rust default ``0.0``).
+        min_severity : str | None
+            Lowest severity retained: ``"info"`` (Rust default), ``"warning"``
+            or ``"error"``.
 
         Raises
         ------
@@ -5748,7 +5895,9 @@ class FormulaCheckSpec:
     Examples
     --------
     >>> from finstack_quant.statements import FormulaCheckSpec
-    >>> FormulaCheckSpec("c1", "Positive revenue", "revenue > 0", "revenue <= 0").severity
+    >>> FormulaCheckSpec(
+    ...     "c1", "Positive revenue", "revenue > 0", "revenue <= 0", "internal_consistency", "error"
+    ... ).severity
     'error'
 
     """
@@ -5759,8 +5908,8 @@ class FormulaCheckSpec:
         name: str,
         formula: str,
         message_template: str,
-        category: str = "internal_consistency",
-        severity: str = "error",
+        category: str,
+        severity: str,
         tolerance: float | None = None,
     ) -> None:
         """Define a formula check.
@@ -5776,9 +5925,13 @@ class FormulaCheckSpec:
         message_template : str
             Message emitted when the predicate fails.
         category : str
-            Classification bucket, e.g. ``"internal_consistency"``.
+            Classification bucket: ``"accounting_identity"``,
+            ``"cross_statement_reconciliation"``, ``"internal_consistency"``,
+            ``"credit_reasonableness"`` or ``"data_quality"``. Required, as in
+            the Rust/JSON form.
         severity : str
-            ``"info"``, ``"warning"`` or ``"error"``.
+            ``"info"``, ``"warning"`` or ``"error"``. Required, as in the
+            Rust/JSON form.
         tolerance : float, optional
             Absolute tolerance overriding the suite default.
 

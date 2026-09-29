@@ -145,6 +145,46 @@ impl FinancialModelSpec {
         }
     }
 
+    /// Parse a model from JSON text and run [`Self::validate_semantics`].
+    ///
+    /// This is the one entry point host bindings use to ingest a model, so a
+    /// JSON document is accepted or rejected identically from Python and
+    /// JavaScript. Unknown fields are rejected and `schema_version` must be
+    /// `1`. Semantic validation may fill in `value_type` on nodes whose
+    /// explicit values determine it.
+    ///
+    /// # Arguments
+    ///
+    /// * `json` - Complete JSON encoding of a financial model in its serde
+    ///   wire form (`id`, ordered `periods`, `nodes`, optional
+    ///   `capital_structure` and `meta`, and `schema_version`).
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::Serde`] when `json` is malformed or does not match the
+    /// model schema, and the [`Self::validate_semantics`] error (an empty or
+    /// out-of-order period timeline, reserved node ids, incompatible node
+    /// fields or value types, invalid formulas, or an invalid capital
+    /// structure) otherwise.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use finstack_quant_statements::types::FinancialModelSpec;
+    ///
+    /// let err = FinancialModelSpec::from_json(
+    ///     r#"{"id": "m", "periods": [], "nodes": {}, "schema_version": 1}"#,
+    /// )
+    /// .expect_err("a model needs at least one period");
+    /// assert!(err.to_string().contains("at least one period"));
+    /// ```
+    pub fn from_json(json: &str) -> Result<Self> {
+        let mut model: Self = serde_json::from_str(json)
+            .map_err(|e| Error::Serde(format!("invalid FinancialModelSpec JSON: {e}")))?;
+        model.validate_semantics()?;
+        Ok(model)
+    }
+
     /// Load and validate a persisted financial model.
     ///
     /// This strict entry point requires `schema_version: 1` and runs
@@ -481,65 +521,7 @@ impl FinancialModelSpec {
         }
 
         if let Some(cs) = &self.capital_structure {
-            if let Some(waterfall) = &cs.waterfall {
-                waterfall.validate()?;
-                let has_prepay = waterfall.priority_of_payments.iter().any(|p| {
-                    matches!(
-                        p,
-                        crate::capital_structure::PaymentPriority::Sweep
-                            | crate::capital_structure::PaymentPriority::MandatoryPrepayment
-                            | crate::capital_structure::PaymentPriority::VoluntaryPrepayment
-                    )
-                });
-                if has_prepay {
-                    for debt in &cs.debt_instruments {
-                        match &debt.spec {
-                            FinancialStatementInstrument::Bond(_)
-                            | FinancialStatementInstrument::ConvertibleBond(_) => {
-                                return Err(Error::build(format!(
-                                    "WaterfallSpec: instrument '{}' is a bond; this waterfall \
-                                     is a loan/revolver engine and rejects Bond or \
-                                     ConvertibleBond targets when a prepayment rung \
-                                     (`Sweep`, `MandatoryPrepayment`, or \
-                                     `VoluntaryPrepayment`) is present. Bond coupons stay on \
-                                     original face.",
-                                    debt.id
-                                )));
-                            }
-                            FinancialStatementInstrument::InterestRateSwap(_)
-                            | FinancialStatementInstrument::CapFloor(_)
-                            | FinancialStatementInstrument::Swaption(_) => {
-                                return Err(Error::build(format!(
-                                    "WaterfallSpec: instrument '{}' is not a sweep target; \
-                                     swaps and options cannot appear with a prepayment rung.",
-                                    debt.id
-                                )));
-                            }
-                            FinancialStatementInstrument::TermLoan(_)
-                            | FinancialStatementInstrument::RevolvingCredit(_) => {}
-                        }
-                    }
-                }
-            }
-            // Period-flow classification infers expense vs income for two-leg
-            // instruments from the sign of the net flow, which assumes the
-            // issuer pays fixed (`PayReceive::Pay`). A `Receive` swap would
-            // silently invert that classification, so reject it loudly until
-            // the sign convention is threaded through (INVARIANTS.md §3).
-            for debt in &cs.debt_instruments {
-                if let FinancialStatementInstrument::InterestRateSwap(swap) = &debt.spec {
-                    if swap.side == finstack_quant_valuations::instruments::PayReceive::Receive {
-                        return Err(Error::build(format!(
-                            "Interest rate swap '{}' has side `Receive`, which the \
-                             capital-structure flow classification does not support: \
-                             two-leg expense/income signs assume the issuer pays fixed \
-                             (`Pay`). Model the position as a `Pay` swap with inverted \
-                             legs instead.",
-                            debt.id
-                        )));
-                    }
-                }
-            }
+            cs.validate()?;
         }
 
         match crate::evaluator::DependencyGraph::from_model(self) {
@@ -609,6 +591,86 @@ pub struct CapitalStructureSpec {
     /// Optional waterfall specification for dynamic cash flow allocation
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub waterfall: Option<crate::capital_structure::WaterfallSpec>,
+}
+
+impl CapitalStructureSpec {
+    /// Validate the capital structure on its own, without the enclosing model.
+    ///
+    /// Runs [`WaterfallSpec::validate`](crate::capital_structure::WaterfallSpec::validate)
+    /// on the optional waterfall, rejects bond, convertible, swap, cap/floor
+    /// and swaption instruments when the waterfall carries a prepayment rung
+    /// (`Sweep`, `MandatoryPrepayment` or `VoluntaryPrepayment`), and rejects
+    /// interest-rate swaps with side `Receive`. It does not check that
+    /// referenced model nodes exist; [`FinancialModelSpec::validate_semantics`]
+    /// calls this method as part of whole-model validation.
+    ///
+    /// # Errors
+    ///
+    /// Returns a build error for an invalid waterfall, a bond or derivative
+    /// instrument alongside a prepayment rung, or a `Receive` interest-rate
+    /// swap.
+    pub fn validate(&self) -> Result<()> {
+        if let Some(waterfall) = &self.waterfall {
+            waterfall.validate()?;
+            let has_prepay = waterfall.priority_of_payments.iter().any(|p| {
+                matches!(
+                    p,
+                    crate::capital_structure::PaymentPriority::Sweep
+                        | crate::capital_structure::PaymentPriority::MandatoryPrepayment
+                        | crate::capital_structure::PaymentPriority::VoluntaryPrepayment
+                )
+            });
+            if has_prepay {
+                for debt in &self.debt_instruments {
+                    match &debt.spec {
+                        FinancialStatementInstrument::Bond(_)
+                        | FinancialStatementInstrument::ConvertibleBond(_) => {
+                            return Err(Error::build(format!(
+                                "WaterfallSpec: instrument '{}' is a bond; this waterfall \
+                                 is a loan/revolver engine and rejects Bond or \
+                                 ConvertibleBond targets when a prepayment rung \
+                                 (`Sweep`, `MandatoryPrepayment`, or \
+                                 `VoluntaryPrepayment`) is present. Bond coupons stay on \
+                                 original face.",
+                                debt.id
+                            )));
+                        }
+                        FinancialStatementInstrument::InterestRateSwap(_)
+                        | FinancialStatementInstrument::CapFloor(_)
+                        | FinancialStatementInstrument::Swaption(_) => {
+                            return Err(Error::build(format!(
+                                "WaterfallSpec: instrument '{}' is not a sweep target; \
+                                 swaps and options cannot appear with a prepayment rung.",
+                                debt.id
+                            )));
+                        }
+                        FinancialStatementInstrument::TermLoan(_)
+                        | FinancialStatementInstrument::RevolvingCredit(_) => {}
+                    }
+                }
+            }
+        }
+        // Period-flow classification infers expense vs income for two-leg
+        // instruments from the sign of the net flow, which assumes the
+        // issuer pays fixed (`PayReceive::Pay`). A `Receive` swap would
+        // silently invert that classification, so reject it loudly until
+        // the sign convention is threaded through (INVARIANTS.md §3).
+        for debt in &self.debt_instruments {
+            if let FinancialStatementInstrument::InterestRateSwap(swap) = &debt.spec {
+                if swap.side == finstack_quant_valuations::instruments::PayReceive::Receive {
+                    return Err(Error::build(format!(
+                        "Interest rate swap '{}' has side `Receive`, which the \
+                         capital-structure flow classification does not support: \
+                         two-leg expense/income signs assume the issuer pays fixed \
+                         (`Pay`). Model the position as a `Pay` swap with inverted \
+                         legs instead.",
+                        debt.id
+                    )));
+                }
+            }
+        }
+        Ok(())
+    }
 }
 
 /// Instruments supported by company financial statement capital structures.
@@ -903,6 +965,62 @@ mod period_timeline_tests {
         model
             .validate_semantics()
             .expect("a Pay swap is supported and must pass");
+    }
+
+    /// The capital-structure checks run on the spec alone, so a host can
+    /// validate a `CapitalStructureSpec` without building a model around it.
+    #[test]
+    fn capital_structure_spec_validates_standalone() {
+        let spec: CapitalStructureSpec = serde_json::from_value(serde_json::json!({
+            "waterfall": {
+                "priority_of_payments": ["fees", "interest", "amortization", "equity", "sweep"],
+                "available_cash_node": "cash",
+            }
+        }))
+        .expect("shape parses");
+        let err = spec.validate().expect_err("equity must rank last");
+        assert!(err.to_string().contains("last entry"), "{err}");
+
+        let mut swap = InterestRateSwap::example().expect("example swap");
+        swap.side = finstack_quant_valuations::instruments::PayReceive::Receive;
+        let spec = CapitalStructureSpec {
+            debt_instruments: vec![DebtInstrumentSpec {
+                id: "IRS-RCV".to_string(),
+                spec: FinancialStatementInstrument::InterestRateSwap(swap),
+            }],
+            meta: IndexMap::new(),
+            reporting_currency: None,
+            fx_policy: None,
+            waterfall: None,
+        };
+        let err = spec.validate().expect_err("a Receive swap is rejected");
+        assert!(err.to_string().contains("Receive"), "{err}");
+    }
+
+    /// `from_json` is serde plus `validate_semantics`: a document serde
+    /// accepts but the semantic rules reject fails, and a valid one parses.
+    #[test]
+    fn from_json_runs_semantic_validation() {
+        let err = FinancialModelSpec::from_json(
+            r#"{"id": "m", "periods": [], "nodes": {}, "schema_version": 1}"#,
+        )
+        .expect_err("empty timeline is rejected");
+        assert!(matches!(err, Error::Build(_)), "{err:?}");
+
+        let err =
+            FinancialModelSpec::from_json("{\"id\": ").expect_err("malformed JSON is rejected");
+        assert!(
+            matches!(&err, Error::Serde(message) if message.starts_with("invalid FinancialModelSpec JSON")),
+            "{err:?}"
+        );
+
+        let model = model_with_periods(vec![period(
+            PeriodId::quarter(2024, 1).expect("valid period fixture"),
+            true,
+        )]);
+        let json = serde_json::to_string(&model).expect("serialize");
+        let parsed = FinancialModelSpec::from_json(&json).expect("valid model parses");
+        assert_eq!(parsed.nodes.len(), 1);
     }
 
     #[test]

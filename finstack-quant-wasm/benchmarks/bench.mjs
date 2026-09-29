@@ -927,21 +927,11 @@ async function main() {
   });
 
   benchTry('statements_analytics', 'goalSeek', 400, () => {
-    w.goalSeek(
-      GOAL_SEEK_MODEL_JSON,
-      'ebitda',
-      '2025Q1',
-      50000.0,
-      'revenue',
-      '2025Q1',
-      false,
-      undefined,
-      undefined
-    );
+    w.goalSeek(GOAL_SEEK_MODEL_JSON, 'ebitda', '2025Q1', 50000.0, 'revenue', '2025Q1', false);
   });
 
-  benchTry('statements_analytics', 'traceDependencies', 2000, () => {
-    w.traceDependencies(FINANCIAL_MODEL_JSON, 'revenue');
+  benchTry('statements_analytics', 'dependencyTree', 2000, () => {
+    w.dependencyTree(FINANCIAL_MODEL_JSON, 'revenue');
   });
 
   benchTry('statements_analytics', 'explainFormula', 1500, () => {

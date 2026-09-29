@@ -223,8 +223,8 @@ are in [INVARIANTS.md](../../INVARIANTS.md).
   `finstack-quant-wasm/exports/statements_analytics.js`: `runSensitivity`,
   `runVariance`, `evaluateScenarioSet`, `backtestForecast`,
   `generateTornadoEntries`, `goalSeek`, `dcfSensitivity`, `evaluateLbo`, `wacc`,
-  `traceDependencies`, `explainFormula`, the report renderers, the check
-  runners, and the comps helpers.
+  `dependencyTree`, `dependencyTreeText`, `explainFormula`, the report
+  renderers, the check runners, and the comps helpers.
 
 ## Verification
 

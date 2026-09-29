@@ -74,21 +74,25 @@ pub struct PyCheckConfig {
 impl PyCheckConfig {
     /// Build a check configuration.
     ///
+    /// Every parameter defaults to the Rust ``CheckConfig::default()`` value
+    /// when omitted or ``None``.
+    ///
     /// Parameters
     /// ----------
-    /// default_tolerance : float, default 0.01
+    /// default_tolerance : float | None
     ///     Absolute equality tolerance in the compared nodes' own units
-    ///     (one cent when nodes are in whole dollars).
-    /// default_relative_tolerance : float, default 1e-9
+    ///     (Rust default ``0.01``, one cent when nodes are in whole dollars).
+    /// default_relative_tolerance : float | None
     ///     Relative tolerance as a decimal fraction of the reference
-    ///     magnitude; zero disables the relative component.
-    /// materiality_threshold : float, default 0.0
+    ///     magnitude (Rust default ``1e-9``); zero disables the relative
+    ///     component.
+    /// materiality_threshold : float | None
     ///     Advisory (info/warning) findings whose absolute materiality is
-    ///     below this amount are dropped from reports. Error findings are
-    ///     always retained.
-    /// min_severity : str, default "info"
-    ///     Lowest severity retained in reports: ``"info"``, ``"warning"``,
-    ///     or ``"error"``.
+    ///     below this amount are dropped from reports (Rust default ``0.0``).
+    ///     Error findings are always retained.
+    /// min_severity : str | None
+    ///     Lowest severity retained in reports: ``"info"`` (Rust default),
+    ///     ``"warning"``, or ``"error"``.
     ///
     /// Raises
     /// ------
@@ -96,21 +100,27 @@ impl PyCheckConfig {
     ///     If ``min_severity`` is not a known severity name.
     #[new]
     #[pyo3(
-        signature = (default_tolerance=0.01, default_relative_tolerance=1e-9, materiality_threshold=0.0, min_severity="info"),
-        text_signature = "(default_tolerance=0.01, default_relative_tolerance=1e-9, materiality_threshold=0.0, min_severity='info')"
+        signature = (default_tolerance=None, default_relative_tolerance=None, materiality_threshold=None, min_severity=None),
+        text_signature = "(default_tolerance=None, default_relative_tolerance=None, materiality_threshold=None, min_severity=None)"
     )]
     fn new(
-        default_tolerance: f64,
-        default_relative_tolerance: f64,
-        materiality_threshold: f64,
-        min_severity: &str,
+        default_tolerance: Option<f64>,
+        default_relative_tolerance: Option<f64>,
+        materiality_threshold: Option<f64>,
+        min_severity: Option<&str>,
     ) -> PyResult<Self> {
+        let defaults = CheckConfig::default();
         Ok(Self {
             inner: CheckConfig {
-                default_tolerance,
-                default_relative_tolerance,
-                materiality_threshold,
-                min_severity: parse_severity(min_severity)?,
+                default_tolerance: default_tolerance.unwrap_or(defaults.default_tolerance),
+                default_relative_tolerance: default_relative_tolerance
+                    .unwrap_or(defaults.default_relative_tolerance),
+                materiality_threshold: materiality_threshold
+                    .unwrap_or(defaults.materiality_threshold),
+                min_severity: min_severity
+                    .map(parse_severity)
+                    .transpose()?
+                    .unwrap_or(defaults.min_severity),
             },
         })
     }
@@ -199,13 +209,14 @@ impl PyFormulaCheckSpec {
     ///     evaluator as calculated nodes, including time-series functions.
     /// message_template : str
     ///     Finding message; ``{period}`` is replaced at run time.
-    /// category : str, default "internal_consistency"
+    /// category : str
     ///     One of ``accounting_identity``, ``cross_statement_reconciliation``,
     ///     ``internal_consistency``, ``credit_reasonableness``,
-    ///     ``data_quality``.
-    /// severity : str, default "error"
+    ///     ``data_quality``. Required, as in the Rust/JSON form.
+    /// severity : str
     ///     Severity of findings: ``"info"``, ``"warning"`` or ``"error"``.
-    ///     Only error findings fail a report.
+    ///     Only error findings fail a report. Required, as in the Rust/JSON
+    ///     form.
     /// tolerance : float | None
     ///     Optional absolute tolerance for equality comparisons inside the
     ///     formula, in the compared nodes' units.
@@ -217,8 +228,8 @@ impl PyFormulaCheckSpec {
     ///     Formula syntax is validated when the suite runs against a model.
     #[new]
     #[pyo3(
-        signature = (id, name, formula, message_template, category="internal_consistency", severity="error", tolerance=None),
-        text_signature = "(id, name, formula, message_template, category='internal_consistency', severity='error', tolerance=None)"
+        signature = (id, name, formula, message_template, category, severity, tolerance=None),
+        text_signature = "(id, name, formula, message_template, category, severity, tolerance=None)"
     )]
     #[allow(clippy::too_many_arguments)]
     fn new(
@@ -321,7 +332,7 @@ impl PyFormulaCheckSpec {
 )]
 #[derive(Clone)]
 pub struct PyCheckSuiteSpec {
-    pub(super) inner: finstack_quant_statements::checks::CheckSuiteSpec,
+    pub(crate) inner: finstack_quant_statements::checks::CheckSuiteSpec,
 }
 
 #[pymethods]
@@ -332,14 +343,13 @@ impl PyCheckSuiteSpec {
     /// ----------
     /// name : str
     ///     Suite name for display and logging.
-    /// builtin_checks : list[str | dict] | None
-    ///     Built-in checks to run. A bare name is enough for checks whose
-    ///     fields all default (``"non_finite"``, ``"sign_convention"``); the
-    ///     others need a dict with the check's ``type`` and node fields, e.g.
-    ///     ``{"type": "balance_sheet_articulation", "assets_nodes":
-    ///     ["assets"], "liabilities_nodes": ["liabilities"],
-    ///     "equity_nodes": ["equity"]}``. See
-    ///     :meth:`builtin_check_names` for the catalog.
+    /// builtin_checks : list[dict] | None
+    ///     Built-in checks to run, each the Rust ``BuiltinCheckSpec`` serde
+    ///     form: a dict with the check's ``type`` tag plus its fields, e.g.
+    ///     ``{"type": "non_finite"}`` or ``{"type":
+    ///     "balance_sheet_articulation", "assets_nodes": ["assets"],
+    ///     "liabilities_nodes": ["liabilities"], "equity_nodes":
+    ///     ["equity"]}``. See :meth:`builtin_check_names` for the catalog.
     /// formula_checks : list[FormulaCheckSpec] | None
     ///     User-defined DSL predicate checks.
     /// config : CheckConfig | None
@@ -350,8 +360,8 @@ impl PyCheckSuiteSpec {
     /// Raises
     /// ------
     /// ValueError
-    ///     If a built-in check name is unknown, a dict lacks a required
-    ///     field, or an entry is neither ``str`` nor ``dict``.
+    ///     If a built-in check ``type`` is unknown, a dict lacks a required
+    ///     field, or an entry is not a ``dict``.
     #[new]
     #[pyo3(
         signature = (name, builtin_checks=None, formula_checks=None, config=None, description=None),
@@ -501,18 +511,15 @@ impl PyCheckSuiteSpec {
     }
 }
 
-/// Parse one ``builtin_checks`` entry: a bare name or a ``{"type": ...}`` dict.
+/// Parse one ``builtin_checks`` entry: the ``{"type": ...}`` serde dict.
 fn parse_builtin_check(py: Python<'_>, entry: &Bound<'_, PyAny>) -> PyResult<BuiltinCheckSpec> {
-    let value = if let Ok(name) = entry.extract::<String>() {
-        serde_json::json!({ "type": name })
-    } else if entry.is_instance_of::<pyo3::types::PyDict>() {
-        crate::bindings::module_utils::py_to_json_value(py, entry, "builtin check")?
-    } else {
+    if !entry.is_instance_of::<pyo3::types::PyDict>() {
         return Err(value_error(format!(
-            "builtin_checks entries must be a check name or a dict with a 'type' key, got {}",
+            "builtin_checks entries must be a dict with a 'type' key, got {}",
             entry.get_type().name()?
         )));
-    };
+    }
+    let value = crate::bindings::module_utils::py_to_json_value(py, entry, "builtin check")?;
     serde_json::from_value(value).map_err(|e| {
         value_error(format!(
             "invalid builtin check: {e}; known checks: {}",
@@ -763,10 +770,11 @@ impl PyCheckReport {
     /// Counts what survived the suite's ``min_severity`` and
     /// ``materiality_threshold`` reporting filters, not every raw diagnostic
     /// the checks produced — it matches the row count of
-    /// :meth:`to_findings_dataframe`.
+    /// :meth:`to_findings_dataframe`. Delegates to the Rust
+    /// ``CheckReport::total_findings``.
     #[getter]
     fn total_findings(&self) -> usize {
-        self.inner.summary.errors + self.inner.summary.warnings + self.inner.summary.infos
+        self.inner.total_findings()
     }
 
     /// Number of retained error-severity findings across all checks.

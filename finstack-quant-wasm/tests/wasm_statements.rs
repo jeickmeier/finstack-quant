@@ -35,11 +35,24 @@ fn model_node_ids_returns_array() {
 
 #[wasm_bindgen_test]
 fn model_node_ids_empty_model() {
-    let model = finstack_quant_statements::FinancialModelSpec::new("empty", vec![]);
+    let periods = finstack_quant_core::dates::build_periods("2025Q1..Q1", None)
+        .unwrap()
+        .periods;
+    let model = finstack_quant_statements::FinancialModelSpec::new("empty", periods);
     let json = serde_json::to_string(&model).unwrap();
     let result = model_node_ids(JsValue::from(&json)).unwrap();
     let ids: Vec<String> = serde_wasm_bindgen::from_value(result).unwrap();
     assert!(ids.is_empty());
+}
+
+#[wasm_bindgen_test]
+fn model_node_ids_validates_the_model() {
+    // `modelNodeIds` goes through Rust `FinancialModelSpec::from_json`, so a
+    // model `validateFinancialModelJson` rejects is rejected here too.
+    let model = finstack_quant_statements::FinancialModelSpec::new("empty", vec![]);
+    let json = serde_json::to_string(&model).unwrap();
+    assert!(model_node_ids(JsValue::from(&json)).is_err());
+    assert!(validate_financial_model_json(JsValue::from(&json)).is_err());
 }
 
 #[wasm_bindgen_test]
@@ -132,8 +145,12 @@ fn validate_ecf_sweep_spec_accepts_minimal() {
 }
 
 #[wasm_bindgen_test]
-fn validate_pik_toggle_spec_accepts_minimal() {
+fn validate_pik_toggle_spec_requires_explicit_targets() {
+    // Rust `PikToggleSpec::validate` rejects implicit all-instrument targets.
     let json = r#"{"liquidity_metric":"cash","threshold":1000000.0}"#;
+    assert!(validate_pik_toggle_spec_json(JsValue::from(json)).is_err());
+    let json =
+        r#"{"liquidity_metric":"cash","threshold":1000000.0,"target_instrument_ids":["TL"]}"#;
     let out = validate_pik_toggle_spec_json(JsValue::from(json)).unwrap();
     assert!(out.contains("liquidity_metric"));
 }

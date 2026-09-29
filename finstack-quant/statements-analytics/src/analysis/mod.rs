@@ -54,7 +54,7 @@ pub use credit::{
     compute_credit_context, forecast_breaches, forecast_covenant, to_table, CreditContextMetrics,
     CreditNumeratorNodes, StatementsAdapter,
 };
-pub use goal_seek::goal_seek;
+pub use goal_seek::{goal_seek, GoalSeekResult};
 pub use introspection::{
     render_tree_ascii, render_tree_detailed, DependencyTracer, DependencyTree, Explanation,
     ExplanationStep, FormulaExplainer,
@@ -71,7 +71,7 @@ pub use scenarios::{
 pub use valuation::{
     dcf_sensitivity, evaluate_dcf_with_market, evaluate_lbo, wacc, CorporateAnalysis,
     CorporateAnalysisBuilder, CorporateValuationResult, DcfOptions, DcfSensitivityResult,
-    ExitMultipleBump, LboCheckMappings, LboConfig, LboResult, LboTranche,
+    ExitMultipleBump, LboCheckMappings, LboConfig, LboResult, LboTranche, DEFAULT_UFCF_NODE,
 };
 
 pub use checks::{

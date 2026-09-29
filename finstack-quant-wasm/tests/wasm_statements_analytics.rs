@@ -60,8 +60,7 @@ fn goal_seek_finds_revenue_for_target_gross_profit() {
         JsValue::from("revenue"),
         JsValue::from("2024Q1"),
         JsValue::from(true),
-        Some(50_000.0),
-        Some(200_000.0),
+        Some(crate::js_object(&[50_000.0, 200_000.0])),
     )
     .unwrap();
     let obj: serde_json::Value = serde_wasm_bindgen::from_value(result).unwrap();
@@ -70,7 +69,9 @@ fn goal_seek_finds_revenue_for_target_gross_profit() {
         solved > 100_000.0,
         "revenue should increase to hit gross_profit=80k; got {solved}"
     );
-    assert!(obj["updated_model_json"].as_str().is_some());
+    // The updated model is the `FinancialModelSpec` object, not a JSON string.
+    assert!(obj["model"].is_object());
+    assert!(obj.get("updated_model_json").is_none());
 }
 
 #[wasm_bindgen_test]
@@ -105,10 +106,12 @@ fn generate_tornado_entries_returns_structured_array() {
 
 #[wasm_bindgen_test]
 fn compute_multiple_uses_canonical_company_metric_fields() {
+    // A `null` metric is missing, as in Python `compute_multiple`.
     let metrics = std::collections::BTreeMap::from([
-        ("enterprise_value".to_string(), 8_500.0),
-        ("ebitda".to_string(), 1_000.0),
-        ("custom_signal".to_string(), 3.0),
+        ("enterprise_value".to_string(), Some(8_500.0)),
+        ("ebitda".to_string(), Some(1_000.0)),
+        ("custom_signal".to_string(), Some(3.0)),
+        ("revenue".to_string(), None),
     ]);
     let metrics = crate::js_object(&metrics);
     let result = compute_multiple(metrics, JsValue::from("ev_ebitda"))
@@ -237,13 +240,11 @@ fn monetary_goal_seek_returns_a_valid_updated_model() {
         JsValue::from("revenue"),
         JsValue::from("2025"),
         JsValue::from(true),
-        Some(1.0),
-        Some(200.0),
+        Some(crate::js_object(&[1.0, 200.0])),
     )
     .unwrap();
     let output: serde_json::Value = serde_wasm_bindgen::from_value(result).unwrap();
-    let updated_json = output["updated_model_json"].as_str().unwrap();
-    let updated = ModelBuilder::from_spec(serde_json::from_str(updated_json).unwrap())
+    let updated = ModelBuilder::from_spec(serde_json::from_value(output["model"].clone()).unwrap())
         .unwrap()
         .build()
         .unwrap();
@@ -275,12 +276,21 @@ fn credit_assessment_report_accepts_minimal_results() {
 }
 
 #[wasm_bindgen_test]
-fn trace_dependencies_renders_for_simple_model() {
+fn dependency_tree_returns_the_rust_tree_and_its_text() {
     let model_json = test_model_json();
-    let tree = trace_dependencies(JsValue::from(&model_json), JsValue::from("gross_profit"))
-        .expect("trace");
-    assert!(!tree.is_empty());
-    assert!(tree.contains("revenue") || tree.contains("gross_profit"));
+    let tree =
+        dependency_tree(JsValue::from(&model_json), JsValue::from("gross_profit")).expect("tree");
+    let tree: finstack_quant_statements_analytics::analysis::DependencyTree =
+        serde_wasm_bindgen::from_value(tree).expect("DependencyTree shape");
+    assert_eq!(tree.node_id, "gross_profit");
+    assert_eq!(tree.children.len(), 2);
+    let text = dependency_tree_text(JsValue::from(&model_json), JsValue::from("gross_profit"))
+        .expect("text");
+    assert_eq!(
+        text,
+        finstack_quant_statements_analytics::analysis::render_tree_ascii(&tree)
+    );
+    assert!(text.contains("├── "), "{text}");
 }
 
 #[wasm_bindgen_test]

@@ -2,6 +2,29 @@
 
 ## [Unreleased]
 
+### WASM binding audit: statements and statements analytics (2026-09-29)
+
+#### Changed (BREAKING)
+
+- `goal_seek` takes `&FinancialModelSpec` and returns `GoalSeekResult { solved_value, model }` without mutating its input. `update_model` is required in every host.
+  - WASM `goalSeek(…, updateModel, bounds?)` takes `bounds` as `[lo, hi]` and returns `{ solved_value, model }`, with `model` an object or `null`. It was `updated_model_json`.
+  - Python `GoalSeekResult` gains `to_json`, `from_json` and pickling.
+- LBO and DCF entry points take the Rust config types:
+  - WASM `evaluateLbo(modelJson, configJson)` and Python `evaluate_lbo(model, config)` take `LboConfig`. `sources` use the `[{ name, amount }]` form, `transaction_fees` is required, and `checks` is now populated.
+  - WASM `dcfSensitivity(model, wacc, terminalValue, ufcfNode?, netDebtOverride?, optionsJson?, marketJson?)` and Python `dcf_sensitivity(…, options=None)` / `evaluate_dcf(…, options=None)` take `DcfOptions`. `DcfOptions` fills omitted keys from its defaults.
+  - `ufcf_node` defaults to `DEFAULT_UFCF_NODE`.
+- `traceDependencies` is replaced by `dependencyTree` (the Rust `DependencyTree` object) and `dependencyTreeText`. Python `DependencyTracer.dependency_tree` returns a typed `DependencyTree`, and `dependency_tree_text` is new. Both render with `├──` / `└──` connectors; the old output was flat.
+- Comps statistics rename their input: WASM `percentileRank`/`zScore`/`peerStats` take `values` (was `data`), Python takes `values` (was `peer_values`), and Rust regression takes `x_values`/`y_values`. `CompanyMetrics::from_flat_metrics` takes `Option<f64>`, with `None` meaning missing.
+- Every model entry point parses through the new `FinancialModelSpec::from_json` (serde plus semantic validation). Semantically invalid models are rejected by `modelNodeIds` and `applyScenario` too.
+- Capital-structure specs validate in Rust: `CapitalStructureSpec::validate`, `EcfSweepSpec::validate` and `PikToggleSpec::validate`. The WASM `validate*SpecJson` functions call them, and Python gains `EcfSweepSpec.validate()` and `PikToggleSpec.validate()`.
+- `ThreeStatementMapping`, `CreditMapping` and `VarianceConfig` reject unknown keys. Python requires `FormulaCheckSpec.category`/`severity`, dict-form `builtin_checks` and all three `ThreeStatementMapping` node groups.
+- `ForecastMetrics` error measures and `Explanation` values serialize non-finite numbers as `"nan"`/`"inf"`/`"-inf"`.
+- Python `StatementResult.warnings` and `MonteCarloResults.warnings` return dicts instead of Debug text.
+
+#### Added
+
+- `CheckReport::total_findings()` (Python delegates to it), `DEFAULT_UFCF_NODE` and `DependencyTracer::dependency_tree_text`.
+
 ### WASM binding audit: core primitives, dates and market data (2026-09-29)
 
 #### Changed (BREAKING)

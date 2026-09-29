@@ -121,6 +121,7 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
             "CreditScorecardExtension",
             "DcfSensitivityResult",
             "DependencyTracer",
+            "DependencyTree",
             "DimensionScore",
             "EclBucket",
             "EclResult",

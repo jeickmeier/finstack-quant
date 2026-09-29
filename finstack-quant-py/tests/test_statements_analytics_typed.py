@@ -250,7 +250,7 @@ def test_monetary_goal_seek_round_trip_and_variance_currency_boundary() -> None:
         builder.compute("profit", "revenue * 0.5")
         models.append(builder.build())
 
-    outcome = goal_seek(models[0], "profit", "2025", 60.0, "revenue", "2025", bounds=(1.0, 200.0))
+    outcome = goal_seek(models[0], "profit", "2025", 60.0, "revenue", "2025", True, bounds=(1.0, 200.0))
     assert outcome.model is not None
     restored = FinancialModelSpec.from_json(outcome.model.to_json())
     revenue = Evaluator().evaluate(restored).get_money("revenue", "2025")

@@ -47,7 +47,7 @@ export function createService(native: {
     typeof statements_analytics,
     | "explainFormula"
     | "explainFormulaText"
-    | "traceDependencies"
+    | "dependencyTreeText"
     | "runChecks"
     | "runThreeStatementChecks"
     | "runCreditUnderwritingChecks"
@@ -187,7 +187,7 @@ export function createService(native: {
     },
     traceStatement(modelJson, nodeId) {
       return result(() =>
-        native.statements_analytics.traceDependencies(modelJson, nodeId),
+        native.statements_analytics.dependencyTreeText(modelJson, nodeId),
       );
     },
     runStatementChecks(request) {

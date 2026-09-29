@@ -112,6 +112,8 @@ RESULT_CLASSES: list[tuple[str, str]] = [
     ("finstack_quant.scenarios", "ApplicationReport"),
     ("finstack_quant.scenarios", "ScenarioSpec"),
     ("finstack_quant.statements_analytics", "TornadoEntry"),
+    ("finstack_quant.statements_analytics", "GoalSeekResult"),
+    ("finstack_quant.statements_analytics", "DependencyTree"),
     ("finstack_quant.models.factor.credit", "FactorCovarianceMatrix"),
     ("finstack_quant.models.factor.credit", "FactorModelConfig"),
     ("finstack_quant.scenarios", "HorizonResult"),

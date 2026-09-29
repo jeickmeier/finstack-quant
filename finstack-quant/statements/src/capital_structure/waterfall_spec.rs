@@ -123,8 +123,10 @@ impl WaterfallSpec {
     /// Enforces:
     /// - `priority_of_payments` contains no duplicate entries.
     /// - All configured prepayment priorities appear before `Equity`.
-    /// - PIK toggles explicitly identify target instruments.
-    /// - `ecf_sweep.sweep_percentage` (when configured) lies in `[0.0, 1.0]`.
+    /// - PIK toggles explicitly identify target instruments
+    ///   ([`PikToggleSpec::validate`]).
+    /// - `ecf_sweep.sweep_percentage` (when configured) lies in `[0.0, 1.0]`
+    ///   ([`EcfSweepSpec::validate`]).
     /// - When an ECF sweep with a positive `sweep_percentage` is configured,
     ///   at least one prepayment priority (`Sweep`, `MandatoryPrepayment`, or
     ///   `VoluntaryPrepayment`) must be present. Any configured `Equity` entry
@@ -233,17 +235,7 @@ impl WaterfallSpec {
         }
 
         if let Some(pik) = &self.pik_toggle {
-            if pik
-                .target_instrument_ids
-                .as_ref()
-                .is_none_or(|targets| targets.is_empty())
-            {
-                return Err(Error::build(
-                    "WaterfallSpec: `pik_toggle.target_instrument_ids` must explicitly list \
-                     the instruments that can PIK. Instrument-level PIK capability is not \
-                     modeled yet, so implicit all-instrument PIK targets are rejected.",
-                ));
-            }
+            pik.validate()?;
         }
 
         // (Prepayment-after-Equity is already rejected by the "Equity must be
@@ -252,12 +244,9 @@ impl WaterfallSpec {
         let Some(ecf) = &self.ecf_sweep else {
             return Ok(());
         };
-        if !(0.0..=1.0).contains(&ecf.sweep_percentage) {
-            return Err(Error::build(format!(
-                "WaterfallSpec: `ecf_sweep.sweep_percentage` must be in [0.0, 1.0], got {}",
-                ecf.sweep_percentage
-            )));
-        }
+        ecf.validate()?;
+        // A positive sweep also needs somewhere to land, which only the
+        // enclosing waterfall's priority stack can tell.
         if ecf.sweep_percentage <= 0.0 {
             return Ok(());
         }
@@ -442,6 +431,29 @@ pub struct EcfSweepSpec {
     pub target_instrument_id: Option<String>,
 }
 
+impl EcfSweepSpec {
+    /// Validate the sweep on its own.
+    ///
+    /// `sweep_percentage` must be a finite decimal fraction in `[0.0, 1.0]`
+    /// (`0.5` sweeps half of excess cash flow). [`WaterfallSpec::validate`]
+    /// calls this and additionally requires a prepayment priority for a
+    /// positive sweep, which needs the enclosing priority stack.
+    ///
+    /// # Errors
+    ///
+    /// Returns a build error when `sweep_percentage` is outside `[0.0, 1.0]`
+    /// or not finite.
+    pub fn validate(&self) -> Result<()> {
+        if !(0.0..=1.0).contains(&self.sweep_percentage) {
+            return Err(Error::build(format!(
+                "EcfSweepSpec: `sweep_percentage` must be in [0.0, 1.0], got {}",
+                self.sweep_percentage
+            )));
+        }
+        Ok(())
+    }
+}
+
 /// PIK toggle specification.
 ///
 /// Defines conditions for switching between cash and PIK interest modes.
@@ -463,7 +475,11 @@ pub struct PikToggleSpec {
     /// Threshold value: if metric < threshold, enable PIK; otherwise use cash
     pub threshold: f64,
 
-    /// Target instrument IDs (if None, applies to all instruments with PIK capability)
+    /// Instruments that switch to PIK when the toggle triggers.
+    ///
+    /// Must be a non-empty list: instrument-level PIK capability is not
+    /// modeled, so `None` or an empty list is rejected by
+    /// [`PikToggleSpec::validate`] rather than meaning "every instrument".
     #[serde(skip_serializing_if = "Option::is_none")]
     pub target_instrument_ids: Option<Vec<String>>,
 
@@ -472,6 +488,31 @@ pub struct PikToggleSpec {
     /// Default: 0 (no hysteresis, PIK can toggle every period).
     #[serde(default)]
     pub min_periods_in_pik: usize,
+}
+
+impl PikToggleSpec {
+    /// Validate the toggle on its own.
+    ///
+    /// `target_instrument_ids` must list at least one instrument explicitly.
+    /// [`WaterfallSpec::validate`] calls this for a configured `pik_toggle`.
+    ///
+    /// # Errors
+    ///
+    /// Returns a build error when `target_instrument_ids` is `None` or empty.
+    pub fn validate(&self) -> Result<()> {
+        if self
+            .target_instrument_ids
+            .as_ref()
+            .is_none_or(|targets| targets.is_empty())
+        {
+            return Err(Error::build(
+                "PikToggleSpec: `target_instrument_ids` must explicitly list the \
+                 instruments that can PIK. Instrument-level PIK capability is not \
+                 modeled yet, so implicit all-instrument PIK targets are rejected.",
+            ));
+        }
+        Ok(())
+    }
 }
 
 #[cfg(test)]
@@ -584,6 +625,31 @@ mod tests {
             .validate()
             .expect_err("implicit PIK targets must be rejected");
         assert!(err.to_string().contains("target_instrument_ids"));
+    }
+
+    /// The sweep and PIK rules run on the sub-specs alone, so a host can
+    /// validate an `EcfSweepSpec` or `PikToggleSpec` without a waterfall.
+    #[test]
+    fn sub_specs_validate_standalone() {
+        for pct in [-0.1, 1.5, f64::NAN] {
+            let err = sweep_spec(pct)
+                .validate()
+                .expect_err("out-of-range sweep_percentage must be rejected");
+            assert!(err.to_string().contains("sweep_percentage"), "{err}");
+        }
+        sweep_spec(0.0).validate().expect("zero sweep is valid");
+        sweep_spec(1.0).validate().expect("full sweep is valid");
+
+        let mut pik = PikToggleSpec {
+            liquidity_metric: "liquidity".into(),
+            threshold: 100.0,
+            target_instrument_ids: Some(Vec::new()),
+            min_periods_in_pik: 0,
+        };
+        let err = pik.validate().expect_err("empty PIK targets are rejected");
+        assert!(err.to_string().contains("target_instrument_ids"), "{err}");
+        pik.target_instrument_ids = Some(vec!["TL-PIK".into()]);
+        pik.validate().expect("explicit PIK targets are valid");
     }
 
     #[test]
