@@ -37,35 +37,92 @@ fn api_sources() -> Vec<(PathBuf, String)> {
     out
 }
 
-/// The declared return type of an exported function in `index.d.ts`.
+/// One method declared inside an `interface` or `class` body of `index.d.ts`.
+struct Member {
+    owner: String,
+    name: String,
+    ret: String,
+}
+
+/// Every method declared in `index.d.ts`, with its owning interface or class.
 ///
-/// Handles both single-line and multi-line signatures, and ignores mentions
-/// inside doc comments (the name appears in prose far more often than in a
-/// declaration). Returns `None` when the export is not declared at all, so a
-/// caller can distinguish that from "declared with the wrong type".
-fn declared_return(dts: &str, export: &str) -> Option<String> {
+/// Members sit at a two-space indent (the file is prettier-formatted);
+/// multi-line signatures end with a `  ): Ret;` line. Doc-comment prose is
+/// never at that indent with a `name(` shape, so it is not mistaken for a
+/// declaration.
+fn members(dts: &str) -> Vec<Member> {
     let lines: Vec<&str> = dts.lines().collect();
+    let mut out = Vec::new();
+    let mut owner: Option<String> = None;
     for (idx, line) in lines.iter().enumerate() {
-        let trimmed = line.trim_start();
-        // Skip prose: doc-comment bodies, `//` comments, and `*` continuations.
-        if trimmed.starts_with('*') || trimmed.starts_with("//") || trimmed.starts_with("/*") {
+        let head = line
+            .trim_start_matches("export ")
+            .trim_start_matches("declare ");
+        if let Some(rest) = head
+            .strip_prefix("interface ")
+            .or_else(|| head.strip_prefix("class "))
+        {
+            let name: String = rest
+                .chars()
+                .take_while(|c| c.is_alphanumeric() || *c == '_')
+                .collect();
+            owner = Some(name);
             continue;
         }
-        if !trimmed.starts_with(&format!("{export}(")) {
+        if line.starts_with('}') {
+            owner = None;
             continue;
         }
-        // Single-line: `name(args): Ret;`
-        if let Some(colon) = line.rfind("):") {
-            return Some(line[colon + 2..].trim_end_matches(';').trim().to_string());
+        let Some(owner_name) = owner.as_ref() else {
+            continue;
+        };
+        let Some(body) = line.strip_prefix("  ") else {
+            continue;
+        };
+        if body.starts_with(' ') {
+            continue;
         }
-        // Multi-line: scan forward for the closing `):`.
-        for follow in lines.iter().skip(idx + 1).take(40) {
-            if let Some(colon) = follow.rfind("):") {
-                return Some(follow[colon + 2..].trim_end_matches(';').trim().to_string());
-            }
+        let body = body
+            .trim_start_matches("static ")
+            .trim_start_matches("readonly ");
+        let name: String = body
+            .chars()
+            .take_while(|c| c.is_alphanumeric() || *c == '_')
+            .collect();
+        let after = &body[name.len()..];
+        if name.is_empty() || !(after.starts_with('(') || after.starts_with('<')) {
+            continue;
+        }
+        let ret = if let Some(colon) = line.rfind("):") {
+            Some(line[colon + 2..].to_string())
+        } else {
+            lines
+                .iter()
+                .skip(idx + 1)
+                .take(80)
+                .find_map(|l| l.strip_prefix("  ):").map(str::to_string))
+        };
+        if let Some(ret) = ret {
+            out.push(Member {
+                owner: owner_name.clone(),
+                name,
+                ret: ret.trim().trim_end_matches(';').trim().to_string(),
+            });
         }
     }
-    None
+    out
+}
+
+/// The declared return type of `owner.name` in `index.d.ts`.
+///
+/// Panics when the member is not declared: a pinned export that disappears
+/// must fail the gate, not silently skip it.
+fn declared(dts: &str, owner: &str, name: &str) -> String {
+    members(dts)
+        .into_iter()
+        .find(|m| m.owner == owner && m.name == name)
+        .map(|m| m.ret)
+        .unwrap_or_else(|| panic!("{owner}.{name} is not declared in index.d.ts"))
 }
 
 /// Raw `serde_wasm_bindgen::to_value` emits ES2015 `Map`s for Rust maps, and
@@ -99,22 +156,31 @@ fn no_binding_bypasses_the_json_compatible_serializer() {
 fn json_suffixed_exports_return_strings() {
     let dts = index_dts();
     // Exports whose names promise a JSON document.
-    for export in [
-        "validateCovenantSpecJson",
-        "validateCovenantReportJson",
-        "validateCovenantEngineJson",
-        "validateValuationResultJson",
-        "valuationResultToJson",
-        "instrumentCashflowsJson",
+    for (owner, export) in [
+        ("CovenantsNamespace", "validateCovenantSpecJson"),
+        ("CovenantsNamespace", "validateCovenantReportJson"),
+        ("CovenantsNamespace", "validateCovenantEngineJson"),
+        ("ValuationsNamespace", "validateValuationResultJson"),
+        ("ValuationsNamespace", "valuationResultToJson"),
+        ("ValuationInstrumentsNamespace", "instrumentCashflowsJson"),
     ] {
-        let Some(ret) = declared_return(&dts, export) else {
-            continue; // not part of this build's surface
-        };
-        assert!(
-            ret.contains("string"),
-            "{export} is Json-suffixed but index.d.ts declares it returning {ret:?}; \
+        let ret = declared(&dts, owner, export);
+        assert_eq!(
+            ret, "string",
+            "{owner}.{export} is Json-suffixed but index.d.ts declares it returning {ret:?}; \
              the suffix must mean 'returns a JSON string'"
         );
+    }
+    // And the rule holds for every Json-suffixed method, pinned or not
+    // (`fromJson` is a constructor, not a wire surface).
+    for member in members(&dts) {
+        if member.name.ends_with("Json") && !member.name.starts_with("from") {
+            assert_eq!(
+                member.ret, "string",
+                "{}.{} is Json-suffixed but returns {:?}",
+                member.owner, member.name, member.ret
+            );
+        }
     }
 }
 
@@ -122,32 +188,90 @@ fn json_suffixed_exports_return_strings() {
 #[test]
 fn computation_results_are_structured_not_strings() {
     let dts = index_dts();
-    for export in [
-        "priceInstrument",
-        "priceInstrumentWithMarket",
-        "calibrate",
-        "attributePnl",
-        "structuredCreditTrancheOas",
-        "structuredCreditTrancheMetrics",
-        "structuredCreditTrancheScenarioTable",
-        "runChecks",
-        "runThreeStatementChecks",
-        "runCreditUnderwritingChecks",
-        "generateTornadoEntries",
-        "covarianceAt",
-        "factorModelAt",
-        "price",
+    for (owner, export) in [
+        ("ValuationInstrumentsNamespace", "priceInstrument"),
+        ("ValuationInstrumentsNamespace", "priceInstrumentWithMarket"),
+        ("CalibrationNamespace", "calibrate"),
+        ("AttributionNamespace", "attributePnl"),
+        (
+            "ValuationInstrumentsNamespace",
+            "structuredCreditTrancheOas",
+        ),
+        (
+            "ValuationInstrumentsNamespace",
+            "structuredCreditTrancheMetrics",
+        ),
+        (
+            "ValuationInstrumentsNamespace",
+            "structuredCreditTrancheScenarioTable",
+        ),
+        ("StatementsAnalyticsNamespace", "runChecks"),
+        ("StatementsAnalyticsNamespace", "runThreeStatementChecks"),
+        (
+            "StatementsAnalyticsNamespace",
+            "runCreditUnderwritingChecks",
+        ),
+        ("StatementsAnalyticsNamespace", "generateTornadoEntries"),
+        ("FactorCovarianceForecast", "covarianceAt"),
+        ("FactorCovarianceForecast", "factorModelAt"),
+        ("FxInstrument", "price"),
     ] {
-        let Some(ret) = declared_return(&dts, export) else {
-            panic!("{export} is missing from index.d.ts");
-        };
-        assert!(
-            !ret.trim_end_matches(';').trim().eq("string"),
-            "{export} is a computation result but index.d.ts declares it \
+        let ret = declared(&dts, owner, export);
+        assert_ne!(
+            ret, "string",
+            "{owner}.{export} is a computation result but index.d.ts declares it \
              returning a bare string; it should be a structured object (or be \
              renamed with a Json suffix if it is really a wire surface)"
         );
     }
+}
+
+/// A method that returns a bare `string` must say what the string is: a
+/// `Json` document, `Text` prose, or `Html`. The allowlist names the few
+/// strings that are the value itself; the `ratchet` entries are defects that a
+/// later slice of the WASM-audit remediation removes, so the list only shrinks.
+#[test]
+fn bare_string_returns_are_named_or_allowlisted() {
+    const VALUE_STRINGS: &[(&str, &str)] = &[
+        ("Currency", "toString"),
+        ("Money", "toString"),
+        ("DayCount", "toString"),
+        ("Tenor", "toString"),
+        ("FxConversionPolicy", "toString"),
+        ("FxQuoteConvention", "toString"),
+        // Exact decimal text of the amount.
+        ("Money", "amountDecimal"),
+        // Display formatting of the amount.
+        ("Money", "formatWith"),
+        // Canonical return-frequency label.
+        ("Performance", "frequency"),
+        // Canonical liquidity-tier label.
+        ("LiquidityNamespace", "liquidityTier"),
+        // Canonical formula text (re-parseable), the Python `parse_formula` twin.
+        ("StatementsNamespace", "parseFormula"),
+    ];
+    const RATCHET: &[(&str, &str)] = &[
+        // S14: becomes a typed report with a `dryRunJson` sibling.
+        ("CalibrationNamespace", "dryRun"),
+        // S11: becomes a structured dependency tree plus a `*Text` rendering.
+        ("StatementsAnalyticsNamespace", "traceDependencies"),
+    ];
+    let dts = index_dts();
+    let offenders: Vec<String> = members(&dts)
+        .into_iter()
+        .filter(|m| m.ret == "string")
+        .filter(|m| !["Json", "Text", "Html"].iter().any(|s| m.name.ends_with(s)))
+        .filter(|m| {
+            let key = (m.owner.as_str(), m.name.as_str());
+            !VALUE_STRINGS.contains(&key) && !RATCHET.contains(&key)
+        })
+        .map(|m| format!("{}.{}", m.owner, m.name))
+        .collect();
+    assert!(
+        offenders.is_empty(),
+        "these methods return a bare string without a Json/Text/Html suffix; \
+         return a structured object or name the string: {offenders:?}"
+    );
 }
 
 /// Text-returning exports say so in their names. They share the
@@ -186,20 +310,18 @@ fn prose_returning_exports_are_named_text() {
 #[test]
 fn numeric_vector_exports_declare_float64array() {
     let dts = index_dts();
-    for export in [
-        "correlationBounds",
-        "jointProbabilities",
-        "nearestCorrelation",
-        "generateSmile",
-        "snowballCouponProfile",
-        "inverseFloaterCouponProfile",
+    for (owner, export) in [
+        ("CorrelationNamespace", "correlationBounds"),
+        ("CorrelationNamespace", "jointProbabilities"),
+        ("CorrelationNamespace", "nearestCorrelation"),
+        ("SabrSmile", "generateSmile"),
+        ("ValuationsNamespace", "snowballCouponProfile"),
+        ("ValuationsNamespace", "inverseFloaterCouponProfile"),
     ] {
-        let Some(ret) = declared_return(&dts, export) else {
-            continue;
-        };
+        let ret = declared(&dts, owner, export);
         assert!(
             ret.contains("Float64Array"),
-            "{export} returns a numeric vector but index.d.ts declares {ret:?}; \
+            "{owner}.{export} returns a numeric vector but index.d.ts declares {ret:?}; \
              flat numeric vectors cross as Float64Array"
         );
     }

@@ -257,7 +257,7 @@ fi
 description = "Run full-workspace Rust tests via cargo-nextest (use rust-test-crate while iterating)"
 run = [
   "cargo nextest run --workspace --exclude finstack-quant-py --exclude finstack-quant-wasm --lib --test '*' --no-fail-fast",
-  "cargo nextest run -p finstack-quant-wasm --lib --test dts_contract --no-fail-fast",
+  "cargo nextest run -p finstack-quant-wasm --lib --test dts_contract --test wasm --no-fail-fast",
 ]
 
 [tasks.rust-doc]
@@ -285,7 +285,7 @@ cargo test -p "$pkg" --doc --no-fail-fast
 description = "Run Rust tests including ignored/slow ones"
 run = [
   "cargo nextest run --workspace --exclude finstack-quant-py --exclude finstack-quant-wasm --lib --test '*' --run-ignored only --no-fail-fast",
-  "cargo nextest run -p finstack-quant-wasm --lib --test dts_contract --run-ignored only --no-tests pass --no-fail-fast",
+  "cargo nextest run -p finstack-quant-wasm --lib --test dts_contract --test wasm --run-ignored only --no-tests pass --no-fail-fast",
 ]
 
 [tasks.rust-test-cov]

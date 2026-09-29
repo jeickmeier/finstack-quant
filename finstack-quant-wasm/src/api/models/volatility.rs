@@ -18,9 +18,7 @@ use wasm_bindgen::prelude::*;
 /// Hagan SABR (2002): see docs/REFERENCES.md#hagan-2002-sabr.
 #[wasm_bindgen(js_name = SabrParameters)]
 pub struct JsSabrParameters {
-    #[wasm_bindgen(skip)]
-    /// Underlying Rust value (not exposed to JS).
-    pub inner: SabrParameters,
+    pub(crate) inner: SabrParameters,
 }
 
 #[wasm_bindgen(js_class = SabrParameters)]
@@ -107,6 +105,10 @@ impl JsSabrParameters {
 }
 
 impl JsSabrParameters {
+    pub(crate) fn from_inner(inner: SabrParameters) -> Self {
+        Self { inner }
+    }
+
     fn clone_inner(&self) -> SabrParameters {
         self.inner.clone()
     }
@@ -151,9 +153,7 @@ impl JsSabrModel {
     /// Parameters used by this model.
     #[wasm_bindgen(getter)]
     pub fn params(&self) -> JsSabrParameters {
-        JsSabrParameters {
-            inner: self.inner.parameters().clone(),
-        }
+        JsSabrParameters::from_inner(self.inner.parameters().clone())
     }
 
     /// Whether the parameterization admits negative forwards.
@@ -337,7 +337,7 @@ impl JsSabrCalibrator {
     ) -> Result<JsSabrParameters, JsValue> {
         self.inner
             .calibrate(forward, &strikes, &market_vols, t, beta)
-            .map(|inner| JsSabrParameters { inner })
+            .map(JsSabrParameters::from_inner)
             .map_err(to_js_err)
     }
 

@@ -88,11 +88,11 @@ one-screen diff. Keep them edited together.
 Run:
 
 ```bash
-# dts_contract is what `mise run rust-test` selects for this crate
-cargo nextest run -p finstack-quant-wasm --test dts_contract
-
-# return_shapes is not selected by any mise task; run it explicitly
-cargo nextest run -p finstack-quant-wasm --test wasm return_shapes
+# `mise run rust-test` selects both host targets for this crate:
+# dts_contract, and the consolidated `wasm` binary, whose only host-runnable
+# module is return_shapes (the wasm_* modules are wasm32-gated).
+mise run rust-test-integration -- finstack-quant-wasm dts_contract
+mise run rust-test-filter -- finstack-quant-wasm return_shapes --integration wasm
 ```
 
 ## Layer 3 — `facade/` (Node, built package)
