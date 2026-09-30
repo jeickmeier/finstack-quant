@@ -147,35 +147,6 @@ const PORTFOLIO_SPEC_JSON = JSON.stringify({
   positions: [],
 });
 
-const PORTFOLIO_RESULT_JSON = JSON.stringify({
-  valuation: {
-    as_of: '2024-01-01',
-    position_values: {},
-    total_base_currency: { amount: 1000000.0, currency: 'USD' },
-    by_entity: {},
-  },
-  metrics: {
-    aggregated: {},
-    by_position: {},
-  },
-  meta: {
-    numeric_mode: 'F64',
-    rounding: {
-      mode: 'Bankers',
-      ingest_scale_by_currency: {},
-      output_scale_by_currency: {},
-      tolerances: {
-        rate_epsilon: 1e-12,
-        generic_epsilon: 1e-10,
-      },
-      version: 1,
-    },
-    fx_policy_applied: null,
-    timestamp: null,
-    version: null,
-  },
-});
-
 const INSTRUMENT_JSON = JSON.stringify({
   type: 'deposit',
   spec: {
@@ -677,10 +648,6 @@ async function main() {
     w.parsePortfolioSpecJson(PORTFOLIO_SPEC_JSON);
   });
 
-  bench('portfolio', 'portfolioResultTotalValue', 8000, () => {
-    w.portfolioResultTotalValue(PORTFOLIO_RESULT_JSON);
-  });
-
   runMaterializationBenchmarks();
 
   bench('valuations', 'validateInstrumentJson', 2000, () => {
@@ -940,10 +907,6 @@ async function main() {
 
   benchTry('portfolio', 'buildPortfolioFromSpecJson', 3000, () => {
     w.buildPortfolioFromSpecJson(PORTFOLIO_SPEC_JSON);
-  });
-
-  benchTry('portfolio', 'portfolioResultGetMetric', 6000, () => {
-    w.portfolioResultGetMetric(PORTFOLIO_RESULT_JSON, 'dv01');
   });
 
   benchTry('portfolio', 'valuePortfolio', 200, () => {

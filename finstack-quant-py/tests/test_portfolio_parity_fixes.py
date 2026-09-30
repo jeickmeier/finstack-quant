@@ -236,15 +236,16 @@ class TestOptimizationInputs:
 
 
 class TestPerformanceInputs:
-    def test_twrr_modified_dietz_keyword_form(self) -> None:
-        assert twrr_modified_dietz(beginning_market_value=100.0, ending_market_value=110.0) == pytest.approx(0.1)
-        assert twrr_modified_dietz({
-            "beginning_market_value": 100.0,
-            "ending_market_value": 110.0,
-            "cashflows": [],
-        }) == pytest.approx(0.1)
-        with pytest.raises(ValueError, match=r"requires either"):
-            twrr_modified_dietz()
+    def test_twrr_modified_dietz_takes_one_rust_owned_period(self) -> None:
+        # Rust owns the omitted-cashflows meaning (no flows) and rejects
+        # unknown keys; the same JSON is accepted by WASM twrrModifiedDietz.
+        bare = {"beginning_market_value": 100.0, "ending_market_value": 110.0}
+        assert twrr_modified_dietz(bare) == pytest.approx(0.1)
+        assert twrr_modified_dietz({**bare, "cashflows": []}) == twrr_modified_dietz(bare)
+        with pytest.raises(ValueError, match=r"unknown field `bogus`"):
+            twrr_modified_dietz({**bare, "bogus": 1})
+        with pytest.raises(TypeError):
+            twrr_modified_dietz(beginning_market_value=100.0, ending_market_value=110.0)  # type: ignore[call-arg]
 
     def test_mwr_xirr_accepts_tuples(self) -> None:
         pairs = [(dt.date(2025, 1, 1), -100.0), ("2026-01-01", 110.0)]

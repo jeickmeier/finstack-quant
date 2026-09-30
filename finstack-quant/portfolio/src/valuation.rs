@@ -187,9 +187,11 @@ impl PortfolioValuation {
 ///
 /// - The entries skipped for a position are listed on
 ///   [`PositionValue::inapplicable_metrics`].
-/// - An identifier that is not a standard metric is still rejected when the
-///   request is parsed, by [`Self::try_from_metric_names`], so a typo fails
-///   loudly instead of narrowing away everywhere.
+/// - An identifier the standard metric registry does not know is still
+///   rejected when the request is parsed, by [`Self::try_from_metric_names`],
+///   so a typo fails loudly instead of narrowing away everywhere.
+/// - A composite position is asked for the additive entries at least one of
+///   its legs supports (see `Instrument::applicable_metrics`).
 /// - A metric an instrument type *does* support but fails to compute is
 ///   governed by
 ///   [`PortfolioValuationOptions::strict_risk`](PortfolioValuationOptions::strict_risk),
@@ -226,8 +228,10 @@ impl RequestedMetrics {
     ///
     /// - `None` requests [`RequestedMetrics::Standard`].
     /// - `Some(names)` requests [`RequestedMetrics::Only`] with each name
-    ///   resolved through [`MetricId::parse_strict`]. An empty list therefore
-    ///   performs a PV-only valuation.
+    ///   resolved against the standard metric registry, the same resolution
+    ///   single-instrument pricing uses: every id `list_standard_metrics`
+    ///   returns is accepted. An empty list therefore performs a PV-only
+    ///   valuation.
     ///
     /// `MetricId`'s `FromStr` is deliberately not used here: it is infallible
     /// (unknown names silently become custom metrics the valuation engine
@@ -241,17 +245,16 @@ impl RequestedMetrics {
     /// # Errors
     ///
     /// Returns [`finstack_quant_core::Error::UnknownMetric`] when a name is
-    /// not a standard metric identifier; the error lists the available ids.
+    /// neither a standard metric identifier nor registered in the standard
+    /// metric registry; the error lists the closest standard ids.
     pub fn try_from_metric_names(
         metrics: Option<Vec<String>>,
     ) -> finstack_quant_core::Result<Self> {
         match metrics {
             None => Ok(Self::Standard),
             Some(names) => Ok(Self::Only(
-                names
-                    .iter()
-                    .map(|name| MetricId::parse_strict(name))
-                    .collect::<finstack_quant_core::Result<Vec<_>>>()?,
+                finstack_quant_valuations::metrics::standard_registry()
+                    .resolve_metric_ids(&names)?,
             )),
         }
     }
@@ -511,6 +514,130 @@ mod tests {
     use finstack_quant_valuations::instruments::rates::deposit::Deposit;
     use std::sync::Arc;
     use time::macros::date;
+
+    fn one_month_deposit(id: &str, as_of: Date) -> Deposit {
+        Deposit::builder()
+            .id(id.into())
+            .notional(Money::from((1_000_000_i64, Currency::USD)))
+            .start_date(as_of)
+            .maturity(date!(2024 - 02 - 01))
+            .day_count(finstack_quant_core::dates::DayCount::Act360)
+            .discount_curve_id("USD".into())
+            .fixed_rate_opt(Some(
+                rust_decimal::Decimal::try_from(0.045).expect("valid literal"),
+            ))
+            .build()
+            .expect("valid deposit fixture")
+    }
+
+    /// The metric menu resolves names exactly as single-instrument pricing
+    /// does: every id the standard registry lists is accepted, a typo is not.
+    #[test]
+    fn metric_names_resolve_against_the_standard_registry() {
+        let listed = finstack_quant_valuations::pricer::json::list_standard_metrics();
+        assert!(listed
+            .iter()
+            .any(|name| MetricId::parse_strict(name).is_err()));
+        let RequestedMetrics::Only(resolved) =
+            RequestedMetrics::try_from_metric_names(Some(listed.clone()))
+                .expect("every listed standard metric is a valid portfolio metric")
+        else {
+            panic!("explicit names request an Only menu");
+        };
+        assert_eq!(
+            resolved.iter().map(MetricId::as_str).collect::<Vec<_>>(),
+            listed
+        );
+        let err = RequestedMetrics::try_from_metric_names(Some(vec!["dv011".to_string()]))
+            .expect_err("a typo is still rejected");
+        assert!(err.to_string().contains("dv011"), "{err}");
+    }
+
+    /// A composite aggregates its metrics over its legs, so its position is
+    /// offered the additive menu entries a leg supports — `dv01` for a
+    /// deposit-leg composite — even though no calculator is registered for
+    /// the composite instrument type itself. A non-additive entry is reported
+    /// as inapplicable instead of failing the valuation.
+    #[test]
+    fn composite_positions_are_offered_the_additive_metrics_their_legs_support() {
+        use finstack_quant_valuations::instruments::composite::{
+            CompositeLegSpec, CompositeSpec, RebalanceRule, WeightingMethod,
+        };
+        use finstack_quant_valuations::instruments::InstrumentJson;
+
+        let as_of = date!(2024 - 01 - 01);
+        let composite = CompositeSpec::new(
+            "DEP-PAIR",
+            Currency::USD,
+            Money::from((1_000_000_i64, Currency::USD)),
+            vec![
+                CompositeLegSpec::new(
+                    "DEP-A",
+                    InstrumentJson::Deposit(one_month_deposit("DEP-A", as_of)),
+                    1.0,
+                ),
+                CompositeLegSpec::new(
+                    "DEP-B",
+                    InstrumentJson::Deposit(one_month_deposit("DEP-B", as_of)),
+                    2.0,
+                ),
+            ],
+            WeightingMethod::FixedQuantity,
+            RebalanceRule::Manual,
+        )
+        .initialize_fixed(as_of)
+        .expect("fixed-quantity composite")
+        .instrument;
+        let position = Position::new(
+            "POS_COMPOSITE",
+            DUMMY_ENTITY_ID,
+            "DEP-PAIR",
+            Arc::new(composite),
+            1.0,
+            PositionUnit::Units,
+        )
+        .expect("valid position");
+        let portfolio = PortfolioBuilder::new("TEST")
+            .base_currency(Currency::USD)
+            .as_of(as_of)
+            .position(position)
+            .build()
+            .expect("valid portfolio");
+        let market = build_test_market();
+        let config = FinstackConfig::default();
+
+        let standard = value_portfolio(
+            &portfolio,
+            &market,
+            &config,
+            &PortfolioValuationOptions::default(),
+        )
+        .expect("standard menu values the composite");
+        let value = &standard.position_values["POS_COMPOSITE"];
+        assert!(value.inapplicable_metrics.is_empty(), "{value:?}");
+        assert!(value.risk_metrics_complete);
+        let measures = &value
+            .valuation_result
+            .as_ref()
+            .expect("valuation result")
+            .measures;
+        assert!(measures.contains_key(&MetricId::Dv01), "{measures:?}");
+
+        let with_ytm = value_portfolio(
+            &portfolio,
+            &market,
+            &config,
+            &PortfolioValuationOptions {
+                metrics: RequestedMetrics::Only(vec![MetricId::Dv01, MetricId::Ytm]),
+                ..PortfolioValuationOptions::default()
+            },
+        )
+        .expect("a non-additive menu entry narrows away");
+        assert_eq!(
+            with_ytm.position_values["POS_COMPOSITE"].inapplicable_metrics,
+            vec![MetricId::Ytm]
+        );
+    }
 
     #[test]
     fn test_value_single_position() {

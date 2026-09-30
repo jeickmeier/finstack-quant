@@ -54,28 +54,6 @@ fn get_f64(value: &JsValue, key: &str) -> f64 {
 }
 
 #[wasm_bindgen_test]
-fn portfolio_result_get_metric_returns_undefined_for_missing() {
-    let spec = portfolio_spec_json();
-    let market = empty_market_json();
-    let valuation = value_portfolio(
-        JsValue::from(&spec),
-        JsValue::from(&market),
-        Some(JsValue::from(false)),
-        None,
-    )
-    .unwrap();
-    let result = finstack_quant_portfolio::results::PortfolioResult::new(
-        serde_wasm_bindgen::from_value(valuation).unwrap(),
-        Default::default(),
-        Default::default(),
-    );
-    let result_json = serde_json::to_string(&result).unwrap();
-    let v = portfolio_result_get_metric(JsValue::from(&result_json), JsValue::from("nonexistent"))
-        .unwrap();
-    assert_eq!(v, None);
-}
-
-#[wasm_bindgen_test]
 fn value_portfolio_returns_a_structured_object() {
     let spec = portfolio_spec_json();
     let market = empty_market_json();
@@ -214,7 +192,7 @@ fn carino_link_reconstructs_compounded_active_return() {
             }
         ]
     ]);
-    let result = carino_link(JsValue::from(&periods.to_string())).unwrap();
+    let result = carino_link_from_sector_periods(JsValue::from(&periods.to_string())).unwrap();
     let geometric_active = get_f64(&result, "portfolio_return_compounded")
         - get_f64(&result, "benchmark_return_compounded");
     let reconstructed = get_f64(&result, "linked_allocation")
@@ -222,6 +200,21 @@ fn carino_link_reconstructs_compounded_active_return() {
         + get_f64(&result, "linked_interaction");
 
     assert!((reconstructed - geometric_active).abs() < 1e-10);
+
+    // `carinoLink` binds Rust `carino_link` over precomputed period results
+    // and reaches the same answer as the raw sector-period entry point.
+    let period_results: Vec<serde_json::Value> = periods
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|sectors| as_json(&brinson_fachler(JsValue::from(&sectors.to_string())).unwrap()))
+        .collect();
+    let linked = carino_link(JsValue::from(
+        &serde_json::Value::from(period_results).to_string(),
+    ))
+    .unwrap();
+    assert_eq!(as_json(&linked), as_json(&result));
+    assert!(carino_link(JsValue::from(&periods.to_string())).is_err());
 }
 
 #[wasm_bindgen_test]
@@ -261,6 +254,7 @@ fn replay_portfolio_returns_a_structured_object() {
 #[wasm_bindgen_test]
 fn mo25_26_decompose_factor_risk_accepts_zero_factors_with_canonical_measure() {
     let sensitivities = serde_json::json!({
+        "base_currency": "USD",
         "position_ids": [],
         "factor_ids": [],
         "data": []
@@ -738,30 +732,6 @@ fn portfolio_handle_exposes_spec_metadata_and_roundtrips() {
     let round = handle.to_json().expect("to spec json");
     let parsed: serde_json::Value = serde_json::from_str(&round).expect("json");
     assert_eq!(parsed["id"], "test_portfolio");
-}
-
-#[wasm_bindgen_test]
-fn portfolio_result_total_value_from_valuation() {
-    let spec: finstack_quant_portfolio::portfolio::PortfolioSpec =
-        serde_json::from_str(&minimal_portfolio_spec_json()).expect("parse spec");
-    let portfolio = finstack_quant_portfolio::Portfolio::from_spec(spec).expect("build portfolio");
-    let market: finstack_quant_core::market_data::context::MarketContext =
-        serde_json::from_str(&empty_market_json()).expect("parse market");
-    let valuation = finstack_quant_portfolio::valuation::value_portfolio(
-        &portfolio,
-        &market,
-        &finstack_quant_core::config::FinstackConfig::default(),
-        &finstack_quant_portfolio::valuation::PortfolioValuationOptions::default(),
-    )
-    .expect("value");
-    let result = finstack_quant_portfolio::results::PortfolioResult::new(
-        valuation,
-        Default::default(),
-        Default::default(),
-    );
-    let result_json = serde_json::to_string(&result).expect("ser");
-    let total = portfolio_result_total_value(JsValue::from(&result_json)).expect("total");
-    assert!(total.is_finite());
 }
 
 #[wasm_bindgen_test]

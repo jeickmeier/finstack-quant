@@ -41,6 +41,7 @@ const EXPORTED_KEYS = [
   'campisiCarinoLinkFromSnapshots',
   'campisiReconciliationCheck',
   'carinoLink',
+  'carinoLinkFromSectorPeriods',
   'cellReturnsFromCurves',
   'cellReturnsFromReference',
   'computeFactorSensitivities',
@@ -55,8 +56,6 @@ const EXPORTED_KEYS = [
   'mwrXirr',
   'optimizePortfolio',
   'parsePortfolioSpecJson',
-  'portfolioResultGetMetric',
-  'portfolioResultTotalValue',
   'replayPortfolio',
   'scenarioPnl',
   'scenarioPnlBuilt',
@@ -898,12 +897,39 @@ test('portfolio.brinsonFachler and carinoLink return structured attributions', (
   assert.ok(Math.abs(reconstructed - single.total_excess_return) < 1e-12);
 
   const linked = assertStructured(
-    portfolio.carinoLink(JSON.stringify([JSON.parse(sectors), JSON.parse(sectors)])),
-    'carinoLink result'
+    portfolio.carinoLinkFromSectorPeriods(
+      JSON.stringify([JSON.parse(sectors), JSON.parse(sectors)])
+    ),
+    'carinoLinkFromSectorPeriods result'
   );
   const geometric = linked.portfolio_return_compounded - linked.benchmark_return_compounded;
   const sum = linked.linked_allocation + linked.linked_selection + linked.linked_interaction;
   assert.ok(Math.abs(sum - geometric) < 1e-10);
+
+  // carinoLink binds Rust `carino_link`: it links precomputed period results
+  // (the brinsonFachler output), like campisiCarinoLink and gridCarinoLink.
+  const precomputed = assertStructured(
+    portfolio.carinoLink(JSON.stringify([single, single])),
+    'carinoLink result'
+  );
+  assert.deepEqual(precomputed, linked);
+  assert.throws(
+    () => portfolio.carinoLink(JSON.stringify([JSON.parse(sectors), JSON.parse(sectors)])),
+    (error) => error instanceof Error && error.kind === 'validation'
+  );
+});
+
+test('portfolio.twrrModifiedDietz treats omitted cashflows as none and rejects unknown keys', () => {
+  const bare = { beginning_market_value: 100.0, ending_market_value: 110.0 };
+  assert.ok(Math.abs(portfolio.twrrModifiedDietz(JSON.stringify(bare)) - 0.1) < 1e-15);
+  assert.equal(
+    portfolio.twrrModifiedDietz(JSON.stringify({ ...bare, cashflows: [] })),
+    portfolio.twrrModifiedDietz(JSON.stringify(bare))
+  );
+  assert.throws(
+    () => portfolio.twrrModifiedDietz(JSON.stringify({ ...bare, bogus: 1 })),
+    (error) => error.kind === 'validation' && /unknown field `bogus`/.test(error.message)
+  );
 });
 
 test('portfolio.twrrLinked returns a structured linked return', () => {
@@ -987,6 +1013,67 @@ test('factor-risk kernels are absent from the portfolio namespace', () => {
   assert.equal('parametricEsDecomposition' in portfolio, false);
   assert.equal('historicalVarDecomposition' in portfolio, false);
   assert.equal('evaluateRiskBudget' in portfolio, false);
+});
+
+// Cross-host golden, asserted identically by
+// finstack-quant-py/tests/test_portfolio_sensitivity_wire.py: the canonical
+// sensitivity-matrix wire object, a 2x2 covariance and the resulting risk.
+const SENSITIVITY_WIRE = {
+  base_currency: 'USD',
+  position_ids: ['A', 'B'],
+  factor_ids: ['F1', 'F2'],
+  data: [
+    [1.0, 2.0],
+    [3.0, -1.0],
+  ],
+};
+const SENSITIVITY_COVARIANCE = JSON.stringify({
+  factor_ids: ['F1', 'F2'],
+  n: 2,
+  data: [0.04, 0.01, 0.01, 0.09],
+});
+
+test('portfolio.decomposeFactorRisk reads the canonical wire and returns the Rust result', () => {
+  const variance = assertStructured(
+    portfolio.decomposeFactorRisk(JSON.stringify(SENSITIVITY_WIRE), SENSITIVITY_COVARIANCE),
+    'decomposeFactorRisk result'
+  );
+  // exposures e = [4, 1]; e' S e = 16*0.04 + 2*4*0.01 + 0.09 = 0.81
+  assert.ok(Math.abs(variance.total_risk - 0.81) < 1e-12);
+  assert.equal(variance.measure, 'variance');
+  assert.equal(variance.position_factor_contributions.length, 4);
+  assert.deepEqual(variance.position_residual_contributions, []);
+
+  // A plain object is accepted too, and the measure keeps its serde form.
+  for (const [measure, expected] of [
+    [{ var: { confidence: 0.99 } }, { var: { confidence: 0.99 } }],
+    [{ expected_shortfall: { confidence: 0.975 } }, { expected_shortfall: { confidence: 0.975 } }],
+    ['volatility', 'volatility'],
+  ]) {
+    const decomposition = portfolio.decomposeFactorRisk(
+      SENSITIVITY_WIRE,
+      SENSITIVITY_COVARIANCE,
+      JSON.stringify(measure)
+    );
+    assert.deepEqual(decomposition.measure, expected);
+  }
+});
+
+test('portfolio.decomposeFactorRisk rejects malformed sensitivity wire with a validation error', () => {
+  const isValidation = (pattern) => (error) =>
+    error instanceof Error && error.kind === 'validation' && pattern.test(error.message);
+  for (const [wire, pattern] of [
+    [{ ...SENSITIVITY_WIRE, data: [[1.0, 2.0]] }, /1 row\(s\) but position_ids declares 2/],
+    [{ ...SENSITIVITY_WIRE, data: [[1.0, 2.0], [3.0]] }, /row 1 has 1 element\(s\)/],
+    [{ ...SENSITIVITY_WIRE, n_factors: 2 }, /unknown field `n_factors`/],
+    [{ ...SENSITIVITY_WIRE, base_currency: 'NOT_A_CCY' }, /NOT_A_CCY/],
+    [{ ...SENSITIVITY_WIRE, data: [1.0, 2.0, 3.0, -1.0] }, /invalid type/],
+  ]) {
+    assert.throws(
+      () => portfolio.decomposeFactorRisk(JSON.stringify(wire), SENSITIVITY_COVARIANCE),
+      isValidation(pattern)
+    );
+  }
 });
 
 test('standalone sensitivity outputs require and retain the reporting currency', () => {

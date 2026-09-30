@@ -131,24 +131,12 @@ impl PyReplayResult {
     }
 }
 
-/// Resolve the replay configuration from ``config`` (JSON string or dict) or
-/// from the ``mode`` shorthand.
+/// Parse the replay configuration from ``config`` (JSON string or dict).
 fn extract_replay_config(
     py: Python<'_>,
-    config: Option<&Bound<'_, PyAny>>,
-    mode: Option<&str>,
+    config: &Bound<'_, PyAny>,
 ) -> PyResult<finstack_quant_portfolio::replay::ReplayConfig> {
-    let json = match (config, mode) {
-        (Some(config), _) => {
-            crate::bindings::extract::extract_records_json(py, config, "replay config")?
-        }
-        (None, Some(mode)) => serde_json::json!({ "mode": mode }).to_string(),
-        (None, None) => {
-            return Err(crate::errors::value_error(
-                "replay_portfolio requires either `config` or `mode`",
-            ))
-        }
-    };
+    let json = crate::bindings::extract::extract_records_json(py, config, "replay config")?;
     py.detach(move || serde_json::from_str(&json))
         .map_err(display_to_py)
 }
@@ -192,11 +180,10 @@ fn run_replay_portfolio(
     py: Python<'_>,
     portfolio: &Bound<'_, PyAny>,
     snapshots: &Bound<'_, PyAny>,
-    config: Option<&Bound<'_, PyAny>>,
-    mode: Option<&str>,
+    config: &Bound<'_, PyAny>,
 ) -> PyResult<finstack_quant_portfolio::replay::ReplayResult> {
     let portfolio = extract_portfolio_ref(py, portfolio)?;
-    let config = extract_replay_config(py, config, mode)?;
+    let config = extract_replay_config(py, config)?;
     let timeline = extract_replay_timeline(py, snapshots)?;
     let finstack_config = finstack_quant_core::config::FinstackConfig::default();
     let portfolio_ref: &finstack_quant_portfolio::Portfolio = &portfolio;
@@ -223,13 +210,12 @@ fn run_replay_portfolio(
 ///     pairs (dates as ``datetime.date`` or ISO strings), JSON-shaped
 ///     ``{"date": "YYYY-MM-DD", "market": {...}}`` dicts, or the canonical
 ///     JSON array string.
-/// config : dict | str | None
-///     ``ReplayConfig`` as a dict or JSON string (``mode``,
-///     ``attribution_method``, ``valuation_options``, ``on_error``).
-/// mode : str | None
-///     Shorthand for ``config={"mode": mode}`` when no other option is
-///     needed: ``"pv_only"``, ``"pv_and_pnl"`` or ``"full_attribution"``.
-///     Ignored when ``config`` is given.
+/// config : dict | str
+///     ``ReplayConfig`` as a dict or JSON string: required ``mode``
+///     (``"pv_only"``, ``"pv_and_pnl"`` or ``"full_attribution"``) and
+///     optional ``attribution_method``, ``valuation_options`` and
+///     ``on_error``; unknown keys are rejected. The same input the WASM
+///     ``replayPortfolio`` takes.
 ///
 /// Returns
 /// -------
@@ -241,24 +227,20 @@ fn run_replay_portfolio(
 /// Raises
 /// ------
 /// ValueError
-///     If neither ``config`` nor ``mode`` is supplied, or a snapshot/config
-///     payload is malformed.
+///     If a snapshot or config payload is malformed (including a missing
+///     ``mode``).
 /// PortfolioError
 ///     If a snapshot fails to revalue under a strict error policy.
 #[pyfunction]
-#[pyo3(
-    signature = (portfolio, snapshots, config=None, mode=None),
-    text_signature = "(portfolio, snapshots, config=None, mode=None)"
-)]
+#[pyo3(text_signature = "(portfolio, snapshots, config)")]
 fn replay_portfolio(
     py: Python<'_>,
     portfolio: &Bound<'_, PyAny>,
     snapshots: &Bound<'_, PyAny>,
-    config: Option<&Bound<'_, PyAny>>,
-    mode: Option<&str>,
+    config: &Bound<'_, PyAny>,
 ) -> PyResult<PyReplayResult> {
     Ok(PyReplayResult {
-        inner: run_replay_portfolio(py, portfolio, snapshots, config, mode)?,
+        inner: run_replay_portfolio(py, portfolio, snapshots, config)?,
     })
 }
 
@@ -271,18 +253,14 @@ fn replay_portfolio(
 /// str
 ///     JSON-serialized ``ReplayResult``.
 #[pyfunction]
-#[pyo3(
-    signature = (portfolio, snapshots, config=None, mode=None),
-    text_signature = "(portfolio, snapshots, config=None, mode=None)"
-)]
+#[pyo3(text_signature = "(portfolio, snapshots, config)")]
 fn replay_portfolio_json<'py>(
     py: Python<'py>,
     portfolio: &Bound<'_, PyAny>,
     snapshots: &Bound<'_, PyAny>,
-    config: Option<&Bound<'_, PyAny>>,
-    mode: Option<&str>,
+    config: &Bound<'_, PyAny>,
 ) -> PyResult<Bound<'py, PyString>> {
-    let result = run_replay_portfolio(py, portfolio, snapshots, config, mode)?;
+    let result = run_replay_portfolio(py, portfolio, snapshots, config)?;
     py.detach(move || {
         REPLAY_JSON_SCRATCH.with(|scratch| {
             let mut scratch = scratch.borrow_mut();

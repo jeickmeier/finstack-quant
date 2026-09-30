@@ -6,7 +6,7 @@ use pyo3::types::{PyDict, PyList, PyType};
 
 use finstack_quant_portfolio::optimization::{
     CandidatePosition, OptimizationStatus, PortfolioOptimizationResult,
-    PortfolioOptimizationResultWire, PortfolioOptimizationSpec, TradeType, TradeUniverse,
+    PortfolioOptimizationResultWire, PortfolioOptimizationSpec, TradeUniverse,
 };
 use finstack_quant_portfolio::types::PositionId;
 
@@ -710,10 +710,8 @@ impl PyPortfolioOptimizationResult {
     #[pyo3(text_signature = "(self)")]
     fn new_position_trades(&self) -> Vec<PyTradeSpec> {
         self.inner
-            .trades
-            .iter()
-            .filter(|t| t.trade_type == TradeType::NewPosition)
-            .cloned()
+            .new_position_trades()
+            .into_iter()
             .map(PyTradeSpec::from_inner)
             .collect()
     }
@@ -780,17 +778,9 @@ impl PyPortfolioOptimizationResult {
     #[pyo3(text_signature = "(self)")]
     fn binding_constraints(&self) -> Vec<(String, f64)> {
         self.inner
-            .binding_constraints
-            .iter()
-            .map(|name| {
-                let slack = self
-                    .inner
-                    .constraint_slacks
-                    .get(name)
-                    .copied()
-                    .unwrap_or(0.0);
-                (name.clone(), slack)
-            })
+            .binding_constraints()
+            .into_iter()
+            .map(|(name, slack)| (name.to_owned(), slack))
             .collect()
     }
 

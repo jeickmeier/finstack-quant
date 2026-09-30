@@ -23,7 +23,7 @@ from finstack_quant.portfolio import (
     aggregate_metrics_json,
     attribute_portfolio_pnl,
     build_portfolio_from_spec_json,
-    carino_link_json,
+    carino_link_from_sector_periods_json,
     compute_factor_sensitivities,
     decompose_factor_risk,
     factor_stress,
@@ -374,7 +374,7 @@ def test_large_carino_parse_compute_and_serialize_release_gil() -> None:
     ]
     periods_json = json.dumps([period] * 10_000)
 
-    result_json = _assert_releases_gil(lambda: carino_link_json(periods_json))
+    result_json = _assert_releases_gil(lambda: carino_link_from_sector_periods_json(periods_json))
     result = json.loads(result_json)
 
     assert len(result["periods"]) == 10_000

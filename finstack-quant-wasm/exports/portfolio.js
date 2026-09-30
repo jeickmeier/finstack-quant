@@ -1,33 +1,33 @@
 import * as wasm from '../pkg/finstack_quant_wasm.js';
 
-const fromMaterializationWithCache = wasm.Portfolio.fromMaterialization.bind(wasm.Portfolio);
-const validateMaterializationWithCache = wasm.Portfolio.validateMaterialization.bind(
-  wasm.Portfolio
+// Rust `Portfolio::from_materialization` / `validate_materialization` borrow a
+// cache; the published statics make it optional. wasm-bindgen 0.2.126 cannot
+// express an optional borrowed handle (`Option<&T>`), and an owned
+// `Option<InstrumentArtifactCache>` would consume the caller's reusable JS
+// handle, so the omitted case lives here. Omitted, `undefined` or `null` means
+// a per-call cache with the Rust default bounds (the Python `cache=None`
+// twin). The statics are patched in place so the namespace keeps exporting
+// the one `Portfolio` class that wasm-bindgen instantiates. The `= undefined`
+// default keeps `Function.length` at the declared required arity (1).
+const withCache =
+  (call) =>
+  (bundle, cache = undefined) => {
+    if (cache != null) {
+      return call(bundle, cache);
+    }
+    const ephemeral = new wasm.InstrumentArtifactCache();
+    try {
+      return call(bundle, ephemeral);
+    } finally {
+      ephemeral.free();
+    }
+  };
+wasm.Portfolio.fromMaterialization = withCache(
+  wasm.Portfolio.fromMaterialization.bind(wasm.Portfolio)
 );
-
-wasm.Portfolio.fromMaterialization = (bundle, cache = undefined) => {
-  if (cache !== undefined) {
-    return fromMaterializationWithCache(bundle, cache);
-  }
-  const ephemeral = new wasm.InstrumentArtifactCache();
-  try {
-    return fromMaterializationWithCache(bundle, ephemeral);
-  } finally {
-    ephemeral.free();
-  }
-};
-
-wasm.Portfolio.validateMaterialization = (bundle, cache = undefined) => {
-  if (cache !== undefined) {
-    return validateMaterializationWithCache(bundle, cache);
-  }
-  const ephemeral = new wasm.InstrumentArtifactCache();
-  try {
-    return validateMaterializationWithCache(bundle, ephemeral);
-  } finally {
-    ephemeral.free();
-  }
-};
+wasm.Portfolio.validateMaterialization = withCache(
+  wasm.Portfolio.validateMaterialization.bind(wasm.Portfolio)
+);
 
 export const portfolio = {
   InstrumentArtifactCache: wasm.InstrumentArtifactCache,
@@ -35,6 +35,7 @@ export const portfolio = {
   parsePortfolioSpecJson: wasm.parsePortfolioSpecJson,
   brinsonFachler: wasm.brinsonFachler,
   carinoLink: wasm.carinoLink,
+  carinoLinkFromSectorPeriods: wasm.carinoLinkFromSectorPeriods,
   campisiAttribution: wasm.campisiAttribution,
   // ⚠️ campisiCarinoLink links precomputed results and carries no shared
   // period_years, so it is the correct entry point for unequal-length
@@ -53,8 +54,6 @@ export const portfolio = {
   twrrLinked: wasm.twrrLinked,
   mwrXirr: wasm.mwrXirr,
   buildPortfolioFromSpecJson: wasm.buildPortfolioFromSpecJson,
-  portfolioResultTotalValue: wasm.portfolioResultTotalValue,
-  portfolioResultGetMetric: wasm.portfolioResultGetMetric,
   aggregateMetrics: wasm.aggregateMetrics,
   valuePortfolio: wasm.valuePortfolio,
   valuePortfolioBuilt: wasm.valuePortfolioBuilt,
@@ -72,7 +71,7 @@ export const portfolio = {
   computeFactorSensitivitiesWithMarket: wasm.computeFactorSensitivitiesWithMarket,
   computePnlProfiles: wasm.computePnlProfiles,
   computePnlProfilesWithMarket: wasm.computePnlProfilesWithMarket,
-  // ⚠️ BLOCKING: validate sensitivity/covariance dimensions before calling;
-  // malformed matrices throw instead of returning partial decompositions.
+  // Takes the computeFactorSensitivities wire object; malformed dimensions
+  // throw a validation Error.
   decomposeFactorRisk: wasm.decomposeFactorRisk,
 };

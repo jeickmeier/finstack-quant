@@ -658,7 +658,7 @@ run = '''
 set -eu
 code() { grep -rnE --include='*.rs' -e "$1" finstack-quant-wasm/src/api | grep -vE '^[^:]+:[0-9]+:[[:space:]]*//' || true; }
 bare=$(code 'JsValue::from_str|js_sys::Error::new|Err\(JsValue::from|JsValue::from\(format!')
-string_errs=$(code '-> Result<[^>]*, String>' | grep -vE -e 'src/api/portfolio/sensitivity\.rs' -e 'src/api/models/volatility\.rs' || true)
+string_errs=$(code '-> Result<[^>]*, String>' | grep -vE -e 'src/api/models/volatility\.rs' || true)
 if [ -n "$bare$string_errs" ]; then
   echo 'Bindings must throw through crate::utils::to_js_err (structured FinstackError with kind).'
   if [ -n "$bare" ]; then echo "$bare"; fi

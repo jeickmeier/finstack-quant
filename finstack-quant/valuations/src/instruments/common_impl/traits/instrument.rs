@@ -381,6 +381,36 @@ pub trait Instrument: CashflowProvider + Send + Sync {
         false
     }
 
+    /// Narrow a metric menu to the entries this instrument can compute.
+    ///
+    /// Pricing is strict: it rejects a requested metric the instrument cannot
+    /// produce. Engines that offer one fixed menu to heterogeneous instruments
+    /// (portfolio valuation, composite legs) narrow it here first. The default
+    /// keeps the entries `registry` has a calculator for on this instrument's
+    /// [`key`](Self::key). Instruments whose metrics do not come from their own
+    /// registry entry override it; a composite reports the additive entries
+    /// that at least one of its legs supports.
+    ///
+    /// # Arguments
+    ///
+    /// * `menu` - Candidate metric identifiers, in caller order; the returned
+    ///   subset keeps that order and any duplicates.
+    /// * `registry` - Metric registry whose calculators decide applicability;
+    ///   pass the pricing options' registry, or the standard registry when
+    ///   none is configured.
+    ///
+    /// # Returns
+    ///
+    /// The menu entries this instrument can compute. An empty result means it
+    /// can compute none of them.
+    fn applicable_metrics(
+        &self,
+        menu: &[MetricId],
+        registry: &crate::metrics::MetricRegistry,
+    ) -> Vec<MetricId> {
+        registry.applicable_subset(menu, self.key())
+    }
+
     /// Validate instrument-specific structural and economic invariants.
     ///
     /// The default implementation accepts the instrument. Types with domain

@@ -16,7 +16,12 @@
 //! - **Wire / spec / validator surfaces** — anything whose purpose is to echo a
 //!   canonical document for re-ingest — return a **JSON string** and their
 //!   names end in `Json` (`Portfolio.toJson`, `parsePortfolioSpecJson`,
-//!   `buildPortfolioFromSpecJson`, `Portfolio.validateMaterialization`).
+//!   `buildPortfolioFromSpecJson`).
+//!
+//! The materialization entry points (`Portfolio.fromMaterialization`,
+//! `Portfolio.validateMaterialization`) return plain structured objects
+//! (`{ portfolio, report }`, and `MaterializationReport | ValidationReport`
+//! respectively); validation diagnostics are returned, not thrown.
 //!
 //! # Stability tiers
 //!
@@ -31,8 +36,7 @@
 //!   `aggregateFullCashflows`, `aggregateFullCashflowsBuilt`,
 //!   `applyScenarioAndRevalue`, `applyScenarioAndRevalueBuilt`,
 //!   `scenarioPnl`, `scenarioPnlBuilt`
-//! - `aggregateMetrics`, `portfolioResultTotalValue`,
-//!   `portfolioResultGetMetric`
+//! - `aggregateMetrics`
 //! - `replayPortfolio`
 //!
 //! **Stable, JSON-shape may evolve** — function names stable, but the
@@ -170,21 +174,44 @@ pub fn brinson_fachler(sectors_json: JsValue) -> Result<JsValue, JsValue> {
     to_js_value(&result)
 }
 
-/// Compute Carino-linked multi-period Brinson attribution from period JSON.
+/// Carino-link already-computed single-period Brinson-Fachler results.
 ///
-/// Accepts a JSON array of periods, where each period is an array of
-/// `SectorPeriod` objects, and returns a structured `CarinoLinkedAttribution`
-/// object.
-/// @param periods_json - Chronological period-result JSON array.
+/// Binds Rust `carino_link`: accepts a chronological JSON array of
+/// `BrinsonPeriodResult` objects (for example `brinsonFachler` outputs) and
+/// returns a structured `CarinoLinkedAttribution` object whose linked effects
+/// reconstruct the geometrically compounded active return. Use
+/// `carinoLinkFromSectorPeriods` to link raw sector inputs instead.
+/// @param periods_json - Chronological JSON array of `BrinsonPeriodResult` objects with identical sector ordering in every period.
+///
+/// # Errors
+///
+/// Throws a JavaScript exception if `periodsJson` is malformed, the sequence is
+/// empty or changes sector ordering, or a period return is non-finite or at
+/// most `-1`.
+#[wasm_bindgen(js_name = carinoLink)]
+pub fn carino_link(periods_json: JsValue) -> Result<JsValue, JsValue> {
+    let periods_json: &str = &json_text(&periods_json, "periodsJson")?;
+    let periods: Vec<finstack_quant_portfolio::BrinsonPeriodResult> =
+        serde_json::from_str(periods_json).map_err(to_js_err)?;
+    let result = finstack_quant_portfolio::carino_link(&periods).map_err(to_js_err)?;
+    to_js_value(&result)
+}
+
+/// Compute Carino-linked multi-period Brinson attribution from raw sector
+/// periods.
+///
+/// Binds Rust `carino_link_from_sector_periods`: runs `brinsonFachler` on each
+/// period, then Carino-links the results. Returns a structured
+/// `CarinoLinkedAttribution` object.
+/// @param periods_json - Chronological JSON array of periods, each an array of `SectorPeriod` objects (`sector`, `portfolio_weight`, `benchmark_weight`, `portfolio_return`, `benchmark_return`).
 ///
 /// # Errors
 ///
 /// Throws a JavaScript exception if `periodsJson` is malformed, any period fails
-/// Brinson validation, the sequence is empty or changes sector ordering, a
-/// period return is non-finite or at most `-1`, or the result cannot be
-/// converted to a JavaScript value.
-#[wasm_bindgen(js_name = carinoLink)]
-pub fn carino_link(periods_json: JsValue) -> Result<JsValue, JsValue> {
+/// Brinson validation, the sequence is empty or changes sector ordering, or a
+/// period return is non-finite or at most `-1`.
+#[wasm_bindgen(js_name = carinoLinkFromSectorPeriods)]
+pub fn carino_link_from_sector_periods(periods_json: JsValue) -> Result<JsValue, JsValue> {
     let periods_json: &str = &json_text(&periods_json, "periodsJson")?;
     let periods: Vec<Vec<finstack_quant_portfolio::SectorPeriod>> =
         serde_json::from_str(periods_json).map_err(to_js_err)?;
@@ -541,13 +568,13 @@ pub fn factor_brinson_attribution(
 }
 
 /// Compute a Modified-Dietz TWRR sub-period return from period JSON.
-/// @param period_json - Single-period result JSON.
+/// @param period_json - `TwrrPeriod` JSON: `beginning_market_value`, `ending_market_value` and optional `cashflows: [{ amount, fraction_of_period_remaining }]` (omitted means no flows); a positive `amount` is a contribution into the portfolio and the fraction, in `[0, 1]`, is the share of the period remaining after the flow. Unknown keys are rejected.
 ///
 /// # Errors
 ///
-/// Throws a JavaScript exception if `periodJson` is malformed, does not match
-/// the expected period schema, or the return is undefined (non-positive
-/// adjusted denominator, out-of-range cashflow weight, non-finite inputs).
+/// Throws a JavaScript exception if `periodJson` is malformed, has unknown
+/// keys, or the return is undefined (non-positive adjusted denominator,
+/// out-of-range cashflow weight, non-finite inputs).
 #[wasm_bindgen(js_name = twrrModifiedDietz)]
 pub fn twrr_modified_dietz(period_json: JsValue) -> Result<f64, JsValue> {
     let period_json: &str = &json_text(&period_json, "periodJson")?;
@@ -576,7 +603,9 @@ pub fn twrr_linked(returns_json: JsValue, horizon_years: f64) -> Result<JsValue,
 }
 
 /// Compute money-weighted return via XIRR from dated cashflow JSON.
-/// @param cashflows_json - Dated cashflow JSON.
+///
+/// Binds Rust `mwr_xirr_from_cashflows` (Act/365F).
+/// @param cashflows_json - JSON array of `{ date, amount }` flows from the investor's cash account: contributions negative, distributions and terminal value positive.
 ///
 /// # Errors
 ///
@@ -616,47 +645,8 @@ pub fn build_portfolio_from_spec_json(spec_json: JsValue) -> Result<String, JsVa
     serde_json::to_string(&round_tripped).map_err(to_js_err)
 }
 
-/// Extract the total portfolio value from a JSON result.
-/// @param result_json - Result JSON produced by a prior call.
-///
-/// # Errors
-///
-/// Throws a JavaScript exception if `resultJson` is malformed or does not match
-/// the `PortfolioResult` schema.
-#[wasm_bindgen(js_name = portfolioResultTotalValue)]
-pub fn portfolio_result_total_value(result_json: JsValue) -> Result<f64, JsValue> {
-    let result_json: &str = &json_text(&result_json, "resultJson")?;
-    let result: finstack_quant_portfolio::results::PortfolioResult =
-        serde_json::from_str(result_json).map_err(to_js_err)?;
-
-    Ok(result.total_value().amount())
-}
-
-/// Extract a specific metric from a portfolio result JSON.
-///
-/// Returns `undefined` (via `Option`) if the metric was not produced.
-/// @param result_json - Result JSON produced by a prior call.
-/// @param metric_id - Stable metric identifier used to select the required domain object.
-///
-/// # Errors
-///
-/// Throws a JavaScript exception if `resultJson` is malformed or does not match
-/// the `PortfolioResult` schema. An absent `metricId` returns `undefined`.
-#[wasm_bindgen(js_name = portfolioResultGetMetric)]
-pub fn portfolio_result_get_metric(
-    result_json: JsValue,
-    metric_id: JsValue,
-) -> Result<Option<f64>, JsValue> {
-    let result_json: &str = &json_text(&result_json, "resultJson")?;
-    let metric_id: &str = &js_string(&metric_id, "metricId")?;
-    let result: finstack_quant_portfolio::results::PortfolioResult =
-        serde_json::from_str(result_json).map_err(to_js_err)?;
-
-    Ok(result.get_metric(metric_id))
-}
-
 /// Aggregate portfolio metrics from a valuation JSON.
-/// @param valuation_json - Portfolio or instrument valuation JSON.
+/// @param valuation_json - `PortfolioValuation` JSON, for example `JSON.stringify(valuePortfolio(...))`.
 /// @param base_currency - ISO-4217 base currency in which aggregate portfolio values are reported.
 /// @param market_json - Canonical market-context JSON supplying curves, quotes, and FX data.
 /// @param as_of - ISO-8601 valuation date used to resolve date-dependent market data.
@@ -693,23 +683,24 @@ pub fn aggregate_metrics(
 /// Value a portfolio from its spec and market context.
 /// @param spec_json - Canonical portfolio specification JSON defining positions, quantities, and base currency.
 /// @param market_json - Canonical market-context JSON supplying curves, quotes, and FX data.
-/// @param strict_risk - Optional; when omitted or `undefined`, defaults to
-///   `true` (fail closed when a requested risk metric fails to compute),
-///   matching Rust `PortfolioValuationOptions`. Pass `false` only for an
-///   intentional PV-preserving fallback.
+/// @param strict_risk - Optional; when omitted or `undefined`, uses the Rust
+///   `PortfolioValuationOptions` default, `true` (fail closed when a requested
+///   risk metric fails to compute). Pass `false` only for an intentional
+///   PV-preserving fallback.
 /// @param metrics - Optional risk-metric ids to offer every position. Omit for
 ///   the standard set (PV plus `dv01`; pricer-specific metrics such as `theta`
 ///   or `cs01` must be listed explicitly); an empty array performs PV-only
-///   valuation. Names are validated strictly against the standard `MetricId`
-///   set — an unknown name throws. The list is a menu, not a
-///   per-position request: one list is chosen for a book of mixed instrument
-///   types, so each position is asked for exactly the entries its own
-///   instrument type has a calculator for, and the rest appear on that
-///   position's `inapplicable_metrics`. Narrowing covers structural
-///   inapplicability only; `strictRisk` still governs a metric an instrument
-///   type supports but fails to compute. `priceInstrument` keeps the opposite
-///   contract and throws on a metric its instrument cannot produce.
-///   Mirrors the Python `metrics=` keyword.
+///   valuation. Names resolve exactly as in `priceInstrument`: every id
+///   `listStandardMetrics()` returns is accepted and an unknown name throws.
+///   The list is a menu, not a per-position request: one list is chosen for a
+///   book of mixed instrument types, so each position is asked for exactly the
+///   entries its own instrument can compute (a composite position: the additive
+///   entries at least one leg supports), and the rest appear on that position's
+///   `inapplicable_metrics`. Narrowing covers structural inapplicability only;
+///   `strictRisk` still governs a metric an instrument supports but fails to
+///   compute. `priceInstrument` keeps the opposite contract and throws on a
+///   metric its instrument cannot produce. Mirrors the Python `metrics=`
+///   keyword.
 ///
 /// Each position's `valuation_result` keeps 64-bit fields (the Monte Carlo
 /// `seed` and path counts) as `BigInt`, exactly as `priceInstrument` returns
@@ -736,9 +727,10 @@ pub fn value_portfolio(
 /// Aggregate the full classified cashflow ladder for a portfolio.
 /// @param spec_json - Canonical portfolio specification JSON defining positions, quantities, and base currency.
 /// @param market_json - Canonical market-context JSON supplying curves, quotes, and FX data.
-/// @param allow_partial - Optional; when omitted or `undefined`, defaults to
-///   `false` (fail closed if any position fails schedule construction).
-///   Pass `true` to keep a partial ladder with issues on the result.
+/// @param allow_partial - Optional; when omitted or `undefined`, uses the Rust
+///   `CashflowAggregationOptions` default, `false` (fail closed if any
+///   position fails schedule construction). Pass `true` to keep a partial
+///   ladder with issues on the result.
 ///
 /// # Errors
 ///
@@ -764,9 +756,10 @@ pub fn aggregate_full_cashflows(
 /// scenarios on the same portfolio), this is the cheap path.
 /// @param portfolio - Built portfolio object whose positions and weights are used by the calculation.
 /// @param market_json - Canonical market-context JSON supplying curves, quotes, and FX data.
-/// @param allow_partial - Optional; when omitted or `undefined`, defaults to
-///   `false` (fail closed if any position fails schedule construction).
-///   Pass `true` to keep a partial ladder with issues on the result.
+/// @param allow_partial - Optional; when omitted or `undefined`, uses the Rust
+///   `CashflowAggregationOptions` default, `false` (fail closed if any
+///   position fails schedule construction). Pass `true` to keep a partial
+///   ladder with issues on the result.
 ///
 /// # Errors
 ///
@@ -784,9 +777,10 @@ pub fn aggregate_full_cashflows_built(
     let allow_partial = js_opt_bool(allow_partial.as_ref(), "allowPartial")?;
     let market: finstack_quant_core::market_data::context::MarketContext =
         serde_json::from_str(market_json).map_err(to_js_err)?;
-    let options = finstack_quant_portfolio::cashflows::CashflowAggregationOptions {
-        allow_partial: allow_partial.unwrap_or(false),
-    };
+    let mut options = finstack_quant_portfolio::cashflows::CashflowAggregationOptions::default();
+    if let Some(allow_partial) = allow_partial {
+        options.allow_partial = allow_partial;
+    }
     let cashflows = finstack_quant_portfolio::cashflows::aggregate_full_cashflows(
         &portfolio.inner,
         &market,
@@ -802,24 +796,24 @@ pub fn aggregate_full_cashflows_built(
 /// against a fixed portfolio.
 /// @param portfolio - Built portfolio object whose positions and weights are used by the calculation.
 /// @param market_json - Canonical market-context JSON supplying curves, quotes, and FX data.
-/// @param strict_risk - Optional; when omitted or `undefined`, defaults to
-///   `true` (fail closed when a requested risk metric fails to compute),
-///   matching Rust `PortfolioValuationOptions`. Pass `false` only for an
-///   intentional PV-preserving fallback.
+/// @param strict_risk - Optional; when omitted or `undefined`, uses the Rust
+///   `PortfolioValuationOptions` default, `true` (fail closed when a requested
+///   risk metric fails to compute). Pass `false` only for an intentional
+///   PV-preserving fallback.
 /// @param metrics - Optional risk-metric ids to offer every position. Omit for
 ///   the standard set (PV plus `dv01`; pricer-specific metrics such as `theta`
 ///   or `cs01` must be listed explicitly); an empty array performs PV-only
-///   valuation. Names are validated strictly against the standard `MetricId`
-///   set — an unknown name throws instead of silently degrading to
-///   PV-only valuation. The list is a menu, not a
-///   per-position request: one list is chosen for a book of mixed instrument
-///   types, so each position is asked for exactly the entries its own
-///   instrument type has a calculator for, and the rest appear on that
-///   position's `inapplicable_metrics`. Narrowing covers structural
-///   inapplicability only; `strictRisk` still governs a metric an instrument
-///   type supports but fails to compute. `priceInstrument` keeps the opposite
-///   contract and throws on a metric its instrument cannot produce.
-///   Mirrors the Python `metrics=` keyword.
+///   valuation. Names resolve exactly as in `priceInstrument`: every id
+///   `listStandardMetrics()` returns is accepted and an unknown name throws.
+///   The list is a menu, not a per-position request: one list is chosen for a
+///   book of mixed instrument types, so each position is asked for exactly the
+///   entries its own instrument can compute (a composite position: the additive
+///   entries at least one leg supports), and the rest appear on that position's
+///   `inapplicable_metrics`. Narrowing covers structural inapplicability only;
+///   `strictRisk` still governs a metric an instrument supports but fails to
+///   compute. `priceInstrument` keeps the opposite contract and throws on a
+///   metric its instrument cannot produce. Mirrors the Python `metrics=`
+///   keyword.
 ///
 /// Each position's `valuation_result` keeps 64-bit fields (the Monte Carlo
 /// `seed` and path counts) as `BigInt`, exactly as `priceInstrument` returns
@@ -847,13 +841,16 @@ pub fn value_portfolio_built(
     // Strict parsing via the canonical portfolio-crate helper (shared with
     // the Python binding): an unknown metric name throws instead of silently
     // degrading to PV-only valuation.
-    let options = finstack_quant_portfolio::valuation::PortfolioValuationOptions {
-        strict_risk: strict_risk.unwrap_or(true),
+    let mut options = finstack_quant_portfolio::valuation::PortfolioValuationOptions {
         metrics: finstack_quant_portfolio::valuation::RequestedMetrics::try_from_metric_names(
             metrics,
         )
         .map_err(to_js_err)?,
+        ..Default::default()
     };
+    if let Some(strict_risk) = strict_risk {
+        options.strict_risk = strict_risk;
+    }
     let valuation = finstack_quant_portfolio::valuation::value_portfolio(
         &portfolio.inner,
         &market,
@@ -998,7 +995,7 @@ pub fn scenario_pnl(
 /// Accepts a `PortfolioOptimizationSpec` JSON (portfolio + objective +
 /// constraints + options) and a `MarketContext` JSON, and returns a structured
 /// `PortfolioOptimizationResult` object.
-/// @param spec_json - Canonical portfolio specification JSON defining positions, quantities, and base currency.
+/// @param spec_json - `PortfolioOptimizationSpec` JSON: `portfolio` (a `PortfolioSpec`) plus `objective`, and optional `constraints`, `weighting`, `missing_metric_policy`, `label` and `trade_universe`.
 /// @param market_json - Canonical market-context JSON supplying curves, quotes, and FX data.
 ///
 /// # Errors
@@ -1028,7 +1025,7 @@ pub fn optimize_portfolio(spec_json: JsValue, market_json: JsValue) -> Result<Js
 /// replay configuration. Returns a structured `ReplayResult` object.
 /// @param spec_json - Canonical portfolio specification JSON defining positions, quantities, and base currency.
 /// @param snapshots_json - Market-snapshot JSON array.
-/// @param config_json - Configuration JSON for this call.
+/// @param config_json - `ReplayConfig` JSON with a required `mode` (`pv_only` | `pv_and_pnl` | `full_attribution`) and optional `attribution_method`, `valuation_options` and `on_error`; unknown keys are rejected.
 ///
 /// Each position's `valuation_result` keeps 64-bit fields (the Monte Carlo
 /// `seed` and path counts) as `BigInt`, exactly as `priceInstrument` returns

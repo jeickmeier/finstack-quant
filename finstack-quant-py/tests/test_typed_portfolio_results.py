@@ -214,8 +214,14 @@ def test_brinson_fachler_returns_typed_result() -> None:
 
 def test_carino_link_returns_typed_result() -> None:
     periods = json.dumps([json.loads(_brinson_sectors()), json.loads(_brinson_sectors())])
-    result = pf.carino_link(periods)
-    expected = json.loads(pf.carino_link_json(periods))
+    result = pf.carino_link_from_sector_periods(periods)
+    expected = json.loads(pf.carino_link_from_sector_periods_json(periods))
+    # `carino_link` binds Rust `carino_link`: it links the precomputed
+    # per-period results and reaches the same answer.
+    period_result = json.loads(pf.brinson_fachler_json(_brinson_sectors()))
+    precomputed = json.dumps([period_result, period_result])
+    assert json.loads(pf.carino_link_json(precomputed)) == expected
+    assert json.loads(pf.carino_link(precomputed).to_json()) == expected
 
     _assert_contract(result, pf.CarinoLinkedAttribution)
     assert result.portfolio_return_compounded == pytest.approx(expected["portfolio_return_compounded"])

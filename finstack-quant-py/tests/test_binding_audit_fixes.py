@@ -97,6 +97,51 @@ def test_value_portfolio_still_accepts_standard_metric_names() -> None:
     assert "dv01" in measures
 
 
+# S12 (F391): the portfolio metric menu resolves names like price_instrument
+
+
+def test_value_portfolio_accepts_every_listed_standard_metric() -> None:
+    from finstack_quant.valuations.instruments import list_standard_metrics
+
+    portfolio = Portfolio.from_spec(_portfolio_json())
+    listed = list_standard_metrics()
+    # A registry-only id (not a standard ``MetricId``) used to be rejected here
+    # while ``price_instrument`` accepted it.
+    assert "accrued_interest" in listed
+    for name in listed:
+        value_portfolio(portfolio, _market(), strict_risk=False, metrics=[name])
+
+
+# S12 (F204): omitted boolean options resolve against the Rust defaults
+
+
+def test_value_portfolio_strict_risk_defaults_to_rust_options() -> None:
+    portfolio = Portfolio.from_spec(_portfolio_json())
+
+    def outcome(**kwargs: object) -> tuple[object, ...]:
+        wire = json.loads(value_portfolio(portfolio, _market(), **kwargs).to_json())
+        measures = wire["position_values"]["USD-POS"]["valuation_result"]["measures"]
+        return (wire["total_base_currency"], wire.get("degraded_positions", []), measures)
+
+    default = outcome()
+    assert outcome(strict_risk=None) == default
+    assert outcome(strict_risk=True) == default
+
+
+# S12 (F203): replay_portfolio takes one canonical ReplayConfig
+
+
+def test_replay_portfolio_requires_the_canonical_config() -> None:
+    from finstack_quant.portfolio import replay_portfolio
+
+    with pytest.raises(TypeError):
+        replay_portfolio(_portfolio_json(), [])  # type: ignore[call-arg]
+    with pytest.raises(TypeError):
+        replay_portfolio(_portfolio_json(), [], mode="pv_only")  # type: ignore[call-arg]
+    with pytest.raises(ValueError, match="missing field `mode`"):
+        replay_portfolio(_portfolio_json(), [], {})
+
+
 # M4: strict metric parsing in PerPositionMetric.metric
 
 
@@ -110,7 +155,8 @@ def test_per_position_metric_accepts_standard_and_custom_paths() -> None:
     assert PerPositionMetric.custom_key("my_measure").kind == "custom_key"
 
 
-# M5: measure getter returns the bare snake_case serde tag
+# M5: measure getter returns the canonical serde form (a string for unit
+# variants), the same value as to_json() and the WASM decomposeFactorRisk
 
 
 def _variance_decomposition():  # noqa: ANN202
@@ -118,9 +164,10 @@ def _variance_decomposition():  # noqa: ANN202
     return decompose_factor_risk(matrix, '{"factor_ids":[],"n":0,"data":[]}')
 
 
-def test_decompose_factor_risk_measure_is_bare_snake_case_tag() -> None:
+def test_decompose_factor_risk_measure_is_canonical_serde_form() -> None:
     decomp = _variance_decomposition()
     assert decomp.measure == "variance"
+    assert json.loads(decomp.to_json())["measure"] == decomp.measure
 
 
 # MD5: position_residual_contributions exposed on FactorRiskDecomposition
@@ -190,6 +237,23 @@ def test_validate_materialization_returns_diagnostics_for_invalid_bundle() -> No
     assert isinstance(outcome, dict)
     assert outcome["diagnostics"], "expected at least one diagnostic"
     assert all("code" in item for item in outcome["diagnostics"])
+    # S12 (F356): the serde form of the Rust ValidationReport, as in WASM.
+    assert set(outcome) == {"diagnostics", "truncated"}
+    assert set(outcome["diagnostics"][0]) == {
+        "code",
+        "phase",
+        "severity",
+        "pointer",
+        "message",
+        "contract",
+        "expected_version",
+        "actual_version",
+        "artifact_hash",
+        "revision_id",
+        "instrument_id",
+        "position_id",
+    }
+    assert outcome["diagnostics"][0]["severity"] == "error"
 
 
 # Item 13a: ReturnContributionResult.specific_return

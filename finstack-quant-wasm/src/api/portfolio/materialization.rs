@@ -25,14 +25,6 @@ pub struct JsInstrumentArtifactCache {
     inner: Arc<InstrumentArtifactCache>,
 }
 
-impl Default for JsInstrumentArtifactCache {
-    fn default() -> Self {
-        Self {
-            inner: Arc::new(InstrumentArtifactCache::new()),
-        }
-    }
-}
-
 #[wasm_bindgen(js_class = InstrumentArtifactCache)]
 impl JsInstrumentArtifactCache {
     /// Create an empty cache with an explicit entry capacity.
@@ -79,7 +71,8 @@ impl JsPortfolio {
     ///
     /// @param bundle - Complete UTF-8 materialization JSON string or `Uint8Array`.
     /// @param cache - Optional reusable decoded-artifact cache created outside
-    /// any timed validation region.
+    /// any timed validation region. Omit, `null`, or `undefined` for a per-call
+    /// cache with the native default bounds (the Python `cache=None` twin).
     /// @returns An object containing the reusable portfolio and load report.
     /// @throws Error - Throws `TypeError` for unsupported input types. Contract
     /// failures throw `ContractValidationError` (`kind` `validation`) with a
@@ -120,13 +113,15 @@ impl JsPortfolio {
     /// non-contract native failures still throw.
     ///
     /// @param bundle - Complete UTF-8 materialization JSON string or `Uint8Array`.
-    /// @param cache - Reusable decoded-artifact cache used while validating.
+    /// @param cache - Optional reusable decoded-artifact cache used while
+    /// validating. Omit, `null`, or `undefined` for a per-call cache with the
+    /// native default bounds (the Python `cache=None` twin).
     /// @returns A materialization report whose build/index phase counters are zero,
     /// or a `ValidationReport` when the contract is invalid but still reportable.
     /// @throws Error - Throws `TypeError` for unsupported input types or a
     /// structured `ContractValidationError` when validation cannot produce a report.
     #[wasm_bindgen(js_name = validateMaterialization)]
-    pub fn validate_materialization_json(
+    pub fn validate_materialization(
         bundle: JsValue,
         cache: &JsInstrumentArtifactCache,
     ) -> Result<JsValue, JsValue> {

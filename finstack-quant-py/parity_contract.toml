@@ -1522,7 +1522,7 @@ position     = { python = "finstack_quant.portfolio.position",     status = "mis
 primitive    = { python = "finstack_quant.portfolio.primitive",    status = "missing", note = "primitive::primitive_exposures is bound in neither host; see the Rust-only inventory below." }
 replay       = { python = "finstack_quant.portfolio",              status = "flattened", note = "replay_portfolio is exported flat on finstack_quant.portfolio; the replay configuration surface (ReplayTimeline, ReplayConfig, snapshot/step types) remains Rust-only; ReplayResult is Python-bound, and WASM returns it as a plain object" }
 results      = { python = "finstack_quant.portfolio.results",      status = "missing", note = "Bindings are currently exported from finstack_quant.portfolio root" }
-sensitivity  = { python = "finstack_quant.portfolio",              status = "flattened", note = "Factor sensitivity entry points compute_factor_sensitivities and compute_pnl_profiles require explicit base_currency (decompose_factor_risk takes none); SensitivityMatrix/FactorPnlProfile/FactorRiskDecomposition are exported flat on finstack_quant.portfolio; the engine types (delta/repricing engines, traits) remain Rust-only" }
+sensitivity  = { python = "finstack_quant.portfolio",              status = "flattened", note = "Factor sensitivity entry points compute_factor_sensitivities and compute_pnl_profiles require explicit base_currency (decompose_factor_risk takes none); SensitivityMatrix/FactorPnlProfile/FactorRiskDecomposition are exported flat on finstack_quant.portfolio; the one sensitivity-matrix wire form is Rust SensitivityMatrixJson ({base_currency, position_ids, factor_ids, data} with nested rows): Python SensitivityMatrix.to_json/from_json and WASM computeFactorSensitivities/decomposeFactorRisk emit and accept it; FactorRiskDecomposition.measure is the RiskMeasure serde form in both hosts; the engine types (delta/repricing engines, traits) remain Rust-only" }
 types        = { python = "finstack_quant.portfolio.types",        status = "missing", note = "Entity/EntityId/PositionId/AttributeValue and friends are Rust-only; the Python root does NOT re-export them (identifiers cross the boundary as plain strings)" }
 valuation    = { python = "finstack_quant.portfolio.valuation",    status = "missing", note = "Bindings are currently exported from finstack_quant.portfolio root" }
 scenarios    = { python = "finstack_quant.portfolio.scenarios",    status = "missing", note = "Scenario support is exposed via root helpers rather than a dedicated submodule" }
@@ -1537,9 +1537,8 @@ schema = { python = "finstack_quant.portfolio.schema", status = "exists", note =
 #   - construction: PortfolioSpec/PositionSpec typed structs (hosts
 #     consume/emit them only as JSON; PortfolioBuilder is bound in Python)
 #   - replay configuration types: ReplayTimeline, ReplayConfig
-#   - primitive::primitive_exposures (primitive exposure report) and the
-#     precomputed-result carino_link (hosts call carino_link_from_sector_periods);
-#     both are unbound in either host
+#   - primitive::primitive_exposures (primitive exposure report), unbound in
+#     either host
 #   - materialization envelope types: PortfolioMaterializationEnvelope,
 #     MaterializedPosition, InstrumentArtifact, PortfolioHeader,
 #     MaterializerInfo, PortfolioMaterializationSchema
@@ -1630,6 +1629,8 @@ public = [
     "campisi_reconciliation_check_json",
     "carino_link",
     "carino_link_json",
+    "carino_link_from_sector_periods",
+    "carino_link_from_sector_periods_json",
     "cell_returns_from_curves",
     "cell_returns_from_reference",
     "compute_factor_sensitivities",
@@ -1826,7 +1827,7 @@ exclusion_reasons = ["pandas", "arrow", "pickle", "pure-python", "dunder"]
 python_rule_excluded_members = { to_dataframe = "pandas", to_series = "pandas", from_dataframe = "pandas", to_arrow = "arrow" }
 js_rule_members = { free = "wasm ownership: releases the wasm-bindgen handle", toString = "JavaScript twin of Python __str__" }
 # Ratchet: remaining backlog sizes. Lower these as names are bound; never raise them.
-backlog_ceiling = { modules = 836, members = 392 }
+backlog_ceiling = { modules = 835, members = 392 }
 
 [parity.modules."finstack_quant"]
 js = ""
@@ -2698,6 +2699,7 @@ backlog = [
     "campisi_carino_link_from_snapshots_json",
     "campisi_carino_link_json",
     "campisi_reconciliation_check_json",
+    "carino_link_from_sector_periods_json",
     "carino_link_json",
     "cell_returns_from_curves_json",
     "cell_returns_from_reference_json",
@@ -3060,8 +3062,6 @@ aggregateFullCashflowsBuilt = "WASM handle variant: takes a built Portfolio so r
 applyScenarioAndRevalueBuilt = "WASM handle variant: takes a built Portfolio so repeated calls skip re-parsing"
 computeFactorSensitivitiesWithMarket = "WASM handle variant: takes a parsed Market handle"
 computePnlProfilesWithMarket = "WASM handle variant: takes a parsed Market handle"
-portfolioResultGetMetric = "S12: deleted (reads an envelope no WASM export produces)"
-portfolioResultTotalValue = "S12: deleted (reads an envelope no WASM export produces)"
 scenarioPnlBuilt = "WASM handle variant: takes a built Portfolio so repeated calls skip re-parsing"
 valuePortfolioBuilt = "WASM handle variant: takes a built Portfolio so repeated calls skip re-parsing"
 

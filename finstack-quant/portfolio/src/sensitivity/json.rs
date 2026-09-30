@@ -9,40 +9,47 @@ use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::{Error, Result};
-use finstack_quant_models::factor::{BumpSizeConfig, FactorDefinition};
-use serde::Serialize;
+use finstack_quant_models::factor::{BumpSizeConfig, FactorDefinition, FactorId};
+use serde::{Deserialize, Serialize};
 
 /// Default scenario count for symmetric P&L profile grids.
 ///
 /// `5` produces `[-2, -1, 0, 1, 2]`.
 pub const DEFAULT_PNL_SCENARIO_POINTS: usize = 5;
 
-/// JSON shape returned by WASM factor sensitivity helpers.
-#[derive(Debug, Clone, Serialize)]
+/// Canonical wire form of a factor-sensitivity matrix, shared by both hosts.
+///
+/// Serializes as `{base_currency, position_ids, factor_ids, data}` with `data`
+/// as nested rows, `data[position][factor]`. It is what the WASM
+/// `computeFactorSensitivities*` return and `decomposeFactorRisk` accepts, and
+/// what the Python `SensitivityMatrix.to_json` / `from_json` emit and accept,
+/// so a matrix produced by either host is readable by the other. Unknown keys
+/// are rejected and `base_currency` must be an ISO-4217 code; converting to a
+/// [`SensitivityMatrix`] (via [`TryFrom`]) validates the row dimensions.
+///
+/// # Examples
+///
+/// ```rust
+/// use finstack_quant_portfolio::sensitivity::{SensitivityMatrix, SensitivityMatrixJson};
+///
+/// let wire: SensitivityMatrixJson = serde_json::from_str(
+///     r#"{"base_currency":"USD","position_ids":["A"],"factor_ids":["F1","F2"],"data":[[1.0,2.0]]}"#,
+/// )?;
+/// let matrix = SensitivityMatrix::try_from(wire)?;
+/// assert_eq!(matrix.delta(0, 1), 2.0);
+/// # Ok::<(), Box<dyn std::error::Error>>(())
+/// ```
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct SensitivityMatrixJson {
     /// Reporting currency of every monetary sensitivity.
     pub base_currency: Currency,
-    /// Ordered position identifiers.
+    /// Ordered position identifiers, one per row of `data`.
     pub position_ids: Vec<String>,
-    /// Ordered factor identifiers.
-    pub factor_ids: Vec<String>,
-    /// Row-major matrix as nested rows.
+    /// Ordered factor identifiers, one per column of `data`.
+    pub factor_ids: Vec<FactorId>,
+    /// Sensitivities as nested rows, `data[position][factor]`.
     pub data: Vec<Vec<f64>>,
-}
-
-/// JSON shape returned by WASM P&L profile helpers.
-#[derive(Debug, Clone, Serialize)]
-pub struct FactorPnlProfileJson {
-    /// Reporting currency of each P&L amount.
-    pub base_currency: Currency,
-    /// Ordered position identifiers for each P&L row.
-    pub position_ids: Vec<String>,
-    /// Shocked factor identifier.
-    pub factor_id: String,
-    /// Scenario shift coordinates.
-    pub shifts: Vec<f64>,
-    /// P&L rows indexed as `[shift_idx][position_idx]`.
-    pub position_pnls: Vec<Vec<f64>>,
 }
 
 /// Parse factor definitions from the binding JSON representation.
@@ -168,7 +175,7 @@ pub fn compute_pnl_profiles_from_json(
 }
 
 impl SensitivityMatrixJson {
-    /// Serialize a matrix with its explicit monetary reporting unit.
+    /// Tag a matrix with its monetary reporting currency for the wire.
     ///
     /// # Arguments
     ///
@@ -178,11 +185,7 @@ impl SensitivityMatrixJson {
         Self {
             base_currency,
             position_ids: matrix.position_ids().to_vec(),
-            factor_ids: matrix
-                .factor_ids()
-                .iter()
-                .map(ToString::to_string)
-                .collect(),
+            factor_ids: matrix.factor_ids().to_vec(),
             data: (0..matrix.n_positions())
                 .map(|idx| matrix.position_deltas(idx).to_vec())
                 .collect(),
@@ -190,15 +193,13 @@ impl SensitivityMatrixJson {
     }
 }
 
-impl From<&FactorPnlProfile> for FactorPnlProfileJson {
-    fn from(profile: &FactorPnlProfile) -> Self {
-        Self {
-            base_currency: profile.base_currency,
-            position_ids: profile.position_ids.clone(),
-            factor_id: profile.factor_id.to_string(),
-            shifts: profile.shifts.clone(),
-            position_pnls: profile.position_pnls.clone(),
-        }
+impl TryFrom<SensitivityMatrixJson> for SensitivityMatrix {
+    type Error = Error;
+
+    /// Rebuild the matrix, validating its dimensions via
+    /// [`SensitivityMatrix::from_rows`]; the reporting currency is dropped.
+    fn try_from(wire: SensitivityMatrixJson) -> Result<Self> {
+        SensitivityMatrix::from_rows(wire.position_ids, wire.factor_ids, wire.data)
     }
 }
 
@@ -266,12 +267,73 @@ mod tests {
         assert!(first.delta(1, 0).abs() > 1.0);
         assert_eq!(first.delta(1, 0), second.delta(0, 0));
         assert_eq!(first.delta(0, 0), second.delta(1, 0));
+        let wire = SensitivityMatrixJson::from_matrix(&first, Currency::USD);
+        assert_eq!(wire.base_currency, Currency::USD);
+        assert_eq!(SensitivityMatrix::try_from(wire).unwrap(), first);
+        assert_eq!(profiles[0].base_currency, Currency::USD);
+        assert_eq!(profiles[0].position_ids, vec!["USD", "EUR"]);
+    }
+
+    fn wire_json(value: serde_json::Value) -> String {
+        value.to_string()
+    }
+
+    #[test]
+    fn sensitivity_wire_round_trips_through_the_matrix() {
+        let json = wire_json(serde_json::json!({
+            "base_currency": "EUR",
+            "position_ids": ["A", "B"],
+            "factor_ids": ["F1", "F2"],
+            "data": [[1.0, 2.0], [3.0, -1.0]]
+        }));
+        let wire: SensitivityMatrixJson = serde_json::from_str(&json).unwrap();
+        let matrix = SensitivityMatrix::try_from(wire.clone()).unwrap();
+        assert_eq!(matrix.as_slice(), &[1.0, 2.0, 3.0, -1.0]);
+        let back = SensitivityMatrixJson::from_matrix(&matrix, Currency::EUR);
+        assert_eq!(back, wire);
         assert_eq!(
-            SensitivityMatrixJson::from_matrix(&first, Currency::USD).base_currency,
-            Currency::USD
+            serde_json::to_value(&back).unwrap(),
+            serde_json::from_str::<serde_json::Value>(&json).unwrap()
         );
-        let profile = FactorPnlProfileJson::from(&profiles[0]);
-        assert_eq!(profile.base_currency, Currency::USD);
-        assert_eq!(profile.position_ids, vec!["USD", "EUR"]);
+    }
+
+    #[test]
+    fn sensitivity_wire_rejects_unknown_keys_and_bad_currency() {
+        let unknown = wire_json(serde_json::json!({
+            "base_currency": "USD", "position_ids": [], "factor_ids": [], "data": [],
+            "n_factors": 0
+        }));
+        let err = serde_json::from_str::<SensitivityMatrixJson>(&unknown).unwrap_err();
+        assert!(
+            err.to_string().contains("unknown field `n_factors`"),
+            "{err}"
+        );
+        let bad_currency = wire_json(serde_json::json!({
+            "base_currency": "NOT_A_CCY", "position_ids": [], "factor_ids": [], "data": []
+        }));
+        assert!(serde_json::from_str::<SensitivityMatrixJson>(&bad_currency).is_err());
+        let missing_currency = wire_json(serde_json::json!({
+            "position_ids": [], "factor_ids": [], "data": []
+        }));
+        assert!(serde_json::from_str::<SensitivityMatrixJson>(&missing_currency).is_err());
+    }
+
+    #[test]
+    fn sensitivity_wire_conversion_rejects_malformed_rows() {
+        for data in [
+            serde_json::json!([[1.0, 2.0]]),
+            serde_json::json!([[1.0, 2.0], [3.0, 4.0], [5.0, 6.0]]),
+            serde_json::json!([[1.0, 2.0], [3.0]]),
+        ] {
+            let wire: SensitivityMatrixJson = serde_json::from_value(serde_json::json!({
+                "base_currency": "USD",
+                "position_ids": ["A", "B"],
+                "factor_ids": ["F1", "F2"],
+                "data": data
+            }))
+            .unwrap();
+            let err = SensitivityMatrix::try_from(wire).unwrap_err();
+            assert!(matches!(err, Error::Validation(_)), "{err}");
+        }
     }
 }

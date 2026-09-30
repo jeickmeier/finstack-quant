@@ -39,8 +39,8 @@ use std::sync::OnceLock;
 ///
 /// # Arguments
 ///
-/// * `instrument` - Composite leg whose registered metric calculators decide
-///   the subset; only its [`Instrument::key`] instrument type is consulted.
+/// * `instrument` - Composite leg whose [`Instrument::applicable_metrics`]
+///   decides the subset (a nested composite answers for its own legs).
 /// * `metrics` - Metric identifiers requested for the composite as a whole, in
 ///   caller order; the returned subset preserves that order.
 /// * `options` - Pricing options whose `metric_registry`, when present, decides
@@ -54,7 +54,7 @@ fn metrics_supported_by_leg(
         Some(registry) => registry,
         None => crate::metrics::standard_registry(),
     };
-    registry.applicable_subset(metrics, instrument.key())
+    instrument.applicable_metrics(metrics, registry)
 }
 
 /// Runtime cache of boxed composite legs. Not serialized.
@@ -576,6 +576,30 @@ impl Instrument for CompositeInstrument {
 
     fn clone_box(&self) -> Box<dyn Instrument> {
         Box::new(self.clone())
+    }
+
+    /// A composite computes a metric by aggregating it over its legs, so the
+    /// applicable menu entries are the additive ones at least one leg
+    /// supports: the same rule its pricing enforces. Legs that cannot be
+    /// built leave nothing applicable; pricing then reports the build error.
+    fn applicable_metrics(
+        &self,
+        menu: &[MetricId],
+        registry: &crate::metrics::MetricRegistry,
+    ) -> Vec<MetricId> {
+        let Ok(legs) = self.boxed_legs() else {
+            return Vec::new();
+        };
+        menu.iter()
+            .filter(|metric| {
+                is_additive_metric(metric)
+                    && legs.iter().any(|leg| {
+                        !leg.applicable_metrics(std::slice::from_ref(*metric), registry)
+                            .is_empty()
+                    })
+            })
+            .cloned()
+            .collect()
     }
 
     fn validate_invariants(&self) -> Result<()> {

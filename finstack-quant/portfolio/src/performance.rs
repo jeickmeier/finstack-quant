@@ -70,7 +70,11 @@ use serde::{Deserialize, Serialize};
 ///   period end divided by the total period length, i.e., the Dietz
 ///   weight `w_i = (T − t_i) / T ∈ [0, 1]`. A flow *at the start* of
 ///   the period has `w_i = 1`; a flow *at the end* has `w_i = 0`.
+///
+/// On the wire `cashflows` may be omitted, meaning a period with no external
+/// flows; unknown keys are rejected.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct TwrrPeriod {
     /// PV at period start.
     pub beginning_market_value: f64,
@@ -82,12 +86,15 @@ pub struct TwrrPeriod {
     /// (capital added by the client); **negative** = withdrawal. This
     /// matches `ReplaySummary.total_pnl` conventions already in use in
     /// `portfolio::replay` and is the **opposite** of [`DatedCashflow`] /
-    /// [`mwr_xirr`]. See the module-level Dietz vs XIRR table.
+    /// [`mwr_xirr`]. See the module-level Dietz vs XIRR table. Empty (the
+    /// wire default when omitted) for a period with no external flows.
+    #[serde(default)]
     pub cashflows: Vec<DietzFlow>,
 }
 
 /// A single external cashflow within a TWRR sub-period.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct DietzFlow {
     /// Signed flow amount from the portfolio's books: positive = contribution
     /// into the portfolio; negative = withdrawal. Opposite of
@@ -342,6 +349,25 @@ mod tests {
         };
         let r = twrr_modified_dietz(&period).unwrap();
         assert!((r - 0.10).abs() < 1e-15);
+    }
+
+    /// The wire form owns the omitted-flows meaning (no flows) and rejects
+    /// unknown keys, so both hosts' JSON paths agree.
+    #[test]
+    fn twrr_period_wire_defaults_cashflows_and_rejects_unknown_keys() {
+        let period: TwrrPeriod =
+            serde_json::from_str(r#"{"beginning_market_value":100.0,"ending_market_value":110.0}"#)
+                .expect("cashflows defaults to empty");
+        assert!(period.cashflows.is_empty());
+        assert!((twrr_modified_dietz(&period).unwrap() - 0.10).abs() < 1e-15);
+        for bad in [
+            r#"{"beginning_market_value":100.0,"ending_market_value":110.0,"bogus":1}"#,
+            r#"{"beginning_market_value":100.0,"ending_market_value":110.0,
+                "cashflows":[{"amount":1.0,"fraction_of_period_remaining":0.5,"bogus":1}]}"#,
+        ] {
+            let err = serde_json::from_str::<TwrrPeriod>(bad).unwrap_err();
+            assert!(err.to_string().contains("unknown field `bogus`"), "{err}");
+        }
     }
 
     #[test]

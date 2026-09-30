@@ -437,19 +437,7 @@ pub fn price_instrument(
     let metric_registry = metric_registry
         .as_deref()
         .unwrap_or_else(|| crate::metrics::standard_registry());
-    let metric_ids: Vec<MetricId> = metrics
-        .iter()
-        .map(|metric| {
-            MetricId::parse_strict(metric).or_else(|strict_error| {
-                let registered: MetricId = metric.parse()?;
-                if metric_registry.has_metric(registered.clone()) {
-                    Ok(registered)
-                } else {
-                    Err(strict_error)
-                }
-            })
-        })
-        .collect::<finstack_quant_core::Result<_>>()?;
+    let metric_ids = metric_registry.resolve_metric_ids(metrics)?;
     let pricing_options = if let Some(json) = market_history_json {
         let history: crate::metrics::risk::MarketHistory = serde_json::from_str(json)
             .map_err(|e| Error::Validation(format!("invalid market history JSON: {e}")))?;

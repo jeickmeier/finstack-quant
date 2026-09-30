@@ -110,6 +110,8 @@ __all__ = [
     "campisi_reconciliation_check",
     "campisi_reconciliation_check_json",
     "carino_link",
+    "carino_link_from_sector_periods",
+    "carino_link_from_sector_periods_json",
     "carino_link_json",
     "cell_returns_from_curves",
     "cell_returns_from_curves_json",
@@ -1274,8 +1276,11 @@ class Portfolio:
             On success, a :class:`MaterializationReport` whose
             ``build_positions`` and ``index_build`` phase counters are always
             zero (those phases are outside this API). When validation finds
-            contract errors, a ``dict`` with ``diagnostics`` (list of
-            diagnostic dicts) and ``truncated`` (bool).
+            contract errors, the Rust ``ValidationReport`` in its serde form
+            (the same object WASM returns): a ``dict`` with ``diagnostics``
+            (list of diagnostic dicts carrying ``code``, ``phase``,
+            ``severity``, ``pointer``, ``message`` and the optional context
+            keys) and ``truncated`` (bool).
 
         Raises
         ------
@@ -3711,7 +3716,7 @@ def aggregate_metrics_json(
 def value_portfolio(
     portfolio: Portfolio | str,
     market: MarketContext | str,
-    strict_risk: bool = True,
+    strict_risk: bool | None = None,
     metrics: list[str] | None = None,
 ) -> PortfolioValuation:
     """
@@ -3726,24 +3731,28 @@ def value_portfolio(
         Built portfolio or canonical ``PortfolioSpec`` JSON to value.
     market : MarketContext or str
         Market context object or JSON supplying curves, quotes, and FX data.
-    strict_risk : bool, default True
+    strict_risk : bool or None, default None
         Whether absent or failed risk calculations abort the valuation rather
-        than being recorded as diagnostics. The default matches Rust: a
-        standard-metric risk run fails closed. Set ``False`` only for an
-        intentional PV-preserving fallback.
+        than being recorded as diagnostics. ``None`` uses the Rust
+        ``PortfolioValuationOptions`` default, ``True``: a standard-metric
+        risk run fails closed. Set ``False`` only for an intentional
+        PV-preserving fallback.
     metrics : list[str] or None, default None
         Metric identifiers to offer every position. ``None`` requests the
         standard portfolio risk set; an empty list performs PV-only
-        valuation. Names are validated strictly against the standard
-        ``MetricId`` set; an unknown name raises ``ValueError`` listing the
-        available metrics.
+        valuation. Names resolve exactly as in
+        :func:`finstack_quant.valuations.instruments.price_instrument`: every
+        id :func:`~finstack_quant.valuations.instruments.list_standard_metrics`
+        returns is accepted, and an unknown name raises ``ValueError`` listing
+        the closest standard metrics.
 
         The list is a *menu*, not a per-position request: one list is chosen
         for a book of mixed instrument types, so each position is asked for
-        exactly the entries its own instrument type has a calculator for, and
-        the rest are reported on
+        exactly the entries its own instrument can compute (a composite
+        position: the additive entries at least one of its legs supports),
+        and the rest are reported on
         :attr:`PositionValue.inapplicable_metrics`. Narrowing covers
-        structural inapplicability only — a metric an instrument type does
+        structural inapplicability only — a metric an instrument does
         support but fails to compute is still governed by ``strict_risk``.
         Pricing one instrument directly with
         :func:`finstack_quant.valuations.instruments.price_instrument` keeps
@@ -3758,7 +3767,8 @@ def value_portfolio(
     Raises
     ------
     ValueError
-        If a requested metric name is not a standard metric identifier.
+        If a requested metric name is neither a standard metric identifier
+        nor registered in the standard metric registry.
     PortfolioError
         If portfolio construction, market lookup, FX conversion, pricing, or
         strict risk evaluation fails.
@@ -3776,7 +3786,7 @@ def value_portfolio(
 def aggregate_full_cashflows(
     portfolio: Portfolio | str,
     market: MarketContext | str,
-    allow_partial: bool = False,
+    allow_partial: bool | None = None,
 ) -> PortfolioCashflows:
     """
     Build the full classified cashflow ladder for the portfolio.
@@ -3790,10 +3800,11 @@ def aggregate_full_cashflows(
         Built portfolio or canonical ``PortfolioSpec`` JSON to expand.
     market : MarketContext or str
         Market context object or JSON needed for instrument cashflow generation.
-    allow_partial : bool, default False
-        When ``False``, any schedule-construction issue aborts the call.
-        When ``True``, remaining positions still contribute to the ladder
-        and issues are returned on :class:`PortfolioCashflows`.
+    allow_partial : bool or None, default None
+        ``None`` uses the Rust ``CashflowAggregationOptions`` default,
+        ``False``: any schedule-construction issue aborts the call. When
+        ``True``, remaining positions still contribute to the ladder and
+        issues are returned on :class:`PortfolioCashflows`.
 
     Returns
     -------
@@ -4514,8 +4525,7 @@ class ReplayResult:
 def replay_portfolio(
     portfolio: Portfolio | str,
     snapshots: list[tuple[datetime.date | str, MarketContext | str]] | list[dict[str, Any]] | str,
-    config: dict[str, Any] | str | None = None,
-    mode: str | None = None,
+    config: dict[str, Any] | str,
 ) -> ReplayResult:
     """
     Replay a portfolio through dated market snapshots.
@@ -4529,13 +4539,12 @@ def replay_portfolio(
         (dates as ``datetime.date`` or ISO strings), JSON-shaped
         ``{"date": "YYYY-MM-DD", "market": {...}}`` dicts, or the canonical
         JSON array string.
-    config : dict | str | None
-        ``ReplayConfig`` as a dict or JSON string (``mode``,
-        ``attribution_method``, ``valuation_options``, ``on_error``).
-    mode : str | None
-        Shorthand for ``config={"mode": mode}``: ``"pv_only"``,
-        ``"pv_and_pnl"`` or ``"full_attribution"``. Ignored when ``config``
-        is given.
+    config : dict | str
+        ``ReplayConfig`` as a dict or JSON string: required ``mode``
+        (``"pv_only"``, ``"pv_and_pnl"`` or ``"full_attribution"``) and
+        optional ``attribution_method``, ``valuation_options`` and
+        ``on_error``; unknown keys are rejected. The same input the WASM
+        ``replayPortfolio`` takes.
 
     Returns
     -------
@@ -4547,8 +4556,8 @@ def replay_portfolio(
     Raises
     ------
     ValueError
-        If neither ``config`` nor ``mode`` is supplied, or the snapshots or
-        config are malformed (an empty timeline is rejected).
+        If the snapshots or config are malformed (a missing ``mode`` or an
+        empty timeline is rejected).
     PortfolioError
         If a snapshot valuation fails under a strict error policy.
 
@@ -4557,7 +4566,7 @@ def replay_portfolio(
     >>> from finstack_quant.portfolio import replay_portfolio
     >>> spec = '{"id":"empty","base_currency":"USD","as_of":"2025-01-01","entities":{},"positions":[]}'
     >>> try:
-    ...     replay_portfolio(spec, [], mode="pv_only")
+    ...     replay_portfolio(spec, [], {"mode": "pv_only"})
     ... except ValueError as exc:
     ...     print("must be non-empty" in str(exc))
     True
@@ -4567,8 +4576,7 @@ def replay_portfolio(
 def replay_portfolio_json(
     portfolio: Portfolio | str,
     snapshots: list[tuple[datetime.date | str, MarketContext | str]] | list[dict[str, Any]] | str,
-    config: dict[str, Any] | str | None = None,
-    mode: str | None = None,
+    config: dict[str, Any] | str,
 ) -> str:
     """
     Replay a portfolio through dated market snapshots and return wire JSON.
@@ -4582,10 +4590,9 @@ def replay_portfolio_json(
         Typed :class:`Portfolio` or JSON ``PortfolioSpec``.
     snapshots : list[tuple[date, MarketContext | str]] | list[dict] | str
         Dated market snapshots (see :func:`replay_portfolio`).
-    config : dict | str | None
-        ``ReplayConfig`` as a dict or JSON string.
-    mode : str | None
-        Shorthand for ``config={"mode": mode}``.
+    config : dict | str
+        ``ReplayConfig`` as a dict or JSON string (see
+        :func:`replay_portfolio`).
 
     Returns
     -------
@@ -4595,8 +4602,7 @@ def replay_portfolio_json(
     Raises
     ------
     ValueError
-        If neither ``config`` nor ``mode`` is supplied or an input is
-        malformed.
+        If an input is malformed (including a config without ``mode``).
     PortfolioError
         If a snapshot valuation fails under a strict error policy.
 
@@ -4820,13 +4826,14 @@ class CarinoLinkedAttribution:
     """
     Carino-linked multi-period Brinson attribution result.
 
-    Returned by :func:`carino_link`. The linked per-sector effects sum to the
-    geometrically compounded active return exactly.
+    Returned by :func:`carino_link` and
+    :func:`carino_link_from_sector_periods`. The linked per-sector effects sum
+    to the geometrically compounded active return exactly.
 
     Examples
     --------
     >>> import json
-    >>> from finstack_quant.portfolio import carino_link
+    >>> from finstack_quant.portfolio import carino_link_from_sector_periods
     >>> period = [
     ...     {
     ...         "sector": "A",
@@ -4836,7 +4843,7 @@ class CarinoLinkedAttribution:
     ...         "benchmark_return": 0.01,
     ...     }
     ... ]
-    >>> result = carino_link(json.dumps([period, period]))
+    >>> result = carino_link_from_sector_periods(json.dumps([period, period]))
     >>> round(result.linked_selection, 4)
     0.0203
     """
@@ -5113,7 +5120,67 @@ def brinson_fachler_json(sectors_json: str | dict[str, Any] | list[Any] | pd.Dat
 
 def carino_link(periods_json: str | dict[str, Any] | list[Any] | pd.DataFrame) -> CarinoLinkedAttribution:
     """
-    Compute Carino-linked multi-period Brinson attribution from period JSON.
+    Carino-link already-computed single-period Brinson-Fachler results.
+
+    Binds Rust ``carino_link``, like :func:`campisi_carino_link` and
+    :func:`grid_carino_link`; use :func:`carino_link_from_sector_periods` to
+    link raw sector inputs instead. The same input the WASM ``carinoLink``
+    takes.
+
+    Parameters
+    ----------
+    periods_json : str | dict | list | pandas.DataFrame
+        Chronological JSON array of ``BrinsonPeriodResult`` objects (for
+        example ``json.loads(brinson_fachler_json(...))`` per period) with
+        identical sector ordering in every period.
+
+    Returns
+    -------
+    CarinoLinkedAttribution
+        Typed result with linked per-sector effects and compounded returns;
+        use :func:`carino_link_json` for the raw wire string.
+
+    Raises
+    ------
+    PortfolioError
+        If the sequence is empty or changes sector ordering, or a period
+        return is non-finite or at most ``-1``.
+    ValueError
+        If ``periods_json`` is malformed.
+
+    Sources
+    -------
+    See ``docs/REFERENCES.md#carino-1999``.
+
+    Examples
+    --------
+    >>> import json
+    >>> from finstack_quant.portfolio import brinson_fachler_json, carino_link
+    >>> period = [
+    ...     {
+    ...         "sector": "A",
+    ...         "portfolio_weight": 1.0,
+    ...         "benchmark_weight": 1.0,
+    ...         "portfolio_return": 0.02,
+    ...         "benchmark_return": 0.01,
+    ...     }
+    ... ]
+    >>> result = json.loads(brinson_fachler_json(json.dumps(period)))
+    >>> linked = carino_link(json.dumps([result, result]))
+    >>> round(linked.linked_selection, 4)
+    0.0203
+    """
+    ...
+
+def carino_link_from_sector_periods(
+    periods_json: str | dict[str, Any] | list[Any] | pd.DataFrame,
+) -> CarinoLinkedAttribution:
+    """
+    Compute Carino-linked multi-period Brinson attribution from raw sector periods.
+
+    Binds Rust ``carino_link_from_sector_periods``: runs
+    :func:`brinson_fachler` on each period, then Carino-links the results.
+    The same input the WASM ``carinoLinkFromSectorPeriods`` takes.
 
     Parameters
     ----------
@@ -5125,12 +5192,15 @@ def carino_link(periods_json: str | dict[str, Any] | list[Any] | pd.DataFrame) -
     -------
     CarinoLinkedAttribution
         Typed result with linked per-sector effects and compounded returns;
-        use :func:`carino_link_json` for the raw wire string.
+        use :func:`carino_link_from_sector_periods_json` for the raw wire
+        string.
 
     Raises
     ------
     PortfolioError
-        If any period fails Brinson validation.
+        If any period fails Brinson validation, the sequence is empty or
+        changes sector ordering, or a period return is non-finite or at most
+        ``-1``.
     ValueError
         If ``periods_json`` is malformed.
 
@@ -5141,7 +5211,7 @@ def carino_link(periods_json: str | dict[str, Any] | list[Any] | pd.DataFrame) -
     Examples
     --------
     >>> import json
-    >>> from finstack_quant.portfolio import carino_link
+    >>> from finstack_quant.portfolio import carino_link_from_sector_periods
     >>> period = [
     ...     {
     ...         "sector": "A",
@@ -5151,8 +5221,57 @@ def carino_link(periods_json: str | dict[str, Any] | list[Any] | pd.DataFrame) -
     ...         "benchmark_return": 0.01,
     ...     }
     ... ]
-    >>> result = carino_link(json.dumps([period, period]))
+    >>> result = carino_link_from_sector_periods(json.dumps([period, period]))
     >>> round(result.linked_selection, 4)
+    0.0203
+    """
+    ...
+
+def carino_link_from_sector_periods_json(
+    periods_json: str | dict[str, Any] | list[Any] | pd.DataFrame,
+) -> str:
+    """
+    Carino-link raw sector periods and return wire JSON.
+
+    Wire twin of :func:`carino_link_from_sector_periods`: same inputs and
+    validation, returning the canonical JSON string instead of the typed
+    wrapper.
+
+    Parameters
+    ----------
+    periods_json : str | dict | list | pandas.DataFrame
+        JSON array of periods of ``SectorPeriod`` objects; same schema as
+        :func:`carino_link_from_sector_periods`.
+
+    Returns
+    -------
+    str
+        JSON-serialized ``CarinoLinkedAttribution`` wire document.
+
+    Raises
+    ------
+    PortfolioError
+        If any period fails Brinson validation, the sequence is empty or
+        changes sector ordering, or a period return is non-finite or at most
+        ``-1``.
+    ValueError
+        If ``periods_json`` is malformed.
+
+    Examples
+    --------
+    >>> import json
+    >>> from finstack_quant.portfolio import carino_link_from_sector_periods_json
+    >>> period = [
+    ...     {
+    ...         "sector": "A",
+    ...         "portfolio_weight": 1.0,
+    ...         "benchmark_weight": 1.0,
+    ...         "portfolio_return": 0.02,
+    ...         "benchmark_return": 0.01,
+    ...     }
+    ... ]
+    >>> result = json.loads(carino_link_from_sector_periods_json(json.dumps([period, period])))
+    >>> round(result["linked_selection"], 4)
     0.0203
     """
     ...
@@ -5795,7 +5914,7 @@ class FiReconciliationReport:
 
 def carino_link_json(periods_json: str | dict[str, Any] | list[Any] | pd.DataFrame) -> str:
     """
-    Compute Carino-linked multi-period Brinson attribution and return wire JSON.
+    Carino-link precomputed Brinson period results and return wire JSON.
 
     Wire twin of :func:`carino_link`: same inputs and validation, returning
     the canonical JSON string instead of the typed wrapper.
@@ -5803,8 +5922,8 @@ def carino_link_json(periods_json: str | dict[str, Any] | list[Any] | pd.DataFra
     Parameters
     ----------
     periods_json : str | dict | list | pandas.DataFrame
-        JSON array of periods of ``SectorPeriod`` objects; same schema as
-        :func:`carino_link`.
+        Chronological JSON array of ``BrinsonPeriodResult`` objects; same
+        schema as :func:`carino_link`.
 
     Returns
     -------
@@ -5814,14 +5933,15 @@ def carino_link_json(periods_json: str | dict[str, Any] | list[Any] | pd.DataFra
     Raises
     ------
     PortfolioError
-        If any period fails Brinson validation.
+        If the sequence is empty or changes sector ordering, or a period
+        return is non-finite or at most ``-1``.
     ValueError
         If ``periods_json`` is malformed.
 
     Examples
     --------
     >>> import json
-    >>> from finstack_quant.portfolio import carino_link_json
+    >>> from finstack_quant.portfolio import brinson_fachler_json, carino_link_json
     >>> period = [
     ...     {
     ...         "sector": "A",
@@ -5831,8 +5951,9 @@ def carino_link_json(periods_json: str | dict[str, Any] | list[Any] | pd.DataFra
     ...         "benchmark_return": 0.01,
     ...     }
     ... ]
-    >>> result = json.loads(carino_link_json(json.dumps([period, period])))
-    >>> round(result["linked_selection"], 4)
+    >>> result = json.loads(brinson_fachler_json(json.dumps(period)))
+    >>> linked = json.loads(carino_link_json(json.dumps([result, result])))
+    >>> round(linked["linked_selection"], 4)
     0.0203
     """
     ...
@@ -8149,31 +8270,20 @@ class LinkedReturn:
         """
         ...
 
-def twrr_modified_dietz(
-    period: dict[str, Any] | str | None = None,
-    *,
-    beginning_market_value: float | None = None,
-    ending_market_value: float | None = None,
-    cashflows: list[tuple[float, float]] | None = None,
-) -> float:
+def twrr_modified_dietz(period: dict[str, Any] | str) -> float:
     """
     Compute a Modified-Dietz TWRR sub-period return.
 
     Parameters
     ----------
-    period : dict | str | None
-        Complete ``TwrrPeriod`` (``beginning_market_value``,
-        ``ending_market_value``, ``cashflows: [{amount,
-        fraction_of_period_remaining}]``) as a dict or JSON string. Omit it
-        to build the period from the keyword arguments instead.
-    beginning_market_value : float | None
-        PV at period start (used when ``period`` is omitted).
-    ending_market_value : float | None
-        PV at period end (used when ``period`` is omitted).
-    cashflows : list[tuple[float, float]] | None
-        External flows as ``(amount, fraction_of_period_remaining)`` pairs:
-        positive amount = contribution into the portfolio; the fraction in
-        ``[0, 1]`` weights the flow by time remaining. Defaults to none.
+    period : dict | str
+        ``TwrrPeriod`` as a dict or JSON string: ``beginning_market_value``,
+        ``ending_market_value`` and optional ``cashflows: [{amount,
+        fraction_of_period_remaining}]`` (omitted means no flows). A positive
+        ``amount`` is a contribution into the portfolio; the fraction, in
+        ``[0, 1]``, is the share of the period remaining after the flow.
+        Unknown keys are rejected. The same input the WASM
+        ``twrrModifiedDietz`` takes.
 
     Returns
     -------
@@ -8183,17 +8293,20 @@ def twrr_modified_dietz(
     Raises
     ------
     ValueError
-        If the period is malformed, a cashflow weight lies outside ``[0, 1]``,
-        the Dietz denominator is non-positive, or neither ``period`` nor both
-        market values are supplied.
+        If the period is malformed or has unknown keys, a cashflow weight lies
+        outside ``[0, 1]``, or the Dietz denominator is non-positive.
 
     Examples
     --------
     >>> from finstack_quant.portfolio import twrr_modified_dietz
-    >>> twrr_modified_dietz(beginning_market_value=100.0, ending_market_value=110.0)
+    >>> twrr_modified_dietz({"beginning_market_value": 100.0, "ending_market_value": 110.0})
     0.1
-    >>> twrr_modified_dietz({"beginning_market_value": 100.0, "ending_market_value": 110.0, "cashflows": []})
-    0.1
+    >>> twrr_modified_dietz({
+    ...     "beginning_market_value": 100.0,
+    ...     "ending_market_value": 110.0,
+    ...     "cashflows": [{"amount": 5.0, "fraction_of_period_remaining": 0.5}],
+    ... }) == 5.0 / 102.5
+    True
     """
     ...
 
@@ -8271,6 +8384,8 @@ def mwr_xirr(
 ) -> float:
     """
     Compute the money-weighted return (XIRR, Act/365F) from dated cashflows.
+
+    Binds Rust ``mwr_xirr_from_cashflows``.
 
     Parameters
     ----------
@@ -13099,42 +13214,55 @@ class SensitivityMatrix:
     @staticmethod
     def from_json(json: str) -> SensitivityMatrix:
         """
-        Parse from canonical JSON produced by :meth:`to_json`.
+        Parse the canonical sensitivity-matrix wire JSON.
+
+        The wire object is ``{base_currency, position_ids, factor_ids, data}``
+        with ``data`` as one row per position (``data[position][factor]``):
+        the JSON :meth:`to_json` emits, the WASM
+        ``computeFactorSensitivities`` returns and ``decomposeFactorRisk``
+        accepts.
 
         Parameters
         ----------
         json : str
-            Canonical payload.
+            Canonical wire payload; unknown keys are rejected.
 
         Returns
         -------
         SensitivityMatrix
-            Reconstructed value.
+            Reconstructed matrix with its reporting currency.
 
         Raises
         ------
         ValueError
-            If the payload is malformed.
+            If the payload is malformed, has unknown keys or an invalid
+            ``base_currency``, or its rows do not match ``position_ids`` and
+            ``factor_ids``.
 
         Examples
         --------
         >>> from finstack_quant.portfolio import SensitivityMatrix
+        >>> wire = '{"base_currency":"USD","position_ids":["A"],"factor_ids":["F1","F2"],"data":[[1.0,2.0]]}'
+        >>> SensitivityMatrix.from_json(wire).delta(0, 1)
+        2.0
         >>> try:
-        ...     SensitivityMatrix.from_json("{}")
-        ... except ValueError:
-        ...     print("missing fields")
-        missing fields
+        ...     SensitivityMatrix.from_json(wire.replace("[[1.0,2.0]]", "[[1.0]]"))
+        ... except ValueError as exc:
+        ...     print("row 0 has 1 element(s)" in str(exc))
+        True
         """
         ...
 
     def to_json(self) -> str:
         """
-        Serialize to canonical JSON.
+        Serialize to the canonical sensitivity-matrix wire JSON.
 
         Returns
         -------
         str
-            JSON accepted by :meth:`from_json`; also backs ``pickle``.
+            ``{base_currency, position_ids, factor_ids, data}`` with nested
+            rows, accepted by :meth:`from_json` and by the WASM
+            ``decomposeFactorRisk``; also backs ``pickle``.
 
         Notes
         -----
@@ -13656,16 +13784,18 @@ class FactorRiskDecomposition:
         ...
 
     @property
-    def measure(self) -> str:
+    def measure(self) -> str | dict[str, dict[str, float]]:
         """
-        Risk-measure tag in canonical snake_case serde form: ``"variance"``,
-        ``"volatility"``, ``"var"``, or ``"expected_shortfall"``. Matches the
-        tag reported by the WASM ``decomposeFactorRisk`` output.
+        Risk measure in its canonical serde form.
+
+        The same value :meth:`to_json` and the WASM ``decomposeFactorRisk``
+        output carry, and the same shape as the ``risk_measure`` input.
 
         Returns
         -------
-        str
-            Risk-measure tag in canonical snake_case serde form: ``"variance"``,
+        str | dict[str, dict[str, float]]
+            ``"variance"`` or ``"volatility"``, or ``{"var": {"confidence":
+            c}}`` / ``{"expected_shortfall": {"confidence": c}}``.
 
         Notes
         -----

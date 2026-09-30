@@ -3,8 +3,8 @@
 //! Each function accepts either a typed :class:`Portfolio` object or a JSON
 //! ``PortfolioSpec`` string, plus either a typed :class:`MarketContext` or a
 //! JSON string. Returning typed wrappers (``PortfolioValuation``) lets
-//! downstream calls (``aggregate_metrics``, ``portfolio_result_*``) avoid
-//! a JSON round-trip.
+//! downstream calls (``aggregate_metrics``, ``PortfolioResult``) avoid a JSON
+//! round-trip.
 
 use crate::bindings::core::currency::extract_currency;
 use crate::bindings::extract::{
@@ -21,9 +21,10 @@ use pyo3::prelude::*;
 ///
 /// Delegates to the canonical
 /// `RequestedMetrics::try_from_metric_names` in the portfolio crate (shared
-/// with the WASM binding), which rejects unknown standard-metric names —
-/// surfaced here as a `ValueError` listing the available identifiers —
-/// instead of letting a typo silently degrade to PV-only valuation.
+/// with the WASM binding), which resolves names against the standard metric
+/// registry and rejects unknown ones — surfaced here as a `ValueError` listing
+/// the closest standard identifiers — instead of letting a typo silently
+/// degrade to PV-only valuation.
 fn parse_requested_metrics(
     metrics: Option<Vec<String>>,
 ) -> PyResult<finstack_quant_portfolio::valuation::RequestedMetrics> {
@@ -36,16 +37,19 @@ fn run_portfolio_valuation(
     py: Python<'_>,
     portfolio: &Bound<'_, PyAny>,
     market: &Bound<'_, PyAny>,
-    strict_risk: bool,
+    strict_risk: Option<bool>,
     metrics: Option<Vec<String>>,
 ) -> PyResult<finstack_quant_portfolio::valuation::PortfolioValuation> {
     let portfolio = extract_portfolio_ref(py, portfolio)?;
     let market = extract_market_ref(py, market)?;
     let config = finstack_quant_core::config::FinstackConfig::default();
-    let options = finstack_quant_portfolio::valuation::PortfolioValuationOptions {
-        strict_risk,
+    let mut options = finstack_quant_portfolio::valuation::PortfolioValuationOptions {
         metrics: parse_requested_metrics(metrics)?,
+        ..Default::default()
     };
+    if let Some(strict_risk) = strict_risk {
+        options.strict_risk = strict_risk;
+    }
     // Release the GIL (PyO3 `detach`) while the CPU-bound Rust valuation runs
     // so other Python threads can execute concurrently. The `*Access` wrappers
     // contain a `PyRef` (not `Ungil`), so we deref to plain Rust references
@@ -73,17 +77,22 @@ fn run_portfolio_valuation(
 ///     JSON-serialized ``PortfolioSpec`` string.
 /// market : MarketContext | str
 ///     A ``MarketContext`` object or a JSON string.
-/// strict_risk : bool
-///     If ``True`` (the default), any risk metric failure aborts the entire
-///     valuation. Set ``False`` only for an intentional PV-preserving
-///     fallback that records failed metrics as diagnostics.
+/// strict_risk : bool | None
+///     ``None`` uses the Rust ``PortfolioValuationOptions`` default, ``True``:
+///     any risk metric failure aborts the entire valuation. Set ``False``
+///     only for an intentional PV-preserving fallback that records failed
+///     metrics as diagnostics.
 /// metrics : list[str] | None
-///     Exact risk metrics to compute. ``None`` requests the standard set
-///     (PV plus ``dv01``, which every rate-sensitive pricer supports);
+///     Risk metrics to offer every position. ``None`` requests the standard
+///     set (PV plus ``dv01``, which every rate-sensitive pricer supports);
 ///     an empty list performs PV-only valuation. Pricer-specific metrics
 ///     such as ``theta``, ``cs01`` or the Greeks must be listed explicitly.
-///     Names are validated strictly against the standard ``MetricId`` set;
-///     an unknown name raises ``ValueError`` listing the available metrics.
+///     Names resolve exactly as in ``price_instrument``: every id
+///     ``list_standard_metrics()`` returns is accepted, and an unknown name
+///     raises ``ValueError`` listing the closest standard metrics. The list is
+///     a menu: each position is asked for the entries its instrument can
+///     compute (a composite: the additive entries at least one leg supports)
+///     and the rest appear on its ``inapplicable_metrics``.
 ///
 /// Returns
 /// -------
@@ -91,12 +100,12 @@ fn run_portfolio_valuation(
 ///     Typed valuation wrapper that can be passed directly to
 ///     ``aggregate_metrics`` without a JSON round-trip.
 #[pyfunction]
-#[pyo3(signature = (portfolio, market, strict_risk=true, metrics=None))]
+#[pyo3(signature = (portfolio, market, strict_risk=None, metrics=None))]
 fn value_portfolio(
     py: Python<'_>,
     portfolio: &Bound<'_, PyAny>,
     market: &Bound<'_, PyAny>,
-    strict_risk: bool,
+    strict_risk: Option<bool>,
     metrics: Option<Vec<String>>,
 ) -> PyResult<PyPortfolioValuation> {
     let valuation = run_portfolio_valuation(py, portfolio, market, strict_risk, metrics)?;
@@ -113,10 +122,11 @@ fn value_portfolio(
 /// market : MarketContext | str
 ///     A ``MarketContext`` object or a JSON string used to build
 ///     instrument schedules.
-/// allow_partial : bool
-///     If ``False`` (the default), any schedule-construction issue aborts
-///     the call. If ``True``, remaining positions still contribute to the
-///     ladder and issues are returned on the result.
+/// allow_partial : bool | None
+///     ``None`` uses the Rust ``CashflowAggregationOptions`` default,
+///     ``False``: any schedule-construction issue aborts the call. If
+///     ``True``, remaining positions still contribute to the ladder and
+///     issues are returned on the result.
 ///
 /// Returns
 /// -------
@@ -133,18 +143,21 @@ fn value_portfolio(
 ///     ``allow_partial`` is ``False``, or same-date same-currency
 ///     same-kind amounts cannot be added.
 #[pyfunction]
-#[pyo3(signature = (portfolio, market, allow_partial=false))]
+#[pyo3(signature = (portfolio, market, allow_partial=None))]
 fn aggregate_full_cashflows(
     py: Python<'_>,
     portfolio: &Bound<'_, PyAny>,
     market: &Bound<'_, PyAny>,
-    allow_partial: bool,
+    allow_partial: Option<bool>,
 ) -> PyResult<PyPortfolioCashflows> {
     let portfolio = extract_portfolio_ref(py, portfolio)?;
     let market = extract_market_ref(py, market)?;
     let portfolio_ref: &finstack_quant_portfolio::Portfolio = &portfolio;
     let market_ref: &finstack_quant_core::market_data::context::MarketContext = &market;
-    let options = finstack_quant_portfolio::cashflows::CashflowAggregationOptions { allow_partial };
+    let mut options = finstack_quant_portfolio::cashflows::CashflowAggregationOptions::default();
+    if let Some(allow_partial) = allow_partial {
+        options.allow_partial = allow_partial;
+    }
     let cashflows = py
         .detach(|| {
             finstack_quant_portfolio::cashflows::aggregate_full_cashflows(

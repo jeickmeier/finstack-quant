@@ -267,6 +267,25 @@ test('fromMaterialization maps max artifact count to limit_exceeded', () => {
   );
 });
 
+// Python `cache=None` twin: an omitted, `undefined` or `null` cache means a
+// per-call cache with the native default bounds, for both entry points.
+test('materialization entry points treat a null or undefined cache as omitted', () => {
+  for (const cache of [null, undefined]) {
+    const loaded = portfolio.Portfolio.fromMaterialization(JSON.stringify(DEPOSIT_BUNDLE), cache);
+    assert.equal(loaded.portfolio.numPositions(), 1);
+    assert.equal(loaded.report.cache_hits, 0);
+    loaded.portfolio.free();
+
+    const report = portfolio.Portfolio.validateMaterialization(
+      JSON.stringify(DEPOSIT_BUNDLE),
+      cache
+    );
+    assert.equal(report.positions, 1);
+  }
+  assert.equal(portfolio.Portfolio.fromMaterialization.length, 1);
+  assert.equal(portfolio.Portfolio.validateMaterialization.length, 1);
+});
+
 test('materialization cache handle is reusable', () => {
   const cache = new portfolio.InstrumentArtifactCache();
   const first = portfolio.Portfolio.fromMaterialization(JSON.stringify(DEPOSIT_BUNDLE), cache);

@@ -140,6 +140,8 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
         "brinson_fachler_json",
         "carino_link",
         "carino_link_json",
+        "carino_link_from_sector_periods",
+        "carino_link_from_sector_periods_json",
         "campisi_attribution",
         "campisi_attribution_json",
         "campisi_carino_link",

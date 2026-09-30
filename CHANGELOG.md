@@ -2,6 +2,27 @@
 
 ## [Unreleased]
 
+### WASM binding audit: portfolio (2026-09-29)
+
+#### Changed (BREAKING)
+
+- Sensitivity matrices have one wire shape in both hosts and both directions: nested `data` rows plus `base_currency`. The flat Python shape (with `n_factors`) is rejected.
+  - Rust: `SensitivityMatrixJson` rejects unknown keys and converts through `TryFrom<SensitivityMatrixJson> for SensitivityMatrix`, which validates via the new `SensitivityMatrix::from_rows`. The models `SensitivityMatrix` no longer derives serde, and `FactorPnlProfileJson` is removed.
+  - WASM `decomposeFactorRisk` requires `base_currency`, and malformed rows throw a Rust `validation` error.
+- Python `FactorRiskDecomposition.measure` returns the serde form of `RiskMeasure`, so VaR and ES give a dict rather than a bare tag.
+- `carinoLink` / `carino_link` / `carino_link_json` bind Rust `carino_link` over precomputed `BrinsonPeriodResult`s. The raw sector-period form moves to the new `carinoLinkFromSectorPeriods` / `carino_link_from_sector_periods(_json)`.
+- WASM `portfolioResultTotalValue` and `portfolioResultGetMetric` are removed; use the typed result accessors.
+- Python `replay_portfolio` / `replay_portfolio_json` take `(portfolio, snapshots, config)` with `config` required, and the `mode=` shorthand is removed.
+- `twrr_modified_dietz(period)` is the only Python form. `TwrrPeriod` and `DietzFlow` reject unknown keys, and an omitted `cashflows` means no flows.
+- Python `strict_risk` and `allow_partial` default to `None`, resolved against `PortfolioValuationOptions::default()`.
+- Metric requests resolve through the new `MetricRegistry::resolve_metric_ids`, so `value_portfolio` / `valuePortfolio` accept every `list_standard_metrics()` id.
+- Composite positions are narrowed leg by leg through the new `Instrument::applicable_metrics`. A composite with a deposit leg now reports `dv01`, a non-additive requested metric is listed in `inapplicable_metrics`, and nested composites receive their aggregated metrics.
+- Portfolio optimization wire results compute `new_position_trades` and `binding_constraints` in Rust.
+
+#### Added
+
+- `Portfolio.fromMaterialization` / `validateMaterialization` accept a `null` cache.
+
 ### WASM binding audit: statements and statements analytics (2026-09-29)
 
 #### Changed (BREAKING)

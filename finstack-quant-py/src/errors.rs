@@ -53,7 +53,6 @@
 
 use pyo3::exceptions::{PyKeyError, PyRuntimeError, PyValueError};
 use pyo3::prelude::*;
-use pyo3::types::{PyDict, PyList};
 
 pyo3::create_exception!(
     finstack_quant.core,
@@ -276,56 +275,15 @@ fn contract_report_to_py(
     }
 }
 
-/// Convert a validation report to a Python list of diagnostic dictionaries.
+/// Convert a validation report's diagnostics to a Python list of dictionaries.
+///
+/// Each dictionary is the serde form of the Rust `Diagnostic` (the same keys
+/// and enum strings the WASM binding returns), so no label table lives here.
 pub(crate) fn diagnostics_to_py(
     py: Python<'_>,
     report: &finstack_quant_core::contract::ValidationReport,
 ) -> PyResult<Py<PyAny>> {
-    let diagnostics = PyList::empty(py);
-    for diagnostic in &report.diagnostics {
-        let item = PyDict::new(py);
-        item.set_item("code", &diagnostic.code)?;
-        item.set_item("phase", load_phase_name(diagnostic.phase))?;
-        item.set_item("severity", severity_name(diagnostic.severity))?;
-        item.set_item("pointer", diagnostic.pointer.as_deref())?;
-        item.set_item("message", &diagnostic.message)?;
-        item.set_item("contract", diagnostic.contract.as_deref())?;
-        item.set_item("expected_version", diagnostic.expected_version)?;
-        item.set_item("actual_version", diagnostic.actual_version)?;
-        item.set_item("artifact_hash", diagnostic.artifact_hash.as_deref())?;
-        item.set_item("revision_id", diagnostic.revision_id.as_deref())?;
-        item.set_item("instrument_id", diagnostic.instrument_id.as_deref())?;
-        item.set_item("position_id", diagnostic.position_id.as_deref())?;
-        diagnostics.append(item)?;
-    }
-    Ok(diagnostics.into_any().unbind())
-}
-
-fn load_phase_name(phase: finstack_quant_core::contract::LoadPhase) -> &'static str {
-    use finstack_quant_core::contract::LoadPhase;
-
-    match phase {
-        LoadPhase::Parse => "parse",
-        LoadPhase::Version => "version",
-        LoadPhase::Structure => "structure",
-        LoadPhase::Semantic => "semantic",
-        LoadPhase::Canonicalize => "canonicalize",
-        LoadPhase::Hash => "hash",
-        LoadPhase::Build => "build",
-        #[allow(unreachable_patterns)]
-        _ => "unknown",
-    }
-}
-
-fn severity_name(severity: finstack_quant_core::contract::Severity) -> &'static str {
-    use finstack_quant_core::contract::Severity;
-
-    match severity {
-        Severity::Error => "error",
-        Severity::Warning => "warning",
-        #[allow(unreachable_patterns)]
-        _ => "unknown",
-    }
+    crate::bindings::pandas_utils::serde_to_py(py, &report.diagnostics).map(Bound::unbind)
 }
 
 /// Convert a `finstack_quant_statements::Error` into a Python exception by its

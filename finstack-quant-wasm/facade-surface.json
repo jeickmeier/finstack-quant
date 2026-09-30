@@ -1047,6 +1047,7 @@
       "campisiCarinoLinkFromSnapshots",
       "campisiReconciliationCheck",
       "carinoLink",
+      "carinoLinkFromSectorPeriods",
       "cellReturnsFromCurves",
       "cellReturnsFromReference",
       "computeFactorSensitivities",
@@ -1061,8 +1062,6 @@
       "mwrXirr",
       "optimizePortfolio",
       "parsePortfolioSpecJson",
-      "portfolioResultGetMetric",
-      "portfolioResultTotalValue",
       "replayPortfolio",
       "scenarioPnl",
       "scenarioPnlBuilt",
@@ -1091,6 +1090,9 @@
     "kind": "function"
   },
   "portfolio.carinoLink": {
+    "kind": "function"
+  },
+  "portfolio.carinoLinkFromSectorPeriods": {
     "kind": "function"
   },
   "portfolio.campisiAttribution": {
@@ -1133,12 +1135,6 @@
     "kind": "function"
   },
   "portfolio.buildPortfolioFromSpecJson": {
-    "kind": "function"
-  },
-  "portfolio.portfolioResultTotalValue": {
-    "kind": "function"
-  },
-  "portfolio.portfolioResultGetMetric": {
     "kind": "function"
   },
   "portfolio.aggregateMetrics": {

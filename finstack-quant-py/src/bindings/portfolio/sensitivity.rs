@@ -26,10 +26,9 @@ const DEFAULT_PNL_SCENARIO_POINTS: usize =
     frozen,
     skip_from_py_object
 )]
-#[derive(Clone, serde::Serialize, serde::Deserialize)]
+#[derive(Clone)]
 pub(crate) struct PySensitivityMatrix {
     base_currency: finstack_quant_core::currency::Currency,
-    #[serde(flatten)]
     pub(crate) inner: finstack_quant_portfolio::sensitivity::SensitivityMatrix,
 }
 
@@ -53,17 +52,31 @@ impl PySensitivityMatrix {
         crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
     }
 
-    /// Parse from JSON (``{base_currency, position_ids, factor_ids, data}``).
+    /// Parse from the canonical wire JSON
+    /// (``{base_currency, position_ids, factor_ids, data}``, ``data`` as one
+    /// row per position), the shape WASM ``computeFactorSensitivities``
+    /// returns and ``decomposeFactorRisk`` accepts.
     #[staticmethod]
     #[pyo3(text_signature = "(json)")]
     fn from_json(json: &str) -> PyResult<Self> {
-        serde_json::from_str(json).map_err(display_to_py)
+        let wire: finstack_quant_portfolio::sensitivity::SensitivityMatrixJson =
+            serde_json::from_str(json).map_err(display_to_py)?;
+        let base_currency = wire.base_currency;
+        let inner = finstack_quant_portfolio::sensitivity::SensitivityMatrix::try_from(wire)
+            .map_err(core_to_py)?;
+        Ok(Self::from_inner(inner, base_currency))
     }
 
-    /// Serialize to compact JSON.
+    /// Serialize to the canonical wire JSON (see :meth:`from_json`).
     #[pyo3(text_signature = "(self)")]
     fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(self).map_err(display_to_py)
+        serde_json::to_string(
+            &finstack_quant_portfolio::sensitivity::SensitivityMatrixJson::from_matrix(
+                &self.inner,
+                self.base_currency,
+            ),
+        )
+        .map_err(display_to_py)
     }
 
     /// ISO reporting currency for every sensitivity entry.
@@ -431,7 +444,6 @@ fn compute_pnl_profiles(
 struct PyFactorRiskDecomposition {
     inner: finstack_quant_models::factor::risk::RiskDecomposition,
     total_risk: f64,
-    measure: String,
     residual_risk: f64,
     factor_ids: Vec<String>,
     absolute_risks: Vec<f64>,
@@ -443,33 +455,8 @@ struct PyFactorRiskDecomposition {
     residual_contributions: Vec<finstack_quant_models::factor::risk::PositionResidualContribution>,
 }
 
-/// Bare snake_case serde tag of a [`RiskMeasure`], without JSON quoting or
-/// variant payload (`"variance"`, `"volatility"`, `"var"`,
-/// `"expected_shortfall"`). Matches the tag the WASM binding reports.
-fn risk_measure_tag(measure: &finstack_quant_models::factor::RiskMeasure) -> String {
-    use finstack_quant_models::factor::RiskMeasure as M;
-    match measure {
-        M::Variance => "variance".to_owned(),
-        M::Volatility => "volatility".to_owned(),
-        M::VaR { .. } => "var".to_owned(),
-        M::ExpectedShortfall { .. } => "expected_shortfall".to_owned(),
-        // `RiskMeasure` is `#[non_exhaustive]`; derive the tag of a future
-        // variant from its serde form so the binding stays forward-compatible.
-        other => match serde_json::to_value(other) {
-            Ok(serde_json::Value::String(tag)) => tag,
-            Ok(serde_json::Value::Object(map)) => map
-                .keys()
-                .next()
-                .cloned()
-                .unwrap_or_else(|| format!("{other:?}")),
-            _ => format!("{other:?}"),
-        },
-    }
-}
-
 impl PyFactorRiskDecomposition {
     fn from_inner(decomp: finstack_quant_models::factor::risk::RiskDecomposition) -> Self {
-        let measure = risk_measure_tag(&decomp.measure);
         let factor_ids: Vec<String> = decomp
             .factor_contributions
             .iter()
@@ -507,7 +494,6 @@ impl PyFactorRiskDecomposition {
             .collect();
         Self {
             total_risk: decomp.total_risk,
-            measure,
             residual_risk: decomp.residual_risk,
             factor_ids,
             absolute_risks,
@@ -551,12 +537,13 @@ impl PyFactorRiskDecomposition {
         self.total_risk
     }
 
-    /// Risk-measure tag in canonical snake_case serde form: ``"variance"``,
-    /// ``"volatility"``, ``"var"``, or ``"expected_shortfall"``. Matches the
-    /// tag reported by the WASM ``decomposeFactorRisk`` output.
+    /// Risk measure in its canonical serde form, the same value
+    /// :meth:`to_json` and the WASM ``decomposeFactorRisk`` output carry:
+    /// ``"variance"`` or ``"volatility"``, or ``{"var": {"confidence": c}}`` /
+    /// ``{"expected_shortfall": {"confidence": c}}``.
     #[getter]
-    fn measure(&self) -> &str {
-        &self.measure
+    fn measure<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        crate::bindings::pandas_utils::serde_to_py(py, &self.inner.measure)
     }
 
     /// Residual (idiosyncratic) risk not attributed to any factor.
@@ -649,8 +636,8 @@ impl PyFactorRiskDecomposition {
 
     fn __repr__(&self) -> String {
         format!(
-            "FactorRiskDecomposition(measure={:?}, total_risk={:.6}, factors={}, positions={})",
-            self.measure,
+            "FactorRiskDecomposition(measure={}, total_risk={:.6}, factors={}, positions={})",
+            serde_json::to_string(&self.inner.measure).unwrap_or_default(),
             self.total_risk,
             self.factor_ids.len(),
             {
@@ -701,7 +688,7 @@ fn decompose_factor_risk(
     let covariance_json: &str = &covariance_json;
     let measure: finstack_quant_models::factor::RiskMeasure = match risk_measure {
         Some(obj) => py_to_serde(py, obj, "risk_measure")?,
-        None => finstack_quant_models::factor::RiskMeasure::Variance,
+        None => finstack_quant_models::factor::RiskMeasure::default(),
     };
 
     let matrix = sensitivities.inner.clone();

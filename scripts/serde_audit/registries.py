@@ -90,9 +90,12 @@ ONE_WAY_EXCEPTIONS = (
     *_exception(
         "portfolio",
         "src/sensitivity/json.rs",
-        ("SensitivityMatrixJson", "FactorPnlProfileJson"),
+        ("SensitivityMatrixJson",),
         "binding-view",
-        "JSON projection for host bindings, not an inbound Rust contract.",
+        "Canonical sensitivity-matrix wire form both hosts emit and accept; it "
+        "gained a validating `Deserialize` (via `TryFrom` into the matrix) but "
+        "has no published JSON schema.",
+        frozenset({"JsonSchema"}),
     ),
     *_exception(
         "statements-analytics",

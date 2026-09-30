@@ -93,7 +93,7 @@ The facade is mostly a re-export map, but not purely: `exports/valuations.js`
 `JSON.stringify`s object arguments for the calibration entry points, and
 `exports/portfolio.js` rebinds `Portfolio.fromMaterialization` /
 `Portfolio.validateMaterialization` to inject an ephemeral
-`InstrumentArtifactCache` when the caller omits one. `exports/core.js` likewise
+`InstrumentArtifactCache` when the caller omits one or passes `null`. `exports/core.js` likewise
 makes the context of `DayCount.yearFraction` / `signedYearFraction` optional
 (the raw methods require a `DayCountContext`; the facade passes the Rust-default
 `new DayCountContext()`), and folds the raw `FxMatrix.rateWithDefaultPolicy`

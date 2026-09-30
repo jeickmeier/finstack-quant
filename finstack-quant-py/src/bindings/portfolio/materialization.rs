@@ -321,9 +321,9 @@ impl PyPortfolio {
     ///
     /// On success, a :class:`MaterializationReport` whose ``build_positions``
     /// and ``index_build`` phase counters are always zero (those phases are
-    /// outside this API). When validation finds contract errors, a ``dict``
-    /// with ``diagnostics`` (list of diagnostic dicts) and ``truncated``
-    /// (bool) mirroring the WASM ``ValidationReport`` shape.
+    /// outside this API). When validation finds contract errors, the serde
+    /// form of the Rust ``ValidationReport`` (``diagnostics`` list plus
+    /// ``truncated`` bool), the same object the WASM binding returns.
     ///
     /// # Errors
     ///
@@ -348,10 +348,7 @@ impl PyPortfolio {
                 .into_any()
                 .unbind()),
             Err(finstack_quant_portfolio::Error::MaterializationFailed(report)) => {
-                let out = PyDict::new(py);
-                out.set_item("diagnostics", diagnostics_to_py(py, &report)?)?;
-                out.set_item("truncated", report.truncated)?;
-                Ok(out.into_any().unbind())
+                Ok(crate::bindings::pandas_utils::serde_to_py(py, &*report)?.unbind())
             }
             Err(error) => Err(materialization_to_py(py, error)),
         }

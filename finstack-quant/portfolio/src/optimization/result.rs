@@ -326,13 +326,7 @@ impl PortfolioOptimizationResult {
     /// [`OptimizationStatus::is_feasible`] before consuming it.
     #[must_use]
     pub fn binding_constraints(&self) -> Vec<(&str, f64)> {
-        // See `optimization::types::SLACK_TOL` for the rationale behind
-        // the chosen scale.
-        self.constraint_slacks
-            .iter()
-            .filter(|(_, &slack)| slack.abs() < SLACK_TOL)
-            .map(|(name, &slack)| (name.as_str(), slack))
-            .collect()
+        binding_from_slacks(&self.constraint_slacks)
     }
 
     /// Calculate gross turnover (sum of absolute weight changes).
@@ -396,6 +390,44 @@ pub struct PortfolioOptimizationResultWire {
     pub label: Option<String>,
 }
 
+/// Constraints whose slack is approximately zero, with that slack, in slack
+/// order. See `optimization::types::SLACK_TOL` for the rationale behind the
+/// chosen scale.
+fn binding_from_slacks(slacks: &IndexMap<String, f64>) -> Vec<(&str, f64)> {
+    slacks
+        .iter()
+        .filter(|(_, &slack)| slack.abs() < SLACK_TOL)
+        .map(|(name, &slack)| (name.as_str(), slack))
+        .collect()
+}
+
+impl PortfolioOptimizationResultWire {
+    /// Trades whose `trade_type` is [`TradeType::NewPosition`], in trade-list
+    /// order.
+    ///
+    /// Same rule as [`PortfolioOptimizationResult::new_position_trades`],
+    /// applied to the wire trade list; empty for an infeasible solve.
+    #[must_use]
+    pub fn new_position_trades(&self) -> Vec<TradeSpec> {
+        self.trades
+            .iter()
+            .filter(|t| t.trade_type == TradeType::NewPosition)
+            .cloned()
+            .collect()
+    }
+
+    /// Approximately binding constraints (slack ≈ 0) and their slack values.
+    ///
+    /// Derived from `constraint_slacks` with the same tolerance as
+    /// [`PortfolioOptimizationResult::binding_constraints`], so a wire result
+    /// reports exactly what the solved result reports; empty for an
+    /// infeasible solve, which carries no slacks.
+    #[must_use]
+    pub fn binding_constraints(&self) -> Vec<(&str, f64)> {
+        binding_from_slacks(&self.constraint_slacks)
+    }
+}
+
 impl From<&PortfolioOptimizationResult> for PortfolioOptimizationResultWire {
     fn from(result: &PortfolioOptimizationResult) -> Self {
         let status_label = match result.status {
@@ -432,5 +464,64 @@ impl From<&PortfolioOptimizationResult> for PortfolioOptimizationResultWire {
 impl Serialize for PortfolioOptimizationResult {
     fn serialize<S: Serializer>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error> {
         PortfolioOptimizationResultWire::from(self).serialize(serializer)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn trade(position_id: &str, trade_type: TradeType) -> TradeSpec {
+        TradeSpec {
+            position_id: PositionId::new(position_id),
+            instrument_id: position_id.to_string(),
+            trade_type,
+            current_quantity: 0.0,
+            target_quantity: 1.0,
+            delta_quantity: 1.0,
+            direction: TradeDirection::Buy,
+            current_weight: 0.0,
+            target_weight: 0.5,
+        }
+    }
+
+    fn wire() -> PortfolioOptimizationResultWire {
+        let mut constraint_slacks = IndexMap::new();
+        constraint_slacks.insert("budget".to_string(), 0.0);
+        constraint_slacks.insert("max_weight".to_string(), 0.25);
+        PortfolioOptimizationResultWire {
+            schema_version: SchemaVersion::CURRENT,
+            status: OptimizationStatus::Optimal,
+            status_label: "optimal".to_string(),
+            is_feasible: true,
+            objective_value: 1.0,
+            turnover: 0.0,
+            optimal_weights: IndexMap::new(),
+            current_weights: IndexMap::new(),
+            weight_deltas: IndexMap::new(),
+            implied_quantities: IndexMap::new(),
+            metric_values: IndexMap::new(),
+            trades: vec![
+                trade("OLD", TradeType::Existing),
+                trade("NEW", TradeType::NewPosition),
+            ],
+            constraint_slacks,
+            // Deliberately inconsistent with the slacks: the methods derive
+            // from `constraint_slacks`, not from this stored name list.
+            binding_constraints: vec!["max_weight".to_string()],
+            label: None,
+        }
+    }
+
+    #[test]
+    fn wire_new_position_trades_keeps_only_candidates() {
+        let trades = wire().new_position_trades();
+        assert_eq!(trades.len(), 1);
+        assert_eq!(trades[0].position_id.as_str(), "NEW");
+    }
+
+    #[test]
+    fn wire_binding_constraints_derive_from_slacks() {
+        assert_eq!(wire().binding_constraints(), vec![("budget", 0.0)]);
     }
 }

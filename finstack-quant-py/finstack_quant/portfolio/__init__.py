@@ -114,6 +114,8 @@ brinson_fachler = _portfolio.brinson_fachler
 brinson_fachler_json = _portfolio.brinson_fachler_json
 carino_link = _portfolio.carino_link
 carino_link_json = _portfolio.carino_link_json
+carino_link_from_sector_periods = _portfolio.carino_link_from_sector_periods
+carino_link_from_sector_periods_json = _portfolio.carino_link_from_sector_periods_json
 campisi_attribution = _portfolio.campisi_attribution
 campisi_attribution_json = _portfolio.campisi_attribution_json
 campisi_carino_link = _portfolio.campisi_carino_link
@@ -265,6 +267,8 @@ __all__ = [
     "campisi_reconciliation_check",
     "campisi_reconciliation_check_json",
     "carino_link",
+    "carino_link_from_sector_periods",
+    "carino_link_from_sector_periods_json",
     "carino_link_json",
     "cell_returns_from_curves",
     "cell_returns_from_curves_json",

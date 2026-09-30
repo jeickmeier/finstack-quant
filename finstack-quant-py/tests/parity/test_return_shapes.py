@@ -70,6 +70,7 @@ ENTRY_SHAPES: list[tuple[str, str, str]] = [
     # paired `_json` twin is the only string-returning surface.
     ("finstack_quant.portfolio", "brinson_fachler", "wrapper"),
     ("finstack_quant.portfolio", "carino_link", "wrapper"),
+    ("finstack_quant.portfolio", "carino_link_from_sector_periods", "wrapper"),
     ("finstack_quant.portfolio", "campisi_attribution", "wrapper"),
     ("finstack_quant.portfolio", "campisi_carino_link", "wrapper"),
     ("finstack_quant.portfolio", "campisi_carino_link_from_snapshots", "wrapper"),
@@ -87,6 +88,7 @@ ENTRY_SHAPES: list[tuple[str, str, str]] = [
     ("finstack_quant.portfolio", "scenario_pnl_batch", "wrapper"),
     ("finstack_quant.portfolio", "brinson_fachler_json", "json"),
     ("finstack_quant.portfolio", "carino_link_json", "json"),
+    ("finstack_quant.portfolio", "carino_link_from_sector_periods_json", "json"),
     ("finstack_quant.portfolio", "campisi_attribution_json", "json"),
     ("finstack_quant.portfolio", "campisi_carino_link_json", "json"),
     ("finstack_quant.portfolio", "campisi_carino_link_from_snapshots_json", "json"),
