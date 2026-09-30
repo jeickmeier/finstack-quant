@@ -13,8 +13,8 @@ fn calculate_vm_usd_regulatory() {
     let csa_json = csa_usd_regulatory_json().unwrap();
     let result = calculate_vm(
         JsValue::from(&csa_json),
-        1_000_000.0,
-        500_000.0,
+        JsValue::from(1_000_000.0),
+        JsValue::from(500_000.0),
         JsValue::from("USD"),
         JsValue::from("2024-06-15"),
     )
@@ -30,8 +30,8 @@ fn calculate_vm_eur_regulatory() {
     let csa_json = csa_eur_regulatory_json().unwrap();
     let result = calculate_vm(
         JsValue::from(&csa_json),
-        500_000.0,
-        600_000.0,
+        JsValue::from(500_000.0),
+        JsValue::from(600_000.0),
         JsValue::from("EUR"),
         JsValue::from("2024-03-01"),
     )
@@ -45,8 +45,8 @@ fn calculate_vm_zero_exposure() {
     let csa_json = csa_usd_regulatory_json().unwrap();
     let result = calculate_vm(
         JsValue::from(&csa_json),
-        0.0,
-        0.0,
+        JsValue::from(0.0),
+        JsValue::from(0.0),
         JsValue::from("USD"),
         JsValue::from("2024-01-15"),
     )

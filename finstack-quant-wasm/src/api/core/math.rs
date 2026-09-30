@@ -1,7 +1,7 @@
 //! WASM bindings for `finstack_quant_core::math` — linear algebra, statistics,
 //! special functions, and compensated summation.
 
-use crate::utils::input::js_uint;
+use crate::utils::input::{js_f64, js_f64_seq, js_uint};
 use crate::utils::to_js_err;
 use finstack_quant_core::math::{self, linalg, special_functions, stats, summation};
 use wasm_bindgen::prelude::*;
@@ -22,7 +22,8 @@ use wasm_bindgen::prelude::*;
 /// entries (including when `n * n` overflows), or the matrix contains a
 /// non-finite value, is singular, or is not positive definite.
 #[wasm_bindgen(js_name = choleskyDecomposition)]
-pub fn cholesky_decomposition(matrix: &[f64], n: JsValue) -> Result<Box<[f64]>, JsValue> {
+pub fn cholesky_decomposition(matrix: JsValue, n: JsValue) -> Result<Box<[f64]>, JsValue> {
+    let matrix: &[f64] = &js_f64_seq(&matrix, "matrix")?;
     let n: usize = js_uint(&n, "n")?;
     linalg::cholesky_decomposition(matrix, n)
         .map(Vec::into_boxed_slice)
@@ -43,7 +44,9 @@ pub fn cholesky_decomposition(matrix: &[f64], n: JsValue) -> Result<Box<[f64]>, 
 /// Throws a JavaScript exception if `chol` does not contain exactly
 /// `b.length * b.length` entries or a diagonal factor is singular.
 #[wasm_bindgen(js_name = choleskySolve)]
-pub fn cholesky_solve(chol: &[f64], b: &[f64]) -> Result<Box<[f64]>, JsValue> {
+pub fn cholesky_solve(chol: JsValue, b: JsValue) -> Result<Box<[f64]>, JsValue> {
+    let chol: &[f64] = &js_f64_seq(&chol, "chol")?;
+    let b: &[f64] = &js_f64_seq(&b, "b")?;
     let mut x = vec![0.0; b.len()];
     linalg::cholesky_solve(chol, b, &mut x).map_err(to_js_err)?;
     Ok(x.into_boxed_slice())
@@ -65,7 +68,9 @@ pub fn cholesky_solve(chol: &[f64], b: &[f64]) -> Result<Box<[f64]>, JsValue> {
 /// entries (including when `n * n` overflows) or `z` does not contain exactly
 /// `n` entries.
 #[wasm_bindgen(js_name = applyLowerTriangular)]
-pub fn apply_lower_triangular(l: &[f64], n: JsValue, z: &[f64]) -> Result<Box<[f64]>, JsValue> {
+pub fn apply_lower_triangular(l: JsValue, n: JsValue, z: JsValue) -> Result<Box<[f64]>, JsValue> {
+    let l: &[f64] = &js_f64_seq(&l, "l")?;
+    let z: &[f64] = &js_f64_seq(&z, "z")?;
     let n: usize = js_uint(&n, "n")?;
     linalg::apply_lower_triangular(l, n, z)
         .map(Vec::into_boxed_slice)
@@ -76,24 +81,27 @@ pub fn apply_lower_triangular(l: &[f64], n: JsValue, z: &[f64]) -> Result<Box<[f
 /// @param data - Numeric observations in input order; an empty series yields 0.0.
 /// @returns Arithmetic mean of `data`, or 0.0 when `data` is empty.
 #[wasm_bindgen(js_name = mean)]
-pub fn mean(data: &[f64]) -> f64 {
-    stats::mean(data)
+pub fn mean(data: JsValue) -> Result<f64, JsValue> {
+    let data: &[f64] = &js_f64_seq(&data, "data")?;
+    Ok(stats::mean(data))
 }
 
 /// Sample variance over a typed numeric array.
 /// @param data - Sample observations in input order; fewer than two points yield 0.0.
 /// @returns Unbiased sample variance, or 0.0 when `data` has fewer than two points.
 #[wasm_bindgen(js_name = variance)]
-pub fn variance(data: &[f64]) -> f64 {
-    stats::variance(data)
+pub fn variance(data: JsValue) -> Result<f64, JsValue> {
+    let data: &[f64] = &js_f64_seq(&data, "data")?;
+    Ok(stats::variance(data))
 }
 
 /// Population variance over a typed numeric array.
 /// @param data - Observations in input order; fewer than two points yield 0.0.
 /// @returns Population variance, or 0.0 when `data` has fewer than two points.
 #[wasm_bindgen(js_name = populationVariance)]
-pub fn population_variance(data: &[f64]) -> f64 {
-    stats::population_variance(data)
+pub fn population_variance(data: JsValue) -> Result<f64, JsValue> {
+    let data: &[f64] = &js_f64_seq(&data, "data")?;
+    Ok(stats::population_variance(data))
 }
 
 /// Pearson correlation over typed numeric arrays.
@@ -101,8 +109,10 @@ pub fn population_variance(data: &[f64]) -> f64 {
 /// @param y - Second numeric series, aligned one-for-one with `x`.
 /// @returns Sample correlation in `[-1, 1]`, or NaN when a series has fewer than two points.
 #[wasm_bindgen(js_name = correlation)]
-pub fn correlation(x: &[f64], y: &[f64]) -> f64 {
-    stats::correlation(x, y)
+pub fn correlation(x: JsValue, y: JsValue) -> Result<f64, JsValue> {
+    let x: &[f64] = &js_f64_seq(&x, "x")?;
+    let y: &[f64] = &js_f64_seq(&y, "y")?;
+    Ok(stats::correlation(x, y))
 }
 
 /// Sample covariance over typed numeric arrays.
@@ -110,8 +120,10 @@ pub fn correlation(x: &[f64], y: &[f64]) -> f64 {
 /// @param y - Second numeric series, aligned one-for-one with `x`.
 /// @returns Unbiased sample covariance, or 0.0 when a series has fewer than two points.
 #[wasm_bindgen(js_name = covariance)]
-pub fn covariance(x: &[f64], y: &[f64]) -> f64 {
-    stats::covariance(x, y)
+pub fn covariance(x: JsValue, y: JsValue) -> Result<f64, JsValue> {
+    let x: &[f64] = &js_f64_seq(&x, "x")?;
+    let y: &[f64] = &js_f64_seq(&y, "y")?;
+    Ok(stats::covariance(x, y))
 }
 
 /// Empirical quantile over a typed numeric array.
@@ -119,120 +131,81 @@ pub fn covariance(x: &[f64], y: &[f64]) -> f64 {
 /// @param q - Quantile probability in `[0, 1]`; values outside that range yield NaN.
 /// @returns R-7 interpolated quantile, or NaN when `data` is empty or non-finite.
 #[wasm_bindgen(js_name = quantile)]
-pub fn quantile(data: &[f64], q: f64) -> f64 {
+pub fn quantile(data: JsValue, q: JsValue) -> Result<f64, JsValue> {
+    let data: &[f64] = &js_f64_seq(&data, "data")?;
+    let q = js_f64(&q, "q")?;
     let mut v = data.to_vec();
-    stats::quantile(&mut v, q)
+    Ok(stats::quantile(&mut v, q))
 }
 
 /// Standard normal CDF Φ(x).
 /// @param x - Real-valued point at which to evaluate Φ; any finite or infinite `x` is accepted.
 /// @returns Probability in `(0, 1)` for finite `x`, with the usual ±∞ limits.
 #[wasm_bindgen(js_name = normCdf)]
-pub fn norm_cdf(x: f64) -> f64 {
-    special_functions::norm_cdf(x)
+pub fn norm_cdf(x: JsValue) -> Result<f64, JsValue> {
+    let x = js_f64(&x, "x")?;
+    Ok(special_functions::norm_cdf(x))
 }
 
 /// Standard normal PDF φ(x).
 /// @param x - Real-valued point at which to evaluate φ.
 /// @returns Density at `x`; φ(0) is `1/sqrt(2π)`.
 #[wasm_bindgen(js_name = normPdf)]
-pub fn norm_pdf(x: f64) -> f64 {
-    special_functions::norm_pdf(x)
+pub fn norm_pdf(x: JsValue) -> Result<f64, JsValue> {
+    let x = js_f64(&x, "x")?;
+    Ok(special_functions::norm_pdf(x))
 }
 
 /// Inverse standard normal CDF Φ⁻¹(p).
 /// @param p - Probability input strictly between 0 and 1 for the inverse normal distribution.
 /// @returns Standard-normal quantile for probability `p`.
 #[wasm_bindgen(js_name = standardNormalInvCdf)]
-pub fn standard_normal_inv_cdf(p: f64) -> f64 {
-    special_functions::standard_normal_inv_cdf(p)
+pub fn standard_normal_inv_cdf(p: JsValue) -> Result<f64, JsValue> {
+    let p = js_f64(&p, "p")?;
+    Ok(special_functions::standard_normal_inv_cdf(p))
 }
 
 /// Error function erf(x).
 /// @param x - Real-valued argument to erf; the function is odd, so erf(-x) = -erf(x).
 /// @returns erf(x) in `(-1, 1)` for finite `x`.
 #[wasm_bindgen(js_name = erf)]
-pub fn erf(x: f64) -> f64 {
-    special_functions::erf(x)
+pub fn erf(x: JsValue) -> Result<f64, JsValue> {
+    let x = js_f64(&x, "x")?;
+    Ok(special_functions::erf(x))
 }
 
 /// Natural logarithm of the Gamma function ln(Γ(x)).
 /// @param x - Real argument; must be positive and away from the non-positive integers.
 /// @returns ln(Γ(x)); ln(Γ(1)) is 0 and ln(Γ(n+1)) is ln(n!).
 #[wasm_bindgen(js_name = lnGamma)]
-pub fn ln_gamma(x: f64) -> f64 {
-    special_functions::ln_gamma(x)
+pub fn ln_gamma(x: JsValue) -> Result<f64, JsValue> {
+    let x = js_f64(&x, "x")?;
+    Ok(special_functions::ln_gamma(x))
 }
 
 /// Kahan compensated summation over a typed numeric array.
 /// @param values - Finite numeric terms in summation or scan order.
 /// @returns Compensated sum of `values` in input order.
 #[wasm_bindgen(js_name = kahanSum)]
-pub fn kahan_sum(values: &[f64]) -> f64 {
-    summation::kahan_sum(values.iter().copied())
+pub fn kahan_sum(values: JsValue) -> Result<f64, JsValue> {
+    let values: &[f64] = &js_f64_seq(&values, "values")?;
+    Ok(summation::kahan_sum(values.iter().copied()))
 }
 
 /// Neumaier compensated summation over a typed numeric array.
 /// @param values - Finite numeric terms in summation or scan order.
 /// @returns Compensated sum of `values`, robust to mixed-sign cancellation.
 #[wasm_bindgen(js_name = neumaierSum)]
-pub fn neumaier_sum(values: &[f64]) -> f64 {
-    summation::neumaier_sum(values.iter().copied())
+pub fn neumaier_sum(values: JsValue) -> Result<f64, JsValue> {
+    let values: &[f64] = &js_f64_seq(&values, "values")?;
+    Ok(summation::neumaier_sum(values.iter().copied()))
 }
 
 /// Count the longest consecutive run of strictly positive values in a typed array.
 /// @param values - Finite numeric terms in summation or scan order.
 /// @returns Length of the longest run of strictly positive observations.
 #[wasm_bindgen(js_name = longestPositiveRun)]
-pub fn longest_positive_run(values: &[f64]) -> usize {
-    math::longest_positive_run(values)
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    const TOL: f64 = 1e-4;
-
-    #[test]
-    fn norm_cdf_reference_values() {
-        assert!((norm_cdf(0.0) - 0.5).abs() < TOL);
-        assert!((norm_cdf(3.0) - 0.9987).abs() < 1e-3);
-    }
-
-    #[test]
-    fn norm_pdf_at_zero() {
-        assert!((norm_pdf(0.0) - 0.3989).abs() < TOL);
-    }
-
-    #[test]
-    fn standard_normal_inv_cdf_reference_values() {
-        assert!(standard_normal_inv_cdf(0.5).abs() < TOL);
-        assert!((standard_normal_inv_cdf(0.975) - 1.96).abs() < 1e-2);
-    }
-
-    #[test]
-    fn erf_reference_values() {
-        assert_eq!(erf(0.0), 0.0);
-        assert!((erf(1.0) - 0.8427).abs() < TOL);
-    }
-
-    #[test]
-    fn ln_gamma_reference_values() {
-        assert!(ln_gamma(1.0).abs() < TOL);
-        assert!((ln_gamma(5.0) - 24f64.ln()).abs() < TOL);
-    }
-
-    #[test]
-    fn norm_cdf_extremes() {
-        assert!(norm_cdf(-10.0) < 1e-15);
-        assert!((norm_cdf(10.0) - 1.0).abs() < 1e-15);
-    }
-
-    #[test]
-    fn erf_negative_symmetry() {
-        let pos = erf(1.0);
-        let neg = erf(-1.0);
-        assert!((pos + neg).abs() < 1e-12, "erf is odd");
-    }
+pub fn longest_positive_run(values: JsValue) -> Result<usize, JsValue> {
+    let values: &[f64] = &js_f64_seq(&values, "values")?;
+    Ok(math::longest_positive_run(values))
 }

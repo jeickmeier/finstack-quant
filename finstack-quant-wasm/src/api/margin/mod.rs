@@ -5,7 +5,7 @@
 //! consumers.
 
 use crate::api::core::market_data::{JsDiscountCurve, JsHazardCurve};
-use crate::utils::input::{js_string, json_text, opt_json_text};
+use crate::utils::input::{js_f64, js_string, json_text, opt_json_text};
 use crate::utils::{parse_iso_date, to_js_err, to_js_value};
 use wasm_bindgen::prelude::*;
 
@@ -80,11 +80,13 @@ pub fn validate_csa_json(json: JsValue) -> Result<String, JsValue> {
 #[wasm_bindgen(js_name = calculateVm)]
 pub fn calculate_vm(
     csa_json: JsValue,
-    exposure: f64,
-    posted_collateral: f64,
+    exposure: JsValue,
+    posted_collateral: JsValue,
     currency: JsValue,
     as_of: JsValue,
 ) -> Result<JsValue, JsValue> {
+    let exposure = js_f64(&exposure, "exposure")?;
+    let posted_collateral = js_f64(&posted_collateral, "postedCollateral")?;
     let csa_json: &str = &json_text(&csa_json, "csaJson")?;
     let currency: &str = &js_string(&currency, "currency")?;
     let as_of: &str = &js_string(&as_of, "asOf")?;
@@ -151,10 +153,13 @@ pub fn compute_bilateral_xva(
     counterparty_hazard_curve: &JsHazardCurve,
     own_hazard_curve: &JsHazardCurve,
     discount_curve: &JsDiscountCurve,
-    counterparty_recovery_rate: f64,
-    own_recovery_rate: f64,
+    counterparty_recovery_rate: JsValue,
+    own_recovery_rate: JsValue,
     funding_json: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
+    let counterparty_recovery_rate =
+        js_f64(&counterparty_recovery_rate, "counterpartyRecoveryRate")?;
+    let own_recovery_rate = js_f64(&own_recovery_rate, "ownRecoveryRate")?;
     let exposure_profile_json: &str = &json_text(&exposure_profile_json, "exposureProfileJson")?;
     let funding_json = opt_json_text(funding_json.as_ref(), "fundingJson")?;
     let exposure: finstack_quant_margin::xva::types::ExposureProfile =

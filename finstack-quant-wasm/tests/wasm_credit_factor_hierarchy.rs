@@ -149,7 +149,7 @@ fn level_values_reject_non_integer_indices() {
     let levels = finstack_quant_wasm::api::models::factor::decompose_levels(
         &model,
         JsValue::from(spreads),
-        0.0100,
+        JsValue::from(0.0100),
         JsValue::from("2024-03-31"),
         None,
     )

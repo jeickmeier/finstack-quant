@@ -1,6 +1,8 @@
 //! WASM bindings for `finstack_quant_core::market_data` term structures and FX.
 
-use crate::utils::input::{from_js_json, js_opt_string, js_string, json_text};
+use crate::utils::input::{
+    from_js_json, js_f64, js_f64_seq, js_opt_f64_seq, js_opt_string, js_string, json_text,
+};
 use std::sync::Arc;
 
 use crate::api::core::currency::JsCurrency;
@@ -174,8 +176,9 @@ impl JsDiscountCurve {
     pub fn flat(
         id: JsValue,
         base_date: JsValue,
-        continuous_rate: f64,
+        continuous_rate: JsValue,
     ) -> Result<JsDiscountCurve, JsValue> {
+        let continuous_rate = js_f64(&continuous_rate, "continuousRate")?;
         let id: &str = &js_string(&id, "id")?;
         let base_date: &str = &js_string(&base_date, "baseDate")?;
         let curve = RustDiscountCurve::flat(id, parse_iso_date(base_date)?, continuous_rate)
@@ -187,14 +190,16 @@ impl JsDiscountCurve {
 
     /// Discount factor at year fraction `t`.
     /// @param t - Time from the curve base date in years.
-    pub fn df(&self, t: f64) -> f64 {
-        self.inner.df(t)
+    pub fn df(&self, t: JsValue) -> Result<f64, JsValue> {
+        let t = js_f64(&t, "t")?;
+        Ok(self.inner.df(t))
     }
 
     /// Continuously-compounded zero rate at year fraction `t`.
     /// @param t - Time from the curve base date in years.
-    pub fn zero(&self, t: f64) -> f64 {
-        self.inner.zero(t)
+    pub fn zero(&self, t: JsValue) -> Result<f64, JsValue> {
+        let t = js_f64(&t, "t")?;
+        Ok(self.inner.zero(t))
     }
 
     /// Continuously-compounded forward rate between `t1` and `t2`.
@@ -207,7 +212,9 @@ impl JsDiscountCurve {
     /// later than `t1`, the interval is shorter than the curve's minimum forward
     /// tenor, or either endpoint discount factor is non-finite or non-positive.
     #[wasm_bindgen(js_name = forward)]
-    pub fn forward(&self, t1: f64, t2: f64) -> Result<f64, JsValue> {
+    pub fn forward(&self, t1: JsValue, t2: JsValue) -> Result<f64, JsValue> {
+        let t1 = js_f64(&t1, "t1")?;
+        let t2 = js_f64(&t2, "t2")?;
         self.inner.forward(t1, t2).map_err(to_js_err)
     }
 
@@ -269,10 +276,12 @@ impl JsHazardCurve {
     pub fn new(
         id: JsValue,
         base_date: JsValue,
-        knots: &[f64],
-        recovery_rate: f64,
+        knots: JsValue,
+        recovery_rate: JsValue,
         day_count: Option<JsValue>,
     ) -> Result<JsHazardCurve, JsValue> {
+        let knots: &[f64] = &js_f64_seq(&knots, "knots")?;
+        let recovery_rate = js_f64(&recovery_rate, "recoveryRate")?;
         let id: &str = &js_string(&id, "id")?;
         let base_date: &str = &js_string(&base_date, "baseDate")?;
         let day_count = js_opt_string(day_count.as_ref(), "dayCount")?;
@@ -301,8 +310,9 @@ impl JsHazardCurve {
     /// @param t - Time from the curve base date in years.
     /// @returns The probability of surviving from the base date through `t`, in `[0, 1]`.
     /// This operation does not throw.
-    pub fn sp(&self, t: f64) -> f64 {
-        self.inner.sp(t)
+    pub fn sp(&self, t: JsValue) -> Result<f64, JsValue> {
+        let t = js_f64(&t, "t")?;
+        Ok(self.inner.sp(t))
     }
 
     /// Instantaneous hazard rate `lambda(t)` at year fraction `t`.
@@ -310,8 +320,9 @@ impl JsHazardCurve {
     /// @returns The annualized default intensity at `t`, expressed as a decimal rate.
     /// This operation does not throw.
     #[wasm_bindgen(js_name = hazardRate)]
-    pub fn hazard_rate(&self, t: f64) -> f64 {
-        self.inner.hazard_rate(t)
+    pub fn hazard_rate(&self, t: JsValue) -> Result<f64, JsValue> {
+        let t = js_f64(&t, "t")?;
+        Ok(self.inner.hazard_rate(t))
     }
 
     /// Curve identifier.
@@ -417,8 +428,9 @@ impl JsForwardCurve {
     /// Forward rate at year fraction `t`.
     /// @param t - Time from the curve base date in years.
     #[wasm_bindgen(js_name = rate)]
-    pub fn rate(&self, t: f64) -> f64 {
-        self.inner.rate(t)
+    pub fn rate(&self, t: JsValue) -> Result<f64, JsValue> {
+        let t = js_f64(&t, "t")?;
+        Ok(self.inner.rate(t))
     }
 
     /// Discount-factor-implied simple forward over `(t1, t2)`.
@@ -431,7 +443,9 @@ impl JsForwardCurve {
     /// later than `t1`, a projection discount factor cannot be computed, or the
     /// implied rate is non-finite.
     #[wasm_bindgen(js_name = rateBetween)]
-    pub fn rate_between(&self, t1: f64, t2: f64) -> Result<f64, JsValue> {
+    pub fn rate_between(&self, t1: JsValue, t2: JsValue) -> Result<f64, JsValue> {
+        let t1 = js_f64(&t1, "t1")?;
+        let t2 = js_f64(&t2, "t2")?;
         self.inner.rate_between(t1, t2).map_err(to_js_err)
     }
 
@@ -735,7 +749,8 @@ pub fn fx_pip_size(base: JsValue, quote: JsValue) -> Result<f64, JsValue> {
 /// Throws a `validation` error if `rate` is non-finite, zero or negative, or
 /// its reciprocal overflows.
 #[wasm_bindgen(js_name = invertFxRate)]
-pub fn invert_fx_rate(rate: f64) -> Result<f64, JsValue> {
+pub fn invert_fx_rate(rate: JsValue) -> Result<f64, JsValue> {
+    let rate = js_f64(&rate, "rate")?;
     rust_invert_fx_rate(rate).map_err(to_js_err)
 }
 
@@ -774,7 +789,8 @@ impl JsFxMatrix {
     /// Throws a JavaScript exception if either currency code is invalid or
     /// `rate` is non-finite or not strictly positive.
     #[wasm_bindgen(js_name = setQuote)]
-    pub fn set_quote(&self, base: JsValue, quote: JsValue, rate: f64) -> Result<(), JsValue> {
+    pub fn set_quote(&self, base: JsValue, quote: JsValue, rate: JsValue) -> Result<(), JsValue> {
+        let rate = js_f64(&rate, "rate")?;
         let base: &str = &js_string(&base, "base")?;
         let quote: &str = &js_string(&quote, "quote")?;
         let base_currency: RustCurrency = base.parse().map_err(to_js_err)?;
@@ -805,8 +821,9 @@ impl JsFxMatrix {
         quote: JsValue,
         date: JsValue,
         policy: &JsFxConversionPolicy,
-        rate: f64,
+        rate: JsValue,
     ) -> Result<(), JsValue> {
+        let rate = js_f64(&rate, "rate")?;
         let base: &str = &js_string(&base, "base")?;
         let quote: &str = &js_string(&quote, "quote")?;
         let date: &str = &js_string(&date, "date")?;
@@ -926,12 +943,16 @@ impl JsVolCube {
     #[wasm_bindgen(constructor)]
     pub fn new(
         id: JsValue,
-        expiries: &[f64],
-        tenors: &[f64],
-        params_flat: &[f64],
-        forwards: &[f64],
+        expiries: JsValue,
+        tenors: JsValue,
+        params_flat: JsValue,
+        forwards: JsValue,
         interpolation_mode: Option<JsValue>,
     ) -> Result<JsVolCube, JsValue> {
+        let expiries: &[f64] = &js_f64_seq(&expiries, "expiries")?;
+        let tenors: &[f64] = &js_f64_seq(&tenors, "tenors")?;
+        let params_flat: &[f64] = &js_f64_seq(&params_flat, "paramsFlat")?;
+        let forwards: &[f64] = &js_f64_seq(&forwards, "forwards")?;
         let id: &str = &js_string(&id, "id")?;
         let interpolation_mode = js_opt_string(interpolation_mode.as_ref(), "interpolationMode")?;
         let n_nodes = expiries.len() * tenors.len();
@@ -1038,13 +1059,19 @@ impl JsFxDeltaVolSurface {
     #[wasm_bindgen(constructor)]
     pub fn new(
         id: JsValue,
-        expiries: &[f64],
-        atm_vols: &[f64],
-        rr25d: &[f64],
-        bf25d: &[f64],
-        rr10d: Option<Vec<f64>>,
-        bf10d: Option<Vec<f64>>,
+        expiries: JsValue,
+        atm_vols: JsValue,
+        rr25d: JsValue,
+        bf25d: JsValue,
+        rr10d: Option<JsValue>,
+        bf10d: Option<JsValue>,
     ) -> Result<JsFxDeltaVolSurface, JsValue> {
+        let expiries: &[f64] = &js_f64_seq(&expiries, "expiries")?;
+        let atm_vols: &[f64] = &js_f64_seq(&atm_vols, "atmVols")?;
+        let rr25d: &[f64] = &js_f64_seq(&rr25d, "rr25d")?;
+        let bf25d: &[f64] = &js_f64_seq(&bf25d, "bf25d")?;
+        let rr10d = js_opt_f64_seq(rr10d.as_ref(), "rr10d")?;
+        let bf10d = js_opt_f64_seq(bf10d.as_ref(), "bf10d")?;
         let id: &str = &js_string(&id, "id")?;
         let surface = RustFxDeltaVolSurface::new(
             id,
@@ -1169,7 +1196,7 @@ mod tests {
         .expect("forward curve");
         assert_eq!(curve.id(), "USD-3M");
         assert_eq!(curve.base_date(), "2024-01-15");
-        assert!((curve.rate(1.0) - 0.045).abs() < 1e-6);
+        assert!((curve.inner.rate(1.0) - 0.045).abs() < 1e-6);
     }
 
     // JsVolCube tests require a WASM runtime (JsValue) — run via wasm-pack test.

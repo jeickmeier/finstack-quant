@@ -9,7 +9,7 @@
 //! JS surface lives under `valuations.instruments`.
 
 use super::pricing::parse_market_json;
-use crate::utils::input::{js_string, json_text, opt_json_text};
+use crate::utils::input::{js_f64, js_opt_f64, js_string, json_text, opt_json_text};
 use crate::utils::{parse_iso_date, to_js_err, to_js_value};
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
     calculate_tranche_breakeven_cdr, calculate_tranche_discount_margin, calculate_tranche_metrics,
@@ -60,8 +60,9 @@ pub fn structured_credit_tranche_discount_margin(
     tranche_id: JsValue,
     market_json: JsValue,
     as_of: JsValue,
-    market_price_pct: f64,
+    market_price_pct: JsValue,
 ) -> Result<f64, JsValue> {
+    let market_price_pct = js_f64(&market_price_pct, "marketPricePct")?;
     let instrument_json: &str = &json_text(&instrument_json, "instrumentJson")?;
     let tranche_id: &str = &js_string(&tranche_id, "trancheId")?;
     let market_json: &str = &json_text(&market_json, "marketJson")?;
@@ -135,9 +136,10 @@ pub fn structured_credit_tranche_oas(
     tranche_id: JsValue,
     market_json: JsValue,
     as_of: JsValue,
-    market_price_pct: f64,
+    market_price_pct: JsValue,
     config_json: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
+    let market_price_pct = js_f64(&market_price_pct, "marketPricePct")?;
     let instrument_json: &str = &json_text(&instrument_json, "instrumentJson")?;
     let tranche_id: &str = &js_string(&tranche_id, "trancheId")?;
     let market_json: &str = &json_text(&market_json, "marketJson")?;
@@ -230,8 +232,9 @@ pub fn structured_credit_tranche_metrics(
     tranche_id: JsValue,
     market_json: JsValue,
     as_of: JsValue,
-    market_price_pct: Option<f64>,
+    market_price_pct: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
+    let market_price_pct = js_opt_f64(market_price_pct.as_ref(), "marketPricePct")?;
     let instrument_json: &str = &json_text(&instrument_json, "instrumentJson")?;
     let tranche_id: &str = &js_string(&tranche_id, "trancheId")?;
     let market_json: &str = &json_text(&market_json, "marketJson")?;

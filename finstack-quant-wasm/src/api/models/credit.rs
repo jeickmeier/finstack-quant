@@ -5,7 +5,9 @@
 //! JS surface is nested under `models.credit`; wasm-bindgen exports remain flat
 //! and the hand-written facade establishes the public namespace.
 
-use crate::utils::input::{js_bool, js_f64_seq, js_string, js_u64, js_uint, json_text};
+use crate::utils::input::{
+    js_bool, js_f64, js_f64_seq, js_opt_f64, js_string, js_u64, js_uint, json_text,
+};
 use crate::utils::{parse_iso_date, to_js_err};
 use finstack_quant_core::dates::DayCount;
 use finstack_quant_models::credit::{
@@ -28,11 +30,15 @@ use wasm_bindgen::prelude::*;
 /// @param risk_free_rate - Annualized risk-free rate expressed as a decimal, such as 0.05 for 5%.
 #[wasm_bindgen(js_name = mertonModelJson)]
 pub fn merton_model_json(
-    asset_value: f64,
-    asset_vol: f64,
-    debt_barrier: f64,
-    risk_free_rate: f64,
+    asset_value: JsValue,
+    asset_vol: JsValue,
+    debt_barrier: JsValue,
+    risk_free_rate: JsValue,
 ) -> Result<String, JsValue> {
+    let asset_value = js_f64(&asset_value, "assetValue")?;
+    let asset_vol = js_f64(&asset_vol, "assetVol")?;
+    let debt_barrier = js_f64(&debt_barrier, "debtBarrier")?;
+    let risk_free_rate = js_f64(&risk_free_rate, "riskFreeRate")?;
     let model = MertonModel::new(asset_value, asset_vol, debt_barrier, risk_free_rate)
         .map_err(to_js_err)?;
     serde_json::to_string(&model).map_err(to_js_err)
@@ -53,13 +59,19 @@ pub fn merton_model_json(
 /// @param mean_recovery - Mean recovery rate at default expressed as a fraction from 0 through 1.
 #[wasm_bindgen(js_name = creditGradesModelJson)]
 pub fn credit_grades_model_json(
-    equity_value: f64,
-    equity_vol: f64,
-    total_debt: f64,
-    risk_free_rate: f64,
-    barrier_uncertainty: f64,
-    mean_recovery: f64,
+    equity_value: JsValue,
+    equity_vol: JsValue,
+    total_debt: JsValue,
+    risk_free_rate: JsValue,
+    barrier_uncertainty: JsValue,
+    mean_recovery: JsValue,
 ) -> Result<String, JsValue> {
+    let equity_value = js_f64(&equity_value, "equityValue")?;
+    let equity_vol = js_f64(&equity_vol, "equityVol")?;
+    let total_debt = js_f64(&total_debt, "totalDebt")?;
+    let risk_free_rate = js_f64(&risk_free_rate, "riskFreeRate")?;
+    let barrier_uncertainty = js_f64(&barrier_uncertainty, "barrierUncertainty")?;
+    let mean_recovery = js_f64(&mean_recovery, "meanRecovery")?;
     let model = MertonModel::credit_grades(
         equity_value,
         equity_vol,
@@ -81,7 +93,8 @@ pub fn credit_grades_model_json(
 /// @param model_json - Serialized Merton structural-credit model produced by this API's model builder.
 /// @param horizon - Forward-looking model horizon measured in years.
 #[wasm_bindgen(js_name = mertonDefaultProbability)]
-pub fn merton_default_probability(model_json: JsValue, horizon: f64) -> Result<f64, JsValue> {
+pub fn merton_default_probability(model_json: JsValue, horizon: JsValue) -> Result<f64, JsValue> {
+    let horizon = js_f64(&horizon, "horizon")?;
     let model_json: &str = &json_text(&model_json, "modelJson")?;
     let model: MertonModel = serde_json::from_str(model_json).map_err(to_js_err)?;
     Ok(model.default_probability(horizon))
@@ -101,9 +114,11 @@ pub fn merton_default_probability(model_json: JsValue, horizon: f64) -> Result<f
 #[wasm_bindgen(js_name = mertonDefaultProbabilityWithDrift)]
 pub fn merton_default_probability_with_drift(
     model_json: JsValue,
-    asset_drift: f64,
-    horizon: f64,
+    asset_drift: JsValue,
+    horizon: JsValue,
 ) -> Result<f64, JsValue> {
+    let asset_drift = js_f64(&asset_drift, "assetDrift")?;
+    let horizon = js_f64(&horizon, "horizon")?;
     let model_json: &str = &json_text(&model_json, "modelJson")?;
     let model: MertonModel = serde_json::from_str(model_json).map_err(to_js_err)?;
     model
@@ -124,7 +139,8 @@ pub fn merton_default_probability_with_drift(
 /// @param model_json - Serialized Merton structural-credit model produced by this API's model builder.
 /// @param horizon - Forward-looking model horizon measured in years.
 #[wasm_bindgen(js_name = mertonDistanceToDefault)]
-pub fn merton_distance_to_default(model_json: JsValue, horizon: f64) -> Result<f64, JsValue> {
+pub fn merton_distance_to_default(model_json: JsValue, horizon: JsValue) -> Result<f64, JsValue> {
+    let horizon = js_f64(&horizon, "horizon")?;
     let model_json: &str = &json_text(&model_json, "modelJson")?;
     let model: MertonModel = serde_json::from_str(model_json).map_err(to_js_err)?;
     Ok(model.distance_to_default(horizon))
@@ -144,9 +160,11 @@ pub fn merton_distance_to_default(model_json: JsValue, horizon: f64) -> Result<f
 #[wasm_bindgen(js_name = mertonDistanceToDefaultWithDrift)]
 pub fn merton_distance_to_default_with_drift(
     model_json: JsValue,
-    asset_drift: f64,
-    horizon: f64,
+    asset_drift: JsValue,
+    horizon: JsValue,
 ) -> Result<f64, JsValue> {
+    let asset_drift = js_f64(&asset_drift, "assetDrift")?;
+    let horizon = js_f64(&horizon, "horizon")?;
     let model_json: &str = &json_text(&model_json, "modelJson")?;
     let model: MertonModel = serde_json::from_str(model_json).map_err(to_js_err)?;
     model
@@ -164,7 +182,12 @@ pub fn merton_distance_to_default_with_drift(
 /// @param short_term_debt - Liabilities due within one year, in the firm's monetary units.
 /// @param long_term_debt - Liabilities maturing beyond one year, in the same units; half of it enters the default point.
 #[wasm_bindgen(js_name = mertonKmvDefaultPoint)]
-pub fn merton_kmv_default_point(short_term_debt: f64, long_term_debt: f64) -> Result<f64, JsValue> {
+pub fn merton_kmv_default_point(
+    short_term_debt: JsValue,
+    long_term_debt: JsValue,
+) -> Result<f64, JsValue> {
+    let short_term_debt = js_f64(&short_term_debt, "shortTermDebt")?;
+    let long_term_debt = js_f64(&long_term_debt, "longTermDebt")?;
     MertonModel::kmv_default_point(short_term_debt, long_term_debt).map_err(to_js_err)
 }
 
@@ -182,9 +205,11 @@ pub fn merton_kmv_default_point(short_term_debt: f64, long_term_debt: f64) -> Re
 #[wasm_bindgen(js_name = mertonImpliedSpread)]
 pub fn merton_implied_spread(
     model_json: JsValue,
-    horizon: f64,
-    recovery: f64,
+    horizon: JsValue,
+    recovery: JsValue,
 ) -> Result<f64, JsValue> {
+    let horizon = js_f64(&horizon, "horizon")?;
+    let recovery = js_f64(&recovery, "recovery")?;
     let model_json: &str = &json_text(&model_json, "modelJson")?;
     let model: MertonModel = serde_json::from_str(model_json).map_err(to_js_err)?;
     model.implied_spread(horizon, recovery).map_err(to_js_err)
@@ -201,7 +226,8 @@ pub fn merton_implied_spread(
 /// @param model_json - Serialized Merton structural-credit model produced by this API's model builder.
 /// @param horizon - Maturity of the firm's debt measured in years.
 #[wasm_bindgen(js_name = mertonDebtSpread)]
-pub fn merton_debt_spread(model_json: JsValue, horizon: f64) -> Result<f64, JsValue> {
+pub fn merton_debt_spread(model_json: JsValue, horizon: JsValue) -> Result<f64, JsValue> {
+    let horizon = js_f64(&horizon, "horizon")?;
     let model_json: &str = &json_text(&model_json, "modelJson")?;
     let model: MertonModel = serde_json::from_str(model_json).map_err(to_js_err)?;
     model.debt_spread(horizon).map_err(to_js_err)
@@ -222,9 +248,11 @@ pub fn merton_debt_spread(model_json: JsValue, horizon: f64) -> Result<f64, JsVa
 #[wasm_bindgen(js_name = mertonCdsParSpread)]
 pub fn merton_cds_par_spread(
     model_json: JsValue,
-    maturity: f64,
-    recovery: f64,
+    maturity: JsValue,
+    recovery: JsValue,
 ) -> Result<f64, JsValue> {
+    let maturity = js_f64(&maturity, "maturity")?;
+    let recovery = js_f64(&recovery, "recovery")?;
     let model_json: &str = &json_text(&model_json, "modelJson")?;
     let model: MertonModel = serde_json::from_str(model_json).map_err(to_js_err)?;
     model.cds_par_spread(maturity, recovery).map_err(to_js_err)
@@ -245,13 +273,19 @@ pub fn merton_cds_par_spread(
 /// @param maturity - Calibration horizon in years; must be positive and finite.
 #[wasm_bindgen(js_name = mertonFromEquityJson)]
 pub fn merton_from_equity_json(
-    equity_value: f64,
-    equity_vol: f64,
-    total_debt: f64,
-    risk_free_rate: f64,
-    payout_rate: f64,
-    maturity: f64,
+    equity_value: JsValue,
+    equity_vol: JsValue,
+    total_debt: JsValue,
+    risk_free_rate: JsValue,
+    payout_rate: JsValue,
+    maturity: JsValue,
 ) -> Result<String, JsValue> {
+    let equity_value = js_f64(&equity_value, "equityValue")?;
+    let equity_vol = js_f64(&equity_vol, "equityVol")?;
+    let total_debt = js_f64(&total_debt, "totalDebt")?;
+    let risk_free_rate = js_f64(&risk_free_rate, "riskFreeRate")?;
+    let payout_rate = js_f64(&payout_rate, "payoutRate")?;
+    let maturity = js_f64(&maturity, "maturity")?;
     let model = MertonModel::from_equity(
         equity_value,
         equity_vol,
@@ -285,14 +319,21 @@ pub fn merton_from_equity_json(
 /// @param payout_rate - Continuous payout rate on assets, expressed as a decimal.
 #[wasm_bindgen(js_name = mertonFromCdsSpreadJson)]
 pub fn merton_from_cds_spread_json(
-    cds_spread_bp: f64,
-    recovery: f64,
-    total_debt: f64,
-    risk_free_rate: f64,
-    maturity: f64,
-    asset_value: f64,
-    payout_rate: f64,
+    cds_spread_bp: JsValue,
+    recovery: JsValue,
+    total_debt: JsValue,
+    risk_free_rate: JsValue,
+    maturity: JsValue,
+    asset_value: JsValue,
+    payout_rate: JsValue,
 ) -> Result<String, JsValue> {
+    let cds_spread_bp = js_f64(&cds_spread_bp, "cdsSpreadBp")?;
+    let recovery = js_f64(&recovery, "recovery")?;
+    let total_debt = js_f64(&total_debt, "totalDebt")?;
+    let risk_free_rate = js_f64(&risk_free_rate, "riskFreeRate")?;
+    let maturity = js_f64(&maturity, "maturity")?;
+    let asset_value = js_f64(&asset_value, "assetValue")?;
+    let payout_rate = js_f64(&payout_rate, "payoutRate")?;
     let model = MertonModel::from_cds_spread(
         cds_spread_bp,
         recovery,
@@ -321,13 +362,19 @@ pub fn merton_from_cds_spread_json(
 /// @param maturity - Calibration horizon in years; must be positive and finite.
 #[wasm_bindgen(js_name = mertonFromTargetPdJson)]
 pub fn merton_from_target_pd_json(
-    asset_value: f64,
-    asset_vol: f64,
-    risk_free_rate: f64,
-    payout_rate: f64,
-    target_pd: f64,
-    maturity: f64,
+    asset_value: JsValue,
+    asset_vol: JsValue,
+    risk_free_rate: JsValue,
+    payout_rate: JsValue,
+    target_pd: JsValue,
+    maturity: JsValue,
 ) -> Result<String, JsValue> {
+    let asset_value = js_f64(&asset_value, "assetValue")?;
+    let asset_vol = js_f64(&asset_vol, "assetVol")?;
+    let risk_free_rate = js_f64(&risk_free_rate, "riskFreeRate")?;
+    let payout_rate = js_f64(&payout_rate, "payoutRate")?;
+    let target_pd = js_f64(&target_pd, "targetPd")?;
+    let maturity = js_f64(&maturity, "maturity")?;
     let model = MertonModel::from_target_pd(
         asset_value,
         asset_vol,
@@ -357,14 +404,19 @@ pub fn merton_from_target_pd_json(
 /// @param dynamics_json - Serialized `AssetDynamics` JSON (GBM, jump-diffusion, or CreditGrades).
 #[wasm_bindgen(js_name = mertonModelWithDynamicsJson)]
 pub fn merton_model_with_dynamics_json(
-    asset_value: f64,
-    asset_vol: f64,
-    debt_barrier: f64,
-    risk_free_rate: f64,
-    payout_rate: f64,
+    asset_value: JsValue,
+    asset_vol: JsValue,
+    debt_barrier: JsValue,
+    risk_free_rate: JsValue,
+    payout_rate: JsValue,
     barrier_type_json: JsValue,
     dynamics_json: JsValue,
 ) -> Result<String, JsValue> {
+    let asset_value = js_f64(&asset_value, "assetValue")?;
+    let asset_vol = js_f64(&asset_vol, "assetVol")?;
+    let debt_barrier = js_f64(&debt_barrier, "debtBarrier")?;
+    let risk_free_rate = js_f64(&risk_free_rate, "riskFreeRate")?;
+    let payout_rate = js_f64(&payout_rate, "payoutRate")?;
     let barrier_type_json: &str = &json_text(&barrier_type_json, "barrierTypeJson")?;
     let dynamics_json: &str = &json_text(&dynamics_json, "dynamicsJson")?;
     let barrier_type: MertonBarrierType =
@@ -396,8 +448,9 @@ pub fn merton_model_with_dynamics_json(
 #[wasm_bindgen(js_name = mertonTryImpliedEquity)]
 pub fn merton_try_implied_equity(
     model_json: JsValue,
-    horizon: f64,
+    horizon: JsValue,
 ) -> Result<Float64Array, JsValue> {
+    let horizon = js_f64(&horizon, "horizon")?;
     let model_json: &str = &json_text(&model_json, "modelJson")?;
     let (equity, equity_vol) = merton_try_implied_equity_pair(model_json, horizon)?;
     let arr = Float64Array::new_with_length(2);
@@ -433,9 +486,10 @@ pub fn merton_to_hazard_curve_json(
     id: JsValue,
     base_date: JsValue,
     tenors: JsValue,
-    recovery: f64,
+    recovery: JsValue,
     day_count: JsValue,
 ) -> Result<String, JsValue> {
+    let recovery = js_f64(&recovery, "recovery")?;
     let model_json: &str = &json_text(&model_json, "modelJson")?;
     let id: &str = &js_string(&id, "id")?;
     let base_date: &str = &js_string(&base_date, "baseDate")?;
@@ -476,10 +530,11 @@ pub fn merton_simulate_paths_json(
     model_json: JsValue,
     num_paths: JsValue,
     num_steps: JsValue,
-    horizon: f64,
+    horizon: JsValue,
     seed: JsValue,
     antithetic: JsValue,
 ) -> Result<String, JsValue> {
+    let horizon = js_f64(&horizon, "horizon")?;
     let model_json: &str = &json_text(&model_json, "modelJson")?;
     let num_paths: usize = js_uint(&num_paths, "numPaths")?;
     let num_steps: usize = js_uint(&num_steps, "numSteps")?;
@@ -503,7 +558,8 @@ pub fn merton_simulate_paths_json(
 /// @param spec_json - Serialized DynamicRecoverySpec JSON defining the notional-to-recovery mapping.
 /// @param notional - Signed trade notional in the instrument's native currency units.
 #[wasm_bindgen(js_name = dynamicRecoveryAtNotional)]
-pub fn dynamic_recovery_at_notional(spec_json: JsValue, notional: f64) -> Result<f64, JsValue> {
+pub fn dynamic_recovery_at_notional(spec_json: JsValue, notional: JsValue) -> Result<f64, JsValue> {
+    let notional = js_f64(&notional, "notional")?;
     let spec_json: &str = &json_text(&spec_json, "specJson")?;
     let spec: DynamicRecoverySpec = serde_json::from_str(spec_json).map_err(to_js_err)?;
     Ok(spec.recovery_at_notional(notional))
@@ -519,7 +575,11 @@ pub fn dynamic_recovery_at_notional(spec_json: JsValue, notional: f64) -> Result
 /// @param spec_json - Serialized EndogenousHazardSpec JSON defining the leverage-to-hazard mapping.
 /// @param leverage - Debt-to-assets leverage ratio used by the structural credit model.
 #[wasm_bindgen(js_name = endogenousHazardAtLeverage)]
-pub fn endogenous_hazard_at_leverage(spec_json: JsValue, leverage: f64) -> Result<f64, JsValue> {
+pub fn endogenous_hazard_at_leverage(
+    spec_json: JsValue,
+    leverage: JsValue,
+) -> Result<f64, JsValue> {
+    let leverage = js_f64(&leverage, "leverage")?;
     let spec_json: &str = &json_text(&spec_json, "specJson")?;
     let spec: EndogenousHazardSpec = serde_json::from_str(spec_json).map_err(to_js_err)?;
     Ok(spec.hazard_at_leverage(leverage))
@@ -539,9 +599,11 @@ pub fn endogenous_hazard_at_leverage(spec_json: JsValue, leverage: f64) -> Resul
 #[wasm_bindgen(js_name = endogenousHazardAfterPikAccrual)]
 pub fn endogenous_hazard_after_pik_accrual(
     spec_json: JsValue,
-    accreted_notional: f64,
-    asset_value: f64,
+    accreted_notional: JsValue,
+    asset_value: JsValue,
 ) -> Result<f64, JsValue> {
+    let accreted_notional = js_f64(&accreted_notional, "accretedNotional")?;
+    let asset_value = js_f64(&asset_value, "assetValue")?;
     let spec_json: &str = &json_text(&spec_json, "specJson")?;
     let spec: EndogenousHazardSpec = serde_json::from_str(spec_json).map_err(to_js_err)?;
     Ok(spec.hazard_after_pik_accrual(accreted_notional, asset_value))
@@ -555,7 +617,8 @@ pub fn endogenous_hazard_after_pik_accrual(
 /// specification cannot be serialized to JSON.
 /// @param recovery - Recovery rate at default expressed as a fraction of par from 0 through 1.
 #[wasm_bindgen(js_name = dynamicRecoveryConstantJson)]
-pub fn dynamic_recovery_constant_json(recovery: f64) -> Result<String, JsValue> {
+pub fn dynamic_recovery_constant_json(recovery: JsValue) -> Result<String, JsValue> {
+    let recovery = js_f64(&recovery, "recovery")?;
     let spec = DynamicRecoverySpec::constant(recovery).map_err(to_js_err)?;
     serde_json::to_string(&spec).map_err(to_js_err)
 }
@@ -572,10 +635,13 @@ pub fn dynamic_recovery_constant_json(recovery: f64) -> Result<String, JsValue> 
 /// @param exponent - Power-law exponent in `lambda(L) = baseHazard * (L / baseLeverage)^exponent`.
 #[wasm_bindgen(js_name = endogenousHazardPowerLawJson)]
 pub fn endogenous_hazard_power_law_json(
-    base_hazard: f64,
-    base_leverage: f64,
-    exponent: f64,
+    base_hazard: JsValue,
+    base_leverage: JsValue,
+    exponent: JsValue,
 ) -> Result<String, JsValue> {
+    let base_hazard = js_f64(&base_hazard, "baseHazard")?;
+    let base_leverage = js_f64(&base_leverage, "baseLeverage")?;
+    let exponent = js_f64(&exponent, "exponent")?;
     let spec =
         EndogenousHazardSpec::power_law(base_hazard, base_leverage, exponent).map_err(to_js_err)?;
     serde_json::to_string(&spec).map_err(to_js_err)
@@ -599,13 +665,19 @@ pub fn endogenous_hazard_power_law_json(
 /// @param asset_value - Current fair value of the firm's assets in monetary units.
 #[wasm_bindgen(js_name = creditStateJson)]
 pub fn credit_state_json(
-    hazard_rate: f64,
-    distance_to_default: Option<f64>,
-    leverage: f64,
-    accreted_notional: f64,
-    coupon_due: f64,
-    asset_value: Option<f64>,
+    hazard_rate: JsValue,
+    distance_to_default: Option<JsValue>,
+    leverage: JsValue,
+    accreted_notional: JsValue,
+    coupon_due: JsValue,
+    asset_value: Option<JsValue>,
 ) -> Result<String, JsValue> {
+    let hazard_rate = js_f64(&hazard_rate, "hazardRate")?;
+    let distance_to_default = js_opt_f64(distance_to_default.as_ref(), "distanceToDefault")?;
+    let leverage = js_f64(&leverage, "leverage")?;
+    let accreted_notional = js_f64(&accreted_notional, "accretedNotional")?;
+    let coupon_due = js_f64(&coupon_due, "couponDue")?;
+    let asset_value = js_opt_f64(asset_value.as_ref(), "assetValue")?;
     let state = CreditState::new(
         hazard_rate,
         distance_to_default,
@@ -630,9 +702,10 @@ pub fn credit_state_json(
 #[wasm_bindgen(js_name = toggleExerciseThresholdJson)]
 pub fn toggle_exercise_threshold_json(
     variable: JsValue,
-    threshold: f64,
+    threshold: JsValue,
     direction: JsValue,
 ) -> Result<String, JsValue> {
+    let threshold = js_f64(&threshold, "threshold")?;
     let variable: &str = &js_string(&variable, "variable")?;
     let direction: &str = &js_string(&direction, "direction")?;
     let variable = variable.parse::<CreditStateVariable>().map_err(to_js_err)?;
@@ -663,11 +736,15 @@ pub fn toggle_exercise_threshold_json(
 #[wasm_bindgen(js_name = toggleExerciseOptimalJson)]
 pub fn toggle_exercise_optimal_json(
     nested_paths: JsValue,
-    equity_discount_rate: f64,
-    asset_vol: f64,
-    risk_free_rate: f64,
-    horizon: f64,
+    equity_discount_rate: JsValue,
+    asset_vol: JsValue,
+    risk_free_rate: JsValue,
+    horizon: JsValue,
 ) -> Result<String, JsValue> {
+    let equity_discount_rate = js_f64(&equity_discount_rate, "equityDiscountRate")?;
+    let asset_vol = js_f64(&asset_vol, "assetVol")?;
+    let risk_free_rate = js_f64(&risk_free_rate, "riskFreeRate")?;
+    let horizon = js_f64(&horizon, "horizon")?;
     let nested_paths: usize = js_uint(&nested_paths, "nestedPaths")?;
     let model = ToggleExerciseModel::optimal(
         nested_paths,
@@ -678,43 +755,4 @@ pub fn toggle_exercise_optimal_json(
     )
     .map_err(to_js_err)?;
     serde_json::to_string(&model).map_err(to_js_err)
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    // Credit-model evaluator parity (mirrors finstack-quant-py PyMertonModel etc.).
-
-    #[test]
-    fn merton_from_equity_roundtrips() {
-        let m_known = MertonModel::new(100.0, 0.20, 80.0, 0.05).expect("merton");
-        let (equity, equity_vol) = m_known.try_implied_equity(1.0).expect("equity");
-        let json = merton_from_equity_json(equity, equity_vol, 80.0, 0.05, 0.0, 1.0).expect("json");
-        let m_cal: MertonModel = serde_json::from_str(&json).expect("deserialize");
-        assert!(
-            (m_cal.asset_value() - m_known.asset_value()).abs() < 1e-6,
-            "asset value roundtrip"
-        );
-        assert!(
-            (m_cal.asset_vol() - m_known.asset_vol()).abs() < 1e-6,
-            "asset vol roundtrip"
-        );
-    }
-
-    #[test]
-    fn merton_try_implied_equity_matches_native() {
-        let json = merton_model_json(100.0, 0.20, 80.0, 0.05).expect("merton json");
-        let (equity_wasm, vol_wasm) = merton_try_implied_equity_pair(&json, 1.0).expect("equity");
-        let model = MertonModel::new(100.0, 0.20, 80.0, 0.05).expect("merton");
-        let (equity_native, vol_native) = model.try_implied_equity(1.0).expect("native");
-        assert!(
-            (equity_wasm - equity_native).abs() < 1e-12,
-            "WASM equity ({equity_wasm}) must match native ({equity_native})"
-        );
-        assert!(
-            (vol_wasm - vol_native).abs() < 1e-12,
-            "WASM equity vol ({vol_wasm}) must match native ({vol_native})"
-        );
-    }
 }

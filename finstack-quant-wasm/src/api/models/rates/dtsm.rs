@@ -1,6 +1,6 @@
 //! WASM bindings for dynamic term-structure models.
 
-use crate::utils::input::js_f64_seq;
+use crate::utils::input::{js_f64, js_f64_seq};
 use crate::utils::to_js_err;
 use finstack_quant_core::Error;
 use wasm_bindgen::prelude::*;
@@ -26,10 +26,11 @@ use wasm_bindgen::prelude::*;
 /// or negative.
 #[wasm_bindgen(js_name = nelsonSiegelYields)]
 pub fn nelson_siegel_yields(
-    lambda: f64,
+    lambda: JsValue,
     factors: JsValue,
     tenors: JsValue,
 ) -> Result<Box<[f64]>, JsValue> {
+    let lambda = js_f64(&lambda, "lambda")?;
     let factors = js_f64_seq(&factors, "factors")?;
     let tenors = js_f64_seq(&tenors, "tenors")?;
     // Shape conversion to the Rust `[f64; 3]`, as PyO3 does for Python.

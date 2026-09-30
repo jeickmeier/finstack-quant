@@ -1838,10 +1838,10 @@ names = [
 [parity]
 # Host coercion of numeric inputs is not a parity gap. Python/PyO3 accepts
 # `bool` and `numpy.bool_` as 1.0/0.0 in `float` scalars and sequences. WASM
-# checks strings, booleans, integers and array elements at the boundary
-# (`finstack-quant-wasm/src/utils/input.rs`), but receives `number` (`f64`)
-# scalars through JavaScript `ToNumber` (TypeScript checks them as `number`);
-# Rust validates their finiteness and ranges for both hosts.
+# checks strings, booleans, integers, numbers and array elements at the
+# boundary (`finstack-quant-wasm/src/utils/input.rs`) and accepts only a
+# JavaScript `number` where Rust takes `f64` (booleans throw). NaN/Infinity
+# pass through both hosts; Rust validates finiteness and ranges for both.
 exclusion_reasons = ["pandas", "arrow", "pickle", "pure-python", "dunder"]
 # Plus, by naming rule, any `to_*_dataframe` / `to_*_series` pandas exit.
 python_rule_excluded_members = { to_dataframe = "pandas", to_series = "pandas", from_dataframe = "pandas", to_arrow = "arrow" }

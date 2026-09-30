@@ -19,7 +19,11 @@ use wasm_bindgen_test::*;
 fn fx_matrix_rate_returns_structured_result() {
     let matrix = JsFxMatrix::new();
     matrix
-        .set_quote(JsValue::from("EUR"), JsValue::from("USD"), 1.10)
+        .set_quote(
+            JsValue::from("EUR"),
+            JsValue::from("USD"),
+            JsValue::from(1.10),
+        )
         .unwrap();
 
     let result = matrix
@@ -56,10 +60,28 @@ fn forward_curve_projection_grid_and_rate_between() {
     .expect("valid options");
     let curve = JsForwardCurve::new(options).expect("forward curve");
 
-    assert!((curve.rate_between(0.0, t_3m).expect("first period") - 0.04).abs() < 1e-14);
-    assert!((curve.rate_between(t_3m, t_6m).expect("second period") - 0.045).abs() < 1e-14);
-    assert!(curve.rate_between(t_3m, t_3m).is_err());
-    assert!(curve.rate_between(t_6m, t_3m).is_err());
+    assert!(
+        (curve
+            .rate_between(JsValue::from(0.0), JsValue::from(t_3m))
+            .expect("first period")
+            - 0.04)
+            .abs()
+            < 1e-14
+    );
+    assert!(
+        (curve
+            .rate_between(JsValue::from(t_3m), JsValue::from(t_6m))
+            .expect("second period")
+            - 0.045)
+            .abs()
+            < 1e-14
+    );
+    assert!(curve
+        .rate_between(JsValue::from(t_3m), JsValue::from(t_3m))
+        .is_err());
+    assert!(curve
+        .rate_between(JsValue::from(t_6m), JsValue::from(t_3m))
+        .is_err());
 
     let grid = Float64Array::new(&curve.projection_grid());
     assert_eq!(grid.length(), 3);
@@ -86,7 +108,12 @@ fn discount_curve_negative_rate_validation_mode_is_explicit() {
     friendly["forwardFloor"] = (-0.01).into();
     let curve = JsDiscountCurve::new(discount_options(friendly.clone()))
         .expect("negative-rate-friendly curve");
-    assert!(curve.forward(0.0, 1.0).expect("negative forward") < 0.0);
+    assert!(
+        curve
+            .forward(JsValue::from(0.0), JsValue::from(1.0))
+            .expect("negative forward")
+            < 0.0
+    );
 
     // A non-finite floor cannot reach Rust through JSON; a floor without the
     // negative-rate preset is rejected by `ValidationMode::from_preset`.
@@ -103,7 +130,11 @@ fn discount_curve_negative_rate_validation_mode_is_explicit() {
 fn fx_matrix_rate_defaults_policy_to_cashflow_date() {
     let matrix = JsFxMatrix::new();
     matrix
-        .set_quote(JsValue::from("GBP"), JsValue::from("USD"), 1.25)
+        .set_quote(
+            JsValue::from("GBP"),
+            JsValue::from("USD"),
+            JsValue::from(1.25),
+        )
         .unwrap();
 
     let result = matrix
@@ -128,7 +159,7 @@ fn fx_matrix_policy_can_be_reused() {
             JsValue::from("USD"),
             JsValue::from("2024-01-02"),
             &policy,
-            1.10,
+            JsValue::from(1.10),
         )
         .unwrap();
     let first = matrix
@@ -154,10 +185,10 @@ fn fx_matrix_policy_can_be_reused() {
 fn fx_delta_vol_surface_basic_accessors_and_implied_vol() {
     let surface = JsFxDeltaVolSurface::new(
         JsValue::from("EURUSD-DELTA-VOL"),
-        &[0.25, 0.5, 1.0],
-        &[0.08, 0.085, 0.09],
-        &[0.01, 0.012, 0.015],
-        &[0.005, 0.006, 0.007],
+        JsValue::from([0.25, 0.5, 1.0].to_vec()),
+        JsValue::from([0.08, 0.085, 0.09].to_vec()),
+        JsValue::from([0.01, 0.012, 0.015].to_vec()),
+        JsValue::from([0.005, 0.006, 0.007].to_vec()),
         None,
         None,
     )
@@ -174,7 +205,13 @@ fn fx_delta_vol_surface_basic_accessors_and_implied_vol() {
     let forward: f64 = 1.20;
     let atm_vol: f64 = 0.09;
     let k_atm = forward * (0.5 * atm_vol * atm_vol * 1.0_f64).exp();
-    let vol = get_fx_delta_vol(&surface, 1.0, k_atm, forward).unwrap();
+    let vol = get_fx_delta_vol(
+        &surface,
+        JsValue::from(1.0),
+        JsValue::from(k_atm),
+        JsValue::from(forward),
+    )
+    .unwrap();
     assert!((vol - atm_vol).abs() < 1e-9);
 }
 
@@ -182,11 +219,11 @@ fn fx_delta_vol_surface_basic_accessors_and_implied_vol() {
 fn fx_delta_vol_surface_rejects_mixed_10d_arguments() {
     match JsFxDeltaVolSurface::new(
         JsValue::from("BAD"),
-        &[0.25, 0.5],
-        &[0.08, 0.085],
-        &[0.01, 0.012],
-        &[0.005, 0.006],
-        Some(vec![0.018, 0.020]),
+        JsValue::from([0.25, 0.5].to_vec()),
+        JsValue::from([0.08, 0.085].to_vec()),
+        JsValue::from([0.01, 0.012].to_vec()),
+        JsValue::from([0.005, 0.006].to_vec()),
+        Some(JsValue::from(vec![0.018, 0.020])),
         None,
     ) {
         Ok(_) => panic!("mixed rr10d/bf10d must error"),
@@ -214,28 +251,46 @@ fn fx_delta_vol_surface_rejects_mixed_10d_arguments() {
 fn normal_sabr_requires_positive_shifted_levels_when_beta_is_positive() {
     let cev = JsVolCube::new(
         JsValue::from("CEV"),
-        &[1.0],
-        &[2.0],
-        &[0.01, 0.5, -0.2, 0.4, f64::NAN],
-        &[-0.01],
+        JsValue::from([1.0].to_vec()),
+        JsValue::from([2.0].to_vec()),
+        JsValue::from([0.01, 0.5, -0.2, 0.4, f64::NAN].to_vec()),
+        JsValue::from([-0.01].to_vec()),
         None,
     )
     .unwrap();
-    assert!(get_cube_normal_vol(&cev, 1.0, 2.0, -0.01).is_err());
-    assert!(get_cube_normal_vol_clamped(&cev, 1.0, 2.0, -0.01).is_nan());
+    assert!(get_cube_normal_vol(
+        &cev,
+        JsValue::from(1.0),
+        JsValue::from(2.0),
+        JsValue::from(-0.01)
+    )
+    .is_err());
+    assert!(get_cube_normal_vol_clamped(
+        &cev,
+        JsValue::from(1.0),
+        JsValue::from(2.0),
+        JsValue::from(-0.01)
+    )
+    .unwrap()
+    .is_nan());
 
     let normal = JsVolCube::new(
         JsValue::from("NORMAL"),
-        &[1.0],
-        &[2.0],
-        &[0.01, 0.0, -0.2, 0.4, f64::NAN],
-        &[-0.01],
+        JsValue::from([1.0].to_vec()),
+        JsValue::from([2.0].to_vec()),
+        JsValue::from([0.01, 0.0, -0.2, 0.4, f64::NAN].to_vec()),
+        JsValue::from([-0.01].to_vec()),
         None,
     )
     .unwrap();
-    assert!(get_cube_normal_vol(&normal, 1.0, 2.0, -0.02)
-        .unwrap()
-        .is_finite());
+    assert!(get_cube_normal_vol(
+        &normal,
+        JsValue::from(1.0),
+        JsValue::from(2.0),
+        JsValue::from(-0.02)
+    )
+    .unwrap()
+    .is_finite());
 }
 
 #[wasm_bindgen_test]
@@ -302,29 +357,46 @@ fn discount_curve_new_and_accessors() {
     .expect("discount curve");
     assert_eq!(curve.id(), "USD-OIS");
     assert_eq!(curve.base_date(), "2024-01-15");
-    assert!((curve.df(0.5) - 0.99).abs() < 1e-6);
-    assert!((curve.df(1.0) - 0.98).abs() < 1e-6);
-    assert!(curve.zero(1.0) > 0.0);
-    let f = curve.forward(0.5, 1.0).expect("forward rate");
+    assert!((curve.df(JsValue::from(0.5)).unwrap() - 0.99).abs() < 1e-6);
+    assert!((curve.df(JsValue::from(1.0)).unwrap() - 0.98).abs() < 1e-6);
+    assert!(curve.zero(JsValue::from(1.0)).unwrap() > 0.0);
+    let f = curve
+        .forward(JsValue::from(0.5), JsValue::from(1.0))
+        .expect("forward rate");
     assert!(f > 0.0);
 }
 
 #[wasm_bindgen_test]
 fn discount_curve_flat_uses_continuous_compounding() {
-    let curve = JsDiscountCurve::flat(JsValue::from("USD-OIS"), JsValue::from("2024-01-15"), 0.04)
-        .expect("flat discount curve");
+    let curve = JsDiscountCurve::flat(
+        JsValue::from("USD-OIS"),
+        JsValue::from("2024-01-15"),
+        JsValue::from(0.04),
+    )
+    .expect("flat discount curve");
 
     for t in [0.0_f64, 0.25, 1.0, 5.0, 30.0] {
-        assert!((curve.df(t) - (-0.04 * t).exp()).abs() < 1e-12);
+        assert!((curve.df(JsValue::from(t)).unwrap() - (-0.04 * t).exp()).abs() < 1e-12);
     }
-    assert!((curve.forward(2.0, 9.0).expect("flat forward") - 0.04).abs() < 1e-12);
+    assert!(
+        (curve
+            .forward(JsValue::from(2.0), JsValue::from(9.0))
+            .expect("flat forward")
+            - 0.04)
+            .abs()
+            < 1e-12
+    );
 }
 
 #[wasm_bindgen_test]
 fn fx_matrix_quote_and_rate() {
     let m = JsFxMatrix::new();
-    m.set_quote(JsValue::from("USD"), JsValue::from("EUR"), 0.92)
-        .expect("set quote");
+    m.set_quote(
+        JsValue::from("USD"),
+        JsValue::from("EUR"),
+        JsValue::from(0.92),
+    )
+    .expect("set quote");
     let r = m
         .rate_with_default_policy(
             JsValue::from("USD"),
@@ -350,7 +422,7 @@ fn fx_pair_convention_helpers() {
             .abs()
             < 1e-12
     );
-    let inverted = invert_fx_rate(1.10).expect("positive rate");
+    let inverted = invert_fx_rate(JsValue::from(1.10)).expect("positive rate");
     assert!((inverted - 1.0 / 1.10).abs() < 1e-12);
     assert_eq!(
         JsFxQuoteConvention::from_name(JsValue::from("direct"))

@@ -8,6 +8,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import init, {
+  analytics,
   core,
   models,
   portfolio,
@@ -269,4 +270,62 @@ test('capacities reject negative and fractional values instead of wrapping', () 
   new portfolio.InstrumentArtifactCache(8).free();
   assert.throws(() => new portfolio.InstrumentArtifactCache(-1), invalidType('capacity'));
   assert.throws(() => new portfolio.InstrumentArtifactCache(1.5), invalidType('capacity'));
+});
+
+test('numbers are not coerced by ToNumber (F372)', () => {
+  const price = models.bsPrice(100, 100, 0.05, 0, 0.2, 1, true);
+  assert.ok(Math.abs(price - 10.4506) < 1e-4, `bsPrice = ${price}`);
+  assert.throws(() => models.bsPrice(100, 100, null, 0, 0.2, 1, true), invalidType('rate'));
+  assert.throws(
+    () => models.bsPrice('100', '100', '0.05', '0', '0.2', '1', true),
+    invalidType('spot')
+  );
+  assert.throws(() => models.bsPrice(100, 100, 0.05, 0, [0.2], 1, true), invalidType('vol'));
+  assert.throws(() => models.bsPrice(100, 100, 0.05, 0, 0.2, 1n, true), invalidType('expiry'));
+  assert.throws(
+    () => models.bsPrice(100, 100, 0.05, 0, 0.2, undefined, true),
+    invalidType('expiry')
+  );
+  // NaN is a number: it reaches Rust, which owns finiteness validation.
+  assert.throws(
+    () => models.bsPrice(100, 100, 0.05, 0, 0.2, Number.NaN, true),
+    (error) => !(error instanceof TypeError) && error.kind === 'validation'
+  );
+});
+
+test('number arrays must be arrays of numbers or Float64Array', () => {
+  const returns = [0.01, -0.02, 0.015, 0.003];
+  assert.equal(analytics.sharpe(returns), analytics.sharpe(Float64Array.from(returns)));
+  assert.equal(core.mean([1, 2, 3]), 2);
+  assert.throws(() => analytics.sharpe('0.01,0.02'), invalidType('returns'));
+  assert.throws(() => analytics.sharpe({}), invalidType('returns'));
+  assert.throws(() => analytics.sharpe(null), invalidType('returns'));
+  assert.throws(() => core.mean('abc'), invalidType('data'));
+  assert.throws(() => core.mean([1, '2', 3]), invalidType('data[1]'));
+  // eslint-disable-next-line no-sparse-arrays -- a hole is not a number
+  assert.throws(() => core.mean([1, , 3]), invalidType('data[1]'));
+  // eslint-disable-next-line no-new-wrappers -- a boxed Number is not a number
+  assert.throws(() => core.mean([1, new Number(2)]), invalidType('data[1]'));
+  assert.ok(Number.isNaN(core.mean([1, Number.NaN])));
+  assert.equal(core.mean([1, Number.POSITIVE_INFINITY]), Number.POSITIVE_INFINITY);
+});
+
+test('optional numbers: omitted and null mean the default, other types throw', () => {
+  const returns = [0.01, -0.02, 0.015, 0.003];
+  const byDefault = analytics.sharpe(returns, 0, 252);
+  assert.equal(analytics.sharpe(returns), byDefault);
+  assert.equal(analytics.sharpe(returns, null, null), byDefault);
+  assert.equal(analytics.sharpe(returns, undefined, undefined), byDefault);
+  assert.notEqual(analytics.sharpe(returns, 0.02), byDefault);
+  assert.throws(() => analytics.sharpe(returns, '0.02'), invalidType('rf'));
+  assert.throws(() => analytics.sharpe(returns, 0, true), invalidType('periodsPerYear'));
+});
+
+test('class methods and constructors check numbers too', () => {
+  const usd = new core.Currency('USD');
+  const money = new core.Money(10, usd);
+  assert.equal(money.mulScalar(2.5).amount, 25);
+  assert.throws(() => money.mulScalar('2'), invalidType('factor'));
+  assert.throws(() => money.mulScalar(null), invalidType('factor'));
+  assert.throws(() => new core.Money('10', usd), invalidType('amount'));
 });

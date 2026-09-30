@@ -127,7 +127,7 @@ const FINANCIAL_MODEL_JSON = JSON.stringify({
 });
 
 const SENSITIVITY_CONFIG_JSON = JSON.stringify({
-  mode: 'Diagonal',
+  mode: 'diagonal',
   parameters: [
     {
       node_id: 'revenue',
@@ -148,17 +148,20 @@ const PORTFOLIO_SPEC_JSON = JSON.stringify({
 });
 
 const INSTRUMENT_JSON = JSON.stringify({
-  type: 'deposit',
-  spec: {
-    id: 'DEP-BENCH',
-    notional: { amount: 100000.0, currency: 'USD' },
-    start_date: '2024-01-01',
-    maturity: '2024-07-01',
-    day_count: 'act_360',
-    fixed_rate: 0.045,
-    discount_curve_id: 'USD-OIS',
-    attributes: {},
-    business_day_convention: 'modified_following',
+  schema: 'finstack_quant.instrument/1',
+  instrument: {
+    type: 'deposit',
+    spec: {
+      id: 'DEP-BENCH',
+      notional: { amount: '100000', currency: 'USD' },
+      start_date: '2024-01-01',
+      maturity: '2024-07-01',
+      day_count: 'act_360',
+      fixed_rate: '0.045',
+      discount_curve_id: 'USD-OIS',
+      attributes: {},
+      business_day_convention: 'modified_following',
+    },
   },
 });
 
@@ -312,11 +315,8 @@ const returnDates = returns.map((_, i) =>
   new Date(Date.UTC(2025, 0, 1 + i)).toISOString().slice(0, 10)
 );
 const statsArr = Array.from({ length: 512 }, (_, i) => i * 0.01 + Math.sin(i));
-const cholMat = [
-  [4, 2, 0],
-  [2, 5, 1],
-  [0, 1, 3],
-];
+// Flat row-major 3x3 SPD matrix (choleskyDecomposition takes a flat array and n).
+const cholMat = [4, 2, 0, 2, 5, 1, 0, 1, 3];
 
 async function main() {
   const wasmHref = pathToFileURL(WASM_JS).href;
@@ -576,7 +576,7 @@ async function main() {
   });
 
   bench('core', 'choleskyDecomposition', 3000, () => {
-    w.choleskyDecomposition(cholMat);
+    w.choleskyDecomposition(cholMat, 3);
   });
 
   bench('core', 'mean + variance (512)', 5000, () => {
@@ -612,8 +612,8 @@ async function main() {
     w.jointProbabilities(0.05, 0.08, 0.2);
   });
 
-  bench('models.monteCarlo', 'blackScholesCall', 20000, () => {
-    w.blackScholesCall(100, 100, 0.05, 0.0, 0.2, 1.0);
+  bench('models', 'bsPrice (call)', 20000, () => {
+    w.bsPrice(100, 100, 0.05, 0.0, 0.2, 1.0, true);
   });
 
   const csaCanonical = w.csaUsdRegulatoryJson();
@@ -719,7 +719,7 @@ async function main() {
     fx.rateWithDefaultPolicy('USD', 'EUR', '2024-01-02');
   });
 
-  const cholFactor = w.choleskyDecomposition(cholMat);
+  const cholFactor = w.choleskyDecomposition(cholMat, 3);
   const cholRhs = [1.0, 2.0, 3.0];
   bench('core', 'choleskySolve', 5000, () => {
     w.choleskySolve(cholFactor, cholRhs);
@@ -833,8 +833,8 @@ async function main() {
     returnPerf.calmar();
   });
 
-  bench('core', 'countConsecutive', 8000, () => {
-    w.countConsecutive(statsArr);
+  bench('core', 'longestPositiveRun', 8000, () => {
+    w.longestPositiveRun(statsArr);
   });
 
   const gaussCop = w.CopulaSpec.gaussian().build();
@@ -847,8 +847,8 @@ async function main() {
     recoveryBuilt.conditionalRecovery(-0.15);
   });
 
-  bench('models.monteCarlo', 'blackScholesPut', 20000, () => {
-    w.blackScholesPut(100, 100, 0.05, 0.0, 0.2, 1.0);
+  bench('models', 'bsPrice (put)', 20000, () => {
+    w.bsPrice(100, 100, 0.05, 0.0, 0.2, 1.0, false);
   });
 
   bench('margin', 'csaEurRegulatoryJson', 2000, () => {

@@ -291,7 +291,7 @@ fn public_json_routes_validate_instrument_before_malformed_market() {
             JsValue::from("missing"),
             JsValue::from(market),
             JsValue::from("not-a-date"),
-            f64::NAN,
+            JsValue::from(f64::NAN),
         )
         .unwrap_err(),
         structured_credit_tranche_breakeven_cdr(
@@ -306,7 +306,7 @@ fn public_json_routes_validate_instrument_before_malformed_market() {
             JsValue::from("missing"),
             JsValue::from(market),
             JsValue::from("not-a-date"),
-            f64::NAN,
+            JsValue::from(f64::NAN),
             Some(JsValue::from("not-json".to_string())),
         )
         .unwrap_err(),
@@ -323,7 +323,7 @@ fn public_json_routes_validate_instrument_before_malformed_market() {
             JsValue::from("missing"),
             JsValue::from(market),
             JsValue::from("not-a-date"),
-            Some(f64::NAN),
+            Some(JsValue::from(f64::NAN)),
         )
         .unwrap_err(),
     ];
@@ -445,7 +445,7 @@ fn structured_credit_tranche_metrics_through_json() {
         JsValue::from("SR"),
         JsValue::from(&mkt),
         JsValue::from("2024-01-01"),
-        100.0,
+        JsValue::from(100.0),
     )
     .expect_err("discount margin on a fixed-rate tranche should error");
     assert!(format!("{dm_err:?}").to_lowercase().contains("floating"));
@@ -455,7 +455,7 @@ fn structured_credit_tranche_metrics_through_json() {
         JsValue::from("SR"),
         JsValue::from(&mkt),
         JsValue::from("2024-01-01"),
-        99.0,
+        JsValue::from(99.0),
         None,
     )
     .expect("tranche oas");
@@ -491,7 +491,7 @@ fn structured_credit_tranche_metrics_through_json() {
         JsValue::from("SR"),
         JsValue::from(&mkt),
         JsValue::from("2024-01-01"),
-        Some(95.0),
+        Some(JsValue::from(95.0)),
     )
     .expect("tranche metrics @95");
     let cheap_parsed = js_object_to_json(&tm_cheap);
@@ -522,8 +522,14 @@ fn price_instrument_structured_credit_stochastic_missing_market_data_errors() {
 
 #[wasm_bindgen_test]
 fn cms_spread_option_intrinsic_call_works() {
-    let p = cms_spread_option_intrinsic(0.04, 0.02, 0.01, JsValue::from(true), 1_000_000.0)
-        .expect("cms");
+    let p = cms_spread_option_intrinsic(
+        JsValue::from(0.04),
+        JsValue::from(0.02),
+        JsValue::from(0.01),
+        JsValue::from(true),
+        JsValue::from(1_000_000.0),
+    )
+    .expect("cms");
     assert!((p - 10_000.0).abs() < 1e-9);
 }
 
@@ -534,7 +540,7 @@ fn public_json_routes_validate_instrument_before_market_json_binding() {
         JsValue::from("missing"),
         JsValue::from("not-market-json"),
         JsValue::from("not-a-date"),
-        f64::NAN,
+        JsValue::from(f64::NAN),
     )
     .is_err());
     assert!(structured_credit_tranche_breakeven_cdr(
@@ -549,7 +555,7 @@ fn public_json_routes_validate_instrument_before_market_json_binding() {
         JsValue::from("missing"),
         JsValue::from("not-market-json"),
         JsValue::from("not-a-date"),
-        f64::NAN,
+        JsValue::from(f64::NAN),
         Some(JsValue::from("not-json".to_string())),
     )
     .is_err());
@@ -566,7 +572,37 @@ fn public_json_routes_validate_instrument_before_market_json_binding() {
         JsValue::from("missing"),
         JsValue::from("not-market-json"),
         JsValue::from("not-a-date"),
-        Some(f64::NAN),
+        Some(JsValue::from(f64::NAN)),
     )
     .is_err());
+}
+
+#[wasm_bindgen_test]
+fn snowball_honors_cap_and_floor() {
+    let coupons = snowball_coupon_profile(
+        JsValue::from(0.02),
+        JsValue::from(0.05),
+        JsValue::from(vec![0.01_f64, 0.04, 0.03]),
+        JsValue::from(0.0),
+        Some(JsValue::from(0.10)),
+    )
+    .expect("snowball");
+    assert_eq!(coupons.len(), 3);
+    for c in coupons {
+        assert!((0.0..=0.10).contains(&c));
+    }
+}
+
+#[wasm_bindgen_test]
+fn inverse_floater_uses_explicit_gearing() {
+    let coupons = inverse_floater_coupon_profile(
+        JsValue::from(0.05),
+        JsValue::from(vec![0.01_f64, 0.02]),
+        JsValue::from(0.0),
+        Some(JsValue::from(0.10)),
+        JsValue::from(2.0),
+    )
+    .expect("inverse floater");
+    assert!((coupons[0] - 0.03).abs() < 1e-12);
+    assert!((coupons[1] - 0.01).abs() < 1e-12);
 }

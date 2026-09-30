@@ -219,7 +219,7 @@ fn cashflows_json_bridge_builds_accrues_and_prices_custom_bond() {
         JsValue::from("CUSTOM-CF"),
         JsValue::from(&schedule_json),
         JsValue::from("USD-OIS"),
-        Some(99.0),
+        Some(JsValue::from(99.0)),
     )
     .expect("bond JSON");
     // `priceInstrument` hands back a structured JS object; stringify to decode

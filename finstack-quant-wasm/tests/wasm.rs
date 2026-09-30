@@ -39,6 +39,8 @@ mod wasm_models_correlation;
 mod wasm_models_credit;
 #[path = "wasm_models_liquidity.rs"]
 mod wasm_models_liquidity;
+#[path = "wasm_models_volatility.rs"]
+mod wasm_models_volatility;
 #[path = "wasm_portfolio.rs"]
 mod wasm_portfolio;
 #[path = "wasm_scenarios.rs"]

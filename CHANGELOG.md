@@ -2,6 +2,18 @@
 
 ## [Unreleased]
 
+### WASM binding audit: strict number arguments (2026-09-30)
+
+#### Changed (BREAKING)
+
+- Every WASM number and number-array argument is checked, not coerced, the same way strings, integers and booleans have been since the strict-boundary change.
+  - A number argument given `null`, a numeric string, a boolean, a `bigint`, an array or an object throws a `TypeError` with `kind: "invalid_type"`. Before, `models.bsPrice(100, 100, null, 0, 0.2, 1, true)` silently priced with a zero rate, and `"5"` was read as 5.
+  - An omitted required number throws `invalid_type`. For an optional number, `undefined` and `null` mean omitted.
+  - `NaN` and `±Infinity` still reach Rust, which validates them, as in Python.
+  - Number-array arguments reject strings, `{}`, `null`, holes and non-number items. Before, a string became `NaN`s and `{}` became `[]`.
+- 36 exports that could not fail before can now throw on a wrong argument type, for example `normCdf`, `mean`, `erf`, `quantile`, `Money` arithmetic and `HazardCurve.sp`.
+- Performance: each checked scalar argument costs a JS heap round trip. In a release build a scalar kernel call is about 65 ns for `normCdf` and 270 ns for `bsPrice` (roughly 3–5× the unchecked glue). Arrays are cheapest as `Float64Array`; a plain 1000-element array costs about 3× as much.
+
 ### WASM binding audit: model kernels (2026-09-30)
 
 #### Changed (BREAKING)

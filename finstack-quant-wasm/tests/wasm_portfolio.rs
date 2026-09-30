@@ -221,7 +221,7 @@ fn carino_link_reconstructs_compounded_active_return() {
 fn twrr_linked_geometrically_links_returns() {
     let result = twrr_linked(
         JsValue::from(&serde_json::json!([0.05, 0.03]).to_string()),
-        1.0,
+        JsValue::from(1.0),
     )
     .unwrap();
     assert!((get_f64(&result, "cumulative") - 0.0815).abs() < 1e-12);
@@ -566,7 +566,8 @@ fn campisi_reconciliation_check_honours_tolerance_and_denies_unknown_fields() {
     .expect("period");
     let canonical = stringify(&result);
 
-    let report = campisi_reconciliation_check(JsValue::from(&canonical), 1e-10).expect("report");
+    let report = campisi_reconciliation_check(JsValue::from(&canonical), JsValue::from(1e-10))
+        .expect("report");
     assert_eq!(as_json(&report)["is_reconciled"], serde_json::json!(true));
     assert!(get_f64(&report, "total_residual").abs() <= 1e-10);
 
@@ -575,16 +576,18 @@ fn campisi_reconciliation_check_honours_tolerance_and_denies_unknown_fields() {
     let active = tampered["active_return"].as_f64().expect("active_return");
     tampered["active_return"] = serde_json::json!(active + 0.01);
     let tampered = tampered.to_string();
-    let strict = campisi_reconciliation_check(JsValue::from(&tampered), 1e-10).expect("report");
+    let strict = campisi_reconciliation_check(JsValue::from(&tampered), JsValue::from(1e-10))
+        .expect("report");
     assert_eq!(as_json(&strict)["is_reconciled"], serde_json::json!(false));
-    let loose = campisi_reconciliation_check(JsValue::from(&tampered), 1.0).expect("report");
+    let loose =
+        campisi_reconciliation_check(JsValue::from(&tampered), JsValue::from(1.0)).expect("report");
     assert_eq!(as_json(&loose)["is_reconciled"], serde_json::json!(true));
 
     // Unknown fields fail closed on both result-consuming entry points.
     let mut bogus: serde_json::Value = serde_json::from_str(&canonical).expect("parse");
     bogus["bogus_field"] = serde_json::json!(1.0);
     let bogus = bogus.to_string();
-    assert!(campisi_reconciliation_check(JsValue::from(&bogus), 1e-10).is_err());
+    assert!(campisi_reconciliation_check(JsValue::from(&bogus), JsValue::from(1e-10)).is_err());
     assert!(campisi_carino_link(JsValue::from(&format!("[{bogus}]"))).is_err());
 }
 

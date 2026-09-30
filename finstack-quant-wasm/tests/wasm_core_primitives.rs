@@ -5,6 +5,7 @@
 use finstack_quant_wasm::api::core::currency::*;
 use finstack_quant_wasm::api::core::dates::*;
 use finstack_quant_wasm::api::core::money::*;
+use finstack_quant_wasm::api::core::types::*;
 use wasm_bindgen::JsValue;
 use wasm_bindgen_test::*;
 
@@ -101,9 +102,122 @@ fn usd() -> JsCurrency {
 
 #[wasm_bindgen_test]
 fn json_roundtrip_binding() {
-    let m = JsMoney::new(1234.56, &usd()).expect("valid");
+    let m = JsMoney::new(JsValue::from(1234.56), &usd()).expect("valid");
     let json = m.to_json().expect("serialize");
     let back = JsMoney::from_json(JsValue::from(&json)).expect("deserialize");
     assert_eq!(back.amount_decimal(), m.amount_decimal());
     assert_eq!(back.currency().code(), "USD");
+}
+
+#[wasm_bindgen_test]
+fn construct_and_getters() {
+    let m = JsMoney::new(JsValue::from(10.0), &usd()).expect("valid");
+    assert!((m.amount() - 10.0).abs() < 1e-10);
+    assert_eq!(m.currency().code(), "USD");
+}
+
+#[wasm_bindgen_test]
+fn add_same_currency() {
+    let a = JsMoney::new(JsValue::from(10.0), &usd()).expect("valid");
+    let b = JsMoney::new(JsValue::from(5.0), &usd()).expect("valid");
+    let c = a.add(&b).expect("add");
+    assert!((c.amount() - 15.0).abs() < 1e-10);
+}
+
+#[wasm_bindgen_test]
+fn sub_same_currency() {
+    let a = JsMoney::new(JsValue::from(10.0), &usd()).expect("valid");
+    let b = JsMoney::new(JsValue::from(3.0), &usd()).expect("valid");
+    let c = a.sub(&b).expect("sub");
+    assert!((c.amount() - 7.0).abs() < 1e-10);
+}
+
+#[wasm_bindgen_test]
+fn mul_scalar() {
+    let m = JsMoney::new(JsValue::from(10.0), &usd()).expect("valid");
+    let scaled = m.mul_scalar(JsValue::from(2.5)).expect("finite factor");
+    assert!((scaled.amount() - 25.0).abs() < 1e-10);
+}
+
+#[wasm_bindgen_test]
+fn div_scalar() {
+    let m = JsMoney::new(JsValue::from(10.0), &usd()).expect("valid");
+    let half = m.div_scalar(JsValue::from(2.0)).expect("div");
+    assert!((half.amount() - 5.0).abs() < 1e-10);
+}
+
+#[wasm_bindgen_test]
+fn negate() {
+    let m = JsMoney::new(JsValue::from(10.0), &usd()).expect("valid");
+    let neg = m.negate();
+    assert!((neg.amount() + 10.0).abs() < 1e-10);
+}
+
+#[wasm_bindgen_test]
+fn to_string_format() {
+    let m = JsMoney::new(JsValue::from(10.0), &usd()).expect("valid");
+    let s = m.to_string();
+    assert!(s.contains("USD"), "expected USD in: {s}");
+    assert!(s.contains("10"), "expected 10 in: {s}");
+}
+
+#[wasm_bindgen_test]
+fn rate_new_roundtrip() {
+    let r = JsRate::new(JsValue::from(0.05)).expect("valid");
+    assert!((r.as_decimal() - 0.05).abs() < 1e-12);
+    assert!((r.as_percent() - 5.0).abs() < 1e-10);
+    assert_eq!(r.as_bp(), 500);
+}
+
+#[wasm_bindgen_test]
+fn rate_from_percent() {
+    let r = JsRate::from_percent(JsValue::from(5.0)).expect("valid");
+    assert!((r.as_decimal() - 0.05).abs() < 1e-12);
+}
+
+#[wasm_bindgen_test]
+fn rate_from_bp() {
+    let r = JsRate::from_bp(JsValue::from(250.0)).expect("valid");
+    assert!((r.as_decimal() - 0.025).abs() < 1e-10);
+    assert_eq!(r.as_bp(), 250);
+}
+
+#[wasm_bindgen_test]
+fn bp_roundtrip() {
+    let b = JsBps::new(JsValue::from(25.0)).expect("valid");
+    assert!((b.as_decimal() - 0.0025).abs() < 1e-10);
+    assert_eq!(b.as_bp(), 25);
+}
+
+#[wasm_bindgen_test]
+fn percentage_roundtrip() {
+    let p = JsPercentage::new(JsValue::from(5.0)).expect("valid");
+    assert!((p.as_decimal() - 0.05).abs() < 1e-12);
+    assert!((p.as_percent() - 5.0).abs() < 1e-12);
+}
+
+#[wasm_bindgen_test]
+fn rate_zero() {
+    let r = JsRate::new(JsValue::from(0.0)).expect("valid");
+    assert_eq!(r.as_decimal(), 0.0);
+    assert_eq!(r.as_percent(), 0.0);
+    assert_eq!(r.as_bp(), 0);
+}
+
+#[wasm_bindgen_test]
+fn bp_large_value() {
+    let b = JsBps::new(JsValue::from(10_000.0)).expect("valid");
+    assert!((b.as_decimal() - 1.0).abs() < 1e-10);
+}
+
+#[wasm_bindgen_test]
+fn percentage_zero() {
+    let p = JsPercentage::new(JsValue::from(0.0)).expect("valid");
+    assert_eq!(p.as_decimal(), 0.0);
+}
+
+#[wasm_bindgen_test]
+fn rate_negative() {
+    let r = JsRate::new(JsValue::from(-0.01)).expect("valid");
+    assert!((r.as_decimal() - (-0.01)).abs() < 1e-12);
 }

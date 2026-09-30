@@ -144,8 +144,8 @@ fn cagr_returns_per_ticker_vec() {
 fn sharpe_sortino_volatility_finite() {
     let perf = build_perf();
     for raw in [
-        perf.sharpe(Some(0.0)),
-        perf.sortino(Some(0.0)),
+        perf.sharpe(Some(JsValue::from(0.0))).unwrap(),
+        perf.sortino(Some(JsValue::from(0.0))).unwrap(),
         perf.volatility(Some(JsValue::from(true))).unwrap(),
         perf.mean_return(Some(JsValue::from(true))).unwrap(),
     ] {
@@ -159,14 +159,16 @@ fn sharpe_sortino_volatility_finite() {
 fn tail_metrics_finite() {
     let perf = build_perf();
     for raw in [
-        perf.value_at_risk(Some(0.95)).expect("valid confidence"),
-        perf.expected_shortfall(Some(0.95))
+        perf.value_at_risk(Some(JsValue::from(0.95)))
             .expect("valid confidence"),
-        perf.parametric_var(Some(0.95), None)
+        perf.expected_shortfall(Some(JsValue::from(0.95)))
             .expect("valid confidence"),
-        perf.cornish_fisher_var(Some(0.95), None)
+        perf.parametric_var(Some(JsValue::from(0.95)), None)
             .expect("valid confidence"),
-        perf.tail_ratio(Some(0.95)).expect("valid confidence"),
+        perf.cornish_fisher_var(Some(JsValue::from(0.95)), None)
+            .expect("valid confidence"),
+        perf.tail_ratio(Some(JsValue::from(0.95)))
+            .expect("valid confidence"),
     ] {
         let v = typed_vec(raw);
         assert_eq!(v.len(), 2);
@@ -365,7 +367,7 @@ fn greeks_optional_risk_free_rate_changes_alpha() {
     let zero: serde_json::Value =
         serde_wasm_bindgen::from_value(perf.greeks(None).unwrap()).unwrap();
     let nonzero: serde_json::Value =
-        serde_wasm_bindgen::from_value(perf.greeks(Some(0.12)).unwrap()).unwrap();
+        serde_wasm_bindgen::from_value(perf.greeks(Some(JsValue::from(0.12))).unwrap()).unwrap();
     let zero_alpha = zero[0]["alpha"].as_f64().unwrap();
     let nonzero_alpha = nonzero[0]["alpha"].as_f64().unwrap();
 

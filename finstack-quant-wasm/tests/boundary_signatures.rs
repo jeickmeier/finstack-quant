@@ -4,8 +4,10 @@
 //! wasm-bindgen's glue for primitive parameters checks nothing at runtime: a
 //! `&str`/`String` parameter traps the instance (and leaks) on a non-string,
 //! integers go through `ToInt32`/`ToBigInt64` wrapping, `bool` through
-//! truthiness, and `Vec<String>` splits strings into characters or accepts
-//! `{}` as empty. This test scans every `#[wasm_bindgen]` export under
+//! truthiness, `f64` through `ToNumber` (`null` becomes `0`, `"5"` becomes
+//! `5`), `&[f64]`/`Vec<f64>` through typed-array glue (a string becomes
+//! `NaN`s, `{}` becomes `[]`), and `Vec<String>` splits strings into
+//! characters or accepts `{}` as empty. This test scans every `#[wasm_bindgen]` export under
 //! `src/api` and rejects those parameter types, so a new binding cannot
 //! reintroduce the silent coercions.
 
@@ -41,6 +43,20 @@ const FORBIDDEN: &[&str] = &[
     "Option<i64>",
     "Vec<String>",
     "Option<Vec<String>>",
+    "f32",
+    "f64",
+    "Option<f32>",
+    "Option<f64>",
+    "&[f32]",
+    "&[f64]",
+    "&mut [f64]",
+    "Vec<f32>",
+    "Vec<f64>",
+    "Box<[f64]>",
+    "Option<&[f64]>",
+    "Option<Vec<f64>>",
+    "Option<Box<[f64]>>",
+    "Vec<Vec<f64>>",
 ];
 
 /// Reasoned exceptions as `(file, function, parameter)`; keep empty.

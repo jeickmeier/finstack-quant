@@ -1,6 +1,6 @@
 //! WASM bindings for the `finstack-quant-covenants` crate.
 
-use crate::utils::input::{js_string, json_text};
+use crate::utils::input::{js_f64, js_string, json_text};
 use crate::utils::to_js_err;
 use wasm_bindgen::prelude::*;
 
@@ -90,11 +90,15 @@ pub fn evaluate_engine(
 /// JSON.
 #[wasm_bindgen(js_name = lboStandardJson)]
 pub fn lbo_standard_json(
-    initial_leverage: f64,
-    interest_coverage: f64,
-    fixed_charge_coverage: f64,
-    max_capex: f64,
+    initial_leverage: JsValue,
+    interest_coverage: JsValue,
+    fixed_charge_coverage: JsValue,
+    max_capex: JsValue,
 ) -> Result<String, JsValue> {
+    let initial_leverage = js_f64(&initial_leverage, "initialLeverage")?;
+    let interest_coverage = js_f64(&interest_coverage, "interestCoverage")?;
+    let fixed_charge_coverage = js_f64(&fixed_charge_coverage, "fixedChargeCoverage")?;
+    let max_capex = js_f64(&max_capex, "maxCapex")?;
     finstack_quant_covenants::lbo_standard_json(
         initial_leverage,
         interest_coverage,
@@ -114,7 +118,12 @@ pub fn lbo_standard_json(
 /// negative, or if the generated covenant package cannot be serialized to
 /// JSON.
 #[wasm_bindgen(js_name = covLiteJson)]
-pub fn cov_lite_json(max_leverage: f64, max_senior_leverage: f64) -> Result<String, JsValue> {
+pub fn cov_lite_json(
+    max_leverage: JsValue,
+    max_senior_leverage: JsValue,
+) -> Result<String, JsValue> {
+    let max_leverage = js_f64(&max_leverage, "maxLeverage")?;
+    let max_senior_leverage = js_f64(&max_senior_leverage, "maxSeniorLeverage")?;
     finstack_quant_covenants::cov_lite_json(max_leverage, max_senior_leverage).map_err(to_js_err)
 }
 
@@ -130,10 +139,13 @@ pub fn cov_lite_json(max_leverage: f64, max_senior_leverage: f64) -> Result<Stri
 /// JSON.
 #[wasm_bindgen(js_name = realEstateJson)]
 pub fn real_estate_json(
-    min_dscr: f64,
-    min_debt_yield: f64,
-    max_ltv: f64,
+    min_dscr: JsValue,
+    min_debt_yield: JsValue,
+    max_ltv: JsValue,
 ) -> Result<String, JsValue> {
+    let min_dscr = js_f64(&min_dscr, "minDscr")?;
+    let min_debt_yield = js_f64(&min_debt_yield, "minDebtYield")?;
+    let max_ltv = js_f64(&max_ltv, "maxLtv")?;
     finstack_quant_covenants::real_estate_json(min_dscr, min_debt_yield, max_ltv).map_err(to_js_err)
 }
 
@@ -150,11 +162,15 @@ pub fn real_estate_json(
 /// JSON.
 #[wasm_bindgen(js_name = projectFinanceJson)]
 pub fn project_finance_json(
-    min_dscr: f64,
-    distribution_lockup_dscr: f64,
-    min_liquidity: f64,
-    max_net_leverage: f64,
+    min_dscr: JsValue,
+    distribution_lockup_dscr: JsValue,
+    min_liquidity: JsValue,
+    max_net_leverage: JsValue,
 ) -> Result<String, JsValue> {
+    let min_dscr = js_f64(&min_dscr, "minDscr")?;
+    let distribution_lockup_dscr = js_f64(&distribution_lockup_dscr, "distributionLockupDscr")?;
+    let min_liquidity = js_f64(&min_liquidity, "minLiquidity")?;
+    let max_net_leverage = js_f64(&max_net_leverage, "maxNetLeverage")?;
     finstack_quant_covenants::project_finance_json(
         min_dscr,
         distribution_lockup_dscr,

@@ -9,7 +9,7 @@
 //! remain Rust-only.
 //!
 
-use crate::utils::input::{js_opt_string, js_opt_u64, js_opt_uint};
+use crate::utils::input::{js_f64, js_opt_string, js_opt_u64, js_opt_uint};
 use std::str::FromStr;
 
 use crate::utils::to_js_err;
@@ -48,21 +48,31 @@ use wasm_bindgen::prelude::*;
 /// @param currency - ISO-4217 currency code for the monetary amount or market convention.
 #[wasm_bindgen(js_name = priceHestonCall)]
 pub fn price_heston_call(
-    spot: f64,
-    strike: f64,
-    rate: f64,
-    div_yield: f64,
-    kappa: f64,
-    theta: f64,
-    vol_of_vol: f64,
-    rho: f64,
-    v0: f64,
-    expiry: f64,
+    spot: JsValue,
+    strike: JsValue,
+    rate: JsValue,
+    div_yield: JsValue,
+    kappa: JsValue,
+    theta: JsValue,
+    vol_of_vol: JsValue,
+    rho: JsValue,
+    v0: JsValue,
+    expiry: JsValue,
     num_paths: Option<JsValue>,
     seed: Option<JsValue>,
     num_steps: Option<JsValue>,
     currency: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
+    let spot = js_f64(&spot, "spot")?;
+    let strike = js_f64(&strike, "strike")?;
+    let rate = js_f64(&rate, "rate")?;
+    let div_yield = js_f64(&div_yield, "divYield")?;
+    let kappa = js_f64(&kappa, "kappa")?;
+    let theta = js_f64(&theta, "theta")?;
+    let vol_of_vol = js_f64(&vol_of_vol, "volOfVol")?;
+    let rho = js_f64(&rho, "rho")?;
+    let v0 = js_f64(&v0, "v0")?;
+    let expiry = js_f64(&expiry, "expiry")?;
     let num_paths: Option<usize> = js_opt_uint(num_paths.as_ref(), "numPaths")?;
     let seed = js_opt_u64(seed.as_ref(), "seed")?;
     let num_steps: Option<usize> = js_opt_uint(num_steps.as_ref(), "numSteps")?;
@@ -105,21 +115,31 @@ pub fn price_heston_call(
 /// @param currency - ISO-4217 currency code for the monetary amount or market convention.
 #[wasm_bindgen(js_name = priceHestonPut)]
 pub fn price_heston_put(
-    spot: f64,
-    strike: f64,
-    rate: f64,
-    div_yield: f64,
-    kappa: f64,
-    theta: f64,
-    vol_of_vol: f64,
-    rho: f64,
-    v0: f64,
-    expiry: f64,
+    spot: JsValue,
+    strike: JsValue,
+    rate: JsValue,
+    div_yield: JsValue,
+    kappa: JsValue,
+    theta: JsValue,
+    vol_of_vol: JsValue,
+    rho: JsValue,
+    v0: JsValue,
+    expiry: JsValue,
     num_paths: Option<JsValue>,
     seed: Option<JsValue>,
     num_steps: Option<JsValue>,
     currency: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
+    let spot = js_f64(&spot, "spot")?;
+    let strike = js_f64(&strike, "strike")?;
+    let rate = js_f64(&rate, "rate")?;
+    let div_yield = js_f64(&div_yield, "divYield")?;
+    let kappa = js_f64(&kappa, "kappa")?;
+    let theta = js_f64(&theta, "theta")?;
+    let vol_of_vol = js_f64(&vol_of_vol, "volOfVol")?;
+    let rho = js_f64(&rho, "rho")?;
+    let v0 = js_f64(&v0, "v0")?;
+    let expiry = js_f64(&expiry, "expiry")?;
     let num_paths: Option<usize> = js_opt_uint(num_paths.as_ref(), "numPaths")?;
     let seed = js_opt_u64(seed.as_ref(), "seed")?;
     let num_steps: Option<usize> = js_opt_uint(num_steps.as_ref(), "numSteps")?;

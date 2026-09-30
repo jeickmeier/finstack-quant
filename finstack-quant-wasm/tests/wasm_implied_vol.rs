@@ -8,25 +8,57 @@ use wasm_bindgen_test::*;
 #[wasm_bindgen_test]
 fn implied_vol_adapters_reprice_calls_and_puts_with_carry() {
     for is_call in [true, false] {
-        let price =
-            bs_price(100.0, 105.0, -0.02, 0.01, 0.35, 0.5, JsValue::from(is_call)).expect("price");
+        let price = bs_price(
+            JsValue::from(100.0),
+            JsValue::from(105.0),
+            JsValue::from(-0.02),
+            JsValue::from(0.01),
+            JsValue::from(0.35),
+            JsValue::from(0.5),
+            JsValue::from(is_call),
+        )
+        .expect("price");
         let bs = bs_implied_vol(
-            100.0,
-            105.0,
-            -0.02,
-            0.01,
-            0.5,
-            price,
+            JsValue::from(100.0),
+            JsValue::from(105.0),
+            JsValue::from(-0.02),
+            JsValue::from(0.01),
+            JsValue::from(0.5),
+            JsValue::from(price),
             JsValue::from(is_call),
         )
         .expect("BS IV");
         let forward = 100.0 * (-0.03_f64 * 0.5).exp();
         let df = (0.02_f64 * 0.5).exp();
-        let black = black76_implied_vol(forward, 105.0, df, 0.5, price, JsValue::from(is_call))
-            .expect("Black IV");
+        let black = black76_implied_vol(
+            JsValue::from(forward),
+            JsValue::from(105.0),
+            JsValue::from(df),
+            JsValue::from(0.5),
+            JsValue::from(price),
+            JsValue::from(is_call),
+        )
+        .expect("Black IV");
         assert!((bs - 0.35).abs() < 1e-12);
         assert!((black - 0.35).abs() < 1e-12);
     }
-    assert!(black76_implied_vol(100.0, 100.0, 1.0, 1.0, 100.0, JsValue::from(true)).is_err());
-    assert!(bs_implied_vol(100.0, 100.0, 0.0, 0.0, 0.0, 5.0, JsValue::from(true)).is_err());
+    assert!(black76_implied_vol(
+        JsValue::from(100.0),
+        JsValue::from(100.0),
+        JsValue::from(1.0),
+        JsValue::from(1.0),
+        JsValue::from(100.0),
+        JsValue::from(true)
+    )
+    .is_err());
+    assert!(bs_implied_vol(
+        JsValue::from(100.0),
+        JsValue::from(100.0),
+        JsValue::from(0.0),
+        JsValue::from(0.0),
+        JsValue::from(0.0),
+        JsValue::from(5.0),
+        JsValue::from(true)
+    )
+    .is_err());
 }

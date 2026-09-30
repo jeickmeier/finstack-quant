@@ -3,7 +3,7 @@
 //! Exposes peer statistics, percentile rank, z-score, OLS fair-value regression,
 //! canonical valuation multiples, and composite rich/cheap scoring.
 
-use crate::utils::input::{from_js_json, js_f64_seq, js_string};
+use crate::utils::input::{from_js_json, js_f64, js_f64_seq, js_string};
 use crate::utils::to_js_err;
 use finstack_quant_statements_analytics::analysis as fc;
 use wasm_bindgen::prelude::*;
@@ -20,7 +20,8 @@ use wasm_bindgen::prelude::*;
 /// @param values - Peer observations forming the comparison universe; non-finite entries are ignored.
 /// @param value - Subject-company metric value to rank against the peer sample.
 #[wasm_bindgen(js_name = percentileRank)]
-pub fn percentile_rank(values: JsValue, value: f64) -> Result<Option<JsValue>, JsValue> {
+pub fn percentile_rank(values: JsValue, value: JsValue) -> Result<Option<JsValue>, JsValue> {
+    let value = js_f64(&value, "value")?;
     let values = js_f64_seq(&values, "values")?;
     match fc::percentile_rank(&values, value) {
         Some(rank) => crate::utils::to_js_value(&rank).map(Some),
@@ -41,7 +42,8 @@ pub fn percentile_rank(values: JsValue, value: f64) -> Result<Option<JsValue>, J
 /// @param values - Peer observations the subject is standardized against; non-finite entries are ignored.
 /// @param value - Subject-company metric value to standardize against the peer sample.
 #[wasm_bindgen(js_name = zScore)]
-pub fn z_score(values: JsValue, value: f64) -> Result<Option<JsValue>, JsValue> {
+pub fn z_score(values: JsValue, value: JsValue) -> Result<Option<JsValue>, JsValue> {
+    let value = js_f64(&value, "value")?;
     let values = js_f64_seq(&values, "values")?;
     match fc::z_score(&values, value) {
         Some(z) => crate::utils::to_js_value(&z).map(Some),
@@ -85,9 +87,11 @@ pub fn peer_stats(values: JsValue) -> Result<Option<JsValue>, JsValue> {
 pub fn regression_fair_value(
     x_values: JsValue,
     y_values: JsValue,
-    subject_x: f64,
-    subject_y: f64,
+    subject_x: JsValue,
+    subject_y: JsValue,
 ) -> Result<Option<JsValue>, JsValue> {
+    let subject_x = js_f64(&subject_x, "subjectX")?;
+    let subject_y = js_f64(&subject_y, "subjectY")?;
     let x = js_f64_seq(&x_values, "xValues")?;
     let y = js_f64_seq(&y_values, "yValues")?;
     match fc::regression_fair_value(&x, &y, subject_x, subject_y) {

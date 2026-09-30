@@ -5,7 +5,7 @@
 //! trajectories. Full MC / copula / LSMC pricers stay on the standard
 //! `priceInstrument` pipeline.
 
-use crate::utils::input::js_bool;
+use crate::utils::input::{js_bool, js_f64, js_f64_seq, js_opt_f64};
 use crate::utils::{to_js_err, to_js_value};
 use finstack_quant_valuations::instruments::rates::hw1f::coupon_profiles;
 use wasm_bindgen::prelude::*;
@@ -41,12 +41,17 @@ use wasm_bindgen::prelude::*;
 /// @param day_count_fraction - Accrual year fraction applied to each coupon period.
 #[wasm_bindgen(js_name = tarnCouponProfile)]
 pub fn tarn_coupon_profile(
-    fixed_rate: f64,
-    coupon_floor: f64,
-    floating_fixings: Vec<f64>,
-    target_coupon: f64,
-    day_count_fraction: f64,
+    fixed_rate: JsValue,
+    coupon_floor: JsValue,
+    floating_fixings: JsValue,
+    target_coupon: JsValue,
+    day_count_fraction: JsValue,
 ) -> Result<JsValue, JsValue> {
+    let fixed_rate = js_f64(&fixed_rate, "fixedRate")?;
+    let coupon_floor = js_f64(&coupon_floor, "couponFloor")?;
+    let floating_fixings = js_f64_seq(&floating_fixings, "floatingFixings")?;
+    let target_coupon = js_f64(&target_coupon, "targetCoupon")?;
+    let day_count_fraction = js_f64(&day_count_fraction, "dayCountFraction")?;
     let profile = coupon_profiles::tarn_coupon_profile(
         fixed_rate,
         coupon_floor,
@@ -75,12 +80,17 @@ pub fn tarn_coupon_profile(
 /// @param coupon_cap - Optional maximum permitted coupon rate in decimal form; `null`/`undefined` leaves the coupon uncapped.
 #[wasm_bindgen(js_name = snowballCouponProfile)]
 pub fn snowball_coupon_profile(
-    initial_coupon: f64,
-    fixed_rate: f64,
-    floating_fixings: Vec<f64>,
-    coupon_floor: f64,
-    coupon_cap: Option<f64>,
+    initial_coupon: JsValue,
+    fixed_rate: JsValue,
+    floating_fixings: JsValue,
+    coupon_floor: JsValue,
+    coupon_cap: Option<JsValue>,
 ) -> Result<Box<[f64]>, JsValue> {
+    let initial_coupon = js_f64(&initial_coupon, "initialCoupon")?;
+    let fixed_rate = js_f64(&fixed_rate, "fixedRate")?;
+    let floating_fixings = js_f64_seq(&floating_fixings, "floatingFixings")?;
+    let coupon_floor = js_f64(&coupon_floor, "couponFloor")?;
+    let coupon_cap = js_opt_f64(coupon_cap.as_ref(), "couponCap")?;
     coupon_profiles::snowball_coupon_profile(
         initial_coupon,
         fixed_rate,
@@ -107,12 +117,17 @@ pub fn snowball_coupon_profile(
 /// @param gearing - Positive multiplier applied to each floating fixing in the inverse-floater coupon.
 #[wasm_bindgen(js_name = inverseFloaterCouponProfile)]
 pub fn inverse_floater_coupon_profile(
-    fixed_rate: f64,
-    floating_fixings: Vec<f64>,
-    coupon_floor: f64,
-    coupon_cap: Option<f64>,
-    gearing: f64,
+    fixed_rate: JsValue,
+    floating_fixings: JsValue,
+    coupon_floor: JsValue,
+    coupon_cap: Option<JsValue>,
+    gearing: JsValue,
 ) -> Result<Box<[f64]>, JsValue> {
+    let fixed_rate = js_f64(&fixed_rate, "fixedRate")?;
+    let floating_fixings = js_f64_seq(&floating_fixings, "floatingFixings")?;
+    let coupon_floor = js_f64(&coupon_floor, "couponFloor")?;
+    let coupon_cap = js_opt_f64(coupon_cap.as_ref(), "couponCap")?;
+    let gearing = js_f64(&gearing, "gearing")?;
     coupon_profiles::inverse_floater_coupon_profile(
         fixed_rate,
         &floating_fixings,
@@ -140,12 +155,16 @@ pub fn inverse_floater_coupon_profile(
 /// @param notional - Signed trade notional in the instrument's native currency units.
 #[wasm_bindgen(js_name = cmsSpreadOptionIntrinsic)]
 pub fn cms_spread_option_intrinsic(
-    long_cms: f64,
-    short_cms: f64,
-    strike: f64,
+    long_cms: JsValue,
+    short_cms: JsValue,
+    strike: JsValue,
     is_call: JsValue,
-    notional: f64,
+    notional: JsValue,
 ) -> Result<f64, JsValue> {
+    let long_cms = js_f64(&long_cms, "longCms")?;
+    let short_cms = js_f64(&short_cms, "shortCms")?;
+    let strike = js_f64(&strike, "strike")?;
+    let notional = js_f64(&notional, "notional")?;
     let is_call = js_bool(&is_call, "isCall")?;
     coupon_profiles::cms_spread_option_intrinsic(long_cms, short_cms, strike, is_call, notional)
         .map_err(to_js_err)
@@ -172,12 +191,17 @@ pub fn cms_spread_option_intrinsic(
 /// @param day_count_fraction - Accrual year fraction for the coupon period.
 #[wasm_bindgen(js_name = callableRangeAccrualAccrued)]
 pub fn callable_range_accrual_accrued(
-    lower: f64,
-    upper: f64,
-    observations: Vec<f64>,
-    coupon_rate: f64,
-    day_count_fraction: f64,
+    lower: JsValue,
+    upper: JsValue,
+    observations: JsValue,
+    coupon_rate: JsValue,
+    day_count_fraction: JsValue,
 ) -> Result<f64, JsValue> {
+    let lower = js_f64(&lower, "lower")?;
+    let upper = js_f64(&upper, "upper")?;
+    let observations = js_f64_seq(&observations, "observations")?;
+    let coupon_rate = js_f64(&coupon_rate, "couponRate")?;
+    let day_count_fraction = js_f64(&day_count_fraction, "dayCountFraction")?;
     coupon_profiles::callable_range_accrual_accrued(
         lower,
         upper,
@@ -186,27 +210,4 @@ pub fn callable_range_accrual_accrued(
         day_count_fraction,
     )
     .map_err(to_js_err)
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn snowball_honors_cap_and_floor() {
-        let coupons = snowball_coupon_profile(0.02, 0.05, vec![0.01, 0.04, 0.03], 0.0, Some(0.10))
-            .expect("snowball");
-        assert_eq!(coupons.len(), 3);
-        for c in coupons {
-            assert!((0.0..=0.10).contains(&c));
-        }
-    }
-
-    #[test]
-    fn inverse_floater_uses_explicit_gearing() {
-        let coupons = inverse_floater_coupon_profile(0.05, vec![0.01, 0.02], 0.0, Some(0.10), 2.0)
-            .expect("inverse floater");
-        assert!((coupons[0] - 0.03).abs() < 1e-12);
-        assert!((coupons[1] - 0.01).abs() < 1e-12);
-    }
 }

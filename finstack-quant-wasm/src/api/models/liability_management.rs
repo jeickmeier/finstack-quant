@@ -7,7 +7,7 @@
 //! returned as plain JS objects with snake_case keys matching the serde
 //! representation of the Rust result types.
 
-use crate::utils::input::js_string;
+use crate::utils::input::{js_f64, js_opt_f64, js_string};
 use crate::utils::{to_js_err, to_js_value};
 use finstack_quant_models::credit::liability_management::{self as lm, ExchangeType, LmeType};
 use wasm_bindgen::prelude::*;
@@ -32,12 +32,16 @@ use wasm_bindgen::prelude::*;
 /// JavaScript object.
 #[wasm_bindgen(js_name = analyzeExchangeOffer)]
 pub fn analyze_exchange_offer(
-    old_pv: f64,
-    new_pv: f64,
-    consent_fee: f64,
-    equity_sweetener_value: f64,
+    old_pv: JsValue,
+    new_pv: JsValue,
+    consent_fee: JsValue,
+    equity_sweetener_value: JsValue,
     exchange_type: JsValue,
 ) -> Result<JsValue, JsValue> {
+    let old_pv = js_f64(&old_pv, "oldPv")?;
+    let new_pv = js_f64(&new_pv, "newPv")?;
+    let consent_fee = js_f64(&consent_fee, "consentFee")?;
+    let equity_sweetener_value = js_f64(&equity_sweetener_value, "equitySweetenerValue")?;
     let exchange_type: &str = &js_string(&exchange_type, "exchangeType")?;
     let exchange_type: ExchangeType = exchange_type.parse().map_err(to_js_err)?;
     let analysis = lm::analyze_exchange_offer(
@@ -73,11 +77,15 @@ pub fn analyze_exchange_offer(
 #[wasm_bindgen(js_name = analyzeLme)]
 pub fn analyze_lme(
     lme_type: JsValue,
-    notional: f64,
-    repurchase_price_pct: f64,
-    opt_acceptance_pct: f64,
-    ebitda: Option<f64>,
+    notional: JsValue,
+    repurchase_price_pct: JsValue,
+    opt_acceptance_pct: JsValue,
+    ebitda: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
+    let notional = js_f64(&notional, "notional")?;
+    let repurchase_price_pct = js_f64(&repurchase_price_pct, "repurchasePricePct")?;
+    let opt_acceptance_pct = js_f64(&opt_acceptance_pct, "optAcceptancePct")?;
+    let ebitda = js_opt_f64(ebitda.as_ref(), "ebitda")?;
     let lme_type: &str = &js_string(&lme_type, "lmeType")?;
     let lme_type: LmeType = lme_type.parse().map_err(to_js_err)?;
     let analysis = lm::analyze_lme(

@@ -1,5 +1,6 @@
 //! WASM bindings for [`finstack_quant_core::types`] rate helpers (`Rate`, `Bps`, `Percentage`).
 
+use crate::utils::input::js_f64;
 use crate::utils::to_js_err;
 use finstack_quant_core::types::{Bps as RustBps, Percentage as RustPercentage, Rate as RustRate};
 use wasm_bindgen::prelude::*;
@@ -42,7 +43,8 @@ impl JsRate {
     /// r.asPercent;  // 5
     /// ```
     #[wasm_bindgen(constructor)]
-    pub fn new(decimal: f64) -> Result<JsRate, JsValue> {
+    pub fn new(decimal: JsValue) -> Result<JsRate, JsValue> {
+        let decimal = js_f64(&decimal, "decimal")?;
         RustRate::from_decimal(decimal)
             .map(|inner| JsRate { inner })
             .map_err(to_js_err)
@@ -60,7 +62,8 @@ impl JsRate {
     /// r.asDecimal;  // 0.05
     /// ```
     #[wasm_bindgen(js_name = fromPercent)]
-    pub fn from_percent(percent: f64) -> Result<JsRate, JsValue> {
+    pub fn from_percent(percent: JsValue) -> Result<JsRate, JsValue> {
+        let percent = js_f64(&percent, "percent")?;
         RustRate::from_percent(percent)
             .map(|inner| JsRate { inner })
             .map_err(to_js_err)
@@ -83,7 +86,8 @@ impl JsRate {
     /// r.asDecimal;  // 0.025
     /// ```
     #[wasm_bindgen(js_name = fromBp)]
-    pub fn from_bp(bp: f64) -> Result<JsRate, JsValue> {
+    pub fn from_bp(bp: JsValue) -> Result<JsRate, JsValue> {
+        let bp = js_f64(&bp, "bp")?;
         let b = RustBps::try_new(bp).map_err(to_js_err)?;
         Ok(JsRate { inner: b.as_rate() })
     }
@@ -143,7 +147,8 @@ impl JsBps {
     /// points. Sub-bp spreads must use the JSON instrument path (which
     /// preserves fractional values) or a decimal `Rate`.
     #[wasm_bindgen(constructor)]
-    pub fn new(bp: f64) -> Result<JsBps, JsValue> {
+    pub fn new(bp: JsValue) -> Result<JsBps, JsValue> {
+        let bp = js_f64(&bp, "bp")?;
         RustBps::try_new(bp)
             .map(|inner| JsBps { inner })
             .map_err(to_js_err)
@@ -192,7 +197,8 @@ impl JsPercentage {
     /// @returns The constructed `Percentage`.
     /// @throws If `percent` is non-finite.
     #[wasm_bindgen(constructor)]
-    pub fn new(percent: f64) -> Result<JsPercentage, JsValue> {
+    pub fn new(percent: JsValue) -> Result<JsPercentage, JsValue> {
+        let percent = js_f64(&percent, "percent")?;
         RustPercentage::new(percent)
             .map(|inner| JsPercentage { inner })
             .map_err(to_js_err)
@@ -218,67 +224,6 @@ impl JsPercentage {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn rate_new_roundtrip() {
-        let r = JsRate::new(0.05).expect("valid");
-        assert!((r.as_decimal() - 0.05).abs() < 1e-12);
-        assert!((r.as_percent() - 5.0).abs() < 1e-10);
-        assert_eq!(r.as_bp(), 500);
-    }
-
-    #[test]
-    fn rate_from_percent() {
-        let r = JsRate::from_percent(5.0).expect("valid");
-        assert!((r.as_decimal() - 0.05).abs() < 1e-12);
-    }
-
-    #[test]
-    fn rate_from_bp() {
-        let r = JsRate::from_bp(250.0).expect("valid");
-        assert!((r.as_decimal() - 0.025).abs() < 1e-10);
-        assert_eq!(r.as_bp(), 250);
-    }
-
-    #[test]
-    fn bp_roundtrip() {
-        let b = JsBps::new(25.0).expect("valid");
-        assert!((b.as_decimal() - 0.0025).abs() < 1e-10);
-        assert_eq!(b.as_bp(), 25);
-    }
-
-    #[test]
-    fn percentage_roundtrip() {
-        let p = JsPercentage::new(5.0).expect("valid");
-        assert!((p.as_decimal() - 0.05).abs() < 1e-12);
-        assert!((p.as_percent() - 5.0).abs() < 1e-12);
-    }
-
-    #[test]
-    fn rate_zero() {
-        let r = JsRate::new(0.0).expect("valid");
-        assert_eq!(r.as_decimal(), 0.0);
-        assert_eq!(r.as_percent(), 0.0);
-        assert_eq!(r.as_bp(), 0);
-    }
-
-    #[test]
-    fn bp_large_value() {
-        let b = JsBps::new(10_000.0).expect("valid");
-        assert!((b.as_decimal() - 1.0).abs() < 1e-10);
-    }
-
-    #[test]
-    fn percentage_zero() {
-        let p = JsPercentage::new(0.0).expect("valid");
-        assert_eq!(p.as_decimal(), 0.0);
-    }
-
-    #[test]
-    fn rate_negative() {
-        let r = JsRate::new(-0.01).expect("valid");
-        assert!((r.as_decimal() - (-0.01)).abs() < 1e-12);
-    }
 
     // -- Boundary tests ------------------------------------------------
     // Error paths through wasm-bindgen create JsValue, which panics on

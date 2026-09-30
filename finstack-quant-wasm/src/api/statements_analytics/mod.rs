@@ -11,7 +11,8 @@ pub use comps::{
 };
 
 use crate::utils::input::{
-    js_bool, js_f64_seq, js_opt_string, js_string, js_string_seq, json_text, opt_json_text,
+    js_bool, js_f64, js_f64_seq, js_opt_f64, js_opt_string, js_string, js_string_seq, json_text,
+    opt_json_text,
 };
 use crate::utils::{to_js_err, to_js_value};
 use finstack_quant_statements::FinancialModelSpec;
@@ -199,13 +200,15 @@ pub fn generate_tornado_entries(
 #[wasm_bindgen(js_name = dcfSensitivity)]
 pub fn dcf_sensitivity(
     model_json: JsValue,
-    wacc: f64,
+    wacc: JsValue,
     terminal_value_json: JsValue,
     ufcf_node: Option<JsValue>,
-    net_debt_override: Option<f64>,
+    net_debt_override: Option<JsValue>,
     options_json: Option<JsValue>,
     market_json: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
+    let wacc = js_f64(&wacc, "wacc")?;
+    let net_debt_override = js_opt_f64(net_debt_override.as_ref(), "netDebtOverride")?;
     use finstack_quant_statements_analytics::analysis::{DcfOptions, DEFAULT_UFCF_NODE};
 
     let model_json: &str = &json_text(&model_json, "modelJson")?;
@@ -293,12 +296,17 @@ pub fn evaluate_lbo(model_json: JsValue, config_json: JsValue) -> Result<JsValue
 /// @param tax_rate - Marginal corporate tax rate as a decimal fraction in [0, 1] (0.25 = 25%).
 #[wasm_bindgen(js_name = wacc)]
 pub fn wacc(
-    equity_weight: f64,
-    cost_of_equity: f64,
-    debt_weight: f64,
-    cost_of_debt: f64,
-    tax_rate: f64,
+    equity_weight: JsValue,
+    cost_of_equity: JsValue,
+    debt_weight: JsValue,
+    cost_of_debt: JsValue,
+    tax_rate: JsValue,
 ) -> Result<f64, JsValue> {
+    let equity_weight = js_f64(&equity_weight, "equityWeight")?;
+    let cost_of_equity = js_f64(&cost_of_equity, "costOfEquity")?;
+    let debt_weight = js_f64(&debt_weight, "debtWeight")?;
+    let cost_of_debt = js_f64(&cost_of_debt, "costOfDebt")?;
+    let tax_rate = js_f64(&tax_rate, "taxRate")?;
     finstack_quant_statements_analytics::analysis::wacc(
         equity_weight,
         cost_of_equity,
@@ -336,12 +344,13 @@ pub fn goal_seek(
     model_json: JsValue,
     target_node: JsValue,
     target_period: JsValue,
-    target_value: f64,
+    target_value: JsValue,
     driver_node: JsValue,
     driver_period: JsValue,
     update_model: JsValue,
     bounds: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
+    let target_value = js_f64(&target_value, "targetValue")?;
     let model_json: &str = &json_text(&model_json, "modelJson")?;
     let target_node: &str = &js_string(&target_node, "targetNode")?;
     let target_period: &str = &js_string(&target_period, "targetPeriod")?;

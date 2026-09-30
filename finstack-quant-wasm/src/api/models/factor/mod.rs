@@ -14,8 +14,8 @@
 //! - JSON string `'{"n_steps": N}'` — variance scaled by `N`.
 
 use crate::utils::input::{
-    js_f64_matrix, js_f64_seq, js_opt_bool, js_string, js_string_seq, js_uint, json_text,
-    opt_json_text,
+    js_f64, js_f64_matrix, js_f64_seq, js_opt_bool, js_opt_f64, js_string, js_string_seq, js_uint,
+    json_text, opt_json_text,
 };
 use crate::utils::{to_js_err, to_js_value};
 use wasm_bindgen::prelude::*;
@@ -355,10 +355,11 @@ impl JsPeriodDecomposition {
 pub fn decompose_levels(
     model: &JsCreditFactorModel,
     observed_spreads_json: JsValue,
-    observed_generic: f64,
+    observed_generic: JsValue,
     as_of: JsValue,
     runtime_tags_json: Option<JsValue>,
 ) -> Result<JsLevelsAtDate, JsValue> {
+    let observed_generic = js_f64(&observed_generic, "observedGeneric")?;
     let observed_spreads_json: &str = &json_text(&observed_spreads_json, "observedSpreadsJson")?;
     let as_of: &str = &js_string(&as_of, "asOf")?;
     let runtime_tags_json = opt_json_text(runtime_tags_json.as_ref(), "runtimeTagsJson")?;
@@ -544,9 +545,10 @@ pub fn parametric_var_decomposition(
     position_ids: JsValue,
     weights: JsValue,
     covariance: JsValue,
-    confidence: Option<f64>,
+    confidence: Option<JsValue>,
     compute_incremental: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
+    let confidence = js_opt_f64(confidence.as_ref(), "confidence")?;
     use finstack_quant_models::factor::risk::{
         flatten_square_matrix, DecompositionConfig, ParametricPositionDecomposer,
     };
@@ -594,8 +596,9 @@ pub fn parametric_es_decomposition(
     position_ids: JsValue,
     weights: JsValue,
     covariance: JsValue,
-    confidence: Option<f64>,
+    confidence: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
+    let confidence = js_opt_f64(confidence.as_ref(), "confidence")?;
     use finstack_quant_models::factor::risk::{
         flatten_square_matrix, parametric_es_decomposition_view, DecompositionConfig,
         ParametricPositionDecomposer,
@@ -637,8 +640,9 @@ pub fn parametric_es_decomposition(
 pub fn historical_var_decomposition(
     position_ids: JsValue,
     position_pnls: JsValue,
-    confidence: Option<f64>,
+    confidence: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
+    let confidence = js_opt_f64(confidence.as_ref(), "confidence")?;
     use finstack_quant_models::factor::risk::{
         flatten_position_pnls, DecompositionConfig, HistoricalPositionDecomposer,
     };
@@ -683,9 +687,11 @@ pub fn evaluate_risk_budget(
     position_ids: JsValue,
     actual_var: JsValue,
     target_var_pct: JsValue,
-    portfolio_var: f64,
-    utilization_threshold: Option<f64>,
+    portfolio_var: JsValue,
+    utilization_threshold: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
+    let portfolio_var = js_f64(&portfolio_var, "portfolioVar")?;
+    let utilization_threshold = js_opt_f64(utilization_threshold.as_ref(), "utilizationThreshold")?;
     use finstack_quant_models::factor::risk::{
         evaluate_risk_budget_arrays, DEFAULT_UTILIZATION_THRESHOLD,
     };

@@ -51,7 +51,9 @@
 //! interactive dashboards), prefer the `*Built` variants which take a
 //! `Portfolio` handle and skip the per-call `from_spec` rebuild.
 
-use crate::utils::input::{js_opt_bool, js_opt_string_seq, js_string, json_text};
+use crate::utils::input::{
+    js_f64, js_f64_seq, js_opt_bool, js_opt_string_seq, js_string, json_text,
+};
 use std::sync::Arc;
 
 use crate::api::core::market_data::JsDiscountCurve;
@@ -352,8 +354,9 @@ pub fn campisi_carino_link_from_snapshots(
 #[wasm_bindgen(js_name = campisiReconciliationCheck)]
 pub fn campisi_reconciliation_check(
     result_json: JsValue,
-    tolerance: f64,
+    tolerance: JsValue,
 ) -> Result<JsValue, JsValue> {
+    let tolerance = js_f64(&tolerance, "tolerance")?;
     let result_json: &str = &json_text(&result_json, "resultJson")?;
     let result: finstack_quant_portfolio::FiAttributionResult =
         serde_json::from_str(result_json).map_err(to_js_err)?;
@@ -424,11 +427,13 @@ pub fn cell_returns_from_reference(
 pub fn cell_returns_from_curves(
     start: &JsDiscountCurve,
     end: &JsDiscountCurve,
-    horizon_years: f64,
-    max_duration: f64,
+    horizon_years: JsValue,
+    max_duration: JsValue,
     base_label: JsValue,
     config_json: JsValue,
 ) -> Result<JsValue, JsValue> {
+    let horizon_years = js_f64(&horizon_years, "horizonYears")?;
+    let max_duration = js_f64(&max_duration, "maxDuration")?;
     let base_label: &str = &js_string(&base_label, "baseLabel")?;
     let config_json: &str = &json_text(&config_json, "configJson")?;
     let config: finstack_quant_portfolio::CellConfig =
@@ -557,8 +562,9 @@ pub fn grid_carino_link(periods_json: JsValue) -> Result<JsValue, JsValue> {
 #[wasm_bindgen(js_name = factorBrinsonAttribution)]
 pub fn factor_brinson_attribution(
     input_json: JsValue,
-    factor_returns: Vec<f64>,
+    factor_returns: JsValue,
 ) -> Result<JsValue, JsValue> {
+    let factor_returns = js_f64_seq(&factor_returns, "factorReturns")?;
     let input_json: &str = &json_text(&input_json, "inputJson")?;
     let input: finstack_quant_portfolio::FactorBrinsonInput =
         serde_json::from_str(input_json).map_err(to_js_err)?;
@@ -594,7 +600,8 @@ pub fn twrr_modified_dietz(period_json: JsValue) -> Result<f64, JsValue> {
 /// growth factor), or the linked result cannot be converted to a JavaScript
 /// value.
 #[wasm_bindgen(js_name = twrrLinked)]
-pub fn twrr_linked(returns_json: JsValue, horizon_years: f64) -> Result<JsValue, JsValue> {
+pub fn twrr_linked(returns_json: JsValue, horizon_years: JsValue) -> Result<JsValue, JsValue> {
+    let horizon_years = js_f64(&horizon_years, "horizonYears")?;
     let returns_json: &str = &json_text(&returns_json, "returnsJson")?;
     let returns: Vec<f64> = serde_json::from_str(returns_json).map_err(to_js_err)?;
     let result =

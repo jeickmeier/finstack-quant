@@ -56,7 +56,7 @@ fn goal_seek_finds_revenue_for_target_gross_profit() {
         JsValue::from(&model_json),
         JsValue::from("gross_profit"),
         JsValue::from("2024Q1"),
-        80_000.0,
+        JsValue::from(80_000.0),
         JsValue::from("revenue"),
         JsValue::from("2024Q1"),
         JsValue::from(true),
@@ -205,11 +205,17 @@ fn pl_summary_report_text_returns_text() {
 fn regression_rejects_constant_predictor_and_unequal_lengths() {
     let x = crate::js_object(&vec![1.0, 1.0, 1.0]);
     let y = crate::js_object(&vec![2.0, 4.0, 6.0]);
-    assert!(regression_fair_value(x, y.clone(), 2.0, 6.0)
-        .unwrap()
-        .is_none());
+    assert!(
+        regression_fair_value(x, y.clone(), JsValue::from(2.0), JsValue::from(6.0))
+            .unwrap()
+            .is_none()
+    );
     let x = crate::js_object(&vec![1.0, 2.0, 3.0, 4.0]);
-    assert!(regression_fair_value(x, y, 2.0, 6.0).unwrap().is_none());
+    assert!(
+        regression_fair_value(x, y, JsValue::from(2.0), JsValue::from(6.0))
+            .unwrap()
+            .is_none()
+    );
 }
 
 #[wasm_bindgen_test]
@@ -236,7 +242,7 @@ fn monetary_goal_seek_returns_a_valid_updated_model() {
         JsValue::from(&json),
         JsValue::from("profit"),
         JsValue::from("2025"),
-        60.0,
+        JsValue::from(60.0),
         JsValue::from("revenue"),
         JsValue::from("2025"),
         JsValue::from(true),

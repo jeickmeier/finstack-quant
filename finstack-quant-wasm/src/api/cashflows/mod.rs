@@ -1,6 +1,6 @@
 //! WASM bindings for the `finstack-quant-cashflows` crate.
 
-use crate::utils::input::{js_string, json_text, opt_json_text};
+use crate::utils::input::{js_f64, js_string, json_text, opt_json_text};
 use crate::utils::to_js_err;
 use wasm_bindgen::prelude::*;
 
@@ -81,7 +81,8 @@ pub fn accrued_interest(
 /// @returns Monthly SMM as a decimal.
 /// @throws If `cpr` is negative, non-finite, or above 1.0.
 #[wasm_bindgen(js_name = cprToSmm)]
-pub fn cpr_to_smm(cpr: f64) -> Result<f64, JsValue> {
+pub fn cpr_to_smm(cpr: JsValue) -> Result<f64, JsValue> {
+    let cpr = js_f64(&cpr, "cpr")?;
     finstack_quant_cashflows::builder::cpr_to_smm(cpr).map_err(to_js_err)
 }
 
@@ -93,7 +94,8 @@ pub fn cpr_to_smm(cpr: f64) -> Result<f64, JsValue> {
 /// @returns Annualized CPR as a decimal.
 /// @throws If `smm` is negative, non-finite, or above 1.0.
 #[wasm_bindgen(js_name = smmToCpr)]
-pub fn smm_to_cpr(smm: f64) -> Result<f64, JsValue> {
+pub fn smm_to_cpr(smm: JsValue) -> Result<f64, JsValue> {
+    let smm = js_f64(&smm, "smm")?;
     finstack_quant_cashflows::builder::smm_to_cpr(smm).map_err(to_js_err)
 }
 
@@ -106,7 +108,8 @@ pub fn smm_to_cpr(smm: f64) -> Result<f64, JsValue> {
 /// @returns Monthly MDR as a decimal.
 /// @throws If `cdr` is negative, non-finite, or above 1.0.
 #[wasm_bindgen(js_name = cdrToMdr)]
-pub fn cdr_to_mdr(cdr: f64) -> Result<f64, JsValue> {
+pub fn cdr_to_mdr(cdr: JsValue) -> Result<f64, JsValue> {
+    let cdr = js_f64(&cdr, "cdr")?;
     finstack_quant_cashflows::builder::cdr_to_mdr(cdr).map_err(to_js_err)
 }
 
@@ -118,6 +121,7 @@ pub fn cdr_to_mdr(cdr: f64) -> Result<f64, JsValue> {
 /// @returns Annualized CDR as a decimal.
 /// @throws If `mdr` is negative, non-finite, or above 1.0.
 #[wasm_bindgen(js_name = mdrToCdr)]
-pub fn mdr_to_cdr(mdr: f64) -> Result<f64, JsValue> {
+pub fn mdr_to_cdr(mdr: JsValue) -> Result<f64, JsValue> {
+    let mdr = js_f64(&mdr, "mdr")?;
     finstack_quant_cashflows::builder::mdr_to_cdr(mdr).map_err(to_js_err)
 }

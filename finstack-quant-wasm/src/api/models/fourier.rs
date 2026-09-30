@@ -9,7 +9,7 @@
 //!
 //! Fang-Oosterlee (2008): see docs/REFERENCES.md#fang-oosterlee-2008.
 
-use crate::utils::input::{js_bool, js_opt_uint};
+use crate::utils::input::{js_bool, js_f64, js_opt_uint};
 use crate::utils::to_js_err;
 use finstack_quant_models::fourier::cos::{
     bs_cos_price as rust_bs_cos_price, merton_jump_cos_price as rust_merton_jump_cos_price,
@@ -40,15 +40,21 @@ use wasm_bindgen::prelude::*;
 #[wasm_bindgen(js_name = bsCosPrice)]
 #[allow(clippy::too_many_arguments)]
 pub fn bs_cos_price(
-    spot: f64,
-    strike: f64,
-    rate: f64,
-    div_yield: f64,
-    vol: f64,
-    expiry: f64,
+    spot: JsValue,
+    strike: JsValue,
+    rate: JsValue,
+    div_yield: JsValue,
+    vol: JsValue,
+    expiry: JsValue,
     is_call: JsValue,
     n_terms: Option<JsValue>,
 ) -> Result<f64, JsValue> {
+    let spot = js_f64(&spot, "spot")?;
+    let strike = js_f64(&strike, "strike")?;
+    let rate = js_f64(&rate, "rate")?;
+    let div_yield = js_f64(&div_yield, "divYield")?;
+    let vol = js_f64(&vol, "vol")?;
+    let expiry = js_f64(&expiry, "expiry")?;
     let is_call = js_bool(&is_call, "isCall")?;
     let n_terms: Option<usize> = js_opt_uint(n_terms.as_ref(), "nTerms")?;
     rust_bs_cos_price(BlackScholesCosParams {
@@ -88,17 +94,25 @@ pub fn bs_cos_price(
 #[wasm_bindgen(js_name = vgCosPrice)]
 #[allow(clippy::too_many_arguments)]
 pub fn vg_cos_price(
-    spot: f64,
-    strike: f64,
-    rate: f64,
-    div_yield: f64,
-    sigma: f64,
-    theta: f64,
-    nu: f64,
-    expiry: f64,
+    spot: JsValue,
+    strike: JsValue,
+    rate: JsValue,
+    div_yield: JsValue,
+    sigma: JsValue,
+    theta: JsValue,
+    nu: JsValue,
+    expiry: JsValue,
     is_call: JsValue,
     n_terms: Option<JsValue>,
 ) -> Result<f64, JsValue> {
+    let spot = js_f64(&spot, "spot")?;
+    let strike = js_f64(&strike, "strike")?;
+    let rate = js_f64(&rate, "rate")?;
+    let div_yield = js_f64(&div_yield, "divYield")?;
+    let sigma = js_f64(&sigma, "sigma")?;
+    let theta = js_f64(&theta, "theta")?;
+    let nu = js_f64(&nu, "nu")?;
+    let expiry = js_f64(&expiry, "expiry")?;
     let is_call = js_bool(&is_call, "isCall")?;
     let n_terms: Option<usize> = js_opt_uint(n_terms.as_ref(), "nTerms")?;
     rust_vg_cos_price(VarianceGammaCosParams {
@@ -141,18 +155,27 @@ pub fn vg_cos_price(
 #[wasm_bindgen(js_name = mertonJumpCosPrice)]
 #[allow(clippy::too_many_arguments)]
 pub fn merton_jump_cos_price(
-    spot: f64,
-    strike: f64,
-    rate: f64,
-    div_yield: f64,
-    sigma: f64,
-    mu_jump: f64,
-    sigma_jump: f64,
-    lambda: f64,
-    expiry: f64,
+    spot: JsValue,
+    strike: JsValue,
+    rate: JsValue,
+    div_yield: JsValue,
+    sigma: JsValue,
+    mu_jump: JsValue,
+    sigma_jump: JsValue,
+    lambda: JsValue,
+    expiry: JsValue,
     is_call: JsValue,
     n_terms: Option<JsValue>,
 ) -> Result<f64, JsValue> {
+    let spot = js_f64(&spot, "spot")?;
+    let strike = js_f64(&strike, "strike")?;
+    let rate = js_f64(&rate, "rate")?;
+    let div_yield = js_f64(&div_yield, "divYield")?;
+    let sigma = js_f64(&sigma, "sigma")?;
+    let mu_jump = js_f64(&mu_jump, "muJump")?;
+    let sigma_jump = js_f64(&sigma_jump, "sigmaJump")?;
+    let lambda = js_f64(&lambda, "lambda")?;
+    let expiry = js_f64(&expiry, "expiry")?;
     let is_call = js_bool(&is_call, "isCall")?;
     let n_terms: Option<usize> = js_opt_uint(n_terms.as_ref(), "nTerms")?;
     rust_merton_jump_cos_price(MertonJumpCosParams {

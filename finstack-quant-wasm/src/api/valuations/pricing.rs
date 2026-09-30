@@ -23,8 +23,8 @@
 
 use super::market_handle::JsMarket;
 use crate::utils::input::{
-    from_js_json, js_opt_string, js_opt_string_seq, js_string, js_string_seq, json_text,
-    opt_json_text,
+    from_js_json, js_opt_f64, js_opt_string, js_opt_string_seq, js_string, js_string_seq,
+    json_text, opt_json_text,
 };
 use crate::utils::{to_js_err, to_js_value, to_js_value_with_bigints};
 use finstack_quant_core::market_data::context::MarketContext;
@@ -263,8 +263,10 @@ pub fn bond_from_cashflows_json(
     instrument_id: JsValue,
     schedule_json: JsValue,
     discount_curve_id: JsValue,
-    quoted_clean_price_pct: Option<f64>,
+    quoted_clean_price_pct: Option<JsValue>,
 ) -> Result<String, JsValue> {
+    let quoted_clean_price_pct =
+        js_opt_f64(quoted_clean_price_pct.as_ref(), "quotedCleanPricePct")?;
     let instrument_id: &str = &js_string(&instrument_id, "instrumentId")?;
     let schedule_json: &str = &json_text(&schedule_json, "scheduleJson")?;
     let discount_curve_id: &str = &js_string(&discount_curve_id, "discountCurveId")?;

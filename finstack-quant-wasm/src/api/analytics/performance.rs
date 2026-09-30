@@ -6,8 +6,8 @@
 //! exposed as classes, keeping the JS facade simple.
 
 use crate::utils::input::{
-    js_f64_matrix, js_f64_seq, js_opt_bool, js_opt_string, js_opt_uint, js_string, js_string_seq,
-    js_uint,
+    js_f64_matrix, js_f64_seq, js_opt_bool, js_opt_f64, js_opt_string, js_opt_uint, js_string,
+    js_string_seq, js_uint,
 };
 use crate::utils::{date_to_iso, to_js_err};
 use finstack_quant_analytics as fa;
@@ -454,15 +454,19 @@ impl JsPerformance {
     /// Sharpe ratio per asset for the given risk-free rate.
     /// @param risk_free_rate - Annualized decimal risk-free rate; defaults to 0.0.
     /// @returns Per-ticker values as a Float64Array in `tickerNames()` order.
-    pub fn sharpe(&self, risk_free_rate: Option<f64>) -> JsValue {
-        vec_f64_to_js(&self.inner.sharpe(risk_free_rate.unwrap_or(0.0)))
+    pub fn sharpe(&self, risk_free_rate: Option<JsValue>) -> Result<JsValue, JsValue> {
+        let risk_free_rate = js_opt_f64(risk_free_rate.as_ref(), "riskFreeRate")?;
+        Ok(vec_f64_to_js(
+            &self.inner.sharpe(risk_free_rate.unwrap_or(0.0)),
+        ))
     }
 
     /// Sortino ratio per asset for the given per-period minimum acceptable return.
     /// @param mar - Per-period minimum acceptable return as a decimal; defaults to 0.0.
     /// @returns Per-ticker values as a Float64Array in `tickerNames()` order.
-    pub fn sortino(&self, mar: Option<f64>) -> JsValue {
-        vec_f64_to_js(&self.inner.sortino(mar.unwrap_or(0.0)))
+    pub fn sortino(&self, mar: Option<JsValue>) -> Result<JsValue, JsValue> {
+        let mar = js_opt_f64(mar.as_ref(), "mar")?;
+        Ok(vec_f64_to_js(&self.inner.sortino(mar.unwrap_or(0.0))))
     }
 
     /// Calmar ratio (CAGR / |max drawdown|) over the active window, not
@@ -496,7 +500,8 @@ impl JsPerformance {
     /// @returns Per-ticker values as a Float64Array in `tickerNames()` order.
     /// @throws Error - Rejects a `confidence` outside the open interval (0, 1).
     #[wasm_bindgen(js_name = valueAtRisk)]
-    pub fn value_at_risk(&self, confidence: Option<f64>) -> Result<JsValue, JsValue> {
+    pub fn value_at_risk(&self, confidence: Option<JsValue>) -> Result<JsValue, JsValue> {
+        let confidence = js_opt_f64(confidence.as_ref(), "confidence")?;
         result_vec_f64_to_js(
             self.inner
                 .value_at_risk(confidence.unwrap_or(DEFAULT_CONFIDENCE)),
@@ -509,7 +514,8 @@ impl JsPerformance {
     /// @returns Per-ticker values as a Float64Array in `tickerNames()` order.
     /// @throws Error - Rejects a `confidence` outside the open interval (0, 1).
     #[wasm_bindgen(js_name = expectedShortfall)]
-    pub fn expected_shortfall(&self, confidence: Option<f64>) -> Result<JsValue, JsValue> {
+    pub fn expected_shortfall(&self, confidence: Option<JsValue>) -> Result<JsValue, JsValue> {
+        let confidence = js_opt_f64(confidence.as_ref(), "confidence")?;
         result_vec_f64_to_js(
             self.inner
                 .expected_shortfall(confidence.unwrap_or(DEFAULT_CONFIDENCE)),
@@ -553,8 +559,11 @@ impl JsPerformance {
     /// @param mar - Per-period minimum acceptable return as a decimal; defaults to 0.0.
     /// @returns Per-ticker values as a Float64Array in `tickerNames()` order.
     #[wasm_bindgen(js_name = downsideDeviation)]
-    pub fn downside_deviation(&self, mar: Option<f64>) -> JsValue {
-        vec_f64_to_js(&self.inner.downside_deviation(mar.unwrap_or(0.0)))
+    pub fn downside_deviation(&self, mar: Option<JsValue>) -> Result<JsValue, JsValue> {
+        let mar = js_opt_f64(mar.as_ref(), "mar")?;
+        Ok(vec_f64_to_js(
+            &self.inner.downside_deviation(mar.unwrap_or(0.0)),
+        ))
     }
 
     /// Longest drawdown duration in calendar days per asset.
@@ -594,15 +603,21 @@ impl JsPerformance {
     /// @param threshold - Per-period threshold return as a decimal; defaults to 0.0.
     /// @returns Per-ticker values as a Float64Array in `tickerNames()` order.
     #[wasm_bindgen(js_name = omegaRatio)]
-    pub fn omega_ratio(&self, threshold: Option<f64>) -> JsValue {
-        vec_f64_to_js(&self.inner.omega_ratio(threshold.unwrap_or(0.0)))
+    pub fn omega_ratio(&self, threshold: Option<JsValue>) -> Result<JsValue, JsValue> {
+        let threshold = js_opt_f64(threshold.as_ref(), "threshold")?;
+        Ok(vec_f64_to_js(
+            &self.inner.omega_ratio(threshold.unwrap_or(0.0)),
+        ))
     }
 
     /// Treynor ratio per asset for the given risk-free rate.
     /// @param risk_free_rate - Annualized decimal risk-free rate; defaults to 0.0.
     /// @returns Per-ticker values as a Float64Array in `tickerNames()` order.
-    pub fn treynor(&self, risk_free_rate: Option<f64>) -> JsValue {
-        vec_f64_to_js(&self.inner.treynor(risk_free_rate.unwrap_or(0.0)))
+    pub fn treynor(&self, risk_free_rate: Option<JsValue>) -> Result<JsValue, JsValue> {
+        let risk_free_rate = js_opt_f64(risk_free_rate.as_ref(), "riskFreeRate")?;
+        Ok(vec_f64_to_js(
+            &self.inner.treynor(risk_free_rate.unwrap_or(0.0)),
+        ))
     }
 
     /// Gain-to-pain ratio per asset.
@@ -654,7 +669,8 @@ impl JsPerformance {
     /// @param risk_free_rate - Annualized decimal risk-free rate; defaults to 0.0.
     /// @returns Per-ticker values as a Float64Array in `tickerNames()` order.
     #[wasm_bindgen(js_name = painRatio)]
-    pub fn pain_ratio(&self, risk_free_rate: Option<f64>) -> Result<JsValue, JsValue> {
+    pub fn pain_ratio(&self, risk_free_rate: Option<JsValue>) -> Result<JsValue, JsValue> {
+        let risk_free_rate = js_opt_f64(risk_free_rate.as_ref(), "riskFreeRate")?;
         result_vec_f64_to_js(self.inner.pain_ratio(risk_free_rate.unwrap_or(0.0)))
     }
 
@@ -663,7 +679,8 @@ impl JsPerformance {
     /// @returns Per-ticker values as a Float64Array in `tickerNames()` order.
     /// @throws Error - Rejects a `confidence` outside the open interval (0, 1).
     #[wasm_bindgen(js_name = tailRatio)]
-    pub fn tail_ratio(&self, confidence: Option<f64>) -> Result<JsValue, JsValue> {
+    pub fn tail_ratio(&self, confidence: Option<JsValue>) -> Result<JsValue, JsValue> {
+        let confidence = js_opt_f64(confidence.as_ref(), "confidence")?;
         result_vec_f64_to_js(
             self.inner
                 .tail_ratio(confidence.unwrap_or(DEFAULT_CONFIDENCE)),
@@ -695,9 +712,11 @@ impl JsPerformance {
     #[wasm_bindgen(js_name = parametricVar)]
     pub fn parametric_var(
         &self,
-        confidence: Option<f64>,
-        horizon_periods: Option<f64>,
+        confidence: Option<JsValue>,
+        horizon_periods: Option<JsValue>,
     ) -> Result<JsValue, JsValue> {
+        let confidence = js_opt_f64(confidence.as_ref(), "confidence")?;
+        let horizon_periods = js_opt_f64(horizon_periods.as_ref(), "horizonPeriods")?;
         result_vec_f64_to_js(
             self.inner
                 .parametric_var(confidence.unwrap_or(DEFAULT_CONFIDENCE), horizon_periods),
@@ -715,9 +734,11 @@ impl JsPerformance {
     #[wasm_bindgen(js_name = cornishFisherVar)]
     pub fn cornish_fisher_var(
         &self,
-        confidence: Option<f64>,
-        horizon_periods: Option<f64>,
+        confidence: Option<JsValue>,
+        horizon_periods: Option<JsValue>,
     ) -> Result<JsValue, JsValue> {
+        let confidence = js_opt_f64(confidence.as_ref(), "confidence")?;
+        let horizon_periods = js_opt_f64(horizon_periods.as_ref(), "horizonPeriods")?;
         result_vec_f64_to_js(
             self.inner
                 .cornish_fisher_var(confidence.unwrap_or(DEFAULT_CONFIDENCE), horizon_periods),
@@ -729,7 +750,8 @@ impl JsPerformance {
     /// @param confidence - Tail confidence as a decimal probability; defaults to 0.95.
     /// @returns Per-ticker values as a Float64Array in `tickerNames()` order.
     /// @throws Error - Rejects a `confidence` outside the open interval (0, 1).
-    pub fn cdar(&self, confidence: Option<f64>) -> Result<JsValue, JsValue> {
+    pub fn cdar(&self, confidence: Option<JsValue>) -> Result<JsValue, JsValue> {
+        let confidence = js_opt_f64(confidence.as_ref(), "confidence")?;
         result_vec_f64_to_js(self.inner.cdar(confidence.unwrap_or(DEFAULT_CONFIDENCE)))
     }
 
@@ -738,8 +760,11 @@ impl JsPerformance {
     /// @param risk_free_rate - Annualized decimal risk-free rate; defaults to 0.0.
     /// @returns Per-ticker values as a Float64Array in `tickerNames()` order.
     #[wasm_bindgen(js_name = mSquared)]
-    pub fn m_squared(&self, risk_free_rate: Option<f64>) -> JsValue {
-        vec_f64_to_js(&self.inner.m_squared(risk_free_rate.unwrap_or(0.0)))
+    pub fn m_squared(&self, risk_free_rate: Option<JsValue>) -> Result<JsValue, JsValue> {
+        let risk_free_rate = js_opt_f64(risk_free_rate.as_ref(), "riskFreeRate")?;
+        Ok(vec_f64_to_js(
+            &self.inner.m_squared(risk_free_rate.unwrap_or(0.0)),
+        ))
     }
 
     /// Modified Sharpe ratio using annualized excess return and
@@ -758,9 +783,11 @@ impl JsPerformance {
     #[wasm_bindgen(js_name = modifiedSharpe)]
     pub fn modified_sharpe(
         &self,
-        risk_free_rate: Option<f64>,
-        confidence: Option<f64>,
+        risk_free_rate: Option<JsValue>,
+        confidence: Option<JsValue>,
     ) -> Result<JsValue, JsValue> {
+        let risk_free_rate = js_opt_f64(risk_free_rate.as_ref(), "riskFreeRate")?;
+        let confidence = js_opt_f64(confidence.as_ref(), "confidence")?;
         result_vec_f64_to_js(self.inner.modified_sharpe(
             risk_free_rate.unwrap_or(0.0),
             confidence.unwrap_or(DEFAULT_CONFIDENCE),
@@ -779,9 +806,10 @@ impl JsPerformance {
     #[wasm_bindgen(js_name = sterlingRatio)]
     pub fn sterling_ratio(
         &self,
-        risk_free_rate: Option<f64>,
+        risk_free_rate: Option<JsValue>,
         n: Option<JsValue>,
     ) -> Result<JsValue, JsValue> {
+        let risk_free_rate = js_opt_f64(risk_free_rate.as_ref(), "riskFreeRate")?;
         let n = js_opt_uint(n.as_ref(), "n")?;
         result_vec_f64_to_js(
             self.inner
@@ -801,9 +829,10 @@ impl JsPerformance {
     #[wasm_bindgen(js_name = burkeRatio)]
     pub fn burke_ratio(
         &self,
-        risk_free_rate: Option<f64>,
+        risk_free_rate: Option<JsValue>,
         n: Option<JsValue>,
     ) -> Result<JsValue, JsValue> {
+        let risk_free_rate = js_opt_f64(risk_free_rate.as_ref(), "riskFreeRate")?;
         let n = js_opt_uint(n.as_ref(), "n")?;
         result_vec_f64_to_js(
             self.inner
@@ -867,9 +896,11 @@ impl JsPerformance {
     #[wasm_bindgen(js_name = summary)]
     pub fn summary(
         &self,
-        risk_free_rate: Option<f64>,
-        confidence: Option<f64>,
+        risk_free_rate: Option<JsValue>,
+        confidence: Option<JsValue>,
     ) -> Result<JsValue, JsValue> {
+        let risk_free_rate = js_opt_f64(risk_free_rate.as_ref(), "riskFreeRate")?;
+        let confidence = js_opt_f64(confidence.as_ref(), "confidence")?;
         let table = self
             .inner
             .summary(
@@ -975,7 +1006,12 @@ impl JsPerformance {
     /// @param nperiods - Optional periods per year used to decompound annual `rf`; omit to use the engine frequency, or pass `1` for already-periodic `rf`.
     /// @returns One Float64Array per ticker in `tickerNames()` order.
     #[wasm_bindgen(js_name = excessReturns)]
-    pub fn excess_returns(&self, rf: JsValue, nperiods: Option<f64>) -> Result<JsValue, JsValue> {
+    pub fn excess_returns(
+        &self,
+        rf: JsValue,
+        nperiods: Option<JsValue>,
+    ) -> Result<JsValue, JsValue> {
+        let nperiods = js_opt_f64(nperiods.as_ref(), "nperiods")?;
         let rf = js_f64_seq(&rf, "rf")?;
         let excess = self
             .inner
@@ -1001,7 +1037,8 @@ impl JsPerformance {
     /// Rejects if the regression results cannot be serialized to JavaScript.
     /// @param risk_free_rate - Annualized decimal risk-free rate; defaults to 0.0.
     /// @returns Per-ticker `{ alpha, beta, r_squared, adjusted_r_squared }` objects in `tickerNames()` order.
-    pub fn greeks(&self, risk_free_rate: Option<f64>) -> Result<JsValue, JsValue> {
+    pub fn greeks(&self, risk_free_rate: Option<JsValue>) -> Result<JsValue, JsValue> {
+        let risk_free_rate = js_opt_f64(risk_free_rate.as_ref(), "riskFreeRate")?;
         greeks_results_to_js(self.inner.greeks(risk_free_rate.unwrap_or(0.0)))
     }
 
@@ -1020,8 +1057,9 @@ impl JsPerformance {
         &self,
         ticker_idx: JsValue,
         window: Option<JsValue>,
-        risk_free_rate: Option<f64>,
+        risk_free_rate: Option<JsValue>,
     ) -> Result<JsValue, JsValue> {
+        let risk_free_rate = js_opt_f64(risk_free_rate.as_ref(), "riskFreeRate")?;
         let ticker_idx = js_uint(&ticker_idx, "tickerIdx")?;
         let window = js_opt_uint(window.as_ref(), "window")?;
         let rg = self
@@ -1074,8 +1112,9 @@ impl JsPerformance {
         &self,
         ticker_idx: JsValue,
         window: Option<JsValue>,
-        mar: Option<f64>,
+        mar: Option<JsValue>,
     ) -> Result<JsValue, JsValue> {
+        let mar = js_opt_f64(mar.as_ref(), "mar")?;
         let ticker_idx = js_uint(&ticker_idx, "tickerIdx")?;
         let window = js_opt_uint(window.as_ref(), "window")?;
         let series = self
@@ -1104,8 +1143,9 @@ impl JsPerformance {
         &self,
         ticker_idx: JsValue,
         window: Option<JsValue>,
-        risk_free_rate: Option<f64>,
+        risk_free_rate: Option<JsValue>,
     ) -> Result<JsValue, JsValue> {
+        let risk_free_rate = js_opt_f64(risk_free_rate.as_ref(), "riskFreeRate")?;
         let ticker_idx = js_uint(&ticker_idx, "tickerIdx")?;
         let window = js_opt_uint(window.as_ref(), "window")?;
         let series = self
@@ -1192,8 +1232,9 @@ impl JsPerformance {
         ticker_idx: JsValue,
         factor_returns: JsValue,
         return_kind: Option<JsValue>,
-        risk_free_rate: Option<f64>,
+        risk_free_rate: Option<JsValue>,
     ) -> Result<JsValue, JsValue> {
+        let risk_free_rate = js_opt_f64(risk_free_rate.as_ref(), "riskFreeRate")?;
         let return_kind = js_opt_string(return_kind.as_ref(), "returnKind")?;
         let ticker_idx = js_uint(&ticker_idx, "tickerIdx")?;
         let factors = js_f64_matrix(&factor_returns, "factorReturns")?;

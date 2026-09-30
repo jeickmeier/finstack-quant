@@ -5,7 +5,7 @@
 //! [`finstack_quant_models::correlation`]. The JS facade nests these exports
 //! under `models.correlation`.
 
-use crate::utils::input::{js_opt_uint, js_uint};
+use crate::utils::input::{js_f64, js_f64_seq, js_opt_f64, js_opt_uint, js_uint};
 use crate::utils::to_js_err;
 use finstack_quant_models::correlation::{self as corr, Copula, CopulaSpec, RecoveryModel};
 use wasm_bindgen::prelude::*;
@@ -34,7 +34,8 @@ impl JsCopulaSpec {
     /// Throws a JavaScript exception if `degreesOfFreedom` is not finite and
     /// strictly greater than two.
     #[wasm_bindgen(js_name = studentT)]
-    pub fn student_t(degrees_of_freedom: f64) -> Result<JsCopulaSpec, JsValue> {
+    pub fn student_t(degrees_of_freedom: JsValue) -> Result<JsCopulaSpec, JsValue> {
+        let degrees_of_freedom = js_f64(&degrees_of_freedom, "degreesOfFreedom")?;
         CopulaSpec::student_t(degrees_of_freedom)
             .map(|inner| Self { inner })
             .map_err(to_js_err)
@@ -43,10 +44,11 @@ impl JsCopulaSpec {
     /// Random Factor Loading copula with stochastic correlation.
     /// @param loading_vol - Standard deviation used to randomize the factor loading.
     #[wasm_bindgen(js_name = randomFactorLoading)]
-    pub fn random_factor_loading(loading_vol: f64) -> Self {
-        Self {
+    pub fn random_factor_loading(loading_vol: JsValue) -> Result<Self, JsValue> {
+        let loading_vol = js_f64(&loading_vol, "loadingVol")?;
+        Ok(Self {
             inner: CopulaSpec::random_factor_loading(loading_vol),
-        }
+        })
     }
 
     /// Global-plus-sector two-factor Gaussian copula.
@@ -117,10 +119,13 @@ impl JsCopula {
     #[wasm_bindgen(js_name = conditionalDefaultProb)]
     pub fn conditional_default_prob(
         &self,
-        default_threshold: f64,
-        factor_realization: &[f64],
-        correlation: f64,
+        default_threshold: JsValue,
+        factor_realization: JsValue,
+        correlation: JsValue,
     ) -> Result<f64, JsValue> {
+        let default_threshold = js_f64(&default_threshold, "defaultThreshold")?;
+        let factor_realization: &[f64] = &js_f64_seq(&factor_realization, "factorRealization")?;
+        let correlation = js_f64(&correlation, "correlation")?;
         self.inner
             .conditional_default_prob_checked(default_threshold, factor_realization, correlation)
             .map_err(to_js_err)
@@ -146,8 +151,9 @@ impl JsCopula {
     /// RFL heuristic stress gauge use `stressCorrelationProxy` instead.
     /// @param correlation - Dependence correlation from -1 through 1 under the selected copula or recovery model.
     #[wasm_bindgen(js_name = tailDependence)]
-    pub fn tail_dependence(&self, correlation: f64) -> f64 {
-        self.inner.tail_dependence(correlation)
+    pub fn tail_dependence(&self, correlation: JsValue) -> Result<f64, JsValue> {
+        let correlation = js_f64(&correlation, "correlation")?;
+        Ok(self.inner.tail_dependence(correlation))
     }
 
     /// Heuristic stress-correlation proxy for the Random Factor Loading
@@ -164,7 +170,8 @@ impl JsCopula {
     /// Throws a JavaScript exception if this copula is not a Random Factor
     /// Loading model.
     #[wasm_bindgen(js_name = stressCorrelationProxy)]
-    pub fn stress_correlation_proxy(&self, correlation: f64) -> Result<f64, JsValue> {
+    pub fn stress_correlation_proxy(&self, correlation: JsValue) -> Result<f64, JsValue> {
+        let correlation = js_f64(&correlation, "correlation")?;
         self.inner
             .stress_correlation_proxy(correlation)
             .map_err(to_js_err)
@@ -187,7 +194,8 @@ impl JsRecoverySpec {
     /// Throws a JavaScript exception if `rate` is not finite or lies outside
     /// `[0, 1]`.
     #[wasm_bindgen(js_name = constant)]
-    pub fn constant(rate: f64) -> Result<JsRecoverySpec, JsValue> {
+    pub fn constant(rate: JsValue) -> Result<JsRecoverySpec, JsValue> {
+        let rate = js_f64(&rate, "rate")?;
         corr::RecoverySpec::constant(rate)
             .map(|inner| Self { inner })
             .map_err(to_js_err)
@@ -205,10 +213,13 @@ impl JsRecoverySpec {
     /// and correlation inputs are clamped to their supported ranges.
     #[wasm_bindgen(js_name = marketCorrelated)]
     pub fn market_correlated(
-        mean: f64,
-        vol: f64,
-        correlation: f64,
+        mean: JsValue,
+        vol: JsValue,
+        correlation: JsValue,
     ) -> Result<JsRecoverySpec, JsValue> {
+        let mean = js_f64(&mean, "mean")?;
+        let vol = js_f64(&vol, "vol")?;
+        let correlation = js_f64(&correlation, "correlation")?;
         corr::RecoverySpec::market_correlated(mean, vol, correlation)
             .map(|inner| Self { inner })
             .map_err(to_js_err)
@@ -263,8 +274,9 @@ impl JsRecoveryModel {
     /// Recovery conditional on the systematic market factor.
     /// @param market_factor - Realized standardized market factor used to condition recovery or loss given default.
     #[wasm_bindgen(js_name = conditionalRecovery)]
-    pub fn conditional_recovery(&self, market_factor: f64) -> f64 {
-        self.inner.conditional_recovery(market_factor)
+    pub fn conditional_recovery(&self, market_factor: JsValue) -> Result<f64, JsValue> {
+        let market_factor = js_f64(&market_factor, "marketFactor")?;
+        Ok(self.inner.conditional_recovery(market_factor))
     }
 
     /// Loss given default (1 − recovery).
@@ -276,8 +288,9 @@ impl JsRecoveryModel {
     /// Conditional LGD given market factor.
     /// @param market_factor - Realized standardized market factor used to condition recovery or loss given default.
     #[wasm_bindgen(js_name = conditionalLgd)]
-    pub fn conditional_lgd(&self, market_factor: f64) -> f64 {
-        self.inner.conditional_lgd(market_factor)
+    pub fn conditional_lgd(&self, market_factor: JsValue) -> Result<f64, JsValue> {
+        let market_factor = js_f64(&market_factor, "marketFactor")?;
+        Ok(self.inner.conditional_lgd(market_factor))
     }
 
     /// Recovery-rate volatility scale (0 for constant models).
@@ -310,7 +323,9 @@ impl JsRecoveryModel {
 /// Throws a JavaScript exception if either marginal probability is non-finite
 /// or outside `[0, 1]`.
 #[wasm_bindgen(js_name = correlationBounds)]
-pub fn correlation_bounds(p1: f64, p2: f64) -> Result<Box<[f64]>, JsValue> {
+pub fn correlation_bounds(p1: JsValue, p2: JsValue) -> Result<Box<[f64]>, JsValue> {
+    let p1 = js_f64(&p1, "p1")?;
+    let p2 = js_f64(&p2, "p2")?;
     let (lo, hi) = corr::correlation_bounds(p1, p2).map_err(to_js_err)?;
     Ok(Box::new([lo, hi]))
 }
@@ -327,7 +342,14 @@ pub fn correlation_bounds(p1: f64, p2: f64) -> Result<Box<[f64]>, JsValue> {
 /// Throws a JavaScript exception if either marginal probability is non-finite
 /// or outside `[0, 1]`, or `correlation` is non-finite or outside `[-1, 1]`.
 #[wasm_bindgen(js_name = jointProbabilities)]
-pub fn joint_probabilities(p1: f64, p2: f64, correlation: f64) -> Result<Box<[f64]>, JsValue> {
+pub fn joint_probabilities(
+    p1: JsValue,
+    p2: JsValue,
+    correlation: JsValue,
+) -> Result<Box<[f64]>, JsValue> {
+    let p1 = js_f64(&p1, "p1")?;
+    let p2 = js_f64(&p2, "p2")?;
+    let correlation = js_f64(&correlation, "correlation")?;
     let (p11, p10, p01, p00) = corr::joint_probabilities(p1, p2, correlation).map_err(to_js_err)?;
     Ok(Box::new([p11, p10, p01, p00]))
 }
@@ -347,7 +369,8 @@ pub fn joint_probabilities(p1: f64, p2: f64, correlation: f64) -> Result<Box<[f6
 /// entry is not one, an entry is outside the correlation bounds, the matrix is
 /// not symmetric, or the matrix is not positive semidefinite.
 #[wasm_bindgen(js_name = validateCorrelationMatrix)]
-pub fn validate_correlation_matrix(matrix: &[f64], n: JsValue) -> Result<(), JsValue> {
+pub fn validate_correlation_matrix(matrix: JsValue, n: JsValue) -> Result<(), JsValue> {
+    let matrix: &[f64] = &js_f64_seq(&matrix, "matrix")?;
     let n: usize = js_uint(&n, "n")?;
     corr::validate_correlation_matrix(matrix, n).map_err(to_js_err)
 }
@@ -370,11 +393,13 @@ pub fn validate_correlation_matrix(matrix: &[f64], n: JsValue) -> Result<(), JsV
 /// the projection does not converge within `maxIter` iterations at `tol`.
 #[wasm_bindgen(js_name = nearestCorrelation)]
 pub fn nearest_correlation(
-    matrix: Vec<f64>,
+    matrix: JsValue,
     n: JsValue,
     max_iter: Option<JsValue>,
-    tol: Option<f64>,
+    tol: Option<JsValue>,
 ) -> Result<Box<[f64]>, JsValue> {
+    let matrix = js_f64_seq(&matrix, "matrix")?;
+    let tol = js_opt_f64(tol.as_ref(), "tol")?;
     let n: usize = js_uint(&n, "n")?;
     let max_iter: Option<usize> = js_opt_uint(max_iter.as_ref(), "maxIter")?;
     // Single source of truth for the defaults: the Rust
@@ -417,7 +442,11 @@ impl JsPortfolioLossResult {
     /// `validation` error if the distribution is empty, a loss is non-finite
     /// or negative, or `confidence` is outside `(0, 1)`.
     #[wasm_bindgen(js_name = fromLosses)]
-    pub fn from_losses(losses: JsValue, confidence: f64) -> Result<JsPortfolioLossResult, JsValue> {
+    pub fn from_losses(
+        losses: JsValue,
+        confidence: JsValue,
+    ) -> Result<JsPortfolioLossResult, JsValue> {
+        let confidence = js_f64(&confidence, "confidence")?;
         let losses = crate::utils::input::js_f64_seq(&losses, "losses")?;
         corr::PortfolioLossResult::from_losses(losses, confidence)
             .map(|inner| Self { inner })
@@ -504,168 +533,17 @@ impl JsPortfolioLossResult {
     #[wasm_bindgen(js_name = trancheLossStatistics)]
     pub fn tranche_loss_statistics(
         &self,
-        attachment: f64,
-        detachment: f64,
-        pool_notional: f64,
+        attachment: JsValue,
+        detachment: JsValue,
+        pool_notional: JsValue,
     ) -> Result<JsValue, JsValue> {
+        let attachment = js_f64(&attachment, "attachment")?;
+        let detachment = js_f64(&detachment, "detachment")?;
+        let pool_notional = js_f64(&pool_notional, "poolNotional")?;
         let stats = self
             .inner
             .tranche_loss_statistics(attachment, detachment, pool_notional)
             .map_err(to_js_err)?;
         crate::utils::to_js_value(&stats)
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use finstack_quant_core::math::standard_normal_inv_cdf;
-
-    #[test]
-    fn wasm_copula_spec_gaussian_and_student_t() {
-        let g = JsCopulaSpec::gaussian();
-        assert!(g.is_gaussian());
-        assert!(!g.is_student_t());
-
-        let Ok(t) = JsCopulaSpec::student_t(5.0) else {
-            panic!("student_t(5.0) should succeed");
-        };
-        assert!(t.is_student_t());
-        assert!(!t.is_gaussian());
-    }
-
-    #[test]
-    fn wasm_copula_spec_random_factor_loading_and_multi_factor_build() {
-        let rfl = JsCopulaSpec::random_factor_loading(0.5);
-        assert!(!rfl.is_gaussian());
-        assert!(!rfl.is_student_t());
-        assert!(rfl.is_rfl());
-        assert!(!rfl.is_multi_factor());
-        let rfl_copula = rfl.build().expect("RFL copula should build");
-        assert_eq!(rfl_copula.num_factors(), 2);
-
-        let mf = JsCopulaSpec::multi_factor();
-        assert!(mf.is_multi_factor());
-        assert!(!mf.is_rfl());
-        let mf_copula = mf.build().expect("multi-factor copula should build");
-        assert_eq!(mf_copula.num_factors(), 2);
-    }
-
-    #[test]
-    fn wasm_copula_stress_correlation_proxy_rfl_only() {
-        let rfl = JsCopulaSpec::random_factor_loading(0.2)
-            .build()
-            .expect("RFL copula should build");
-        // RFL has no closed-form λ_L: NaN per the tail-dependence contract.
-        assert!(rfl.tail_dependence(0.3).is_nan());
-        let proxy = rfl
-            .stress_correlation_proxy(0.3)
-            .expect("proxy defined for RFL");
-        assert!(proxy > 0.0, "proxy should be positive for σ_β > 0: {proxy}");
-
-        // The non-RFL error path constructs a `JsValue`, which panics on
-        // non-wasm32 targets, so it can only be asserted in wasm tests.
-        #[cfg(target_arch = "wasm32")]
-        {
-            let gaussian = JsCopulaSpec::gaussian()
-                .build()
-                .expect("Gaussian copula should build");
-            assert!(
-                gaussian.stress_correlation_proxy(0.3).is_err(),
-                "proxy must throw for non-RFL copulas"
-            );
-        }
-    }
-
-    #[test]
-    fn wasm_copula_from_gaussian_spec() {
-        let copula = JsCopulaSpec::gaussian()
-            .build()
-            .expect("Gaussian copula should build");
-        assert_eq!(copula.num_factors(), 1);
-        assert_eq!(copula.model_name(), "One-Factor Gaussian Copula");
-        assert_eq!(copula.tail_dependence(0.3), 0.0);
-
-        let pd = 0.05_f64;
-        let threshold = standard_normal_inv_cdf(pd);
-        let correlation = 0.3_f64;
-        let cond = copula
-            .conditional_default_prob(threshold, &[0.0], correlation)
-            .expect("valid Gaussian copula inputs");
-        assert!(cond > 0.0 && cond < 1.0);
-    }
-
-    #[test]
-    fn wasm_recovery_spec_and_model() {
-        let c = JsRecoverySpec::constant(0.4).expect("0.4 is a valid recovery rate");
-        assert!((c.expected_recovery() - 0.4).abs() < 1e-12);
-        let m = c.build();
-        assert!((m.expected_recovery() - 0.4).abs() < 1e-12);
-        assert!((m.conditional_recovery(0.0) - 0.4).abs() < 1e-12);
-        assert!((m.lgd() - 0.6).abs() < 1e-12);
-        assert!(!m.is_stochastic());
-        assert!(!m.model_name().is_empty());
-
-        let mc = JsRecoverySpec::market_correlated(0.4, 0.1, 0.3)
-            .expect("valid market-correlated spec")
-            .build();
-        assert!(mc.is_stochastic());
-        assert!(mc.recovery_volatility() > 0.0);
-        assert!(
-            (mc.conditional_lgd(0.0) - (1.0 - mc.conditional_recovery(0.0))).abs() < 1e-12,
-            "conditional_lgd must complement conditional_recovery"
-        );
-
-        let std = JsRecoverySpec::market_standard_stochastic().build();
-        assert!(std.is_stochastic());
-        assert!((std.recovery_volatility() - 0.25).abs() < 1e-12);
-    }
-
-    #[test]
-    fn wasm_recovery_spec_constant_rejects_out_of_range_and_nan() {
-        // RecoverySpec::constant rejects rates outside [0, 1] and non-finite
-        // values at the Rust API boundary.
-        assert!(
-            JsRecoverySpec::constant(1.5).is_err(),
-            "recovery rate above 1 must be rejected, not clamped"
-        );
-        assert!(
-            JsRecoverySpec::constant(-0.2).is_err(),
-            "negative recovery rate must be rejected, not clamped"
-        );
-        assert!(
-            JsRecoverySpec::constant(f64::NAN).is_err(),
-            "NaN recovery rate must be rejected"
-        );
-        // The valid endpoints must still be accepted.
-        assert!(JsRecoverySpec::constant(0.0).is_ok());
-        assert!(JsRecoverySpec::constant(1.0).is_ok());
-    }
-
-    #[test]
-    fn wasm_recovery_spec_market_correlated_validates_inputs() {
-        // Mean recovery outside [0, 1] or non-finite must be rejected.
-        assert!(JsRecoverySpec::market_correlated(1.5, 0.1, 0.3).is_err());
-        assert!(JsRecoverySpec::market_correlated(f64::NAN, 0.1, 0.3).is_err());
-        // Non-finite vol / correlation must also be rejected.
-        assert!(JsRecoverySpec::market_correlated(0.4, f64::NAN, 0.3).is_err());
-        assert!(JsRecoverySpec::market_correlated(0.4, 0.1, f64::INFINITY).is_err());
-        // A fully valid spec is still accepted.
-        assert!(JsRecoverySpec::market_correlated(0.4, 0.25, -0.4).is_ok());
-    }
-
-    #[test]
-    fn correlation_bounds_ordered() {
-        let b = correlation_bounds(0.05, 0.10).expect("valid marginals");
-        assert_eq!(b.len(), 2);
-        assert!(b[0] <= b[1]);
-    }
-
-    #[test]
-    fn joint_probabilities_sum_to_one() {
-        let j = joint_probabilities(0.05, 0.10, 0.3).expect("valid inputs");
-        assert_eq!(j.len(), 4);
-        let sum: f64 = j.iter().sum();
-        assert!((sum - 1.0).abs() < 1e-9);
     }
 }

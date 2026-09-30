@@ -221,22 +221,22 @@ functions (`createDate`, `dateFromEpochDays`, `adjust`) speak signed epoch-day
 integers. Instrument, market, and pricing entry points take ISO-8601 date strings
 (`'2025-06-15'`). Calendar codes come from `core.availableCalendars()`.
 
-**Argument types are checked, not coerced.** Every string, boolean and integer
-argument is validated before Rust runs: a wrong type throws a `TypeError` with
-`kind: "invalid_type"` and a message that starts with the argument name
-(`"asOf: expected a string, got number"`). Integers must be whole numbers in range
-(`1.5`, `-1`, `NaN` and `"5"` throw rather than truncate or wrap); 64-bit seeds take a
-safe-integer `number` or an exact `bigint`; booleans must be `true` or `false`.
+**Argument types are checked, not coerced.** Every string, boolean, number and
+number-array argument is validated before Rust runs: a wrong type throws a `TypeError`
+with `kind: "invalid_type"` and a message that starts with the argument name
+(`"asOf: expected a string, got number"`). Numbers must be JavaScript `number`s:
+`null`, `undefined` (for a required argument), numeric strings, booleans, `bigint`s and
+`[1]`-style arrays throw instead of going through `ToNumber`. `NaN` and `±Infinity` are
+numbers and reach Rust, which rejects them wherever a finite value is required. Number
+arrays take a `Float64Array` or an array of `number`s; a string, a plain object or a
+non-number item throws. An optional number or number array treats `undefined` and
+`null` as omitted. Integers must be whole numbers in range (`1.5`, `-1`, `NaN` and `"5"`
+throw rather than truncate or wrap); 64-bit seeds take a safe-integer `number` or an
+exact `bigint`; booleans must be `true` or `false`.
 JSON inputs (`*Json` parameters, typed `JsonInput`) take JSON text or the equivalent
 plain object/array, and objects get the same unknown-field checks as text;
 `NaN`, `Infinity`, `Map`s, class instances and WASM handles inside them throw.
 Returned 64-bit values (Monte Carlo seeds, `DayCount.calendarDays`) are `bigint`.
-Plain `number` (float) arguments are the exception: wasm-bindgen converts them
-with JavaScript `ToNumber` before Rust runs, so `undefined` becomes `NaN`,
-`null` becomes `0` and `"5"` becomes `5`. Rust rejects non-finite values and
-out-of-domain inputs (for example a non-positive spot, strike, forward or
-discount factor), but a `null` rate or correlation silently reads as `0`; use
-the TypeScript declarations to catch those at compile time.
 
 **Determinism.** Simulation entry points are seeded; where the seed is optional
 (`models.monteCarlo.priceHestonCall/Put`) the Rust registry supplies a fixed

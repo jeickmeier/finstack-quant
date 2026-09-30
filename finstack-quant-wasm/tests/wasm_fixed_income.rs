@@ -14,14 +14,14 @@ use wasm_bindgen_test::*;
 fn usd_money(amount: f64) -> JsMoney {
     let usd = finstack_quant_wasm::api::core::currency::JsCurrency::new(JsValue::from("USD"))
         .expect("USD currency");
-    JsMoney::new(amount, &usd).expect("money")
+    JsMoney::new(JsValue::from(amount), &usd).expect("money")
 }
 
 fn fixed_bond() -> JsBond {
     JsBond::fixed(
         JsValue::from("BOND-1"),
         &usd_money(1_000_000.0),
-        &JsRate::new(0.05).expect("rate"),
+        &JsRate::new(JsValue::from(0.05)).expect("rate"),
         JsValue::from("2024-01-01"),
         JsValue::from("2034-01-01"),
         JsValue::from("short_front"),
@@ -129,11 +129,11 @@ fn without_timestamp(result: &wasm_bindgen::JsValue) -> serde_json::Value {
 /// the JSON path for the same instrument.
 #[wasm_bindgen_test]
 fn bp_rejects_fractional_input() {
-    assert!(JsBps::new(62.5).is_err());
-    assert!(JsRate::from_bp(12.4).is_err());
+    assert!(JsBps::new(JsValue::from(62.5)).is_err());
+    assert!(JsRate::from_bp(JsValue::from(12.4)).is_err());
     // Whole values still construct.
-    assert!(JsBps::new(200.0).is_ok());
-    assert!(JsRate::from_bp(250.0).is_ok());
+    assert!(JsBps::new(JsValue::from(200.0)).is_ok());
+    assert!(JsRate::from_bp(JsValue::from(250.0)).is_ok());
 }
 
 #[wasm_bindgen_test]
@@ -186,7 +186,7 @@ fn bond_floating_constructor_builds_frn() {
         JsValue::from("FRN-1"),
         &usd_money(1_000_000.0),
         JsValue::from("USD-SOFR-3M"),
-        &JsBps::new(200.0).unwrap(),
+        &JsBps::new(JsValue::from(200.0)).unwrap(),
         JsValue::from("2024-01-01"),
         JsValue::from("2030-01-01"),
         &JsTenor::quarterly(),

@@ -1,6 +1,6 @@
 //! WASM bindings for product-independent liquidity models.
 
-use crate::utils::input::js_f64_seq;
+use crate::utils::input::{js_f64, js_f64_seq, js_opt_f64};
 use crate::utils::{to_js_err, to_js_value};
 use finstack_quant_models::liquidity::{self, KyleLambdaModel};
 use wasm_bindgen::prelude::*;
@@ -41,8 +41,19 @@ pub fn amihud_illiquidity(returns: JsValue, volumes: JsValue) -> Result<Option<f
 /// @param participationRate - Fraction of ADV available for execution each trading day.
 /// @returns Liquidation horizon in trading days, or infinity for non-positive capacity.
 #[wasm_bindgen(js_name = daysToLiquidate)]
-pub fn days_to_liquidate(position_quantity: f64, adv: f64, participation_rate: f64) -> f64 {
-    liquidity::days_to_liquidate(position_quantity, adv, participation_rate)
+pub fn days_to_liquidate(
+    position_quantity: JsValue,
+    adv: JsValue,
+    participation_rate: JsValue,
+) -> Result<f64, JsValue> {
+    let position_quantity = js_f64(&position_quantity, "positionQuantity")?;
+    let adv = js_f64(&adv, "adv")?;
+    let participation_rate = js_f64(&participation_rate, "participationRate")?;
+    Ok(liquidity::days_to_liquidate(
+        position_quantity,
+        adv,
+        participation_rate,
+    ))
 }
 
 /// Classify a liquidation horizon into a liquidity tier.
@@ -57,9 +68,10 @@ pub fn days_to_liquidate(position_quantity: f64, adv: f64, participation_rate: f
 /// thresholds are not strictly ascending.
 #[wasm_bindgen(js_name = liquidityTier)]
 pub fn liquidity_tier(
-    days_to_liquidate: f64,
+    days_to_liquidate: JsValue,
     thresholds: Option<JsValue>,
 ) -> Result<String, JsValue> {
+    let days_to_liquidate = js_f64(&days_to_liquidate, "daysToLiquidate")?;
     let thresholds = match thresholds {
         Some(value) if !(value.is_null() || value.is_undefined()) => {
             let values = js_f64_seq(&value, "thresholds")?;
@@ -92,12 +104,17 @@ pub fn liquidity_tier(
 /// sign, or range contract, or if the result cannot be converted.
 #[wasm_bindgen(js_name = lvarBangia)]
 pub fn lvar_bangia(
-    var: f64,
-    spread_mean: f64,
-    spread_vol: f64,
-    confidence: f64,
-    position_value: f64,
+    var: JsValue,
+    spread_mean: JsValue,
+    spread_vol: JsValue,
+    confidence: JsValue,
+    position_value: JsValue,
 ) -> Result<JsValue, JsValue> {
+    let var = js_f64(&var, "varValue")?;
+    let spread_mean = js_f64(&spread_mean, "spreadMean")?;
+    let spread_vol = js_f64(&spread_vol, "spreadVol")?;
+    let confidence = js_f64(&confidence, "confidence")?;
+    let position_value = js_f64(&position_value, "positionValue")?;
     let result =
         liquidity::lvar_bangia_scalar(var, spread_mean, spread_vol, confidence, position_value)
             .map_err(to_js_err)?;
@@ -121,14 +138,21 @@ pub fn lvar_bangia(
 #[wasm_bindgen(js_name = almgrenChrissImpact)]
 #[allow(clippy::too_many_arguments)]
 pub fn almgren_chriss_impact(
-    position_size: f64,
-    avg_daily_volume: f64,
-    volatility: f64,
-    execution_horizon_days: f64,
-    permanent_impact_coef: f64,
-    temporary_impact_coef: f64,
-    reference_price: Option<f64>,
+    position_size: JsValue,
+    avg_daily_volume: JsValue,
+    volatility: JsValue,
+    execution_horizon_days: JsValue,
+    permanent_impact_coef: JsValue,
+    temporary_impact_coef: JsValue,
+    reference_price: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
+    let position_size = js_f64(&position_size, "positionSize")?;
+    let avg_daily_volume = js_f64(&avg_daily_volume, "avgDailyVolume")?;
+    let volatility = js_f64(&volatility, "volatility")?;
+    let execution_horizon_days = js_f64(&execution_horizon_days, "executionHorizonDays")?;
+    let permanent_impact_coef = js_f64(&permanent_impact_coef, "permanentImpactCoef")?;
+    let temporary_impact_coef = js_f64(&temporary_impact_coef, "temporaryImpactCoef")?;
+    let reference_price = js_opt_f64(reference_price.as_ref(), "referencePrice")?;
     let estimate = liquidity::almgren_chriss_uniform_impact(
         position_size,
         avg_daily_volume,
@@ -158,8 +182,9 @@ pub fn almgren_chriss_impact(
 pub fn kyle_lambda(
     returns: JsValue,
     volumes: JsValue,
-    reference_price: f64,
+    reference_price: JsValue,
 ) -> Result<Option<f64>, JsValue> {
+    let reference_price = js_f64(&reference_price, "referencePrice")?;
     let returns = js_f64_seq(&returns, "returns")?;
     let volumes = js_f64_seq(&volumes, "volumes")?;
     Ok(KyleLambdaModel::lambda_from_series(
@@ -167,14 +192,4 @@ pub fn kyle_lambda(
         &volumes,
         reference_price,
     ))
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn tier_without_thresholds_uses_the_rust_default() {
-        assert_eq!(liquidity_tier(3.0, None).expect("default tiers"), "tier2");
-    }
 }

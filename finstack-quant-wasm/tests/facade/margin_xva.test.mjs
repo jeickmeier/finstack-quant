@@ -72,9 +72,17 @@ test('core namespace exports HazardCurve as a live constructor', () => {
 });
 
 test('HazardCurve rejects missing recovery', () => {
-  // An omitted recovery reaches the Rust builder as NaN; the message is Rust's.
+  // An omitted recovery is a missing number: the boundary throws before Rust runs.
   assert.throws(
     () => new core.HazardCurve('HZ', '2025-01-01', [0.0, 0.02, 30.0, 0.02]),
+    (error) =>
+      error instanceof TypeError &&
+      error.kind === 'invalid_type' &&
+      error.message === 'recoveryRate: expected a number, got undefined'
+  );
+  // An explicit NaN is a number and reaches Rust's range check.
+  assert.throws(
+    () => new core.HazardCurve('HZ', '2025-01-01', [0.0, 0.02, 30.0, 0.02], Number.NaN),
     /recovery_rate must be a decimal fraction in \[0, 1\], got NaN/
   );
 });
