@@ -256,6 +256,11 @@ fn schema_index_is_sorted_by_path_and_carries_kind_and_summary() {
     assert_eq!(rows[0]["summary"], json!("An explicit one-line summary."));
     assert_eq!(rows[1]["kind"], json!("output"));
     assert_eq!(
+        rows[0]["type_name"],
+        json!("SuffixProbe"),
+        "each row names the Rust root type, not the display title"
+    );
+    assert_eq!(
         rows[1]["summary"],
         json!("Registered second but sorts first by path."),
         "an artifact without a summary must fall back to its description"

@@ -12,43 +12,36 @@ use finstack_quant_core::market_data::term_structures::{
     InflationCurve, ParametricCurve, PriceCurve,
 };
 use serde::{Deserialize, Serialize};
-#[cfg(feature = "ts_export")]
-use ts_rs::TS;
 
 /// A pre-built calibrated market object.
 ///
 /// Variants are tagged via serde as `{"kind": "<snake_case_variant>", ...}` so
 /// callers can author flat heterogeneous lists in JSON/YAML. Each wrapped
 /// curve or surface contributes its own derived JSON Schema.
-#[cfg_attr(feature = "ts_export", derive(TS))]
-#[cfg_attr(feature = "ts_export", ts(export))]
-#[cfg_attr(feature = "ts_export", ts(rename_all = "snake_case"))]
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
 pub enum PriorMarketObject {
     /// Pre-built discount-factor curve.
-    DiscountCurve(#[cfg_attr(feature = "ts_export", ts(type = "unknown"))] DiscountCurve),
+    DiscountCurve(DiscountCurve),
     /// Pre-built forward-rate curve.
-    ForwardCurve(#[cfg_attr(feature = "ts_export", ts(type = "unknown"))] ForwardCurve),
+    ForwardCurve(ForwardCurve),
     /// Pre-built default hazard-rate curve.
-    HazardCurve(#[cfg_attr(feature = "ts_export", ts(type = "unknown"))] HazardCurve),
+    HazardCurve(HazardCurve),
     /// Pre-built inflation (breakeven / index) curve.
-    InflationCurve(#[cfg_attr(feature = "ts_export", ts(type = "unknown"))] InflationCurve),
+    InflationCurve(InflationCurve),
     /// Pre-built CDS-index base-correlation curve.
-    BaseCorrelationCurve(
-        #[cfg_attr(feature = "ts_export", ts(type = "unknown"))] BaseCorrelationCurve,
-    ),
+    BaseCorrelationCurve(BaseCorrelationCurve),
     /// Pre-built tenor-basis spread curve.
-    BasisSpreadCurve(#[cfg_attr(feature = "ts_export", ts(type = "unknown"))] BasisSpreadCurve),
+    BasisSpreadCurve(BasisSpreadCurve),
     /// Pre-built parametric (e.g. Nelson-Siegel) curve.
-    ParametricCurve(#[cfg_attr(feature = "ts_export", ts(type = "unknown"))] ParametricCurve),
+    ParametricCurve(ParametricCurve),
     /// Pre-built spot / forward price curve.
-    PriceCurve(#[cfg_attr(feature = "ts_export", ts(type = "unknown"))] PriceCurve),
+    PriceCurve(PriceCurve),
     /// Pre-built volatility-index forward curve (a [`PriceCurve`] of kind `VolIndex`).
-    VolatilityIndexCurve(#[cfg_attr(feature = "ts_export", ts(type = "unknown"))] PriceCurve),
+    VolatilityIndexCurve(PriceCurve),
     /// Pre-built volatility surface (expiry x strike).
-    VolSurface(#[cfg_attr(feature = "ts_export", ts(type = "unknown"))] VolSurface),
+    VolSurface(VolSurface),
 }
 
 impl PriorMarketObject {

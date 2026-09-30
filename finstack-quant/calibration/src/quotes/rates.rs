@@ -7,8 +7,6 @@ use finstack_quant_core::types::IndexId;
 use finstack_quant_core::Result;
 use finstack_quant_valuations::market::conventions::ids::IrFutureContractId;
 use serde::{Deserialize, Serialize};
-#[cfg(feature = "ts_export")]
-use ts_rs::TS;
 
 /// Market quote for interest rate instruments.
 ///
@@ -52,9 +50,6 @@ use ts_rs::TS;
 /// # Ok(())
 /// # }
 /// ```
-#[cfg_attr(feature = "ts_export", derive(TS))]
-#[cfg_attr(feature = "ts_export", ts(export))]
-#[cfg_attr(feature = "ts_export", ts(rename_all = "snake_case"))]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(tag = "type", rename_all = "snake_case", deny_unknown_fields)]
@@ -62,13 +57,11 @@ pub enum RateQuote {
     /// Money market deposit rate.
     Deposit {
         /// Unique identifier for the quote.
-        #[cfg_attr(feature = "ts_export", ts(type = "string"))]
         id: QuoteId,
         /// Rate index identifier (e.g. "USD-SOFR-3M").
-        #[cfg_attr(feature = "ts_export", ts(type = "string"))]
         index: IndexId,
-        /// Maturity pillar (e.g. Tenor("3M") or Date("2024-01-01")).
-        #[cfg_attr(feature = "ts_export", ts(type = "string"))]
+        /// Maturity pillar; on the wire `{"tenor": {"count": 3, "unit": "months"}}`
+        /// or `{"date": "2024-01-01"}`.
         pillar: Pillar,
         /// Rate value (decimal).
         rate: f64,
@@ -76,16 +69,12 @@ pub enum RateQuote {
     /// Forward Rate Agreement.
     Fra {
         /// Unique identifier for the quote.
-        #[cfg_attr(feature = "ts_export", ts(type = "string"))]
         id: QuoteId,
         /// Rate index identifier.
-        #[cfg_attr(feature = "ts_export", ts(type = "string"))]
         index: IndexId,
         /// Start date pillar.
-        #[cfg_attr(feature = "ts_export", ts(type = "string"))]
         start: Pillar,
         /// End date pillar.
-        #[cfg_attr(feature = "ts_export", ts(type = "string"))]
         end: Pillar,
         /// Rate value (decimal).
         rate: f64,
@@ -93,10 +82,8 @@ pub enum RateQuote {
     /// Interest Rate Future (price).
     Futures {
         /// Unique identifier for the quote.
-        #[cfg_attr(feature = "ts_export", ts(type = "string"))]
         id: QuoteId,
         /// Future contract identifier (e.g. "CME:SR3").
-        #[cfg_attr(feature = "ts_export", ts(type = "string"))]
         contract: IrFutureContractId,
         /// Last trading date of the future.
         ///
@@ -104,7 +91,6 @@ pub enum RateQuote {
         /// this date. For in-arrears IMM contracts such as `CME:SR3`, pass the
         /// business day before the ending IMM Wednesday, not the named contract
         /// month's starting IMM date.
-        #[cfg_attr(feature = "ts_export", ts(type = "string"))]
         #[serde(with = "finstack_quant_core::wire::date")]
         #[cfg_attr(
             feature = "json-schema",
@@ -124,13 +110,10 @@ pub enum RateQuote {
     /// Interest Rate Swap (par rate).
     Swap {
         /// Unique identifier for the quote.
-        #[cfg_attr(feature = "ts_export", ts(type = "string"))]
         id: QuoteId,
         /// Rate index identifier (floating leg).
-        #[cfg_attr(feature = "ts_export", ts(type = "string"))]
         index: IndexId,
         /// Maturity pillar of the swap.
-        #[cfg_attr(feature = "ts_export", ts(type = "string"))]
         pillar: Pillar,
         /// Fixed rate (decimal) making the swap PV=0.
         rate: f64,

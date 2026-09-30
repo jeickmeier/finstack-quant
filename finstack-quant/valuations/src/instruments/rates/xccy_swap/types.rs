@@ -95,8 +95,6 @@ pub(crate) fn initial_principal_sign(side: PayReceive) -> f64 {
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(rename_all = "snake_case")]
-#[cfg_attr(feature = "ts_export", derive(ts_rs::TS))]
-#[cfg_attr(feature = "ts_export", ts(export, rename_all = "snake_case"))]
 #[non_exhaustive]
 pub enum NotionalExchange {
     /// No principal exchange.
@@ -137,8 +135,6 @@ impl std::fmt::Display for NotionalExchange {
 /// Identifies which leg of an XCCY swap has its notional reset under
 /// MtM-resetting. `Leg1` and `Leg2` refer to `XccySwap::leg1` and `XccySwap::leg2`
 /// respectively.
-#[cfg_attr(feature = "ts_export", derive(ts_rs::TS))]
-#[cfg_attr(feature = "ts_export", ts(export, rename_all = "snake_case"))]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(rename_all = "snake_case")]

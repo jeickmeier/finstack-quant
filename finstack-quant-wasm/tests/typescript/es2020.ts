@@ -118,12 +118,12 @@ features.rankToWeights([1, 2], ['d', 'd'], {});
 
 // Native output retains generated nested shapes and stricter emitted-field presence.
 declare const valuation: ValuationResult;
-const roundingMode: import('../../types/valuation-result').ValuationResult['meta']['rounding']['mode'] =
+const roundingMode: import('../../types/valuation-result.js').ValuationResult['meta']['rounding']['mode'] =
   valuation.meta.rounding.mode;
 const covenantReports: NonNullable<
-  import('../../types/valuation-result').ValuationResult['covenants']
+  import('../../types/valuation-result.js').ValuationResult['covenants']
 > | null = valuation.covenants;
-const explanation: import('../../types/valuation-result').ExplanationTrace | undefined =
+const explanation: import('../../types/valuation-result.js').ExplanationTrace | undefined =
   valuation.explanation;
 // @ts-expect-error Native absence is omitted, never null.
 valuation.explanation = null;

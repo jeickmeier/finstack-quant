@@ -1,15 +1,11 @@
 //! Shared option-model input types.
 
 use serde::{Deserialize, Serialize};
-#[cfg(feature = "ts_export")]
-use ts_rs::TS;
 
 /// Option payoff direction used by analytical and numerical model engines.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(rename_all = "snake_case")]
-#[cfg_attr(feature = "ts_export", derive(TS))]
-#[cfg_attr(feature = "ts_export", ts(export))]
 pub enum OptionType {
     /// Call option.
     Call,

@@ -11,8 +11,6 @@ use super::rates::RateQuote;
 use super::vol::VolQuote;
 use super::xccy::XccyQuote;
 use finstack_quant_core::{Error, Result};
-#[cfg(feature = "ts_export")]
-use ts_rs::TS;
 
 /// Polymorphic container for all supported market quote types.
 ///
@@ -41,9 +39,6 @@ use ts_rs::TS;
 /// # }
 /// ```
 ///
-#[cfg_attr(feature = "ts_export", derive(TS))]
-#[cfg_attr(feature = "ts_export", ts(export))]
-#[cfg_attr(feature = "ts_export", ts(rename_all = "snake_case"))]
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(tag = "class", rename_all = "snake_case", deny_unknown_fields)]

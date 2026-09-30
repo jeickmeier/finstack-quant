@@ -5,28 +5,21 @@ use super::validate;
 use finstack_quant_core::Result;
 use finstack_quant_valuations::market::conventions::ids::XccyConventionId;
 use serde::{Deserialize, Serialize};
-#[cfg(feature = "ts_export")]
-use ts_rs::TS;
 
 /// Market quote for a cross-currency basis swap.
 ///
 /// The quote is a spread on the base-currency floating leg. Optional `spot_fx` is
 /// quote-currency per 1 unit of base currency and is used to size the FX-equivalent
 /// notionals when the build context supplies only one standard notional.
-#[cfg_attr(feature = "ts_export", derive(TS))]
-#[cfg_attr(feature = "ts_export", ts(export))]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct XccyQuote {
     /// Unique identifier for the quote.
-    #[cfg_attr(feature = "ts_export", ts(type = "string"))]
     pub id: QuoteId,
     /// XCCY pair convention identifier (e.g., `EUR/USD-XCCY`).
-    #[cfg_attr(feature = "ts_export", ts(type = "string"))]
     pub convention: XccyConventionId,
     /// Far-leg maturity pillar; near leg is the convention spot date.
-    #[cfg_attr(feature = "ts_export", ts(type = "string"))]
     pub far_pillar: Pillar,
     /// Basis spread in basis points on the base-currency leg.
     pub basis_spread_bp: f64,

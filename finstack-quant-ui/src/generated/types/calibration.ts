@@ -16,7 +16,8 @@ export type D_826Db27Dbb673D9F5F86 =
           id: string;
           index: Id;
           /**
-           * Maturity pillar (e.g. Tenor("3M") or Date("2024-01-01")).
+           * Maturity pillar; on the wire `{"tenor": {"count": 3, "unit": "months"}}`
+           * or `{"date": "2024-01-01"}`.
            */
           pillar:
             | {
@@ -5725,14 +5726,6 @@ export interface D_65447E12Defc07E99879 {
    * Absolute minimum allowed discount factor (prevents singularity).
    */
   df_hard_min?: number;
-  /**
-   * Extrapolation policy for the constructed curve.
-   */
-  extrapolation_policy?: "flat_zero" | "flat_forward" | "none";
-  /**
-   * Interpolation style for the constructed curve.
-   */
-  interp_style?: "linear" | "log_linear" | "monotone_convex" | "cubic_hermite" | "piecewise_quadratic_forward";
   /**
    * Step size (h) for finite-difference Jacobian calculation.
    */

@@ -177,6 +177,7 @@ pub struct SchemaArtifact {
     /// Whether callers author this document, read it, or only reference it.
     pub kind: SchemaKind,
     generator: fn(&SchemaArtifact) -> Result<Value>,
+    type_name: fn() -> std::borrow::Cow<'static, str>,
     examples: fn() -> Result<Vec<Value>>,
     packager: fn(&mut Value) -> Result<()>,
 }
@@ -205,6 +206,7 @@ impl SchemaArtifact {
             summary: "",
             kind: SchemaKind::Component,
             generator: generate_artifact::<T>,
+            type_name: <T as JsonSchema>::schema_name,
             examples: empty_examples,
             packager: no_op_packager,
         }
@@ -272,6 +274,17 @@ impl SchemaArtifact {
     pub const fn with_packager(mut self, packager: fn(&mut Value) -> Result<()>) -> Self {
         self.packager = packager;
         self
+    }
+
+    /// Return the Rust type name of the root contract type.
+    ///
+    /// This is the `schemars` schema name of `T`: the same name the type
+    /// carries in `$defs` wherever another contract embeds it. Generated host
+    /// declarations (the WASM package's TypeScript types) name the root with it,
+    /// so a document's type keeps its Rust name rather than its display title.
+    #[must_use]
+    pub fn type_name(&self) -> std::borrow::Cow<'static, str> {
+        (self.type_name)()
     }
 
     /// Render this artifact exactly as the checked-in file is written.

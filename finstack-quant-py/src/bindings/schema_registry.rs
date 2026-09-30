@@ -24,7 +24,7 @@ macro_rules! schema_registry_functions {
         /// -------
         /// str
         ///     Pretty-printed JSON with an ``artifacts`` array. Each row carries
-        ///     ``path``, ``$id``, ``title``, ``summary``, ``bytes`` and ``kind``
+        ///     ``path``, ``$id``, ``title``, ``type_name`` (the Rust root type), ``summary``, ``bytes`` and ``kind``
         ///     (``input`` for documents you author, ``output`` for documents the
         ///     library emits, ``component`` for shared definitions).
         ///

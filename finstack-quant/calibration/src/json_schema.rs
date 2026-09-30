@@ -60,6 +60,26 @@ fn build_artifacts() -> Vec<SchemaArtifact> {
             "Build a market from quotes: a calibration plan, flat market data, and any pre-built curves or surfaces.",
         )
         .with_examples(calibration_examples),
+        SchemaArtifact::new::<crate::api::schema::CalibrationResultEnvelope>(
+            "schemas/calibration/1/calibration_result.schema.json",
+            "https://finstack_quant.dev/schemas/calibration/1/calibration_result.schema.json",
+            "Calibration Result",
+            "Canonical typed calibration result envelope.",
+        )
+        .with_packager(finstack_quant_valuations::schema::package_valuations_schema)
+        .with_kind(SchemaKind::Output)
+        .with_summary(
+            "The calibrated market snapshot with the plan-level and per-step fit reports.",
+        ),
+        SchemaArtifact::new::<crate::api::validate::CalibrationValidationReport>(
+            "schemas/calibration/1/calibration_validation_report.schema.json",
+            "https://finstack_quant.dev/schemas/calibration/1/calibration_validation_report.schema.json",
+            "Calibration Validation Report",
+            "Structural validation findings and the static step dependency graph.",
+        )
+        .with_packager(finstack_quant_valuations::schema::package_valuations_schema)
+        .with_kind(SchemaKind::Output)
+        .with_summary("Dry-run findings for a calibration envelope; nothing is solved."),
         SchemaArtifact::new::<crate::quotes::market_quote::MarketQuote>(
             "schemas/market/1/market_quote.schema.json",
             "https://finstack_quant.dev/schemas/market/1/market_quote.schema.json",
@@ -69,5 +89,61 @@ fn build_artifacts() -> Vec<SchemaArtifact> {
         .with_packager(finstack_quant_valuations::schema::package_valuations_schema)
         .with_summary("One market observation, tagged by asset class.")
         .with_examples(market_quote_examples),
+        component::<crate::api::schema::StepParams>(
+            "schemas/calibration/1/step_params.schema.json",
+            "https://finstack_quant.dev/schemas/calibration/1/step_params.schema.json",
+            "Step Params",
+            "Kind-tagged parameters of one calibration step, flattened into `CalibrationStep`.",
+        ),
+        component::<crate::quotes::cds::CdsQuote>(
+            "schemas/market/1/cds_quote.schema.json",
+            "https://finstack_quant.dev/schemas/market/1/cds_quote.schema.json",
+            "CDS Quote",
+            "Single-name CDS par-spread or upfront quote.",
+        ),
+        component::<crate::quotes::cds_tranche::CdsTrancheQuote>(
+            "schemas/market/1/cds_tranche_quote.schema.json",
+            "https://finstack_quant.dev/schemas/market/1/cds_tranche_quote.schema.json",
+            "CDS Tranche Quote",
+            "Index tranche upfront quote.",
+        ),
+        component::<crate::quotes::inflation::InflationQuote>(
+            "schemas/market/1/inflation_quote.schema.json",
+            "https://finstack_quant.dev/schemas/market/1/inflation_quote.schema.json",
+            "Inflation Quote",
+            "Zero-coupon or year-on-year inflation swap quote.",
+        ),
+        component::<crate::quotes::rates::RateQuote>(
+            "schemas/market/1/rate_quote.schema.json",
+            "https://finstack_quant.dev/schemas/market/1/rate_quote.schema.json",
+            "Rate Quote",
+            "Deposit, FRA, futures or swap rate quote.",
+        ),
+        component::<crate::quotes::vol::VolQuote>(
+            "schemas/market/1/vol_quote.schema.json",
+            "https://finstack_quant.dev/schemas/market/1/vol_quote.schema.json",
+            "Vol Quote",
+            "Option, swaption or cap/floor volatility quote.",
+        ),
+        component::<crate::quotes::xccy::XccyQuote>(
+            "schemas/market/1/xccy_quote.schema.json",
+            "https://finstack_quant.dev/schemas/market/1/xccy_quote.schema.json",
+            "Cross-Currency Quote",
+            "Cross-currency basis swap quote.",
+        ),
     ]
+}
+
+/// Register a reusable definition that other calibration contracts embed.
+///
+/// Each one is published on its own so its Rust type name survives into the
+/// generated host declarations, even where serde flattens it into a parent.
+fn component<T: finstack_quant_core::schema::SerdeSchema>(
+    relative_path: &'static str,
+    id: &'static str,
+    title: &'static str,
+    description: &'static str,
+) -> SchemaArtifact {
+    SchemaArtifact::new::<T>(relative_path, id, title, description)
+        .with_packager(finstack_quant_valuations::schema::package_valuations_schema)
 }

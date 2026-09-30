@@ -1,0 +1,491 @@
+{
+  "$defs": {
+    "DependencyGraph": {
+      "description": "Static dependency graph derived from a [`CalibrationEnvelope`].",
+      "properties": {
+        "initial_ids": {
+          "description": "Curve / surface IDs available at the start of execution, contributed\nby `market_data` and `prior_market`.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "nodes": {
+          "description": "Per-step inputs and outputs in declared order.",
+          "items": {
+            "$ref": "#/$defs/DependencyNode"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "initial_ids",
+        "nodes"
+      ],
+      "type": "object"
+    },
+    "DependencyNode": {
+      "description": "A single step's view of the dependency graph.",
+      "properties": {
+        "kind": {
+          "description": "Step kind (`\"discount\"`, `\"forward\"`, ...).",
+          "type": "string"
+        },
+        "reads": {
+          "description": "Curve / surface IDs the step depends on. Each must be either in\n`initial_ids` or produced by an earlier step.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "step_id": {
+          "description": "Step identifier.",
+          "type": "string"
+        },
+        "step_index": {
+          "description": "Zero-based index in `plan.steps`.",
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "writes": {
+          "description": "Curve / surface ID(s) the step produces.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "step_index",
+        "step_id",
+        "kind",
+        "reads",
+        "writes"
+      ],
+      "type": "object"
+    },
+    "EnvelopeError": {
+      "description": "Errors surfaced when an envelope is invalid or calibration fails.",
+      "oneOf": [
+        {
+          "description": "A step references a curve / surface ID that's not produced by an\nearlier step or carried in `market_data` / `prior_market`.",
+          "properties": {
+            "available": {
+              "description": "Identifiers available at the time the step would run.",
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "kind": {
+              "const": "missing_dependency",
+              "type": "string"
+            },
+            "missing_id": {
+              "description": "The missing curve/surface identifier referenced by the step.",
+              "type": "string"
+            },
+            "missing_kind": {
+              "description": "Kind of the missing dependency (e.g. `\"discount\"`, `\"surface\"`).",
+              "type": "string"
+            },
+            "step_id": {
+              "description": "Step identifier.",
+              "type": "string"
+            },
+            "step_index": {
+              "description": "Zero-based index of the offending step in `plan.steps`.",
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "step_kind": {
+              "description": "Step kind (e.g. `\"forward\"`, `\"hazard\"`).",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "step_index",
+            "step_id",
+            "step_kind",
+            "missing_id",
+            "missing_kind",
+            "available"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "A step's `quote_set` field references a name not in `plan.quote_sets`.",
+          "properties": {
+            "available": {
+              "description": "Defined `quote_set` names in the plan.",
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "kind": {
+              "const": "undefined_quote_set",
+              "type": "string"
+            },
+            "ref_name": {
+              "description": "The missing `quote_set` name as referenced by the step.",
+              "type": "string"
+            },
+            "step_id": {
+              "description": "Step identifier.",
+              "type": "string"
+            },
+            "step_index": {
+              "description": "Zero-based index of the offending step.",
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "suggestion": {
+              "description": "Closest-match suggestion (Levenshtein distance ≤ 3), if any.",
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          "required": [
+            "kind",
+            "step_index",
+            "step_id",
+            "ref_name",
+            "available"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Two calibration steps use the same audit identifier.",
+          "properties": {
+            "duplicate_index": {
+              "description": "Zero-based index of the conflicting declaration.",
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "first_index": {
+              "description": "Zero-based index of the first declaration.",
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "kind": {
+              "const": "duplicate_step_id",
+              "type": "string"
+            },
+            "step_id": {
+              "description": "Duplicated step identifier.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "step_id",
+            "first_index",
+            "duplicate_index"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "A solver step did not converge to within tolerance.",
+          "properties": {
+            "iterations": {
+              "description": "Iterations performed before termination.",
+              "format": "uint32",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "kind": {
+              "const": "solver_not_converged",
+              "type": "string"
+            },
+            "max_residual": {
+              "description": "Largest absolute residual at termination.",
+              "format": "double",
+              "type": "number"
+            },
+            "step_id": {
+              "description": "Step identifier.",
+              "type": "string"
+            },
+            "tolerance": {
+              "description": "Configured solver tolerance.",
+              "format": "double",
+              "type": "number"
+            },
+            "worst_quote_id": {
+              "description": "Identifier of the worst-fitting quote, if known.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "worst_quote_residual": {
+              "description": "Residual of the worst-fitting quote, if known.",
+              "format": "double",
+              "type": [
+                "number",
+                "null"
+              ]
+            }
+          },
+          "required": [
+            "kind",
+            "step_id",
+            "max_residual",
+            "tolerance",
+            "iterations"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Quote data fails domain validation (NaN, out-of-range, etc.).",
+          "properties": {
+            "kind": {
+              "const": "quote_data_invalid",
+              "type": "string"
+            },
+            "quote_id": {
+              "description": "Quote identifier that failed validation.",
+              "type": "string"
+            },
+            "reason": {
+              "description": "Human-readable reason describing the validation failure.",
+              "type": "string"
+            },
+            "step_id": {
+              "description": "Step identifier consuming the quote.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "step_id",
+            "quote_id",
+            "reason"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Two entries in `market_data` share the same `(kind, id)` (or same id\nwithin the quote namespace shared by the eight `*_quote` kinds).",
+          "properties": {
+            "datum_kind": {
+              "description": "`\"quote\"` (shared namespace for the eight `*_quote` variants) or\nthe specific datum kind name for non-quote variants.\n\nRenamed to `datum_kind` in the Rust struct because the enum's serde\ntag is already named `kind`; the JSON payload uses `datum_kind`.",
+              "type": "string"
+            },
+            "id": {
+              "description": "The duplicated identifier.",
+              "type": "string"
+            },
+            "kind": {
+              "const": "duplicate_market_datum_id",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "datum_kind",
+            "id"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "A quote ID listed in `plan.quote_sets[name]` doesn't resolve to any\nquote-kind entry in `market_data`.",
+          "properties": {
+            "id": {
+              "description": "The unresolved quote identifier.",
+              "type": "string"
+            },
+            "kind": {
+              "const": "quote_id_not_in_market_data",
+              "type": "string"
+            },
+            "quote_set": {
+              "description": "The named quote set in `plan.quote_sets`.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "quote_set",
+            "id"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Two steps (or a step and an explicit quote set) define the same\nquote-set name with different quote ids.",
+          "properties": {
+            "kind": {
+              "const": "quote_set_conflict",
+              "type": "string"
+            },
+            "quote_set": {
+              "description": "The conflicting quote-set name.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "quote_set"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "One quote id is attached to steps with two different payloads.",
+          "properties": {
+            "id": {
+              "description": "The quote identifier attached with conflicting payloads.",
+              "type": "string"
+            },
+            "kind": {
+              "const": "conflicting_market_datum",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "id"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Strict bounded contract loading rejected the request or result.\n\n`message` already lists every retained diagnostic (JSON pointer and\nmessage); `diagnostics` carries the same findings structurally so hosts\ncan surface them as records without parsing the message.",
+          "properties": {
+            "diagnostics": {
+              "description": "Structured contract diagnostics retained by the bounded loader;\nempty when the failure carried no per-pointer findings.",
+              "items": {
+                "$ref": "#/$defs/StrictLoadDiagnostic"
+              },
+              "type": "array"
+            },
+            "kind": {
+              "const": "strict_load",
+              "type": "string"
+            },
+            "message": {
+              "description": "Bounded parser or semantic-validation summary, including each\nretained diagnostic's pointer and message.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "message"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "A JSON response payload could not be serialized.",
+          "properties": {
+            "kind": {
+              "const": "json_serialize",
+              "type": "string"
+            },
+            "message": {
+              "description": "Serializer-provided error description.",
+              "type": "string"
+            },
+            "target": {
+              "description": "Payload being serialized, e.g. `\"CalibrationValidationReport\"`.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "target",
+            "message"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "StrictLoadDiagnostic": {
+      "description": "One structured finding from the bounded strict loader.\n\nMirrors the host-independent fields of\n[`finstack_quant_core::contract::Diagnostic`] so the Python and WASM\nbindings can attach the findings as plain records.",
+      "properties": {
+        "actual_version": {
+          "description": "Version actually found, when the finding is version-related.",
+          "format": "uint32",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "code": {
+          "description": "Stable machine-readable code (e.g. `parse/invalid-json`,\n`calibration/undefined-quote-set`).",
+          "type": "string"
+        },
+        "contract": {
+          "description": "Contract identifier the finding was evaluated against, when known.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "expected_version": {
+          "description": "Expected contract version, when the finding is version-related.",
+          "format": "uint32",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "message": {
+          "description": "Human-readable description of the finding.",
+          "type": "string"
+        },
+        "phase": {
+          "description": "Load phase that produced the finding (`parse`, `version`, `structure`,\n`semantic`, ...).",
+          "type": "string"
+        },
+        "pointer": {
+          "description": "RFC 6901 JSON pointer into the request document, when known.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "severity": {
+          "description": "Severity label (`error` or `warning`).",
+          "type": "string"
+        }
+      },
+      "required": [
+        "code",
+        "phase",
+        "severity",
+        "message"
+      ],
+      "type": "object"
+    }
+  },
+  "$id": "https://finstack_quant.dev/schemas/calibration/1/calibration_validation_report.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Structural validation findings and the static step dependency graph.",
+  "properties": {
+    "dependency_graph": {
+      "$ref": "#/$defs/DependencyGraph",
+      "description": "Topological view of the steps' inputs and outputs."
+    },
+    "errors": {
+      "description": "All errors found in a single pass; empty if the envelope is valid.",
+      "items": {
+        "$ref": "#/$defs/EnvelopeError"
+      },
+      "type": "array"
+    }
+  },
+  "required": [
+    "errors",
+    "dependency_graph"
+  ],
+  "title": "Calibration Validation Report",
+  "type": "object"
+}

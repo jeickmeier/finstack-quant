@@ -546,8 +546,8 @@ fn pricing_entry_points_declare_structured_valuation_results() {
         "measures: Record<string, number>;"
     ));
     assert!(contains_ignoring_ws(&dts, "details?: ValuationDetails;"));
-    assert!(dts.contains("import('./types/valuation-result').MonteCarloValuationDetails"));
-    assert!(dts.contains("import('./types/valuation-result').ValuationDetails"));
+    assert!(dts.contains("import('./types/valuation-result.js').MonteCarloValuationDetails"));
+    assert!(dts.contains("import('./types/valuation-result.js').ValuationDetails"));
     let host = fs::read_to_string(
         PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("types/valuation-result.d.ts"),
     )
@@ -675,7 +675,7 @@ fn package_dts_documents_hand_facade_over_raw_wasm_bindgen_types() {
     assert!(dts.contains("export declare const features: FeaturesNamespace;"));
     assert!(dts.contains("export declare const valuations: ValuationsNamespace;"));
     assert!(dts.contains("export declare const portfolio: PortfolioNamespace;"));
-    assert!(dts.contains("generated `types/generated/*` files"));
+    assert!(dts.contains("schema-generated `types/generated/<crate>/` modules"));
 }
 
 #[test]

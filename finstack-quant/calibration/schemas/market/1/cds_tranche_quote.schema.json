@@ -1,0 +1,145 @@
+{
+  "$defs": {
+    "CdsConventionKey": {
+      "description": "Key to look up CDS conventions (Currency + DocClause).\n\nCDS conventions are identified by both currency and documentation clause, as different\nclauses have different market conventions. Used to look up [`CdsConventionSpec`](crate::market::conventions::defs::CdsConventionSpec)\nfrom the convention registry.\n\n# Examples\n\n```rust\nuse finstack_quant_valuations::market::conventions::ids::{CdsConventionKey, CdsDocClause};\nuse finstack_quant_core::currency::Currency;\n\nlet key = CdsConventionKey {\n    currency: Currency::USD,\n    doc_clause: CdsDocClause::Cr14,\n};\n```",
+      "properties": {
+        "currency": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/currency.schema.json",
+          "description": "The currency of the CDS."
+        },
+        "doc_clause": {
+          "$ref": "#/$defs/CdsDocClause",
+          "description": "The documentation clause (e.g. CR14, MM14)."
+        }
+      },
+      "required": [
+        "currency",
+        "doc_clause"
+      ],
+      "type": "object"
+    },
+    "CdsDocClause": {
+      "description": "CDS market standard documentation clauses.\n\nRepresents the ISDA documentation clause used for CDS contracts. Different clauses\ndefine different restructuring events and settlement procedures. Used as part of\n[`CdsConventionKey`] to look up CDS conventions.\n\n# Examples\n\n```rust\nuse finstack_quant_valuations::market::conventions::ids::CdsDocClause;\n\nlet clause = CdsDocClause::Cr14; // Cum-Restructuring 2014\n```",
+      "oneOf": [
+        {
+          "const": "cr14",
+          "description": "Cum-Restructuring 2014 (CR14)",
+          "type": "string"
+        },
+        {
+          "const": "mr14",
+          "description": "Modified-Restructuring 2014 (MR14)",
+          "type": "string"
+        },
+        {
+          "const": "mm14",
+          "description": "Modified-Modified-Restructuring 2014 (MM14)",
+          "type": "string"
+        },
+        {
+          "const": "xr14",
+          "description": "No-Restructuring 2014 (XR14)",
+          "type": "string"
+        },
+        {
+          "const": "isda_na",
+          "description": "ISDA North American Corporate (IsdaNa)",
+          "type": "string"
+        },
+        {
+          "const": "isda_eu",
+          "description": "ISDA European Corporate (IsdaEu)",
+          "type": "string"
+        },
+        {
+          "const": "isda_as",
+          "description": "ISDA Asia Corporate (IsdaAs)",
+          "type": "string"
+        },
+        {
+          "const": "isda_au",
+          "description": "ISDA Australia Corporate (IsdaAu)",
+          "type": "string"
+        },
+        {
+          "const": "isda_nz",
+          "description": "ISDA New Zealand Corporate (IsdaNz)",
+          "type": "string"
+        },
+        {
+          "const": "custom",
+          "description": "Custom / Other",
+          "type": "string"
+        }
+      ]
+    },
+    "QuoteId": {
+      "description": "A stable identifier for a market quote (e.g., \"USD-OIS-SWAP-5Y\").\n\nThis ID is used for human readability, logging, and potentially matching against external\ndata sources. Quote IDs should be unique within a calibration set and follow a consistent\nnaming convention (e.g., \"{currency}-{index}-{type}-{pillar}\").\n\n[`QuoteId::new`] is infallible, including for empty strings. Empty or\nwhitespace-only IDs are rejected when this type is deserialized from the\nwire, and again by [`MarketQuote::validate`](super::market_quote::MarketQuote::validate).\n\n# Examples\n\n```rust\nuse finstack_quant_calibration::quotes::ids::QuoteId;\n\nlet id = QuoteId::new(\"USD-SOFR-DEP-1M\");\nassert_eq!(id.as_str(), \"USD-SOFR-DEP-1M\");\n```",
+      "minLength": 1,
+      "pattern": ".*\\S.*",
+      "type": "string"
+    }
+  },
+  "$id": "https://finstack_quant.dev/schemas/market/1/cds_tranche_quote.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Index tranche upfront quote.",
+  "properties": {
+    "attachment": {
+      "description": "Attachment point (decimal, e.g. 0.03).",
+      "format": "double",
+      "type": "number"
+    },
+    "convention": {
+      "$ref": "#/$defs/CdsConventionKey",
+      "description": "Convention key (currency + doc clause)."
+    },
+    "coupon_bp": {
+      "description": "Contractual running coupon of the tranche, in basis points.",
+      "format": "double",
+      "type": "number"
+    },
+    "detachment": {
+      "description": "Detachment point (decimal, e.g. 0.07).",
+      "format": "double",
+      "type": "number"
+    },
+    "id": {
+      "$ref": "#/$defs/QuoteId",
+      "description": "Unique identifier."
+    },
+    "index": {
+      "description": "Index identifier (e.g. CDX.NA.HY).",
+      "type": "string"
+    },
+    "maturity": {
+      "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
+      "description": "Maturity date."
+    },
+    "series": {
+      "description": "CDS index series number.",
+      "format": "uint16",
+      "maximum": 65535,
+      "minimum": 0,
+      "type": "integer"
+    },
+    "upfront_pct": {
+      "description": "Upfront payment as a decimal fraction of tranche notional (e.g., -0.025 for -2.5%).",
+      "format": "double",
+      "type": "number"
+    }
+  },
+  "required": [
+    "id",
+    "index",
+    "series",
+    "attachment",
+    "detachment",
+    "maturity",
+    "upfront_pct",
+    "coupon_bp",
+    "convention"
+  ],
+  "title": "CDS Tranche Quote",
+  "type": "object"
+}

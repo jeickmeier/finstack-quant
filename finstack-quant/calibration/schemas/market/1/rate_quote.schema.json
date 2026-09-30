@@ -1,0 +1,211 @@
+{
+  "$defs": {
+    "IrFutureContractId": {
+      "description": "Stable identifier for an Interest Rate Future contract (e.g., \"CME:SR3\").\n\nUsed to look up [`IrFutureConventions`](crate::market::conventions::defs::IrFutureConventions)\nfrom the convention registry.",
+      "type": "string"
+    },
+    "Pillar": {
+      "description": "The maturity pillar of a quote.\n\nThe pillar represents the maturity of the instrument referenced by the quote. OTC instruments\n(swaps, deposits) typically use `Tenor` (e.g., \"5Y\") to allow rolling headers that automatically\nadjust as the valuation date changes. Futures or bespoke runs may use `Date` to pin a specific\nmaturity date.\n\nThe JSON wire form is externally tagged: `{\"tenor\": {\"count\": 5, \"unit\": \"years\"}}`\nor `{\"date\": \"2029-06-20\"}`. A bare string such as `\"5Y\"` is rejected.\n\n# Examples\n\nUsing a tenor pillar:\n```rust\nuse finstack_quant_calibration::quotes::ids::Pillar;\n\n# fn example() -> finstack_quant_core::Result<()> {\nlet pillar = Pillar::Tenor(\"5Y\".parse()?);\n# Ok(())\n# }\n```\n\nUsing a date pillar:\n```rust\nuse finstack_quant_calibration::quotes::ids::Pillar;\nuse finstack_quant_core::dates::Date;\n\nlet pillar = Pillar::Date(Date::from_calendar_date(2029, time::Month::June, 20).unwrap());\n```",
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "description": "A relative tenor (e.g., 5Y, 3M).\n\nThe maturity is calculated relative to the valuation date, allowing quotes to \"roll\"\nforward automatically. This is the standard approach for OTC instruments.",
+          "properties": {
+            "tenor": {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/tenor.schema.json"
+            }
+          },
+          "required": [
+            "tenor"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "An absolute date.\n\nThe maturity is fixed to a specific date, regardless of the valuation date. This is\ntypically used for futures contracts or bespoke instruments with fixed maturities.",
+          "properties": {
+            "date": {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json"
+            }
+          },
+          "required": [
+            "date"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "QuoteId": {
+      "description": "A stable identifier for a market quote (e.g., \"USD-OIS-SWAP-5Y\").\n\nThis ID is used for human readability, logging, and potentially matching against external\ndata sources. Quote IDs should be unique within a calibration set and follow a consistent\nnaming convention (e.g., \"{currency}-{index}-{type}-{pillar}\").\n\n[`QuoteId::new`] is infallible, including for empty strings. Empty or\nwhitespace-only IDs are rejected when this type is deserialized from the\nwire, and again by [`MarketQuote::validate`](super::market_quote::MarketQuote::validate).\n\n# Examples\n\n```rust\nuse finstack_quant_calibration::quotes::ids::QuoteId;\n\nlet id = QuoteId::new(\"USD-SOFR-DEP-1M\");\nassert_eq!(id.as_str(), \"USD-SOFR-DEP-1M\");\n```",
+      "minLength": 1,
+      "pattern": ".*\\S.*",
+      "type": "string"
+    }
+  },
+  "$id": "https://finstack_quant.dev/schemas/market/1/rate_quote.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Deposit, FRA, futures or swap rate quote.",
+  "oneOf": [
+    {
+      "additionalProperties": false,
+      "description": "Money market deposit rate.",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/QuoteId",
+          "description": "Unique identifier for the quote."
+        },
+        "index": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+          "description": "Rate index identifier (e.g. \"USD-SOFR-3M\")."
+        },
+        "pillar": {
+          "$ref": "#/$defs/Pillar",
+          "description": "Maturity pillar; on the wire `{\"tenor\": {\"count\": 3, \"unit\": \"months\"}}`\nor `{\"date\": \"2024-01-01\"}`."
+        },
+        "rate": {
+          "description": "Rate value (decimal).",
+          "format": "double",
+          "type": "number"
+        },
+        "type": {
+          "const": "deposit",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type",
+        "id",
+        "index",
+        "pillar",
+        "rate"
+      ],
+      "type": "object"
+    },
+    {
+      "additionalProperties": false,
+      "description": "Forward Rate Agreement.",
+      "properties": {
+        "end": {
+          "$ref": "#/$defs/Pillar",
+          "description": "End date pillar."
+        },
+        "id": {
+          "$ref": "#/$defs/QuoteId",
+          "description": "Unique identifier for the quote."
+        },
+        "index": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+          "description": "Rate index identifier."
+        },
+        "rate": {
+          "description": "Rate value (decimal).",
+          "format": "double",
+          "type": "number"
+        },
+        "start": {
+          "$ref": "#/$defs/Pillar",
+          "description": "Start date pillar."
+        },
+        "type": {
+          "const": "fra",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type",
+        "id",
+        "index",
+        "start",
+        "end",
+        "rate"
+      ],
+      "type": "object"
+    },
+    {
+      "additionalProperties": false,
+      "description": "Interest Rate Future (price).",
+      "properties": {
+        "contract": {
+          "$ref": "#/$defs/IrFutureContractId",
+          "description": "Future contract identifier (e.g. \"CME:SR3\")."
+        },
+        "convexity_adjustment": {
+          "description": "Convexity adjustment as a decimal rate (Hull convention).\n\nThe implied forward is\n`forward = (100 - price) / 100 − convexity_adjustment`.\nA positive adjustment lowers the futures-implied rate toward the true\nforward. Callers that want no adjustment must pass `0.0` explicitly.",
+          "format": "double",
+          "type": "number"
+        },
+        "expiry": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
+          "description": "Last trading date of the future.\n\nThe convention registry derives the underlying reference period from\nthis date. For in-arrears IMM contracts such as `CME:SR3`, pass the\nbusiness day before the ending IMM Wednesday, not the named contract\nmonth's starting IMM date."
+        },
+        "id": {
+          "$ref": "#/$defs/QuoteId",
+          "description": "Unique identifier for the quote."
+        },
+        "price": {
+          "description": "Price of the future (e.g. 98.50).",
+          "format": "double",
+          "type": "number"
+        },
+        "type": {
+          "const": "futures",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type",
+        "id",
+        "contract",
+        "expiry",
+        "price",
+        "convexity_adjustment"
+      ],
+      "type": "object"
+    },
+    {
+      "additionalProperties": false,
+      "description": "Interest Rate Swap (par rate).",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/QuoteId",
+          "description": "Unique identifier for the quote."
+        },
+        "index": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+          "description": "Rate index identifier (floating leg)."
+        },
+        "pillar": {
+          "$ref": "#/$defs/Pillar",
+          "description": "Maturity pillar of the swap."
+        },
+        "rate": {
+          "description": "Fixed rate (decimal) making the swap PV=0.",
+          "format": "double",
+          "type": "number"
+        },
+        "spread_decimal": {
+          "default": null,
+          "description": "Optional spread over the index in decimal format (e.g., 0.0010 for 10 basis points).\n\nThis spread is added to the floating leg rate. The value is in decimal format\nand will be converted to basis points internally (multiplied by 10,000).",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "type": {
+          "const": "swap",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type",
+        "id",
+        "index",
+        "pillar",
+        "rate"
+      ],
+      "type": "object"
+    }
+  ],
+  "title": "Rate Quote"
+}

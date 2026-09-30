@@ -29,7 +29,6 @@ jsonschema = { version = "0.28", default-features = false, optional = true }
 tracing = { version = "0.1", default-features = false, features = ["attributes"] }
 thiserror = { workspace = true }
 strum = { workspace = true, features = ["derive"] }
-ts-rs = { version = "12", optional = true, features = ["serde-compat", "no-serde-warnings"] }
 
 # rayon has no working thread pool on single-threaded wasm32; parallel
 # code paths are cfg-gated to native targets, so the dependency is too.
@@ -62,7 +61,6 @@ jsonschema-validate = [
     "dep:jsonschema",
     "finstack-quant-cashflows/jsonschema-validate",
 ]
-ts_export = ["dep:ts-rs", "finstack-quant-models/ts_export"]
 
 [[bench]]
 name = "bond_pricing"

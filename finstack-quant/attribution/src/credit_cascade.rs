@@ -657,8 +657,8 @@ mod tests {
     use finstack_quant_core::market_data::term_structures::HazardCurve;
     use finstack_quant_core::money::Money;
     use finstack_quant_models::factor::credit::hierarchy::{
-        AdderVolSource, CalibrationDiagnostics, CreditFactorModel, CreditHierarchySpec, DateRange,
-        FactorCorrelationMatrix, GenericFactorSpec, HierarchyDimension, IssuerBetaMode,
+        AdderVolSource, CreditCalibrationDiagnostics, CreditFactorModel, CreditHierarchySpec,
+        DateRange, FactorCorrelationMatrix, GenericFactorSpec, HierarchyDimension, IssuerBetaMode,
         IssuerBetaPolicy, IssuerBetaRow, IssuerBetas, IssuerTags, LevelsAtAnchor, VolState,
     };
     use finstack_quant_models::factor::{
@@ -734,7 +734,7 @@ mod tests {
                 idiosyncratic: std::collections::BTreeMap::new(),
             },
             factor_histories: None,
-            diagnostics: CalibrationDiagnostics {
+            diagnostics: CreditCalibrationDiagnostics {
                 mode_counts: std::collections::BTreeMap::new(),
                 bucket_sizes_per_level: vec![],
                 fold_ups: vec![],

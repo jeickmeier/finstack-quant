@@ -59,7 +59,7 @@
 //! # Design notes
 //!
 //! - Stable artifact structs use `#[serde(deny_unknown_fields)]` to catch schema
-//!   drift early. `CalibrationDiagnostics` is the explicitly open extension
+//!   drift early. `CreditCalibrationDiagnostics` is the explicitly open extension
 //!   object for additive diagnostic fields.
 //! - All keyed maps use `BTreeMap` for deterministic serialization order.
 //! - `Vec<IssuerBetaRow>` is kept sorted by `issuer_id` so two calibrations on
@@ -762,7 +762,7 @@ pub struct FoldUpRecord {
 /// diagnostic fields in future calibration versions.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-pub struct CalibrationDiagnostics {
+pub struct CreditCalibrationDiagnostics {
     /// Count of resolved [`IssuerBetaMode`] values.
     ///
     /// Keys are `"issuer_beta"` and `"bucket_only"`.
@@ -893,7 +893,7 @@ pub struct CreditFactorModel {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub factor_histories: Option<FactorHistories>,
     /// Structured calibration diagnostics for programmatic coverage checks.
-    pub diagnostics: CalibrationDiagnostics,
+    pub diagnostics: CreditCalibrationDiagnostics,
 }
 
 impl CreditFactorModel {
@@ -1174,7 +1174,7 @@ mod tests {
                 idiosyncratic: BTreeMap::new(),
             },
             factor_histories: None,
-            diagnostics: CalibrationDiagnostics {
+            diagnostics: CreditCalibrationDiagnostics {
                 mode_counts: BTreeMap::new(),
                 bucket_sizes_per_level: vec![],
                 fold_ups: vec![],
@@ -1287,7 +1287,7 @@ mod tests {
 
     // INVARIANTS.md §8 contract: the root artifact is closed
     // (`deny_unknown_fields`), so an unknown root key must FAIL to
-    // deserialize; `CalibrationDiagnostics` is an open extension point, so
+    // deserialize; `CreditCalibrationDiagnostics` is an open extension point, so
     // an unknown diagnostics key must deserialize successfully. Adding a
     // root key therefore requires a coordinated v1 contract change.
     #[test]
@@ -1320,7 +1320,7 @@ mod tests {
         let parsed = serde_json::from_str::<CreditFactorModel>(&with_diag_key);
         assert!(
             parsed.is_ok(),
-            "unknown CalibrationDiagnostics key must deserialize: diagnostics \
+            "unknown CreditCalibrationDiagnostics key must deserialize: diagnostics \
              is a declared open extension point (no deny_unknown_fields)"
         );
     }

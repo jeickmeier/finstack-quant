@@ -28,7 +28,7 @@ def index() -> str:
     >>> import json
     >>> from finstack_quant.calibration import schema
     >>> len(json.loads(schema.index())["artifacts"])
-    2
+    11
     """
     ...
 

@@ -6,7 +6,8 @@
       "kind": "input",
       "path": "schemas/scenarios/1/scenario.schema.json",
       "summary": "Ordered shock and roll operations over market, statement and valuation targets.",
-      "title": "Finstack Quant Scenario Specification"
+      "title": "Finstack Quant Scenario Specification",
+      "type_name": "ScenarioEnvelope"
     }
   ],
   "schema_index_version": 1

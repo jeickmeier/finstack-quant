@@ -27,7 +27,7 @@
 //!    to PSD, Σ = D·ρ_repaired·D; `LedoitWolf` → Σ and ρ from the Ledoit-Wolf
 //!    identity-target shrinkage estimator over complete-case observations.
 //! 10. Assemble [`crate::factor::FactorModelConfig`] with `MatchingConfig::CreditHierarchical`.
-//! 11. Build [`CalibrationDiagnostics`][crate::factor::credit::hierarchy::CalibrationDiagnostics]
+//! 11. Build [`CreditCalibrationDiagnostics`][crate::factor::credit::hierarchy::CreditCalibrationDiagnostics]
 //!     from the bookkeeping above.
 //! 12. Return the assembled
 //!     [`CreditFactorModel`][crate::factor::credit::hierarchy::CreditFactorModel] after a final

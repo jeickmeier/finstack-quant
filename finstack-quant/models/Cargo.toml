@@ -27,7 +27,6 @@ time = { workspace = true }
 schemars = { workspace = true, optional = true }
 thiserror = { workspace = true }
 num-complex = "0.4"
-ts-rs = { version = "12", optional = true, features = ["serde-compat", "no-serde-warnings"] }
 
 # rayon has no working thread pool on single-threaded wasm32; parallel
 # code paths are cfg-gated to native targets, so the dependency is too.
@@ -41,7 +40,6 @@ json-schema = [
     "finstack-quant-core/json-schema",
     "finstack-quant-cashflows/json-schema",
 ]
-ts_export = ["dep:ts-rs"]
 
 [dev-dependencies]
 criterion = { workspace = true }

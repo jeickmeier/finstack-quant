@@ -202,7 +202,8 @@ finstack-quant = { path = ".." }
 
 | Feature | Default | Purpose |
 |---------|---------|---------|
-| `ts_export` | off | `ts-rs` TypeScript type export for schema/quote/calibration types |
+| `json-schema` | on | `schemars` derives, the schema registry and the `gen_schemas` binary |
+| `jsonschema-validate` | on | `jsonschema` validation behind the `validate_*_json` entry points (implies `json-schema`) |
 
 Crate API docs: `cargo doc -p finstack-quant-valuations --open`.
 

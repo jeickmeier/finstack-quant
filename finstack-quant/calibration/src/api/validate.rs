@@ -38,9 +38,8 @@ use finstack_quant_core::contract::{
 
 /// Result of [`validate`]. Always contains the dependency graph; `errors` is
 /// empty when the envelope is structurally valid.
-#[cfg_attr(feature = "ts_export", derive(ts_rs::TS))]
-#[cfg_attr(feature = "ts_export", ts(export))]
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct CalibrationValidationReport {
     /// All errors found in a single pass; empty if the envelope is valid.
     pub errors: Vec<EnvelopeError>,
@@ -49,9 +48,8 @@ pub struct CalibrationValidationReport {
 }
 
 /// Static dependency graph derived from a [`CalibrationEnvelope`].
-#[cfg_attr(feature = "ts_export", derive(ts_rs::TS))]
-#[cfg_attr(feature = "ts_export", ts(export))]
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct DependencyGraph {
     /// Curve / surface IDs available at the start of execution, contributed
     /// by `market_data` and `prior_market`.
@@ -61,9 +59,8 @@ pub struct DependencyGraph {
 }
 
 /// A single step's view of the dependency graph.
-#[cfg_attr(feature = "ts_export", derive(ts_rs::TS))]
-#[cfg_attr(feature = "ts_export", ts(export))]
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct DependencyNode {
     /// Zero-based index in `plan.steps`.
     pub step_index: usize,

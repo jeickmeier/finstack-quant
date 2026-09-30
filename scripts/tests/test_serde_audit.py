@@ -523,16 +523,16 @@ def test_documented_one_way_inventory_is_exact() -> None:
         1,
     )[0]
     inventory_listing = inventory.split(
-        "The current public inventory contains 19 one-way types:",
+        "The current public inventory contains 16 one-way types:",
         1,
     )[1]
     documented_names = set(re.findall(r"`([A-Z][A-Za-z0-9]+)`", inventory_listing))
     audited_names = {identity[2] for identity in _MODULE.ONE_WAY_OUTPUT_IDENTITIES}
 
-    assert "current public inventory contains 19 one-way types" in inventory
+    assert "current public inventory contains 16 one-way types" in inventory
     assert documented_names == audited_names
-    assert len(_MODULE.ONE_WAY_OUTPUT_IDENTITIES) == 19
-    assert len(_MODULE.ONE_WAY_EXCEPTIONS) == 18
+    assert len(_MODULE.ONE_WAY_OUTPUT_IDENTITIES) == 16
+    assert len(_MODULE.ONE_WAY_EXCEPTIONS) == 15
     assert all(entry.rationale and entry.category for entry in _MODULE.ONE_WAY_EXCEPTIONS)
     assert all(
         entry.category != "serde-without-schema"
@@ -555,9 +555,8 @@ def test_documented_one_way_inventory_is_exact() -> None:
         "runtime-result": 16,
         "runtime-spec": 3,
         "scenario-view": 2,
-        "validation-report": 3,
     }
-    assert len(_MODULE.REVIEWED_EXCEPTIONS) == 99
+    assert len(_MODULE.REVIEWED_EXCEPTIONS) == 96
 
 
 def test_maintained_contract_capability_matrix_is_complete() -> None:

@@ -6,7 +6,8 @@
       "kind": "component",
       "path": "schemas/factor_model/1/credit_calibration_config.schema.json",
       "summary": "Estimator choice and bounds for credit factor calibration.",
-      "title": "CreditCalibrationConfig"
+      "title": "CreditCalibrationConfig",
+      "type_name": "CreditCalibrationConfig"
     },
     {
       "$id": "https://finstack_quant.dev/schemas/factor_model/1/credit_calibration_inputs.schema.json",
@@ -14,15 +15,17 @@
       "kind": "component",
       "path": "schemas/factor_model/1/credit_calibration_inputs.schema.json",
       "summary": "Observed spread panel feeding credit factor calibration.",
-      "title": "CreditCalibrationInputs"
+      "title": "CreditCalibrationInputs",
+      "type_name": "CreditCalibrationInputs"
     },
     {
       "$id": "https://finstack_quant.dev/schemas/factor_model/1/credit_factor_model.schema.json",
-      "bytes": 92104,
+      "bytes": 92116,
       "kind": "input",
       "path": "schemas/factor_model/1/credit_factor_model.schema.json",
       "summary": "Calibrated credit factor hierarchy, loadable as pricing input.",
-      "title": "CreditFactorModel"
+      "title": "CreditFactorModel",
+      "type_name": "CreditFactorModel"
     },
     {
       "$id": "https://finstack_quant.dev/schemas/factor_model/1/factor_model_config.schema.json",
@@ -30,7 +33,8 @@
       "kind": "input",
       "path": "schemas/factor_model/1/factor_model_config.schema.json",
       "summary": "Factor definitions, matchers and covariance settings.",
-      "title": "Finstack Quant Factor Model Configuration"
+      "title": "Finstack Quant Factor Model Configuration",
+      "type_name": "FactorModelConfigEnvelope"
     }
   ],
   "schema_index_version": 1

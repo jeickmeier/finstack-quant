@@ -686,34 +686,31 @@ run = [
 ]
 
 [tasks.wasm-gen-contracts]
-description = "Generate Rust-derived WASM host result schema and declarations"
+description = "Generate the WASM host result schema and every schema-derived TypeScript declaration"
 run = [
   "cargo run -p finstack-quant-wasm --example generate_contracts --features contract-generation -- --write",
   "node finstack-quant-wasm/scripts/generate-contract-types.mjs",
 ]
 
 [tasks.wasm-check-contracts]
-description = "Check Rust-derived WASM host result schema and declarations"
+description = "Check the WASM host result schema and every schema-derived TypeScript declaration"
 run = [
   "cargo run -p finstack-quant-wasm --example generate_contracts --features contract-generation -- --check",
   "node finstack-quant-wasm/scripts/generate-contract-types.mjs --check",
 ]
 
 [tasks.wasm-gen-bindings]
-description = "Export TypeScript types from Rust (writes finstack-quant-wasm/types/generated/)"
+description = "Generate TypeScript types from the Rust JSON schemas (writes finstack-quant-wasm/types/)"
 run = [
   "mise run wasm-gen-contracts",
-  "cargo test -p finstack-quant-calibration --test ts_export --features ts_export -- --test-threads=1",
-  "cargo test -p finstack-quant-portfolio --test ts_export --features ts_export",
   "uv run --no-sync python scripts/sync_generated_ts_index.py",
 ]
 
 [tasks.wasm-check-bindings]
-description = "Verify Rust-exported TypeScript types without mutating the workspace"
+description = "Verify the schema-generated TypeScript types without mutating the workspace"
 run = [
   "mise run wasm-check-contracts",
-  "uv run --no-sync pytest scripts/tests/test_check_generated_ts.py -q",
-  "uv run --no-sync python scripts/check_generated_ts.py",
+  "uv run --no-sync python scripts/sync_generated_ts_index.py --check",
 ]
 
 # ─────────────────────────────────────────────────────────────────

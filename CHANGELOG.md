@@ -2,6 +2,30 @@
 
 ## [Unreleased]
 
+### WASM binding audit: TypeScript types generated from JSON Schema (2026-09-30)
+
+#### Changed (BREAKING)
+
+- The published TypeScript types come only from the Rust JSON Schemas. `finstack-quant-wasm/types` is generated per crate (`types/generated/<crate>/`) and imported by namespace, e.g. `import type { calibration } from 'finstack-quant-wasm/types'` then `calibration.MarketDatum`; it used to be a flat barrel. The root re-exports of `finstack-quant-wasm` are unchanged.
+- ts-rs is retired: the `ts_export` feature is removed from core, models, valuations, calibration, portfolio and wasm, along with the `ts-rs` dependency.
+- The generated types now match the serde wire:
+  - integers inside JSON envelopes are `number` (e.g. `MarketFreshnessPolicy.max_age_seconds`); only the valuation-result contract uses `bigint`;
+  - `Pillar`, `Tenor` and `CdsConventionKey` have their real object shapes;
+  - `MaterializedPosition.unit` is the wire union;
+  - defaulted and skipped fields are optional;
+  - tagged-enum variants carry their fields;
+  - closed enums are string-literal unions;
+  - `InstrumentArtifact.dependencies` accepts `null`;
+  - `calibrate()` sub-documents and the `dryRun` report are typed;
+  - every import uses a `.js` specifier and compiles under NodeNext with `skipLibCheck: false`.
+- `DiscountCurveSolveConfig` drops `interp_style` and `extrapolation_policy`, which nothing read. Envelopes that still set them are rejected (`strict_load`).
+- `models::factor::credit::hierarchy::CalibrationDiagnostics` is renamed `CreditCalibrationDiagnostics`, so the schema `$defs` no longer clash with calibration's `CalibrationDiagnostics`.
+- Schema index rows gain `type_name`, and 10 schema artifacts are new (calibration result and validation report, quote components, materialization report).
+
+#### Added
+
+- Type gates: a strict NodeNext `tsc` project over the published types, and `tests/facade/contract_types.test.mjs`, which compiles real runtime outputs (calibration results and reports, materializations, a Monte Carlo valuation result) against the generated types.
+
 ### WASM binding audit: native vs wasm32 determinism (2026-09-30)
 
 #### Changed

@@ -3,7 +3,8 @@
 // The raw `pkg/finstack_quant_wasm.d.ts` emitted by wasm-bindgen is intentionally
 // not the package root contract: it exposes a flat module, while `index.js`
 // publishes a namespaced facade. Keep this file as the facade declaration and
-// use generated `types/generated/*` files only for JSON envelope shapes.
+// use the schema-generated `types/generated/<crate>/` modules for JSON contract
+// shapes (also published as `finstack-quant-wasm/types`, one namespace per crate).
 //
 // Building a MarketContext from quotes (canonical path):
 //
@@ -74,25 +75,30 @@ export default function init(
   moduleOrPath?: { module_or_path: InitInput | Promise<InitInput> } | InitInput | Promise<InitInput>
 ): Promise<InitOutput>;
 
-// --- Calibration envelope types (generated from Rust via ts-rs) ---
-import type { CalibrationEnvelope } from './types/generated/CalibrationEnvelope';
-import type { CalibrationResultEnvelope } from './types/generated/CalibrationResultEnvelope';
-import type { CalibrationValidationReport } from './types/generated/CalibrationValidationReport';
-import type { MaterializationReport } from './types/generated/MaterializationReport';
-import type { ValidationReport } from './types/generated/ValidationReport';
+// --- JSON contract types (generated from the Rust JSON Schemas) ---
+import type {
+  CalibrationEnvelope,
+  CalibrationResultEnvelope,
+  CalibrationValidationReport,
+} from './types/generated/calibration/index.js';
+import type { MaterializationReport } from './types/generated/portfolio/index.js';
+import type { ValidationReport } from './types/generated/valuations/index.js';
 
 export type { CalibrationEnvelope, CalibrationResultEnvelope, CalibrationValidationReport };
-export type { Diagnostic } from './types/generated/Diagnostic';
-export type { MaterializationPhases } from './types/generated/MaterializationPhases';
-export type { MaterializationReport } from './types/generated/MaterializationReport';
-export type { ValidationReport } from './types/generated/ValidationReport';
-export type { CalibrationPlan } from './types/generated/CalibrationPlan';
-export type { CalibrationStep } from './types/generated/CalibrationStep';
-export type { StepParams } from './types/generated/StepParams';
-export type { MarketDatum } from './types/generated/MarketDatum';
-export type { PriorMarketObject } from './types/generated/PriorMarketObject';
-export type { CalibrationResult } from './types/generated/CalibrationResult';
-export type { CalibrationReport } from './types/generated/CalibrationReport';
+export type { Diagnostic, ValidationReport } from './types/generated/valuations/index.js';
+export type {
+  MaterializationPhases,
+  MaterializationReport,
+} from './types/generated/portfolio/index.js';
+export type {
+  CalibrationPlan,
+  CalibrationReport,
+  CalibrationResult,
+  CalibrationStep,
+  MarketDatum,
+  PriorMarketObject,
+  StepParams,
+} from './types/generated/calibration/index.js';
 // wasm-bindgen handle classes are reached through their namespace (for example
 // `valuations.instruments.Bond`); the package root exports their types only.
 export type {
@@ -5748,12 +5754,12 @@ export interface MoneyValue {
  * Convergence and reproducibility diagnostics for a Monte Carlo valuation.
  */
 export type MonteCarloValuationDetails =
-  import('./types/valuation-result').MonteCarloValuationDetails;
+  import('./types/valuation-result.js').MonteCarloValuationDetails;
 
 /**
  * Model-specific native detail, generated from Rust with exact host integer representations.
  */
-export type ValuationDetails = import('./types/valuation-result').ValuationDetails;
+export type ValuationDetails = import('./types/valuation-result.js').ValuationDetails;
 
 /**
  * Valuation envelope returned by the `priceInstrument*` entry points.
@@ -5797,15 +5803,15 @@ export interface ValuationResult {
   /**
    * Policy stamps: numeric mode, rounding context, FX policy, timing.
    */
-  meta: import('./types/valuation-result').ValuationResult['meta'];
+  meta: import('./types/valuation-result.js').ValuationResult['meta'];
   /**
    * Covenant reports for instruments that carry covenants; `null` otherwise.
    */
-  covenants: NonNullable<import('./types/valuation-result').ValuationResult['covenants']> | null;
+  covenants: NonNullable<import('./types/valuation-result.js').ValuationResult['covenants']> | null;
   /**
    * Computation trace, present only when explain mode is enabled.
    */
-  explanation?: NonNullable<import('./types/valuation-result').ValuationResult['explanation']>;
+  explanation?: NonNullable<import('./types/valuation-result.js').ValuationResult['explanation']>;
 }
 
 /**
@@ -7527,15 +7533,15 @@ export interface CompositeRebalanceResult {
  * path (`PrimitiveExposure`) and aggregate (`PrimitiveAggregate`) rows. These
  * are the generated valuation-result contract types, re-exported unchanged.
  */
-export type CompositeExposureReport = import('./types/valuation-result').CompositeExposureReport;
+export type CompositeExposureReport = import('./types/valuation-result.js').CompositeExposureReport;
 /**
  * One primitive exposure path in a resolved composite.
  */
-export type PrimitiveExposure = import('./types/valuation-result').PrimitiveExposure;
+export type PrimitiveExposure = import('./types/valuation-result.js').PrimitiveExposure;
 /**
  * Net and gross concentration for one primitive identifier.
  */
-export type PrimitiveAggregate = import('./types/valuation-result').PrimitiveAggregate;
+export type PrimitiveAggregate = import('./types/valuation-result.js').PrimitiveAggregate;
 
 /**
  * One dated composite total-return and rebalance observation.

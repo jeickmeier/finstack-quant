@@ -118,7 +118,7 @@ when empty, and reject `null`.
 
 Some public result and binding-view types are intentionally one-way outputs.
 They are computed from canonical inputs and are never accepted as persisted
-request documents. The current public inventory contains 19 one-way types:
+request documents. The current public inventory contains 16 one-way types:
 
 - attribution: `ReturnContributionResult`, `InstrumentContribution`,
   `GroupContribution`, `FactorContribution`, and
@@ -130,8 +130,6 @@ request documents. The current public inventory contains 19 one-way types:
 - scenario views: `ScenarioRevalueView` and `ScenarioPnlView`;
 - sensitivity wire form: `SensitivityMatrixJson` (bidirectional, no schema);
 - statement-analysis outputs: `CreditAssessmentPoint` and `CreditAssessment`;
-- calibration validation views: `CalibrationValidationReport`, `DependencyGraph`, and
-  `DependencyNode`;
 - optimization output: `PortfolioOptimizationResult`.
 
 This list is based on effective trait support and is enforced by

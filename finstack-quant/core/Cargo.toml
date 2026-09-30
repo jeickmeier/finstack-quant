@@ -32,7 +32,6 @@ nalgebra = { version = "0.34", default-features = false, features = ["std"] }
 rand = { version = "0.9.3", default-features = false, features = ["std"] }
 rand_pcg = { version = "0.9", features = ["serde"] }
 tracing = { version = "0.1", default-features = false }
-ts-rs = { version = "12", optional = true, features = ["serde-compat", "no-serde-warnings"] }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 time = { workspace = true, features = ["wasm-bindgen"] }
@@ -45,7 +44,6 @@ rayon = "1.11"
 [features]
 default = ["json-schema"]
 json-schema = ["dep:schemars"]
-ts_export = ["dep:ts-rs"]
 
 [[bin]]
 name = "gen_core_schemas"

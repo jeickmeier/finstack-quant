@@ -253,7 +253,7 @@ fn credit_factor_model_schema_matches_generated_type_and_metadata() {
     assert_eq!(schema["additionalProperties"], false);
     assert_eq!(schema["$defs"]["DateRange"]["additionalProperties"], false);
     assert!(
-        schema["$defs"]["CalibrationDiagnostics"]
+        schema["$defs"]["CreditCalibrationDiagnostics"]
             .get("additionalProperties")
             .is_none(),
         "open diagnostics type must match serde and accept extension fields"

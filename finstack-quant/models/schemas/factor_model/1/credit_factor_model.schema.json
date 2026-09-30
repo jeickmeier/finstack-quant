@@ -159,7 +159,7 @@
         }
       ]
     },
-    "CalibrationDiagnostics": {
+    "CreditCalibrationDiagnostics": {
       "description": "Structured diagnostics attached to every calibrated artifact.\n\nConsumers can programmatically check coverage (e.g. \"≥ 95 % of buckets\nhad ≥ 5 issuers\") without parsing free-form log messages.\n\nThis struct omits `#[serde(deny_unknown_fields)]` to allow additive\ndiagnostic fields in future calibration versions.",
       "properties": {
         "bucket_sizes_per_level": {
@@ -2634,7 +2634,7 @@
       "description": "Existing factor-model config (factors, covariance, matching)."
     },
     "diagnostics": {
-      "$ref": "#/$defs/CalibrationDiagnostics",
+      "$ref": "#/$defs/CreditCalibrationDiagnostics",
       "description": "Structured calibration diagnostics for programmatic coverage checks."
     },
     "factor_histories": {

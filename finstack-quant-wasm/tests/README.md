@@ -17,7 +17,7 @@ tests/
   return_shapes.rs       host test: declared return shapes, mirror of the Python file
   boundary_signatures.rs host test: exports take host values as JsValue
   facade/*.test.mjs      Node tests against the built package via the JS facade
-  typescript/            tsc compile checks of index.d.ts under two lib targets
+  typescript/            tsc compile checks of index.d.ts and the generated types
   scripts/               tests for the JSDoc/TypeScript doc tooling in ../scripts/
 ```
 
@@ -135,6 +135,7 @@ hunts lives below the facade (see below).
 | `plain_object_returns.test.mjs`                            | map-returning functions produce plain objects, not ES2015 `Map`s                                                                                  |
 | `boundary_input.test.mjs`                                  | wrong argument types throw `TypeError` (`kind: "invalid_type"`) without trapping or leaking; JSON inputs accept objects with unknown-field checks |
 | `core_rust_owned.test.mjs`                                 | core currency/money/date/curve behaviour owned by Rust; asserts the same values and messages as `finstack-quant-py/tests/test_core_rust_owned.py` |
+| `contract_types.test.mjs`                                  | runtime calibration, materialization and valuation outputs type-check against the schema-generated TypeScript types under NodeNext                |
 
 **These need a build.** All of them except `plain_object_returns.test.mjs` load
 the web target from `pkg/finstack_quant_wasm_bg.wasm` (Node has no fetchable
@@ -167,7 +168,14 @@ the ban, `return_shapes.rs` asserts it, and this file proves it at runtime.
   ordinary typed surface, and `esnext-disposable.ts` /
   `tsconfig.esnext-disposable.json` (ES2022 + `ESNext.Disposable`) exercises the
   `WasmOwned` / `[Symbol.dispose]()` handle contract. Both run under
-  `strict: true`.
+  `strict: true`. `nodenext.ts` / `tsconfig.nodenext.json` is the consumer view:
+  it imports `finstack-quant-wasm` and `finstack-quant-wasm/types` by package
+  name under `module`/`moduleResolution` `NodeNext` with `skipLibCheck: false`,
+  compiles every schema-generated module under `../types/generated/`, and pins
+  the serde wire shapes with `@ts-expect-error` negatives (a type that degrades
+  to `any` fails the gate). `facade/contract_types.test.mjs` extends this to
+  runtime values: it type-checks real `calibrate`, `dryRun`, canonical-envelope,
+  materialization and valuation outputs against the generated types.
 - **`scripts/typescript_docs.test.mjs`** tests the documentation tooling in
   [`../scripts/`](../scripts) — `sync-facade-jsdoc.mjs`,
   `complete-facade-jsdoc.mjs`, `check-typescript-docs.mjs` — in both `--write`

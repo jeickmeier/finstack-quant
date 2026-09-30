@@ -243,3 +243,27 @@ test('parametric calibration rejects a separate discount curve', () => {
   assert.equal(error.stage, 'ingestion');
   assert.match(error.message, /discount_curve_id/);
 });
+
+test('discount solve settings reject the removed curve-shape keys', () => {
+  for (const key of ['interp_style', 'extrapolation_policy']) {
+    const error = captureError(() =>
+      calibration.validateCalibrationJson({
+        schema: 'finstack_quant.calibration/1',
+        plan: { id: 'p', steps: [], settings: { discount_curve: { [key]: 'linear' } } },
+      })
+    );
+    assert.equal(error.name, 'CalibrationEnvelopeError');
+    assert.equal(error.kind, 'strict_load');
+    assert.match(error.message, new RegExp(`unknown field \`${key}\``));
+  }
+});
+
+test('market freshness age is accepted as a plain number', () => {
+  const envelope = {
+    schema: 'finstack_quant.calibration/1',
+    plan: { id: 'p', steps: [], settings: { market_freshness: { max_age_seconds: 3600 } } },
+  };
+  assert.deepEqual(calibration.dryRun(envelope).errors, []);
+  const canonical = JSON.parse(calibration.validateCalibrationJson(envelope));
+  assert.equal(canonical.plan.settings.market_freshness.max_age_seconds, 3600);
+});

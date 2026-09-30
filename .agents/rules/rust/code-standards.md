@@ -181,20 +181,21 @@ The complete set of features across all crates (read from each `Cargo.toml`) is:
 
 | Crate | Features |
 | --- | --- |
-| `core` | `json-schema` (default), `ts_export` |
-| `cashflows`, `valuations` | `json-schema` (default), `jsonschema-validate` (default; implies `json-schema`), plus `ts_export` on `valuations` |
-| `models`, `calibration`, `portfolio` | `json-schema` (default), `ts_export` |
+| `core` | `json-schema` (default) |
+| `cashflows`, `valuations` | `json-schema` (default), `jsonschema-validate` (default; implies `json-schema`) |
+| `models`, `calibration`, `portfolio` | `json-schema` (default) |
 | `covenants`, `features`, `margin`, `attribution`, `statements`, `scenarios` | `json-schema` (default) |
 | `finstack-quant` (umbrella) | `json-schema` (default), `jsonschema-validate` (default) |
 | `finstack-quant-py` | `extension-module` (PyO3 requirement) |
-| `finstack-quant-wasm` | `console_panic_hook`, `ts_export` |
+| `finstack-quant-wasm` | `console_panic_hook`, `contract-generation` (the `generate_contracts` example) |
 | `analytics`, `statements-analytics`, `arrow-interchange`, `test-utils`, `valuations/macros` | none |
 
 `json-schema` gates every `schemars::JsonSchema` derive, `core::schema` and the
 `gen_*_schemas` binaries; each downstream crate's `json-schema` forwards to its
 dependencies'. `jsonschema-validate` adds the `jsonschema` validator behind the
-`validate_*_json` entry points in `cashflows` and `valuations`. `ts_export`
-gates `ts-rs` exports (tested by the `ts_export.rs` integration tests).
+`validate_*_json` entry points in `cashflows` and `valuations`. The WASM
+package's TypeScript types are generated from the checked-in JSON Schemas by
+`finstack-quant-wasm/scripts/generate-contract-types.mjs`, not by a feature.
 
 There is **no** `std`, `parallel`, `decimal128`, `mc` or `monte_carlo` feature anywhere. A
 `#[cfg(feature = "...")]` naming a feature that does not exist **compiles

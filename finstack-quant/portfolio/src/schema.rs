@@ -157,6 +157,14 @@ fn optimization_result_examples() -> Result<Vec<Value>> {
 
 /// The crate's complete schema registry, sorted by artifact path.
 pub const ARTIFACTS: &[SchemaArtifact] = &[
+    SchemaArtifact::new::<crate::materialization::MaterializationReport>(
+        "schemas/portfolio/1/materialization_report.schema.json",
+        "https://finstack_quant.dev/schemas/portfolio/1/materialization_report.schema.json",
+        "Materialization Report",
+        "Outcome metadata for one successful portfolio materialization.",
+    )
+    .with_kind(SchemaKind::Output)
+    .with_summary("Retained diagnostics, bundle counts and phase timings from a portfolio load."),
     SchemaArtifact::new::<crate::PortfolioMaterializationEnvelope>(
         "schemas/portfolio/1/portfolio_materialization.schema.json",
         "https://finstack_quant.dev/schemas/portfolio/1/portfolio_materialization.schema.json",

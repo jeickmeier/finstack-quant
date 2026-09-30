@@ -210,9 +210,10 @@ pub fn find(selector: &str) -> Result<&'static SchemaArtifact> {
 /// wrapping this library needs in order to advertise its contracts without
 /// hard-coding the domain list.
 ///
-/// Each row carries `domain`, `path`, `$id`, `title`, `summary`, `bytes` and
-/// `kind` (`input` for documents you author, `output` for documents the library
-/// emits, `component` for shared definitions).
+/// Each row carries `domain`, `path`, `$id`, `title`, `type_name` (the Rust
+/// root type), `summary`, `bytes` and `kind` (`input` for documents you
+/// author, `output` for documents the library emits, `component` for shared
+/// definitions).
 ///
 /// # Errors
 ///

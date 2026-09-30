@@ -1,0 +1,274 @@
+{
+  "$defs": {
+    "Diagnostic": {
+      "additionalProperties": false,
+      "description": "One structured finding produced while loading a persisted artifact.\n\nField names and enum representations are a persisted JSON contract. Unknown\nfields are rejected during deserialization.",
+      "properties": {
+        "actual_version": {
+          "description": "Version found in the payload, when one was present.",
+          "format": "uint32",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "artifact_hash": {
+          "description": "Canonical artifact digest, including its algorithm prefix, when available.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "code": {
+          "description": "Stable machine-readable code, such as `\"contract/version-unsupported\"`.",
+          "type": "string"
+        },
+        "contract": {
+          "description": "Stable persisted contract identifier, when the finding is contract-specific.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "expected_version": {
+          "description": "Version expected by the loader, when version context is available.",
+          "format": "uint32",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "instrument_id": {
+          "description": "Instrument identifier associated with the finding, when available.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "message": {
+          "description": "Human-readable explanation with source details such as parse line and column.",
+          "type": "string"
+        },
+        "phase": {
+          "$ref": "#/$defs/LoadPhase",
+          "description": "Loading stage that produced the finding."
+        },
+        "pointer": {
+          "description": "JSON Pointer locating the finding in the source document, when known.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "position_id": {
+          "description": "Portfolio-position identifier associated with the finding, when available.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "revision_id": {
+          "description": "Storage revision identifier associated with the artifact, when available.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "severity": {
+          "$ref": "#/$defs/Severity",
+          "description": "Whether the finding is fatal or recoverable."
+        }
+      },
+      "required": [
+        "code",
+        "phase",
+        "severity",
+        "message"
+      ],
+      "type": "object"
+    },
+    "LoadPhase": {
+      "description": "Stage of persisted artifact loading that produced a diagnostic.",
+      "oneOf": [
+        {
+          "const": "parse",
+          "description": "Source bytes were parsed into a JSON document.",
+          "type": "string"
+        },
+        {
+          "const": "version",
+          "description": "Contract identity and version policy were checked.",
+          "type": "string"
+        },
+        {
+          "const": "structure",
+          "description": "Document shape and required fields were checked.",
+          "type": "string"
+        },
+        {
+          "const": "semantic",
+          "description": "Domain invariants and references were checked.",
+          "type": "string"
+        },
+        {
+          "const": "canonicalize",
+          "description": "The validated artifact was converted to canonical JSON bytes.",
+          "type": "string"
+        },
+        {
+          "const": "hash",
+          "description": "A content digest was calculated or checked.",
+          "type": "string"
+        },
+        {
+          "const": "build",
+          "description": "Runtime domain objects were built from the validated payload.",
+          "type": "string"
+        }
+      ]
+    },
+    "MaterializationPhases": {
+      "additionalProperties": false,
+      "description": "Nanoseconds spent in each sequential materialization phase.\n\nNative values retain `std::time::Instant` precision. On WASM, values are\nderived from the host's monotonic `performance.now()` clock and rounded to\nnanoseconds, so their effective precision remains host-defined and a phase\nshorter than the host clock resolution may legitimately report zero.",
+      "properties": {
+        "build_positions": {
+          "description": "Ordered runtime position construction time.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "decode_instruments": {
+          "description": "Unique instrument decoding and dependency extraction time.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "index_build": {
+          "description": "Portfolio index rebuilding and final invariant validation time.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "parse": {
+          "description": "Outer bundle parsing time.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "validate_versions": {
+          "description": "Post-parse count-limit, contract, reference, dependency-shape, and\ncontent-hash validation time.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "parse",
+        "validate_versions",
+        "decode_instruments",
+        "build_positions",
+        "index_build"
+      ],
+      "type": "object"
+    },
+    "Severity": {
+      "description": "Severity assigned to a persisted artifact diagnostic.",
+      "oneOf": [
+        {
+          "const": "error",
+          "description": "A finding that prevents successful loading.",
+          "type": "string"
+        },
+        {
+          "const": "warning",
+          "description": "A recoverable finding that callers should inspect.",
+          "type": "string"
+        }
+      ]
+    },
+    "ValidationReport": {
+      "additionalProperties": false,
+      "description": "Bounded collection of diagnostics produced by a validation operation.",
+      "properties": {
+        "diagnostics": {
+          "description": "Individual findings retained up to the configured diagnostic limit.",
+          "items": {
+            "$ref": "#/$defs/Diagnostic"
+          },
+          "type": "array"
+        },
+        "truncated": {
+          "description": "Whether one or more additional findings were omitted due to the limit.\n\nA truncated report with no retained diagnostics is treated as fatal\nbecause the wire format cannot distinguish omitted warnings from errors.",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "diagnostics",
+        "truncated"
+      ],
+      "type": "object"
+    }
+  },
+  "$id": "https://finstack_quant.dev/schemas/portfolio/1/materialization_report.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Outcome metadata for one successful portfolio materialization.",
+  "properties": {
+    "cache_hits": {
+      "description": "Number of unique artifacts served from the shared decode cache.",
+      "format": "uint",
+      "minimum": 0,
+      "type": "integer"
+    },
+    "dependencies": {
+      "description": "Sum of normalized market-dependency keys over unique artifacts.",
+      "format": "uint",
+      "minimum": 0,
+      "type": "integer"
+    },
+    "input_bytes": {
+      "description": "Number of encoded bytes in the input bundle.",
+      "format": "uint",
+      "minimum": 0,
+      "type": "integer"
+    },
+    "phase_nanos": {
+      "$ref": "#/$defs/MaterializationPhases",
+      "description": "Sequential phase timings in nanoseconds."
+    },
+    "positions": {
+      "description": "Number of ordered positions materialized.",
+      "format": "uint",
+      "minimum": 0,
+      "type": "integer"
+    },
+    "report": {
+      "$ref": "#/$defs/ValidationReport",
+      "description": "Bounded non-fatal diagnostics retained during loading."
+    },
+    "timing_available": {
+      "description": "Whether the host supplied a monotonic clock for every phase.\n\nWhen false, unavailable phase values are represented as zero in\n`phase_nanos` and must not be interpreted as measured durations.",
+      "type": "boolean"
+    },
+    "unique_instruments": {
+      "description": "Number of unique instrument artifacts in the input bundle.",
+      "format": "uint",
+      "minimum": 0,
+      "type": "integer"
+    }
+  },
+  "required": [
+    "report",
+    "unique_instruments",
+    "positions",
+    "dependencies",
+    "cache_hits",
+    "input_bytes",
+    "timing_available",
+    "phase_nanos"
+  ],
+  "title": "Materialization Report",
+  "type": "object"
+}

@@ -3990,69 +3990,6 @@
         }
       ]
     },
-    "CalibrationDiagnostics": {
-      "description": "Structured diagnostics attached to every calibrated artifact.\n\nConsumers can programmatically check coverage (e.g. \"≥ 95 % of buckets\nhad ≥ 5 issuers\") without parsing free-form log messages.\n\nThis struct omits `#[serde(deny_unknown_fields)]` to allow additive\ndiagnostic fields in future calibration versions.",
-      "properties": {
-        "bucket_sizes_per_level": {
-          "description": "One entry per hierarchy level: `BTreeMap<bucket_path, member_count>`.\nCounts every issuer assigned to the bucket regardless of\n[`IssuerBetaMode`]; the same full-membership count gates fold-up.",
-          "items": {
-            "additionalProperties": {
-              "format": "uint",
-              "minimum": 0,
-              "type": "integer"
-            },
-            "type": "object"
-          },
-          "type": "array"
-        },
-        "fold_ups": {
-          "description": "Log of all fold-up events triggered by insufficient bucket coverage.\n\n**Load-bearing, not purely diagnostic:**\n[`decompose_levels`][crate::factor::credit::decomposition::decompose_levels]\nreads these records to reconstruct which `(issuer, level)` pairs were\nfolded during calibration. Stripping or editing them changes\ndecomposition results.",
-          "items": {
-            "$ref": "#/$defs/FoldUpRecord"
-          },
-          "type": "array"
-        },
-        "mode_counts": {
-          "additionalProperties": {
-            "format": "uint",
-            "minimum": 0,
-            "type": "integer"
-          },
-          "description": "Count of resolved [`IssuerBetaMode`] values.\n\nKeys are `\"issuer_beta\"` and `\"bucket_only\"`.",
-          "type": "object"
-        },
-        "r_squared_histogram": {
-          "additionalProperties": {
-            "format": "uint",
-            "minimum": 0,
-            "type": "integer"
-          },
-          "description": "Optional histogram of per-issuer R² values (bucketed as string ranges).",
-          "type": [
-            "object",
-            "null"
-          ]
-        },
-        "tag_taxonomy": {
-          "additionalProperties": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array",
-            "uniqueItems": true
-          },
-          "description": "Canonical tag taxonomy observed during calibration.\n\nKeys are dimension names (e.g. `\"rating\"`, `\"region\"`, `\"sector\"`);\nvalues are the set of distinct observed tag values.",
-          "type": "object"
-        }
-      },
-      "required": [
-        "mode_counts",
-        "bucket_sizes_per_level",
-        "fold_ups",
-        "tag_taxonomy"
-      ],
-      "type": "object"
-    },
     "CalibrationParameter": {
       "description": "Which structural parameter to calibrate in the MC engine.",
       "oneOf": [
@@ -8611,6 +8548,69 @@
       ],
       "type": "object"
     },
+    "CreditCalibrationDiagnostics": {
+      "description": "Structured diagnostics attached to every calibrated artifact.\n\nConsumers can programmatically check coverage (e.g. \"≥ 95 % of buckets\nhad ≥ 5 issuers\") without parsing free-form log messages.\n\nThis struct omits `#[serde(deny_unknown_fields)]` to allow additive\ndiagnostic fields in future calibration versions.",
+      "properties": {
+        "bucket_sizes_per_level": {
+          "description": "One entry per hierarchy level: `BTreeMap<bucket_path, member_count>`.\nCounts every issuer assigned to the bucket regardless of\n[`IssuerBetaMode`]; the same full-membership count gates fold-up.",
+          "items": {
+            "additionalProperties": {
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "fold_ups": {
+          "description": "Log of all fold-up events triggered by insufficient bucket coverage.\n\n**Load-bearing, not purely diagnostic:**\n[`decompose_levels`][crate::factor::credit::decomposition::decompose_levels]\nreads these records to reconstruct which `(issuer, level)` pairs were\nfolded during calibration. Stripping or editing them changes\ndecomposition results.",
+          "items": {
+            "$ref": "#/$defs/FoldUpRecord"
+          },
+          "type": "array"
+        },
+        "mode_counts": {
+          "additionalProperties": {
+            "format": "uint",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "description": "Count of resolved [`IssuerBetaMode`] values.\n\nKeys are `\"issuer_beta\"` and `\"bucket_only\"`.",
+          "type": "object"
+        },
+        "r_squared_histogram": {
+          "additionalProperties": {
+            "format": "uint",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "description": "Optional histogram of per-issuer R² values (bucketed as string ranges).",
+          "type": [
+            "object",
+            "null"
+          ]
+        },
+        "tag_taxonomy": {
+          "additionalProperties": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "uniqueItems": true
+          },
+          "description": "Canonical tag taxonomy observed during calibration.\n\nKeys are dimension names (e.g. `\"rating\"`, `\"region\"`, `\"sector\"`);\nvalues are the set of distinct observed tag values.",
+          "type": "object"
+        }
+      },
+      "required": [
+        "mode_counts",
+        "bucket_sizes_per_level",
+        "fold_ups",
+        "tag_taxonomy"
+      ],
+      "type": "object"
+    },
     "CreditDefaultSwap": {
       "additionalProperties": false,
       "description": "Credit Default Swap instrument.\n\n# Market Standards & Citations (Week 5)\n\n## ISDA Standards\n\nThis implementation follows the **ISDA 2014 Credit Derivatives Definitions**:\n- **Section 1.1:** General Terms and Credit Events\n- **Section 3.2:** Fixed Payments (Premium Leg)\n- **Section 3.3:** Floating Payments (Protection Leg)\n- **Section 7.1:** Settlement Terms\n\n## ISDA CDS Standard Model\n\nThe pricing engine implements the **ISDA CDS Standard Model (2009)**:\n- Quarterly premium payments (20th of Mar/Jun/Sep/Dec - IMM dates)\n- ACT/360 day count\n- Modified Following business day convention\n- Accrual-on-default included in premium leg\n- Settlement: T+3 (North America), T+1 (Europe post-2009)\n\n## Integration Method\n\nProtection and accrual-on-default legs use one piecewise-analytical\nintegration engine. Hazard- and discount-curve knots are mandatory\nboundaries; configurable intra-knot substeps control the additional\nresolution between those boundaries.\n\n## References\n\n- ISDA 2014 Credit Derivatives Definitions `docs/REFERENCES.md#isda-2014-credit-definitions`\n- \"Modelling Single-name and Multi-name Credit Derivatives\" by O'Kane (2008) `docs/REFERENCES.md#o-kane-2008`\n- ISDA CDS Standard Model Implementation (Markit, 2009) `docs/REFERENCES.md#isda-cds-standard-model`\n- Bloomberg CDSW / *The Bloomberg CDS Model* (DOCS 2057273)\n  `docs/REFERENCES.md#bloomberg-cds-model`\n\nSee unit tests and `examples/` for usage.",
@@ -8764,7 +8764,7 @@
           "description": "Existing factor-model config (factors, covariance, matching)."
         },
         "diagnostics": {
-          "$ref": "#/$defs/CalibrationDiagnostics",
+          "$ref": "#/$defs/CreditCalibrationDiagnostics",
           "description": "Structured calibration diagnostics for programmatic coverage checks."
         },
         "factor_histories": {

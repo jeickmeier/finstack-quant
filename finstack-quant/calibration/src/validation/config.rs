@@ -3,8 +3,6 @@
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::{Error, Result};
 use serde::{Deserialize, Serialize};
-#[cfg(feature = "ts_export")]
-use ts_rs::TS;
 
 pub(crate) fn default_rate_bounds_policy_for_serde() -> RateBoundsPolicy {
     // plan-driven default: choose currency-aware bounds unless explicitly overridden.
@@ -32,8 +30,6 @@ pub(crate) fn default_rate_bounds_policy_for_serde() -> RateBoundsPolicy {
 /// let em_bounds = RateBounds::emerging_markets();
 /// assert!(em_bounds.max_rate > 1.0);
 /// ```
-#[cfg_attr(feature = "ts_export", derive(TS))]
-#[cfg_attr(feature = "ts_export", ts(export))]
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
@@ -128,8 +124,6 @@ impl RateBounds {
 ///
 /// Market-standard bounds depend on currency/market regime. `AutoCurrency` makes this choice
 /// explicit and avoids relying on `RateBounds::default()` as an implicit assumption.
-#[cfg_attr(feature = "ts_export", derive(TS))]
-#[cfg_attr(feature = "ts_export", ts(export))]
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(rename_all = "snake_case")]
@@ -151,8 +145,6 @@ impl std::fmt::Display for RateBoundsPolicy {
 }
 
 /// Runtime validation behavior for arbitrage/consistency checks.
-#[cfg_attr(feature = "ts_export", derive(TS))]
-#[cfg_attr(feature = "ts_export", ts(export))]
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(rename_all = "snake_case")]
@@ -179,8 +171,6 @@ impl std::fmt::Display for ValidationMode {
 /// This structure defines the limits for various financial metrics
 /// (forward rates, hazard rates, inflation growth) and toggles
 /// for specific arbitrage and monotonicity checks.
-#[cfg_attr(feature = "ts_export", derive(TS))]
-#[cfg_attr(feature = "ts_export", ts(export))]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]

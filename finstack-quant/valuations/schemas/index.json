@@ -6,7 +6,8 @@
       "kind": "component",
       "path": "schemas/common/1/attributes.schema.json",
       "summary": "User-defined tags and key-value metadata for classification.",
-      "title": "Attributes"
+      "title": "Attributes",
+      "type_name": "Attributes"
     },
     {
       "$id": "https://finstack_quant.dev/schemas/common/1/business_day_convention.schema.json",
@@ -14,7 +15,8 @@
       "kind": "component",
       "path": "schemas/common/1/business_day_convention.schema.json",
       "summary": "Business-day adjustment convention.",
-      "title": "Business Day Convention"
+      "title": "Business Day Convention",
+      "type_name": "BusinessDayConvention"
     },
     {
       "$id": "https://finstack_quant.dev/schemas/common/1/currency.schema.json",
@@ -22,7 +24,8 @@
       "kind": "component",
       "path": "schemas/common/1/currency.schema.json",
       "summary": "ISO 4217 currency code.",
-      "title": "Currency"
+      "title": "Currency",
+      "type_name": "Currency"
     },
     {
       "$id": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
@@ -30,7 +33,8 @@
       "kind": "component",
       "path": "schemas/common/1/date.schema.json",
       "summary": "ISO 8601 calendar date string.",
-      "title": "Date"
+      "title": "Date",
+      "type_name": "DateWire"
     },
     {
       "$id": "https://finstack_quant.dev/schemas/common/1/day_count.schema.json",
@@ -38,7 +42,8 @@
       "kind": "component",
       "path": "schemas/common/1/day_count.schema.json",
       "summary": "Day-count convention.",
-      "title": "Day Count"
+      "title": "Day Count",
+      "type_name": "DayCount"
     },
     {
       "$id": "https://finstack_quant.dev/schemas/common/1/decimal.schema.json",
@@ -46,7 +51,8 @@
       "kind": "component",
       "path": "schemas/common/1/decimal.schema.json",
       "summary": "Exact decimal encoded as a JSON string.",
-      "title": "Decimal"
+      "title": "Decimal",
+      "type_name": "DecimalWire"
     },
     {
       "$id": "https://finstack_quant.dev/schemas/common/1/diagnostic.schema.json",
@@ -54,7 +60,8 @@
       "kind": "component",
       "path": "schemas/common/1/diagnostic.schema.json",
       "summary": "One structured finding emitted while loading a persisted contract.",
-      "title": "Diagnostic"
+      "title": "Diagnostic",
+      "type_name": "Diagnostic"
     },
     {
       "$id": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
@@ -62,7 +69,8 @@
       "kind": "component",
       "path": "schemas/common/1/id.schema.json",
       "summary": "Opaque string identifier.",
-      "title": "Id"
+      "title": "Id",
+      "type_name": "Id"
     },
     {
       "$id": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json",
@@ -70,7 +78,8 @@
       "kind": "component",
       "path": "schemas/common/1/instrument_pricing_overrides.schema.json",
       "summary": "Instrument-owned market quote and model configuration overrides.",
-      "title": "Instrument Pricing Overrides"
+      "title": "Instrument Pricing Overrides",
+      "type_name": "InstrumentPricingOverrides"
     },
     {
       "$id": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json",
@@ -78,7 +87,8 @@
       "kind": "component",
       "path": "schemas/common/1/metric_pricing_overrides.schema.json",
       "summary": "Metric-time pricing and finite-difference configuration.",
-      "title": "Metric Pricing Overrides"
+      "title": "Metric Pricing Overrides",
+      "type_name": "MetricPricingOverrides"
     },
     {
       "$id": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
@@ -86,7 +96,8 @@
       "kind": "component",
       "path": "schemas/common/1/money.schema.json",
       "summary": "Currency-tagged monetary amount.",
-      "title": "Money"
+      "title": "Money",
+      "type_name": "Money"
     },
     {
       "$id": "https://finstack_quant.dev/schemas/common/1/scenario_pricing_overrides.schema.json",
@@ -94,7 +105,8 @@
       "kind": "component",
       "path": "schemas/common/1/scenario_pricing_overrides.schema.json",
       "summary": "Scenario-only price and spread shocks.",
-      "title": "Scenario Pricing Overrides"
+      "title": "Scenario Pricing Overrides",
+      "type_name": "ScenarioPricingOverrides"
     },
     {
       "$id": "https://finstack_quant.dev/schemas/common/1/tenor.schema.json",
@@ -102,7 +114,8 @@
       "kind": "component",
       "path": "schemas/common/1/tenor.schema.json",
       "summary": "Parsed financial tenor.",
-      "title": "Tenor"
+      "title": "Tenor",
+      "type_name": "Tenor"
     },
     {
       "$id": "https://finstack_quant.dev/schemas/common/1/validation_report.schema.json",
@@ -110,7 +123,8 @@
       "kind": "component",
       "path": "schemas/common/1/validation_report.schema.json",
       "summary": "Bounded structured diagnostics emitted by persisted-contract validation.",
-      "title": "Validation Report"
+      "title": "Validation Report",
+      "type_name": "ValidationReport"
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_asian_option.schema.json",
@@ -118,7 +132,8 @@
       "kind": "input",
       "path": "schemas/instruments/1/commodity/commodity_asian_option.schema.json",
       "summary": "Commodity option on an average settlement price.",
-      "title": "commodity_asian_option"
+      "title": "commodity_asian_option",
+      "type_name": "SingleInstrumentEnvelope"
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_forward.schema.json",
@@ -126,7 +141,8 @@
       "kind": "input",
       "path": "schemas/instruments/1/commodity/commodity_forward.schema.json",
       "summary": "Forward on a commodity reference price.",
-      "title": "commodity_forward"
+      "title": "commodity_forward",
+      "type_name": "SingleInstrumentEnvelope"
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_future.schema.json",
@@ -134,7 +150,8 @@
       "kind": "input",
       "path": "schemas/instruments/1/commodity/commodity_future.schema.json",
       "summary": "Linear listed future on a single or average observed price.",
-      "title": "commodity_future"
+      "title": "commodity_future",
+      "type_name": "SingleInstrumentEnvelope"
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_future_option.schema.json",
@@ -142,7 +159,8 @@
       "kind": "input",
       "path": "schemas/instruments/1/commodity/commodity_future_option.schema.json",
       "summary": "Exchange-listed option on a commodity future.",
-      "title": "commodity_future_option"
+      "title": "commodity_future_option",
+      "type_name": "SingleInstrumentEnvelope"
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_option.schema.json",
@@ -150,7 +168,8 @@
       "kind": "input",
       "path": "schemas/instruments/1/commodity/commodity_option.schema.json",
       "summary": "Option on a commodity forward or future.",
-      "title": "commodity_option"
+      "title": "commodity_option",
+      "type_name": "SingleInstrumentEnvelope"
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_spread_option.schema.json",
@@ -158,7 +177,8 @@
       "kind": "input",
       "path": "schemas/instruments/1/commodity/commodity_spread_option.schema.json",
       "summary": "Option on the spread between two commodity legs.",
-      "title": "commodity_spread_option"
+      "title": "commodity_spread_option",
+      "type_name": "SingleInstrumentEnvelope"
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_swap.schema.json",
@@ -166,7 +186,8 @@
       "kind": "input",
       "path": "schemas/instruments/1/commodity/commodity_swap.schema.json",
       "summary": "Fixed-versus-floating commodity swap on an average price.",
-      "title": "commodity_swap"
+      "title": "commodity_swap",
+      "type_name": "SingleInstrumentEnvelope"
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_swaption.schema.json",
@@ -174,7 +195,8 @@
       "kind": "input",
       "path": "schemas/instruments/1/commodity/commodity_swaption.schema.json",
       "summary": "Option to enter a commodity swap.",
-      "title": "commodity_swaption"
+      "title": "commodity_swaption",
+      "type_name": "SingleInstrumentEnvelope"
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/composite/composite.schema.json",
@@ -182,7 +204,8 @@
       "kind": "input",
       "path": "schemas/instruments/1/composite/composite.schema.json",
       "summary": "Resolved cross-asset synthetic instrument with immutable leg quantities.",
-      "title": "composite"
+      "title": "composite",
+      "type_name": "SingleInstrumentEnvelope"
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_index.schema.json",
@@ -190,7 +213,8 @@
       "kind": "input",
       "path": "schemas/instruments/1/credit_derivatives/cds_index.schema.json",
       "summary": "Standardised CDS index such as CDX or iTraxx.",
-      "title": "cds_index"
+      "title": "cds_index",
+      "type_name": "SingleInstrumentEnvelope"
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_option.schema.json",
@@ -198,7 +222,8 @@
       "kind": "input",
       "path": "schemas/instruments/1/credit_derivatives/cds_option.schema.json",
       "summary": "Payer or receiver option on a CDS or CDS index.",
-      "title": "cds_option"
+      "title": "cds_option",
+      "type_name": "SingleInstrumentEnvelope"
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_tranche.schema.json",
@@ -206,7 +231,8 @@
       "kind": "input",
       "path": "schemas/instruments/1/credit_derivatives/cds_tranche.schema.json",
       "summary": "Synthetic index tranche priced with a correlation model.",
-      "title": "cds_tranche"
+      "title": "cds_tranche",
+      "type_name": "SingleInstrumentEnvelope"
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/credit_default_swap.schema.json",
@@ -214,7 +240,8 @@
       "kind": "input",
       "path": "schemas/instruments/1/credit_derivatives/credit_default_swap.schema.json",
       "summary": "Single-name CDS priced on the ISDA standard model.",
-      "title": "credit_default_swap"
+      "title": "credit_default_swap",
+      "type_name": "SingleInstrumentEnvelope"
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/equity/autocallable.schema.json",
@@ -222,7 +249,8 @@
       "kind": "input",
       "path": "schemas/instruments/1/equity/autocallable.schema.json",
       "summary": "Structured note that redeems early when a barrier is met.",
-      "title": "autocallable"
+      "title": "autocallable",
+      "type_name": "SingleInstrumentEnvelope"
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/equity/cliquet_option.schema.json",
@@ -230,7 +258,8 @@
       "kind": "input",
       "path": "schemas/instruments/1/equity/cliquet_option.schema.json",
       "summary": "Series of forward-starting options with local and global caps.",
-      "title": "cliquet_option"
+      "title": "cliquet_option",
+      "type_name": "SingleInstrumentEnvelope"
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/equity/discounted_cash_flow.schema.json",
@@ -238,7 +267,8 @@
       "kind": "input",
       "path": "schemas/instruments/1/equity/discounted_cash_flow.schema.json",
       "summary": "Enterprise DCF valuation with an explicit forecast and terminal value.",
-      "title": "discounted_cash_flow"
+      "title": "discounted_cash_flow",
+      "type_name": "SingleInstrumentEnvelope"
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/equity/equity.schema.json",
@@ -246,7 +276,8 @@
       "kind": "input",
       "path": "schemas/instruments/1/equity/equity.schema.json",
       "summary": "Cash equity position.",
-      "title": "equity"
+      "title": "equity",
+      "type_name": "SingleInstrumentEnvelope"
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/equity/equity_future.schema.json",
@@ -254,7 +285,8 @@
       "kind": "input",
       "path": "schemas/instruments/1/equity/equity_future.schema.json",
       "summary": "Listed equity future with optional fixed-currency quanto.",
-      "title": "equity_future"
+      "title": "equity_future",
+      "type_name": "SingleInstrumentEnvelope"
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/equity/equity_future_option.schema.json",
@@ -262,7 +294,8 @@
       "kind": "input",
       "path": "schemas/instruments/1/equity/equity_future_option.schema.json",
       "summary": "Exchange-listed option on an equity future.",
-      "title": "equity_future_option"
+      "title": "equity_future_option",
+      "type_name": "SingleInstrumentEnvelope"
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/equity/equity_option.schema.json",
@@ -270,7 +303,8 @@
       "kind": "input",
       "path": "schemas/instruments/1/equity/equity_option.schema.json",
       "summary": "European or American option on a single equity.",
-      "title": "equity_option"
+      "title": "equity_option",
+      "type_name": "SingleInstrumentEnvelope"
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/equity/equity_total_return_future.schema.json",
@@ -278,7 +312,8 @@
       "kind": "input",
       "path": "schemas/instruments/1/equity/equity_total_return_future.schema.json",
       "summary": "Listed equity total-return future and financing spread.",
-      "title": "equity_total_return_future"
+      "title": "equity_total_return_future",
+      "type_name": "SingleInstrumentEnvelope"
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/equity/levered_real_estate_equity.schema.json",
@@ -286,7 +321,8 @@
       "kind": "input",
       "path": "schemas/instruments/1/equity/levered_real_estate_equity.schema.json",
       "summary": "Property equity net of its financing stack.",
-      "title": "levered_real_estate_equity"
+      "title": "levered_real_estate_equity",
+      "type_name": "SingleInstrumentEnvelope"
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/equity/private_markets_fund.schema.json",
@@ -294,7 +330,8 @@
       "kind": "input",
       "path": "schemas/instruments/1/equity/private_markets_fund.schema.json",
       "summary": "Closed-end fund with a commitment schedule and distribution waterfall.",
-      "title": "private_markets_fund"
+      "title": "private_markets_fund",
+      "type_name": "SingleInstrumentEnvelope"
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/equity/real_estate_asset.schema.json",
@@ -302,7 +339,8 @@
       "kind": "input",
       "path": "schemas/instruments/1/equity/real_estate_asset.schema.json",
       "summary": "Direct property asset with rent roll and exit assumptions.",
-      "title": "real_estate_asset"
+      "title": "real_estate_asset",
+      "type_name": "SingleInstrumentEnvelope"
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/equity/trs_equity.schema.json",
@@ -310,7 +348,8 @@
       "kind": "input",
       "path": "schemas/instruments/1/equity/trs_equity.schema.json",
       "summary": "Equity total-return swap versus a funding leg.",
-      "title": "trs_equity"
+      "title": "trs_equity",
+      "type_name": "SingleInstrumentEnvelope"
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/equity/variance_swap.schema.json",
@@ -318,7 +357,8 @@
       "kind": "input",
       "path": "schemas/instruments/1/equity/variance_swap.schema.json",
       "summary": "Swap on realised variance against a strike.",
-      "title": "variance_swap"
+      "title": "variance_swap",
+      "type_name": "SingleInstrumentEnvelope"
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/equity/volatility_index_future.schema.json",
@@ -326,7 +366,8 @@
       "kind": "input",
       "path": "schemas/instruments/1/equity/volatility_index_future.schema.json",
       "summary": "Future on a volatility index such as VIX.",
-      "title": "volatility_index_future"
+      "title": "volatility_index_future",
+      "type_name": "SingleInstrumentEnvelope"
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/equity/volatility_index_future_option.schema.json",
@@ -334,7 +375,8 @@
       "kind": "input",
       "path": "schemas/instruments/1/equity/volatility_index_future_option.schema.json",
       "summary": "Exchange-listed option on a volatility-index future.",
-      "title": "volatility_index_future_option"
+      "title": "volatility_index_future_option",
+      "type_name": "SingleInstrumentEnvelope"
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/exotics/asian_option.schema.json",
@@ -342,7 +384,8 @@
       "kind": "input",
       "path": "schemas/instruments/1/exotics/asian_option.schema.json",
       "summary": "Option on an average of observed fixings.",
-      "title": "asian_option"
+      "title": "asian_option",
+      "type_name": "SingleInstrumentEnvelope"
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/exotics/barrier_option.schema.json",
@@ -350,7 +393,8 @@
       "kind": "input",
       "path": "schemas/instruments/1/exotics/barrier_option.schema.json",
       "summary": "Knock-in or knock-out option on a monitored barrier.",
-      "title": "barrier_option"
+      "title": "barrier_option",
+      "type_name": "SingleInstrumentEnvelope"
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/exotics/basket.schema.json",
@@ -358,7 +402,8 @@
       "kind": "input",
       "path": "schemas/instruments/1/exotics/basket.schema.json",
       "summary": "Weighted basket of constituents priced as one position.",
-      "title": "basket"
+      "title": "basket",
+      "type_name": "SingleInstrumentEnvelope"
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/exotics/callable_range_accrual.schema.json",
@@ -366,7 +411,8 @@
       "kind": "input",
       "path": "schemas/instruments/1/exotics/callable_range_accrual.schema.json",
       "summary": "Range accrual with issuer call rights.",
-      "title": "callable_range_accrual"
+      "title": "callable_range_accrual",
+      "type_name": "SingleInstrumentEnvelope"
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/exotics/lookback_option.schema.json",
@@ -374,7 +420,8 @@
       "kind": "input",
       "path": "schemas/instruments/1/exotics/lookback_option.schema.json",
       "summary": "Option struck on the path maximum or minimum.",
-      "title": "lookback_option"
+      "title": "lookback_option",
+      "type_name": "SingleInstrumentEnvelope"
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/exotics/range_accrual.schema.json",
@@ -382,7 +429,8 @@
       "kind": "input",
       "path": "schemas/instruments/1/exotics/range_accrual.schema.json",
       "summary": "Coupon accruing only on days the index sits inside a range.",
-      "title": "range_accrual"
+      "title": "range_accrual",
+      "type_name": "SingleInstrumentEnvelope"
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/exotics/snowball.schema.json",
@@ -390,7 +438,8 @@
       "kind": "input",
       "path": "schemas/instruments/1/exotics/snowball.schema.json",
       "summary": "Path-dependent note whose coupon builds on the previous one.",
-      "title": "snowball"
+      "title": "snowball",
+      "type_name": "SingleInstrumentEnvelope"
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/exotics/tarn.schema.json",
@@ -398,7 +447,8 @@
       "kind": "input",
       "path": "schemas/instruments/1/exotics/tarn.schema.json",
       "summary": "Target-redemption note that terminates once cumulative coupons hit a cap.",
-      "title": "tarn"
+      "title": "tarn",
+      "type_name": "SingleInstrumentEnvelope"
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/agency_cmo.schema.json",
@@ -406,7 +456,8 @@
       "kind": "input",
       "path": "schemas/instruments/1/fixed_income/agency_cmo.schema.json",
       "summary": "Agency CMO tranche carved from a collateral pool.",
-      "title": "agency_cmo"
+      "title": "agency_cmo",
+      "type_name": "SingleInstrumentEnvelope"
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/agency_mbs_passthrough.schema.json",
@@ -414,7 +465,8 @@
       "kind": "input",
       "path": "schemas/instruments/1/fixed_income/agency_mbs_passthrough.schema.json",
       "summary": "Agency mortgage pass-through priced off a prepayment model.",
-      "title": "agency_mbs_passthrough"
+      "title": "agency_mbs_passthrough",
+      "type_name": "SingleInstrumentEnvelope"
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/agency_tba.schema.json",
@@ -422,7 +474,8 @@
       "kind": "input",
       "path": "schemas/instruments/1/fixed_income/agency_tba.schema.json",
       "summary": "To-be-announced agency MBS forward trade.",
-      "title": "agency_tba"
+      "title": "agency_tba",
+      "type_name": "SingleInstrumentEnvelope"
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/asset_backed_facility.schema.json",
@@ -430,7 +483,8 @@
       "kind": "input",
       "path": "schemas/instruments/1/fixed_income/asset_backed_facility.schema.json",
       "summary": "Warehouse line against a collateral pool: advance rates, concentration limits, borrowing base.",
-      "title": "asset_backed_facility"
+      "title": "asset_backed_facility",
+      "type_name": "SingleInstrumentEnvelope"
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/bond.schema.json",
@@ -438,7 +492,8 @@
       "kind": "input",
       "path": "schemas/instruments/1/fixed_income/bond.schema.json",
       "summary": "Fixed- or floating-rate cash bond with a coupon schedule.",
-      "title": "bond"
+      "title": "bond",
+      "type_name": "SingleInstrumentEnvelope"
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/bond_future.schema.json",
@@ -446,7 +501,8 @@
       "kind": "input",
       "path": "schemas/instruments/1/fixed_income/bond_future.schema.json",
       "summary": "Exchange-traded bond future with a deliverable basket and CTD.",
-      "title": "bond_future"
+      "title": "bond_future",
+      "type_name": "SingleInstrumentEnvelope"
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/convertible_bond.schema.json",
@@ -454,7 +510,8 @@
       "kind": "input",
       "path": "schemas/instruments/1/fixed_income/convertible_bond.schema.json",
       "summary": "Corporate bond convertible into a fixed number of shares.",
-      "title": "convertible_bond"
+      "title": "convertible_bond",
+      "type_name": "SingleInstrumentEnvelope"
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/dollar_roll.schema.json",
@@ -462,7 +519,8 @@
       "kind": "input",
       "path": "schemas/instruments/1/fixed_income/dollar_roll.schema.json",
       "summary": "Simultaneous TBA sale and forward repurchase.",
-      "title": "dollar_roll"
+      "title": "dollar_roll",
+      "type_name": "SingleInstrumentEnvelope"
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/inflation_linked_bond.schema.json",
@@ -470,7 +528,8 @@
       "kind": "input",
       "path": "schemas/instruments/1/fixed_income/inflation_linked_bond.schema.json",
       "summary": "Bond whose principal and coupons index to a price level.",
-      "title": "inflation_linked_bond"
+      "title": "inflation_linked_bond",
+      "type_name": "SingleInstrumentEnvelope"
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/revolving_credit.schema.json",
@@ -478,7 +537,8 @@
       "kind": "input",
       "path": "schemas/instruments/1/fixed_income/revolving_credit.schema.json",
       "summary": "Committed revolver with drawn/undrawn balances and commitment fees.",
-      "title": "revolving_credit"
+      "title": "revolving_credit",
+      "type_name": "SingleInstrumentEnvelope"
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/structured_credit.schema.json",
@@ -486,7 +546,8 @@
       "kind": "input",
       "path": "schemas/instruments/1/fixed_income/structured_credit.schema.json",
       "summary": "ABS/CLO/RMBS/CMBS deal: collateral pool, tranches and waterfall.",
-      "title": "structured_credit"
+      "title": "structured_credit",
+      "type_name": "SingleInstrumentEnvelope"
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/term_loan.schema.json",
@@ -494,7 +555,8 @@
       "kind": "input",
       "path": "schemas/instruments/1/fixed_income/term_loan.schema.json",
       "summary": "Amortising leveraged loan with call protection and covenants.",
-      "title": "term_loan"
+      "title": "term_loan",
+      "type_name": "SingleInstrumentEnvelope"
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/trs_fixed_income_index.schema.json",
@@ -502,7 +564,8 @@
       "kind": "input",
       "path": "schemas/instruments/1/fixed_income/trs_fixed_income_index.schema.json",
       "summary": "Total-return swap on a fixed-income index versus a funding leg.",
-      "title": "trs_fixed_income_index"
+      "title": "trs_fixed_income_index",
+      "type_name": "SingleInstrumentEnvelope"
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/fx/fx_barrier_option.schema.json",
@@ -510,7 +573,8 @@
       "kind": "input",
       "path": "schemas/instruments/1/fx/fx_barrier_option.schema.json",
       "summary": "FX option with a knock-in or knock-out barrier.",
-      "title": "fx_barrier_option"
+      "title": "fx_barrier_option",
+      "type_name": "SingleInstrumentEnvelope"
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/fx/fx_digital_option.schema.json",
@@ -518,7 +582,8 @@
       "kind": "input",
       "path": "schemas/instruments/1/fx/fx_digital_option.schema.json",
       "summary": "FX option paying a fixed amount if in the money.",
-      "title": "fx_digital_option"
+      "title": "fx_digital_option",
+      "type_name": "SingleInstrumentEnvelope"
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/fx/fx_forward.schema.json",
@@ -526,7 +591,8 @@
       "kind": "input",
       "path": "schemas/instruments/1/fx/fx_forward.schema.json",
       "summary": "Outright FX forward.",
-      "title": "fx_forward"
+      "title": "fx_forward",
+      "type_name": "SingleInstrumentEnvelope"
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/fx/fx_future.schema.json",
@@ -534,7 +600,8 @@
       "kind": "input",
       "path": "schemas/instruments/1/fx/fx_future.schema.json",
       "summary": "Exchange-listed future on a deliverable currency pair.",
-      "title": "fx_future"
+      "title": "fx_future",
+      "type_name": "SingleInstrumentEnvelope"
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/fx/fx_future_option.schema.json",
@@ -542,7 +609,8 @@
       "kind": "input",
       "path": "schemas/instruments/1/fx/fx_future_option.schema.json",
       "summary": "Exchange-listed option on an FX future.",
-      "title": "fx_future_option"
+      "title": "fx_future_option",
+      "type_name": "SingleInstrumentEnvelope"
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/fx/fx_option.schema.json",
@@ -550,7 +618,8 @@
       "kind": "input",
       "path": "schemas/instruments/1/fx/fx_option.schema.json",
       "summary": "Vanilla European FX option.",
-      "title": "fx_option"
+      "title": "fx_option",
+      "type_name": "SingleInstrumentEnvelope"
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/fx/fx_spot.schema.json",
@@ -558,7 +627,8 @@
       "kind": "input",
       "path": "schemas/instruments/1/fx/fx_spot.schema.json",
       "summary": "Spot foreign-exchange trade.",
-      "title": "fx_spot"
+      "title": "fx_spot",
+      "type_name": "SingleInstrumentEnvelope"
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/fx/fx_swap.schema.json",
@@ -566,7 +636,8 @@
       "kind": "input",
       "path": "schemas/instruments/1/fx/fx_swap.schema.json",
       "summary": "Near- and far-leg FX swap.",
-      "title": "fx_swap"
+      "title": "fx_swap",
+      "type_name": "SingleInstrumentEnvelope"
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/fx/fx_touch_option.schema.json",
@@ -574,7 +645,8 @@
       "kind": "input",
       "path": "schemas/instruments/1/fx/fx_touch_option.schema.json",
       "summary": "FX option paying on barrier touch or no-touch.",
-      "title": "fx_touch_option"
+      "title": "fx_touch_option",
+      "type_name": "SingleInstrumentEnvelope"
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/fx/fx_variance_swap.schema.json",
@@ -582,7 +654,8 @@
       "kind": "input",
       "path": "schemas/instruments/1/fx/fx_variance_swap.schema.json",
       "summary": "Swap on realised FX variance.",
-      "title": "fx_variance_swap"
+      "title": "fx_variance_swap",
+      "type_name": "SingleInstrumentEnvelope"
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/fx/ndf.schema.json",
@@ -590,7 +663,8 @@
       "kind": "input",
       "path": "schemas/instruments/1/fx/ndf.schema.json",
       "summary": "Non-deliverable forward cash-settled against a fixing.",
-      "title": "ndf"
+      "title": "ndf",
+      "type_name": "SingleInstrumentEnvelope"
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/fx/quanto_option.schema.json",
@@ -598,7 +672,8 @@
       "kind": "input",
       "path": "schemas/instruments/1/fx/quanto_option.schema.json",
       "summary": "Option on a foreign asset settled in the domestic currency at a fixed rate.",
-      "title": "quanto_option"
+      "title": "quanto_option",
+      "type_name": "SingleInstrumentEnvelope"
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/instrument.schema.json",
@@ -606,7 +681,8 @@
       "kind": "input",
       "path": "schemas/instruments/1/instrument.schema.json",
       "summary": "The seventy-branch union of every instrument type. Prefer the per-type schema beside it: this document is too large to hand to a model.",
-      "title": "Finstack Quant Instrument"
+      "title": "Finstack Quant Instrument",
+      "type_name": "InstrumentEnvelope"
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/rates/basis_swap.schema.json",
@@ -614,7 +690,8 @@
       "kind": "input",
       "path": "schemas/instruments/1/rates/basis_swap.schema.json",
       "summary": "Floating-versus-floating swap between two indices or tenors.",
-      "title": "basis_swap"
+      "title": "basis_swap",
+      "type_name": "SingleInstrumentEnvelope"
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/rates/bermudan_swaption.schema.json",
@@ -622,7 +699,8 @@
       "kind": "input",
       "path": "schemas/instruments/1/rates/bermudan_swaption.schema.json",
       "summary": "Bermudan-exercise swaption valued on a short-rate lattice.",
-      "title": "bermudan_swaption"
+      "title": "bermudan_swaption",
+      "type_name": "SingleInstrumentEnvelope"
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/rates/cap_floor.schema.json",
@@ -630,7 +708,8 @@
       "kind": "input",
       "path": "schemas/instruments/1/rates/cap_floor.schema.json",
       "summary": "Strip of caplets or floorlets on a floating index.",
-      "title": "cap_floor"
+      "title": "cap_floor",
+      "type_name": "SingleInstrumentEnvelope"
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/rates/cms_option.schema.json",
@@ -638,7 +717,8 @@
       "kind": "input",
       "path": "schemas/instruments/1/rates/cms_option.schema.json",
       "summary": "Option on a constant-maturity swap rate.",
-      "title": "cms_option"
+      "title": "cms_option",
+      "type_name": "SingleInstrumentEnvelope"
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/rates/cms_spread_option.schema.json",
@@ -646,7 +726,8 @@
       "kind": "input",
       "path": "schemas/instruments/1/rates/cms_spread_option.schema.json",
       "summary": "Option on the spread between two CMS rates.",
-      "title": "cms_spread_option"
+      "title": "cms_spread_option",
+      "type_name": "SingleInstrumentEnvelope"
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/rates/cms_swap.schema.json",
@@ -654,7 +735,8 @@
       "kind": "input",
       "path": "schemas/instruments/1/rates/cms_swap.schema.json",
       "summary": "Swap paying a constant-maturity swap rate.",
-      "title": "cms_swap"
+      "title": "cms_swap",
+      "type_name": "SingleInstrumentEnvelope"
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/rates/deposit.schema.json",
@@ -662,7 +744,8 @@
       "kind": "input",
       "path": "schemas/instruments/1/rates/deposit.schema.json",
       "summary": "Money-market deposit quoted as a simple rate.",
-      "title": "deposit"
+      "title": "deposit",
+      "type_name": "SingleInstrumentEnvelope"
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/rates/forward_rate_agreement.schema.json",
@@ -670,7 +753,8 @@
       "kind": "input",
       "path": "schemas/instruments/1/rates/forward_rate_agreement.schema.json",
       "summary": "Single-period forward rate agreement.",
-      "title": "forward_rate_agreement"
+      "title": "forward_rate_agreement",
+      "type_name": "SingleInstrumentEnvelope"
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/rates/inflation_cap_floor.schema.json",
@@ -678,7 +762,8 @@
       "kind": "input",
       "path": "schemas/instruments/1/rates/inflation_cap_floor.schema.json",
       "summary": "Cap or floor on realised inflation.",
-      "title": "inflation_cap_floor"
+      "title": "inflation_cap_floor",
+      "type_name": "SingleInstrumentEnvelope"
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/rates/inflation_swap.schema.json",
@@ -686,7 +771,8 @@
       "kind": "input",
       "path": "schemas/instruments/1/rates/inflation_swap.schema.json",
       "summary": "Zero-coupon inflation swap on a price index.",
-      "title": "inflation_swap"
+      "title": "inflation_swap",
+      "type_name": "SingleInstrumentEnvelope"
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/rates/interest_rate_future.schema.json",
@@ -694,7 +780,8 @@
       "kind": "input",
       "path": "schemas/instruments/1/rates/interest_rate_future.schema.json",
       "summary": "Exchange-traded short-rate future.",
-      "title": "interest_rate_future"
+      "title": "interest_rate_future",
+      "type_name": "SingleInstrumentEnvelope"
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/rates/interest_rate_future_option.schema.json",
@@ -702,7 +789,8 @@
       "kind": "input",
       "path": "schemas/instruments/1/rates/interest_rate_future_option.schema.json",
       "summary": "Listed or bilateral option on an interest-rate futures price.",
-      "title": "interest_rate_future_option"
+      "title": "interest_rate_future_option",
+      "type_name": "SingleInstrumentEnvelope"
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/rates/interest_rate_swap.schema.json",
@@ -710,7 +798,8 @@
       "kind": "input",
       "path": "schemas/instruments/1/rates/interest_rate_swap.schema.json",
       "summary": "Vanilla fixed-versus-floating interest-rate swap.",
-      "title": "interest_rate_swap"
+      "title": "interest_rate_swap",
+      "type_name": "SingleInstrumentEnvelope"
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/rates/repo.schema.json",
@@ -718,7 +807,8 @@
       "kind": "input",
       "path": "schemas/instruments/1/rates/repo.schema.json",
       "summary": "Repurchase agreement against posted collateral.",
-      "title": "repo"
+      "title": "repo",
+      "type_name": "SingleInstrumentEnvelope"
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/rates/swaption.schema.json",
@@ -726,7 +816,8 @@
       "kind": "input",
       "path": "schemas/instruments/1/rates/swaption.schema.json",
       "summary": "European option to enter an interest-rate swap.",
-      "title": "swaption"
+      "title": "swaption",
+      "type_name": "SingleInstrumentEnvelope"
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/rates/xccy_swap.schema.json",
@@ -734,7 +825,8 @@
       "kind": "input",
       "path": "schemas/instruments/1/rates/xccy_swap.schema.json",
       "summary": "Cross-currency swap with notional exchange and a basis spread.",
-      "title": "xccy_swap"
+      "title": "xccy_swap",
+      "type_name": "SingleInstrumentEnvelope"
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/rates/yoy_inflation_swap.schema.json",
@@ -742,7 +834,8 @@
       "kind": "input",
       "path": "schemas/instruments/1/rates/yoy_inflation_swap.schema.json",
       "summary": "Year-on-year inflation swap.",
-      "title": "yoy_inflation_swap"
+      "title": "yoy_inflation_swap",
+      "type_name": "SingleInstrumentEnvelope"
     },
     {
       "$id": "https://finstack_quant.dev/schemas/results/1/instrument_cashflow.schema.json",
@@ -750,7 +843,8 @@
       "kind": "output",
       "path": "schemas/results/1/instrument_cashflow.schema.json",
       "summary": "Native cashflow rows, reporting-currency PV and reconciliation status.",
-      "title": "Instrument Cashflow"
+      "title": "Instrument Cashflow",
+      "type_name": "InstrumentCashflowEnvelope"
     },
     {
       "$id": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json",
@@ -758,7 +852,8 @@
       "kind": "output",
       "path": "schemas/results/1/valuation_result.schema.json",
       "summary": "PV plus requested measures, with rounding and FX policy stamps.",
-      "title": "Valuation Result"
+      "title": "Valuation Result",
+      "type_name": "ValuationResult"
     }
   ],
   "schema_index_version": 1

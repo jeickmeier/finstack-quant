@@ -64,14 +64,14 @@ match the types and that regeneration is idempotent.
 | `check_schema_residue.py` | Rejects obsolete or hand-maintained JSON/serde machinery: hand-written schema files, asymmetric optional wire adapters, non-canonical serde enum naming. | `mise run rust-check-schemas` |
 | `check_schema_generation.py` | Regenerates the full schema tree into a temporary directory and compares byte-for-byte, then validates the `$ref` graph across registries. Catches non-reproducible emitters and dangling references. | `mise run rust-check-schemas` |
 | `check_generated_instrument_fixtures.py` | Validates canonical generated instrument fixtures against `finstack-quant/valuations/tests/instruments/coverage_manifest.toml`. | `mise run gen-check` |
-| `sync_generated_ts_index.py` | Writes (or with `--check`, verifies) the barrel `index.ts` for the ts-rs artifacts in `finstack-quant-wasm/types/generated/`. | `mise run wasm-gen-bindings`, `mise run gen-check` |
-| `check_generated_ts.py` | Re-runs the ts-rs exporters into a temp directory and diffs against the committed declarations, without mutating the workspace. Expected paths come from `git ls-files` so case-only filename drift is visible on case-insensitive filesystems. | `mise run wasm-check-bindings` |
+| `sync_generated_ts_index.py` | Writes (or with `--check`, verifies) the barrels for the schema-generated TypeScript types in `finstack-quant-wasm/types/generated/`: one `<crate>/index.ts` per crate and a root `index.ts` that re-exports each crate as a namespace. The per-crate modules themselves come from `finstack-quant-wasm/scripts/generate-contract-types.mjs`. | `mise run wasm-gen-bindings`, `mise run wasm-check-bindings`, `mise run gen-check` |
 | `generation_digest.py` | Computes a stable SHA-256 over the generated artifacts named in the manifest. `--check-manifest` verifies that the file list still matches what is on disk; `gen-check` takes the digest before and after the verification pass and fails if it moved, so a "check" that quietly rewrote the workspace is caught. | `mise run gen-check` (`mise run all-ci` writes first via `gen-write`) |
 
 `generated-artifacts.txt` is the manifest of tracked generated files. It covers
 two trees: the generated instrument JSON examples under
-`finstack-quant/valuations/tests/instruments/json_examples/` and the ts-rs
-declarations under `finstack-quant-wasm/types/generated/`. The per-crate JSON
+`finstack-quant/valuations/tests/instruments/json_examples/` and the
+schema-generated TypeScript declarations under
+`finstack-quant-wasm/types/generated/`. The per-crate JSON
 schema registries in `finstack-quant/*/schemas/` are not in it — their
 reproducibility is proved by `check_schema_generation.py` instead. Update the
 manifest with `generation_digest.py --write-manifest` when a new generated

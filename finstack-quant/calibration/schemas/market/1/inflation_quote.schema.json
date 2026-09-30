@@ -1,0 +1,113 @@
+{
+  "$defs": {
+    "InflationSwapConventionId": {
+      "description": "Identifier for Inflation Swap market conventions (e.g., \"USD-CPI\", \"UK-RPI\").\n\nUsed to look up [`InflationSwapConventions`](crate::market::conventions::defs::InflationSwapConventions)\nfrom the convention registry.",
+      "type": "string"
+    },
+    "QuoteId": {
+      "description": "A stable identifier for a market quote (e.g., \"USD-OIS-SWAP-5Y\").\n\nThis ID is used for human readability, logging, and potentially matching against external\ndata sources. Quote IDs should be unique within a calibration set and follow a consistent\nnaming convention (e.g., \"{currency}-{index}-{type}-{pillar}\").\n\n[`QuoteId::new`] is infallible, including for empty strings. Empty or\nwhitespace-only IDs are rejected when this type is deserialized from the\nwire, and again by [`MarketQuote::validate`](super::market_quote::MarketQuote::validate).\n\n# Examples\n\n```rust\nuse finstack_quant_calibration::quotes::ids::QuoteId;\n\nlet id = QuoteId::new(\"USD-SOFR-DEP-1M\");\nassert_eq!(id.as_str(), \"USD-SOFR-DEP-1M\");\n```",
+      "minLength": 1,
+      "pattern": ".*\\S.*",
+      "type": "string"
+    }
+  },
+  "$id": "https://finstack_quant.dev/schemas/market/1/inflation_quote.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Zero-coupon or year-on-year inflation swap quote.",
+  "oneOf": [
+    {
+      "additionalProperties": false,
+      "description": "Zero-coupon inflation swap (ZCIS) quote.",
+      "properties": {
+        "inflation_swap": {
+          "additionalProperties": false,
+          "properties": {
+            "convention": {
+              "$ref": "#/$defs/InflationSwapConventionId",
+              "description": "Per-instrument conventions"
+            },
+            "id": {
+              "$ref": "#/$defs/QuoteId",
+              "description": "Unique identifier for the quote."
+            },
+            "index": {
+              "description": "Inflation index identifier",
+              "type": "string"
+            },
+            "maturity": {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
+              "description": "Swap maturity"
+            },
+            "rate": {
+              "description": "Fixed rate (decimal)",
+              "format": "double",
+              "type": "number"
+            }
+          },
+          "required": [
+            "id",
+            "maturity",
+            "rate",
+            "index",
+            "convention"
+          ],
+          "type": "object"
+        }
+      },
+      "required": [
+        "inflation_swap"
+      ],
+      "type": "object"
+    },
+    {
+      "additionalProperties": false,
+      "description": "Year-on-year (YoY) inflation swap quote.",
+      "properties": {
+        "yoy_inflation_swap": {
+          "additionalProperties": false,
+          "properties": {
+            "convention": {
+              "$ref": "#/$defs/InflationSwapConventionId",
+              "description": "Instrument-wide conventions"
+            },
+            "frequency": {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/tenor.schema.json",
+              "description": "Payment frequency"
+            },
+            "id": {
+              "$ref": "#/$defs/QuoteId",
+              "description": "Unique identifier for the quote."
+            },
+            "index": {
+              "description": "Inflation index identifier",
+              "type": "string"
+            },
+            "maturity": {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
+              "description": "Swap maturity"
+            },
+            "rate": {
+              "description": "Fixed rate (decimal)",
+              "format": "double",
+              "type": "number"
+            }
+          },
+          "required": [
+            "id",
+            "maturity",
+            "rate",
+            "index",
+            "frequency",
+            "convention"
+          ],
+          "type": "object"
+        }
+      },
+      "required": [
+        "yoy_inflation_swap"
+      ],
+      "type": "object"
+    }
+  ],
+  "title": "Inflation Quote"
+}

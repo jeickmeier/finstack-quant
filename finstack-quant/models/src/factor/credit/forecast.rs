@@ -286,7 +286,7 @@ mod tests {
     use super::*;
     use crate::factor::credit::calibration::{BucketWeighting, PanelFrequency, PanelSpace};
     use crate::factor::credit::hierarchy::{
-        CalibrationDiagnostics, CreditFactorModelSchema, CreditHierarchySpec, DateRange,
+        CreditCalibrationDiagnostics, CreditFactorModelSchema, CreditHierarchySpec, DateRange,
         FactorCorrelationMatrix, GenericFactorSpec, HierarchyDimension, IssuerBetaPolicy,
         LevelsAtAnchor, VolState,
     };
@@ -374,7 +374,7 @@ mod tests {
                 idiosyncratic: BTreeMap::new(),
             },
             factor_histories: None,
-            diagnostics: CalibrationDiagnostics {
+            diagnostics: CreditCalibrationDiagnostics {
                 mode_counts: BTreeMap::new(),
                 bucket_sizes_per_level: vec![],
                 fold_ups: vec![],

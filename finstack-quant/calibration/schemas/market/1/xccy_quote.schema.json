@@ -1,0 +1,84 @@
+{
+  "$defs": {
+    "Pillar": {
+      "description": "The maturity pillar of a quote.\n\nThe pillar represents the maturity of the instrument referenced by the quote. OTC instruments\n(swaps, deposits) typically use `Tenor` (e.g., \"5Y\") to allow rolling headers that automatically\nadjust as the valuation date changes. Futures or bespoke runs may use `Date` to pin a specific\nmaturity date.\n\nThe JSON wire form is externally tagged: `{\"tenor\": {\"count\": 5, \"unit\": \"years\"}}`\nor `{\"date\": \"2029-06-20\"}`. A bare string such as `\"5Y\"` is rejected.\n\n# Examples\n\nUsing a tenor pillar:\n```rust\nuse finstack_quant_calibration::quotes::ids::Pillar;\n\n# fn example() -> finstack_quant_core::Result<()> {\nlet pillar = Pillar::Tenor(\"5Y\".parse()?);\n# Ok(())\n# }\n```\n\nUsing a date pillar:\n```rust\nuse finstack_quant_calibration::quotes::ids::Pillar;\nuse finstack_quant_core::dates::Date;\n\nlet pillar = Pillar::Date(Date::from_calendar_date(2029, time::Month::June, 20).unwrap());\n```",
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "description": "A relative tenor (e.g., 5Y, 3M).\n\nThe maturity is calculated relative to the valuation date, allowing quotes to \"roll\"\nforward automatically. This is the standard approach for OTC instruments.",
+          "properties": {
+            "tenor": {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/tenor.schema.json"
+            }
+          },
+          "required": [
+            "tenor"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "An absolute date.\n\nThe maturity is fixed to a specific date, regardless of the valuation date. This is\ntypically used for futures contracts or bespoke instruments with fixed maturities.",
+          "properties": {
+            "date": {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json"
+            }
+          },
+          "required": [
+            "date"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "QuoteId": {
+      "description": "A stable identifier for a market quote (e.g., \"USD-OIS-SWAP-5Y\").\n\nThis ID is used for human readability, logging, and potentially matching against external\ndata sources. Quote IDs should be unique within a calibration set and follow a consistent\nnaming convention (e.g., \"{currency}-{index}-{type}-{pillar}\").\n\n[`QuoteId::new`] is infallible, including for empty strings. Empty or\nwhitespace-only IDs are rejected when this type is deserialized from the\nwire, and again by [`MarketQuote::validate`](super::market_quote::MarketQuote::validate).\n\n# Examples\n\n```rust\nuse finstack_quant_calibration::quotes::ids::QuoteId;\n\nlet id = QuoteId::new(\"USD-SOFR-DEP-1M\");\nassert_eq!(id.as_str(), \"USD-SOFR-DEP-1M\");\n```",
+      "minLength": 1,
+      "pattern": ".*\\S.*",
+      "type": "string"
+    },
+    "XccyConventionId": {
+      "description": "Identifier for cross-currency swap market conventions (e.g., \"EUR/USD-XCCY\").",
+      "type": "string"
+    }
+  },
+  "$id": "https://finstack_quant.dev/schemas/market/1/xccy_quote.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Cross-currency basis swap quote.",
+  "properties": {
+    "basis_spread_bp": {
+      "description": "Basis spread in basis points on the base-currency leg.",
+      "format": "double",
+      "type": "number"
+    },
+    "convention": {
+      "$ref": "#/$defs/XccyConventionId",
+      "description": "XCCY pair convention identifier (e.g., `EUR/USD-XCCY`)."
+    },
+    "far_pillar": {
+      "$ref": "#/$defs/Pillar",
+      "description": "Far-leg maturity pillar; near leg is the convention spot date."
+    },
+    "id": {
+      "$ref": "#/$defs/QuoteId",
+      "description": "Unique identifier for the quote."
+    },
+    "spot_fx": {
+      "description": "Optional spot FX quote (quote currency per 1 unit of base currency).",
+      "format": "double",
+      "type": [
+        "number",
+        "null"
+      ]
+    }
+  },
+  "required": [
+    "id",
+    "convention",
+    "far_pillar",
+    "basis_spread_bp"
+  ],
+  "title": "Cross-Currency Quote",
+  "type": "object"
+}

@@ -38,7 +38,9 @@ SURFACE: dict[str, dict[str, Any]] = json.loads((ROOT / "finstack-quant-wasm/fac
 DTS = (ROOT / "finstack-quant-wasm/index.d.ts").read_text()
 GENERATED = ROOT / "finstack-quant-wasm/types/generated"
 TS_TYPES = set(re.findall(r"^(?:export )?(?:declare )?(?:interface|type|class) (\w+)", DTS, re.M)) | {
-    path.stem for path in GENERATED.glob("*.ts") if path.stem != "index"
+    name
+    for path in GENERATED.rglob("*.ts")
+    for name in re.findall(r"^export (?:interface|type) (\w+)", path.read_text(), re.M)
 }
 REASONS = set(LEDGER["exclusion_reasons"])
 PY_RULE_MEMBERS: dict[str, str] = LEDGER["python_rule_excluded_members"]

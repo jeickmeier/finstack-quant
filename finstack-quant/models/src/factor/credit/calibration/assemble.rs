@@ -14,7 +14,7 @@ use super::statistics::{
 };
 use super::validation::validation_err;
 use crate::factor::credit::hierarchy::{
-    CalibrationDiagnostics, CreditHierarchySpec, FactorCorrelationMatrix, FactorHistories,
+    CreditCalibrationDiagnostics, CreditHierarchySpec, FactorCorrelationMatrix, FactorHistories,
     FactorVolModel, FitQuality, FoldUpRecord, IdiosyncraticVolModel, IssuerBetaMode, IssuerBetaRow,
     IssuerBetas, IssuerTags, LevelAnchor, LevelsAtAnchor, VolState,
 };
@@ -334,7 +334,7 @@ pub(super) fn build_diagnostics(
     fold_ups: Vec<FoldUpRecord>,
     fit_quality: &BTreeMap<IssuerId, FitQuality>,
     tag_taxonomy: BTreeMap<String, BTreeSet<String>>,
-) -> CalibrationDiagnostics {
+) -> CreditCalibrationDiagnostics {
     let mut mode_counts: BTreeMap<String, usize> = BTreeMap::new();
     mode_counts.insert("issuer_beta".to_owned(), 0);
     mode_counts.insert("bucket_only".to_owned(), 0);
@@ -380,7 +380,7 @@ pub(super) fn build_diagnostics(
         Some(hist)
     };
 
-    CalibrationDiagnostics {
+    CreditCalibrationDiagnostics {
         mode_counts,
         bucket_sizes_per_level,
         fold_ups,

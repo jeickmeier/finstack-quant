@@ -1,12 +1,22 @@
 {
   "artifacts": [
     {
+      "$id": "https://finstack_quant.dev/schemas/portfolio/1/materialization_report.schema.json",
+      "bytes": 8987,
+      "kind": "output",
+      "path": "schemas/portfolio/1/materialization_report.schema.json",
+      "summary": "Retained diagnostics, bundle counts and phase timings from a portfolio load.",
+      "title": "Materialization Report",
+      "type_name": "MaterializationReport"
+    },
+    {
       "$id": "https://finstack_quant.dev/schemas/portfolio/1/portfolio_materialization.schema.json",
       "bytes": 42108,
       "kind": "input",
       "path": "schemas/portfolio/1/portfolio_materialization.schema.json",
       "summary": "Positions, books and their instruments as one content-addressed bundle.",
-      "title": "Portfolio Materialization Envelope"
+      "title": "Portfolio Materialization Envelope",
+      "type_name": "PortfolioMaterializationEnvelope"
     },
     {
       "$id": "https://finstack_quant.dev/schemas/portfolio/1/portfolio_optimization_result.schema.json",
@@ -14,7 +24,8 @@
       "kind": "output",
       "path": "schemas/portfolio/1/portfolio_optimization_result.schema.json",
       "summary": "Optimizer weights and diagnostics.",
-      "title": "Portfolio Optimization Result"
+      "title": "Portfolio Optimization Result",
+      "type_name": "PortfolioOptimizationResultWire"
     }
   ],
   "schema_index_version": 1

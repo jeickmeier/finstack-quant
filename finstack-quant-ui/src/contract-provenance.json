@@ -579,7 +579,7 @@
           "uri": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json",
           "pointer": "#",
           "source": "finstack-quant/calibration/schemas/calibration/1/calibration.schema.json",
-          "sha256": "548c1fb7c8b7fd2d8536f0d84bc6367a8c911cb9e4f5173855564bddc0f679e6",
+          "sha256": "67777a3a0c7accf68d5be297afb4d0624c1875287a277c3438c29d6d1ca8840e",
           "description": "Canonical typed calibration request and result envelope."
         }
       ]
@@ -1258,20 +1258,20 @@
     {
       "name": "ValuationResult",
       "source": "finstack-quant-wasm/index.d.ts",
-      "declaration": "/**\n * Valuation envelope returned by the `priceInstrument*` entry points.\n *\n * This is the same document Python callers hold as\n * `finstack_quant.valuations.ValuationResult` — field names are the canonical\n * Rust serde names. Monte Carlo details carry `seed` as a lossless `bigint`,\n * so serialize stochastic results with `valuations.valuationResultToJson`\n * rather than `JSON.stringify`, which throws on `bigint`.\n * Python's `price` / `currency` getters correspond to `value.amount` /\n * `value.currency` here.\n */\nexport interface ValuationResult {\n  /**\n   * Wire-format schema version; only `1` is emitted.\n   */\n  schema_version: number;\n  /**\n   * Identifier of the priced instrument.\n   */\n  instrument_id: string;\n  /**\n   * ISO-8601 valuation date.\n   */\n  as_of: string;\n  /**\n   * Present value in the instrument's native currency.\n   */\n  value: MoneyValue;\n  /**\n   * Requested risk measures keyed by canonical metric ID.\n   */\n  measures: Record<string, number>;\n  /**\n   * Model-specific structured detail, when the pricer emits one.\n   *\n   * Stochastic `\"rates_credit\"` bond pricing emits `type: \"monte_carlo\"` with\n   * convergence, path-count, seed, time-grid, and variance-reduction data.\n   */\n  details?: ValuationDetails;\n  /**\n   * Policy stamps: numeric mode, rounding context, FX policy, timing.\n   */\n  meta: import('./types/valuation-result').ValuationResult['meta'];\n  /**\n   * Covenant reports for instruments that carry covenants; `null` otherwise.\n   */\n  covenants: NonNullable<import('./types/valuation-result').ValuationResult['covenants']> | null;\n  /**\n   * Computation trace, present only when explain mode is enabled.\n   */\n  explanation?: NonNullable<import('./types/valuation-result').ValuationResult['explanation']>;\n}",
-      "sha256": "2e6ada2682b4512629c719c00ddbc940499493b087157f219b1546cf76a49eee"
+      "declaration": "/**\n * Valuation envelope returned by the `priceInstrument*` entry points.\n *\n * This is the same document Python callers hold as\n * `finstack_quant.valuations.ValuationResult` — field names are the canonical\n * Rust serde names. Monte Carlo details carry `seed` as a lossless `bigint`,\n * so serialize stochastic results with `valuations.valuationResultToJson`\n * rather than `JSON.stringify`, which throws on `bigint`.\n * Python's `price` / `currency` getters correspond to `value.amount` /\n * `value.currency` here.\n */\nexport interface ValuationResult {\n  /**\n   * Wire-format schema version; only `1` is emitted.\n   */\n  schema_version: number;\n  /**\n   * Identifier of the priced instrument.\n   */\n  instrument_id: string;\n  /**\n   * ISO-8601 valuation date.\n   */\n  as_of: string;\n  /**\n   * Present value in the instrument's native currency.\n   */\n  value: MoneyValue;\n  /**\n   * Requested risk measures keyed by canonical metric ID.\n   */\n  measures: Record<string, number>;\n  /**\n   * Model-specific structured detail, when the pricer emits one.\n   *\n   * Stochastic `\"rates_credit\"` bond pricing emits `type: \"monte_carlo\"` with\n   * convergence, path-count, seed, time-grid, and variance-reduction data.\n   */\n  details?: ValuationDetails;\n  /**\n   * Policy stamps: numeric mode, rounding context, FX policy, timing.\n   */\n  meta: import('./types/valuation-result.js').ValuationResult['meta'];\n  /**\n   * Covenant reports for instruments that carry covenants; `null` otherwise.\n   */\n  covenants: NonNullable<import('./types/valuation-result.js').ValuationResult['covenants']> | null;\n  /**\n   * Computation trace, present only when explain mode is enabled.\n   */\n  explanation?: NonNullable<import('./types/valuation-result.js').ValuationResult['explanation']>;\n}",
+      "sha256": "4cd93c4925576a2056419aa42bd5b766e9935580aecf50c2e2fc6f0fe651c110"
     },
     {
       "name": "ValuationDetails",
       "source": "finstack-quant-wasm/index.d.ts",
-      "declaration": "/**\n * Model-specific native detail, generated from Rust with exact host integer representations.\n */\nexport type ValuationDetails = import('./types/valuation-result').ValuationDetails;",
-      "sha256": "e1f4a49abc2e18d23b84a2be5c96c3816005315f856da21c7327a95dd22babb4"
+      "declaration": "/**\n * Model-specific native detail, generated from Rust with exact host integer representations.\n */\nexport type ValuationDetails = import('./types/valuation-result.js').ValuationDetails;",
+      "sha256": "23f19122b73c471df9313b7ef64c9796daf1d1d13f49387e5f181911b66fef85"
     },
     {
       "name": "MonteCarloValuationDetails",
       "source": "finstack-quant-wasm/index.d.ts",
-      "declaration": "/**\n * Convergence and reproducibility diagnostics for a Monte Carlo valuation.\n */\nexport type MonteCarloValuationDetails =\n  import('./types/valuation-result').MonteCarloValuationDetails;",
-      "sha256": "24ae26056d3f8629fed6214f1689dc3516f63d433be543faa4ab4df8604dd63c"
+      "declaration": "/**\n * Convergence and reproducibility diagnostics for a Monte Carlo valuation.\n */\nexport type MonteCarloValuationDetails =\n  import('./types/valuation-result.js').MonteCarloValuationDetails;",
+      "sha256": "38755f4b5e541bf3bf384cbe24ab72973ccd7abb0811aeb1e147e8cf8036861a"
     },
     {
       "name": "MoneyValue",

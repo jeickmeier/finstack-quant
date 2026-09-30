@@ -21,8 +21,6 @@ use serde::{Deserialize, Deserializer, Serialize};
 /// # Ok(())
 /// # }
 /// ```
-#[cfg_attr(feature = "ts_export", derive(ts_rs::TS))]
-#[cfg_attr(feature = "ts_export", ts(export))]
 #[derive(Debug, Clone, Serialize, PartialEq)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(default, deny_unknown_fields)]

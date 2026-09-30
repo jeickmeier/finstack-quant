@@ -97,7 +97,7 @@
       ]
     },
     "Pillar": {
-      "description": "The maturity pillar of a quote.\n\nThe pillar represents the maturity of the instrument referenced by the quote. OTC instruments\n(swaps, deposits) typically use `Tenor` (e.g., \"5Y\") to allow rolling headers that automatically\nadjust as the valuation date changes. Futures or bespoke runs may use `Date` to pin a specific\nmaturity date.\n\n# Examples\n\nUsing a tenor pillar:\n```rust\nuse finstack_quant_calibration::quotes::ids::Pillar;\n\n# fn example() -> finstack_quant_core::Result<()> {\nlet pillar = Pillar::Tenor(\"5Y\".parse()?);\n# Ok(())\n# }\n```\n\nUsing a date pillar:\n```rust\nuse finstack_quant_calibration::quotes::ids::Pillar;\nuse finstack_quant_core::dates::Date;\n\nlet pillar = Pillar::Date(Date::from_calendar_date(2029, time::Month::June, 20).unwrap());\n```",
+      "description": "The maturity pillar of a quote.\n\nThe pillar represents the maturity of the instrument referenced by the quote. OTC instruments\n(swaps, deposits) typically use `Tenor` (e.g., \"5Y\") to allow rolling headers that automatically\nadjust as the valuation date changes. Futures or bespoke runs may use `Date` to pin a specific\nmaturity date.\n\nThe JSON wire form is externally tagged: `{\"tenor\": {\"count\": 5, \"unit\": \"years\"}}`\nor `{\"date\": \"2029-06-20\"}`. A bare string such as `\"5Y\"` is rejected.\n\n# Examples\n\nUsing a tenor pillar:\n```rust\nuse finstack_quant_calibration::quotes::ids::Pillar;\n\n# fn example() -> finstack_quant_core::Result<()> {\nlet pillar = Pillar::Tenor(\"5Y\".parse()?);\n# Ok(())\n# }\n```\n\nUsing a date pillar:\n```rust\nuse finstack_quant_calibration::quotes::ids::Pillar;\nuse finstack_quant_core::dates::Date;\n\nlet pillar = Pillar::Date(Date::from_calendar_date(2029, time::Month::June, 20).unwrap());\n```",
       "oneOf": [
         {
           "additionalProperties": false,
@@ -192,7 +192,7 @@
             },
             "pillar": {
               "$ref": "#/$defs/Pillar",
-              "description": "Maturity pillar (e.g. Tenor(\"3M\") or Date(\"2024-01-01\"))."
+              "description": "Maturity pillar; on the wire `{\"tenor\": {\"count\": 3, \"unit\": \"months\"}}`\nor `{\"date\": \"2024-01-01\"}`."
             },
             "rate": {
               "description": "Rate value (decimal).",

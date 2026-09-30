@@ -8,8 +8,6 @@ use super::validate;
 use finstack_quant_core::dates::{Date, Tenor};
 use finstack_quant_core::Result;
 use finstack_quant_valuations::market::conventions::ids::InflationSwapConventionId;
-#[cfg(feature = "ts_export")]
-use ts_rs::TS;
 
 /// Inflation instrument quotes for CPI and inflation curve calibration.
 ///
@@ -54,9 +52,6 @@ use ts_rs::TS;
 /// # Ok(())
 /// # }
 /// ```
-#[cfg_attr(feature = "ts_export", derive(TS))]
-#[cfg_attr(feature = "ts_export", ts(export))]
-#[cfg_attr(feature = "ts_export", ts(rename_all = "snake_case"))]
 // Keep this enum externally tagged. Market quote schemas, golden calibration
 // payloads, and Python envelope payloads already depend on this shape.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -67,10 +62,8 @@ pub enum InflationQuote {
     /// Zero-coupon inflation swap (ZCIS) quote.
     InflationSwap {
         /// Unique identifier for the quote.
-        #[cfg_attr(feature = "ts_export", ts(type = "string"))]
         id: QuoteId,
         /// Swap maturity
-        #[cfg_attr(feature = "ts_export", ts(type = "string"))]
         #[serde(with = "finstack_quant_core::wire::date")]
         #[cfg_attr(
             feature = "json-schema",
@@ -82,18 +75,14 @@ pub enum InflationQuote {
         /// Inflation index identifier
         index: String,
         /// Per-instrument conventions
-        #[cfg_attr(feature = "ts_export", ts(type = "string"))]
         convention: InflationSwapConventionId,
     },
     /// Year-on-year (YoY) inflation swap quote.
     #[serde(rename = "yoy_inflation_swap")]
-    #[cfg_attr(feature = "ts_export", ts(rename = "yoy_inflation_swap"))]
     YoYInflationSwap {
         /// Unique identifier for the quote.
-        #[cfg_attr(feature = "ts_export", ts(type = "string"))]
         id: QuoteId,
         /// Swap maturity
-        #[cfg_attr(feature = "ts_export", ts(type = "string"))]
         #[serde(with = "finstack_quant_core::wire::date")]
         #[cfg_attr(
             feature = "json-schema",
@@ -105,10 +94,8 @@ pub enum InflationQuote {
         /// Inflation index identifier
         index: String,
         /// Payment frequency
-        #[cfg_attr(feature = "ts_export", ts(type = "string"))]
         frequency: Tenor,
         /// Instrument-wide conventions
-        #[cfg_attr(feature = "ts_export", ts(type = "string"))]
         convention: InflationSwapConventionId,
     },
 }

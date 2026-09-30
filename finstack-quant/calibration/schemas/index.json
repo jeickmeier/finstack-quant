@@ -2,19 +2,102 @@
   "artifacts": [
     {
       "$id": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json",
-      "bytes": 209063,
+      "bytes": 208638,
       "kind": "input",
       "path": "schemas/calibration/1/calibration.schema.json",
       "summary": "Build a market from quotes: a calibration plan, flat market data, and any pre-built curves or surfaces.",
-      "title": "Calibration"
+      "title": "Calibration",
+      "type_name": "CalibrationEnvelope"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/calibration/1/calibration_result.schema.json",
+      "bytes": 114098,
+      "kind": "output",
+      "path": "schemas/calibration/1/calibration_result.schema.json",
+      "summary": "The calibrated market snapshot with the plan-level and per-step fit reports.",
+      "title": "Calibration Result",
+      "type_name": "CalibrationResultEnvelope"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/calibration/1/calibration_validation_report.schema.json",
+      "bytes": 15690,
+      "kind": "output",
+      "path": "schemas/calibration/1/calibration_validation_report.schema.json",
+      "summary": "Dry-run findings for a calibration envelope; nothing is solved.",
+      "title": "Calibration Validation Report",
+      "type_name": "CalibrationValidationReport"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/calibration/1/step_params.schema.json",
+      "bytes": 62424,
+      "kind": "component",
+      "path": "schemas/calibration/1/step_params.schema.json",
+      "summary": "Kind-tagged parameters of one calibration step, flattened into `CalibrationStep`.",
+      "title": "Step Params",
+      "type_name": "StepParams"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/market/1/cds_quote.schema.json",
+      "bytes": 8828,
+      "kind": "component",
+      "path": "schemas/market/1/cds_quote.schema.json",
+      "summary": "Single-name CDS par-spread or upfront quote.",
+      "title": "CDS Quote",
+      "type_name": "CdsQuote"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/market/1/cds_tranche_quote.schema.json",
+      "bytes": 5556,
+      "kind": "component",
+      "path": "schemas/market/1/cds_tranche_quote.schema.json",
+      "summary": "Index tranche upfront quote.",
+      "title": "CDS Tranche Quote",
+      "type_name": "CdsTrancheQuote"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/market/1/inflation_quote.schema.json",
+      "bytes": 4195,
+      "kind": "component",
+      "path": "schemas/market/1/inflation_quote.schema.json",
+      "summary": "Zero-coupon or year-on-year inflation swap quote.",
+      "title": "Inflation Quote",
+      "type_name": "InflationQuote"
     },
     {
       "$id": "https://finstack_quant.dev/schemas/market/1/market_quote.schema.json",
-      "bytes": 29710,
+      "bytes": 29936,
       "kind": "component",
       "path": "schemas/market/1/market_quote.schema.json",
       "summary": "One market observation, tagged by asset class.",
-      "title": "Market Quote"
+      "title": "Market Quote",
+      "type_name": "MarketQuote"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/market/1/rate_quote.schema.json",
+      "bytes": 8502,
+      "kind": "component",
+      "path": "schemas/market/1/rate_quote.schema.json",
+      "summary": "Deposit, FRA, futures or swap rate quote.",
+      "title": "Rate Quote",
+      "type_name": "RateQuote"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/market/1/vol_quote.schema.json",
+      "bytes": 7702,
+      "kind": "component",
+      "path": "schemas/market/1/vol_quote.schema.json",
+      "summary": "Option, swaption or cap/floor volatility quote.",
+      "title": "Vol Quote",
+      "type_name": "VolQuote"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/market/1/xccy_quote.schema.json",
+      "bytes": 4279,
+      "kind": "component",
+      "path": "schemas/market/1/xccy_quote.schema.json",
+      "summary": "Cross-currency basis swap quote.",
+      "title": "Cross-Currency Quote",
+      "type_name": "XccyQuote"
     }
   ],
   "schema_index_version": 1

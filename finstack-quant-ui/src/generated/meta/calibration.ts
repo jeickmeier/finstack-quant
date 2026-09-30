@@ -18,8 +18,6 @@ export default [
               "bootstrap_seed_global_solve": true,
               "df_hard_max": 1000000,
               "df_hard_min": 1e-12,
-              "extrapolation_policy": "flat_zero",
-              "interp_style": "linear",
               "jacobian_step_size": 0.000001,
               "min_scan_grid_points": 20,
               "min_t_spot": 0.000001,
@@ -2327,22 +2325,6 @@ export default [
     "format": "double"
   },
   {
-    "path": "#/$defs/d_65447e12defc07e99879/properties/extrapolation_policy",
-    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/DiscountCurveSolveConfig/properties/extrapolation_policy",
-    "default": "flat_zero",
-    "description": "Extrapolation policy for the constructed curve.",
-    "ref": "#/$defs/ExtrapolationPolicy",
-    "resolvedRef": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/ExtrapolationPolicy"
-  },
-  {
-    "path": "#/$defs/d_65447e12defc07e99879/properties/interp_style",
-    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/DiscountCurveSolveConfig/properties/interp_style",
-    "default": "linear",
-    "description": "Interpolation style for the constructed curve.",
-    "ref": "#/$defs/InterpStyle",
-    "resolvedRef": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/InterpStyle"
-  },
-  {
     "path": "#/$defs/d_65447e12defc07e99879/properties/jacobian_step_size",
     "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/DiscountCurveSolveConfig/properties/jacobian_step_size",
     "default": 0,
@@ -2449,7 +2431,7 @@ export default [
   {
     "path": "#/$defs/d_6b24e3c3222cc0ab8aeb",
     "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/Pillar",
-    "description": "The maturity pillar of a quote.\n\nThe pillar represents the maturity of the instrument referenced by the quote. OTC instruments\n(swaps, deposits) typically use `Tenor` (e.g., \"5Y\") to allow rolling headers that automatically\nadjust as the valuation date changes. Futures or bespoke runs may use `Date` to pin a specific\nmaturity date.\n\n# Examples\n\nUsing a tenor pillar:\n```rust\nuse finstack_quant_calibration::quotes::ids::Pillar;\n\n# fn example() -> finstack_quant_core::Result<()> {\nlet pillar = Pillar::Tenor(\"5Y\".parse()?);\n# Ok(())\n# }\n```\n\nUsing a date pillar:\n```rust\nuse finstack_quant_calibration::quotes::ids::Pillar;\nuse finstack_quant_core::dates::Date;\n\nlet pillar = Pillar::Date(Date::from_calendar_date(2029, time::Month::June, 20).unwrap());\n```"
+    "description": "The maturity pillar of a quote.\n\nThe pillar represents the maturity of the instrument referenced by the quote. OTC instruments\n(swaps, deposits) typically use `Tenor` (e.g., \"5Y\") to allow rolling headers that automatically\nadjust as the valuation date changes. Futures or bespoke runs may use `Date` to pin a specific\nmaturity date.\n\nThe JSON wire form is externally tagged: `{\"tenor\": {\"count\": 5, \"unit\": \"years\"}}`\nor `{\"date\": \"2029-06-20\"}`. A bare string such as `\"5Y\"` is rejected.\n\n# Examples\n\nUsing a tenor pillar:\n```rust\nuse finstack_quant_calibration::quotes::ids::Pillar;\n\n# fn example() -> finstack_quant_core::Result<()> {\nlet pillar = Pillar::Tenor(\"5Y\".parse()?);\n# Ok(())\n# }\n```\n\nUsing a date pillar:\n```rust\nuse finstack_quant_calibration::quotes::ids::Pillar;\nuse finstack_quant_core::dates::Date;\n\nlet pillar = Pillar::Date(Date::from_calendar_date(2029, time::Month::June, 20).unwrap());\n```"
   },
   {
     "path": "#/$defs/d_6b24e3c3222cc0ab8aeb/oneOf/0",
@@ -2686,7 +2668,7 @@ export default [
   {
     "path": "#/$defs/d_826db27dbb673d9f5f86/oneOf/0/oneOf/0/properties/pillar",
     "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/MarketDatum/oneOf/0/oneOf/0/properties/pillar",
-    "description": "Maturity pillar (e.g. Tenor(\"3M\") or Date(\"2024-01-01\")).",
+    "description": "Maturity pillar; on the wire `{\"tenor\": {\"count\": 3, \"unit\": \"months\"}}`\nor `{\"date\": \"2024-01-01\"}`.",
     "ref": "#/$defs/Pillar",
     "resolvedRef": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/Pillar"
   },
@@ -6330,8 +6312,6 @@ export default [
       "bootstrap_seed_global_solve": true,
       "df_hard_max": 1000000,
       "df_hard_min": 1e-12,
-      "extrapolation_policy": "flat_zero",
-      "interp_style": "linear",
       "jacobian_step_size": 0.000001,
       "min_scan_grid_points": 20,
       "min_t_spot": 0.000001,
@@ -6568,8 +6548,6 @@ export default [
         "bootstrap_seed_global_solve": true,
         "df_hard_max": 1000000,
         "df_hard_min": 1e-12,
-        "extrapolation_policy": "flat_zero",
-        "interp_style": "linear",
         "jacobian_step_size": 0.000001,
         "min_scan_grid_points": 20,
         "min_t_spot": 0.000001,

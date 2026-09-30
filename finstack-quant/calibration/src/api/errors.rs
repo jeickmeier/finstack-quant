@@ -25,9 +25,8 @@ fn format_worst_quote(id: &Option<String>, residual: &Option<f64>) -> String {
 /// Mirrors the host-independent fields of
 /// [`finstack_quant_core::contract::Diagnostic`] so the Python and WASM
 /// bindings can attach the findings as plain records.
-#[cfg_attr(feature = "ts_export", derive(ts_rs::TS))]
-#[cfg_attr(feature = "ts_export", ts(export))]
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct StrictLoadDiagnostic {
     /// Stable machine-readable code (e.g. `parse/invalid-json`,
     /// `calibration/undefined-quote-set`).
@@ -130,9 +129,8 @@ impl EnvelopeError {
 }
 
 /// Errors surfaced when an envelope is invalid or calibration fails.
-#[cfg_attr(feature = "ts_export", derive(ts_rs::TS))]
-#[cfg_attr(feature = "ts_export", ts(export))]
 #[derive(Debug, Clone, PartialEq, thiserror::Error, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[non_exhaustive]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum EnvelopeError {

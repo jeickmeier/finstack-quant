@@ -275,7 +275,6 @@ produced by the `gen_core_schemas` binary. Regenerate with
 | Feature | Default | Effect |
 |---------|---------|--------|
 | `json-schema` | on | Optional `schemars` derives and the `schema` generation module. WASM builds this crate with `default-features = false` so the schema stack stays off that graph. |
-| `ts_export` | off | Derives `ts_rs::TS` on the `contract::diagnostics` types for TypeScript declaration export. |
 
 Serde and tracing hooks compile unconditionally; there is no `std`/`no_std`
 split (the crate uses the standard library). Golden-test helpers live in

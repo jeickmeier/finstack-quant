@@ -6,7 +6,7 @@ list one crate each. This namespace merges all of them, so a service exposing
 these contracts does not have to hard-code the domain list.
 
 Each :func:`index` row carries ``domain`` alongside ``path``, ``$id``,
-``title``, ``summary``, ``bytes`` and ``kind``.
+``title``, ``type_name`` (the Rust root type), ``summary``, ``bytes`` and ``kind``.
 
 Examples
 --------
@@ -38,7 +38,7 @@ def index() -> str:
     str
         Pretty-printed JSON with an ``artifacts`` array. Each row carries
         ``domain`` (the owning crate namespace), ``path``, ``$id``, ``title``,
-        ``summary``, ``bytes`` and ``kind`` (``input`` for documents you author,
+        ``type_name`` (the Rust root type), ``summary``, ``bytes`` and ``kind`` (``input`` for documents you author,
         ``output`` for documents the library emits, ``component`` for shared
         definitions). Rows are sorted by ``domain`` then ``path``.
 

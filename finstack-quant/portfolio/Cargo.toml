@@ -27,7 +27,6 @@ indexmap = { workspace = true, features = ["serde"] }
 tracing = { version = "0.1", default-features = false }
 time = { workspace = true, features = ["macros", "serde", "parsing", "formatting"] }
 good_lp = { version = "1.15", default-features = false, features = ["microlp"] }
-ts-rs = { version = "12", optional = true, features = ["serde-compat", "no-serde-warnings"] }
 
 [features]
 default = ["json-schema"]
@@ -42,7 +41,6 @@ json-schema = [
     "finstack-quant-valuations/json-schema",
     "finstack-quant-scenarios/json-schema",
 ]
-ts_export = ["dep:ts-rs", "finstack-quant-core/ts_export"]
 
 [[bin]]
 name = "gen_materialization_schemas"
@@ -115,9 +113,3 @@ wasm-bindgen = "0.2.126"
 [[test]]
 name = "portfolio"
 path = "tests/main.rs"
-
-# Gated by `#![cfg(feature = "ts_export")]` in the file. A required-features
-# entry would make `--test '*'` fail whenever that feature is off.
-[[test]]
-name = "ts_export"
-path = "tests/ts_export.rs"

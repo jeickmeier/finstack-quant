@@ -131,7 +131,7 @@ sequential peel:
    - `LedoitWolf` — identity-target shrinkage; Σ and ρ both come from the
      shrunk estimator over complete-case dates.
 10. Assemble `FactorModelConfig` with `MatchingConfig::CreditHierarchical`,
-    build `CalibrationDiagnostics`, and run `CreditFactorModel::validate()`
+    build `CreditCalibrationDiagnostics`, and run `CreditFactorModel::validate()`
     before returning.
 
 ```rust,ignore

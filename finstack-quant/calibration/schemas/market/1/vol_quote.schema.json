@@ -1,0 +1,205 @@
+{
+  "$defs": {
+    "OptionType": {
+      "description": "Option payoff direction used by analytical and numerical model engines.",
+      "oneOf": [
+        {
+          "const": "call",
+          "description": "Call option.",
+          "type": "string"
+        },
+        {
+          "const": "put",
+          "description": "Put option.",
+          "type": "string"
+        }
+      ]
+    },
+    "QuoteId": {
+      "description": "A stable identifier for a market quote (e.g., \"USD-OIS-SWAP-5Y\").\n\nThis ID is used for human readability, logging, and potentially matching against external\ndata sources. Quote IDs should be unique within a calibration set and follow a consistent\nnaming convention (e.g., \"{currency}-{index}-{type}-{pillar}\").\n\n[`QuoteId::new`] is infallible, including for empty strings. Empty or\nwhitespace-only IDs are rejected when this type is deserialized from the\nwire, and again by [`MarketQuote::validate`](super::market_quote::MarketQuote::validate).\n\n# Examples\n\n```rust\nuse finstack_quant_calibration::quotes::ids::QuoteId;\n\nlet id = QuoteId::new(\"USD-SOFR-DEP-1M\");\nassert_eq!(id.as_str(), \"USD-SOFR-DEP-1M\");\n```",
+      "minLength": 1,
+      "pattern": ".*\\S.*",
+      "type": "string"
+    },
+    "SwaptionConventionId": {
+      "description": "Identifier for Swaption market conventions (e.g., \"USD\", \"EUR\").\n\nUsed to look up [`SwaptionConventions`](crate::market::conventions::defs::SwaptionConventions)\nfrom the convention registry.",
+      "type": "string"
+    },
+    "VolQuoteType": {
+      "description": "Quoting convention of the volatilities stored on a [`VolSurface`].\n\nThe same `vol_surface_id` channel is read by consumers with very different\nexpectations: rates calibrations typically read normal (Bachelier, absolute)\nvols on an `expiry × tenor` ATM matrix, while equity/FX/swaption smile\nconsumers read Black (lognormal, relative) vols on `expiry × strike`. The\nstored numbers are an order of magnitude apart (e.g. 0.008 normal vs 0.20\nBlack), so misreading one as the other silently mis-prices. Tagging the\nquote type lets consumers enforce their convention via\n[`VolSurface::require_quote_type`].",
+      "oneOf": [
+        {
+          "const": "black_lognormal",
+          "description": "Black (lognormal) implied volatility, relative units (the default).",
+          "type": "string"
+        },
+        {
+          "const": "normal",
+          "description": "Normal (Bachelier) implied volatility, absolute rate units.",
+          "type": "string"
+        }
+      ]
+    }
+  },
+  "$id": "https://finstack_quant.dev/schemas/market/1/vol_quote.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Option, swaption or cap/floor volatility quote.",
+  "oneOf": [
+    {
+      "additionalProperties": false,
+      "description": "Equity or commodity option implied volatility quote.",
+      "properties": {
+        "option_vol": {
+          "additionalProperties": false,
+          "properties": {
+            "expiry": {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
+              "description": "Option expiry"
+            },
+            "id": {
+              "$ref": "#/$defs/QuoteId",
+              "description": "Unique identifier for the quote."
+            },
+            "option_type": {
+              "$ref": "#/$defs/OptionType",
+              "description": "Option type (Call or Put)."
+            },
+            "strike": {
+              "description": "Strike",
+              "format": "double",
+              "type": "number"
+            },
+            "underlying": {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+              "description": "Underlying identifier"
+            },
+            "vol": {
+              "description": "Implied volatility in decimal units (for example, `0.20` for 20%).",
+              "format": "double",
+              "type": "number"
+            }
+          },
+          "required": [
+            "id",
+            "underlying",
+            "expiry",
+            "strike",
+            "vol",
+            "option_type"
+          ],
+          "type": "object"
+        }
+      },
+      "required": [
+        "option_vol"
+      ],
+      "type": "object"
+    },
+    {
+      "additionalProperties": false,
+      "description": "Interest rate swaption implied volatility quote.",
+      "properties": {
+        "swaption_vol": {
+          "additionalProperties": false,
+          "properties": {
+            "convention": {
+              "$ref": "#/$defs/SwaptionConventionId",
+              "description": "Option exercise conventions"
+            },
+            "expiry": {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
+              "description": "Option expiry"
+            },
+            "id": {
+              "$ref": "#/$defs/QuoteId",
+              "description": "Unique identifier for the quote."
+            },
+            "maturity": {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
+              "description": "Underlying swap maturity date"
+            },
+            "quote_type": {
+              "$ref": "#/$defs/VolQuoteType",
+              "description": "Volatility quoting convention."
+            },
+            "strike": {
+              "description": "Strike rate",
+              "format": "double",
+              "type": "number"
+            },
+            "vol": {
+              "description": "Implied volatility in canonical decimal units: absolute rate\nvolatility for normal quotes and Black volatility for lognormal quotes.",
+              "format": "double",
+              "type": "number"
+            }
+          },
+          "required": [
+            "id",
+            "expiry",
+            "maturity",
+            "strike",
+            "vol",
+            "quote_type",
+            "convention"
+          ],
+          "type": "object"
+        }
+      },
+      "required": [
+        "swaption_vol"
+      ],
+      "type": "object"
+    },
+    {
+      "additionalProperties": false,
+      "description": "Interest rate cap/floor implied volatility quote.",
+      "properties": {
+        "cap_floor_vol": {
+          "additionalProperties": false,
+          "properties": {
+            "expiry": {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
+              "description": "Cap/floor maturity or caplet expiry."
+            },
+            "id": {
+              "$ref": "#/$defs/QuoteId",
+              "description": "Unique identifier for the quote."
+            },
+            "is_cap": {
+              "description": "`true` for cap, `false` for floor.",
+              "type": "boolean"
+            },
+            "quote_type": {
+              "$ref": "#/$defs/VolQuoteType",
+              "description": "Volatility quoting convention."
+            },
+            "strike": {
+              "description": "Strike rate.",
+              "format": "double",
+              "type": "number"
+            },
+            "vol": {
+              "description": "Implied volatility in canonical decimal units: absolute rate\nvolatility for normal quotes and Black volatility for lognormal quotes.",
+              "format": "double",
+              "type": "number"
+            }
+          },
+          "required": [
+            "id",
+            "expiry",
+            "strike",
+            "vol",
+            "quote_type",
+            "is_cap"
+          ],
+          "type": "object"
+        }
+      },
+      "required": [
+        "cap_floor_vol"
+      ],
+      "type": "object"
+    }
+  ],
+  "title": "Vol Quote"
+}

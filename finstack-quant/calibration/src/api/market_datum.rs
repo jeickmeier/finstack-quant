@@ -18,16 +18,11 @@ use finstack_quant_core::market_data::dividends::DividendSchedule;
 use finstack_quant_core::market_data::scalars::{InflationIndex, MarketScalar, ScalarTimeSeries};
 use finstack_quant_core::market_data::surfaces::{FxDeltaVolSurface, VolCube};
 use serde::{Deserialize, Serialize};
-#[cfg(feature = "ts_export")]
-use ts_rs::TS;
 
 /// A single id-addressable input to the calibrator.
 ///
 /// Each variant is tagged via serde as `{"kind": "<snake_case_variant>", ...}`
 /// so callers can author flat heterogeneous lists in JSON/YAML.
-#[cfg_attr(feature = "ts_export", derive(TS))]
-#[cfg_attr(feature = "ts_export", ts(export))]
-#[cfg_attr(feature = "ts_export", ts(rename_all = "snake_case"))]
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
@@ -51,25 +46,23 @@ pub enum MarketDatum {
     /// Dividend schedule for an underlier.
     DividendSchedule(DividendScheduleDatum),
     /// Generic scalar time series (CPI, historical fixings, ...).
-    FixingSeries(#[cfg_attr(feature = "ts_export", ts(type = "unknown"))] ScalarTimeSeries),
+    FixingSeries(ScalarTimeSeries),
     /// Inflation index fixings.
     InflationFixings(
-        #[cfg_attr(feature = "ts_export", ts(type = "unknown"))] //
+        //
         InflationIndex,
     ),
     /// Credit-index reference state.
-    CreditIndex(#[cfg_attr(feature = "ts_export", ts(type = "unknown"))] CreditIndexState),
+    CreditIndex(CreditIndexState),
     /// FX delta-vol surface.
-    FxVolSurface(#[cfg_attr(feature = "ts_export", ts(type = "unknown"))] FxDeltaVolSurface),
+    FxVolSurface(FxDeltaVolSurface),
     /// Generic vol cube.
-    VolCube(#[cfg_attr(feature = "ts_export", ts(type = "unknown"))] VolCube),
+    VolCube(VolCube),
     /// Collateral / CSA mapping entry.
     Collateral(CollateralEntry),
 }
 
 /// FX-spot quote payload for [`MarketDatum::FxSpot`].
-#[cfg_attr(feature = "ts_export", derive(TS))]
-#[cfg_attr(feature = "ts_export", ts(export))]
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
@@ -77,18 +70,14 @@ pub struct FxSpotDatum {
     /// Stable identifier for this datum.
     pub id: String,
     /// Base currency (e.g. `EUR` in `EUR/USD`).
-    #[cfg_attr(feature = "ts_export", ts(type = "string"))]
     pub from: Currency,
     /// Quote currency (e.g. `USD` in `EUR/USD`).
-    #[cfg_attr(feature = "ts_export", ts(type = "string"))]
     pub to: Currency,
     /// Rate such that `1 from = rate to`.
     pub rate: f64,
 }
 
 /// Single-name spot-price payload for [`MarketDatum::Price`].
-#[cfg_attr(feature = "ts_export", derive(TS))]
-#[cfg_attr(feature = "ts_export", ts(export))]
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
@@ -96,34 +85,26 @@ pub struct PriceDatum {
     /// Stable identifier (e.g., asset ticker).
     pub id: String,
     /// Scalar value (unitless or monetary).
-    #[cfg_attr(feature = "ts_export", ts(type = "unknown"))]
     pub scalar: MarketScalar,
 }
 
 /// Dividend-schedule payload for [`MarketDatum::DividendSchedule`].
-#[cfg_attr(feature = "ts_export", derive(TS))]
-#[cfg_attr(feature = "ts_export", ts(export))]
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct DividendScheduleDatum {
     /// The dividend schedule itself.
-    #[cfg_attr(feature = "ts_export", ts(type = "unknown"))]
     pub schedule: DividendSchedule,
 }
 
 /// Collateral / CSA mapping payload for [`MarketDatum::Collateral`].
-#[cfg_attr(feature = "ts_export", derive(TS))]
-#[cfg_attr(feature = "ts_export", ts(export))]
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct CollateralEntry {
     /// Trade-leg currency this CSA mapping applies to.
-    #[cfg_attr(feature = "ts_export", ts(type = "string"))]
     pub id: Currency,
     /// Collateral / CSA currency.
-    #[cfg_attr(feature = "ts_export", ts(type = "string"))]
     pub csa_currency: Currency,
 }
 

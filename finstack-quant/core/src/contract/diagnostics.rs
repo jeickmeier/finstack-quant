@@ -8,7 +8,6 @@ use super::LoadLimits;
 #[non_exhaustive]
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[cfg_attr(feature = "ts_export", derive(ts_rs::TS))]
 #[serde(rename_all = "snake_case")]
 pub enum LoadPhase {
     /// Source bytes were parsed into a JSON document.
@@ -31,7 +30,6 @@ pub enum LoadPhase {
 #[non_exhaustive]
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[cfg_attr(feature = "ts_export", derive(ts_rs::TS))]
 #[serde(rename_all = "snake_case")]
 pub enum Severity {
     /// A finding that prevents successful loading.
@@ -47,7 +45,6 @@ pub enum Severity {
 #[non_exhaustive]
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[cfg_attr(feature = "ts_export", derive(ts_rs::TS))]
 #[serde(deny_unknown_fields)]
 pub struct Diagnostic {
     /// Stable machine-readable code, such as `"contract/version-unsupported"`.
@@ -234,7 +231,6 @@ impl Diagnostic {
 /// Bounded collection of diagnostics produced by a validation operation.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[cfg_attr(feature = "ts_export", derive(ts_rs::TS))]
 #[serde(deny_unknown_fields)]
 pub struct ValidationReport {
     /// Individual findings retained up to the configured diagnostic limit.

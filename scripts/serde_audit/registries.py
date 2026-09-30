@@ -93,14 +93,6 @@ ONE_WAY_EXCEPTIONS = (
         "Computed statement-analysis report; source statement results are canonical.",
         frozenset({"JsonSchema"}),
     ),
-    *_exception(
-        "calibration",
-        "src/api/validate.rs",
-        ("CalibrationValidationReport", "DependencyGraph", "DependencyNode"),
-        "validation-report",
-        "Transient calibration validation view, regenerated from the input envelope.",
-        frozenset({"JsonSchema"}),
-    ),
 )
 
 

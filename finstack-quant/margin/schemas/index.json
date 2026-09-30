@@ -6,7 +6,8 @@
       "kind": "input",
       "path": "schemas/margin/1/margin.schema.json",
       "summary": "One of three closed root shapes: an OTC margin spec, a CSA spec, or a margin call.",
-      "title": "Finstack Quant Margin Specification"
+      "title": "Finstack Quant Margin Specification",
+      "type_name": "MarginEnvelope"
     }
   ],
   "schema_index_version": 1

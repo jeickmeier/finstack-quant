@@ -6,8 +6,6 @@ use finstack_quant_core::config::ResultsMeta;
 use finstack_quant_core::explain::ExplanationTrace;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
-#[cfg(feature = "ts_export")]
-use ts_rs::TS;
 
 fn default_true() -> bool {
     true
@@ -17,8 +15,6 @@ fn default_true() -> bool {
 ///
 /// Captures the fitted vs target values for a single market quote,
 /// along with the residual and a local sensitivity measure.
-#[cfg_attr(feature = "ts_export", derive(TS))]
-#[cfg_attr(feature = "ts_export", ts(export))]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
@@ -41,8 +37,6 @@ pub struct QuoteQuality {
 /// is set to `true`. They are relatively expensive to compute (requiring Jacobian
 /// analysis) and are intended for calibration debugging, auditing, and quality
 /// monitoring rather than production hot paths.
-#[cfg_attr(feature = "ts_export", derive(TS))]
-#[cfg_attr(feature = "ts_export", ts(export))]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
@@ -54,13 +48,13 @@ pub struct CalibrationDiagnostics {
     /// A high condition number (e.g., > 1e10) indicates an ill-conditioned
     /// calibration problem where small changes in market data can produce
     /// large changes in calibrated parameters.
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub condition_number: Option<f64>,
     /// Singular values of the Jacobian matrix (if computed).
     ///
     /// Useful for diagnosing rank deficiency and understanding which
     /// parameter directions are well-determined vs poorly-determined.
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub singular_values: Option<Vec<f64>>,
     /// Maximum absolute residual across all quotes.
     pub max_residual: f64,
@@ -70,7 +64,7 @@ pub struct CalibrationDiagnostics {
     ///
     /// Values close to 1.0 indicate a good fit. Only meaningful when
     /// target values have meaningful variance.
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub r_squared: Option<f64>,
 }
 
@@ -221,8 +215,6 @@ fn compute_residual_diagnostics(residuals: &BTreeMap<String, f64>) -> ResidualDi
 /// assert!(report.success);
 /// assert!(report.max_residual <= 1e-12);
 /// ```
-#[cfg_attr(feature = "ts_export", derive(TS))]
-#[cfg_attr(feature = "ts_export", ts(export))]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
@@ -254,7 +246,7 @@ pub struct CalibrationReport {
     #[serde(default = "default_true")]
     pub validation_passed: bool,
     /// Optional details on validation failures.
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub validation_error: Option<String>,
     /// Human-readable reason for convergence or failure.
     pub convergence_reason: String,
@@ -264,14 +256,10 @@ pub struct CalibrationReport {
     #[serde(default)]
     pub solver_config: SolverConfig,
     /// Results metadata (timestamp, software version, etc.).
-    // ResultsMeta is from finstack-quant-core which does not carry ts_export yet.
     #[serde(default)]
-    #[cfg_attr(feature = "ts_export", ts(type = "unknown"))]
     pub results_meta: ResultsMeta,
     /// Optional detailed trace of the calibration steps (enabled via config).
-    // ExplanationTrace is from finstack-quant-core which does not carry ts_export yet.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    #[cfg_attr(feature = "ts_export", ts(type = "unknown | null"))]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub explanation: Option<ExplanationTrace>,
     /// Optional model/methodology version used for this calibration.
     ///
@@ -651,6 +639,18 @@ impl CalibrationReport {
 mod tests {
     use super::*;
     use crate::constants::PENALTY;
+
+    #[test]
+    fn omitted_optional_report_fields_round_trip_as_absent_keys() {
+        let report = CalibrationReport::new(BTreeMap::new(), 1, true, "converged");
+        let value = serde_json::to_value(&report).expect("report serializes");
+        for key in ["validation_error", "explanation"] {
+            assert!(value.get(key).is_none(), "{key} is omitted, not null");
+        }
+        let back: CalibrationReport = serde_json::from_value(value).expect("absent keys default");
+        assert!(back.validation_error.is_none());
+        assert!(back.explanation.is_none());
+    }
 
     #[test]
     fn test_for_type_with_tolerance_success() {

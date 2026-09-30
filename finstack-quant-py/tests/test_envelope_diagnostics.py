@@ -228,3 +228,24 @@ def test_dry_run_json_is_the_wire_twin_of_dry_run() -> None:
 
     envelope = json.dumps(_empty_envelope())
     assert json.loads(dry_run_json(envelope)) == json.loads(dry_run(envelope).to_json())
+
+
+@pytest.mark.parametrize("key", ["interp_style", "extrapolation_policy"])
+def test_discount_solve_settings_reject_removed_curve_shape_keys(key: str) -> None:
+    envelope = {
+        "schema": "finstack_quant.calibration/1",
+        "plan": {"id": "p", "steps": [], "settings": {"discount_curve": {key: "linear"}}},
+    }
+    with pytest.raises(CalibrationEnvelopeError, match=f"unknown field `{key}`") as info:
+        validate_calibration_json(envelope)
+    assert info.value.kind == "strict_load"
+
+
+def test_market_freshness_age_is_a_plain_integer() -> None:
+    envelope = {
+        "schema": "finstack_quant.calibration/1",
+        "plan": {"id": "p", "steps": [], "settings": {"market_freshness": {"max_age_seconds": 3600}}},
+    }
+    assert dry_run(envelope).errors == []
+    canonical = json.loads(validate_calibration_json(envelope))
+    assert canonical["plan"]["settings"]["market_freshness"]["max_age_seconds"] == 3600

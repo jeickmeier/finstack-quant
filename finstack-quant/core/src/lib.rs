@@ -77,7 +77,6 @@
 //! # Cargo features
 //!
 //! - `json-schema` (default): `schemars` derives and the `schema` generation module.
-//! - `ts_export`: `ts_rs::TS` derives on contract diagnostics types.
 //!
 //! Serde is always enabled. WASM builds this crate with `default-features = false`.
 //!
