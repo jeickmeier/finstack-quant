@@ -122,7 +122,7 @@ pub use aggregation::PeriodAggregation;
 pub use builder::CashFlowBuilder;
 pub use builder::{cdr_to_mdr, cpr_to_smm, mdr_to_cdr, smm_to_cpr};
 pub use json::{
-    accrued_interest, build_cashflow_schedule_json, dated_flows_json,
+    accrued_interest, build_cashflow_schedule_json, dated_flows, dated_flows_json,
     validate_cashflow_schedule_json, CashflowScheduleBuildSpec, CouponLegSpec, DatedFlowJson,
     PaymentProgramSpec,
 };

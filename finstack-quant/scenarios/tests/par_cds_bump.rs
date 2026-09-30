@@ -585,7 +585,7 @@ fn solve_to_par_after_roll_requotes_surviving_pillars_at_the_horizon() {
         "../../calibration/examples/market_bootstrap/03_single_name_hazard.json"
     ))
     .unwrap();
-    let calibrated = engine::execute(&envelope).expect("source calibration");
+    let calibrated = engine::calibrate(&envelope).expect("source calibration");
     let source = MarketContext::try_from(calibrated.result.final_market).unwrap();
     let original = source.get_hazard("ISSUER-A-CDS").unwrap();
     let base = original.base_date();

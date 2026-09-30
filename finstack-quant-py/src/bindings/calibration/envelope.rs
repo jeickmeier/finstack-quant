@@ -1762,7 +1762,7 @@ impl PyCalibrationPlan {
     /// steps : list[CalibrationStep]
     ///     Steps in execution order; attached quotes populate ``quote_sets``.
     /// id : str, default "plan"
-    ///     Plan identifier.
+    ///     Plan identifier (Rust ``CalibrationPlan::DEFAULT_ID`` when omitted).
     /// description : str | None, default None
     ///     Free-text description.
     /// settings : CalibrationConfig | dict | None, default None
@@ -1774,12 +1774,15 @@ impl PyCalibrationPlan {
     /// Raises
     /// ------
     /// ValueError
-    ///     If ``settings`` is invalid or two steps attach quotes under the
-    ///     same set name with different ids, or reuse a quote id with a
-    ///     different payload. Identical attached quotes are collected once,
-    ///     including when their set is supplied explicitly.
+    ///     If ``settings`` is invalid.
+    /// CalibrationEnvelopeError
+    ///     If two steps attach quotes under the same set name with different
+    ///     ids (``kind == "quote_set_conflict"``), or reuse a quote id with a
+    ///     different payload (``kind == "conflicting_market_datum"``).
+    ///     Identical attached quotes are collected once, including when their
+    ///     set is supplied explicitly.
     #[new]
-    #[pyo3(signature = (steps, id = "plan", description = None, settings = None, quote_sets = None))]
+    #[pyo3(signature = (steps, id = CalibrationPlan::DEFAULT_ID, description = None, settings = None, quote_sets = None))]
     #[pyo3(text_signature = "(steps, id='plan', description=None, settings=None, quote_sets=None)")]
     fn new(
         py: Python<'_>,
@@ -1804,57 +1807,21 @@ impl PyCalibrationPlan {
                 );
             }
         }
-        let mut market_data = Vec::new();
-        let mut payloads = IndexMap::new();
-        let mut inner_steps = Vec::with_capacity(steps.len());
-        for step in steps {
-            if !step.quotes.is_empty() {
-                let ids: Vec<_> = step
-                    .quotes
-                    .iter()
-                    .map(|q| finstack_quant_calibration::quotes::ids::QuoteId::new(q.id()))
-                    .collect();
-                match sets.get(&step.inner.quote_set) {
-                    Some(existing) if existing != &ids => {
-                        return Err(value_error(format!(
-                            "quote set '{}' is attached by more than one step with different quotes",
-                            step.inner.quote_set
-                        )));
-                    }
-                    Some(_) => {}
-                    None => {
-                        sets.insert(step.inner.quote_set.clone(), ids);
-                    }
-                }
-                for quote in &step.quotes {
-                    let payload = serde_json::to_value(quote)
-                        .map_err(|error| value_error(error.to_string()))?;
-                    match payloads.get(quote.id()) {
-                        Some(existing) if existing != &payload => {
-                            return Err(value_error(format!(
-                                "quote id '{}' has conflicting attached payloads",
-                                quote.id()
-                            )));
-                        }
-                        Some(_) => {}
-                        None => {
-                            payloads.insert(quote.id().to_string(), payload);
-                            market_data.push(quote.clone());
-                        }
-                    }
-                }
-            }
-            inner_steps.push(step.inner.clone());
-        }
+        let steps = steps
+            .iter()
+            .map(|step| (step.inner.clone(), step.quotes.clone()))
+            .collect();
+        let envelope = CalibrationEnvelope::from_attached_steps(
+            id.to_string(),
+            description,
+            settings,
+            sets,
+            steps,
+        )
+        .map_err(|error| super::envelope_error_to_py(py, error))?;
         Ok(Self {
-            inner: CalibrationPlan {
-                id: id.to_string(),
-                description,
-                quote_sets: sets,
-                steps: inner_steps,
-                settings,
-            },
-            market_data,
+            inner: envelope.plan,
+            market_data: envelope.market_data,
         })
     }
 
@@ -2089,7 +2056,7 @@ impl PyCalibrationEnvelope {
     ///     pointer-level findings.
     #[staticmethod]
     fn from_json(py: Python<'_>, json: &str) -> PyResult<Self> {
-        super::parse_envelope_json(py, json).map(Self::from_inner)
+        super::parse_envelope(py, json).map(Self::from_inner)
     }
 
     /// Pickle support through the JSON wire format.

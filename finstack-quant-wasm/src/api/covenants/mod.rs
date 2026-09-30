@@ -55,7 +55,7 @@ pub fn validate_covenant_engine_json(engine_json: JsValue) -> Result<String, JsV
 ///
 /// @param engine_json - JSON-serialized covenant engine and its covenant definitions.
 /// @param metrics_json - JSON object of financial metrics referenced by the covenant engine.
-/// @param as_of - ISO-8601 valuation date used to resolve date-dependent market data.
+/// @param as_of - ISO-8601 date on which every covenant test is evaluated.
 ///
 /// # Errors
 ///
@@ -72,7 +72,7 @@ pub fn evaluate_engine(
     let engine_json: &str = &json_text(&engine_json, "engineJson")?;
     let metrics_json: &str = &json_text(&metrics_json, "metricsJson")?;
     let as_of: &str = &js_string(&as_of, "asOf")?;
-    let reports = finstack_quant_covenants::evaluate_engine_map(engine_json, metrics_json, as_of)
+    let reports = finstack_quant_covenants::evaluate_engine(engine_json, metrics_json, as_of)
         .map_err(to_js_err)?;
     crate::utils::to_js_value(&reports)
 }

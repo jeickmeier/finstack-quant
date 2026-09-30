@@ -17,24 +17,19 @@ type MetricFrameRows = Vec<(time::Date, Vec<(String, f64)>)>;
 
 /// Accept a ``dict[str, float]`` or a JSON-object string of metric values.
 ///
-/// Every value must be a real number; ``bool`` is rejected so a stray
-/// ``True`` cannot silently evaluate as ``1.0``.
-pub(crate) fn extract_metrics(obj: &Bound<'_, PyAny>) -> PyResult<Vec<(String, f64)>> {
+/// A string goes to the Rust metric-map parser
+/// ([`HashMapMetricSource::from_json`]); a dict is converted here. Every dict
+/// value must be a real number; ``bool`` is rejected so a stray ``True``
+/// cannot silently evaluate as ``1.0``.
+pub(crate) fn extract_metrics(obj: &Bound<'_, PyAny>) -> PyResult<HashMapMetricSource> {
     if let Ok(text) = obj.extract::<std::borrow::Cow<'_, str>>() {
-        let map: serde_json::Map<String, serde_json::Value> = serde_json::from_str(&text)
-            .map_err(|e| value_error(format!("Invalid metric map JSON: {e}")))?;
-        return map
-            .into_iter()
-            .map(|(key, value)| {
-                value
-                    .as_f64()
-                    .map(|number| (key.clone(), number))
-                    .ok_or_else(|| {
-                        value_error(format!("Metric '{key}' must be a finite JSON number"))
-                    })
-            })
-            .collect();
+        return HashMapMetricSource::from_json(&text).map_err(core_to_py);
     }
+    extract_metric_dict(obj).map(HashMapMetricSource::from_pairs)
+}
+
+/// Convert a ``dict[str, float]`` of metric values into pairs.
+pub(crate) fn extract_metric_dict(obj: &Bound<'_, PyAny>) -> PyResult<Vec<(String, f64)>> {
     let dict = obj.cast::<PyDict>().map_err(|_| {
         pyo3::exceptions::PyTypeError::new_err(format!(
             "metrics must be a dict[str, float] or a JSON object string, got {}",
@@ -224,7 +219,7 @@ impl PyCovenantEngine {
         as_of: &Bound<'py, PyAny>,
     ) -> PyResult<Bound<'py, PyDict>> {
         let as_of = extract_date(as_of)?;
-        let source = HashMapMetricSource::from_pairs(extract_metrics(metrics)?);
+        let source = extract_metrics(metrics)?;
         let reports = py.detach(|| self.inner.evaluate(&source, as_of).map_err(core_to_py))?;
         reports_to_pydict(py, reports)
     }
@@ -248,7 +243,7 @@ impl PyCovenantEngine {
     ) -> PyResult<Bound<'py, PyDict>> {
         let scope = super::spec::parse_scope(scope)?;
         let as_of = extract_date(as_of)?;
-        let source = HashMapMetricSource::from_pairs(extract_metrics(metrics)?);
+        let source = extract_metrics(metrics)?;
         let reports = py.detach(|| {
             self.inner
                 .evaluate_and_track(&source, as_of, scope)

@@ -273,7 +273,7 @@ fn base_correlation_step_builds_curve_and_updates_credit_index_data() {
         prior_market: prior,
     };
 
-    let result = engine::execute(&envelope).expect("execute");
+    let result = engine::calibrate(&envelope).expect("execute");
     assert!(result.result.report.success);
     let step = result.result.step_reports.get("corr").expect("step report");
     assert!(step.success);

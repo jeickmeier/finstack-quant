@@ -33,8 +33,21 @@ def test_attached_quote_id_rejects_conflicting_payloads(same_set: bool) -> None:
             quotes=[RateQuote.deposit("D", "USD-Deposit", "1Y", 0.08)],
         ),
     ]
-    with pytest.raises(ValueError, match="conflicting attached payloads"):
+    with pytest.raises(CalibrationEnvelopeError, match="conflicting attached payloads") as info:
         CalibrationPlan(steps)
+    assert info.value.kind == "conflicting_market_datum"
+
+
+def test_attached_quote_sets_reject_different_ids_under_one_name() -> None:
+    steps = [
+        CalibrationStep.discount(
+            curve, "USD", "2026-05-08", quote_set="shared", quotes=[RateQuote.deposit(qid, "USD-Deposit", "1Y", 0.03)]
+        )
+        for curve, qid in [("A", "D1"), ("B", "D2")]
+    ]
+    with pytest.raises(CalibrationEnvelopeError, match="more than one step with different quotes") as info:
+        CalibrationPlan(steps)
+    assert info.value.kind == "quote_set_conflict"
 
 
 @pytest.mark.parametrize("explicit", [True, False])
@@ -181,3 +194,37 @@ def test_runtime_error_handler_catches_calibration_envelope_error() -> None:
     with pytest.raises(RuntimeError) as excinfo:
         dry_run("garbage")
     assert isinstance(excinfo.value, CalibrationEnvelopeError)
+
+
+@pytest.mark.parametrize("entry", [calibrate, dry_run, validate_calibration_json])
+def test_malformed_json_reports_the_rust_parse_diagnostic(entry: Callable[[str], object]) -> None:
+    # A str goes straight to the Rust strict loader (same diagnostic as WASM).
+    with pytest.raises(CalibrationEnvelopeError) as info:
+        entry("not json")
+    assert info.value.kind == "strict_load"
+    assert info.value.diagnostics[0]["code"] == "contract/parse-error"
+    assert info.value.diagnostics[0]["pointer"] is None
+
+
+@pytest.mark.parametrize("solver", [{"tolerance": 0.0}, {"tolerance": -1.0}, {"max_iterations": 0}])
+def test_unusable_solver_settings_are_rejected_everywhere(solver: dict) -> None:
+    from finstack_quant.calibration import CalibrationConfig, SolverConfig
+
+    envelope = _empty_envelope()
+    envelope["plan"]["settings"] = {"solver": solver}
+    for entry in (calibrate, dry_run, validate_calibration_json):
+        with pytest.raises(CalibrationEnvelopeError, match=r"solver (tolerance|max_iterations)"):
+            entry(json.dumps(envelope))
+    with pytest.raises(ValueError, match=r"solver (tolerance|max_iterations)"):
+        SolverConfig.from_json(json.dumps(solver))
+    with pytest.raises(ValueError, match=r"solver (tolerance|max_iterations)"):
+        SolverConfig(**solver)
+    with pytest.raises(ValueError, match=r"solver (tolerance|max_iterations)"):
+        CalibrationConfig(**solver)
+
+
+def test_dry_run_json_is_the_wire_twin_of_dry_run() -> None:
+    from finstack_quant.calibration import dry_run_json
+
+    envelope = json.dumps(_empty_envelope())
+    assert json.loads(dry_run_json(envelope)) == json.loads(dry_run(envelope).to_json())

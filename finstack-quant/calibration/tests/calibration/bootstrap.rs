@@ -136,7 +136,7 @@ fn run_discount_plan(base_date: Date, quotes: Vec<MarketQuote>) -> DiscountCurve
         prior_market: Vec::new(),
     };
 
-    let result = engine::execute(&envelope).expect("calibration should succeed");
+    let result = engine::calibrate(&envelope).expect("calibration should succeed");
     let ctx = MarketContext::try_from(result.result.final_market).expect("restore market context");
     ctx.get_discount("USD-OIS")
         .expect("discount curve")
@@ -192,7 +192,7 @@ fn run_hazard_plan(
         prior_market: prior,
     };
 
-    let result = engine::execute(&envelope).expect("calibration should succeed");
+    let result = engine::calibrate(&envelope).expect("calibration should succeed");
     let ctx = MarketContext::try_from(result.result.final_market).expect("restore market context");
     ctx.get_hazard("TEST-ENTITY-SENIOR")
         .expect("hazard curve")
@@ -316,7 +316,7 @@ fn discount_curve_global_solve_smoke() {
         prior_market: Vec::new(),
     };
 
-    let result = engine::execute(&envelope).expect("global solve should succeed");
+    let result = engine::calibrate(&envelope).expect("global solve should succeed");
     let step = result.result.step_reports.get("disc").expect("step report");
     assert!(step.success, "global solve should report success");
     assert!(

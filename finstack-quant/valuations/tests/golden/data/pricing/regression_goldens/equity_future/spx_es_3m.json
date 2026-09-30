@@ -23,7 +23,7 @@
       "schema": "finstack_quant.calibration/1",
       "plan": {
         "id": "spx_es_3m_market",
-        "description": "the canonical typed market inputs are supplied with no calibration steps. Routes through engine::execute without changing pricing math.",
+        "description": "the canonical typed market inputs are supplied with no calibration steps. Routes through engine::calibrate without changing pricing math.",
         "quote_sets": {},
         "steps": [],
         "settings": {

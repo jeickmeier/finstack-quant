@@ -12,7 +12,7 @@
 //! # let envelope_json = r#"{"schema":"finstack_quant.calibration/1","plan":{"id":"empty","description":null,"quote_sets":{},"steps":[],"settings":{}}}"#;
 //! let envelope: CalibrationEnvelope =
 //!     serde_json::from_str(envelope_json).expect("parse envelope");
-//! let result = engine::execute(&envelope).expect("calibration succeeded");
+//! let result = engine::calibrate(&envelope).expect("calibration succeeded");
 //! let market = MarketContext::try_from(result.result.final_market)
 //!     .expect("rehydrate market");
 //! // `market` is now ready for valuations, attribution, scenarios, portfolio analysis.

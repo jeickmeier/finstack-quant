@@ -54,7 +54,7 @@ fn missing_quote_set_fails_fast() {
         prior_market: Vec::new(),
     };
 
-    let err = engine::execute(&envelope).expect_err("missing quote set should error");
+    let err = engine::calibrate(&envelope).expect_err("missing quote set should error");
     assert_eq!(err.details().category, "undefined_quote_set");
 }
 
@@ -204,7 +204,7 @@ fn two_step_envelope(use_parallel: bool) -> CalibrationEnvelope {
 #[test]
 fn parallel_execution_batches_independent_discount_steps() {
     let envelope = two_step_envelope(true);
-    let result = engine::execute(&envelope).expect("parallel calibration succeeds");
+    let result = engine::calibrate(&envelope).expect("parallel calibration succeeds");
     assert!(result.result.report.success);
     let context = MarketContext::try_from(result.result.final_market).expect("restore context");
     context
@@ -218,8 +218,8 @@ fn parallel_execution_batches_independent_discount_steps() {
 /// Serial and parallel execution must produce identical results.
 #[test]
 fn parallel_and_sequential_execution_produce_identical_results() {
-    let sequential = engine::execute(&two_step_envelope(false)).expect("sequential succeeds");
-    let parallel = engine::execute(&two_step_envelope(true)).expect("parallel succeeds");
+    let sequential = engine::calibrate(&two_step_envelope(false)).expect("sequential succeeds");
+    let parallel = engine::calibrate(&two_step_envelope(true)).expect("parallel succeeds");
 
     assert_eq!(
         sequential.result.report.success,

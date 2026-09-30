@@ -123,3 +123,20 @@ test('engine validation rejects overlapping amendments and invalid sweep fractio
   spec.covenant.consequences = [{ cash_sweep: { sweep_percentage: 1.5 } }];
   assert.throws(() => covenants.validateCovenantSpecJson(JSON.stringify(spec)), /sweep/);
 });
+
+test('JSON metric-map errors come from the Rust parser (same text as Python)', () => {
+  const spec = JSON.parse(covenants.lboStandardJson(5.0, 1.5, 1.2, 10_000_000.0))[0];
+  const engine = JSON.stringify({ specs: [spec] });
+  for (const [metrics, message] of [
+    [
+      '{"debt_to_ebitda": true}',
+      "Validation error: Metric 'debt_to_ebitda' must be a finite JSON number",
+    ],
+    ['[1,2]', 'Validation error: Invalid metric map JSON: invalid type: sequence'],
+  ]) {
+    assert.throws(
+      () => covenants.evaluateEngine(engine, metrics, '2026-03-31'),
+      (error) => error.kind === 'validation' && error.message.startsWith(message)
+    );
+  }
+});

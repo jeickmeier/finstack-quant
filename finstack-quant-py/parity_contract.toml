@@ -387,11 +387,11 @@ status = "exists"
 note = "Python binds the typed engine surface flat on finstack_quant.covenants (Covenant, CovenantType, CovenantSpec (with_denominator_metric selects required net-leverage earnings), ThresholdSchedule, CovenantWaiver, SpringingCondition, CovenantConsequence, CovenantEngine, CovenantBreach), the typed templates, DataFrame-backed forecasting, and keeps the JSON wire surface (`_json` twins + validators + evaluate_engine) shared with WASM. WASM binds only the JSON surface."
 
 [crates.covenants.modules]
-json = { python = "finstack_quant.covenants", status = "exists", note = "validate_covenant_spec_json, validate_covenant_report_json, validate_covenant_engine_json, and the covenant template builders (lbo_standard_json, cov_lite_json, real_estate_json, project_finance_json) exposed flat on finstack_quant.covenants, matching the Rust `json` module names. Each `_json` template has a typed twin (lbo_standard, cov_lite, real_estate, project_finance -> list[CovenantSpec]). Python `evaluate_engine` accepts `metrics` as dict[str, float] or a JSON string (serialised in the binding) and returns dict[str, CovenantReport] in spec (IndexMap) order. Rust-only json kernel (deliberately unbound, tracked as a decision): evaluate_engine_map — both hosts' evaluate_engine/evaluateEngine delegate to it." }
-report = { python = "finstack_quant.covenants", status = "flattened", note = "CovenantReport wrapper exposed flat on finstack_quant.covenants (frozen, `__eq__` via Rust PartialEq, Python-style `__repr__`); `evaluate_engine` and `CovenantEngine.evaluate` return dict[str, CovenantReport]. Python-only ergonomic helper `reports_to_dataframe(dict) -> DataFrame` flattens that dict. WASM `evaluateEngine` returns a typed plain-object map (keyed by covenant instance key) from the same evaluate_engine_map kernel — NOT a JSON string; the dts_contract gate pins this. Rust-only: CovenantReport::passed/::failed builder constructors are not bound in Python because the constructor names collide with the `passed` boolean property on the wrapper; construct reports via evaluate_engine or from_json." }
+json = { python = "finstack_quant.covenants", status = "exists", note = "validate_covenant_spec_json, validate_covenant_report_json, validate_covenant_engine_json, and the covenant template builders (lbo_standard_json, cov_lite_json, real_estate_json, project_finance_json) exposed flat on finstack_quant.covenants, matching the Rust `json` module names. Each `_json` template has a typed twin (lbo_standard, cov_lite, real_estate, project_finance -> list[CovenantSpec]). Rust `evaluate_engine` is bound as Python `evaluate_engine` / WASM `evaluateEngine` and returns dict[str, CovenantReport] in spec (IndexMap) order. Documented host-ergonomics deviation: Python takes `metrics` (dict[str, float] or a JSON string passed through unchanged; only a dict is serialised in the binding) where Rust/WASM take `metrics_json`. A JSON metric map is parsed only by Rust `HashMapMetricSource::from_json`, so both hosts report identical errors." }
+report = { python = "finstack_quant.covenants", status = "flattened", note = "CovenantReport wrapper exposed flat on finstack_quant.covenants (frozen, `__eq__` via Rust PartialEq, Python-style `__repr__`); `evaluate_engine` and `CovenantEngine.evaluate` return dict[str, CovenantReport]. Python-only ergonomic helper `reports_to_dataframe(dict) -> DataFrame` flattens that dict. WASM `evaluateEngine` returns a typed plain-object map (keyed by covenant instance key) from the same evaluate_engine kernel — NOT a JSON string; the dts_contract gate pins this. Rust-only: CovenantReport::passed/::failed builder constructors are not bound in Python because the constructor names collide with the `passed` boolean property on the wrapper; construct reports via evaluate_engine or from_json." }
 engine    = { python = "finstack_quant.covenants", status = "flattened", note = "Typed Covenant / CovenantType (one staticmethod per Rust variant; ThresholdTest is spelled as the string pair (\"maximum\"|\"minimum\", value) in CovenantType.custom and SpringingCondition) / CovenantSpec / CovenantWaiver / SpringingCondition / CovenantConsequence / CovenantEngine (evaluate_and_track requires explicit scope; breaches retain original consequences; new, from_specs, add_spec, add_waiver, validate, evaluate, evaluate_and_track, evaluate_series (Python-only DataFrame loop), specs, waivers, breach_history, to_json/from_json) / CovenantBreach exposed flat. `CovenantScope` and `BoundKind` are spelled as strings (\"maintenance\"|\"incurrence\", \"at_most\"|\"at_least\"). Rust-only: CovenantWindow / add_window (reachable through engine JSON only), InstrumentMutator, ConsequenceApplication and apply_consequences (instrument mutation is a Rust trait seam). Python-only DataFrame-backed CovenantEngine.evaluate_series. WASM: JSON bridge only." }
 forward   = { python = "finstack_quant.covenants", status = "flattened", note = "CovenantForecastConfig, CovenantForecast (to_dataframe) and FutureBreach exposed flat; `forecast_covenant(spec, metrics: DataFrame, config)` and `forecast_breaches(engine, metrics: DataFrame, config)` are the host names of forecast_covenant_generic / forecast_breaches_generic, batch forecasts default to maintenance and with_scope selects incurrence; missing required observations fail and duplicate columns are rejected; driven by a binding-side DataFrame adapter implementing the Rust ModelTimeSeries trait (each index date becomes a daily PeriodId whose period end is the date). ModelTimeSeries itself is a Rust trait and stays Rust-only. Python-only helper: breaches_to_dataframe. statements-analytics keeps its statement-model adapter. WASM: not bound." }
-metric    = { python = "finstack_quant.covenants.metric",    status = "missing", note = "CovenantMetricId/CovenantMetricSource/HashMapMetricSource are Rust trait plumbing; hosts pass metrics as a dict / JSON map to CovenantEngine.evaluate or evaluate_engine" }
+metric    = { python = "finstack_quant.covenants.metric",    status = "missing", note = "CovenantMetricId/CovenantMetricSource/HashMapMetricSource are Rust trait plumbing; hosts pass metrics as a dict / JSON map to CovenantEngine.evaluate or evaluate_engine (a JSON map is parsed by HashMapMetricSource::from_json)" }
 schedule  = { python = "finstack_quant.covenants", status = "flattened", note = "ThresholdSchedule (step-down limits) exposed flat: constructor from (date, value) pairs, `entries`, `threshold_for(date)`, to_json/from_json." }
 templates = { python = "finstack_quant.covenants", status = "flattened", note = "Typed template constructors lbo_standard, cov_lite, real_estate, project_finance exposed flat returning list[CovenantSpec]; the flat *_json builders remain as their JSON twins (shared with WASM). All template thresholds are validated finite and non-negative in Rust (ValueError)." }
 
@@ -749,8 +749,6 @@ symbols = [
     "api::engine::ExecutionErrorDetails",
     "api::engine::ExecutionSolverDiagnostics",
     "api::engine::ExecutionStage",
-    "api::engine::execute",
-    "api::engine::execute_json",
     "api::host_error::HostExecuteError",
     "api::validate::DependencyGraph",
     "api::validate::DependencyNode",
@@ -1193,9 +1191,11 @@ schema = { python = "finstack_quant.attribution.schema", status = "exists", note
 #     CreditFactorAttribution, and the rest of types::detail) — reachable
 #     from hosts as serde payloads on PnlAttribution detail getters
 #   - spec/envelope/schema types (AttributionSpec, AttributionEnvelope,
-#     AttributionResult(Envelope), AttributionSchema, AttributionConfig,
+#     AttributionResult, AttributionSchema, AttributionConfig,
 #     AttributionJsonInputs, TaylorAttributionConfig) — hosts pass/receive
-#     them as JSON or binding fragments
+#     them as JSON or binding fragments (WASM binds the JSON fragments as the
+#     AttributionJsonInputs class; AttributionResultEnvelope is a typed
+#     Python wrapper and a WASM plain object from attribute_pnl_envelope)
 #   - test-only market snapshot support
 #     (MarketSnapshot/MarketRestoreFlags)
 #   - return-contribution value types (spec/position/factor/group structs) —
@@ -1204,9 +1204,11 @@ schema = { python = "finstack_quant.attribution.schema", status = "exists", note
 #     siblings) — consumed by the Python DataFrame exports; not yet a
 #     standalone host API
 public = [
+    "AttributionResultEnvelope",
     "PnlAttribution",
     "ReturnContributionResult",
     "attribute_pnl",
+    "attribute_pnl_envelope",
     "attribute_pnl_envelope_json",
     "attribute_pnl_many",
     "attribute_return_contribution",
@@ -1468,7 +1470,12 @@ status = "exists"
 # CrossSectionalOp, PairwiseOp) as string-accepting enum classes; the Rust
 # *_with_op variants and the PanelOperation / PanelTransformColumn building
 # blocks stay Rust-only (the string entry points accept the same ops). The
-# WASM side is accounted in the [parity] ledger.
+# WASM side is accounted in the [parity] ledger. Key columns: WASM accepts
+# strings only; Python also accepts date/datetime objects, formatted by the
+# Rust key policy (datetime_order_key / naive_datetime_order_key: aware -> UTC,
+# fixed nanosecond precision) and rejects every other non-string key with
+# TypeError. datetime_order_key / naive_datetime_order_key are otherwise
+# Rust-only.
 
 [crates.features.symbols]
 public = [
@@ -1846,7 +1853,7 @@ backlog = [
 
 [parity.modules."finstack_quant.attribution"]
 js = "attribution"
-types = { PnlAttribution = "PnlAttribution" }
+types = { AttributionResultEnvelope = "AttributionResultEnvelope", PnlAttribution = "PnlAttribution" }
 backlog = [
     "ReturnContributionResult",
     "attribute_pnl_many",
@@ -1865,12 +1872,10 @@ backlog = [
 
 [parity.modules."finstack_quant.calibration"]
 js = "calibration"
-types = { CalibrationConfig = "CalibrationConfig", CalibrationDiagnostics = "CalibrationDiagnostics", CalibrationEnvelope = "CalibrationEnvelope", CalibrationPlan = "CalibrationPlan", CalibrationReport = "CalibrationReport", CalibrationResult = "CalibrationResult", CalibrationStep = "CalibrationStep", CdsQuote = "CdsQuote", QuoteQuality = "QuoteQuality", RateBounds = "RateBounds", RateQuote = "RateQuote", SolverConfig = "SolverConfig", VolQuote = "VolQuote" }
+types = { CalibrationConfig = "CalibrationConfig", CalibrationDiagnostics = "CalibrationDiagnostics", CalibrationEnvelope = "CalibrationEnvelope", CalibrationPlan = "CalibrationPlan", CalibrationReport = "CalibrationReport", CalibrationResult = "CalibrationResult", CalibrationStep = "CalibrationStep", CalibrationValidationReport = "CalibrationValidationReport", CdsQuote = "CdsQuote", QuoteQuality = "QuoteQuality", RateBounds = "RateBounds", RateQuote = "RateQuote", SolverConfig = "SolverConfig", VolQuote = "VolQuote" }
 backlog = [
     "CalibrationEnvelopeError",
-    "CalibrationValidationReport",
     "ValidationConfig",
-    "dry_run_json",
     "validate_calibration",
 ]
 
@@ -3014,14 +3019,17 @@ backlog = [
 ]
 
 [parity.js."attribution".wasm_only]
-AttributionParams = "S14: becomes AttributionJsonInputs, the JSON inputs of attribute_pnl"
+AttributionJsonInputs = "the Rust AttributionJsonInputs fragments as a class (JS has no keyword arguments; Python passes the same fields as attribute_pnl kwargs)"
 attributePnlJson = "JSON wire twin of attribute_pnl (Python returns the typed PnlAttribution)"
 
+# WASM has no CsaSpec / VmCalculator class (P4 binds them); these JSON-first
+# free functions are the WASM authoring path. Each is a renamed twin of a Rust
+# method that Python binds under its Rust name, not a WASM-only capability.
 [parity.js."margin".wasm_only]
-calculateVm = "JSON-first twin of the Python VM calculator (P4 binds the class)"
-csaEurRegulatoryJson = "JSON document twin of Python CsaSpec.eur_regulatory"
-csaUsdRegulatoryJson = "JSON document twin of Python CsaSpec.usd_regulatory"
-validateCsaJson = "JSON wire validation twin of Python CsaSpec.from_json"
+calculateVm = "twin of Rust VmCalculator::new(csa).calculate / Python VmCalculator(csa).calculate; returns the canonical VmResult serde (P4 binds the class)"
+csaEurRegulatoryJson = "JSON document twin of Rust CsaSpec::eur_regulatory / Python CsaSpec.eur_regulatory().to_json()"
+csaUsdRegulatoryJson = "JSON document twin of Rust CsaSpec::usd_regulatory / Python CsaSpec.usd_regulatory().to_json()"
+validateCsaJson = "JSON wire validation twin of serde CsaSpec + Rust CsaSpec::validate / Python CsaSpec.from_json(json).to_json()"
 
 [parity.js."models.credit".wasm_only]
 creditGradesModelJson = "JSON-first twin of a Python credit model constructor (P5 binds the class)"

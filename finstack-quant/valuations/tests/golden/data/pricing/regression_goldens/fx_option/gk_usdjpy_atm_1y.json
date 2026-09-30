@@ -60,7 +60,7 @@
         }
       ],
       "plan": {
-        "description": "the canonical typed market inputs are supplied with no calibration steps. Routes through engine::execute without changing pricing math.",
+        "description": "the canonical typed market inputs are supplied with no calibration steps. Routes through engine::calibrate without changing pricing math.",
         "id": "gk_usdjpy_atm_1y_market",
         "quote_sets": {},
         "settings": {

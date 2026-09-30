@@ -122,7 +122,7 @@ fn calibrated_market(index: Option<InflationIndex>, base_cpi: f64) -> (MarketCon
         prior_market: prior,
     };
 
-    let result = engine::execute(&envelope).expect("execute");
+    let result = engine::calibrate(&envelope).expect("execute");
     let ctx = MarketContext::try_from(result.result.final_market).expect("restore context");
     (ctx, base_date, maturity)
 }
@@ -224,7 +224,7 @@ fn inflation_preflight_rejects_base_cpi_mismatch_with_fixings() {
         prior_market: prior,
     };
 
-    let err = engine::execute(&envelope).expect_err("base CPI mismatch should error");
+    let err = engine::calibrate(&envelope).expect_err("base CPI mismatch should error");
     let msg = err.to_string();
     assert!(msg.contains("base_cpi mismatch") || msg.contains("base_cpi"));
 }

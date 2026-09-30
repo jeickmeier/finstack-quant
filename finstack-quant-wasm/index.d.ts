@@ -29,7 +29,7 @@
 // the envelope without solving — use it to surface schema errors early.
 //
 // Structured diagnostics: errors thrown by `calibrate`,
-// `validateCalibrationJson`, and `dryRun` have:
+// `validateCalibrationJson`, `dryRun`, and `dryRunJson` have:
 //   - name: 'CalibrationEnvelopeError'
 //   - kind: Rust-owned execution category such as 'strict_load' or
 //     'solver_not_converged'
@@ -77,10 +77,11 @@ export default function init(
 // --- Calibration envelope types (generated from Rust via ts-rs) ---
 import type { CalibrationEnvelope } from './types/generated/CalibrationEnvelope';
 import type { CalibrationResultEnvelope } from './types/generated/CalibrationResultEnvelope';
+import type { CalibrationValidationReport } from './types/generated/CalibrationValidationReport';
 import type { MaterializationReport } from './types/generated/MaterializationReport';
 import type { ValidationReport } from './types/generated/ValidationReport';
 
-export type { CalibrationEnvelope, CalibrationResultEnvelope };
+export type { CalibrationEnvelope, CalibrationResultEnvelope, CalibrationValidationReport };
 export type { Diagnostic } from './types/generated/Diagnostic';
 export type { MaterializationPhases } from './types/generated/MaterializationPhases';
 export type { MaterializationReport } from './types/generated/MaterializationReport';
@@ -1936,45 +1937,39 @@ export interface MonteCarloEstimateJson {
 }
 
 /**
- * Variation margin calculator result (JSON object from Rust).
+ * Variation margin result: the canonical serde form of Rust `VmResult`
+ * (identical to Python `VmResult.to_json()`).
+ *
+ * Every amount is a {@link MoneyValue} in the CSA base currency with an exact
+ * decimal-string amount. The net cash outflow is `post_amount` when it is
+ * positive, else minus `collect_amount`; a call is required when either is
+ * positive.
  */
-export interface VariationMarginJson {
-  /**
-   * ISO-4217 currency of every amount.
-   */
-  currency: string;
+export interface VmResult {
   /**
    * ISO-8601 calculation date.
    */
   date: string;
   /**
-   * ISO-8601 settlement date after the contractual business-day lag.
-   */
-  settlement_date: string;
-  /**
    * Signed mark-to-market exposure; positive means the counterparty owes the desk.
    */
-  gross_exposure: number;
+  gross_exposure: MoneyValue;
   /**
-   * Signed net mark-to-market exposure, in the caller's currency.
+   * Net exposure after applying threshold and independent amount.
    */
-  net_exposure: number;
+  net_exposure: MoneyValue;
   /**
    * Amount the desk pays, including new postings and collateral returned.
    */
-  post_amount: number;
+  post_amount: MoneyValue;
   /**
    * Amount the desk receives, including collections and collateral returned to it.
    */
-  collect_amount: number;
+  collect_amount: MoneyValue;
   /**
-   * Net desk cash outflow: post minus collect.
+   * ISO-8601 settlement date after the contractual business-day lag.
    */
-  net_margin: number;
-  /**
-   * True when the post or collect amount is strictly positive.
-   */
-  requires_call: boolean;
+  settlement_date: string;
 }
 
 /**
@@ -4931,7 +4926,7 @@ export interface MonteCarloNamespace {
  * await init();
  * const csa = margin.csaUsdRegulatoryJson();
  * const vm = margin.calculateVm(csa, 1_000_000, 0, "USD", "2026-01-02");
- * console.log(vm.collect_amount);
+ * console.log(vm.collect_amount.amount); // exact decimal string
  * ```
  */
 export interface MarginNamespace {
@@ -4962,15 +4957,17 @@ export interface MarginNamespace {
   /**
    * Calculate variation margin given exposure, posted collateral, and CSA JSON.
    *
-   * Returns a JSON object with post_amount, collect_amount, net_exposure,
-   * and requires_call fields.
+   * Returns the Rust `VmResult` in its canonical serde form (the same wire
+   * Python `VmResult.to_json()` emits): `date`, `gross_exposure`,
+   * `net_exposure`, `post_amount`, `collect_amount` (each a Money object
+   * `{amount, currency}` with a decimal-string amount) and `settlement_date`.
    *
    * @param csaJson - CSA specification JSON governing thresholds, minimum transfer, and timing.
    * @param exposure - Signed mark-to-market in the supplied currency: positive means the counterparty owes the desk.
    * @param postedCollateral - Signed collateral balance: positive held, negative posted, including pending agreed calls.
    * @param currency - ISO-4217 currency code shared by exposure and collateral amounts.
    * @param asOf - ISO-8601 VM calculation date.
-   * @returns Variation-margin call amount, currency, and CSA metadata as a plain object.
+   * @returns The canonical `VmResult` as a plain object.
    * @throws Error - Rejects malformed or schema-incompatible `csa_json`, an unknown `currency`, non-finite exposure or collateral amounts, an invalid calendar date, a currency mismatch with the CSA, invalid VM parameters, calendar lookup or settlement-date adjustment failures, or failure to serialize the result.
    */
   calculateVm(
@@ -4979,7 +4976,7 @@ export interface MarginNamespace {
     postedCollateral: number,
     currency: string,
     asOf: string
-  ): VariationMarginJson;
+  ): VmResult;
   /**
    * Compute bilateral XVA: CVA, DVA, FVA, MVA, and the all-in adjustment.
    *
@@ -5004,7 +5001,7 @@ export interface MarginNamespace {
    * );
    * result.total_xva; // CVA - DVA + FVA + MVA
    * ```
-   * @param exposureProfileJson - `ExposureProfile` JSON with `times`, `mtm_values`, `epe`, and `ene` arrays of equal length.
+   * @param exposureProfileJson - Strict `ExposureProfile` JSON with `times`, `mtm_values`, `epe`, and `ene` arrays of equal length and an optional `diagnostics` object (`market_roll_failures`, `valuation_failures`, `total_time_points`); unknown fields are rejected.
    * @param counterpartyHazardCurve - Hazard curve for the counterparty's credit.
    * @param ownHazardCurve - Hazard curve for the institution's own credit.
    * @param discountCurve - Risk-free discount curve for present-valuing.
@@ -5012,7 +5009,7 @@ export interface MarginNamespace {
    * @param ownRecoveryRate - Recovery on own default, in `[0, 1]`.
    * @param fundingJson - Optional strict `FundingConfig` JSON driving FVA and, when it carries `im_profile`, MVA; unknown fields are rejected. Omit for credit legs only.
    * @returns The `XvaResult` as a plain object.
-   * @throws Error - If JSON is malformed or has unknown funding fields, a recovery rate is outside `[0, 1]`, a profile is invalid or has a mismatched IM horizon, or a curve evaluation is non-finite.
+   * @throws Error - If JSON is malformed or has unknown profile or funding fields, a recovery rate is outside `[0, 1]`, a profile is invalid or has a mismatched IM horizon, or a curve evaluation is non-finite.
    */
   computeBilateralXva(
     exposureProfileJson: JsonInput,
@@ -5089,7 +5086,7 @@ export interface CashflowsNamespace {
    *
    * @param scheduleJson - JSON-encoded `CashFlowSchedule`.
    * @returns JSON array of settlement cash entries. PIK and `DefaultedNotional` state rows are omitted; parse the full schedule JSON when flow classification is required.
-   * @throws If the schedule JSON is malformed.
+   * @throws If the schedule JSON is malformed or the schedule fails `CashFlowSchedule` validation (kind `"validation"`).
    */
   datedFlowsJson(scheduleJson: JsonInput): string;
 
@@ -5238,7 +5235,7 @@ export interface CovenantsNamespace {
    * @returns A plain object keyed by covenant instance key, each value a `CovenantReport`.
    * @param engineJson - JSON-serialized covenant engine and its covenant definitions.
    * @param metricsJson - JSON object of financial metrics referenced by the covenant engine.
-   * @param asOf - ISO-8601 valuation date used to resolve date-dependent market data.
+   * @param asOf - ISO-8601 date on which every covenant test is evaluated.
    * @throws Error - Throws a JavaScript exception if either JSON input is malformed or has the wrong schema, a metric is non-numeric, `asOf` is not a valid ISO date, the engine or required metrics fail validation, or the reports cannot be serialized to JavaScript.
    */
   evaluateEngine(
@@ -8628,7 +8625,7 @@ export declare const models: ModelsNamespace;
  *   schema: "finstack_quant.calibration/1",
  *   plan: { id: "smoke", description: null, quote_sets: {}, steps: [], settings: {} }
  * });
- * console.log(JSON.parse(report).errors);
+ * console.log(report.errors);
  * ```
  */
 export interface CalibrationNamespace {
@@ -8649,10 +8646,17 @@ export interface CalibrationNamespace {
   /**
    * Return all static plan errors and dependencies without running solvers.
    * @param envelope - Typed calibration envelope or its serialized JSON form.
-   * @returns JSON `CalibrationValidationReport` containing errors and a dependency graph.
+   * @returns `CalibrationValidationReport` object containing every static error and the dependency graph.
+   * @throws Error - Throws a JavaScript exception if `envelopeJson` is malformed, its schema marker is missing, malformed, or unsupported, the envelope structure is invalid, or the validation report cannot be converted to a JavaScript value. Semantic findings are returned in the report rather than thrown.
+   */
+  dryRun(envelope: CalibrationEnvelope | string): CalibrationValidationReport;
+  /**
+   * JSON wire twin of `dryRun`: the validation report as pretty-printed JSON.
+   * @param envelope - Typed calibration envelope or its serialized JSON form.
+   * @returns Pretty-printed `CalibrationValidationReport` JSON.
    * @throws Error - Throws a JavaScript exception if `envelopeJson` is malformed, its schema marker is missing, malformed, or unsupported, the envelope structure is invalid, or the validation report cannot be serialized. Semantic findings are returned in the report rather than thrown.
    */
-  dryRun(envelope: CalibrationEnvelope | string): string;
+  dryRunJson(envelope: CalibrationEnvelope | string): string;
   /**
    * Fit the Bermudan LMM loading scale from the market swaption surface.
    * @param market - Reusable market handle containing discount and swaption-volatility inputs.
@@ -8860,12 +8864,16 @@ export declare const valuations: ValuationsNamespace;
 // --- attribution -----------------------------------------------------------
 
 /**
- * Parameters for P&L attribution via [`attribute_pnl`].
+ * Owned JSON fragments for P&L attribution via `attributePnl`: the fields of
+ * Rust `AttributionJsonInputs`, which `attributePnl` passes to
+ * `AttributionSpec::from_json_inputs`. JavaScript has no keyword arguments,
+ * so the inputs are bundled in this class; Python passes the same fields as
+ * keyword arguments of `attribute_pnl`.
  *
  * Optional `modelParamsT0Json` and `creditFactorModelJson` attach an opening
  * model-parameter snapshot and a credit-factor model after construction.
  */
-export interface AttributionParams extends WasmOwned {
+export interface AttributionJsonInputs extends WasmOwned {
   /**
    * Optional serialized opening `ModelParamsSnapshot` JSON.
    */
@@ -8874,6 +8882,31 @@ export interface AttributionParams extends WasmOwned {
    * Optional serialized `CreditFactorModel` JSON.
    */
   creditFactorModelJson?: string | null;
+}
+
+/**
+ * Result envelope returned by `attributePnlEnvelope`: the canonical serde
+ * form of Rust `AttributionResultEnvelope` (identical to Python
+ * `AttributionResultEnvelope.to_json()` and to `attributePnlEnvelopeJson`).
+ */
+export interface AttributionResultEnvelope {
+  /**
+   * Attribution contract marker, always `"finstack_quant.attribution/1"`.
+   */
+  schema: 'finstack_quant.attribution/1';
+  /**
+   * Attribution output plus the result-policy audit stamp.
+   */
+  result: {
+    /**
+     * The P&L attribution document.
+     */
+    attribution: PnlAttribution;
+    /**
+     * Numeric mode, rounding context and FX-policy audit stamp.
+     */
+    results_meta: ResultsMeta;
+  };
 }
 
 /**
@@ -9025,7 +9058,7 @@ export interface AttributionNamespace {
    * `modelParamsT0Json` / `creditFactorModelJson` on the constructed object
    * to attach an opening model-parameter snapshot or credit-factor model.
    */
-  AttributionParams: new (
+  AttributionJsonInputs: new (
     instrumentJson: JsonInput,
     marketT0Json: JsonInput,
     marketT1Json: JsonInput,
@@ -9034,11 +9067,11 @@ export interface AttributionNamespace {
     methodJson: JsonInput,
     configJson?: JsonInput,
     fullCrossAttribution?: boolean
-  ) => AttributionParams;
+  ) => AttributionJsonInputs;
   /**
    * Run P&L attribution for a single instrument.
    *
-   * Accepts an [`AttributionParams`] struct with the instrument JSON, two market
+   * Accepts an [`AttributionJsonInputs`] struct with the instrument JSON, two market
    * snapshots, dates, and a method descriptor. Returns the `PnlAttribution`
    * result as a structured object with the canonical Rust serde field names;
    * use `attributePnlJson` for the JSON wire string. `config_json` may include
@@ -9046,10 +9079,10 @@ export interface AttributionNamespace {
    * is not already parallelizing attribution at a higher level. Serial is
    * the default.
    * @returns Structured `PnlAttribution` result object for the instrument.
-   * @param params - Fully specified AttributionParams object containing instrument, markets, dates, and method.
+   * @param params - Fully specified AttributionJsonInputs object containing instrument, markets, dates, and method.
    * @throws Error - Throws a `FinstackError` whose `kind` is the Rust classification (`not_found` for missing market data, `computation` for a caught panic or solver failure, otherwise `validation`). Rejects malformed instrument, market, method, or configuration JSON; invalid ISO attribution dates; instrument or market reconstruction, pricing, FX, rounding, metric, or method-specific attribution failures; a caught attribution panic; or failure to convert the result to a JavaScript value.
    */
-  attributePnl(params: AttributionParams): PnlAttribution;
+  attributePnl(params: AttributionJsonInputs): PnlAttribution;
   /**
    * Run P&L attribution for a single instrument and return wire JSON.
    *
@@ -9057,17 +9090,29 @@ export interface AttributionNamespace {
    * containment, returning the `PnlAttribution` as a JSON string instead of
    * a structured object.
    * @returns JSON-serialized `PnlAttribution` wire document.
-   * @param params - Fully specified AttributionParams object containing instrument, markets, dates, and method.
+   * @param params - Fully specified AttributionJsonInputs object containing instrument, markets, dates, and method.
    * @throws Error - Rejects the same conditions as [`attribute_pnl`], plus failure to serialize the result to JSON.
    */
-  attributePnlJson(params: AttributionParams): string;
+  attributePnlJson(params: AttributionJsonInputs): string;
+  /**
+   * Run attribution from a full `AttributionEnvelope` and return the result envelope.
+   *
+   * Returns the Rust `AttributionResultEnvelope` as a plain object:
+   * `{ schema: "finstack_quant.attribution/1", result: { attribution, results_meta } }`.
+   * Use `attributePnlEnvelopeJson` for the JSON wire string.
+   * @returns The `AttributionResultEnvelope` as a plain object.
+   * @param specJson - JSON-serialized AttributionEnvelope (schema `finstack_quant.attribution/1`) to validate and execute.
+   * @throws Error - Rejects malformed, schema-incompatible, or unsupported-version `spec_json`; instrument or market reconstruction, pricing, FX, rounding, metric, or method-specific attribution failures; a caught execution panic; or failure to convert the result envelope to a JavaScript value.
+   */
+  attributePnlEnvelope(specJson: JsonInput): AttributionResultEnvelope;
   /**
    * Run attribution from a full JSON `AttributionEnvelope` and return JSON.
    *
-   * Power-user variant for full envelope round-trip workflows.
+   * Wire twin of `attributePnlEnvelope` for full envelope round-trip
+   * workflows.
    * @returns JSON attribution result envelope for the supplied spec.
-   * @param specJson - JSON-serialized AttributionParams specification to validate and execute.
-   * @throws Error - Rejects malformed, schema-incompatible, or unsupported-version `spec_json`; instrument or market reconstruction, pricing, FX, rounding, metric, or method-specific attribution failures; a caught execution panic; or failure to serialize the result envelope.
+   * @param specJson - JSON-serialized AttributionEnvelope (schema `finstack_quant.attribution/1`) to validate and execute.
+   * @throws Error - Rejects the same conditions as [`attribute_pnl_envelope`], plus failure to serialize the result envelope.
    */
   attributePnlEnvelopeJson(specJson: JsonInput): string;
   /**

@@ -217,7 +217,7 @@ or a leverage ratio on negative EBITDA.
 ## JSON surface
 
 `json` is the serde-first boundary used by the language bindings:
-`evaluate_engine_map`, the validators (`validate_covenant_spec_json`,
+`evaluate_engine`, the validators (`validate_covenant_spec_json`,
 `validate_covenant_report_json`, `validate_covenant_engine_json`), and JSON
 template builders (`lbo_standard_json`, `cov_lite_json`, `real_estate_json`,
 `project_finance_json`).

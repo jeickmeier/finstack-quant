@@ -17,6 +17,7 @@ nalgebra = { version = "0.34", default-features = false, features = ["std"] }
 schemars = { workspace = true, optional = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
+time = { workspace = true }
 
 [features]
 default = ["json-schema"]

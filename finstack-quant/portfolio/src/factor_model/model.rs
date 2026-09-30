@@ -1867,7 +1867,7 @@ pub(super) mod tests {
             quotes.into_iter().map(MarketDatum::from).collect(),
             vec![PriorMarketObject::DiscountCurve(discount)],
         );
-        let result = engine::execute(&request).expect("calibrate issuer spreads");
+        let result = engine::calibrate(&request).expect("calibrate issuer spreads");
         MarketContext::try_from(result.result.final_market).expect("calibrated market")
     }
 

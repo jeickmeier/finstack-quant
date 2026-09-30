@@ -40,7 +40,8 @@ pub fn validate_cashflow_schedule_json(schedule_json: JsValue) -> Result<String,
 /// @returns JSON array of settlement cash entries. PIK and
 ///   `DefaultedNotional` state rows are omitted; parse the full schedule JSON
 ///   when flow classification is required.
-/// @throws If the schedule JSON is malformed.
+/// @throws If the schedule JSON is malformed or the schedule fails
+///   `CashFlowSchedule` validation (kind `"validation"`).
 #[wasm_bindgen(js_name = datedFlowsJson)]
 pub fn dated_flows_json(schedule_json: JsValue) -> Result<String, JsValue> {
     let schedule_json: &str = &json_text(&schedule_json, "scheduleJson")?;

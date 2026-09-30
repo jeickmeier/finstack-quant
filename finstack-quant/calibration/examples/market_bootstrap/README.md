@@ -90,13 +90,13 @@ use finstack_quant_calibration::api::schema::CalibrationEnvelope;
 let envelope_json = std::fs::read_to_string("01_usd_discount.json")?;
 let (envelope, _load_report) =
     CalibrationEnvelope::from_slice_strict(envelope_json.as_bytes(), &LoadLimits::default())?;
-let result = engine::execute(&envelope)?;
+let result = engine::calibrate(&envelope)?;
 let market = MarketContext::try_from(result.result.final_market)?;
 let curve = market.get_discount("USD-OIS")?;
 println!("DF(1y) = {}", curve.df(1.0));
 ```
 
-`engine::execute` returns a structured `ExecuteError` (`worst_quote_id`,
+`engine::calibrate` returns a structured `ExecuteError` (`worst_quote_id`,
 tolerance, and the rest) on solver non-convergence. `From<ExecuteError>` maps
 that payload to `finstack_quant_core::Error` so `?` still works in
 `core::Result` functions. Static validation is fail-fast; `dry_run` lists

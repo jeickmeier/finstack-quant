@@ -735,9 +735,12 @@ impl CalibrationConfig {
     ///
     /// # Errors
     ///
-    /// Returns an error when nested validation/rate-bound settings are invalid or
-    /// when solver tolerance is looser than residual success tolerances.
+    /// Returns an error when the solver settings are unusable
+    /// ([`SolverConfig::validate`](crate::SolverConfig::validate)), nested
+    /// validation/rate-bound settings are invalid, or the solver tolerance is
+    /// looser than residual success tolerances.
     pub fn validate(&self) -> finstack_quant_core::Result<()> {
+        self.solver.validate()?;
         self.validation.validate()?;
         self.rate_bounds.validate()?;
         self.market_freshness.validate()?;

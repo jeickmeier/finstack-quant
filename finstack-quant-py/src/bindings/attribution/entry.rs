@@ -1,6 +1,7 @@
 //! P&L attribution entry points and JSON helpers.
 
 use crate::bindings::attribution::pnl_attribution::{PyPnlAttribution, WIDE_COLUMNS};
+use crate::bindings::attribution::result_envelope::PyAttributionResultEnvelope;
 use crate::bindings::attribution::return_contribution::{
     extract_return_contribution_spec, PyReturnContributionResult,
 };
@@ -403,11 +404,54 @@ pub(crate) fn pnl_bridge(
     Ok(PyMoney::from_inner(pnl))
 }
 
+/// Parse and execute one ``AttributionEnvelope`` with panic containment.
+fn run_attribute_pnl_envelope(
+    py: Python<'_>,
+    spec_json: &str,
+) -> PyResult<finstack_quant_attribution::AttributionResultEnvelope> {
+    let envelope = AttributionEnvelope::from_json(spec_json).map_err(core_to_py)?;
+    py.detach(|| envelope.execute_contained())
+        .map_err(core_to_py)
+}
+
+/// Run attribution from a full JSON ``AttributionEnvelope``.
+///
+/// Typed twin of ``attribute_pnl_envelope_json`` (WASM ``attributePnlEnvelope``).
+/// Most users should prefer ``attribute_pnl``, which accepts separate
+/// arguments.
+///
+/// Parameters
+/// ----------
+/// spec_json : str
+///     JSON-serialized ``AttributionEnvelope`` (schema
+///     ``finstack_quant.attribution/1``).
+///
+/// Returns
+/// -------
+/// AttributionResultEnvelope
+///     The attribution plus its result-policy audit stamp.
+///
+/// Raises
+/// ------
+/// ValueError
+///     If ``spec_json`` is malformed or fails schema validation, or the
+///     attribution fails validation / pricing.
+/// KeyError
+///     If a required curve, market item, calendar, or FX leg is missing.
+/// RuntimeError
+///     If the engine reports an internal failure.
+#[pyfunction]
+#[pyo3(text_signature = "(spec_json)")]
+pub(crate) fn attribute_pnl_envelope(
+    py: Python<'_>,
+    spec_json: &str,
+) -> PyResult<PyAttributionResultEnvelope> {
+    run_attribute_pnl_envelope(py, spec_json).map(|inner| PyAttributionResultEnvelope { inner })
+}
+
 /// Run attribution from a full JSON ``AttributionEnvelope`` and return JSON.
 ///
-/// This is the raw JSON round-trip variant. Most users should prefer
-/// ``attribute_pnl``, which accepts separate arguments and returns a typed
-/// ``PnlAttribution``.
+/// JSON wire twin of ``attribute_pnl_envelope``.
 ///
 /// Parameters
 /// ----------
@@ -429,11 +473,9 @@ pub(crate) fn pnl_bridge(
 /// RuntimeError
 ///     If the engine reports an internal failure.
 #[pyfunction]
+#[pyo3(text_signature = "(spec_json)")]
 pub(crate) fn attribute_pnl_envelope_json(py: Python<'_>, spec_json: &str) -> PyResult<String> {
-    let envelope = AttributionEnvelope::from_json(spec_json).map_err(core_to_py)?;
-    let result_envelope = py
-        .detach(|| envelope.execute_contained())
-        .map_err(core_to_py)?;
+    let result_envelope = run_attribute_pnl_envelope(py, spec_json)?;
     serde_json::to_string(&result_envelope).map_err(display_to_py)
 }
 

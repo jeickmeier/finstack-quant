@@ -70,7 +70,7 @@ beforeEach(() => {
       case "validateCalibration":
         return native.validateCalibrationJson(request);
       case "dryRun":
-        return native.dryRun(request);
+        return native.dryRunJson(request);
       case "calibrate":
         return native.calibrate(request);
       case "scenarioTable":

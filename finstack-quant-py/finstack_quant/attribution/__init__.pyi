@@ -28,9 +28,11 @@ from finstack_quant.core.money import Money
 from finstack_quant.attribution import schema as schema
 
 __all__ = [
+    "AttributionResultEnvelope",
     "PnlAttribution",
     "ReturnContributionResult",
     "attribute_pnl",
+    "attribute_pnl_envelope",
     "attribute_pnl_envelope_json",
     "attribute_pnl_many",
     "attribute_return_contribution",
@@ -43,6 +45,108 @@ __all__ = [
 ]
 
 # P&L Attribution
+
+class AttributionResultEnvelope:
+    """
+    Versioned attribution result: a :class:`PnlAttribution` plus its audit stamp.
+
+    Wraps Rust ``AttributionResultEnvelope`` (schema
+    ``finstack_quant.attribution/1``). Returned by
+    :func:`attribute_pnl_envelope`; :meth:`to_json` is byte-identical to
+    :func:`attribute_pnl_envelope_json` and to the WASM
+    ``attributePnlEnvelopeJson``.
+
+    Examples
+    --------
+    >>> from finstack_quant.attribution import AttributionResultEnvelope
+    >>> try:
+    ...     AttributionResultEnvelope.from_json("{}")
+    ... except ValueError as exc:
+    ...     "missing field" in str(exc)
+    True
+    """
+
+    @staticmethod
+    def from_json(json: str) -> AttributionResultEnvelope:
+        """
+        Deserialize an ``AttributionResultEnvelope`` from JSON.
+
+        Parameters
+        ----------
+        json : str
+            JSON produced by :meth:`to_json` or
+            :func:`attribute_pnl_envelope_json`.
+
+        Returns
+        -------
+        AttributionResultEnvelope
+            Parsed result envelope.
+
+        Examples
+        --------
+        >>> from finstack_quant.attribution import AttributionResultEnvelope
+        >>> try:
+        ...     AttributionResultEnvelope.from_json("{}")
+        ... except ValueError as exc:
+        ...     "missing field" in str(exc)
+        True
+
+        Raises
+        ------
+        ValueError
+            If ``json`` is malformed, carries an unsupported schema marker, or
+            omits fields required by the result-envelope schema.
+        """
+        ...
+
+    def to_json(self) -> str:
+        """
+        Serialize to compact JSON (the ``attribute_pnl_envelope_json`` wire).
+
+        Returns
+        -------
+        str
+            Compact JSON string.
+
+        Raises
+        ------
+        ValueError
+            If the value cannot be serialized to JSON.
+        """
+        ...
+
+    @property
+    def attribution(self) -> PnlAttribution:
+        """
+        The P&L attribution document.
+
+        Returns
+        -------
+        PnlAttribution
+            Factor decomposition of the instrument's P&L.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+
+    @property
+    def results_meta(self) -> dict[str, Any]:
+        """
+        Result-policy audit stamp: numeric mode, rounding context, FX policy.
+
+        Returns
+        -------
+        dict[str, Any]
+            The Rust ``ResultsMeta`` in its serde form.
+
+        Raises
+        ------
+        ValueError
+            If the stamp cannot be converted to Python objects.
+        """
+        ...
 
 class PnlAttribution:
     """
@@ -1536,11 +1640,53 @@ def pnl_bridge(
     """
     ...
 
+def attribute_pnl_envelope(spec_json: str) -> AttributionResultEnvelope:
+    """
+    Run attribution from a full JSON ``AttributionEnvelope``.
+
+    Typed twin of :func:`attribute_pnl_envelope_json` (WASM
+    ``attributePnlEnvelope``). Most users should prefer
+    :func:`attribute_pnl`.
+
+    Parameters
+    ----------
+    spec_json : str
+        JSON-serialized ``AttributionEnvelope`` (schema
+        ``finstack_quant.attribution/1``).
+
+    Returns
+    -------
+    AttributionResultEnvelope
+        The attribution plus its result-policy audit stamp.
+
+    Examples
+    --------
+    >>> from finstack_quant.attribution import attribute_pnl_envelope
+    >>> try:
+    ...     attribute_pnl_envelope("{}")
+    ... except ValueError as exc:
+    ...     "missing field" in str(exc)
+    True
+
+    Raises
+    ------
+    ValueError
+        If ``spec_json`` is malformed or violates the exact attribution
+        envelope schema, or attribution validation or pricing fails.
+    KeyError
+        If execution cannot find a required curve, market item, calendar, or FX
+        triangulation leg.
+    RuntimeError
+        If calibration or solver convergence fails, or attribution encounters
+        an internal operational failure.
+    """
+    ...
+
 def attribute_pnl_envelope_json(spec_json: str) -> str:
     """
     Run attribution from a full JSON ``AttributionEnvelope``.
 
-    Power-user variant for full envelope round-trip workflows.
+    JSON wire twin of :func:`attribute_pnl_envelope`.
     Most users should prefer :func:`attribute_pnl`.
 
     Parameters

@@ -54,7 +54,7 @@ Its `README.md` and `.d.ts` are wasm-pack copies; treat nothing in `pkg/` or
 | ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `core`                 | `Currency`, `Money`, `Rate`/`Bps`/`Percentage`, `DayCount`, `Tenor`, date helpers, `DiscountCurve`/`HazardCurve`/`ForwardCurve`, `VolCube`, `FxDeltaVolSurface`, `FxMatrix`, and the `math` helpers (Cholesky, statistics, special functions, stable summation) |
 | `analytics`            | `Performance` panel engine, `constrainedLeastSquares`                                                                                                                                                                                                           |
-| `attribution`          | `attributePnl`, `attributePnlJson`, waterfall/metric defaults, schema validation                                                                                                                                                                                |
+| `attribution`          | `attributePnl`, `attributePnlEnvelope` and their `*Json` twins, waterfall/metric defaults, schema validation                                                                                                                                                    |
 | `calibration`          | quote ingestion, market construction, plan validation, dependency graphs, and explicit Bermudan LMM base-vol fitting                                                                                                                                            |
 | `cashflows`            | schedule build/validate, `accruedInterest`, dated flows, CPR↔SMM and CDR↔MDR conversions                                                                                                                                                                        |
 | `covenants`            | spec/report/engine validation, `evaluateEngine`, preset covenant packages                                                                                                                                                                                       |
@@ -200,7 +200,7 @@ diagnostics are available, and `error.report` then carries the serialized
 remaining failures are ordinary `FinstackError`s (an unknown entity or missing FX
 rate is `not_found`, a failed valuation carries the kind of its cause).
 The calibration envelope entry points (`calibrate`, `validateCalibrationJson`,
-`dryRun`) throw `CalibrationEnvelopeError`, whose `kind` is the Rust execution
+`dryRun`, `dryRunJson`) throw `CalibrationEnvelopeError`, whose `kind` is the Rust execution
 category (`strict_load`, `solver_not_converged`, …) alongside the failing `stage`,
 `step_id`, `solver_diagnostics` and strict-load `diagnostics`. No export throws a bare string:
 `mise run wasm-check-errors` rejects any binding error that bypasses

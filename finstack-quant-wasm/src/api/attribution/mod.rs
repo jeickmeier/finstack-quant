@@ -14,10 +14,15 @@ use crate::utils::input::{js_opt_bool, js_string, json_text, opt_json_text};
 use crate::utils::to_js_err;
 use wasm_bindgen::prelude::*;
 
-/// Parameters for P&L attribution via [`attribute_pnl`].
-#[wasm_bindgen(js_name = AttributionParams)]
+/// Owned JSON fragments for P&L attribution via [`attribute_pnl`].
+///
+/// Holds the fields of Rust `AttributionJsonInputs`, which `attributePnl`
+/// passes to `AttributionSpec::from_json_inputs`. JavaScript has no keyword
+/// arguments, so the inputs are bundled in this class; Python passes the same
+/// fields as keyword arguments of `attribute_pnl`.
+#[wasm_bindgen(js_name = AttributionJsonInputs)]
 #[derive(Default)]
-pub struct JsAttributionParams {
+pub struct JsAttributionJsonInputs {
     instrument_json: String,
     market_t0_json: String,
     market_t1_json: String,
@@ -30,8 +35,8 @@ pub struct JsAttributionParams {
     credit_factor_model_json: Option<String>,
 }
 
-#[wasm_bindgen(js_class = AttributionParams)]
-impl JsAttributionParams {
+#[wasm_bindgen(js_class = AttributionJsonInputs)]
+impl JsAttributionJsonInputs {
     /// Bundle the attribution inputs (instrument / markets / dates / method
     /// JSON strings plus optional config and full-cross flag) for
     /// `attributePnl`. Attach a T₀ model-parameter snapshot or credit-factor
@@ -151,7 +156,7 @@ impl JsAttributionParams {
 /// `Error::Internal`: an uncaught unwind at the wasm boundary would abort the
 /// module instance and kill every subsequent call from the JS host.
 fn run_attribute_pnl(
-    params: &JsAttributionParams,
+    params: &JsAttributionJsonInputs,
 ) -> Result<finstack_quant_attribution::AttributionResult, JsValue> {
     let spec = finstack_quant_attribution::AttributionSpec::from_json_inputs(
         finstack_quant_attribution::AttributionJsonInputs {
@@ -173,7 +178,7 @@ fn run_attribute_pnl(
 
 /// Run P&L attribution for a single instrument.
 ///
-/// Accepts a [`JsAttributionParams`] struct with the instrument JSON, two market
+/// Accepts a [`JsAttributionJsonInputs`] object with the instrument JSON, two market
 /// snapshots, dates, and a method descriptor. Returns the `PnlAttribution`
 /// result as a structured JavaScript object whose fields carry the canonical
 /// Rust serde names (`total_pnl.amount`, `carry`, `meta`, ...); use
@@ -192,9 +197,9 @@ fn run_attribute_pnl(
 /// pricing, FX, rounding, metric, or method-specific attribution failures; a
 /// caught attribution panic; or failure to convert the result to a
 /// JavaScript value.
-/// @param params - Fully specified AttributionParams object containing instrument, markets, dates, and method.
+/// @param params - Fully specified AttributionJsonInputs object containing instrument, markets, dates, and method.
 #[wasm_bindgen(js_name = attributePnl)]
-pub fn attribute_pnl(params: &JsAttributionParams) -> Result<JsValue, JsValue> {
+pub fn attribute_pnl(params: &JsAttributionJsonInputs) -> Result<JsValue, JsValue> {
     let result = run_attribute_pnl(params)?;
     crate::utils::to_js_value(&result.attribution)
 }
@@ -209,30 +214,57 @@ pub fn attribute_pnl(params: &JsAttributionParams) -> Result<JsValue, JsValue> {
 ///
 /// Rejects the same conditions as [`attribute_pnl`], plus failure to
 /// serialize the result to JSON.
-/// @param params - Fully specified AttributionParams object containing instrument, markets, dates, and method.
+/// @param params - Fully specified AttributionJsonInputs object containing instrument, markets, dates, and method.
 #[wasm_bindgen(js_name = attributePnlJson)]
-pub fn attribute_pnl_json(params: &JsAttributionParams) -> Result<String, JsValue> {
+pub fn attribute_pnl_json(params: &JsAttributionJsonInputs) -> Result<String, JsValue> {
     let result = run_attribute_pnl(params)?;
     serde_json::to_string(&result.attribution).map_err(to_js_err)
 }
 
-/// Run attribution from a full JSON `AttributionEnvelope` and return JSON.
+/// Parse and execute one `AttributionEnvelope` with panic containment.
 ///
-/// Power-user variant for full envelope round-trip workflows.
+/// Shared by [`attribute_pnl_envelope`] and [`attribute_pnl_envelope_json`].
+fn run_attribute_pnl_envelope(
+    spec_json: &JsValue,
+) -> Result<finstack_quant_attribution::AttributionResultEnvelope, JsValue> {
+    let spec_json: &str = &json_text(spec_json, "specJson")?;
+    let envelope =
+        finstack_quant_attribution::AttributionEnvelope::from_json(spec_json).map_err(to_js_err)?;
+    envelope.execute_contained().map_err(to_js_err)
+}
+
+/// Run attribution from a full `AttributionEnvelope` and return the result envelope.
+///
+/// Returns the Rust `AttributionResultEnvelope` as a plain object:
+/// `{ schema: "finstack_quant.attribution/1", result: { attribution, results_meta } }`.
+/// Use [`attribute_pnl_envelope_json`] for the JSON wire string.
 ///
 /// # Errors
 ///
 /// Rejects malformed, schema-incompatible, or unsupported-version `spec_json`;
 /// instrument or market reconstruction, pricing, FX, rounding, metric, or
 /// method-specific attribution failures; a caught execution panic; or
-/// failure to serialize the result envelope.
-/// @param spec_json - JSON-serialized AttributionParams specification to validate and execute.
+/// failure to convert the result envelope to a JavaScript value.
+/// @param spec_json - JSON-serialized AttributionEnvelope (schema `finstack_quant.attribution/1`) to validate and execute.
+#[wasm_bindgen(js_name = attributePnlEnvelope)]
+pub fn attribute_pnl_envelope(spec_json: JsValue) -> Result<JsValue, JsValue> {
+    let result_envelope = run_attribute_pnl_envelope(&spec_json)?;
+    crate::utils::to_js_value(&result_envelope)
+}
+
+/// Run attribution from a full JSON `AttributionEnvelope` and return JSON.
+///
+/// Wire twin of [`attribute_pnl_envelope`] for full envelope round-trip
+/// workflows.
+///
+/// # Errors
+///
+/// Rejects the same conditions as [`attribute_pnl_envelope`], plus failure to
+/// serialize the result envelope.
+/// @param spec_json - JSON-serialized AttributionEnvelope (schema `finstack_quant.attribution/1`) to validate and execute.
 #[wasm_bindgen(js_name = attributePnlEnvelopeJson)]
 pub fn attribute_pnl_envelope_json(spec_json: JsValue) -> Result<String, JsValue> {
-    let spec_json: &str = &json_text(&spec_json, "specJson")?;
-    let envelope =
-        finstack_quant_attribution::AttributionEnvelope::from_json(spec_json).map_err(to_js_err)?;
-    let result_envelope = envelope.execute_contained().map_err(to_js_err)?;
+    let result_envelope = run_attribute_pnl_envelope(&spec_json)?;
     serde_json::to_string(&result_envelope).map_err(to_js_err)
 }
 

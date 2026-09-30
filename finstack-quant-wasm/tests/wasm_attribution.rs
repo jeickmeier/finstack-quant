@@ -51,9 +51,9 @@ fn market_json(as_of: time::Date, rate: f64) -> String {
     serde_json::to_string(&MarketContextState::from(&market)).expect("market JSON")
 }
 
-fn params(method_json: &str) -> JsAttributionParams {
+fn params(method_json: &str) -> JsAttributionJsonInputs {
     use time::macros::date;
-    JsAttributionParams::new(
+    JsAttributionJsonInputs::new(
         JsValue::from(bond_json()),
         JsValue::from(market_json(date!(2025 - 01 - 15), 0.04)),
         JsValue::from(market_json(date!(2025 - 01 - 16), 0.042)),
@@ -165,7 +165,7 @@ fn validate_attribution_json_rejects_wrong_schema() {
 #[wasm_bindgen_test]
 fn attribute_pnl_missing_market_data_yields_structured_error() {
     let empty = serde_json::to_string(&MarketContextState::from(&MarketContext::new())).unwrap();
-    let p = JsAttributionParams::new(
+    let p = JsAttributionJsonInputs::new(
         JsValue::from(bond_json()),
         JsValue::from(empty.clone()),
         JsValue::from(empty),
@@ -193,7 +193,7 @@ fn attribute_pnl_missing_market_data_yields_structured_error() {
 #[wasm_bindgen_test]
 fn requested_reporting_currency_requires_fx() {
     use time::macros::date;
-    let inputs = JsAttributionParams::new(
+    let inputs = JsAttributionJsonInputs::new(
         JsValue::from(bond_json()),
         JsValue::from(market_json(date!(2025 - 01 - 15), 0.04)),
         JsValue::from(market_json(date!(2025 - 01 - 16), 0.04)),
@@ -211,7 +211,7 @@ fn requested_reporting_currency_requires_fx() {
 fn metrics_and_taylor_preserve_rounding() {
     use time::macros::date;
     for method in [r#""metrics_based""#, r#"{"taylor":{}}"#] {
-        let inputs = JsAttributionParams::new(
+        let inputs = JsAttributionJsonInputs::new(
             JsValue::from(bond_json()),
             JsValue::from(market_json(date!(2025 - 01 - 15), 0.04)),
             JsValue::from(market_json(date!(2025 - 01 - 16), 0.04)),

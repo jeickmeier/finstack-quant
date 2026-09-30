@@ -140,7 +140,7 @@ fn test_v2_simple_usd_calibration() {
         panic!("second step should be the forward curve");
     };
     bootstrap_params.method = CalibrationMethod::Bootstrap;
-    let bootstrap_error = engine::execute(&bootstrap_envelope)
+    let bootstrap_error = engine::calibrate(&bootstrap_envelope)
         .expect_err("forward Bootstrap must be rejected rather than silently invoking LM");
     assert!(
         bootstrap_error
@@ -150,8 +150,8 @@ fn test_v2_simple_usd_calibration() {
     );
 
     // 4. Execute the explicit global method twice to verify deterministic output.
-    let result = engine::execute(&envelope).expect("Calibration failed");
-    let repeated = engine::execute(&envelope).expect("Repeated calibration failed");
+    let result = engine::calibrate(&envelope).expect("Calibration failed");
+    let repeated = engine::calibrate(&envelope).expect("Repeated calibration failed");
 
     // Forward rate checks might need adjustment if rate changes due to different date
     // But since market data is synthetic/flat-ish, it should be robust.

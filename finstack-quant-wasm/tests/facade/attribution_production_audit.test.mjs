@@ -25,7 +25,7 @@ test('Taylor and metrics attribution count risky discount moves only as credit',
     )
   );
   for (const method of ['metrics_based', { taylor: {} }]) {
-    const params = new attribution.AttributionParams(
+    const params = new attribution.AttributionJsonInputs(
       JSON.stringify(fixture.instrument),
       JSON.stringify(fixture.market_t0),
       JSON.stringify(fixture.market_t1),
@@ -61,7 +61,7 @@ test('metrics attribution reports gross carry and a separate funding overlay', (
     tolerance_abs: 0.01,
     tolerance_pct: 0.001,
   };
-  const params = new attribution.AttributionParams(
+  const params = new attribution.AttributionJsonInputs(
     JSON.stringify(bond),
     JSON.stringify(market),
     JSON.stringify(market),
@@ -97,7 +97,7 @@ test('scalar volatility moves stay out of generic scalar attribution', () => {
   const closing = structuredClone(opening);
   closing.prices['AAPL-VOL'] = { unitless: 0.26 };
   for (const method of ['parallel', { waterfall: attribution.defaultWaterfallOrder() }]) {
-    const params = new attribution.AttributionParams(
+    const params = new attribution.AttributionJsonInputs(
       JSON.stringify(instrument),
       JSON.stringify(opening),
       JSON.stringify(closing),
@@ -112,4 +112,31 @@ test('scalar volatility moves stay out of generic scalar attribution', () => {
     assert.ok(Math.abs(Number(result.vol_pnl.amount) - Number(result.total_pnl.amount)) < 0.01);
     assert.ok(Math.abs(Number(result.market_scalars_pnl.amount)) < 0.01);
   }
+});
+
+test('attributePnlEnvelope returns the typed twin of attributePnlEnvelopeJson', () => {
+  const fixture = JSON.parse(
+    readFileSync(
+      new URL(
+        '../../../finstack-quant/attribution/tests/fixtures/production_convertible_credit.json',
+        import.meta.url
+      )
+    )
+  );
+  const envelope = {
+    schema: 'finstack_quant.attribution/1',
+    attribution: {
+      instrument: fixture.instrument.instrument,
+      market_t0: fixture.market_t0,
+      market_t1: fixture.market_t1,
+      as_of_t0: fixture.as_of_t0,
+      as_of_t1: fixture.as_of_t1,
+      method: 'metrics_based',
+    },
+  };
+  const typed = attribution.attributePnlEnvelope(envelope);
+  assert.equal(typed.schema, 'finstack_quant.attribution/1');
+  assert.ok(typed.result.results_meta);
+  assert.deepEqual(typed, JSON.parse(attribution.attributePnlEnvelopeJson(envelope)));
+  assert.throws(() => attribution.attributePnlEnvelope('{}'), /missing field/);
 });

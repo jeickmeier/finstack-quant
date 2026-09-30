@@ -6,6 +6,9 @@
  * Calibration owns its bracket search. This configuration contains only the
  * tolerance and iteration budget consumed by its numerical solvers.
  *
+ * Deserialization runs [`SolverConfig::validate`], so a wire document with a
+ * non-positive tolerance or a zero iteration budget is rejected at parse time.
+ *
  * # Examples
  *
  * ```

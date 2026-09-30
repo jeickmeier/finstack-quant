@@ -1,6 +1,6 @@
 //! wasm-bindgen-test suite for `api::margin`.
 //!
-//! Covers calculate_vm which returns JsValue.
+//! Covers calculate_vm, which returns the canonical `VmResult` serde as a JsValue.
 
 #![cfg(target_arch = "wasm32")]
 
@@ -19,13 +19,10 @@ fn calculate_vm_usd_regulatory() {
         JsValue::from("2024-06-15"),
     )
     .unwrap();
-    let obj: serde_json::Value = serde_wasm_bindgen::from_value(result).unwrap();
-    assert!(obj["gross_exposure"].as_f64().is_some());
-    assert!(obj["net_exposure"].as_f64().is_some());
-    assert!(obj["post_amount"].as_f64().is_some());
-    assert!(obj["collect_amount"].as_f64().is_some());
-    assert!(obj["net_margin"].as_f64().is_some());
-    assert!(obj["requires_call"].as_bool().is_some());
+    let vm: finstack_quant_margin::VmResult = serde_wasm_bindgen::from_value(result).unwrap();
+    assert_eq!(vm.gross_exposure.amount(), 1_000_000.0);
+    assert_eq!(vm.gross_exposure.currency().to_string(), "USD");
+    assert!(vm.requires_call());
 }
 
 #[wasm_bindgen_test]
@@ -39,8 +36,8 @@ fn calculate_vm_eur_regulatory() {
         JsValue::from("2024-03-01"),
     )
     .unwrap();
-    let obj: serde_json::Value = serde_wasm_bindgen::from_value(result).unwrap();
-    assert!(obj["gross_exposure"].as_f64().is_some());
+    let vm: finstack_quant_margin::VmResult = serde_wasm_bindgen::from_value(result).unwrap();
+    assert_eq!(vm.gross_exposure.currency().to_string(), "EUR");
 }
 
 #[wasm_bindgen_test]
@@ -54,8 +51,9 @@ fn calculate_vm_zero_exposure() {
         JsValue::from("2024-01-15"),
     )
     .unwrap();
-    let obj: serde_json::Value = serde_wasm_bindgen::from_value(result).unwrap();
-    assert!((obj["gross_exposure"].as_f64().unwrap()).abs() < 1e-10);
+    let vm: finstack_quant_margin::VmResult = serde_wasm_bindgen::from_value(result).unwrap();
+    assert!(vm.gross_exposure.amount().abs() < 1e-10);
+    assert!(!vm.requires_call());
 }
 
 #[wasm_bindgen_test]

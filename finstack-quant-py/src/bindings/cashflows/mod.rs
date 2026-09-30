@@ -149,7 +149,7 @@ fn validate_cashflow_schedule_json(py: Python<'_>, schedule_json: &str) -> PyRes
 /// Raises
 /// ------
 /// ValueError
-///     If the schedule JSON is malformed.
+///     If the schedule JSON is malformed or the schedule fails validation.
 #[pyfunction]
 #[pyo3(text_signature = "(schedule_json)")]
 fn dated_flows_json(py: Python<'_>, schedule_json: &str) -> PyResult<String> {
@@ -175,7 +175,8 @@ fn dated_flows_json(py: Python<'_>, schedule_json: &str) -> PyResult<String> {
 /// Raises
 /// ------
 /// ValueError
-///     If ``schedule`` is a malformed JSON string.
+///     If ``schedule`` is a malformed JSON string or the schedule fails
+///     validation (e.g. an interest-bearing flow dated before the issue date).
 /// TypeError
 ///     If ``schedule`` is neither a ``CashFlowSchedule`` nor a string.
 ///
@@ -195,11 +196,10 @@ fn dated_flows<'py>(
     schedule: &Bound<'py, PyAny>,
 ) -> PyResult<Vec<(Bound<'py, PyAny>, PyMoney)>> {
     let schedule = extract_schedule(schedule)?;
-    schedule
-        .get_flows()
-        .iter()
-        .filter(|flow| finstack_quant_cashflows::primitives::is_cash_settlement_kind(flow.kind))
-        .map(|flow| Ok((date_to_py(py, flow.date)?, PyMoney::from_inner(flow.amount))))
+    finstack_quant_cashflows::dated_flows(&schedule)
+        .map_err(crate::errors::core_to_py)?
+        .into_iter()
+        .map(|(date, amount)| Ok((date_to_py(py, date)?, PyMoney::from_inner(amount))))
         .collect()
 }
 

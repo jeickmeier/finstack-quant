@@ -1,6 +1,7 @@
 //! Tests for the surrounding crate component and its documented behavior.
 #![cfg(feature = "ts_export")]
 //!
+use finstack_quant_calibration::api::errors::{EnvelopeError, StrictLoadDiagnostic};
 use finstack_quant_calibration::api::market_datum::{
     CollateralEntry, DividendScheduleDatum, FxSpotDatum, MarketDatum, PriceDatum,
 };
@@ -12,6 +13,9 @@ use finstack_quant_calibration::api::schema::{
     HullWhiteVolatilityMode, InflationCurveParams, ParametricCurveParams, SabrInterpolationMethod,
     SeasonalFactors, StepParams, StudentTParams, SurfaceExtrapolationPolicy, SviSurfaceParams,
     SwaptionVolConvention, SwaptionVolParams, VolSurfaceModel, VolSurfaceParams, XccyBasisParams,
+};
+use finstack_quant_calibration::api::validate::{
+    CalibrationValidationReport, DependencyGraph, DependencyNode,
 };
 use finstack_quant_calibration::quotes::cds::CdsQuote;
 use finstack_quant_calibration::quotes::cds_tranche::CdsTrancheQuote;
@@ -157,5 +161,12 @@ fn export_calibration_envelope_types() {
     CalibrationReport::export(cfg).expect("export CalibrationReport");
     CalibrationDiagnostics::export(cfg).expect("export CalibrationDiagnostics");
     QuoteQuality::export(cfg).expect("export QuoteQuality");
+
+    // Static validation report (`dryRun`) and its error payloads
+    CalibrationValidationReport::export(cfg).expect("export CalibrationValidationReport");
+    DependencyGraph::export(cfg).expect("export DependencyGraph");
+    DependencyNode::export(cfg).expect("export DependencyNode");
+    EnvelopeError::export(cfg).expect("export EnvelopeError");
+    StrictLoadDiagnostic::export(cfg).expect("export StrictLoadDiagnostic");
     normalize_generated_types();
 }

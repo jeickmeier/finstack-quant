@@ -61,6 +61,7 @@ test('calibration is owned only by the calibration namespace', () => {
     'calibrate',
     'calibrateBermudanLmmBaseVol',
     'dryRun',
+    'dryRunJson',
     'validateCalibrationJson',
   ]) {
     assert.equal(typeof calibration[name], 'function');
@@ -77,6 +78,59 @@ test('malformed calibration input exposes canonical ingestion details', () => {
   assert.equal(error.step_id, undefined);
   assert.equal(error.solver_diagnostics, undefined);
   assert.equal(error.cause.category, 'strict_load');
+});
+
+test('every envelope entry point reports malformed JSON with the same parse diagnostic', () => {
+  for (const name of ['calibrate', 'dryRun', 'dryRunJson', 'validateCalibrationJson']) {
+    const error = captureError(() => calibration[name]('not json'));
+    assertStructuredError(error);
+    assert.equal(error.kind, 'strict_load', name);
+    assert.equal(error.diagnostics[0].code, 'contract/parse-error', name);
+    assert.equal(error.diagnostics[0].pointer, null, name);
+  }
+});
+
+test('dryRun returns the typed report and dryRunJson its wire twin', () => {
+  const envelope = {
+    schema: 'finstack_quant.calibration/1',
+    plan: {
+      id: 'dry',
+      quote_sets: {},
+      settings: {},
+      steps: [
+        {
+          id: 'discount_step',
+          quote_set: 'missing_quotes',
+          kind: 'discount',
+          curve_id: 'USD-OIS',
+          currency: 'USD',
+          base_date: '2026-05-08',
+        },
+      ],
+    },
+  };
+  const report = calibration.dryRun(envelope);
+  assert.equal(typeof report, 'object');
+  assert.equal(report.errors[0].kind, 'undefined_quote_set');
+  assert.equal(report.dependency_graph.nodes[0].step_id, 'discount_step');
+  assert.deepEqual(report, JSON.parse(calibration.dryRunJson(envelope)));
+});
+
+test('unusable solver settings are rejected by validation and execution', () => {
+  const EMPTY = JSON.parse(readFileSync(EQUITY_VOL_EXAMPLE, 'utf8'));
+  for (const solver of [{ tolerance: 0 }, { tolerance: -1 }, { max_iterations: 0 }]) {
+    const envelope = structuredClone(EMPTY);
+    envelope.plan.settings.solver = solver;
+    for (const name of ['calibrate', 'validateCalibrationJson', 'dryRun']) {
+      const error = captureError(() => calibration[name](envelope));
+      assertStructuredError(error);
+      assert.match(
+        error.message,
+        /solver (tolerance|max_iterations)/,
+        `${name} ${JSON.stringify(solver)}`
+      );
+    }
+  }
 });
 
 test('Hull-White calibration requires an explicit quoted-volatility fit budget', () => {

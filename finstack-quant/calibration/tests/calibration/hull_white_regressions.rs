@@ -98,7 +98,7 @@ fn projection(dc: DayCount, shift_years: u32) -> ForwardCurve {
 }
 
 fn fitted_sigma(envelope: &CalibrationEnvelope) -> f64 {
-    let result = engine::execute(envelope).expect("calibration");
+    let result = engine::calibrate(envelope).expect("calibration");
     assert!(result.result.report.success);
     let MarketScalar::Unitless(sigma) = result.result.final_market.prices["D_CAPFLOOR_HW1F_SIGMA"]
     else {
@@ -186,11 +186,11 @@ fn cap_floor_plan_rejects_conflicting_quotes_in_any_order() {
             (0..3).map(|i| QuoteId::new(format!("cap-{i}"))).collect(),
         );
         assert!(
-            engine::execute(&env).is_err(),
+            engine::calibrate(&env).is_err(),
             "strict acceptance must reject conflicting quotes"
         );
         env.plan.settings.fail_on_bad_fit = false;
-        let result = engine::execute(&env).expect("diagnostic result");
+        let result = engine::calibrate(&env).expect("diagnostic result");
         assert!(!result.result.report.success);
         assert_eq!(result.result.step_reports["hw"].residuals.len(), 3);
     }

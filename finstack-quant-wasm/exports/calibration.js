@@ -5,5 +5,6 @@ export const calibration = {
   calibrate: wasm.calibrate,
   validateCalibrationJson: wasm.validateCalibrationJson,
   dryRun: wasm.dryRun,
+  dryRunJson: wasm.dryRunJson,
   calibrateBermudanLmmBaseVol: wasm.calibrateBermudanLmmBaseVol,
 };

@@ -1,7 +1,7 @@
 //! WASM bindings for the calibration engine.
 //!
 //! Mirrors the Python `calibrate` / `validate_calibration_json` surface plus
-//! diagnostics (`dryRun`).
+//! diagnostics (`dryRun` and its `dryRunJson` wire twin).
 //!
 //! # Number safety
 //!
@@ -78,7 +78,7 @@ pub fn validate_calibration_json(json: JsValue) -> Result<String, JsValue> {
 /// carries the structured `EnvelopeError` payload when the failure is
 /// envelope-related).
 fn calibrate_inner(envelope_json: &str) -> Result<CalibrationResultEnvelope, ExecuteError> {
-    engine::execute_json(envelope_json)
+    engine::calibrate_from_json(envelope_json)
 }
 
 /// Execute a calibration plan and return the full result envelope.
@@ -106,8 +106,27 @@ pub fn calibrate(envelope_json: JsValue) -> Result<JsValue, JsValue> {
 
 /// Pre-flight envelope validation without invoking the solver.
 ///
-/// Returns a JSON-serialized `CalibrationValidationReport` listing every error found
-/// plus the dependency graph. Microseconds.
+/// Returns the `CalibrationValidationReport` as a plain object listing every
+/// static error found (`errors`) plus the dependency graph
+/// (`dependency_graph`). Microseconds. Use [`dry_run_json`] for the JSON
+/// wire string.
+/// @param envelope_json - CalibrationEnvelope JSON containing targets, parameters, bounds, and dependencies.
+///
+/// # Errors
+///
+/// Throws a JavaScript exception if `envelopeJson` is malformed, its schema
+/// marker is missing, malformed, or unsupported, the envelope structure is
+/// invalid, or the validation report cannot be converted to a JavaScript
+/// value. Semantic findings are returned in the report rather than thrown.
+#[wasm_bindgen(js_name = dryRun)]
+pub fn dry_run(envelope_json: JsValue) -> Result<JsValue, JsValue> {
+    let envelope_json: &str = &json_text(&envelope_json, "envelopeJson")?;
+    let report =
+        validate::dry_run(envelope_json).map_err(|error| execute_error_to_js(error.into()))?;
+    to_js_value(&report)
+}
+
+/// JSON wire twin of [`dry_run`]: the validation report as pretty-printed JSON.
 /// @param envelope_json - CalibrationEnvelope JSON containing targets, parameters, bounds, and dependencies.
 ///
 /// # Errors
@@ -116,10 +135,10 @@ pub fn calibrate(envelope_json: JsValue) -> Result<JsValue, JsValue> {
 /// marker is missing, malformed, or unsupported, the envelope structure is
 /// invalid, or the validation report cannot be serialized. Semantic findings
 /// are returned in the report rather than thrown.
-#[wasm_bindgen(js_name = dryRun)]
-pub fn dry_run(envelope_json: JsValue) -> Result<String, JsValue> {
+#[wasm_bindgen(js_name = dryRunJson)]
+pub fn dry_run_json(envelope_json: JsValue) -> Result<String, JsValue> {
     let envelope_json: &str = &json_text(&envelope_json, "envelopeJson")?;
-    validate::dry_run(envelope_json).map_err(|error| execute_error_to_js(error.into()))
+    validate::dry_run_json(envelope_json).map_err(|error| execute_error_to_js(error.into()))
 }
 
 /// Calibrate the explicit Bermudan LMM loading scale from the market surface.
@@ -267,7 +286,9 @@ mod tests {
     #[test]
     fn dry_run_accepts_empty_plan() {
         let json = empty_envelope_json();
-        let report_json = validate::dry_run(&json).expect("dry_run");
+        let report = validate::dry_run(&json).expect("dry_run");
+        assert!(report.errors.is_empty());
+        let report_json = validate::dry_run_json(&json).expect("dry_run_json");
         let parsed: serde_json::Value = serde_json::from_str(&report_json).expect("json");
         assert!(parsed.get("errors").is_some());
         assert!(parsed.get("dependency_graph").is_some());
@@ -276,6 +297,7 @@ mod tests {
     #[test]
     fn dry_run_rejects_malformed_json() {
         assert!(validate::dry_run("not json").is_err());
+        assert!(validate::dry_run_json("not json").is_err());
     }
 
     #[test]

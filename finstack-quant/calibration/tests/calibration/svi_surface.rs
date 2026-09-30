@@ -220,7 +220,7 @@ fn svi_surface_grid_is_calendar_monotone_under_nonflat_curve() {
         prior_market: prior,
     };
 
-    let result = engine::execute(&envelope).expect("SVI surface calibration must not error");
+    let result = engine::calibrate(&envelope).expect("SVI surface calibration must not error");
     let report = result
         .result
         .step_reports

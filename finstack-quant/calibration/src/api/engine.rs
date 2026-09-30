@@ -724,10 +724,10 @@ fn bad_fit_envelope_error(step_id: &str, report: &CalibrationReport) -> Envelope
     }
 }
 
-/// Parse a JSON calibration envelope and execute it.
+/// Parse a JSON calibration envelope and calibrate it.
 ///
-/// Combines the internal `parse_envelope` loader with [`execute`] so host
-/// bindings do not reimplement the parse-then-run path.
+/// Combines [`parse_envelope`](super::validate::parse_envelope) with
+/// [`calibrate`] so host bindings do not reimplement the parse-then-run path.
 ///
 /// # Arguments
 ///
@@ -737,12 +737,12 @@ fn bad_fit_envelope_error(step_id: &str, report: &CalibrationReport) -> Envelope
 /// # Errors
 ///
 /// Returns [`ExecuteError`] when strict loading rejects the document or
-/// [`execute`] fails after a successful parse.
-pub fn execute_json(
+/// [`calibrate`] fails after a successful parse.
+pub fn calibrate_from_json(
     envelope_json: &str,
 ) -> std::result::Result<CalibrationResultEnvelope, ExecuteError> {
     let envelope = super::validate::parse_envelope(envelope_json)?;
-    execute(&envelope)
+    calibrate(&envelope)
 }
 
 /// Execute a full [`CalibrationEnvelope`] plan.
@@ -760,7 +760,7 @@ pub fn execute_json(
 ///
 /// * `envelope` - Typed calibration plan, inputs, quote sets, and solver
 ///   settings to execute in declared dependency order.
-pub fn execute(
+pub fn calibrate(
     envelope: &CalibrationEnvelope,
 ) -> std::result::Result<CalibrationResultEnvelope, ExecuteError> {
     let _span = tracing::info_span!(
@@ -770,13 +770,8 @@ pub fn execute(
     )
     .entered();
 
-    if let Some(error) = super::validate::validate(envelope)
-        .errors
-        .into_iter()
-        .next()
-    {
-        return Err(ExecuteError::envelope(ExecutionStage::Ingestion, error));
-    }
+    super::validate::validate_fail_fast(envelope)
+        .map_err(|error| ExecuteError::envelope(ExecutionStage::Ingestion, error))?;
     let plan = &envelope.plan;
     plan.settings
         .validate()

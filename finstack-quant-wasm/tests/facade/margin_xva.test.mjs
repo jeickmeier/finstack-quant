@@ -233,16 +233,44 @@ test('computeBilateralXva rejects unknown funding fields', () => {
   );
 });
 
+test('computeBilateralXva rejects unknown exposure-profile fields', () => {
+  const profile = JSON.parse(exposureJson);
+  const diagnostics = { market_roll_failures: 3, valuation_failures: 0, total_time_points: 2 };
+  const run = (p) =>
+    margin.computeBilateralXva(
+      JSON.stringify(p),
+      flatHazard(0.02),
+      flatHazard(0.02),
+      flatDiscount(),
+      0.4,
+      0.4
+    );
+  // A correctly spelled `diagnostics` with failures trips the XVA validity gate ...
+  assert.throws(() => run({ ...profile, diagnostics }), /not valid for XVA/);
+  // ... and a misspelled key can no longer bypass it.
+  assert.throws(() => run({ ...profile, diagnostic: diagnostics }), /unknown field `diagnostic`/);
+  assert.throws(() => run({ ...profile, bogus: 1 }), /unknown field `bogus`/);
+});
+
 test('VM validation and desk direction retain settlement metadata', () => {
   const csa = margin.csaUsdRegulatoryJson();
   const collect = margin.calculateVm(csa, 1e6, 0, 'USD', '2025-01-10');
-  assert.equal(collect.collect_amount, 1e6);
-  assert.equal(collect.post_amount, 0);
-  assert.equal(collect.currency, 'USD');
+  // Canonical Rust `VmResult` serde: Money amounts are exact decimal strings.
+  assert.deepEqual(Object.keys(collect).sort(), [
+    'collect_amount',
+    'date',
+    'gross_exposure',
+    'net_exposure',
+    'post_amount',
+    'settlement_date',
+  ]);
+  assert.deepEqual(collect.collect_amount, { amount: '1000000', currency: 'USD' });
+  assert.equal(Number(collect.post_amount.amount), 0);
+  assert.equal(collect.gross_exposure.currency, 'USD');
   assert.equal(collect.date, '2025-01-10');
   assert.equal(collect.settlement_date, '2025-01-13');
   const post = margin.calculateVm(csa, -1e6, 0, 'USD', '2025-01-10');
-  assert.equal(post.post_amount, 1e6);
+  assert.equal(Number(post.post_amount.amount), 1e6);
   const invalid = JSON.parse(csa);
   invalid.calendar_id = 'unknown-calendar';
   assert.throws(() => margin.validateCsaJson(JSON.stringify(invalid)));

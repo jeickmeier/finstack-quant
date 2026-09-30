@@ -434,14 +434,18 @@ finstack-quant-wasm/types/generated/CalibrationResult.ts
 finstack-quant-wasm/types/generated/CalibrationResultEnvelope.ts
 finstack-quant-wasm/types/generated/CalibrationSchema.ts
 finstack-quant-wasm/types/generated/CalibrationStep.ts
+finstack-quant-wasm/types/generated/CalibrationValidationReport.ts
 finstack-quant-wasm/types/generated/CapFloorHullWhiteStepParams.ts
 finstack-quant-wasm/types/generated/CdsQuote.ts
 finstack-quant-wasm/types/generated/CdsTrancheQuote.ts
 finstack-quant-wasm/types/generated/CollateralEntry.ts
+finstack-quant-wasm/types/generated/DependencyGraph.ts
+finstack-quant-wasm/types/generated/DependencyNode.ts
 finstack-quant-wasm/types/generated/Diagnostic.ts
 finstack-quant-wasm/types/generated/DiscountCurveParams.ts
 finstack-quant-wasm/types/generated/DiscountCurveSolveConfig.ts
 finstack-quant-wasm/types/generated/DividendScheduleDatum.ts
+finstack-quant-wasm/types/generated/EnvelopeError.ts
 finstack-quant-wasm/types/generated/ForwardCurveParams.ts
 finstack-quant-wasm/types/generated/ForwardCurveSolveConfig.ts
 finstack-quant-wasm/types/generated/FxSpotDatum.ts
@@ -480,6 +484,7 @@ finstack-quant-wasm/types/generated/SeasonalFactors.ts
 finstack-quant-wasm/types/generated/Severity.ts
 finstack-quant-wasm/types/generated/SolverConfig.ts
 finstack-quant-wasm/types/generated/StepParams.ts
+finstack-quant-wasm/types/generated/StrictLoadDiagnostic.ts
 finstack-quant-wasm/types/generated/StudentTParams.ts
 finstack-quant-wasm/types/generated/SurfaceExtrapolationPolicy.ts
 finstack-quant-wasm/types/generated/SviSurfaceParams.ts

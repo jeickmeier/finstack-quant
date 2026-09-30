@@ -504,6 +504,36 @@ pub fn validate_cashflow_schedule_json(schedule_json: &str) -> Result<String> {
     serialize_json(&schedule, "cashflow schedule")
 }
 
+/// Settlement cash flows of a validated schedule as `(date, amount)` pairs.
+///
+/// Runs [`CashFlowSchedule::validate`] and keeps only cash-settling rows
+/// (non-cash `PIK` and `DefaultedNotional` rows are excluded), in schedule
+/// order. This is the single owner of the settlement filter used by
+/// [`dated_flows_json`] and host bindings.
+///
+/// # Arguments
+///
+/// * `schedule` - Cashflow schedule to validate and filter; amounts keep
+///   their own currency.
+///
+/// # Returns
+///
+/// Dated settlement amounts, safe to sum per currency.
+///
+/// # Errors
+///
+/// Returns an error if the schedule fails validation (for example, an
+/// interest-bearing flow dated before `meta.issue_date`).
+pub fn dated_flows(schedule: &CashFlowSchedule) -> Result<crate::DatedFlows> {
+    schedule.validate()?;
+    Ok(schedule
+        .flows
+        .iter()
+        .filter(|flow| is_cash_settlement_kind(flow.kind))
+        .map(|flow| (flow.date, flow.amount))
+        .collect())
+}
+
 /// Extract dated amounts from a schedule JSON payload.
 ///
 /// The returned JSON is an array of [`DatedFlowJson`] values. Each entry
@@ -521,8 +551,8 @@ pub fn validate_cashflow_schedule_json(schedule_json: &str) -> Result<String> {
 ///
 /// # Errors
 ///
-/// Returns an error if the schedule JSON is invalid or the output cannot be
-/// serialized.
+/// Returns an error if the schedule JSON is invalid, the schedule fails
+/// validation (see [`dated_flows`]), or the output cannot be serialized.
 ///
 /// # Examples
 ///
@@ -547,15 +577,9 @@ pub fn validate_cashflow_schedule_json(schedule_json: &str) -> Result<String> {
 /// ```
 pub fn dated_flows_json(schedule_json: &str) -> Result<String> {
     let schedule = parse_schedule(schedule_json)?;
-    schedule.validate()?;
-    let flows: Vec<DatedFlowJson> = schedule
-        .flows
-        .iter()
-        .filter(|flow| is_cash_settlement_kind(flow.kind))
-        .map(|flow| DatedFlowJson {
-            date: flow.date,
-            amount: flow.amount,
-        })
+    let flows: Vec<DatedFlowJson> = dated_flows(&schedule)?
+        .into_iter()
+        .map(|(date, amount)| DatedFlowJson { date, amount })
         .collect();
     serialize_json(&flows, "dated flows")
 }

@@ -13,7 +13,7 @@ only to replay an already-calibrated context.
 
 | Path | Visibility | Contents |
 |------|-----------|----------|
-| `api/` | public | `CalibrationEnvelope` schema, `engine::execute`, envelope validation, market-datum and prior-market inputs |
+| `api/` | public | `CalibrationEnvelope` schema, `engine::calibrate`, envelope validation, market-datum and prior-market inputs |
 | `recalibration/` | public | Cached quote-space replay implementing valuations' `RecalibrationProvider` port |
 | `quotes/` | public | Raw market quote DTOs and quote identifiers |
 | `build/` | crate-private | Quote-to-instrument construction and date resolution |
@@ -83,14 +83,14 @@ use finstack_quant_calibration::api::engine;
 fn run(plan: CalibrationPlan) -> finstack_quant_core::Result<MarketContext> {
     let envelope = CalibrationEnvelope::new(plan, Vec::new(), Vec::new());
 
-    let result = engine::execute(&envelope)?;
+    let result = engine::calibrate(&envelope)?;
     println!("executed {} steps", result.result.step_reports.len());
 
     MarketContext::try_from(result.result.final_market)
 }
 ```
 
-`engine::execute` returns a `CalibrationResultEnvelope` whose `result` carries
+`engine::calibrate` returns a `CalibrationResultEnvelope` whose `result` carries
 `final_market` (a `MarketContextState`), a merged plan-level `report`,
 `step_reports` keyed by step id, and `results_meta`. Failures are a structured
 `ExecuteError` (including `worst_quote_id` on solver non-convergence). Static

@@ -193,24 +193,6 @@ Document any places where divergence from the dominant pattern is intentional:
   `im_profile_from_simm` and cascade into its binding, stub, and tests. The
   other three margin pairs were collapsed.
 
-## Known Remaining Gap: paired conversions still owed
-
-These entry points return a bare JSON string under a name with **no** `_json`
-suffix in **both** Python and WASM. They are therefore consistent with each
-other but not with the contract. Converting either side alone would
-*manufacture* the cross-language divergence this contract exists to remove, so
-they must be done as paired changes:
-
-| Domain | Entry points |
-|--------|-------------|
-| attribution | `attribute_pnl_from_spec` |
-| features | `transform_panel` (the typed twin `transform_panel_spec` is already public in Rust) |
-
-The scenarios group is arguably fine as-is — those emit spec *documents* meant
-for re-ingest, so they are wire surfaces and only need `_json`/`Json` suffixes.
-The statements_analytics and factor_model groups are genuine computation
-results and want typed returns on both sides.
-
 ### Error & Module Structure
 - `error/mod.rs` in core: Uses subdirectory because error module has `inputs.rs` and `suggestions.rs` submodules (justified by size). Valuations uses flat `error.rs` as a re-export facade.
 - `prelude.rs` only in core/valuations: Other crates are too small to benefit from a prelude.

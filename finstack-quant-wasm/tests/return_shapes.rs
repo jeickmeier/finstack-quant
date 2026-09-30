@@ -163,6 +163,8 @@ fn json_suffixed_exports_return_strings() {
         ("ValuationsNamespace", "validateValuationResultJson"),
         ("ValuationsNamespace", "valuationResultToJson"),
         ("ValuationInstrumentsNamespace", "instrumentCashflowsJson"),
+        ("CalibrationNamespace", "dryRunJson"),
+        ("AttributionNamespace", "attributePnlEnvelopeJson"),
     ] {
         let ret = declared(&dts, owner, export);
         assert_eq!(
@@ -192,7 +194,10 @@ fn computation_results_are_structured_not_strings() {
         ("ValuationInstrumentsNamespace", "priceInstrument"),
         ("ValuationInstrumentsNamespace", "priceInstrumentWithMarket"),
         ("CalibrationNamespace", "calibrate"),
+        ("CalibrationNamespace", "dryRun"),
         ("AttributionNamespace", "attributePnl"),
+        ("AttributionNamespace", "attributePnlEnvelope"),
+        ("MarginNamespace", "calculateVm"),
         (
             "ValuationInstrumentsNamespace",
             "structuredCreditTrancheOas",
@@ -228,8 +233,7 @@ fn computation_results_are_structured_not_strings() {
 
 /// A method that returns a bare `string` must say what the string is: a
 /// `Json` document, `Text` prose, or `Html`. The allowlist names the few
-/// strings that are the value itself; the `ratchet` entries are defects that a
-/// later slice of the WASM-audit remediation removes, so the list only shrinks.
+/// strings that are the value itself.
 #[test]
 fn bare_string_returns_are_named_or_allowlisted() {
     const VALUE_STRINGS: &[(&str, &str)] = &[
@@ -250,10 +254,6 @@ fn bare_string_returns_are_named_or_allowlisted() {
         // Canonical formula text (re-parseable), the Python `parse_formula` twin.
         ("StatementsNamespace", "parseFormula"),
     ];
-    const RATCHET: &[(&str, &str)] = &[
-        // S14: becomes a typed report with a `dryRunJson` sibling.
-        ("CalibrationNamespace", "dryRun"),
-    ];
     let dts = index_dts();
     let offenders: Vec<String> = members(&dts)
         .into_iter()
@@ -261,7 +261,7 @@ fn bare_string_returns_are_named_or_allowlisted() {
         .filter(|m| !["Json", "Text", "Html"].iter().any(|s| m.name.ends_with(s)))
         .filter(|m| {
             let key = (m.owner.as_str(), m.name.as_str());
-            !VALUE_STRINGS.contains(&key) && !RATCHET.contains(&key)
+            !VALUE_STRINGS.contains(&key)
         })
         .map(|m| format!("{}.{}", m.owner, m.name))
         .collect();

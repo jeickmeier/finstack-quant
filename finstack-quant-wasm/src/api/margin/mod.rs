@@ -24,7 +24,6 @@ fn serialize_csa(csa: &finstack_quant_margin::CsaSpec) -> Result<String, JsValue
 #[wasm_bindgen(js_name = csaUsdRegulatoryJson)]
 pub fn csa_usd_regulatory_json() -> Result<String, JsValue> {
     let csa = finstack_quant_margin::CsaSpec::usd_regulatory().map_err(to_js_err)?;
-    csa.validate().map_err(to_js_err)?;
     serialize_csa(&csa)
 }
 
@@ -37,7 +36,6 @@ pub fn csa_usd_regulatory_json() -> Result<String, JsValue> {
 #[wasm_bindgen(js_name = csaEurRegulatoryJson)]
 pub fn csa_eur_regulatory_json() -> Result<String, JsValue> {
     let csa = finstack_quant_margin::CsaSpec::eur_regulatory().map_err(to_js_err)?;
-    csa.validate().map_err(to_js_err)?;
     serialize_csa(&csa)
 }
 
@@ -61,15 +59,17 @@ pub fn validate_csa_json(json: JsValue) -> Result<String, JsValue> {
 
 /// Calculate variation margin given exposure, posted collateral, and CSA JSON.
 ///
-/// Returns a JSON object with post_amount, collect_amount, net_exposure,
-/// and requires_call fields.
+/// Returns the Rust `VmResult` in its canonical serde form (the same wire
+/// Python `VmResult.to_json()` emits): `date`, `gross_exposure`,
+/// `net_exposure`, `post_amount`, `collect_amount` (each a Money object
+/// `{amount, currency}` with a decimal-string amount) and `settlement_date`.
 ///
 /// @param csa_json - CSA specification JSON governing thresholds, minimum transfer, and timing.
 /// @param exposure - Signed mark-to-market in the supplied currency: positive means the counterparty owes the desk.
 /// @param posted_collateral - Signed collateral balance: positive held, negative posted, including pending agreed calls.
 /// @param currency - ISO-4217 currency code shared by exposure and collateral amounts.
 /// @param as_of - ISO-8601 VM calculation date.
-/// @returns Variation-margin call amount, currency, and CSA metadata as a plain object.
+/// @returns The canonical `VmResult` as a plain object.
 ///
 /// # Errors
 ///
@@ -90,27 +90,14 @@ pub fn calculate_vm(
     let as_of: &str = &js_string(&as_of, "asOf")?;
     let csa: finstack_quant_margin::CsaSpec = serde_json::from_str(csa_json).map_err(to_js_err)?;
     let ccy: finstack_quant_core::currency::Currency = currency.parse().map_err(to_js_err)?;
-    let exp = finstack_quant_core::money::Money::new(exposure, ccy)
-        .map_err(|e| to_js_err(format!("invalid exposure: {e}")))?;
-    let posted = finstack_quant_core::money::Money::new(posted_collateral, ccy)
-        .map_err(|e| to_js_err(format!("invalid posted_collateral: {e}")))?;
+    let exp = finstack_quant_core::money::Money::new(exposure, ccy).map_err(to_js_err)?;
+    let posted =
+        finstack_quant_core::money::Money::new(posted_collateral, ccy).map_err(to_js_err)?;
     let as_of = parse_iso_date(as_of)?;
 
     let calc = finstack_quant_margin::VmCalculator::new(csa);
     let result = calc.calculate(exp, posted, as_of).map_err(to_js_err)?;
-
-    let out = serde_json::json!({
-        "currency": ccy.to_string(),
-        "settlement_date": result.settlement_date.to_string(),
-        "date": result.date.to_string(),
-        "gross_exposure": result.gross_exposure.amount(),
-        "net_exposure": result.net_exposure.amount(),
-        "post_amount": result.post_amount.amount(),
-        "collect_amount": result.collect_amount.amount(),
-        "net_margin": result.net_margin().amount(),
-        "requires_call": result.requires_call(),
-    });
-    to_js_value(&out)
+    to_js_value(&result)
 }
 
 /// Compute bilateral XVA: CVA, DVA, FVA, MVA, and the all-in adjustment.
@@ -123,8 +110,10 @@ pub fn calculate_vm(
 /// `total_xva = CVA - DVA + FVA + MVA`. Optional funding legs are absent from
 /// the payload when they were not computed.
 ///
-/// @param exposureProfileJson - `ExposureProfile` JSON with `times`,
-/// `mtm_values`, `epe`, and `ene` arrays of equal length.
+/// @param exposureProfileJson - Strict `ExposureProfile` JSON with `times`,
+/// `mtm_values`, `epe`, and `ene` arrays of equal length and an optional
+/// `diagnostics` object (`market_roll_failures`, `valuation_failures`,
+/// `total_time_points`); unknown fields are rejected.
 /// @param counterpartyHazardCurve - Hazard curve for the counterparty's credit.
 /// @param ownHazardCurve - Hazard curve for the institution's own credit.
 /// @param discountCurve - Risk-free discount curve for present-valuing.
@@ -134,7 +123,7 @@ pub fn calculate_vm(
 /// when it carries `im_profile`, MVA; unknown fields are rejected. Omit for
 /// credit legs only.
 /// @returns The `XvaResult` as a plain object.
-/// @throws Error - If JSON is malformed or has unknown funding fields, a recovery rate
+/// @throws Error - If JSON is malformed or has unknown profile or funding fields, a recovery rate
 /// is outside `[0, 1]`, a profile is invalid or has a mismatched IM horizon,
 /// or a curve evaluation is non-finite.
 ///

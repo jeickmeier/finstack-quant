@@ -42,7 +42,9 @@
 //! # Conventions
 //!
 //! - Keys are opaque; time order is lexicographic (use ISO-8601 for calendar
-//!   chronology, with one timezone and fixed precision).
+//!   chronology, with one timezone and fixed precision). Hosts that accept
+//!   native timestamps format them with [`datetime_order_key`] /
+//!   [`naive_datetime_order_key`].
 //! - `periods` (`returns`, `log_returns`, `diff`, `lag`) counts finite
 //!   observations (observation time): a `None` row never advances the lag, so
 //!   `v_t` is compared with the `periods`-th finite value before it. Missing
@@ -87,6 +89,7 @@
 
 mod cross_sectional;
 mod index;
+mod keys;
 mod multi;
 mod panel;
 mod timeseries;
@@ -95,6 +98,7 @@ mod types;
 pub use cross_sectional::{
     transform_cross_sectional, transform_cross_sectional_with_op, CrossSectionalOp,
 };
+pub use keys::{datetime_order_key, naive_datetime_order_key};
 pub use multi::{
     neutralize, neutralize_and_zscore, rank_to_weights, risk_scaled_weights,
     rolling_regression_residual, transform_cross_sectional_grouped,

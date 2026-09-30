@@ -137,7 +137,8 @@ class SolverConfig:
         Raises
         ------
         ValueError
-            If ``json`` is malformed or carries unknown fields.
+            If ``json`` is malformed, carries unknown fields, or has a non-positive
+            tolerance or zero ``max_iterations``.
 
         Examples
         --------
@@ -2253,9 +2254,14 @@ class CalibrationPlan:
         Raises
         ------
         ValueError
-            If attached sets disagree on quote IDs, an ID has conflicting
-            payloads, or ``settings`` is invalid. Missing referenced quote IDs
-            and duplicate step IDs are rejected when the envelope is validated.
+            If ``settings`` is invalid.
+        CalibrationEnvelopeError
+            If attached sets disagree on quote IDs (``kind ==
+            "quote_set_conflict"``) or an ID has conflicting payloads
+            (``kind == "conflicting_market_datum"``); the plan assembly is
+            Rust ``CalibrationEnvelope::from_attached_steps``. Missing
+            referenced quote IDs and duplicate step IDs are rejected when the
+            envelope is validated.
 
         """
 

@@ -119,7 +119,7 @@ fn hazard_preflight_rejects_entity_mismatch() {
     };
 
     let envelope = envelope_for_step(step, vec![quote], source_market);
-    let err = engine::execute(&envelope).expect_err("entity mismatch should fail");
+    let err = engine::calibrate(&envelope).expect_err("entity mismatch should fail");
     let msg = err.to_string();
     assert!(msg.contains("entity mismatch"), "unexpected error: {msg}");
 }
@@ -160,7 +160,7 @@ fn inflation_preflight_rejects_invalid_observation_lag() {
     };
 
     let envelope = envelope_for_step(step, vec![quote], source_market);
-    let err = engine::execute(&envelope).expect_err("invalid lag should fail");
+    let err = engine::calibrate(&envelope).expect_err("invalid lag should fail");
     let msg = err.to_string();
     assert!(
         msg.contains("Invalid observation_lag"),
@@ -228,7 +228,7 @@ fn swaption_vol_preflight_rejects_invalid_shift() {
     };
 
     let envelope = envelope_for_step(step, Vec::new(), source_market);
-    let err = engine::execute(&envelope).expect_err("invalid shift should fail");
+    let err = engine::calibrate(&envelope).expect_err("invalid shift should fail");
     let msg = err.to_string();
     assert!(msg.contains("Shifted lognormal"), "unexpected error: {msg}");
 }
@@ -299,7 +299,7 @@ fn base_correlation_preflight_rejects_invalid_attachment_detachment() {
     };
 
     let envelope = envelope_for_step(step, vec![tranche_quote], source_market);
-    let err = engine::execute(&envelope).expect_err("invalid tranche should fail");
+    let err = engine::calibrate(&envelope).expect_err("invalid tranche should fail");
     let msg = err.to_string();
     assert!(
         msg.contains("attachment must be less than detachment"),
@@ -349,7 +349,7 @@ fn base_correlation_preflight_requires_credit_index_data() {
     };
 
     let envelope = envelope_for_step(step, vec![tranche_quote], source_market);
-    let err = engine::execute(&envelope).expect_err("missing credit index should fail");
+    let err = engine::calibrate(&envelope).expect_err("missing credit index should fail");
     let msg = err.to_string();
     assert!(
         msg.to_ascii_lowercase().contains("credit index")
@@ -426,7 +426,7 @@ fn base_correlation_preflight_rejects_non_monotone_tranche_points() {
     };
 
     let envelope = envelope_for_step(step, vec![tranche_quote], source_market);
-    let err = engine::execute(&envelope).expect_err("invalid tranche attachment should fail");
+    let err = engine::calibrate(&envelope).expect_err("invalid tranche attachment should fail");
     let msg = err.to_string();
     assert!(
         msg.contains("attachment must be less than detachment"),
@@ -487,7 +487,7 @@ fn inflation_preflight_rejects_lag_mismatch_with_index() {
     };
 
     let envelope = envelope_for_step(step, vec![quote], source_market);
-    let err = engine::execute(&envelope).expect_err("lag mismatch should fail");
+    let err = engine::calibrate(&envelope).expect_err("lag mismatch should fail");
     let msg = err.to_string();
     assert!(msg.contains("lag mismatch"), "unexpected error: {msg}");
 }
@@ -514,7 +514,7 @@ fn forward_preflight_requires_quotes() {
     };
 
     let envelope = envelope_for_step(step, Vec::new(), source_market);
-    let err = engine::execute(&envelope).expect_err("missing forward quotes should fail");
+    let err = engine::calibrate(&envelope).expect_err("missing forward quotes should fail");
     let msg = err.to_string().to_ascii_lowercase();
     assert!(
         msg.contains("too few points") || msg.contains("at least two"),
@@ -547,7 +547,7 @@ fn vol_surface_requires_quotes_even_when_params_valid() {
     };
 
     let envelope = envelope_for_step(step, Vec::new(), source_market);
-    let err = engine::execute(&envelope).expect_err("missing vol quotes should fail");
+    let err = engine::calibrate(&envelope).expect_err("missing vol quotes should fail");
     let msg = err.to_string().to_ascii_lowercase();
     assert!(
         msg.contains("too few points") || msg.contains("at least two"),

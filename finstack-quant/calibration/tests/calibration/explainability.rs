@@ -99,7 +99,7 @@ fn explanation_not_computed_by_default() {
         prior_market: prior,
     };
 
-    let result = engine::execute(&envelope).expect("execute");
+    let result = engine::calibrate(&envelope).expect("execute");
     let step = result.result.step_reports.get("fwd").expect("step report");
 
     assert!(step.explanation.is_none());
@@ -153,7 +153,7 @@ fn explanation_is_present_when_enabled() {
         prior_market: prior,
     };
 
-    let result = engine::execute(&envelope).expect("execute");
+    let result = engine::calibrate(&envelope).expect("execute");
     let step = result.result.step_reports.get("fwd").expect("step report");
 
     assert!(step.success);

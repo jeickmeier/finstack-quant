@@ -175,7 +175,7 @@ pub fn execute_step(
         prior_market: prior,
     };
 
-    let result = engine::execute(&envelope)?;
+    let result = engine::calibrate(&envelope)?;
     let market = MarketContext::try_from(result.result.final_market)?;
     Ok((market, result.result.report))
 }

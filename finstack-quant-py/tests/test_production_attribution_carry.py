@@ -54,3 +54,38 @@ def test_convertible_credit_move_is_not_counted_as_rates(method: str | dict) -> 
     credit = float(payload["credit_curves_pnl"]["amount"])
     assert credit < 0.0
     assert abs(credit) > 5.0 * abs(float(payload["residual"]["amount"]))
+
+
+def test_attribute_pnl_envelope_is_the_typed_twin_of_the_json_wire() -> None:
+    import pickle
+
+    from finstack_quant.attribution import (
+        AttributionResultEnvelope,
+        attribute_pnl_envelope,
+        attribute_pnl_envelope_json,
+    )
+
+    fixture = json.loads(
+        (
+            Path(__file__).resolve().parents[2]
+            / "finstack-quant/attribution/tests/fixtures/production_convertible_credit.json"
+        ).read_text()
+    )
+    spec = json.dumps({
+        "schema": "finstack_quant.attribution/1",
+        "attribution": {
+            "instrument": fixture["instrument"]["instrument"],
+            "market_t0": fixture["market_t0"],
+            "market_t1": fixture["market_t1"],
+            "as_of_t0": fixture["as_of_t0"],
+            "as_of_t1": fixture["as_of_t1"],
+            "method": "metrics_based",
+        },
+    })
+    typed = attribute_pnl_envelope(spec)
+    assert isinstance(typed, AttributionResultEnvelope)
+    assert json.loads(typed.to_json()) == json.loads(attribute_pnl_envelope_json(spec))
+    assert json.loads(typed.attribution.to_json()) == json.loads(typed.to_json())["result"]["attribution"]
+    assert isinstance(typed.results_meta, dict)
+    restored = pickle.loads(pickle.dumps(typed))  # noqa: S301 - trusted in-process round trip
+    assert restored.to_json() == typed.to_json()

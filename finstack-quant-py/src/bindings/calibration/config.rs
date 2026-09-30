@@ -106,19 +106,12 @@ impl PySolverConfig {
     fn new(tolerance: Option<f64>, max_iterations: Option<usize>) -> PyResult<Self> {
         let mut inner = SolverConfig::default();
         if let Some(tolerance) = tolerance {
-            if !tolerance.is_finite() || tolerance <= 0.0 {
-                return Err(value_error(format!(
-                    "solver tolerance must be a positive finite number, got {tolerance}"
-                )));
-            }
             inner = inner.with_tolerance(tolerance);
         }
         if let Some(max_iterations) = max_iterations {
-            if max_iterations == 0 {
-                return Err(value_error("solver max_iterations must be at least 1"));
-            }
             inner = inner.with_max_iterations(max_iterations);
         }
+        inner.validate().map_err(core_to_py)?;
         Ok(Self::from_inner(inner))
     }
 
@@ -150,7 +143,8 @@ impl PySolverConfig {
     /// Raises
     /// ------
     /// ValueError
-    ///     If ``json`` is malformed or contains unknown solver fields.
+    ///     If ``json`` is malformed, contains unknown solver fields, or has a
+    ///     non-positive tolerance or zero ``max_iterations``.
     #[staticmethod]
     fn from_json(json: &str) -> PyResult<Self> {
         serde_json::from_str(json)

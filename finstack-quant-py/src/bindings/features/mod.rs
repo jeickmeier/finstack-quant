@@ -2,11 +2,14 @@
 //!
 //! Every transform takes row-aligned Python lists, releases the GIL for the
 //! Rust kernel, and returns a list of ``float | None`` aligned to the input.
-//! Key columns (``entity``, ``order``, ``time_key``, ``groups``) accept any
-//! sequence of strings, ints, dates, timestamps or other objects: each entry
-//! uses UTC and fixed nanosecond precision for aware datetimes; naive datetimes
-//! retain wall time. Other date-like objects use ``isoformat()``, else ``str()``.
-//! Mixed aware/naive datetime keys fail; opaque strings retain caller ordering.
+//! Key columns (``entity``, ``order``, ``time_key``, ``groups``) accept
+//! strings and date-like objects only. Datetimes and pandas timestamps are
+//! formatted by the Rust key policy (``datetime_order_key``: aware values
+//! normalize to UTC; naive values keep wall time; fixed nanosecond precision);
+//! dates use ``isoformat()``. Ints, floats, bools and other objects raise
+//! ``TypeError`` (as in WASM, where keys are strings); convert integer period
+//! keys to zero-padded strings. Mixed aware/naive datetime keys fail; opaque
+//! strings retain caller ordering.
 
 use crate::bindings::module_utils::{py_to_json_value, register_submodule, ParentNameSource};
 use crate::errors::core_to_py;
@@ -17,67 +20,81 @@ use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList, PyType};
 use serde_json::Value;
 
-/// Coerce one key-column sequence into strings.
+/// Convert one key-column sequence into strings.
 ///
-/// Strings pass through. Aware datetimes normalize to UTC; datetimes and
-/// pandas timestamps use fixed nanosecond precision. Dates use ``isoformat``;
-/// other keys use ``str()``. Aware and naive datetimes must not be mixed.
+/// Strings pass through. Datetimes and pandas timestamps go to the Rust key
+/// formatter; other date-like objects use ``isoformat``. Every other element
+/// type raises ``TypeError``. Aware and naive datetimes must not be mixed.
 fn extract_keys(obj: &Bound<'_, PyAny>, role: &str) -> PyResult<Vec<String>> {
     let mut keys = Vec::new();
-    let datetime = obj.py().import("datetime")?;
-    let datetime_type = datetime.getattr("datetime")?;
-    let utc = datetime.getattr("timezone")?.getattr("utc")?;
+    let datetime_type = obj.py().import("datetime")?.getattr("datetime")?;
     let mut aware_kind = None;
     for item in obj.try_iter().map_err(|_| {
         pyo3::exceptions::PyTypeError::new_err(format!(
-            "{role} must be a sequence of str, int, or date-like values"
+            "{role} must be a sequence of str or date-like values"
         ))
     })? {
         let item = item?;
         if let Ok(text) = item.extract::<String>() {
             keys.push(text);
         } else if item.is_instance(&datetime_type)? {
-            let aware = !item.call_method0("utcoffset")?.is_none();
+            let offset = item.call_method0("utcoffset")?;
+            let aware = !offset.is_none();
             if aware_kind.is_some_and(|previous| previous != aware) {
                 return Err(pyo3::exceptions::PyValueError::new_err(format!(
                     "{role} must not mix timezone-aware and naive datetimes"
                 )));
             }
             aware_kind = Some(aware);
-            let normalized = if aware {
-                item.call_method1("astimezone", (&utc,))?
+            let wall = wall_datetime(&item)?;
+            keys.push(if aware {
+                let seconds: i32 = offset
+                    .call_method0("total_seconds")?
+                    .call_method0("__int__")?
+                    .extract()?;
+                let offset = time::UtcOffset::from_whole_seconds(seconds)
+                    .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
+                finstack_quant_features::datetime_order_key(wall.assume_offset(offset))
             } else {
-                item.clone()
-            };
-            keys.push(datetime_key(&normalized, aware)?);
+                finstack_quant_features::naive_datetime_order_key(wall)
+            });
         } else if item.hasattr("isoformat")? {
             keys.push(item.call_method0("isoformat")?.extract()?);
         } else {
-            keys.push(item.str()?.to_string());
+            return Err(pyo3::exceptions::PyTypeError::new_err(format!(
+                "{role} entries must be str or date-like, got {}",
+                item.get_type()
+                    .name()
+                    .map_or_else(|_| "?".to_string(), |n| n.to_string())
+            )));
         }
     }
     Ok(keys)
 }
 
-/// Fixed nanosecond precision preserves both datetime and pandas Timestamp order.
-fn datetime_key(value: &Bound<'_, PyAny>, aware: bool) -> PyResult<String> {
-    let year: i32 = value.getattr("year")?.extract()?;
-    let month: u32 = value.getattr("month")?.extract()?;
-    let day: u32 = value.getattr("day")?.extract()?;
-    let hour: u32 = value.getattr("hour")?.extract()?;
-    let minute: u32 = value.getattr("minute")?.extract()?;
-    let second: u32 = value.getattr("second")?.extract()?;
+/// Wall-clock fields of a ``datetime`` / pandas ``Timestamp`` (with its
+/// ``nanosecond`` when present), without any timezone conversion.
+fn wall_datetime(value: &Bound<'_, PyAny>) -> PyResult<time::PrimitiveDateTime> {
+    let small = |name: &str| -> PyResult<u8> { value.getattr(name)?.extract() };
     let microsecond: u32 = value.getattr("microsecond")?.extract()?;
     let nanosecond: u32 = if value.hasattr("nanosecond")? {
         value.getattr("nanosecond")?.extract()?
     } else {
         0
     };
-    let fraction = microsecond * 1000 + nanosecond;
-    let suffix = if aware { "+00:00" } else { "" };
-    Ok(format!(
-        "{year:04}-{month:02}-{day:02}T{hour:02}:{minute:02}:{second:02}.{fraction:09}{suffix}"
-    ))
+    let invalid =
+        |e: time::error::ComponentRange| pyo3::exceptions::PyValueError::new_err(e.to_string());
+    let month = time::Month::try_from(small("month")?).map_err(invalid)?;
+    let year: i32 = value.getattr("year")?.extract()?;
+    let date = time::Date::from_calendar_date(year, month, small("day")?).map_err(invalid)?;
+    let clock = time::Time::from_hms_nano(
+        small("hour")?,
+        small("minute")?,
+        small("second")?,
+        microsecond * 1000 + nanosecond,
+    )
+    .map_err(invalid)?;
+    Ok(time::PrimitiveDateTime::new(date, clock))
 }
 
 fn parse_params(
@@ -256,9 +273,9 @@ fn extract_op_name<T: pyo3::PyClass + Clone>(
 ///     Row-aligned observations (levels for ``returns``/``drawdown``,
 ///     returns for EWMA and Sharpe ops).
 /// entity : sequence
-///     Row-aligned entity keys (str, int or date-like; aware datetimes normalize to UTC; strings stay opaque).
+///     Row-aligned entity keys (str or date-like; aware datetimes normalize to UTC; strings stay opaque).
 /// order : sequence
-///     Row-aligned sort keys within each entity (ISO strings, dates, ints).
+///     Row-aligned sort keys within each entity (ISO strings or dates; ints are rejected).
 /// op : str or TimeSeriesOp
 ///     Operation name, e.g. ``"returns"``, ``"rolling_mean"``, ``"ewma_vol"``.
 /// params : dict, optional
@@ -322,7 +339,7 @@ fn transform_timeseries(
 /// values : list[float | None]
 ///     Row-aligned observations; ``None`` / NaN are skipped.
 /// time_key : sequence
-///     Row-aligned partition keys (str, int or date-like; aware datetimes normalize to UTC; strings stay opaque).
+///     Row-aligned partition keys (str or date-like; aware datetimes normalize to UTC; strings stay opaque).
 /// op : str or CrossSectionalOp
 ///     Operation name, e.g. ``"zscore"``, ``"rank"``, ``"winsorize"``.
 /// params : dict, optional
@@ -1017,45 +1034,34 @@ impl PyPanelTransformResult {
 #[pyfunction]
 #[pyo3(text_signature = "(spec)")]
 fn transform_panel(py: Python<'_>, spec: &Bound<'_, PyAny>) -> PyResult<PyPanelTransformResult> {
-    let spec: PanelTransformSpec = if let Ok(typed) =
-        spec.extract::<PyRef<'_, PyPanelTransformSpec>>()
-    {
-        typed.inner.clone()
-    } else if let Ok(json) = spec.extract::<String>() {
-        serde_json::from_str(&json).map_err(|error| {
-            crate::errors::serde_json_to_py(error, "invalid panel transform spec")
-        })?
-    } else {
-        let mapping = spec.cast::<PyDict>()?;
-        for key in mapping.keys() {
-            let key: String = key.extract()?;
-            if !["values", "operations", "entity", "order", "time_key"].contains(&key.as_str()) {
-                return Err(pyo3::exceptions::PyValueError::new_err(format!(
-                    "unknown panel transform field '{key}'"
-                )));
+    let spec: PanelTransformSpec =
+        if let Ok(typed) = spec.extract::<PyRef<'_, PyPanelTransformSpec>>() {
+            typed.inner.clone()
+        } else if let Ok(json) = spec.extract::<String>() {
+            serde_json::from_str(&json).map_err(|error| {
+                crate::errors::serde_json_to_py(error, "invalid panel transform spec")
+            })?
+        } else {
+            // Host conversion only: numeric/NaN values, date-like keys and other
+            // fields become JSON; Rust serde owns the field set, the
+            // required fields and the unknown-field rejection.
+            let mapping = spec.cast::<PyDict>()?;
+            let mut fields = serde_json::Map::new();
+            for (key, value) in mapping.iter() {
+                let key: String = key.extract()?;
+                let json = match key.as_str() {
+                    _ if value.is_none() => Value::Null,
+                    // Non-finite numbers (NaN marks missing) become JSON null.
+                    "values" => Value::from(value.extract::<Vec<Option<f64>>>()?),
+                    "entity" | "order" | "time_key" => Value::from(extract_keys(&value, &key)?),
+                    _ => py_to_json_value(py, &value, "panel transform spec field")?,
+                };
+                fields.insert(key, json);
             }
-        }
-        let values = mapping.get_item("values")?.ok_or_else(|| {
-            pyo3::exceptions::PyValueError::new_err("panel transform values is required")
-        })?;
-        let operations = mapping.get_item("operations")?.ok_or_else(|| {
-            pyo3::exceptions::PyValueError::new_err("panel transform operations is required")
-        })?;
-        let entity = mapping.get_item("entity")?.filter(|value| !value.is_none());
-        let order = mapping.get_item("order")?.filter(|value| !value.is_none());
-        let time_key = mapping
-            .get_item("time_key")?
-            .filter(|value| !value.is_none());
-        PyPanelTransformSpec::new(
-            py,
-            values.extract()?,
-            &operations,
-            entity.as_ref(),
-            order.as_ref(),
-            time_key.as_ref(),
-        )?
-        .inner
-    };
+            serde_json::from_value(Value::Object(fields)).map_err(|error| {
+                crate::errors::serde_json_to_py(error, "invalid panel transform spec")
+            })?
+        };
     py.detach(move || finstack_quant_features::transform_panel(&spec))
         .map(|inner| PyPanelTransformResult { inner })
         .map_err(core_to_py)

@@ -387,6 +387,91 @@ impl CalibrationEnvelope {
         }
     }
 
+    /// Assemble an envelope from steps that carry their own quotes.
+    ///
+    /// Each step's attached quotes become the quote set named by the step's
+    /// `quote_set` (unless `quote_sets` already defines that name with the
+    /// same ids), and every distinct attached quote is appended once to
+    /// `market_data`, in first-seen order. Identical quotes attached by more
+    /// than one step are collected once. Steps without attached quotes keep
+    /// referencing `quote_sets` only. `prior_market` starts empty.
+    ///
+    /// # Arguments
+    ///
+    /// * `id` - Plan identifier recorded in `plan.id`.
+    /// * `description` - Optional human-readable plan description.
+    /// * `settings` - Global calibration settings for the plan.
+    /// * `quote_sets` - Explicitly named quote sets whose ids must resolve in
+    ///   the envelope `market_data`; they take precedence and are merged with
+    ///   the sets derived from attached quotes.
+    /// * `steps` - Calibration steps in execution order, each paired with the
+    ///   quotes attached to it (possibly empty).
+    ///
+    /// # Errors
+    ///
+    /// Returns [`super::errors::EnvelopeError::QuoteSetConflict`] when a
+    /// quote-set name is defined (explicitly or by an earlier step) with
+    /// different ids than a step attaches, and
+    /// [`super::errors::EnvelopeError::ConflictingMarketDatum`] when one quote
+    /// id is attached with two different payloads.
+    pub fn from_attached_steps(
+        id: String,
+        description: Option<String>,
+        settings: CalibrationConfig,
+        mut quote_sets: IndexMap<String, Vec<QuoteId>>,
+        steps: Vec<(CalibrationStep, Vec<MarketDatum>)>,
+    ) -> Result<Self, super::errors::EnvelopeError> {
+        use super::errors::EnvelopeError;
+        let mut market_data = Vec::new();
+        let mut payloads: IndexMap<String, serde_json::Value> = IndexMap::new();
+        let mut plan_steps = Vec::with_capacity(steps.len());
+        for (step, quotes) in steps {
+            if !quotes.is_empty() {
+                let ids: Vec<QuoteId> = quotes.iter().map(|q| QuoteId::new(q.id())).collect();
+                match quote_sets.get(&step.quote_set) {
+                    Some(existing) if existing != &ids => {
+                        return Err(EnvelopeError::QuoteSetConflict {
+                            quote_set: step.quote_set.clone(),
+                        });
+                    }
+                    Some(_) => {}
+                    None => {
+                        quote_sets.insert(step.quote_set.clone(), ids);
+                    }
+                }
+                for quote in quotes {
+                    let payload = serde_json::to_value(&quote).map_err(|error| {
+                        EnvelopeError::JsonSerialize {
+                            target: "MarketDatum".to_string(),
+                            message: error.to_string(),
+                        }
+                    })?;
+                    match payloads.get(quote.id()) {
+                        Some(existing) if existing != &payload => {
+                            return Err(EnvelopeError::ConflictingMarketDatum {
+                                id: quote.id().to_string(),
+                            });
+                        }
+                        Some(_) => {}
+                        None => {
+                            payloads.insert(quote.id().to_string(), payload);
+                            market_data.push(quote);
+                        }
+                    }
+                }
+            }
+            plan_steps.push(step);
+        }
+        let plan = CalibrationPlan {
+            id,
+            description,
+            quote_sets,
+            steps: plan_steps,
+            settings,
+        };
+        Ok(Self::new(plan, market_data, Vec::new()))
+    }
+
     /// Serialize this request envelope as canonical pretty-printed JSON.
     ///
     /// # Errors
@@ -468,6 +553,11 @@ pub struct CalibrationPlan {
     /// Global settings for the calibration process.
     #[serde(default)]
     pub settings: CalibrationConfig,
+}
+
+impl CalibrationPlan {
+    /// Plan identifier host builders use when the caller does not name one.
+    pub const DEFAULT_ID: &'static str = "plan";
 }
 
 /// A single step in the calibration process.

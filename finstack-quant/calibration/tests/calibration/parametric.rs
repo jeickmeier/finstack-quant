@@ -140,7 +140,7 @@ fn run_parametric_ns_with_config(
         prior_market: Vec::new(),
     };
 
-    let result = engine::execute(&envelope).expect("calibration engine must not error");
+    let result = engine::calibrate(&envelope).expect("calibration engine must not error");
     let report = result
         .result
         .step_reports

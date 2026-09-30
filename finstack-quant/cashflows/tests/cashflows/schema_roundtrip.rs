@@ -232,6 +232,31 @@ fn test_json_bridge_build_validate_flows_and_accrual() {
 }
 
 #[test]
+fn test_dated_flows_validates_the_schedule_like_its_json_twin() {
+    let spec_json = fixed_schedule_build_spec().to_string();
+    let schedule_json = finstack_quant_cashflows::build_cashflow_schedule_json(&spec_json, None)
+        .expect("schedule should build from JSON");
+    let schedule: finstack_quant_cashflows::builder::CashFlowSchedule =
+        serde_json::from_str(&schedule_json).expect("schedule JSON should deserialize");
+    let typed = finstack_quant_cashflows::dated_flows(&schedule).expect("valid schedule");
+    assert_eq!(typed.len(), schedule.get_flows().len());
+
+    // Moving the issue date after the first coupon makes the schedule invalid;
+    // the typed and JSON entry points must both reject it.
+    let mut bad: serde_json::Value = serde_json::from_str(&schedule_json).expect("value");
+    bad["meta"]["issue_date"] = json!("2025-12-01");
+    let bad_json = bad.to_string();
+    let bad_schedule: finstack_quant_cashflows::builder::CashFlowSchedule =
+        serde_json::from_str(&bad_json).expect("serde accepts the shape");
+    let typed_error = finstack_quant_cashflows::dated_flows(&bad_schedule)
+        .expect_err("typed dated_flows must validate");
+    let json_error = finstack_quant_cashflows::dated_flows_json(&bad_json)
+        .expect_err("dated_flows_json must validate");
+    assert_eq!(typed_error.to_string(), json_error.to_string());
+    assert!(typed_error.to_string().contains("before issue date"));
+}
+
+#[test]
 fn test_json_bridge_validates_pre_issue_principal_and_fee_flows() {
     // Delayed-funding structures legitimately carry principal-type flows and
     // fees dated before the issue date; the validator must accept them while

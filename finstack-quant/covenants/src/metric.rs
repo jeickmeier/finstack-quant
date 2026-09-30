@@ -99,6 +99,40 @@ impl HashMapMetricSource {
         }
     }
 
+    /// Parse a JSON object mapping metric ids to numeric values.
+    ///
+    /// This is the one metric-map parser shared by
+    /// [`evaluate_engine`](crate::evaluate_engine) and host bindings that
+    /// accept a JSON metric map.
+    ///
+    /// # Arguments
+    ///
+    /// * `json` - UTF-8 JSON object whose keys are metric identifiers (for
+    ///   example `debt_to_ebitda`) and whose values are JSON numbers in the
+    ///   units required by the covenant tests that read them.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`finstack_quant_core::Error::Validation`] when `json` is not
+    /// a JSON object (`Invalid metric map JSON: ...`) or a value is not a JSON
+    /// number (`Metric '<id>' must be a finite JSON number`).
+    pub fn from_json(json: &str) -> finstack_quant_core::Result<Self> {
+        let map: serde_json::Map<String, serde_json::Value> =
+            serde_json::from_str(json).map_err(|e| {
+                finstack_quant_core::Error::Validation(format!("Invalid metric map JSON: {e}"))
+            })?;
+        let pairs = map
+            .into_iter()
+            .map(|(key, value)| match value.as_f64() {
+                Some(number) => Ok((key, number)),
+                None => Err(finstack_quant_core::Error::Validation(format!(
+                    "Metric '{key}' must be a finite JSON number"
+                ))),
+            })
+            .collect::<finstack_quant_core::Result<Vec<_>>>()?;
+        Ok(Self::from_pairs(pairs))
+    }
+
     /// Insert or replace a metric value.
     pub fn insert(&mut self, metric: impl Into<CovenantMetricId>, value: f64) -> Option<f64> {
         self.metrics.insert(metric.into(), value)
@@ -114,5 +148,34 @@ impl CovenantMetricSource for HashMapMetricSource {
                 id: format!("metric:{}", metric.as_str()),
             })
             .map_err(Into::into)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn from_json_reads_numeric_metric_map() {
+        let source = HashMapMetricSource::from_json(r#"{"debt_to_ebitda": 3.5, "dscr": 2}"#)
+            .expect("numeric map parses");
+        let leverage = source
+            .get_metric(&CovenantMetricId::from("debt_to_ebitda"))
+            .expect("metric present");
+        assert_eq!(leverage, 3.5);
+    }
+
+    #[test]
+    fn from_json_rejects_non_numbers_and_non_objects() {
+        let error = HashMapMetricSource::from_json(r#"{"debt_to_ebitda": true}"#)
+            .expect_err("bool metric must be rejected");
+        assert_eq!(
+            error.to_string(),
+            "Validation error: Metric 'debt_to_ebitda' must be a finite JSON number"
+        );
+        let error = HashMapMetricSource::from_json("[1,2]").expect_err("array must be rejected");
+        assert!(error
+            .to_string()
+            .starts_with("Validation error: Invalid metric map JSON:"));
     }
 }

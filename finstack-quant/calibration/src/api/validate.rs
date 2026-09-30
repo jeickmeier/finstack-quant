@@ -11,8 +11,11 @@
 //! step would surface as a [`EnvelopeError::MissingDependency`] rather than a
 //! cycle.
 //!
-//! [`dry_run`] is a JSON-string wrapper for cross-binding consumption
-//! (Python / WASM). The dependency graph is included in that report.
+//! [`dry_run`] parses a JSON envelope and returns the typed report;
+//! [`dry_run_json`] is its JSON-string wire twin for cross-binding
+//! consumption (Python / WASM). [`parse_envelope`] and [`validate_fail_fast`]
+//! are the shared strict-load and fail-fast policies every host entry point
+//! uses.
 
 // `EnvelopeError` is intentionally large (carries available-IDs lists, etc.)
 // because the cross-binding consumers want all the diagnostic context in
@@ -35,6 +38,8 @@ use finstack_quant_core::contract::{
 
 /// Result of [`validate`]. Always contains the dependency graph; `errors` is
 /// empty when the envelope is structurally valid.
+#[cfg_attr(feature = "ts_export", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts_export", ts(export))]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CalibrationValidationReport {
     /// All errors found in a single pass; empty if the envelope is valid.
@@ -44,6 +49,8 @@ pub struct CalibrationValidationReport {
 }
 
 /// Static dependency graph derived from a [`CalibrationEnvelope`].
+#[cfg_attr(feature = "ts_export", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts_export", ts(export))]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DependencyGraph {
     /// Curve / surface IDs available at the start of execution, contributed
@@ -54,6 +61,8 @@ pub struct DependencyGraph {
 }
 
 /// A single step's view of the dependency graph.
+#[cfg_attr(feature = "ts_export", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts_export", ts(export))]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DependencyNode {
     /// Zero-based index in `plan.steps`.
@@ -73,7 +82,7 @@ pub struct DependencyNode {
 ///
 /// Always returns a [`CalibrationValidationReport`]; inspect `errors` to see what failed.
 /// The validator is solver-free — runs in microseconds, suitable as a
-/// pre-flight check before invoking [`engine::execute`](super::engine::execute).
+/// pre-flight check before invoking [`engine::calibrate`](super::engine::calibrate).
 ///
 /// # Arguments
 ///
@@ -127,9 +136,11 @@ fn contract_diagnostic(error: &EnvelopeError) -> Diagnostic {
         EnvelopeError::QuoteDataInvalid { .. } | EnvelopeError::DuplicateMarketDatumId { .. } => {
             "/market_data".to_string()
         }
-        EnvelopeError::QuoteIdNotInMarketData { quote_set, .. } => {
+        EnvelopeError::QuoteIdNotInMarketData { quote_set, .. }
+        | EnvelopeError::QuoteSetConflict { quote_set } => {
             format!("/plan/quote_sets/{}", escape_json_pointer(quote_set))
         }
+        EnvelopeError::ConflictingMarketDatum { .. } => "/market_data".to_string(),
         EnvelopeError::JsonSerialize { .. }
         | EnvelopeError::StrictLoad { .. }
         | EnvelopeError::SolverNotConverged { .. } => "/".to_string(),
@@ -148,20 +159,61 @@ fn escape_json_pointer(segment: &str) -> String {
     segment.replace('~', "~0").replace('/', "~1")
 }
 
-/// Wrap [`validate`] to take a JSON string.
+/// Return the first static validation error of `envelope`, if any.
 ///
-/// Returns the report serialized as pretty-printed JSON. Returns an
-/// [`EnvelopeError::StrictLoad`] if strict contract ingestion rejects the
-/// envelope.
+/// This is the fail-fast policy shared by [`validate_calibration_json`],
+/// [`engine::calibrate`](super::engine::calibrate) and host bindings;
+/// [`validate`] reports every error instead.
+///
+/// # Arguments
+///
+/// * `envelope` - Typed calibration envelope to check with the same static,
+///   solver-free rules as [`validate`].
+///
+/// # Errors
+///
+/// Returns the first [`EnvelopeError`] of [`validate`]'s report (duplicate
+/// step ids, undefined or unresolved quote sets, duplicate or invalid market
+/// data, missing dependencies).
+pub fn validate_fail_fast(envelope: &CalibrationEnvelope) -> Result<(), EnvelopeError> {
+    match validate(envelope).errors.into_iter().next() {
+        Some(error) => Err(error),
+        None => Ok(()),
+    }
+}
+
+/// Parse a JSON envelope and run [`validate`] without invoking a solver.
 ///
 /// # Arguments
 ///
 /// * `envelope_json` - UTF-8 JSON calibration-envelope document to parse and
 ///   run through static, solver-free validation.
-pub fn dry_run(envelope_json: &str) -> Result<String, EnvelopeError> {
-    let envelope = parse_envelope(envelope_json)?;
-    let report = validate(&envelope);
-    serialize_pretty_json(&report, "CalibrationValidationReport")
+///
+/// # Errors
+///
+/// Returns [`EnvelopeError::StrictLoad`] if strict contract ingestion
+/// rejects the envelope. Static findings are returned in the report, never
+/// as an error.
+pub fn dry_run(envelope_json: &str) -> Result<CalibrationValidationReport, EnvelopeError> {
+    Ok(validate(&parse_envelope(envelope_json)?))
+}
+
+/// JSON-string wire twin of [`dry_run`].
+///
+/// Returns the report serialized as pretty-printed JSON.
+///
+/// # Arguments
+///
+/// * `envelope_json` - UTF-8 JSON calibration-envelope document to parse and
+///   run through static, solver-free validation.
+///
+/// # Errors
+///
+/// Returns [`EnvelopeError::StrictLoad`] if strict contract ingestion
+/// rejects the envelope, or [`EnvelopeError::JsonSerialize`] if the report
+/// cannot be serialized.
+pub fn dry_run_json(envelope_json: &str) -> Result<String, EnvelopeError> {
+    dry_run(envelope_json)?.to_json_pretty()
 }
 
 /// Validate a calibration envelope JSON string and return its canonical form.
@@ -170,18 +222,23 @@ pub fn dry_run(envelope_json: &str) -> Result<String, EnvelopeError> {
 /// centralizes the parse and pretty-serialization path so Python and WASM do
 /// not each reimplement the same validation logic.
 ///
-/// Static validation is fail-fast: the first envelope error is returned.
-/// [`dry_run`] lists every static error without solving.
+/// Static validation is fail-fast ([`validate_fail_fast`]): the first
+/// envelope error is returned. [`dry_run`] lists every static error without
+/// solving.
 ///
 /// # Arguments
 ///
 /// * `envelope_json` - UTF-8 JSON calibration-envelope document to parse,
 ///   statically validate, and reserialize in canonical pretty JSON form.
+///
+/// # Errors
+///
+/// Returns [`EnvelopeError::StrictLoad`] if strict loading rejects the
+/// document, the first static validation error, or
+/// [`EnvelopeError::JsonSerialize`] if the envelope cannot be serialized.
 pub fn validate_calibration_json(envelope_json: &str) -> Result<String, EnvelopeError> {
     let envelope = parse_envelope(envelope_json)?;
-    if let Some(error) = validate(&envelope).errors.into_iter().next() {
-        return Err(error);
-    }
+    validate_fail_fast(&envelope)?;
     serialize_pretty_json(&envelope, "CalibrationEnvelope")
 }
 
@@ -206,13 +263,22 @@ pub(crate) fn serialize_pretty_json<T: Serialize>(
     })
 }
 
-/// Parse a JSON envelope, enforcing its calibration schema marker.
+/// Strictly parse a JSON envelope, enforcing its calibration schema marker.
+///
+/// Uses [`LoadLimits::default`] and the calibration contract; this is the one
+/// strict-load path every host entry point shares.
 ///
 /// # Arguments
 ///
 /// * `json` - UTF-8 JSON calibration-envelope document in the canonical v1
 ///   flat-market shape.
-pub(crate) fn parse_envelope(json: &str) -> Result<CalibrationEnvelope, EnvelopeError> {
+///
+/// # Errors
+///
+/// Returns [`EnvelopeError::StrictLoad`] (carrying structured diagnostics)
+/// for malformed JSON, a missing, malformed or unsupported schema marker,
+/// unknown fields, resource limits, or an invalid v1 envelope structure.
+pub fn parse_envelope(json: &str) -> Result<CalibrationEnvelope, EnvelopeError> {
     parse_envelope_with_report(json).map(|(envelope, _report)| envelope)
 }
 
@@ -541,7 +607,7 @@ mod tests {
         assert!(matches!(error, EnvelopeError::UndefinedQuoteSet { .. }));
 
         let duplicate = duplicate_price_envelope();
-        let error = crate::api::engine::execute(&duplicate)
+        let error = crate::api::engine::calibrate(&duplicate)
             .expect_err("execute path must not bypass envelope validation");
         assert!(matches!(
             error,
@@ -585,9 +651,121 @@ mod tests {
     fn dry_run_returns_pretty_json() {
         let env = empty_envelope("smoke");
         let json = serde_json::to_string(&env).expect("serialize");
-        let report_json = dry_run(&json).expect("dry_run");
+        let report_json = dry_run_json(&json).expect("dry_run_json");
         assert!(report_json.contains("\"errors\""));
         assert!(report_json.contains("\"dependency_graph\""));
+        let report = dry_run(&json).expect("dry_run");
+        assert!(report.errors.is_empty());
+        assert_eq!(
+            report.to_json_pretty().expect("pretty report"),
+            report_json,
+            "the JSON twin must serialize the typed report"
+        );
+    }
+
+    fn deposit(id: &str, rate: f64) -> MarketDatum {
+        MarketDatum::RateQuote(RateQuote::Deposit {
+            id: QuoteId::new(id),
+            index: IndexId::new("USD-SOFR-1M"),
+            pillar: Pillar::Tenor("1M".parse().expect("tenor")),
+            rate,
+        })
+    }
+
+    #[test]
+    fn from_attached_steps_derives_quote_sets_and_dedups_market_data() {
+        let shared = deposit("USD-DEP-1M", 0.05);
+        let envelope = CalibrationEnvelope::from_attached_steps(
+            "attached".to_string(),
+            None,
+            Default::default(),
+            Default::default(),
+            vec![
+                (discount_step("a", "set", "USD-OIS"), vec![shared.clone()]),
+                (discount_step("b", "set", "USD-OIS-2"), vec![shared]),
+                (discount_step("c", "other", "USD-OIS-3"), Vec::new()),
+            ],
+        )
+        .expect("identical attached quotes are collected once");
+        assert_eq!(envelope.plan.id, "attached");
+        assert_eq!(envelope.plan.steps.len(), 3);
+        assert_eq!(
+            envelope.plan.quote_sets.get("set"),
+            Some(&vec![QuoteId::new("USD-DEP-1M")])
+        );
+        assert!(!envelope.plan.quote_sets.contains_key("other"));
+        assert_eq!(envelope.market_data.len(), 1);
+        assert!(envelope.prior_market.is_empty());
+    }
+
+    #[test]
+    fn from_attached_steps_rejects_quote_set_conflict() {
+        let error = CalibrationEnvelope::from_attached_steps(
+            "p".to_string(),
+            None,
+            Default::default(),
+            Default::default(),
+            vec![
+                (
+                    discount_step("a", "set", "USD-OIS"),
+                    vec![deposit("Q1", 0.05)],
+                ),
+                (
+                    discount_step("b", "set", "USD-OIS-2"),
+                    vec![deposit("Q2", 0.05)],
+                ),
+            ],
+        )
+        .expect_err("same set name with different ids must conflict");
+        assert_eq!(
+            error,
+            EnvelopeError::QuoteSetConflict {
+                quote_set: "set".to_string()
+            }
+        );
+        assert_eq!(error.kind_str(), "quote_set_conflict");
+    }
+
+    #[test]
+    fn from_attached_steps_rejects_conflicting_payloads() {
+        let error = CalibrationEnvelope::from_attached_steps(
+            "p".to_string(),
+            None,
+            Default::default(),
+            Default::default(),
+            vec![
+                (
+                    discount_step("a", "set_a", "USD-OIS"),
+                    vec![deposit("Q1", 0.05)],
+                ),
+                (
+                    discount_step("b", "set_b", "USD-OIS-2"),
+                    vec![deposit("Q1", 0.06)],
+                ),
+            ],
+        )
+        .expect_err("one id with two payloads must conflict");
+        assert_eq!(
+            error,
+            EnvelopeError::ConflictingMarketDatum {
+                id: "Q1".to_string()
+            }
+        );
+        assert!(error.to_string().contains("conflicting attached payloads"));
+    }
+
+    #[test]
+    fn validate_fail_fast_returns_first_static_error() {
+        let mut env = empty_envelope("fail-fast");
+        env.plan
+            .steps
+            .push(discount_step("a", "missing_a", "USD-OIS"));
+        env.plan
+            .steps
+            .push(discount_step("b", "missing_b", "EUR-OIS"));
+        let first = validate(&env).errors.into_iter().next().expect("errors");
+        assert_eq!(validate_fail_fast(&env), Err(first));
+        assert_eq!(validate_fail_fast(&empty_envelope("ok")), Ok(()));
     }
 
     #[test]
@@ -751,7 +929,7 @@ mod tests {
             }));
 
         let json = serde_json::to_string(&env).expect("serialize");
-        let report_json = dry_run(&json).expect("dry_run");
+        let report_json = dry_run_json(&json).expect("dry_run_json");
         assert!(report_json.contains("\"kind\": \"quote_data_invalid\""));
         assert!(report_json.contains("\"quote_id\": \"CDS-ACME-5Y\""));
     }
@@ -817,7 +995,7 @@ mod tests {
     fn calibration_result_strict_loader_enforces_current_missing_zero_future_and_malformed_schema()
     {
         // schema-rejection-test
-        let envelope = crate::api::engine::execute(&empty_envelope("result"))
+        let envelope = crate::api::engine::calibrate(&empty_envelope("result"))
             .expect("empty calibration executes");
         let base = serde_json::to_value(envelope).expect("result serializes");
         let cases = [
@@ -899,7 +1077,7 @@ mod tests {
 
     #[test]
     fn calibration_result_strict_loader_validates_nested_final_market() {
-        let envelope = crate::api::engine::execute(&empty_envelope("result-market"))
+        let envelope = crate::api::engine::calibrate(&empty_envelope("result-market"))
             .expect("empty calibration executes");
         let base = serde_json::to_value(envelope).expect("result serializes");
 
@@ -967,7 +1145,7 @@ mod tests {
 
     #[test]
     fn calibration_result_nested_market_depth_is_bounded() {
-        let envelope = crate::api::engine::execute(&empty_envelope("result-depth"))
+        let envelope = crate::api::engine::calibrate(&empty_envelope("result-depth"))
             .expect("empty calibration executes");
         let mut value = serde_json::to_value(envelope).expect("result serializes");
         value["result"]["final_market"]["hierarchy"] = nested_json(20);

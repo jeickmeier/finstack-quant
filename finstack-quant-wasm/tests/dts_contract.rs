@@ -486,6 +486,7 @@ fn calibration_dts_owns_calibration_surface() {
         "calibrate(",
         "validateCalibrationJson(",
         "dryRun(",
+        "dryRunJson(",
         "calibrateBermudanLmmBaseVol(",
     ] {
         assert!(
@@ -1353,9 +1354,11 @@ fn attribution_dts_matches_json_pipeline_surface() {
 
     assert!(dts.contains("export interface AttributionNamespace"));
     assert!(dts.contains("export interface PnlAttribution"));
-    assert!(dts.contains("attributePnl(params: AttributionParams): PnlAttribution;"));
-    assert!(dts.contains("attributePnlJson(params: AttributionParams): string;"));
-    assert!(dts.contains("AttributionParams: new ("));
+    assert!(dts.contains("attributePnl(params: AttributionJsonInputs): PnlAttribution;"));
+    assert!(dts.contains("attributePnlJson(params: AttributionJsonInputs): string;"));
+    assert!(dts.contains("AttributionJsonInputs: new ("));
+    assert!(dts.contains("attributePnlEnvelope(specJson: JsonInput): AttributionResultEnvelope;"));
+    assert!(dts.contains("export interface AttributionResultEnvelope"));
     assert!(dts.contains("attributePnlEnvelopeJson(specJson: JsonInput): string;"));
     assert!(dts.contains("validateAttributionJson(json: JsonInput): string;"));
     assert!(dts.contains("defaultWaterfallOrder(): string[];"));

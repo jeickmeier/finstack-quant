@@ -1586,7 +1586,7 @@ export default [
   {
     "path": "#/$defs/d_354032bddbd823c2e3f2",
     "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/SolverConfig",
-    "description": "Serializable convergence settings for calibration.\n\nCalibration owns its bracket search. This configuration contains only the\ntolerance and iteration budget consumed by its numerical solvers.\n\n# Examples\n\n```\nuse finstack_quant_calibration::SolverConfig;\n# fn main() -> Result<(), Box<dyn std::error::Error>> {\nlet config = SolverConfig::default().with_tolerance(1e-12).with_max_iterations(200);\nlet json = serde_json::to_string(&config)?;\n# let _ = json;\n# Ok(())\n# }\n```"
+    "description": "Serializable convergence settings for calibration.\n\nCalibration owns its bracket search. This configuration contains only the\ntolerance and iteration budget consumed by its numerical solvers.\n\nDeserialization runs [`SolverConfig::validate`], so a wire document with a\nnon-positive tolerance or a zero iteration budget is rejected at parse time.\n\n# Examples\n\n```\nuse finstack_quant_calibration::SolverConfig;\n# fn main() -> Result<(), Box<dyn std::error::Error>> {\nlet config = SolverConfig::default().with_tolerance(1e-12).with_max_iterations(200);\nlet json = serde_json::to_string(&config)?;\n# let _ = json;\n# Ok(())\n# }\n```"
   },
   {
     "path": "#/$defs/d_354032bddbd823c2e3f2/properties/max_iterations",

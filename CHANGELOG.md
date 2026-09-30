@@ -2,6 +2,32 @@
 
 ## [Unreleased]
 
+### WASM binding audit: calibration, attribution, cashflows, covenants, margin and features (2026-09-30)
+
+#### Changed (BREAKING)
+
+- Rust renames:
+  - calibration `api::engine::execute` → `calibrate`, and `execute_json` → `calibrate_from_json`
+  - covenants `evaluate_engine_map` → `evaluate_engine`
+  - calibration `validate::dry_run` now returns the typed `CalibrationValidationReport`; the JSON form is `dry_run_json`
+- WASM:
+  - `dryRun` returns the report as an object; the JSON text is `dryRunJson`.
+  - `AttributionParams` is renamed `AttributionJsonInputs`.
+  - `calculateVm` returns the canonical `VmResult` (Money objects with decimal-string amounts); the hand-built `currency`, `net_margin` and `requires_call` fields are gone.
+- Solver settings are validated when parsed: a zero, negative or NaN `tolerance`, or `max_iterations = 0`, is rejected by every calibration entry point in both hosts.
+- `CsaSpec::regulatory_inner` validates the spec. `ExposureProfile` and `ExposureDiagnostics` reject unknown fields.
+- Python:
+  - Quote-set and payload conflicts in `CalibrationPlan(...)` raise `CalibrationEnvelopeError` (kinds `quote_set_conflict`, `conflicting_market_datum`) through the new Rust `CalibrationEnvelope::from_attached_steps`.
+  - Feature key columns accept strings and dates only (int, float and bool keys raise `TypeError`), ordered by the new Rust `datetime_order_key`.
+  - `transform_panel(dict)` goes through the Rust serde contract, so errors are serde text (`unknown field`, `missing field`).
+  - `dated_flows` validates the schedule via the new Rust `cashflows::dated_flows`.
+- `cdr_to_mdr` / `mdr_to_cdr` errors name the rate they reject.
+
+#### Added
+
+- `attributePnlEnvelope` (WASM) and `attribute_pnl_envelope` / `AttributionResultEnvelope` (Python) return the attribution envelope as a typed value.
+- Rust: `validate::parse_envelope` (public), `validate::validate_fail_fast`, `CalibrationPlan::DEFAULT_ID`, `SolverConfig::validate`, `HashMapMetricSource::from_json`, `cashflows::dated_flows`, and `features::{datetime_order_key, naive_datetime_order_key}`.
+
 ### WASM binding audit: models credit, factor, correlation and liquidity (2026-09-29)
 
 #### Changed (BREAKING)

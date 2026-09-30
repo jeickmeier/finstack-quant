@@ -100,13 +100,19 @@ fn evaluate_engine<'py>(
     as_of: &Bound<'py, PyAny>,
 ) -> PyResult<Bound<'py, PyDict>> {
     let as_of = crate::bindings::date_utils::extract_date_iso(as_of)?;
-    let metrics: serde_json::Map<String, serde_json::Value> = engine::extract_metrics(metrics)?
-        .into_iter()
-        .map(|(key, value)| (key, serde_json::Value::from(value)))
-        .collect();
-    let metrics_json = serde_json::to_string(&metrics).map_err(crate::errors::display_to_py)?;
+    let metrics_json = match metrics.extract::<String>() {
+        Ok(text) => text,
+        Err(_) => {
+            let metrics: serde_json::Map<String, serde_json::Value> =
+                engine::extract_metric_dict(metrics)?
+                    .into_iter()
+                    .map(|(key, value)| (key, serde_json::Value::from(value)))
+                    .collect();
+            serde_json::to_string(&metrics).map_err(crate::errors::display_to_py)?
+        }
+    };
     let reports = py.detach(|| {
-        finstack_quant_covenants::evaluate_engine_map(engine_json, &metrics_json, &as_of)
+        finstack_quant_covenants::evaluate_engine(engine_json, &metrics_json, &as_of)
             .map_err(crate::errors::core_to_py)
     })?;
     engine::reports_to_pydict(py, reports)

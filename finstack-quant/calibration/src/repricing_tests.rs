@@ -52,7 +52,7 @@ const CDS_TOLERANCE_DOLLARS: f64 = 5.0;
 const INFLATION_TOLERANCE_DOLLARS: f64 = 5.0;
 
 fn run_plan(envelope: &CalibrationEnvelope) -> MarketContext {
-    let out = engine::execute(envelope).expect("calibration should succeed");
+    let out = engine::calibrate(envelope).expect("calibration should succeed");
     MarketContext::try_from(out.result.final_market).expect("restore context")
 }
 
@@ -547,7 +547,7 @@ fn forward_curve_future_global_solve_reprices_compounded_settlement_quote() {
         convexity_adjustment: 0.0,
     };
     let envelope = forward_only_envelope(base_date, quote.clone(), "USD-SOFR-3M", 0.25);
-    let output = engine::execute(&envelope).expect("future forward calibration");
+    let output = engine::calibrate(&envelope).expect("future forward calibration");
     let report = output
         .result
         .step_reports
@@ -615,7 +615,7 @@ fn forward_curve_swap_global_solve_reprices_df_implied_periods() {
         spread_decimal: None,
     };
     let envelope = forward_only_envelope(base_date, quote.clone(), "USD-LIBOR-3M", 0.25);
-    let output = engine::execute(&envelope).expect("swap forward calibration");
+    let output = engine::calibrate(&envelope).expect("swap forward calibration");
     let report = output
         .result
         .step_reports
@@ -902,7 +902,7 @@ fn hazard_curve_step_report_matches_market_built_cds_repricing() {
         prior_market: Vec::new(),
     };
 
-    let out = engine::execute(&envelope).expect("calibration should succeed");
+    let out = engine::calibrate(&envelope).expect("calibration should succeed");
     let ctx = MarketContext::try_from(out.result.final_market).expect("restore context");
     let haz_report = out
         .result

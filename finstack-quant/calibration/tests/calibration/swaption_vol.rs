@@ -203,7 +203,7 @@ fn swaption_vol_step_builds_and_inserts_surface() {
         prior_market: prior,
     };
 
-    let result = engine::execute(&envelope).expect("execute");
+    let result = engine::calibrate(&envelope).expect("execute");
     assert!(result.result.report.success);
     let step = result.result.step_reports.get("swpt").expect("step report");
     assert!(step.success);
@@ -287,7 +287,7 @@ fn calibrated_swaption_surface_is_not_silently_reused_as_strike_surface() {
         prior_market: prior,
     };
 
-    let result = engine::execute(&envelope).expect("execute");
+    let result = engine::calibrate(&envelope).expect("execute");
     let ctx = MarketContext::try_from(result.result.final_market).expect("restore context");
 
     let expiry = Date::from_calendar_date(2026, Month::January, 1).unwrap();
@@ -373,7 +373,7 @@ fn swaption_vol_out_of_bounds_targets_error_by_default() {
         prior_market: prior,
     };
 
-    let err = engine::execute(&envelope).expect_err("out-of-bounds targets should error");
+    let err = engine::calibrate(&envelope).expect_err("out-of-bounds targets should error");
     let msg = err.to_string();
     assert!(msg.contains("out of bounds"));
     assert!(msg.contains("sabr_extrapolation"));
@@ -430,7 +430,7 @@ fn swaption_vol_out_of_bounds_targets_can_clamp_when_configured() {
         prior_market: prior,
     };
 
-    let result = engine::execute(&envelope).expect("execute");
+    let result = engine::calibrate(&envelope).expect("execute");
     let step = result.result.step_reports.get("swpt").expect("step report");
     assert!(step.success);
     assert_eq!(
@@ -513,7 +513,7 @@ fn swaption_vol_settlement_lag_uses_canonical_tenor_axis() {
                 }),
             }],
         };
-        engine::execute(&CalibrationEnvelope {
+        engine::calibrate(&CalibrationEnvelope {
             schema_url: None,
             schema: finstack_quant_calibration::api::schema::CalibrationSchema::CURRENT,
             plan,

@@ -196,7 +196,8 @@ def dated_flows(schedule: CashFlowSchedule | str) -> list[tuple[datetime.date, M
     Raises
     ------
     ValueError
-        If ``schedule`` is a malformed JSON string.
+        If ``schedule`` is a malformed JSON string or the schedule fails
+        validation (e.g. an interest-bearing flow dated before the issue date).
     TypeError
         If ``schedule`` is neither a ``CashFlowSchedule`` nor a string.
 
@@ -412,7 +413,7 @@ def dated_flows_json(schedule_json: str) -> str:
     Raises
     ------
     ValueError
-        If ``schedule_json`` is invalid.
+        If ``schedule_json`` is invalid or the schedule fails validation.
 
     Examples
     --------

@@ -31,7 +31,7 @@ export function createService(native: {
   };
   calibration: Pick<
     typeof calibration,
-    "calibrate" | "dryRun" | "validateCalibrationJson"
+    "calibrate" | "dryRunJson" | "validateCalibrationJson"
   >;
   statements: Pick<
     typeof statements,
@@ -221,7 +221,7 @@ export function createService(native: {
       );
     },
     dryRun(json) {
-      return result(() => native.calibration.dryRun(json));
+      return result(() => native.calibration.dryRunJson(json));
     },
     calibrate(json) {
       return result(() => native.calibration.calibrate(json));

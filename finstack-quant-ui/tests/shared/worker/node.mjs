@@ -85,7 +85,7 @@ const service = createService({
   },
   calibration: {
     calibrate: wasm.calibrate,
-    dryRun: wasm.dryRun,
+    dryRunJson: wasm.dryRunJson,
     validateCalibrationJson: wasm.validateCalibrationJson,
   },
   statements: wasm,

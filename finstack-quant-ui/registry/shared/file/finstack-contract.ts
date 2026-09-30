@@ -119,6 +119,7 @@ export interface WorkerApi {
     request: StatementChecksRequest,
   ): Promise<Envelope<CheckReport>>;
   renderStatementChecks(reportJson: string): Promise<Envelope<string>>;
+  /** Static diagnostics as the exact `CalibrationValidationReport` wire JSON (native `dryRunJson`). */
   dryRun(envelopeJson: string): Promise<Envelope<string>>;
   calibrate(envelopeJson: string): Promise<Envelope<CalibrationResultEnvelope>>;
   sampleCube(request: CubeSampleRequest): Promise<Envelope<number[]>>;
