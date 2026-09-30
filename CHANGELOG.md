@@ -2,6 +2,30 @@
 
 ## [Unreleased]
 
+### WASM binding audit: model kernels (2026-09-30)
+
+#### Changed (BREAKING)
+
+- Forward-measure kernels are checked Rust functions in `models::closed_form`: `black76_price`, `black76_greeks`, `bachelier_price` (unit annuity), `bachelier_greeks`, `black_shifted_price`, `black_shifted_vega` and `heston_price`. Both bindings are one call; call/put dispatch and discounting are no longer done in the bindings.
+  - `black76_price` rejects `df <= 0`; it used to return a negative premium.
+  - Negative vol or expiry, a non-positive Black-76 forward or strike, and non-positive shifted coordinates are errors in both hosts; they used to return intrinsic value or 0.
+  - The Greeks return `ForwardGreeks { delta, gamma, vega }`. In Python, `g["delta"]` becomes `g.delta`.
+- Rust renames:
+  - The dispatchers `barrier_call_str` / `barrier_put_str` / `asian_option_price_str` / `lookback_option_price_str` → `barrier_call` / `barrier_put` / `asian_option_price` / `lookback_option_price`, with arguments ordered `(spot, strike, [barrier,] rate, div_yield, vol, expiry, …)`.
+  - `bs_implied_vol` / `black76_implied_vol` take `price` before `option_type`.
+  - `volatility::normal::bachelier_price` → `bachelier_price_with_annuity`.
+- SABR:
+  - `SabrSmile::implied_vol(strike)` is new.
+  - `validate_no_arbitrage` / `check_no_arbitrage` / `repair_arbitrage` drop the unused `q`.
+  - `ArbitrageValidationResult` carries `arbitrage_free`.
+  - The host method `arbitrage_diagnostics(strikes, r=0, q=0)` / `arbitrageDiagnostics` is `validate_no_arbitrage(strikes, r)` / `validateNoArbitrage(strikes, r)`.
+  - `SabrShift` parses from `"auto"` via `FromStr`; `withShift(true)` throws `invalid_type` and Python `with_shift(True)` raises `ValueError`.
+- WASM:
+  - `priceHestonCall` / `priceHestonPut` return `MoneyEstimate` (`mean` and `ci_95` are money values), and `numPaths` and `seed` are optional with Rust defaults.
+  - `nelsonSiegelYields(lambda, factors, tenors)` takes the three factors as an array.
+  - `deltaToStrike` / `strikeToDelta` name their volatility parameter `vol`.
+- `DEFAULT_THETA_DAYS_PER_YEAR` lives in `models::closed_form` and is re-exported by valuations. `DEFAULT_ASIAN_AVERAGING` and `DEFAULT_LOOKBACK_STRIKE_TYPE` are the Rust defaults both hosts use.
+
 ### WASM binding audit: calibration, attribution, cashflows, covenants, margin and features (2026-09-30)
 
 #### Changed (BREAKING)

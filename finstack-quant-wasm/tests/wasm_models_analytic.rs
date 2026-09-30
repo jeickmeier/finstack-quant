@@ -44,7 +44,13 @@ fn black76_and_bachelier_prices_are_positive() {
         black_shifted_price(-0.005, -0.005, 0.25, 1.0, 0.03, JsValue::from(true)).expect("price")
             > 0.0
     );
-    assert!(black_shifted_vega_js(-0.005, -0.005, 0.25, 1.0, 0.03).expect("vega") > 0.0);
+    assert!(black_shifted_vega(-0.005, -0.005, 0.25, 1.0, 0.03).expect("vega") > 0.0);
+}
+
+#[wasm_bindgen_test]
+fn black76_price_rejects_non_positive_df() {
+    assert!(black76_price(100.0, 100.0, -0.95, 1.0, 0.2, JsValue::from(true)).is_err());
+    assert!(black76_price(100.0, 100.0, 0.0, 1.0, 0.2, JsValue::from(true)).is_err());
 }
 
 #[wasm_bindgen_test]

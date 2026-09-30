@@ -1875,33 +1875,26 @@ export interface FxDeltaVolSurfaceConstructor {
 }
 
 /**
- * Monte Carlo pricer result (JSON object from Rust).
+ * Monte Carlo estimate of a money-valued price: the canonical serde form of the
+ * Rust `MoneyEstimate` (identical to Python `MoneyEstimate.to_json()`).
+ *
+ * Optional statistics are `null` (not absent) when they were not captured.
+ * The relative standard error is `stderr / |mean.amount|`; it is not part of
+ * the payload.
  */
-export interface MonteCarloEstimateJson {
+export interface MoneyEstimate {
   /**
-   * Discounted mean estimate in `currency` units.
+   * Discounted mean estimate as an exact decimal-string money value.
    */
-  mean: number;
+  mean: MoneyValue;
   /**
-   * ISO-4217 currency code of the estimate.
-   */
-  currency: string;
-  /**
-   * Standard error of the mean estimate, in the same units as `mean`.
+   * Standard error of the mean estimate, in the currency units of `mean`.
    */
   stderr: number;
   /**
-   * Sample standard deviation (absent when not computed).
+   * 95% confidence interval `[lower, upper]` around `mean`, as money values.
    */
-  std_dev?: number;
-  /**
-   * Lower bound of the reported confidence interval, in the same units as `mean`.
-   */
-  ci_lower: number;
-  /**
-   * Upper bound of the reported confidence interval, in the same units as `mean`.
-   */
-  ci_upper: number;
+  ci_95: [MoneyValue, MoneyValue];
   /**
    * Number of independent path estimators; equals `num_simulated_paths` without variance reduction, half of it with antithetic pairing.
    */
@@ -1911,29 +1904,29 @@ export interface MonteCarloEstimateJson {
    */
   num_simulated_paths: number;
   /**
-   * Median of captured discounted path values (absent when paths are not captured).
+   * Sample standard deviation, or `null` when not computed.
    */
-  median?: number;
+  std_dev: number | null;
   /**
-   * 25th percentile of captured discounted path values (absent when paths are not captured).
+   * Median of captured discounted path values, or `null` when paths are not captured.
    */
-  percentile_25?: number;
+  median: number | null;
   /**
-   * 75th percentile of captured discounted path values (absent when paths are not captured).
+   * 25th percentile of captured discounted path values, or `null` when paths are not captured.
    */
-  percentile_75?: number;
+  percentile_25: number | null;
   /**
-   * Minimum of captured discounted path values (absent when paths are not captured).
+   * 75th percentile of captured discounted path values, or `null` when paths are not captured.
    */
-  min?: number;
+  percentile_75: number | null;
   /**
-   * Maximum of captured discounted path values (absent when paths are not captured).
+   * Minimum of captured discounted path values, or `null` when paths are not captured.
    */
-  max?: number;
+  min: number | null;
   /**
-   * Relative standard error (`stderr / |mean|`); `Infinity` near zero mean.
+   * Maximum of captured discounted path values, or `null` when paths are not captured.
    */
-  relative_stderr: number;
+  max: number | null;
 }
 
 /**
@@ -4836,13 +4829,17 @@ export interface CorrelationNamespace {
  * const est = models.monteCarlo.priceHestonCall(
  *   100, 100, 0.05, 0.0, 2.0, 0.04, 0.3, -0.7, 0.04, 1.0, 5000, 42n,
  * );
- * console.log(est.mean);
+ * console.log(est.mean.amount, est.mean.currency);
+ * // Path count and seed default to the Rust registry values.
+ * const byDefault = models.monteCarlo.priceHestonCall(
+ *   100, 100, 0.05, 0.0, 2.0, 0.04, 0.3, -0.7, 0.04, 1.0,
+ * );
+ * console.log(byDefault.num_paths); // 100000
  * ```
  */
 export interface MonteCarloNamespace {
   /**
    * Price a European call under Heston stochastic volatility.
-   * @returns Discounted Monte Carlo estimate with standard error and optional path statistics.
    * @param spot - Current spot price or exchange rate in the same units as the strike.
    * @param strike - Option strike price in the same price units as the underlying.
    * @param rate - Interest rate expressed as a decimal, such as 0.05 for 5%.
@@ -4853,10 +4850,11 @@ export interface MonteCarloNamespace {
    * @param rho - Instantaneous correlation between the asset and variance shocks.
    * @param v0 - Initial instantaneous variance in the Heston stochastic-volatility model.
    * @param expiry - Time to option expiry in years on the model's annual time basis.
-   * @param numPaths - Number of simulated stochastic paths; larger values improve sampling precision.
-   * @param seed - Deterministic random-number seed used to reproduce simulation output.
+   * @param numPaths - Number of simulated stochastic paths; omitted or `null` uses the Rust registry European-pricer default (100 000).
+   * @param seed - Deterministic random-number seed (number or BigInt); omitted or `null` uses the Rust registry default seed, so results stay reproducible.
    * @param numSteps - Number of time steps per simulated path.
    * @param currency - ISO-4217 currency code for the monetary amount or market convention.
+   * @returns The Rust `MoneyEstimate` serde object: `mean` and `ci_95` as `{amount, currency}` money, plus `stderr`, `num_paths`, `num_simulated_paths` and the optional statistics (`null` when not captured).
    * @throws Error - Throws a JavaScript exception if `currency` is unknown; embedded defaults cannot be loaded when `num_steps` is omitted; `rate` or `div_yield` is non-finite; `kappa`, `theta`, `vol_of_vol`, or `v0` is non-finite or non-positive; `rho` is outside `[-1, 1]`; the expiry, step count, path count, or computed discount factor fails validation; a simulated discounted payoff is non-finite; or the result cannot be serialized.
    */
   priceHestonCall(
@@ -4870,14 +4868,13 @@ export interface MonteCarloNamespace {
     rho: number,
     v0: number,
     expiry: number,
-    numPaths: number,
-    seed: bigint,
-    numSteps?: number,
-    currency?: string
-  ): MonteCarloEstimateJson;
+    numPaths?: number | null,
+    seed?: bigint | number | null,
+    numSteps?: number | null,
+    currency?: string | null
+  ): MoneyEstimate;
   /**
    * Price a European put under Heston stochastic volatility.
-   * @returns Discounted Monte Carlo estimate with standard error and optional path statistics.
    * @param spot - Current spot price or exchange rate in the same units as the strike.
    * @param strike - Option strike price in the same price units as the underlying.
    * @param rate - Interest rate expressed as a decimal, such as 0.05 for 5%.
@@ -4888,10 +4885,11 @@ export interface MonteCarloNamespace {
    * @param rho - Instantaneous correlation between the asset and variance shocks.
    * @param v0 - Initial instantaneous variance in the Heston stochastic-volatility model.
    * @param expiry - Time to option expiry in years on the model's annual time basis.
-   * @param numPaths - Number of simulated stochastic paths; larger values improve sampling precision.
-   * @param seed - Deterministic random-number seed used to reproduce simulation output.
+   * @param numPaths - Number of simulated stochastic paths; omitted or `null` uses the Rust registry European-pricer default (100 000).
+   * @param seed - Deterministic random-number seed (number or BigInt); omitted or `null` uses the Rust registry default seed, so results stay reproducible.
    * @param numSteps - Number of time steps per simulated path.
    * @param currency - ISO-4217 currency code for the monetary amount or market convention.
+   * @returns The Rust `MoneyEstimate` serde object: `mean` and `ci_95` as `{amount, currency}` money, plus `stderr`, `num_paths`, `num_simulated_paths` and the optional statistics (`null` when not captured).
    * @throws Error - Throws a JavaScript exception if `currency` is unknown; embedded defaults cannot be loaded when `num_steps` is omitted; `rate` or `div_yield` is non-finite; `kappa`, `theta`, `vol_of_vol`, or `v0` is non-finite or non-positive; `rho` is outside `[-1, 1]`; the expiry, step count, path count, or computed discount factor fails validation; a simulated discounted payoff is non-finite; or the result cannot be serialized.
    */
   priceHestonPut(
@@ -4905,11 +4903,11 @@ export interface MonteCarloNamespace {
     rho: number,
     v0: number,
     expiry: number,
-    numPaths: number,
-    seed: bigint,
-    numSteps?: number,
-    currency?: string
-  ): MonteCarloEstimateJson;
+    numPaths?: number | null,
+    seed?: bigint | number | null,
+    numSteps?: number | null,
+    currency?: string | null
+  ): MoneyEstimate;
 }
 
 /**
@@ -5648,7 +5646,7 @@ export interface EnhancedMonteCarloResult {
    * bounds and the path counts; negative when draws at the fixed margin are
    * worth less than at the path's fair spread.
    */
-  draw_option_cost: Record<string, unknown>;
+  draw_option_cost: MoneyEstimate;
 }
 
 /**
@@ -6771,8 +6769,8 @@ export interface SabrParametersConstructor {
  */
 export interface SabrModel extends WasmOwned {
   /**
-   * Black implied volatility for the given strike.
-   * @returns Hagan-2002 Black implied volatility as a decimal.
+   * Implied volatility for the given strike: normal (Bachelier) vol in absolute rate units when beta < 1e-4, Black decimal vol otherwise.
+   * @returns Hagan-2002 implied volatility: normal vol in absolute rate units when beta < 1e-4, Black decimal volatility otherwise.
    * @param forward - Forward price or rate in the same quote convention as the strike.
    * @param strike - Option strike price in the same price units as the underlying.
    * @param t - Time from the curve base date in years.
@@ -6815,11 +6813,12 @@ export interface SabrModelConstructor {
 }
 
 /**
- * Butterfly and monotonicity diagnostics for a SABR smile.
+ * Static-arbitrage check of a SABR smile: the serde form of the Rust
+ * `ArbitrageValidationResult` returned by `SabrSmile.validateNoArbitrage`.
  */
-export interface SabrSmileArbitrageResult {
+export interface ArbitrageValidationResult {
   /**
-   * Whether the smile has no butterfly or calendar-spread monotonicity violations on the tested strikes.
+   * Whether the smile has no butterfly or call-price monotonicity violations on the tested strikes (set by Rust).
    */
   arbitrage_free: boolean;
   /**
@@ -6849,37 +6848,36 @@ export interface SabrSmileArbitrageResult {
 export interface SabrSmile extends WasmOwned {
   /**
    * At-the-money implied volatility.
-   * @returns ATM Black implied volatility as a decimal for this smile's `(forward, t)`.
+   * @returns ATM implied volatility for this smile's `(forward, t)`: normal vol in absolute rate units when beta < 1e-4, Black decimal vol otherwise.
    * @throws Error - Throws a JavaScript exception if the smile's expiry or effective forward is outside the model domain, or the ATM calculation produces an invalid volatility.
    */
   atmVol(): number;
   /**
-   * Black implied volatility for the given strike.
-   * @returns Black implied volatility as a decimal at `strike`.
+   * Implied volatility at `strike`: normal (Bachelier) vol in absolute rate units when beta < 1e-4, Black decimal vol otherwise.
    * @param strike - Option strike price in the same price units as the underlying.
-   * @throws Error - Throws a JavaScript exception if the smile's expiry, forward, or requested `strike` is outside the model domain, the Hagan expansion fails, or no volatility is returned for the strike.
+   * @returns Normal (Bachelier) vol in absolute rate units when beta < 1e-4, Black decimal vol otherwise.
+   * @throws Error - Throws a JavaScript exception if the smile's expiry, forward, or requested `strike` is outside the model domain or the Hagan expansion fails.
    */
   impliedVol(strike: number): number;
   /**
    * Implied volatilities for a strike grid.
-   * @returns One Black implied vol per strike, in the same order as `strikes`.
+   * @returns One implied vol per strike, in the same order as `strikes` (normal vol when beta < 1e-4, Black decimal vol otherwise).
    * @param strikes - Option strikes at which to evaluate the SABR volatility smile.
    * @throws Error - Throws a JavaScript exception if the smile's expiry or forward, or any supplied strike, is outside the model domain, or the Hagan expansion produces an invalid volatility.
    */
   generateSmile(strikes: number[]): Float64Array;
   /**
-   * Butterfly + monotonicity arbitrage diagnostics.
+   * Butterfly + strike-monotonicity static-arbitrage check of the smile.
    *
-   * Returns a JSON object with `arbitrage_free`, `butterfly_violations`,
-   * and `monotonicity_violations` arrays (snake_case keys matching the Rust
-   * canonical fields and the Python binding).
-   * @returns Butterfly and monotonicity diagnostics for the supplied strike grid.
-   * @param strikes - Ordered option strikes used to test the calibrated smile for static arbitrage.
-   * @param r - Continuously compounded risk-free rate, expressed as a decimal.
-   * @param q - Continuous dividend yield or foreign rate, expressed as a decimal.
-   * @throws Error - Throws a JavaScript exception if volatility generation fails for the stored smile and supplied strikes, or the diagnostics cannot be converted to a JavaScript value.
+   * Returns the Rust `ArbitrageValidationResult` serde object (`arbitrage_free`,
+   * `butterfly_violations`, `monotonicity_violations`), the same shape Python
+   * `SabrSmile.validate_no_arbitrage` returns.
+   * @returns The Rust `ArbitrageValidationResult` for the supplied strike grid.
+   * @param strikes - Ascending option strikes used to test the smile for static arbitrage.
+   * @param r - Continuously compounded risk-free rate (decimal) that discounts the forward-based Black call prices compared against the 1e-6 tolerance.
+   * @throws Error - Throws a JavaScript exception if volatility generation fails for the stored smile and supplied strikes, or the result cannot be converted to a JavaScript value.
    */
-  arbitrageDiagnostics(strikes: number[], r?: number, q?: number): SabrSmileArbitrageResult;
+  validateNoArbitrage(strikes: NumericArray, r: number): ArbitrageValidationResult;
 }
 
 /**
@@ -6915,9 +6913,9 @@ export interface SabrSmileConstructor {
  */
 export interface SabrCalibrator extends WasmOwned {
   /**
-   * Return a copy of this calibrator with an overridden convergence
-   * tolerance, preserving all other settings (e.g. the iteration cap from
-   * `highPrecision`).
+   * Return a copy of this calibrator with an overridden maximum relative
+   * quote error (also used as the solver residual tolerance), preserving all
+   * other settings (e.g. the iteration cap from `highPrecision`).
    * @returns A `SabrCalibrator` handle.
    * @param tolerance - Positive finite maximum relative error of any final volatility quote; 1e-4 permits 0.01% of each quote. Invalid settings or a fit outside this budget throw during calibration.
    */
@@ -6951,7 +6949,7 @@ export interface SabrCalibrator extends WasmOwned {
    * preserving all other settings.
    * @returns A `SabrCalibrator` handle.
    * @param shift - `null`/`undefined` fits the quotes as-is; a number is a fixed additive shift in the forward's units (decimal rate or price); `"auto"` picks the smallest standardized shift (1-4%) that leaves 10bp of headroom above the most negative forward or strike, or none when every input is non-negative. The shift used is stored on the fitted `SabrParameters`.
-   * @throws Error - Throws a JavaScript exception if `shift` is neither `null`, a number, nor the string `"auto"`.
+   * @throws Error - Throws a `FinstackError` (`kind: "validation"`) for a string other than `"auto"` (parsed by the Rust `SabrShift`), and a `TypeError` (`kind: "invalid_type"`) for any other non-null, non-number value such as a boolean.
    */
   withShift(shift: number | 'auto' | null | undefined): SabrCalibrator;
   /**
@@ -7662,7 +7660,7 @@ export interface CompositeNamespace {
  * import init, { models } from "finstack-quant-wasm";
  * await init();
  * const yields = models.rates.dtsm.nelsonSiegelYields(
- *   0.7308, 0.03, -0.01, 0.005, [1, 5, 10]
+ *   0.7308, [0.03, -0.01, 0.005], [1, 5, 10]
  * );
  * ```
  */
@@ -7675,24 +7673,16 @@ export interface DtsmNamespace {
    * import init, { models } from "finstack-quant-wasm";
    * await init();
    * const yields = models.rates.dtsm.nelsonSiegelYields(
-   *   0.7308, 0.03, -0.01, 0.005, [1, 5, 10]
+   *   0.7308, [0.03, -0.01, 0.005], [1, 5, 10]
    * );
    * ```
    * @param lambda - Exponential decay parameter for tenors in years; must be finite and greater than zero (0.7308 is the years-equivalent of Diebold-Li's 0.0609 months value).
-   * @param level - Nelson-Siegel beta1, the long-run level factor in decimal yield units such as 0.06 for 6%.
-   * @param slope - Nelson-Siegel beta2, the slope factor (negative of the short-minus-long spread) in decimal yield units.
-   * @param curvature - Nelson-Siegel beta3, the hump-shaped curvature factor in decimal yield units.
+   * @param factors - Nelson-Siegel `[level, slope, curvature]` (beta1, beta2, beta3) in decimal yield units such as `[0.06, -0.02, 0.01]`; exactly three numbers.
    * @param tenors - Maturities in years, each finite and non-negative; output order matches this array.
    * @returns One decimal yield per tenor, in the same order as `tenors`.
-   * @throws Error - Throws a JavaScript exception if `lambda` is non-finite or non-positive, any factor loading is non-finite, or any tenor is non-finite or negative.
+   * @throws Error - Throws a `TypeError` (`kind: "invalid_type"`) if `factors` or `tenors` is not an array of numbers, and a `FinstackError` (`kind: "validation"`) if `factors` does not hold exactly three entries, `lambda` is non-finite or non-positive, any factor loading is non-finite, or any tenor is non-finite or negative.
    */
-  nelsonSiegelYields(
-    lambda: number,
-    level: number,
-    slope: number,
-    curvature: number,
-    tenors: NumericArray
-  ): Float64Array;
+  nelsonSiegelYields(lambda: number, factors: NumericArray, tenors: NumericArray): Float64Array;
 }
 
 /**
@@ -7703,7 +7693,7 @@ export interface DtsmNamespace {
  * import init, { models } from "finstack-quant-wasm";
  * await init();
  * const yields = models.rates.dtsm.nelsonSiegelYields(
- *   0.7308, 0.03, -0.01, 0.005, [1, 5, 10]
+ *   0.7308, [0.03, -0.01, 0.005], [1, 5, 10]
  * );
  * ```
  */
@@ -7816,20 +7806,20 @@ export interface VolatilityNamespace {
    * @throws Never; invalid inputs propagate IEEE non-finite results.
    * @param delta - Forward call delta as a decimal probability in `(0, 1)`.
    * @param forward - Positive forward in the same units as the returned strike.
-   * @param volatility - Positive annualized Black volatility as a decimal.
+   * @param vol - Positive annualized Black volatility as a decimal.
    * @param expiry - Positive option expiry in years.
    */
-  deltaToStrike(delta: number, forward: number, volatility: number, expiry: number): number;
+  deltaToStrike(delta: number, forward: number, vol: number, expiry: number): number;
   /**
    * Convert strike to premium-unadjusted forward call delta.
    * @returns Forward call delta as a decimal probability.
    * @throws Never; invalid inputs propagate IEEE non-finite results.
    * @param strike - Positive strike in the same units as `forward`.
    * @param forward - Positive forward in the same units as `strike`.
-   * @param volatility - Positive annualized Black volatility as a decimal.
+   * @param vol - Positive annualized Black volatility as a decimal.
    * @param expiry - Positive option expiry in years.
    */
-  strikeToDelta(strike: number, forward: number, volatility: number, expiry: number): number;
+  strikeToDelta(strike: number, forward: number, vol: number, expiry: number): number;
   /**
    * Convert an ATM volatility quote between normal, lognormal and shifted-lognormal conventions.
    * @returns Volatility in the target convention (decimal Black vol, or absolute normal vol).
@@ -8230,15 +8220,17 @@ export interface ModelsNamespace {
   /**
    * Black-76 per-unit price of a European option on a forward: `df * Black(F, K, vol, expiry)`.
    *
-   * Black (1976): see docs/REFERENCES.md#black-1976.
+   * The Rust `closed_form::black76_price` owns the call/put dispatch, the
+   * discounting and the input validation (`df` must be positive, as for
+   * `black76ImpliedVol`). Black (1976): see docs/REFERENCES.md#black-1976.
    * @returns Discounted per-unit option price in the units of `forward`.
    * @param forward - Forward price or rate at expiry.
    * @param strike - Strike in the same units as `forward`.
-   * @param df - Discount factor from valuation to expiry (positive decimal).
-   * @param expiry - Time to expiry in years.
-   * @param vol - Annualized lognormal (Black) volatility, decimal.
+   * @param df - Discount factor from valuation to expiry; a finite decimal strictly greater than zero (the same domain `black76ImpliedVol` accepts).
+   * @param expiry - Time to expiry in years; non-negative.
+   * @param vol - Annualized lognormal (Black) volatility, decimal; non-negative.
    * @param isCall - Whether to value a call (`true`) or put (`false`).
-   * @throws Error - Throws a JavaScript exception if the inputs produce a non-finite price.
+   * @throws Error - Throws a `FinstackError` (`kind: "validation"`) if an input is non-finite, `forward`, `strike` or `df` is not positive, `vol` or `expiry` is negative, or the price is non-finite.
    */
   black76Price(
     forward: number,
@@ -8253,13 +8245,13 @@ export interface ModelsNamespace {
    *
    * `delta` / `gamma` are with respect to the forward; `vega` is per unit (1.0) change in `vol`.
    * Black (1976): see docs/REFERENCES.md#black-1976.
-   * @returns Object `{ delta, gamma, vega }`.
    * @param forward - Forward price or rate at expiry.
    * @param strike - Strike in the same units as `forward`.
-   * @param expiry - Time to expiry in years.
-   * @param vol - Annualized lognormal (Black) volatility, decimal.
+   * @param expiry - Time to expiry in years; non-negative.
+   * @param vol - Annualized lognormal (Black) volatility, decimal; non-negative.
    * @param isCall - Whether to value a call (`true`) or put (`false`).
-   * @throws Error - Throws a JavaScript exception if any Greek is non-finite.
+   * @returns The Rust `ForwardGreeks` object `{ delta, gamma, vega }`.
+   * @throws Error - Throws a `FinstackError` (`kind: "validation"`) if an input is non-finite, `forward` or `strike` is not positive, `vol` or `expiry` is negative, or a Greek is non-finite.
    */
   black76Greeks(
     forward: number,
@@ -8276,9 +8268,9 @@ export interface ModelsNamespace {
    * @param forward - Forward price or rate at expiry (may be negative).
    * @param strike - Strike in the same units as `forward`.
    * @param normalVol - Annualized **absolute** (normal) volatility in the units of `forward` (e.g. `0.0075` for 75 bp on decimal rates).
-   * @param expiry - Time to expiry in years.
+   * @param expiry - Time to expiry in years; non-negative.
    * @param isCall - Whether to value a call (`true`) or put (`false`).
-   * @throws Error - Throws a JavaScript exception if the inputs produce a non-finite price.
+   * @throws Error - Throws a `FinstackError` (`kind: "validation"`) if an input is non-finite, `normalVol` or `expiry` is negative, or the price is non-finite.
    */
   bachelierPrice(
     forward: number,
@@ -8292,13 +8284,13 @@ export interface ModelsNamespace {
    *
    * `vega` is per unit (1.0) change in `normalVol` (absolute units).
    * Bachelier (1900): see docs/REFERENCES.md#bachelier-1900.
-   * @returns Object `{ delta, gamma, vega }`.
    * @param forward - Forward price or rate at expiry (may be negative).
    * @param strike - Strike in the same units as `forward`.
-   * @param normalVol - Annualized absolute (normal) volatility in the units of `forward`.
-   * @param expiry - Time to expiry in years.
+   * @param normalVol - Annualized absolute (normal) volatility in the units of `forward`; non-negative.
+   * @param expiry - Time to expiry in years; non-negative.
    * @param isCall - Whether to value a call (`true`) or put (`false`).
-   * @throws Error - Throws a JavaScript exception if any Greek is non-finite.
+   * @returns The Rust `ForwardGreeks` object `{ delta, gamma, vega }`.
+   * @throws Error - Throws a `FinstackError` (`kind: "validation"`) if an input is non-finite, `normalVol` or `expiry` is negative, or a Greek is non-finite.
    */
   bachelierGreeks(
     forward: number,
@@ -8318,7 +8310,7 @@ export interface ModelsNamespace {
    * @param expiry - Time to expiry in years.
    * @param shift - Displacement added to forward and strike, in rate units (e.g. `0.03` for a 3% shift); both shifted values must be positive.
    * @param isCall - Whether to value a call (`true`) or put (`false`).
-   * @throws Error - Throws a JavaScript exception if the inputs produce a non-finite price.
+   * @throws Error - Throws a `FinstackError` (`kind: "validation"`) if an input is non-finite, `forward + shift` or `strike + shift` is not positive, `vol` or `expiry` is negative, or the price is non-finite.
    */
   blackShiftedPrice(
     forward: number,
@@ -8335,8 +8327,8 @@ export interface ModelsNamespace {
    * @param strike - Strike (decimal, same units as `forward`).
    * @param vol - Annualized shifted-lognormal volatility, decimal.
    * @param expiry - Time to expiry in years.
-   * @param shift - Displacement added to forward and strike, in rate units.
-   * @throws Error - Throws a JavaScript exception if the inputs produce a non-finite vega.
+   * @param shift - Displacement added to forward and strike, in rate units; both shifted values must be positive.
+   * @throws Error - Throws a `FinstackError` (`kind: "validation"`) if an input is non-finite, `forward + shift` or `strike + shift` is not positive, `vol` or `expiry` is negative, or the vega is non-finite.
    */
   blackShiftedVega(
     forward: number,
@@ -8415,7 +8407,7 @@ export interface ModelsNamespace {
    * @param expiry - Time to expiry in years.
    * @param numFixings - Positive number of equally spaced averaging observations before expiry.
    * @param averaging - Asian averaging convention: `"arithmetic"` (default) or `"geometric"`.
-   * @param isCall - Whether to value a call (`true`) or put (`false`).
+   * @param isCall - Whether to value a call (`true`, default) or put (`false`).
    * @throws Error - Throws a JavaScript exception if `numFixings` is not a positive whole number, `averaging` is not `"arithmetic"` or `"geometric"`, or the supplied model inputs produce a non-finite option price.
    */
   asianOptionPrice(
@@ -8444,7 +8436,7 @@ export interface ModelsNamespace {
    * @param expiry - Time to expiry in years.
    * @param extremum - Observed maximum for fixed calls or floating puts, minimum for fixed puts or floating calls, including current spot; in spot-price units.
    * @param strikeType - Lookback payoff convention: `"fixed"` (default) or `"floating"`.
-   * @param isCall - Whether to value a call (`true`) or put (`false`).
+   * @param isCall - Whether to value a call (`true`, default) or put (`false`).
    * @throws Error - Throws a JavaScript exception if `strikeType` is not `"fixed"` or `"floating"`, or the supplied model inputs produce a non-finite option price.
    */
   lookbackOptionPrice(
@@ -8474,7 +8466,7 @@ export interface ModelsNamespace {
    * @param volAsset - Annualized asset-price volatility expressed as a decimal.
    * @param volFx - Annualized FX-rate volatility expressed as a decimal.
    * @param correlation - Instantaneous correlation between the asset and FX-rate shocks, from -1 to 1.
-   * @param isCall - Whether to value a call (`true`) or put (`false`).
+   * @param isCall - Whether to value a call (`true`, default) or put (`false`).
    * @throws If the inputs produce a non-finite price.
    */
   quantoOptionPrice(

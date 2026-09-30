@@ -37,7 +37,7 @@ use finstack_quant_models::volatility::svi::{calibrate_svi as rust_calibrate_svi
 use finstack_quant_models::volatility::VolatilityConvention;
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
-use pyo3::types::{PyDict, PyList};
+use pyo3::types::{PyBool, PyDict, PyList};
 
 /// SABR model parameters ``(alpha, beta, nu, rho)`` with optional ``shift``.
 ///
@@ -266,17 +266,11 @@ impl PySabrSmile {
     }
 
     /// Implied volatility at a single strike.
+    ///
+    /// Normal (Bachelier) vol in absolute rate units when ``beta < 1e-4``,
+    /// Black decimal vol otherwise.
     fn implied_vol(&self, strike: f64) -> PyResult<f64> {
-        self.inner
-            .generate_smile(&[strike])
-            .map_err(core_to_py)?
-            .first()
-            .copied()
-            .ok_or_else(|| {
-                pyo3::exceptions::PyRuntimeError::new_err(
-                    "SABR smile returned no volatility for the requested strike",
-                )
-            })
+        self.inner.implied_vol(strike).map_err(core_to_py)
     }
 
     /// Generate implied volatilities for a vector of strikes.
@@ -289,47 +283,35 @@ impl PySabrSmile {
         self.inner.generate_smile(&strikes).map_err(core_to_py)
     }
 
-    /// Arbitrage diagnostics (butterfly + monotonicity) across ``strikes``.
+    /// Butterfly + strike-monotonicity static-arbitrage check across ``strikes``.
     ///
     /// Parameters
     /// ----------
     /// strikes : list[float]
     ///     Strike grid to evaluate. Must be sorted in ascending order for
     ///     monotonicity checks to be meaningful.
-    /// r : float, optional
-    ///     Risk-free rate (default ``0.0``).
-    /// q : float, optional
-    ///     Dividend / foreign rate (default ``0.0``).
+    /// r : float
+    ///     Continuously compounded risk-free rate (decimal) that discounts the
+    ///     forward-based Black call prices compared against the 1e-6
+    ///     tolerance.
     ///
     /// Returns
     /// -------
     /// dict
-    ///     ``{"arbitrage_free": bool, "butterfly_violations": [...],
-    ///     "monotonicity_violations": [...]}``. Violation lists contain dicts
-    ///     with strike, price, and severity fields.
-    #[pyo3(signature = (strikes, r=0.0, q=0.0))]
-    fn arbitrage_diagnostics<'py>(
+    ///     The Rust ``ArbitrageValidationResult``: ``{"arbitrage_free": bool,
+    ///     "butterfly_violations": [...], "monotonicity_violations": [...]}``.
+    #[pyo3(signature = (strikes, r))]
+    fn validate_no_arbitrage<'py>(
         &self,
         py: Python<'py>,
         strikes: Vec<f64>,
         r: f64,
-        q: f64,
-    ) -> PyResult<Bound<'py, PyDict>> {
+    ) -> PyResult<Bound<'py, PyAny>> {
         let result = self
             .inner
-            .validate_no_arbitrage(&strikes, r, q)
+            .validate_no_arbitrage(&strikes, r)
             .map_err(core_to_py)?;
-        let out = PyDict::new(py);
-        out.set_item("arbitrage_free", result.is_arbitrage_free())?;
-        out.set_item(
-            "butterfly_violations",
-            serde_to_py(py, &result.butterfly_violations)?,
-        )?;
-        out.set_item(
-            "monotonicity_violations",
-            serde_to_py(py, &result.monotonicity_violations)?,
-        )?;
-        Ok(out)
+        serde_to_py(py, &result)
     }
 
     /// Tabulate the smile on a strike grid as a ``pandas.DataFrame``.
@@ -533,19 +515,21 @@ impl PySabrCalibrator {
     /// Raises
     /// ------
     /// ValueError
-    ///     If ``shift`` is neither ``None``, a float, nor ``"auto"``.
+    ///     If ``shift`` is neither ``None``, a float, nor ``"auto"`` (a
+    ///     ``bool`` is rejected, not read as a 0/1 shift).
     #[pyo3(signature = (shift))]
     fn with_shift(&self, shift: &Bound<'_, PyAny>) -> PyResult<Self> {
+        // Host-union conversion only: None → None, str → the Rust `SabrShift`
+        // keyword parser, float → Fixed. `bool` subclasses `int`, so reject it
+        // before the float extraction.
         let shift = if shift.is_none() {
             SabrShift::None
         } else if let Ok(text) = shift.extract::<String>() {
-            if text == "auto" {
-                SabrShift::Auto
-            } else {
-                return Err(PyValueError::new_err(format!(
-                    "shift must be None, a float, or \"auto\"; got {text:?}"
-                )));
-            }
+            text.parse::<SabrShift>().map_err(core_to_py)?
+        } else if shift.is_instance_of::<PyBool>() {
+            return Err(PyValueError::new_err(
+                "shift must be None, a float, or \"auto\"; got bool",
+            ));
         } else if let Ok(value) = shift.extract::<f64>() {
             SabrShift::Fixed(value)
         } else {
@@ -581,7 +565,7 @@ impl PySabrCalibrator {
         let shift = match self.inner.shift() {
             SabrShift::None => "None".to_string(),
             SabrShift::Fixed(value) => value.to_string(),
-            SabrShift::Auto => "'auto'".to_string(),
+            SabrShift::Auto => format!("'{}'", SabrShift::Auto),
         };
         format!(
             "SabrCalibrator(tolerance={}, max_iterations={}, shift={}, atm_pinning={})",

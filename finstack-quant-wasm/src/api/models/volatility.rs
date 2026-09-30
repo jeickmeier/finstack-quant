@@ -6,7 +6,7 @@
 //! Hagan SABR (2002): see docs/REFERENCES.md#hagan-2002-sabr.
 
 use crate::api::core::market_data::{JsFxDeltaVolSurface, JsVolCube};
-use crate::utils::input::{from_js_json, js_bool, js_uint};
+use crate::utils::input::{from_js_json, invalid_type, js_bool, js_f64_seq, js_uint};
 use crate::utils::{to_js_err, to_js_value};
 use finstack_quant_models::volatility as vol;
 use finstack_quant_models::volatility::sabr::{
@@ -200,20 +200,17 @@ impl JsSabrSmile {
 
     /// Implied volatility: normal decimal rate for beta=0, Black decimal volatility otherwise.
     /// @param strike - Option strike price in the same price units as the underlying.
+    /// @returns Normal (Bachelier) vol in absolute rate units when beta < 1e-4,
+    /// Black decimal vol otherwise.
     ///
     /// # Errors
     ///
     /// Throws a JavaScript exception if the smile's expiry, forward, or
-    /// requested `strike` is outside the model domain, the Hagan expansion
-    /// fails, or no volatility is returned for the strike.
+    /// requested `strike` is outside the model domain or the Hagan expansion
+    /// fails.
     #[wasm_bindgen(js_name = impliedVol)]
     pub fn implied_vol(&self, strike: f64) -> Result<f64, JsValue> {
-        self.inner
-            .generate_smile(&[strike])
-            .map_err(to_js_err)?
-            .first()
-            .copied()
-            .ok_or_else(|| to_js_err("SABR smile returned no volatility for the requested strike"))
+        self.inner.implied_vol(strike).map_err(to_js_err)
     }
 
     /// Implied volatilities for a strike grid.
@@ -232,39 +229,27 @@ impl JsSabrSmile {
             .map_err(to_js_err)
     }
 
-    /// Butterfly + monotonicity arbitrage diagnostics.
+    /// Butterfly + strike-monotonicity static-arbitrage check of the smile.
     ///
-    /// Returns a JSON object with `arbitrage_free`, `butterfly_violations`,
-    /// and `monotonicity_violations` arrays (snake_case keys matching the Rust
-    /// canonical fields and the Python binding).
-    /// @param strikes - Ordered option strikes used to test the calibrated smile for static arbitrage.
-    /// @param r - Continuously compounded risk-free rate, expressed as a decimal.
-    /// @param q - Continuous dividend yield or foreign rate, expressed as a decimal.
+    /// Returns the Rust `ArbitrageValidationResult` serde object:
+    /// `arbitrage_free`, `butterfly_violations` and `monotonicity_violations`.
+    /// @param strikes - Ascending option strikes used to test the smile for static arbitrage.
+    /// @param r - Continuously compounded risk-free rate (decimal) that discounts the
+    /// forward-based Black call prices compared against the 1e-6 tolerance.
     ///
     /// # Errors
     ///
     /// Throws a JavaScript exception if volatility generation fails for the
-    /// stored smile and supplied strikes, or the diagnostics cannot be
-    /// converted to a JavaScript value.
-    #[wasm_bindgen(js_name = arbitrageDiagnostics)]
-    pub fn arbitrage_diagnostics(
-        &self,
-        strikes: Vec<f64>,
-        r: Option<f64>,
-        q: Option<f64>,
-    ) -> Result<JsValue, JsValue> {
+    /// stored smile and supplied strikes, or the result cannot be converted to
+    /// a JavaScript value.
+    #[wasm_bindgen(js_name = validateNoArbitrage)]
+    pub fn validate_no_arbitrage(&self, strikes: JsValue, r: f64) -> Result<JsValue, JsValue> {
+        let strikes = js_f64_seq(&strikes, "strikes")?;
         let result = self
             .inner
-            .validate_no_arbitrage(&strikes, r.unwrap_or(0.0), q.unwrap_or(0.0))
+            .validate_no_arbitrage(&strikes, r)
             .map_err(to_js_err)?;
-        // Violation rows are the serde form of the Rust types, so field
-        // names stay identical to Python and to `ArbitrageValidationResult`.
-        let out = serde_json::json!({
-            "arbitrage_free": result.is_arbitrage_free(),
-            "butterfly_violations": result.butterfly_violations,
-            "monotonicity_violations": result.monotonicity_violations,
-        });
-        to_js_value(&out)
+        to_js_value(&result)
     }
 }
 
@@ -357,19 +342,29 @@ impl JsSabrCalibrator {
     ///
     /// # Errors
     ///
-    /// Throws a JavaScript exception if `shift` is neither `null`, a number,
-    /// nor the string `"auto"`.
+    /// Throws a `FinstackError` (`kind: "validation"`) for a string other than
+    /// `"auto"` (parsed by the Rust `SabrShift`), and a `TypeError`
+    /// (`kind: "invalid_type"`) for any other non-null, non-number value such
+    /// as a boolean.
     #[wasm_bindgen(js_name = withShift)]
     pub fn with_shift(&self, shift: JsValue) -> Result<JsSabrCalibrator, JsValue> {
-        parse_sabr_shift(
-            shift.is_null() || shift.is_undefined(),
-            shift.as_f64(),
-            shift.as_string().as_deref(),
-        )
-        .map(|policy| Self {
+        // Host-union conversion only: null → None, number → Fixed, string →
+        // the Rust `SabrShift` keyword parser.
+        let policy = if shift.is_null() || shift.is_undefined() {
+            SabrShift::None
+        } else if let Some(value) = shift.as_f64() {
+            SabrShift::Fixed(value)
+        } else if let Some(text) = shift.as_string() {
+            text.parse::<SabrShift>().map_err(to_js_err)?
+        } else {
+            return Err(invalid_type(
+                "shift",
+                "expected null, a number, or the string \"auto\"",
+            ));
+        };
+        Ok(Self {
             inner: self.inner.clone().with_shift(policy),
         })
-        .map_err(to_js_err)
     }
 
     /// Return a copy of this calibrator with exact ATM pinning enabled or
@@ -389,26 +384,6 @@ impl JsSabrCalibrator {
 impl Default for JsSabrCalibrator {
     fn default() -> Self {
         Self::new()
-    }
-}
-
-/// Decode the JS `withShift` union without constructing a `JsValue`.
-///
-/// Native tests cannot call `JsValue::from_str`: wasm-bindgen's string
-/// constructor is a `nounwind` stub off `wasm32` and aborts the process.
-fn parse_sabr_shift(
-    is_null_or_undefined: bool,
-    number: Option<f64>,
-    text: Option<&str>,
-) -> Result<SabrShift, String> {
-    if is_null_or_undefined {
-        Ok(SabrShift::None)
-    } else if let Some(value) = number {
-        Ok(SabrShift::Fixed(value))
-    } else if text == Some("auto") {
-        Ok(SabrShift::Auto)
-    } else {
-        Err("shift must be null, a number, or the string \"auto\"".to_string())
     }
 }
 
@@ -616,11 +591,11 @@ pub fn get_fx_delta_vol(
 ///
 /// * `delta` - Forward call delta as a decimal probability in `(0, 1)`.
 /// * `forward` - Positive forward in the same units as the returned strike.
-/// * `volatility` - Positive annualized Black volatility as a decimal.
+/// * `vol` - Positive annualized Black volatility as a decimal.
 /// * `expiry` - Positive option expiry in years.
 #[wasm_bindgen(js_name = deltaToStrike)]
-pub fn delta_to_strike(delta: f64, forward: f64, volatility: f64, expiry: f64) -> f64 {
-    vol::delta_to_strike(delta, forward, volatility, expiry)
+pub fn delta_to_strike(delta: f64, forward: f64, vol: f64, expiry: f64) -> f64 {
+    vol::delta_to_strike(delta, forward, vol, expiry)
 }
 
 /// Convert strike to premium-unadjusted forward call delta.
@@ -629,11 +604,11 @@ pub fn delta_to_strike(delta: f64, forward: f64, volatility: f64, expiry: f64) -
 ///
 /// * `strike` - Positive strike in the same units as `forward`.
 /// * `forward` - Positive forward in the same units as `strike`.
-/// * `volatility` - Positive annualized Black volatility as a decimal.
+/// * `vol` - Positive annualized Black volatility as a decimal.
 /// * `expiry` - Positive option expiry in years.
 #[wasm_bindgen(js_name = strikeToDelta)]
-pub fn strike_to_delta(strike: f64, forward: f64, volatility: f64, expiry: f64) -> f64 {
-    vol::strike_to_delta(strike, forward, volatility, expiry)
+pub fn strike_to_delta(strike: f64, forward: f64, vol: f64, expiry: f64) -> f64 {
+    vol::strike_to_delta(strike, forward, vol, expiry)
 }
 
 #[cfg(test)]
@@ -684,30 +659,14 @@ mod tests {
     }
 
     #[test]
-    fn parse_sabr_shift_accepts_null_number_and_auto() {
-        assert_eq!(
-            parse_sabr_shift(true, None, None).expect("null"),
-            SabrShift::None
-        );
-        assert_eq!(
-            parse_sabr_shift(false, Some(0.03), None).expect("fixed"),
-            SabrShift::Fixed(0.03)
-        );
-        assert_eq!(
-            parse_sabr_shift(false, None, Some("auto")).expect("auto"),
-            SabrShift::Auto
-        );
-        assert!(parse_sabr_shift(false, None, Some("later")).is_err());
-    }
-
-    #[test]
     fn sabr_auto_shift_fits_negative_rate_smile() {
         // Native tests cannot construct `JsValue` strings or Debug a `JsValue`
         // error: both abort off wasm32. Drive the same `"auto"` policy through
-        // the native-testable parser and the domain calibrator. Synthetic
-        // quotes use the documented 2% ladder rung (`-min(strike)+10bp = 1.6%`
-        // rounds up to 2%), matching the JS facade and Python bindings.
-        let policy = parse_sabr_shift(false, None, Some("auto")).expect("auto shift policy");
+        // the Rust keyword parser the binding calls and the domain calibrator.
+        // Synthetic quotes use the documented 2% ladder rung
+        // (`-min(strike)+10bp = 1.6%` rounds up to 2%), matching the JS facade
+        // and Python bindings.
+        let policy = "auto".parse::<SabrShift>().expect("auto shift policy");
         let p = SabrParameters::new_with_shift(0.05, 0.5, 0.4, -0.1, 0.02).expect("params");
         let forward = -0.005;
         let strikes = vec![-0.015, -0.01, -0.005, 0.0, 0.005];

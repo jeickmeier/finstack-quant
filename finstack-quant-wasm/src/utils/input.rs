@@ -256,6 +256,23 @@ pub fn js_u64(value: &JsValue, label: &str) -> Result<u64, JsValue> {
     ))
 }
 
+/// An optional unsigned 64-bit integer argument; `null` and `undefined` mean absent.
+///
+/// # Arguments
+///
+/// * `value` - The JavaScript argument, if supplied.
+/// * `label` - The camelCase argument name, used in the error message.
+///
+/// # Errors
+///
+/// As [`js_u64`], for a present value.
+pub fn js_opt_u64(value: Option<&JsValue>, label: &str) -> Result<Option<u64>, JsValue> {
+    match value {
+        Some(v) if !(v.is_null() || v.is_undefined()) => js_u64(v, label).map(Some),
+        _ => Ok(None),
+    }
+}
+
 /// A calendar date given as integer epoch days (days since 1970-01-01).
 ///
 /// # Arguments

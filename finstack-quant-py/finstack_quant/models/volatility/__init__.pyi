@@ -414,15 +414,14 @@ class SabrSmile:
         Returns
         -------
         float
-            Implied vol as a decimal.
+            Normal (Bachelier) vol in absolute rate units when beta is below
+            1e-4; otherwise Black decimal volatility.
 
         Raises
         ------
         ValueError
             If the stored forward, ``strike``, or expiry is outside the model's
             valid domain, or the calculation produces an invalid volatility.
-        RuntimeError
-            If the native smile calculation returns no value for ``strike``.
         """
         ...
 
@@ -448,32 +447,32 @@ class SabrSmile:
         """
         ...
 
-    def arbitrage_diagnostics(
+    def validate_no_arbitrage(
         self,
         strikes: list[float],
-        r: float = 0.0,
-        q: float = 0.0,
+        r: float,
     ) -> dict[str, Any]:
         """
-        Butterfly + monotonicity arbitrage diagnostics on ``strikes``.
+        Butterfly + strike-monotonicity static-arbitrage check on ``strikes``.
 
-        Returns a dict with ``arbitrage_free``, ``butterfly_violations``,
-        and ``monotonicity_violations``.
+        Returns the Rust ``ArbitrageValidationResult`` as a dict with
+        ``arbitrage_free``, ``butterfly_violations``, and
+        ``monotonicity_violations``.
 
         Parameters
         ----------
         strikes : list[float]
-            Strike grid to test.
-        r : float, default 0.0
-            Risk-free rate (decimal).
-        q : float, default 0.0
-            Dividend yield (decimal).
+            Ascending strike grid to test.
+        r : float
+            Continuously compounded risk-free rate (decimal) that discounts
+            the forward-based Black call prices compared against the 1e-6
+            tolerance; carry is already in the smile's forward.
 
         Returns
         -------
         dict[str, Any]
-            Diagnostics dict with ``arbitrage_free``, ``butterfly_violations``,
-            and ``monotonicity_violations``.
+            ``arbitrage_free`` (bool), ``butterfly_violations`` and
+            ``monotonicity_violations`` (lists of dicts).
 
         Raises
         ------
@@ -705,7 +704,8 @@ class SabrCalibrator:
         Raises
         ------
         ValueError
-            If ``shift`` is neither ``None``, a float, nor ``"auto"``.
+            If ``shift`` is neither ``None``, a float, nor ``"auto"`` (a
+            ``bool`` is rejected rather than read as a 0/1 shift).
 
         Examples
         --------

@@ -15,16 +15,16 @@
 //! ```rust
 //! use finstack_quant_models::OptionType;
 //! use finstack_quant_models::closed_form::dispatch::{
-//!     asian_option_price_str, barrier_call_str, barrier_put_str,
+//!     asian_option_price, barrier_call, barrier_put,
 //! };
 //!
-//! let barrier = barrier_call_str(100.0, 100.0, 90.0, 1.0, 0.05, 0.02, 0.20, "down", "out")?;
+//! let barrier = barrier_call(100.0, 100.0, 90.0, 0.05, 0.02, 0.20, 1.0, "down", "out")?;
 //! assert!(barrier > 0.0);
-//! let barrier_put = barrier_put_str(100.0, 100.0, 90.0, 1.0, 0.05, 0.02, 0.20, "down", "out")?;
+//! let barrier_put = barrier_put(100.0, 100.0, 90.0, 0.05, 0.02, 0.20, 1.0, "down", "out")?;
 //! assert!(barrier_put >= 0.0);
 //!
-//! let asian = asian_option_price_str(
-//!     100.0, 100.0, 1.0, 0.05, 0.02, 0.20, 12, "arithmetic", OptionType::Call,
+//! let asian = asian_option_price(
+//!     100.0, 100.0, 0.05, 0.02, 0.20, 1.0, 12, "arithmetic", OptionType::Call,
 //! )?;
 //! assert!(asian > 0.0);
 //! # Ok::<(), finstack_quant_core::Error>(())
@@ -47,6 +47,14 @@ use super::quanto::{quanto_call, quanto_put};
 use super::vanilla::checked_closed_form_value;
 use crate::types::OptionType;
 
+/// Averaging convention host bindings use when `averaging` is omitted from
+/// [`asian_option_price`]: `"arithmetic"` (Turnbull-Wakeman approximation).
+pub const DEFAULT_ASIAN_AVERAGING: &str = "arithmetic";
+
+/// Strike convention host bindings use when `strike_type` is omitted from
+/// [`lookback_option_price`]: `"fixed"`.
+pub const DEFAULT_LOOKBACK_STRIKE_TYPE: &str = "fixed";
+
 /// Reiner-Rubinstein continuous-monitoring barrier call, selected by strings.
 ///
 /// Routes to [`up_in_call`], [`up_out_call`], [`down_in_call`], or
@@ -57,10 +65,10 @@ use crate::types::OptionType;
 /// * `spot` - Current spot price of the underlying.
 /// * `strike` - Option strike price in the same units as `spot`.
 /// * `barrier` - Continuously monitored barrier level in the same units as `spot`.
-/// * `expiry` - Time to expiry in years.
 /// * `rate` - Risk-free rate, continuously compounded decimal.
 /// * `div_yield` - Continuous dividend yield (or foreign rate for FX), decimal.
 /// * `vol` - Annualized volatility, decimal.
+/// * `expiry` - Time to expiry in years.
 /// * `direction` - `"up"` for an upper barrier or `"down"` for a lower barrier.
 /// * `knock` - `"in"` for knock-in or `"out"` for knock-out.
 ///
@@ -69,14 +77,14 @@ use crate::types::OptionType;
 /// Returns `Error::Validation` if `(direction, knock)` is not a supported
 /// pair, or if the resulting barrier price is non-finite.
 #[allow(clippy::too_many_arguments)]
-pub fn barrier_call_str(
+pub fn barrier_call(
     spot: f64,
     strike: f64,
     barrier: f64,
-    expiry: f64,
     rate: f64,
     div_yield: f64,
     vol: f64,
+    expiry: f64,
     direction: &str,
     knock: &str,
 ) -> Result<f64> {
@@ -99,17 +107,17 @@ pub fn barrier_call_str(
 ///
 /// Routes to [`up_in_put`], [`up_out_put`], [`down_in_put`], or
 /// [`down_out_put`] from the `(direction, knock)` pair, mirroring
-/// [`barrier_call_str`].
+/// [`barrier_call`].
 ///
 /// # Arguments
 ///
 /// * `spot` - Current spot price of the underlying.
 /// * `strike` - Option strike price in the same units as `spot`.
 /// * `barrier` - Continuously monitored barrier level in the same units as `spot`.
-/// * `expiry` - Time to expiry in years.
 /// * `rate` - Risk-free rate, continuously compounded decimal.
 /// * `div_yield` - Continuous dividend yield (or foreign rate for FX), decimal.
 /// * `vol` - Annualized volatility, decimal.
+/// * `expiry` - Time to expiry in years.
 /// * `direction` - `"up"` for an upper barrier or `"down"` for a lower barrier.
 /// * `knock` - `"in"` for knock-in or `"out"` for knock-out.
 ///
@@ -118,14 +126,14 @@ pub fn barrier_call_str(
 /// Returns `Error::Validation` if `(direction, knock)` is not a supported
 /// pair, or if the resulting barrier price is non-finite.
 #[allow(clippy::too_many_arguments)]
-pub fn barrier_put_str(
+pub fn barrier_put(
     spot: f64,
     strike: f64,
     barrier: f64,
-    expiry: f64,
     rate: f64,
     div_yield: f64,
     vol: f64,
+    expiry: f64,
     direction: &str,
     knock: &str,
 ) -> Result<f64> {
@@ -155,10 +163,10 @@ pub fn barrier_put_str(
 ///
 /// * `spot` - Current spot price of the underlying.
 /// * `strike` - Option strike price in the same units as `spot`.
-/// * `expiry` - Time to expiry in years.
 /// * `rate` - Risk-free rate, continuously compounded decimal.
 /// * `div_yield` - Continuous dividend yield, decimal.
 /// * `vol` - Annualized volatility, decimal.
+/// * `expiry` - Time to expiry in years.
 /// * `num_fixings` - Positive number of equally spaced averaging observations.
 /// * `averaging` - `"arithmetic"` (Turnbull-Wakeman) or `"geometric"` (Kemna-Vorst).
 /// * `option_type` - Call or put payoff convention.
@@ -168,13 +176,13 @@ pub fn barrier_put_str(
 /// Returns `Error::Validation` if `num_fixings` is zero, `averaging` is not a
 /// supported convention, or the resulting option price is non-finite.
 #[allow(clippy::too_many_arguments)]
-pub fn asian_option_price_str(
+pub fn asian_option_price(
     spot: f64,
     strike: f64,
-    expiry: f64,
     rate: f64,
     div_yield: f64,
     vol: f64,
+    expiry: f64,
     num_fixings: usize,
     averaging: &str,
     option_type: OptionType,
@@ -216,10 +224,10 @@ pub fn asian_option_price_str(
 ///
 /// * `spot` - Current spot price of the underlying.
 /// * `strike` - Option strike price (ignored for `"floating"`).
-/// * `expiry` - Time to expiry in years.
 /// * `rate` - Risk-free rate, continuously compounded decimal.
 /// * `div_yield` - Continuous dividend yield, decimal.
 /// * `vol` - Annualized volatility, decimal.
+/// * `expiry` - Time to expiry in years.
 /// * `extremum` - Observed running extremum to date, in `spot` units.
 /// * `strike_type` - `"fixed"` or `"floating"`.
 /// * `option_type` - Call or put payoff convention.
@@ -229,13 +237,13 @@ pub fn asian_option_price_str(
 /// Returns `Error::Validation` if `strike_type` is not a supported
 /// convention, or if the resulting option price is non-finite.
 #[allow(clippy::too_many_arguments)]
-pub fn lookback_option_price_str(
+pub fn lookback_option_price(
     spot: f64,
     strike: f64,
-    expiry: f64,
     rate: f64,
     div_yield: f64,
     vol: f64,
+    expiry: f64,
     extremum: f64,
     strike_type: &str,
     option_type: OptionType,
@@ -331,20 +339,20 @@ mod tests {
     fn barrier_dispatch_matches_leaf_functions() {
         let (s, k, b, t, r, q, sigma) = (100.0, 100.0, 90.0, 1.0, 0.05, 0.02, 0.20);
         assert_eq!(
-            barrier_call_str(s, k, b, t, r, q, sigma, "down", "out").unwrap(),
+            barrier_call(s, k, b, r, q, sigma, t, "down", "out").unwrap(),
             down_out_call(s, k, b, t, r, q, sigma)
         );
         assert_eq!(
-            barrier_call_str(s, k, b, t, r, q, sigma, "down", "in").unwrap(),
+            barrier_call(s, k, b, r, q, sigma, t, "down", "in").unwrap(),
             down_in_call(s, k, b, t, r, q, sigma)
         );
         let b_up = 120.0;
         assert_eq!(
-            barrier_call_str(s, k, b_up, t, r, q, sigma, "up", "out").unwrap(),
+            barrier_call(s, k, b_up, r, q, sigma, t, "up", "out").unwrap(),
             up_out_call(s, k, b_up, t, r, q, sigma)
         );
         assert_eq!(
-            barrier_call_str(s, k, b_up, t, r, q, sigma, "up", "in").unwrap(),
+            barrier_call(s, k, b_up, r, q, sigma, t, "up", "in").unwrap(),
             up_in_call(s, k, b_up, t, r, q, sigma)
         );
     }
@@ -354,29 +362,29 @@ mod tests {
         use crate::closed_form::barrier::{down_in_put, down_out_put, up_in_put, up_out_put};
         let (s, k, b, t, r, q, sigma) = (100.0, 100.0, 90.0, 1.0, 0.05, 0.02, 0.20);
         assert_eq!(
-            barrier_put_str(s, k, b, t, r, q, sigma, "down", "out").unwrap(),
+            barrier_put(s, k, b, r, q, sigma, t, "down", "out").unwrap(),
             down_out_put(s, k, b, t, r, q, sigma)
         );
         assert_eq!(
-            barrier_put_str(s, k, b, t, r, q, sigma, "down", "in").unwrap(),
+            barrier_put(s, k, b, r, q, sigma, t, "down", "in").unwrap(),
             down_in_put(s, k, b, t, r, q, sigma)
         );
         let b_up = 120.0;
         assert_eq!(
-            barrier_put_str(s, k, b_up, t, r, q, sigma, "up", "out").unwrap(),
+            barrier_put(s, k, b_up, r, q, sigma, t, "up", "out").unwrap(),
             up_out_put(s, k, b_up, t, r, q, sigma)
         );
         assert_eq!(
-            barrier_put_str(s, k, b_up, t, r, q, sigma, "up", "in").unwrap(),
+            barrier_put(s, k, b_up, r, q, sigma, t, "up", "in").unwrap(),
             up_in_put(s, k, b_up, t, r, q, sigma)
         );
-        assert!(barrier_put_str(s, k, b, t, r, q, sigma, "sideways", "out").is_err());
+        assert!(barrier_put(s, k, b, r, q, sigma, t, "sideways", "out").is_err());
     }
 
     #[test]
     fn barrier_dispatch_rejects_unknown_selector() {
-        let err = barrier_call_str(100.0, 100.0, 90.0, 1.0, 0.05, 0.02, 0.20, "sideways", "out")
-            .unwrap_err();
+        let err =
+            barrier_call(100.0, 100.0, 90.0, 0.05, 0.02, 0.20, 1.0, "sideways", "out").unwrap_err();
         let msg = err.to_string();
         assert!(msg.contains("unknown barrier spec"), "message: {msg}");
         assert!(msg.contains("direction='sideways'"), "message: {msg}");
@@ -386,12 +394,11 @@ mod tests {
     fn asian_dispatch_matches_leaf_functions() {
         let (s, k, t, r, q, sigma, n) = (100.0, 100.0, 1.0, 0.05, 0.02, 0.20, 12);
         assert_eq!(
-            asian_option_price_str(s, k, t, r, q, sigma, n, "arithmetic", OptionType::Call)
-                .unwrap(),
+            asian_option_price(s, k, r, q, sigma, t, n, "arithmetic", OptionType::Call).unwrap(),
             arithmetic_asian_call_tw(s, k, t, r, q, sigma, n)
         );
         assert_eq!(
-            asian_option_price_str(s, k, t, r, q, sigma, n, "geometric", OptionType::Put).unwrap(),
+            asian_option_price(s, k, r, q, sigma, t, n, "geometric", OptionType::Put).unwrap(),
             geometric_asian_put(s, k, t, r, q, sigma, n)
         );
     }
@@ -399,13 +406,13 @@ mod tests {
     #[test]
     fn asian_dispatch_rejects_zero_fixings() {
         for averaging in ["arithmetic", "geometric"] {
-            let err = asian_option_price_str(
+            let err = asian_option_price(
                 100.0,
                 100.0,
-                1.0,
                 0.05,
                 0.02,
                 0.20,
+                1.0,
                 0,
                 averaging,
                 OptionType::Call,
@@ -417,13 +424,13 @@ mod tests {
 
     #[test]
     fn asian_dispatch_rejects_unknown_averaging() {
-        let err = asian_option_price_str(
+        let err = asian_option_price(
             100.0,
             100.0,
-            1.0,
             0.05,
             0.02,
             0.20,
+            1.0,
             12,
             "median",
             OptionType::Call,
@@ -436,25 +443,24 @@ mod tests {
     fn lookback_dispatch_matches_leaf_functions() {
         let (s, k, t, r, q, sigma, m) = (100.0, 100.0, 1.0, 0.05, 0.02, 0.20, 100.0);
         assert_eq!(
-            lookback_option_price_str(s, k, t, r, q, sigma, m, "fixed", OptionType::Call).unwrap(),
+            lookback_option_price(s, k, r, q, sigma, t, m, "fixed", OptionType::Call).unwrap(),
             fixed_strike_lookback_call(s, k, t, r, q, sigma, m)
         );
         assert_eq!(
-            lookback_option_price_str(s, k, t, r, q, sigma, m, "floating", OptionType::Put)
-                .unwrap(),
+            lookback_option_price(s, k, r, q, sigma, t, m, "floating", OptionType::Put).unwrap(),
             floating_strike_lookback_put(s, t, r, q, sigma, m)
         );
     }
 
     #[test]
     fn lookback_dispatch_rejects_unknown_strike_type() {
-        let err = lookback_option_price_str(
+        let err = lookback_option_price(
             100.0,
             100.0,
-            1.0,
             0.05,
             0.02,
             0.20,
+            1.0,
             100.0,
             "adaptive",
             OptionType::Call,

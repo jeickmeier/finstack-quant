@@ -679,12 +679,17 @@ impl Swaption {
             as_of,
             |forward, strike, sigma, t, annuity| {
                 use finstack_quant_models::closed_form::{black_call, black_put};
-                use finstack_quant_models::volatility::normal::bachelier_price;
+                use finstack_quant_models::volatility::normal::bachelier_price_with_annuity;
                 let (forward, strike) = quote.model_rates(forward, strike)?;
                 let unit = match quote.convention {
-                    VolatilityConvention::Normal => {
-                        bachelier_price(self.option_type, forward, strike, sigma, t, 1.0)
-                    }
+                    VolatilityConvention::Normal => bachelier_price_with_annuity(
+                        self.option_type,
+                        forward,
+                        strike,
+                        sigma,
+                        t,
+                        1.0,
+                    ),
                     _ => match self.option_type {
                         OptionType::Call => black_call(forward, strike, sigma, t),
                         OptionType::Put => black_put(forward, strike, sigma, t),

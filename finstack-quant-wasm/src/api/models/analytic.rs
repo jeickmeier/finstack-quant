@@ -20,19 +20,19 @@ use finstack_quant_models::closed_form::implied_vol::{
     black76_implied_vol as black76_implied_vol_core, bs_implied_vol as bs_implied_vol_core,
 };
 use finstack_quant_models::closed_form::{
-    asian_option_price_str, bachelier_call, bachelier_delta_call, bachelier_delta_put,
-    bachelier_gamma, bachelier_put, bachelier_vega, barrier_call_str, barrier_put_str, black_call,
-    black_delta_call, black_delta_put, black_gamma, black_put, black_shifted_call,
-    black_shifted_put, black_shifted_vega, black_vega, bs_greeks as bs_greeks_core,
-    bs_price as bs_price_core, checked_closed_form_value, heston_call_price_fourier,
-    heston_put_price_fourier, lookback_option_price_str,
+    asian_option_price as asian_option_price_core, bachelier_greeks as bachelier_greeks_core,
+    bachelier_price as bachelier_price_core, barrier_call as barrier_call_core,
+    barrier_put as barrier_put_core, black76_greeks as black76_greeks_core,
+    black76_price as black76_price_core, black_shifted_price as black_shifted_price_core,
+    black_shifted_vega as black_shifted_vega_core, bs_greeks as bs_greeks_core,
+    bs_price as bs_price_core, heston_price as heston_price_core,
+    lookback_option_price as lookback_option_price_core,
     quanto_option_price as quanto_option_price_core,
     vanilla_expiry_payoff as vanilla_expiry_payoff_core, HestonPricingParams,
+    DEFAULT_ASIAN_AVERAGING, DEFAULT_LOOKBACK_STRIKE_TYPE, DEFAULT_THETA_DAYS_PER_YEAR,
 };
 use finstack_quant_models::OptionType;
 use wasm_bindgen::prelude::*;
-
-const DEFAULT_THETA_DAYS_PER_YEAR: f64 = 365.0;
 
 /// Per-unit Black-Scholes / Garman-Kohlhagen price of a European option.
 ///
@@ -105,7 +105,7 @@ pub fn bs_price(
 /// ```javascript
 /// import init, { models } from "finstack-quant-wasm";
 /// await init();
-/// const payoff = valuations.vanillaExpiryPayoff(110, 100, true);
+/// const payoff = models.vanillaExpiryPayoff(110, 100, true);
 /// // payoff === 10
 /// ```
 ///
@@ -214,8 +214,8 @@ pub fn bs_implied_vol(
         rate,
         div_yield,
         expiry,
-        OptionType::from(is_call),
         price,
+        OptionType::from(is_call),
     )
     .map_err(to_js_err)
 }
@@ -251,25 +251,31 @@ pub fn black76_implied_vol(
         strike,
         df,
         expiry,
-        OptionType::from(is_call),
         price,
+        OptionType::from(is_call),
     )
     .map_err(to_js_err)
 }
 
 /// Black-76 per-unit price of a European option on a forward: `df * Black(F, K, vol, expiry)`.
 ///
+/// Calls the Rust `closed_form::black76_price`, which owns the call/put
+/// dispatch, the discounting and the input validation.
+///
 /// Black (1976): see docs/REFERENCES.md#black-1976.
 /// @param forward - Forward price or rate at expiry.
 /// @param strike - Strike in the same units as `forward`.
-/// @param df - Discount factor from valuation to expiry (positive decimal).
-/// @param expiry - Time to expiry in years.
-/// @param vol - Annualized lognormal (Black) volatility, decimal.
+/// @param df - Discount factor from valuation to expiry; a finite decimal
+/// strictly greater than zero (the same domain `black76ImpliedVol` accepts).
+/// @param expiry - Time to expiry in years; non-negative.
+/// @param vol - Annualized lognormal (Black) volatility, decimal; non-negative.
 /// @param is_call - Whether to value a call (`true`) or put (`false`).
 ///
 /// # Errors
 ///
-/// Throws a JavaScript exception if the inputs produce a non-finite price.
+/// Throws a `FinstackError` (`kind: "validation"`) if an input is non-finite,
+/// `forward`, `strike` or `df` is not positive, `vol` or `expiry` is negative,
+/// or the price is non-finite.
 #[wasm_bindgen(js_name = black76Price)]
 pub fn black76_price(
     forward: f64,
@@ -280,12 +286,8 @@ pub fn black76_price(
     is_call: JsValue,
 ) -> Result<f64, JsValue> {
     let is_call = js_bool(&is_call, "isCall")?;
-    let undiscounted = if is_call {
-        black_call(forward, strike, vol, expiry)
-    } else {
-        black_put(forward, strike, vol, expiry)
-    };
-    checked_closed_form_value(df * undiscounted, "Black-76 price").map_err(to_js_err)
+    black76_price_core(forward, strike, df, expiry, vol, OptionType::from(is_call))
+        .map_err(to_js_err)
 }
 
 /// Black-76 undiscounted forward Greeks as a `{delta, gamma, vega}` object.
@@ -295,13 +297,16 @@ pub fn black76_price(
 /// sensitivities. Black (1976): see docs/REFERENCES.md#black-1976.
 /// @param forward - Forward price or rate at expiry.
 /// @param strike - Strike in the same units as `forward`.
-/// @param expiry - Time to expiry in years.
-/// @param vol - Annualized lognormal (Black) volatility, decimal.
+/// @param expiry - Time to expiry in years; non-negative.
+/// @param vol - Annualized lognormal (Black) volatility, decimal; non-negative.
 /// @param is_call - Whether to value a call (`true`) or put (`false`).
+/// @returns The Rust `ForwardGreeks` object `{ delta, gamma, vega }`.
 ///
 /// # Errors
 ///
-/// Throws a JavaScript exception if any Greek is non-finite.
+/// Throws a `FinstackError` (`kind: "validation"`) if an input is non-finite,
+/// `forward` or `strike` is not positive, `vol` or `expiry` is negative, or a
+/// Greek is non-finite.
 #[wasm_bindgen(js_name = black76Greeks)]
 pub fn black76_greeks(
     forward: f64,
@@ -311,17 +316,9 @@ pub fn black76_greeks(
     is_call: JsValue,
 ) -> Result<JsValue, JsValue> {
     let is_call = js_bool(&is_call, "isCall")?;
-    let delta = if is_call {
-        black_delta_call(forward, strike, vol, expiry)
-    } else {
-        black_delta_put(forward, strike, vol, expiry)
-    };
-    forward_greeks(
-        delta,
-        black_gamma(forward, strike, vol, expiry),
-        black_vega(forward, strike, vol, expiry),
-        "Black-76",
-    )
+    let greeks = black76_greeks_core(forward, strike, expiry, vol, OptionType::from(is_call))
+        .map_err(to_js_err)?;
+    crate::utils::to_js_value(&greeks)
 }
 
 /// Bachelier (normal-model) undiscounted per-unit option price.
@@ -331,12 +328,13 @@ pub fn black76_greeks(
 /// @param strike - Strike in the same units as `forward`.
 /// @param normal_vol - Annualized **absolute** (normal) volatility in the
 /// units of `forward` (e.g. `0.0075` for 75 bp on decimal rates).
-/// @param expiry - Time to expiry in years.
+/// @param expiry - Time to expiry in years; non-negative.
 /// @param is_call - Whether to value a call (`true`) or put (`false`).
 ///
 /// # Errors
 ///
-/// Throws a JavaScript exception if the inputs produce a non-finite price.
+/// Throws a `FinstackError` (`kind: "validation"`) if an input is non-finite,
+/// `normalVol` or `expiry` is negative, or the price is non-finite.
 #[wasm_bindgen(js_name = bachelierPrice)]
 pub fn bachelier_price(
     forward: f64,
@@ -346,12 +344,14 @@ pub fn bachelier_price(
     is_call: JsValue,
 ) -> Result<f64, JsValue> {
     let is_call = js_bool(&is_call, "isCall")?;
-    let value = if is_call {
-        bachelier_call(forward, strike, normal_vol, expiry)
-    } else {
-        bachelier_put(forward, strike, normal_vol, expiry)
-    };
-    checked_closed_form_value(value, "Bachelier price").map_err(to_js_err)
+    bachelier_price_core(
+        forward,
+        strike,
+        normal_vol,
+        expiry,
+        OptionType::from(is_call),
+    )
+    .map_err(to_js_err)
 }
 
 /// Bachelier (normal-model) undiscounted forward Greeks as a `{delta, gamma, vega}` object.
@@ -360,13 +360,15 @@ pub fn bachelier_price(
 /// Bachelier (1900): see docs/REFERENCES.md#bachelier-1900.
 /// @param forward - Forward price or rate at expiry (may be negative).
 /// @param strike - Strike in the same units as `forward`.
-/// @param normal_vol - Annualized absolute (normal) volatility in the units of `forward`.
-/// @param expiry - Time to expiry in years.
+/// @param normal_vol - Annualized absolute (normal) volatility in the units of `forward`; non-negative.
+/// @param expiry - Time to expiry in years; non-negative.
 /// @param is_call - Whether to value a call (`true`) or put (`false`).
+/// @returns The Rust `ForwardGreeks` object `{ delta, gamma, vega }`.
 ///
 /// # Errors
 ///
-/// Throws a JavaScript exception if any Greek is non-finite.
+/// Throws a `FinstackError` (`kind: "validation"`) if an input is non-finite,
+/// `normalVol` or `expiry` is negative, or a Greek is non-finite.
 #[wasm_bindgen(js_name = bachelierGreeks)]
 pub fn bachelier_greeks(
     forward: f64,
@@ -376,31 +378,15 @@ pub fn bachelier_greeks(
     is_call: JsValue,
 ) -> Result<JsValue, JsValue> {
     let is_call = js_bool(&is_call, "isCall")?;
-    let delta = if is_call {
-        bachelier_delta_call(forward, strike, normal_vol, expiry)
-    } else {
-        bachelier_delta_put(forward, strike, normal_vol, expiry)
-    };
-    forward_greeks(
-        delta,
-        bachelier_gamma(forward, strike, normal_vol, expiry),
-        bachelier_vega(forward, strike, normal_vol, expiry),
-        "Bachelier",
+    let greeks = bachelier_greeks_core(
+        forward,
+        strike,
+        normal_vol,
+        expiry,
+        OptionType::from(is_call),
     )
-}
-
-#[derive(serde::Serialize)]
-struct ForwardGreeksJs {
-    delta: f64,
-    gamma: f64,
-    vega: f64,
-}
-
-fn forward_greeks(delta: f64, gamma: f64, vega: f64, model: &str) -> Result<JsValue, JsValue> {
-    for (name, value) in [("delta", delta), ("gamma", gamma), ("vega", vega)] {
-        checked_closed_form_value(value, &format!("{model} {name}")).map_err(to_js_err)?;
-    }
-    crate::utils::to_js_value(&ForwardGreeksJs { delta, gamma, vega })
+    .map_err(to_js_err)?;
+    crate::utils::to_js_value(&greeks)
 }
 
 /// Shifted (displaced) Black undiscounted per-unit price for negative-rate markets.
@@ -416,7 +402,9 @@ fn forward_greeks(delta: f64, gamma: f64, vega: f64, model: &str) -> Result<JsVa
 ///
 /// # Errors
 ///
-/// Throws a JavaScript exception if the inputs produce a non-finite price.
+/// Throws a `FinstackError` (`kind: "validation"`) if an input is non-finite,
+/// `forward + shift` or `strike + shift` is not positive, `vol` or `expiry` is
+/// negative, or the price is non-finite.
 #[wasm_bindgen(js_name = blackShiftedPrice)]
 pub fn black_shifted_price(
     forward: f64,
@@ -427,12 +415,15 @@ pub fn black_shifted_price(
     is_call: JsValue,
 ) -> Result<f64, JsValue> {
     let is_call = js_bool(&is_call, "isCall")?;
-    let value = if is_call {
-        black_shifted_call(forward, strike, vol, expiry, shift)
-    } else {
-        black_shifted_put(forward, strike, vol, expiry, shift)
-    };
-    checked_closed_form_value(value, "shifted Black price").map_err(to_js_err)
+    black_shifted_price_core(
+        forward,
+        strike,
+        vol,
+        expiry,
+        shift,
+        OptionType::from(is_call),
+    )
+    .map_err(to_js_err)
 }
 
 /// Shifted (displaced) Black vega per unit (1.0) change in `vol`, undiscounted.
@@ -440,24 +431,23 @@ pub fn black_shifted_price(
 /// @param strike - Strike (decimal, same units as `forward`).
 /// @param vol - Annualized shifted-lognormal volatility, decimal.
 /// @param expiry - Time to expiry in years.
-/// @param shift - Displacement added to forward and strike, in rate units.
+/// @param shift - Displacement added to forward and strike, in rate units;
+/// both shifted values must be positive.
 ///
 /// # Errors
 ///
-/// Throws a JavaScript exception if the inputs produce a non-finite vega.
+/// Throws a `FinstackError` (`kind: "validation"`) if an input is non-finite,
+/// `forward + shift` or `strike + shift` is not positive, `vol` or `expiry` is
+/// negative, or the vega is non-finite.
 #[wasm_bindgen(js_name = blackShiftedVega)]
-pub fn black_shifted_vega_js(
+pub fn black_shifted_vega(
     forward: f64,
     strike: f64,
     vol: f64,
     expiry: f64,
     shift: f64,
 ) -> Result<f64, JsValue> {
-    checked_closed_form_value(
-        black_shifted_vega(forward, strike, vol, expiry, shift),
-        "shifted Black vega",
-    )
-    .map_err(to_js_err)
+    black_shifted_vega_core(forward, strike, vol, expiry, shift).map_err(to_js_err)
 }
 
 /// Reiner-Rubinstein continuous-monitoring barrier call price.
@@ -493,8 +483,8 @@ pub fn barrier_call(
 ) -> Result<f64, JsValue> {
     let direction: &str = &js_string(&direction, "direction")?;
     let knock: &str = &js_string(&knock, "knock")?;
-    barrier_call_str(
-        spot, strike, barrier, expiry, rate, div_yield, vol, direction, knock,
+    barrier_call_core(
+        spot, strike, barrier, rate, div_yield, vol, expiry, direction, knock,
     )
     .map_err(to_js_err)
 }
@@ -532,8 +522,8 @@ pub fn barrier_put(
 ) -> Result<f64, JsValue> {
     let direction: &str = &js_string(&direction, "direction")?;
     let knock: &str = &js_string(&knock, "knock")?;
-    barrier_put_str(
-        spot, strike, barrier, expiry, rate, div_yield, vol, direction, knock,
+    barrier_put_core(
+        spot, strike, barrier, rate, div_yield, vol, expiry, direction, knock,
     )
     .map_err(to_js_err)
 }
@@ -550,7 +540,7 @@ pub fn barrier_put(
 /// @param expiry - Time to expiry in years.
 /// @param num_fixings - Positive number of equally spaced averaging observations before expiry.
 /// @param averaging - Asian averaging convention: `"arithmetic"` (default) or `"geometric"`.
-/// @param is_call - Whether to value a call (`true`) or put (`false`).
+/// @param is_call - Whether to value a call (`true`, default) or put (`false`).
 ///
 /// # Errors
 ///
@@ -573,15 +563,15 @@ pub fn asian_option_price(
     let num_fixings: usize = js_uint(&num_fixings, "numFixings")?;
     let averaging = js_opt_string(averaging.as_ref(), "averaging")?;
     let is_call = js_opt_bool(is_call.as_ref(), "isCall")?;
-    let averaging = averaging.as_deref().unwrap_or("arithmetic");
+    let averaging = averaging.as_deref().unwrap_or(DEFAULT_ASIAN_AVERAGING);
     let option_type = OptionType::from(is_call.unwrap_or(true));
-    asian_option_price_str(
+    asian_option_price_core(
         spot,
         strike,
-        expiry,
         rate,
         div_yield,
         vol,
+        expiry,
         num_fixings,
         averaging,
         option_type,
@@ -602,7 +592,7 @@ pub fn asian_option_price(
 /// @param expiry - Time to expiry in years.
 /// @param extremum - Observed maximum for fixed calls or floating puts, minimum for fixed puts or floating calls, including current spot; in spot-price units.
 /// @param strike_type - Lookback payoff convention: `"fixed"` (default) or `"floating"`.
-/// @param is_call - Whether to value a call (`true`) or put (`false`).
+/// @param is_call - Whether to value a call (`true`, default) or put (`false`).
 ///
 /// # Errors
 ///
@@ -624,15 +614,17 @@ pub fn lookback_option_price(
 ) -> Result<f64, JsValue> {
     let strike_type = js_opt_string(strike_type.as_ref(), "strikeType")?;
     let is_call = js_opt_bool(is_call.as_ref(), "isCall")?;
-    let strike_type = strike_type.as_deref().unwrap_or("fixed");
+    let strike_type = strike_type
+        .as_deref()
+        .unwrap_or(DEFAULT_LOOKBACK_STRIKE_TYPE);
     let option_type = OptionType::from(is_call.unwrap_or(true));
-    lookback_option_price_str(
+    lookback_option_price_core(
         spot,
         strike,
-        expiry,
         rate,
         div_yield,
         vol,
+        expiry,
         extremum,
         strike_type,
         option_type,
@@ -655,7 +647,7 @@ pub fn lookback_option_price(
 /// @param vol_asset - Annualized asset-price volatility expressed as a decimal.
 /// @param vol_fx - Annualized FX-rate volatility expressed as a decimal.
 /// @param correlation - Instantaneous correlation between the asset and FX-rate shocks, from -1 to 1.
-/// @param is_call - Whether to value a call (`true`) or put (`false`).
+/// @param is_call - Whether to value a call (`true`, default) or put (`false`).
 #[wasm_bindgen(js_name = quantoOptionPrice)]
 #[allow(clippy::too_many_arguments)]
 pub fn quanto_option_price(
@@ -724,12 +716,8 @@ pub fn heston_price(
     let is_call = js_opt_bool(is_call.as_ref(), "isCall")?;
     let params = HestonPricingParams::new(rate, div_yield, kappa, theta, sigma_v, rho, v0)
         .map_err(to_js_err)?;
-    if is_call.unwrap_or(true) {
-        heston_call_price_fourier(spot, strike, expiry, &params, None)
-    } else {
-        heston_put_price_fourier(spot, strike, expiry, &params, None)
-    }
-    .map_err(to_js_err)
+    let option_type = OptionType::from(is_call.unwrap_or(true));
+    heston_price_core(spot, strike, expiry, &params, option_type, None).map_err(to_js_err)
 }
 
 #[cfg(test)]

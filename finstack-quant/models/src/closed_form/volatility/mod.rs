@@ -21,7 +21,7 @@ pub use bachelier::{
 };
 pub use black::{
     black_call, black_delta_call, black_delta_put, black_gamma, black_put, black_scholes_spot_call,
-    black_scholes_spot_put, black_shifted_call, black_shifted_put, black_shifted_vega, black_vega,
+    black_scholes_spot_put, black_shifted_call, black_shifted_put, black_vega,
 };
 
 #[cfg(test)]

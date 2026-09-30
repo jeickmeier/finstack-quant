@@ -24,6 +24,7 @@ from finstack_quant.models import volatility as volatility
 
 __all__ = [
     "BsGreeks",
+    "ForwardGreeks",
     "asian_option_price",
     "bachelier_greeks",
     "bachelier_price",
@@ -236,6 +237,141 @@ class BsGreeks:
         >>> from finstack_quant.models import BsGreeks, bs_greeks
         >>> g = bs_greeks(100.0, 100.0, 0.05, 0.0, 0.2, 1.0, True)
         >>> BsGreeks.from_json(g.to_json()) == g
+        True
+        """
+        ...
+
+    def __eq__(self, other: object) -> bool: ...
+    def __reduce__(self) -> tuple[Any, tuple[str]]: ...
+
+class ForwardGreeks:
+    """
+    Undiscounted forward Greeks of a European option on a forward.
+
+    Returned by :func:`black76_greeks` and :func:`bachelier_greeks`. ``delta``
+    and ``gamma`` are with respect to the forward; ``vega`` is per unit (1.0)
+    change in the model volatility (lognormal decimal for Black-76, absolute
+    normal vol for Bachelier). Multiply by the discount factor for
+    present-value sensitivities. Immutable, compares by value, picklable.
+
+    Examples
+    --------
+    >>> from finstack_quant.models import black76_greeks
+    >>> g = black76_greeks(100.0, 100.0, 1.0, 0.2, True)
+    >>> round(g.delta, 4)
+    0.5398
+    >>> g.to_series().index.tolist()
+    ['delta', 'gamma', 'vega']
+    """
+
+    @property
+    def delta(self) -> float:
+        """
+        Delta to the forward, undiscounted.
+
+        Returns
+        -------
+        float
+            Change in the undiscounted premium per one-unit move in the forward.
+
+        Notes
+        -----
+        This accessor does not raise.
+        """
+        ...
+
+    @property
+    def gamma(self) -> float:
+        """
+        Gamma to the forward, undiscounted.
+
+        Returns
+        -------
+        float
+            Change in *delta* per one-unit move in the forward.
+
+        Notes
+        -----
+        This accessor does not raise.
+        """
+        ...
+
+    @property
+    def vega(self) -> float:
+        """
+        Vega per unit (1.0) change in the model volatility, undiscounted.
+
+        Returns
+        -------
+        float
+            Change in the undiscounted premium for a 1.0 increase in the model
+            vol (lognormal decimal for Black-76, absolute normal vol for
+            Bachelier).
+
+        Notes
+        -----
+        This accessor does not raise.
+        """
+        ...
+
+    def to_series(self) -> pd.Series:
+        """
+        Return the Greeks as a float ``pandas.Series`` named ``forward_greeks``.
+
+        Returns
+        -------
+        pandas.Series
+            Index ``delta, gamma, vega``. Does not raise.
+        """
+        ...
+
+    def to_dataframe(self) -> pd.DataFrame:
+        """
+        Return the Greeks as a single-row ``pandas.DataFrame``.
+
+        Returns
+        -------
+        pandas.DataFrame
+            Columns ``delta, gamma, vega``. Does not raise.
+        """
+        ...
+
+    def to_json(self) -> str:
+        """
+        Serialize to compact JSON with the canonical field names.
+
+        Returns
+        -------
+        str
+            JSON object with ``delta``, ``gamma`` and ``vega``. Does not raise.
+        """
+        ...
+
+    @staticmethod
+    def from_json(json: str) -> ForwardGreeks:
+        """
+        Deserialize from the JSON produced by :meth:`to_json`.
+
+        Parameters
+        ----------
+        json : str
+            JSON object with ``delta, gamma, vega``.
+
+        Returns
+        -------
+        ForwardGreeks
+            Reconstructed Greeks.
+
+        Raises
+        ------
+        ValueError
+            If a field is missing or unknown.
+
+        Examples
+        --------
+        >>> from finstack_quant.models import ForwardGreeks, bachelier_greeks
+        >>> g = bachelier_greeks(0.03, 0.03, 0.0075, 1.0, True)
+        >>> ForwardGreeks.from_json(g.to_json()) == g
         True
         """
         ...
@@ -523,15 +659,17 @@ def black76_price(
     Parameters
     ----------
     forward : float
-        Forward price or rate at expiry.
+        Forward price or rate at expiry; positive.
     strike : float
-        Strike in the same units as ``forward``.
+        Strike in the same units as ``forward``; positive.
     df : float
-        Discount factor from valuation date to expiry (positive decimal).
+        Discount factor from valuation date to expiry; a finite decimal
+        strictly greater than zero (the domain :func:`black76_implied_vol`
+        accepts).
     expiry : float
-        Time to expiry in years.
+        Time to expiry in years; non-negative.
     vol : float
-        Annualized lognormal (Black) volatility, decimal.
+        Annualized lognormal (Black) volatility, decimal; non-negative.
     is_call : bool
         ``True`` for a call, ``False`` for a put.
 
@@ -543,7 +681,9 @@ def black76_price(
     Raises
     ------
     ValueError
-        If the inputs produce a non-finite price.
+        If an input is non-finite, ``forward``, ``strike`` or ``df`` is not
+        positive, ``vol`` or ``expiry`` is negative, or the price is
+        non-finite.
 
     Examples
     --------
@@ -563,9 +703,9 @@ def black76_greeks(
     expiry: float,
     vol: float,
     is_call: bool,
-) -> dict[str, float]:
+) -> ForwardGreeks:
     """
-    Black-76 undiscounted forward Greeks ``{"delta", "gamma", "vega"}``.
+    Black-76 undiscounted forward Greeks as a :class:`ForwardGreeks`.
 
     ``delta`` / ``gamma`` are with respect to the forward; ``vega`` is per
     unit (1.0) change in ``vol``. Multiply by the discount factor for
@@ -578,26 +718,27 @@ def black76_greeks(
     strike : float
         Strike in the same units as ``forward``.
     expiry : float
-        Time to expiry in years.
+        Time to expiry in years; non-negative.
     vol : float
-        Annualized lognormal (Black) volatility, decimal.
+        Annualized lognormal (Black) volatility, decimal; non-negative.
     is_call : bool
         ``True`` for a call, ``False`` for a put (only ``delta`` differs).
 
     Returns
     -------
-    dict[str, float]
-        ``{"delta": ..., "gamma": ..., "vega": ...}``.
+    ForwardGreeks
+        ``delta``, ``gamma`` and ``vega`` (per unit vol), undiscounted.
 
     Raises
     ------
     ValueError
-        If any Greek is non-finite for the supplied inputs.
+        If an input is non-finite, ``forward`` or ``strike`` is not positive,
+        ``vol`` or ``expiry`` is negative, or a Greek is non-finite.
 
     Examples
     --------
     >>> from finstack_quant.models import black76_greeks
-    >>> round(black76_greeks(100.0, 100.0, 1.0, 0.2, True)["delta"], 4)
+    >>> round(black76_greeks(100.0, 100.0, 1.0, 0.2, True).delta, 4)
     0.5398
 
     Sources
@@ -626,7 +767,7 @@ def bachelier_price(
         Annualized **absolute** (normal) volatility in the units of
         ``forward`` (``0.0075`` = 75 bp on decimal rates).
     expiry : float
-        Time to expiry in years.
+        Time to expiry in years; non-negative.
     is_call : bool
         ``True`` for a call (payer), ``False`` for a put (receiver).
 
@@ -638,7 +779,8 @@ def bachelier_price(
     Raises
     ------
     ValueError
-        If the inputs produce a non-finite price.
+        If an input is non-finite, ``normal_vol`` or ``expiry`` is negative, or
+        the price is non-finite.
 
     Examples
     --------
@@ -658,9 +800,9 @@ def bachelier_greeks(
     normal_vol: float,
     expiry: float,
     is_call: bool,
-) -> dict[str, float]:
+) -> ForwardGreeks:
     """
-    Bachelier (normal-model) undiscounted forward Greeks ``{"delta", "gamma", "vega"}``.
+    Bachelier (normal-model) undiscounted forward Greeks as a :class:`ForwardGreeks`.
 
     ``vega`` is per unit (1.0) change in ``normal_vol`` (absolute units).
 
@@ -671,26 +813,28 @@ def bachelier_greeks(
     strike : float
         Strike in the same units as ``forward``.
     normal_vol : float
-        Annualized absolute (normal) volatility in the units of ``forward``.
+        Annualized absolute (normal) volatility in the units of ``forward``;
+        non-negative.
     expiry : float
-        Time to expiry in years.
+        Time to expiry in years; non-negative.
     is_call : bool
         ``True`` for a call, ``False`` for a put (only ``delta`` differs).
 
     Returns
     -------
-    dict[str, float]
-        ``{"delta": ..., "gamma": ..., "vega": ...}``.
+    ForwardGreeks
+        ``delta``, ``gamma`` and ``vega`` (per unit normal vol), undiscounted.
 
     Raises
     ------
     ValueError
-        If any Greek is non-finite for the supplied inputs.
+        If an input is non-finite, ``normal_vol`` or ``expiry`` is negative, or
+        a Greek is non-finite.
 
     Examples
     --------
     >>> from finstack_quant.models import bachelier_greeks
-    >>> round(bachelier_greeks(0.03, 0.03, 0.0075, 1.0, True)["delta"], 2)
+    >>> round(bachelier_greeks(0.03, 0.03, 0.0075, 1.0, True).delta, 2)
     0.5
 
     Sources
@@ -736,7 +880,9 @@ def black_shifted_price(
     Raises
     ------
     ValueError
-        If the inputs produce a non-finite price.
+        If an input is non-finite, ``forward + shift`` or ``strike + shift`` is
+        not positive, ``vol`` or ``expiry`` is negative, or the price is
+        non-finite.
 
     Examples
     --------
@@ -777,7 +923,9 @@ def black_shifted_vega(
     Raises
     ------
     ValueError
-        If the inputs produce a non-finite vega.
+        If an input is non-finite, ``forward + shift`` or ``strike + shift`` is
+        not positive, ``vol`` or ``expiry`` is negative, or the vega is
+        non-finite.
 
     Examples
     --------

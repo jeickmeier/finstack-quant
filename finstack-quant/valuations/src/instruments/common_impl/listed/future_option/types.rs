@@ -16,7 +16,7 @@ use finstack_quant_core::math::norm_cdf;
 use finstack_quant_core::types::{CurveId, InstrumentId};
 use finstack_quant_models::trees::binomial_tree::BinomialTree;
 use finstack_quant_models::volatility::black::d1_d2_black76;
-use finstack_quant_models::volatility::normal::bachelier_price;
+use finstack_quant_models::volatility::normal::bachelier_price_with_annuity;
 
 /// Official American lattice size when `tree_steps` is omitted on PV.
 const OFFICIAL_TREE_STEPS: usize = 401;
@@ -443,7 +443,7 @@ impl FutureOptionTerms {
                     OptionType::Put => self.strike * norm_cdf(-d2) - futures_price * norm_cdf(-d1),
                 }
             }
-            FutureOptionModel::Normal => bachelier_price(
+            FutureOptionModel::Normal => bachelier_price_with_annuity(
                 self.option_type,
                 futures_price,
                 self.strike,

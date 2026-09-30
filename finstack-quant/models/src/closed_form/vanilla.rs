@@ -492,6 +492,14 @@ pub fn bs_greeks_unchecked(
     }
 }
 
+/// Default day-count denominator for the per-day theta returned by [`bs_greeks`].
+///
+/// ACT/365 calendar-day theta (`CALENDAR_DAYS_PER_YEAR`, 365) is the market
+/// default for equity and FX options; pass 252 for business-day-scaled theta.
+/// Both host bindings default their optional `theta_days_per_year` argument to
+/// this constant, so the value has a single home in Rust.
+pub const DEFAULT_THETA_DAYS_PER_YEAR: f64 = finstack_quant_core::dates::CALENDAR_DAYS_PER_YEAR;
+
 /// Checked Black–Scholes / Garman–Kohlhagen Greeks for host boundaries.
 ///
 /// Unlike the raw formula, this rejects non-finite or economically invalid

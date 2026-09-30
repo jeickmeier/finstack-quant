@@ -20,11 +20,22 @@ test('DTSM is exposed only under models.rates.dtsm', () => {
 
   const yields = facade.models.rates.dtsm.nelsonSiegelYields(
     0.7308,
-    0.03,
-    -0.01,
-    0.005,
+    [0.03, -0.01, 0.005],
     [1, 5, 10]
   );
+  const expected = [0.024045061287046227, 0.02853762303631049, 0.02931292600971276];
   assert.equal(yields.length, 3);
-  assert.ok(Array.from(yields).every(Number.isFinite));
+  Array.from(yields).forEach((value, i) => assert.ok(Math.abs(value - expected[i]) < 1e-15));
+});
+
+test('nelsonSiegelYields takes factors as one [level, slope, curvature] array like Rust and Python', () => {
+  const { nelsonSiegelYields } = facade.models.rates.dtsm;
+  assert.throws(
+    () => nelsonSiegelYields(0.7308, [0.03, -0.01], [1, 5, 10]),
+    (err) => err.kind === 'validation' && /exactly 3 entries/.test(err.message)
+  );
+  assert.throws(
+    () => nelsonSiegelYields(0.7308, 0.03, [1, 5, 10]),
+    (err) => err.kind === 'invalid_type'
+  );
 });

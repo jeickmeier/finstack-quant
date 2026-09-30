@@ -85,7 +85,7 @@ pub use conventions::VolatilityConvention;
 pub use convert::convert_atm_volatility;
 pub use finstack_quant_core::math::{norm_cdf, norm_pdf};
 pub use implied::{implied_vol_bachelier, implied_vol_black};
-pub use normal::{bachelier_price, d_bachelier};
+pub use normal::{bachelier_price_with_annuity, d_bachelier};
 pub use sabr::{
     vega_weight, SabrCalibrationOutcome, SabrCalibrator, SabrModel, SabrParameters, SabrShift,
     SabrSmile,

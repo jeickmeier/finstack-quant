@@ -345,20 +345,3 @@ pub fn black_shifted_call(forward: f64, strike: f64, sigma: f64, t: f64, shift: 
 pub fn black_shifted_put(forward: f64, strike: f64, sigma: f64, t: f64, shift: f64) -> f64 {
     black_put(forward + shift, strike + shift, sigma, t)
 }
-
-/// Shifted Black vega with unit annuity.
-///
-/// Applies [`black_vega`] to `forward + shift` and `strike + shift`.
-///
-/// # Arguments
-///
-/// * `forward` - Unshifted forward rate or price in the option's native units.
-/// * `strike` - Unshifted option strike in the same units as `forward`.
-/// * `sigma` - Annualized lognormal volatility as a decimal, for example `0.20`.
-/// * `t` - Time to expiry in years.
-/// * `shift` - Additive displacement applied to both forward and strike before
-///   Black-76 pricing.
-#[inline]
-pub fn black_shifted_vega(forward: f64, strike: f64, sigma: f64, t: f64, shift: f64) -> f64 {
-    black_vega(forward + shift, strike + shift, sigma, t)
-}

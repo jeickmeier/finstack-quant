@@ -42,11 +42,11 @@ test('tarnCouponProfile returns a plain object with readable properties', () => 
   assert.equal(typeof profile.redeemed_early, 'boolean');
 });
 
-test('SabrSmile.arbitrageDiagnostics returns a plain object', () => {
+test('SabrSmile.validateNoArbitrage returns a plain object', () => {
   const params = new wasm.SabrParameters(0.2, 1.0, 0.3, -0.2);
   const smile = new wasm.SabrSmile(params, 100.0, 1.0);
-  const diag = smile.arbitrageDiagnostics([80, 90, 100, 110, 120]);
-  assertPlainObject(diag, 'arbitrageDiagnostics result');
+  const diag = smile.validateNoArbitrage([80, 90, 100, 110, 120], 0.0);
+  assertPlainObject(diag, 'validateNoArbitrage result');
   assert.equal(typeof diag.arbitrage_free, 'boolean');
   assert.ok(Array.isArray(diag.butterfly_violations));
   assert.ok(Array.isArray(diag.monotonicity_violations));

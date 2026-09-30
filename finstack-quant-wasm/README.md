@@ -231,9 +231,16 @@ JSON inputs (`*Json` parameters, typed `JsonInput`) take JSON text or the equiva
 plain object/array, and objects get the same unknown-field checks as text;
 `NaN`, `Infinity`, `Map`s, class instances and WASM handles inside them throw.
 Returned 64-bit values (Monte Carlo seeds, `DayCount.calendarDays`) are `bigint`.
+Plain `number` (float) arguments are the exception: wasm-bindgen converts them
+with JavaScript `ToNumber` before Rust runs, so `undefined` becomes `NaN`,
+`null` becomes `0` and `"5"` becomes `5`. Rust rejects non-finite values and
+out-of-domain inputs (for example a non-positive spot, strike, forward or
+discount factor), but a `null` rate or correlation silently reads as `0`; use
+the TypeScript declarations to catch those at compile time.
 
-**Determinism.** Simulation entry points take an explicit seed; the same seed and
-path count reproduce the same estimate.
+**Determinism.** Simulation entry points are seeded; where the seed is optional
+(`models.monteCarlo.priceHestonCall/Put`) the Rust registry supplies a fixed
+default, so the same seed and path count always reproduce the same estimate.
 
 **Serde strictness.** JSON envelopes deny unknown fields and are versioned
 (`finstack_quant.instrument/1`, `finstack_quant.calibration/1`, …). See

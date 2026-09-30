@@ -950,7 +950,7 @@
   "models.volatility.SabrSmile": {
     "kind": "class",
     "statics": [],
-    "methods": ["arbitrageDiagnostics", "atmVol", "free", "generateSmile", "impliedVol"],
+    "methods": ["atmVol", "free", "generateSmile", "impliedVol", "validateNoArbitrage"],
     "getters": []
   },
   "models.volatility.calibrateSvi": {

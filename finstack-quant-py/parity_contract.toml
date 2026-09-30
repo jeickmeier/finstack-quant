@@ -522,7 +522,15 @@ rates        = { python = "finstack_quant.models.rates", status = "exists", note
 [crates.models.symbols]
 # Kwarg vocabulary is crate-wide: `spot, strike, rate, div_yield, vol, expiry,
 # is_call` (Rust parameter names == Python kwargs; WASM camelCase). `bs_greeks`
-# returns the typed `BsGreeks` (`rho_r`, not `rho`). Rust-only closed-form
+# returns the typed `BsGreeks` (`rho_r`, not `rho`); `black76_greeks` /
+# `bachelier_greeks` return the typed `ForwardGreeks`. Each host function makes
+# one call into the same-named checked Rust entry point in `closed_form`
+# (`forward.rs`, `dispatch.rs`, `heston_price`). Host defaults come from Rust
+# constants: `theta_days_per_year` = `DEFAULT_THETA_DAYS_PER_YEAR`, `averaging` =
+# `DEFAULT_ASIAN_AVERAGING`, `strike_type` = `DEFAULT_LOOKBACK_STRIKE_TYPE`. The
+# optional `is_call` of `asian_option_price` / `lookback_option_price` /
+# `quanto_option_price` / `heston_price` defaults to a call in both hosts (a
+# host signature default mapped to `OptionType::Call`). Rust-only closed-form
 # items, deliberately not bound: `bs_price_unchecked` / `bs_greeks_unchecked`,
 # the `*_df` Asian variants, `barrier_rebate` / `PayoutTiming` /
 # `BarrierParams` / `barrier_touch_probability`, `quanto_call` / `quanto_put` /
@@ -534,6 +542,7 @@ rates        = { python = "finstack_quant.models.rates", status = "exists", note
 # `CosPricer` / `CosConfig` / characteristic functions (hosts use `*_cos_price`).
 public = [
     "BsGreeks",
+    "ForwardGreeks",
     "asian_option_price",
     "bachelier_greeks",
     "bachelier_price",
@@ -686,7 +695,8 @@ public = [
 # twins over the Rust free functions of the same name and return the typed
 # `FactorTimeSeries` / `YieldForecast` / `YieldPcaView` wrappers. Rust-only:
 # `diebold_li_model` (folded into `DieboldLi(lambda_=None)`) and
-# `DieboldLi::to_parametric_curve`. WASM exposes `nelsonSiegelYields` only.
+# `DieboldLi::to_parametric_curve`. WASM exposes `nelsonSiegelYields` only, with
+# the Rust/Python `(lambda, factors[3], tenors)` signature.
 [crates.models.rates.dtsm]
 python_package = "finstack_quant.models.rates.dtsm"
 public = [
@@ -2416,7 +2426,7 @@ backlog = [
 
 [parity.modules."finstack_quant.models"]
 js = "models"
-types = { BsGreeks = "BsGreeks" }
+types = { BsGreeks = "BsGreeks", ForwardGreeks = "ForwardGreeks" }
 
 [parity.modules."finstack_quant.models.correlation"]
 js = "models.correlation"
@@ -2573,6 +2583,10 @@ backlog = [
     "TradeParams",
 ]
 
+# `priceHestonCall` / `priceHestonPut` return the canonical `MoneyEstimate`
+# serde object (TS interface `MoneyEstimate`, the same wire form as Python
+# `MoneyEstimate.to_json()`). The Python class stays in the backlog until a
+# WASM twin of its `relative_stderr()` method exists.
 [parity.modules."finstack_quant.models.monte_carlo"]
 js = "models.monteCarlo"
 backlog = [

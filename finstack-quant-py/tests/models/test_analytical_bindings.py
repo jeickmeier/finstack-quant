@@ -77,9 +77,9 @@ def test_bs_implied_vol_rejects_expired_option() -> None:
 
 def test_new_closed_form_bindings_run() -> None:
     assert abs(black76_price(100.0, 100.0, 0.95, 1.0, 0.2, True) - 7.5673) < 1e-3
-    assert 0.5 < black76_greeks(100.0, 100.0, 1.0, 0.2, True)["delta"] < 0.6
+    assert 0.5 < black76_greeks(100.0, 100.0, 1.0, 0.2, True).delta < 0.6
     assert bachelier_price(0.03, 0.03, 0.0075, 1.0, True) > 0.0
-    assert abs(bachelier_greeks(0.03, 0.03, 0.0075, 1.0, True)["delta"] - 0.5) < 1e-9
+    assert abs(bachelier_greeks(0.03, 0.03, 0.0075, 1.0, True).delta - 0.5) < 1e-9
     assert black_shifted_price(-0.005, -0.005, 0.25, 1.0, 0.03, True) > 0.0
     assert black_shifted_vega(-0.005, -0.005, 0.25, 1.0, 0.03) > 0.0
     assert barrier_put(100.0, 100.0, 80.0, 0.05, 0.0, 0.2, 1.0, "down", "out") > 0.0

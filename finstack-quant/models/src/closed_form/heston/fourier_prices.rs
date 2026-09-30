@@ -294,6 +294,58 @@ pub fn heston_put_price_fourier(
     Ok(put_price.max(0.0))
 }
 
+/// Price a European call or put under the Heston model using Fourier inversion.
+///
+/// Routes to [`heston_call_price_fourier`] or [`heston_put_price_fourier`] from
+/// `option_type`, so host bindings share one call/put branch.
+///
+/// # Arguments
+///
+/// * `spot` - Current underlying spot price in the option quote currency.
+/// * `strike` - Exercise price in the same units as `spot`.
+/// * `time` - Remaining time to maturity in years; a non-positive value
+///   returns intrinsic value.
+/// * `params` - Validated Heston rate, carry, variance, mean-reversion,
+///   volatility-of-variance, and correlation parameters.
+/// * `option_type` - Call or put payoff.
+/// * `settings` - Optional Fourier integration settings. `None` uses
+///   [`HestonFourierSettings::for_maturity_with_variance`].
+///
+/// # Returns
+///
+/// Option price per unit of the underlying.
+///
+/// # Errors
+///
+/// Returns `Error::Calibration` (category `heston_fourier`) when the Fourier
+/// integration or the put-call parity step produces a non-finite price.
+///
+/// # Examples
+///
+/// ```rust
+/// use finstack_quant_models::OptionType;
+/// use finstack_quant_models::closed_form::{heston_price, HestonPricingParams};
+///
+/// let params = HestonPricingParams::new(0.05, 0.02, 2.0, 0.04, 0.3, -0.7, 0.04)?;
+/// let call = heston_price(100.0, 100.0, 1.0, &params, OptionType::Call, None)?;
+/// let put = heston_price(100.0, 100.0, 1.0, &params, OptionType::Put, None)?;
+/// assert!(call > 5.0 && call < 15.0 && put > 0.0);
+/// # Ok::<(), finstack_quant_core::Error>(())
+/// ```
+pub fn heston_price(
+    spot: f64,
+    strike: f64,
+    time: f64,
+    params: &HestonPricingParams,
+    option_type: OptionType,
+    settings: Option<&HestonFourierSettings>,
+) -> Result<f64> {
+    match option_type {
+        OptionType::Call => heston_call_price_fourier(spot, strike, time, params, settings),
+        OptionType::Put => heston_put_price_fourier(spot, strike, time, params, settings),
+    }
+}
+
 /// Black-Scholes call price for the exact deterministic-variance limit.
 pub(super) fn black_scholes_call(
     spot: f64,

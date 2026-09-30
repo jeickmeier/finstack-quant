@@ -263,10 +263,10 @@ Tistaert (2007); Lord & Kahl (2010).
 
 ## Implied volatility (`implied_vol.rs`)
 
-`bs_implied_vol(spot, strike, r, q, t, OptionType, target_price)` and
-`black76_implied_vol(forward, strike, df, t, OptionType, target_price)`.
+`bs_implied_vol(spot, strike, r, q, t, price, OptionType)` and
+`black76_implied_vol(forward, strike, df, t, price, OptionType)`.
 
-1. Reject non-finite inputs, non-positive `spot`/`strike`/`target_price`, and
+1. Reject non-finite inputs, non-positive `spot`/`strike`/`price`, and
    any target at or below intrinsic (an arbitrage violation).
 2. Bracket in `[MIN_VOL = 1e-8, MAX_VOL = 10.0]`, starting the upper bound at
    `0.3` and expanding by 1.5x for up to 50 tries.
@@ -286,12 +286,24 @@ apart on selector spelling or error text. Every dispatcher finishes through
 `checked_closed_form_value`, so a non-finite price from a degenerate input
 surfaces as a validation error instead of crossing the host boundary.
 
+Arguments follow the host order `(spot, strike, [barrier,] rate, div_yield,
+vol, expiry, ...)`, matching `bs_price`.
+
 | Function | Selectors |
 |----------|-----------|
-| `barrier_call_str` | `direction ∈ {"up","down"}`, `knock ∈ {"in","out"}` |
-| `asian_option_price_str` | `averaging ∈ {"arithmetic","geometric"}` |
-| `lookback_option_price_str` | `strike_type ∈ {"fixed","floating"}` |
+| `barrier_call` / `barrier_put` | `direction ∈ {"up","down"}`, `knock ∈ {"in","out"}` |
+| `asian_option_price` | `averaging ∈ {"arithmetic","geometric"}`; hosts default to `DEFAULT_ASIAN_AVERAGING` (`"arithmetic"`) |
+| `lookback_option_price` | `strike_type ∈ {"fixed","floating"}`; hosts default to `DEFAULT_LOOKBACK_STRIKE_TYPE` (`"fixed"`) |
 | `quanto_option_price` | call/put only |
+
+## Checked forward-measure entry points (`forward.rs`)
+
+`black76_price` (discounted by a positive `df`), `black76_greeks`,
+`bachelier_price` (unit annuity), `bachelier_greeks`, `black_shifted_price` and
+`black_shifted_vega` validate their model's domain, dispatch on `OptionType` and
+finish through `checked_closed_form_value`. The Greeks return `ForwardGreeks
+{ delta, gamma, vega }` (undiscounted, vega per unit vol). `heston_price`
+(`heston/fourier_prices.rs`) routes to the call or put Fourier pricer.
 
 ## Conventions
 
@@ -330,7 +342,7 @@ let greeks = bs_greeks(spot, strike, r, q, vol, t, OptionType::Call, 365.0);
 assert!(greeks.is_valid());
 
 // Invert the same price back to the input vol.
-let iv = bs_implied_vol(spot, strike, r, q, t, OptionType::Call, price)?;
+let iv = bs_implied_vol(spot, strike, r, q, t, price, OptionType::Call)?;
 assert!((iv - vol).abs() < 1e-8);
 
 // Knock-out barrier below spot: worth strictly less than the vanilla.
@@ -346,18 +358,15 @@ assert!(heston > 0.0 && heston < spot);
 
 ## Binding exposure
 
-**Python** (`finstack_quant.valuations`): `bs_price`, `vanilla_expiry_payoff`,
-`bs_greeks`, `bs_implied_vol`, `black76_implied_vol`, plus the four dispatchers
-as `barrier_call`, `asian_option_price`, `lookback_option_price`,
-`quanto_option_price`.
-
-**WASM** (`valuations` namespace): the same set as `bsPrice`,
-`vanillaExpiryPayoff`, `bsGreeks`, `bsImpliedVol`, `black76ImpliedVol`,
-`barrierCall`, `asianOptionPrice`, `lookbackOptionPrice`, `quantoOptionPrice`.
-
-The Heston Fourier pricer is not bound directly in either host; it is reached
-through equity-option pricing. Lookback and Asian put/`_df`/`_times` variants
-are Rust-only.
+Both hosts (Python `finstack_quant.models`, WASM `models` namespace) bind
+`bs_price`, `vanilla_expiry_payoff`, `bs_greeks` (default
+`DEFAULT_THETA_DAYS_PER_YEAR`), `bs_implied_vol`, `black76_implied_vol`,
+`black76_price`, `black76_greeks`, `bachelier_price`, `bachelier_greeks`,
+`black_shifted_price`, `black_shifted_vega`, `barrier_call`, `barrier_put`,
+`asian_option_price`, `lookback_option_price`, `quanto_option_price` and
+`heston_price` under the same names (camelCase in WASM). Each binding converts
+`is_call` to `OptionType` and makes one call. Lookback and Asian put/`_df`/`_times`
+variants are Rust-only.
 
 ## Verification
 

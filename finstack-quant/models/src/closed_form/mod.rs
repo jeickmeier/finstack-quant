@@ -137,10 +137,13 @@
 //! - [`lookback`] for lookback option pricing
 //! - [`quanto`] for quanto option pricing
 //! - [`heston`] for stochastic volatility pricing
+//! - [`forward`] for checked Black-76 / Bachelier / shifted-Black prices and forward Greeks
+//! - [`dispatch`] for the string-selected exotic closed forms
 
 pub mod asian;
 pub mod barrier;
 pub mod dispatch;
+pub mod forward;
 pub mod heston;
 pub mod implied_vol;
 pub mod lookback;
@@ -156,10 +159,16 @@ pub use barrier::{
     up_in_call, up_out_call,
 };
 pub use dispatch::{
-    asian_option_price_str, barrier_call_str, barrier_put_str, lookback_option_price_str,
-    quanto_option_price,
+    asian_option_price, barrier_call, barrier_put, lookback_option_price, quanto_option_price,
+    DEFAULT_ASIAN_AVERAGING, DEFAULT_LOOKBACK_STRIKE_TYPE,
 };
-pub use heston::{heston_call_price_fourier, heston_put_price_fourier, HestonPricingParams};
+pub use forward::{
+    bachelier_greeks, bachelier_price, black76_greeks, black76_price, black_shifted_price,
+    black_shifted_vega, ForwardGreeks,
+};
+pub use heston::{
+    heston_call_price_fourier, heston_price, heston_put_price_fourier, HestonPricingParams,
+};
 pub use implied_vol::{black76_implied_vol, bs_implied_vol};
 pub use lookback::{
     fixed_strike_lookback_call, fixed_strike_lookback_put, floating_strike_lookback_call,
@@ -167,12 +176,12 @@ pub use lookback::{
 };
 pub use quanto::{quanto_call, quanto_drift_adjustment, quanto_put};
 pub use vanilla::{
-    bs_greeks, bs_price, checked_closed_form_value, vanilla_expiry_payoff, BsGreeks, ONE_PERCENT,
+    bs_greeks, bs_price, checked_closed_form_value, vanilla_expiry_payoff, BsGreeks,
+    DEFAULT_THETA_DAYS_PER_YEAR, ONE_PERCENT,
 };
 pub use volatility::{
     bachelier_call, bachelier_delta_call, bachelier_delta_put, bachelier_gamma, bachelier_put,
     bachelier_vega, black_call, black_delta_call, black_delta_put, black_gamma, black_put,
     black_scholes_spot_call, black_scholes_spot_put, black_shifted_call, black_shifted_put,
-    black_shifted_vega, black_vega, brenner_subrahmanyam_approx, implied_vol_initial_guess,
-    manaster_koehler_approx,
+    black_vega, brenner_subrahmanyam_approx, implied_vol_initial_guess, manaster_koehler_approx,
 };

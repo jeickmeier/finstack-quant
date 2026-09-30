@@ -1105,6 +1105,17 @@ fn models_monte_carlo_dts_matches_pricing_surface() {
             "MonteCarloNamespace is missing `{name}`"
         );
     }
+    // Path count and seed are optional: the Rust registry owns their defaults.
+    assert_eq!(monte_carlo.matches("numPaths?: number | null,").count(), 2);
+    assert_eq!(
+        monte_carlo
+            .matches("seed?: bigint | number | null,")
+            .count(),
+        2
+    );
+    assert_eq!(monte_carlo.matches("): MoneyEstimate;").count(), 2);
+    assert!(dts.contains("export interface MoneyEstimate {"));
+    assert!(!dts.contains("MonteCarloEstimateJson"));
     let models = interface_block(&dts, "ModelsNamespace");
     assert!(models.contains("monteCarlo: MonteCarloNamespace;"));
     assert!(dts.contains("export declare const models: ModelsNamespace;"));

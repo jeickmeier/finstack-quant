@@ -22,19 +22,14 @@ use crate::bindings::repr_support::repr_from_serde;
 use crate::errors::{core_to_py, serde_json_to_py};
 use finstack_quant_models::closed_form::implied_vol::{black76_implied_vol, bs_implied_vol};
 use finstack_quant_models::closed_form::{
-    asian_option_price_str, bachelier_call, bachelier_delta_call, bachelier_delta_put,
-    bachelier_gamma, bachelier_put, bachelier_vega, barrier_call_str, barrier_put_str, black_call,
-    black_delta_call, black_delta_put, black_gamma, black_put, black_shifted_call,
-    black_shifted_put, black_shifted_vega, black_vega, bs_greeks, bs_price,
-    checked_closed_form_value, heston_call_price_fourier, heston_put_price_fourier,
-    lookback_option_price_str, quanto_option_price, vanilla_expiry_payoff, BsGreeks,
-    HestonPricingParams,
+    asian_option_price, bachelier_greeks, bachelier_price, barrier_call, barrier_put,
+    black76_greeks, black76_price, black_shifted_price, black_shifted_vega, bs_greeks, bs_price,
+    heston_price, lookback_option_price, quanto_option_price, vanilla_expiry_payoff, BsGreeks,
+    ForwardGreeks, HestonPricingParams, DEFAULT_ASIAN_AVERAGING, DEFAULT_LOOKBACK_STRIKE_TYPE,
+    DEFAULT_THETA_DAYS_PER_YEAR,
 };
 use finstack_quant_models::OptionType;
 use pyo3::prelude::*;
-use pyo3::types::PyDict;
-
-const DEFAULT_THETA_DAYS_PER_YEAR: f64 = 365.0;
 
 const BS_GREEK_LABELS: [&str; 6] = ["delta", "gamma", "vega", "theta", "rho_r", "rho_q"];
 
@@ -174,6 +169,108 @@ impl PyBsGreeks {
             self.inner.rho_r,
             self.inner.rho_q,
         ]
+    }
+}
+
+// ForwardGreeks
+
+const FORWARD_GREEK_LABELS: [&str; 3] = ["delta", "gamma", "vega"];
+
+/// Undiscounted forward Greeks of a European option on a forward.
+///
+/// Returned by ``black76_greeks`` and ``bachelier_greeks``. ``delta`` and
+/// ``gamma`` are with respect to the forward; ``vega`` is per unit (1.0) change
+/// in the model volatility (lognormal decimal for Black-76, absolute normal vol
+/// for Bachelier). Multiply by the discount factor for present-value
+/// sensitivities.
+///
+/// The object is immutable, compares by value, is picklable, and exposes
+/// ``to_series()`` / ``to_dataframe()`` pandas exits plus ``to_json`` /
+/// ``from_json`` for wire round-trips.
+///
+/// Examples
+/// --------
+/// >>> from finstack_quant.models import black76_greeks
+/// >>> g = black76_greeks(100.0, 100.0, 1.0, 0.2, True)
+/// >>> round(g.delta, 4)
+/// 0.5398
+/// >>> g.to_series().index.tolist()
+/// ['delta', 'gamma', 'vega']
+#[pyclass(
+    name = "ForwardGreeks",
+    module = "finstack_quant.models",
+    frozen,
+    eq,
+    from_py_object
+)]
+#[derive(Clone, PartialEq)]
+pub struct PyForwardGreeks {
+    pub(crate) inner: ForwardGreeks,
+}
+
+#[pymethods]
+impl PyForwardGreeks {
+    /// Delta to the forward (``dV/dF``), undiscounted.
+    #[getter]
+    fn delta(&self) -> f64 {
+        self.inner.delta
+    }
+
+    /// Gamma to the forward (``d2V/dF2``), undiscounted.
+    #[getter]
+    fn gamma(&self) -> f64 {
+        self.inner.gamma
+    }
+
+    /// Vega per unit (1.0) change in the model volatility, undiscounted.
+    #[getter]
+    fn vega(&self) -> f64 {
+        self.inner.vega
+    }
+
+    /// Return the Greeks as a float ``pandas.Series`` named ``forward_greeks``.
+    ///
+    /// Index order is ``delta, gamma, vega``.
+    fn to_series<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        let labels: Vec<String> = FORWARD_GREEK_LABELS
+            .iter()
+            .map(|s| (*s).to_string())
+            .collect();
+        let values = vec![self.inner.delta, self.inner.gamma, self.inner.vega];
+        labeled_values_to_series(py, &labels, values, "forward_greeks")
+    }
+
+    /// Return the Greeks as a single-row ``pandas.DataFrame``.
+    ///
+    /// Columns are ``delta, gamma, vega``.
+    fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        serde_object_to_single_row_dataframe(py, &self.inner)
+    }
+
+    /// Serialize to compact JSON with the canonical field names.
+    fn to_json(&self) -> PyResult<String> {
+        serde_json::to_string(&self.inner).map_err(|e| serde_json_to_py(e, "ForwardGreeks"))
+    }
+
+    /// Deserialize from the JSON produced by ``to_json``.
+    ///
+    /// Raises ``ValueError`` when a field is missing or unknown.
+    #[staticmethod]
+    #[pyo3(text_signature = "(json)")]
+    fn from_json(json: &str) -> PyResult<Self> {
+        let inner: ForwardGreeks = serde_json::from_str(json)
+            .map_err(|e| serde_json_to_py(e, "invalid ForwardGreeks JSON"))?;
+        Ok(Self { inner })
+    }
+
+    /// Support ``pickle`` (and therefore ``copy.deepcopy``, ``multiprocessing``).
+    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
+        let from_json = py.get_type::<Self>().getattr("from_json")?;
+        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
+    }
+
+    fn __repr__(&self) -> String {
+        repr_from_serde("ForwardGreeks", &self.inner)
     }
 }
 
@@ -425,8 +522,8 @@ fn bs_implied_vol_wrapper(
         rate,
         div_yield,
         expiry,
-        OptionType::from(is_call),
         price,
+        OptionType::from(is_call),
     )
     .map_err(core_to_py)
 }
@@ -491,8 +588,8 @@ fn black76_implied_vol_wrapper(
         strike,
         df,
         expiry,
-        OptionType::from(is_call),
         price,
+        OptionType::from(is_call),
     )
     .map_err(core_to_py)
 }
@@ -502,20 +599,23 @@ fn black76_implied_vol_wrapper(
 /// Black-76 per-unit price of a European option on a forward.
 ///
 /// ``df * Black(forward, strike, vol, expiry)``: the undiscounted Black
-/// premium scaled by the supplied discount factor.
+/// premium scaled by the supplied discount factor. The Rust
+/// ``closed_form::black76_price`` owns the call/put dispatch, discounting and
+/// validation.
 ///
 /// Parameters
 /// ----------
 /// forward : float
-///     Forward price or rate ``F`` at expiry.
+///     Forward price or rate ``F`` at expiry; positive.
 /// strike : float
-///     Strike ``K`` in the same units as ``forward``.
+///     Strike ``K`` in the same units as ``forward``; positive.
 /// df : float
-///     Discount factor from valuation date to expiry (positive decimal).
+///     Discount factor from valuation date to expiry; a finite decimal
+///     strictly greater than zero (the domain ``black76_implied_vol`` accepts).
 /// expiry : float
-///     Time to expiry in years.
+///     Time to expiry in years; non-negative.
 /// vol : float
-///     Annualized lognormal (Black) volatility, decimal.
+///     Annualized lognormal (Black) volatility, decimal; non-negative.
 /// is_call : bool
 ///     ``True`` for a call, ``False`` for a put.
 ///
@@ -527,8 +627,8 @@ fn black76_implied_vol_wrapper(
 /// Raises
 /// ------
 /// ValueError
-///     If the inputs produce a non-finite price (for example a negative or
-///     non-finite volatility or forward).
+///     If an input is non-finite, ``forward``, ``strike`` or ``df`` is not
+///     positive, ``vol`` or ``expiry`` is negative, or the price is non-finite.
 ///
 /// Examples
 /// --------
@@ -549,15 +649,10 @@ fn black76_price_wrapper(
     vol: f64,
     is_call: bool,
 ) -> PyResult<f64> {
-    let undiscounted = if is_call {
-        black_call(forward, strike, vol, expiry)
-    } else {
-        black_put(forward, strike, vol, expiry)
-    };
-    checked_closed_form_value(df * undiscounted, "Black-76 price").map_err(core_to_py)
+    black76_price(forward, strike, df, expiry, vol, OptionType::from(is_call)).map_err(core_to_py)
 }
 
-/// Black-76 forward Greeks ``{"delta", "gamma", "vega"}`` (undiscounted).
+/// Black-76 forward Greeks (undiscounted) as a :class:`ForwardGreeks`.
 ///
 /// ``delta`` and ``gamma`` are with respect to the forward; ``vega`` is per
 /// unit (1.0) change in ``vol``. Multiply by the discount factor to obtain
@@ -570,27 +665,28 @@ fn black76_price_wrapper(
 /// strike : float
 ///     Strike ``K`` in the same units as ``forward``.
 /// expiry : float
-///     Time to expiry in years.
+///     Time to expiry in years; non-negative.
 /// vol : float
-///     Annualized lognormal (Black) volatility, decimal.
+///     Annualized lognormal (Black) volatility, decimal; non-negative.
 /// is_call : bool
 ///     ``True`` for a call, ``False`` for a put (only ``delta`` differs).
 ///
 /// Returns
 /// -------
-/// dict[str, float]
-///     ``{"delta": ..., "gamma": ..., "vega": ...}``.
+/// ForwardGreeks
+///     ``delta``, ``gamma`` and ``vega`` (per unit vol), undiscounted.
 ///
 /// Raises
 /// ------
 /// ValueError
-///     If any Greek is non-finite for the supplied inputs.
+///     If an input is non-finite, ``forward`` or ``strike`` is not positive,
+///     ``vol`` or ``expiry`` is negative, or a Greek is non-finite.
 ///
 /// Examples
 /// --------
 /// >>> from finstack_quant.models import black76_greeks
 /// >>> g = black76_greeks(100.0, 100.0, 1.0, 0.2, True)
-/// >>> round(g["delta"], 4)
+/// >>> round(g.delta, 4)
 /// 0.5398
 ///
 /// Sources
@@ -598,26 +694,16 @@ fn black76_price_wrapper(
 /// - Black (1976): see docs/REFERENCES.md#black-1976
 #[pyfunction(name = "black76_greeks")]
 #[pyo3(signature = (forward, strike, expiry, vol, is_call))]
-fn black76_greeks_wrapper<'py>(
-    py: Python<'py>,
+fn black76_greeks_wrapper(
     forward: f64,
     strike: f64,
     expiry: f64,
     vol: f64,
     is_call: bool,
-) -> PyResult<Bound<'py, PyDict>> {
-    let delta = if is_call {
-        black_delta_call(forward, strike, vol, expiry)
-    } else {
-        black_delta_put(forward, strike, vol, expiry)
-    };
-    forward_greeks_dict(
-        py,
-        delta,
-        black_gamma(forward, strike, vol, expiry),
-        black_vega(forward, strike, vol, expiry),
-        "Black-76",
-    )
+) -> PyResult<PyForwardGreeks> {
+    black76_greeks(forward, strike, expiry, vol, OptionType::from(is_call))
+        .map(|inner| PyForwardGreeks { inner })
+        .map_err(core_to_py)
 }
 
 // bachelier_price / bachelier_greeks
@@ -634,7 +720,7 @@ fn black76_greeks_wrapper<'py>(
 ///     Annualized **absolute** (normal / Bachelier) volatility in the units of
 ///     ``forward`` — e.g. ``0.0075`` for 75 bp on a rate quoted as a decimal.
 /// expiry : float
-///     Time to expiry in years.
+///     Time to expiry in years; non-negative.
 /// is_call : bool
 ///     ``True`` for a call (payer), ``False`` for a put (receiver).
 ///
@@ -647,7 +733,8 @@ fn black76_greeks_wrapper<'py>(
 /// Raises
 /// ------
 /// ValueError
-///     If the inputs produce a non-finite price.
+///     If an input is non-finite, ``normal_vol`` or ``expiry`` is negative, or
+///     the price is non-finite.
 ///
 /// Examples
 /// --------
@@ -667,15 +754,17 @@ fn bachelier_price_wrapper(
     expiry: f64,
     is_call: bool,
 ) -> PyResult<f64> {
-    let value = if is_call {
-        bachelier_call(forward, strike, normal_vol, expiry)
-    } else {
-        bachelier_put(forward, strike, normal_vol, expiry)
-    };
-    checked_closed_form_value(value, "Bachelier price").map_err(core_to_py)
+    bachelier_price(
+        forward,
+        strike,
+        normal_vol,
+        expiry,
+        OptionType::from(is_call),
+    )
+    .map_err(core_to_py)
 }
 
-/// Bachelier (normal-model) forward Greeks ``{"delta", "gamma", "vega"}``.
+/// Bachelier (normal-model) forward Greeks as a :class:`ForwardGreeks`.
 ///
 /// ``delta`` and ``gamma`` are with respect to the forward; ``vega`` is per
 /// unit (1.0) change in ``normal_vol`` (absolute units). All values are
@@ -688,26 +777,28 @@ fn bachelier_price_wrapper(
 /// strike : float
 ///     Strike ``K`` in the same units as ``forward``.
 /// normal_vol : float
-///     Annualized absolute (normal) volatility in the units of ``forward``.
+///     Annualized absolute (normal) volatility in the units of ``forward``;
+///     non-negative.
 /// expiry : float
-///     Time to expiry in years.
+///     Time to expiry in years; non-negative.
 /// is_call : bool
 ///     ``True`` for a call, ``False`` for a put (only ``delta`` differs).
 ///
 /// Returns
 /// -------
-/// dict[str, float]
-///     ``{"delta": ..., "gamma": ..., "vega": ...}``.
+/// ForwardGreeks
+///     ``delta``, ``gamma`` and ``vega`` (per unit normal vol), undiscounted.
 ///
 /// Raises
 /// ------
 /// ValueError
-///     If any Greek is non-finite for the supplied inputs.
+///     If an input is non-finite, ``normal_vol`` or ``expiry`` is negative, or
+///     a Greek is non-finite.
 ///
 /// Examples
 /// --------
 /// >>> from finstack_quant.models import bachelier_greeks
-/// >>> round(bachelier_greeks(0.03, 0.03, 0.0075, 1.0, True)["delta"], 2)
+/// >>> round(bachelier_greeks(0.03, 0.03, 0.0075, 1.0, True).delta, 2)
 /// 0.5
 ///
 /// Sources
@@ -715,43 +806,22 @@ fn bachelier_price_wrapper(
 /// - Bachelier (1900): see docs/REFERENCES.md#bachelier-1900
 #[pyfunction(name = "bachelier_greeks")]
 #[pyo3(signature = (forward, strike, normal_vol, expiry, is_call))]
-fn bachelier_greeks_wrapper<'py>(
-    py: Python<'py>,
+fn bachelier_greeks_wrapper(
     forward: f64,
     strike: f64,
     normal_vol: f64,
     expiry: f64,
     is_call: bool,
-) -> PyResult<Bound<'py, PyDict>> {
-    let delta = if is_call {
-        bachelier_delta_call(forward, strike, normal_vol, expiry)
-    } else {
-        bachelier_delta_put(forward, strike, normal_vol, expiry)
-    };
-    forward_greeks_dict(
-        py,
-        delta,
-        bachelier_gamma(forward, strike, normal_vol, expiry),
-        bachelier_vega(forward, strike, normal_vol, expiry),
-        "Bachelier",
+) -> PyResult<PyForwardGreeks> {
+    bachelier_greeks(
+        forward,
+        strike,
+        normal_vol,
+        expiry,
+        OptionType::from(is_call),
     )
-}
-
-fn forward_greeks_dict<'py>(
-    py: Python<'py>,
-    delta: f64,
-    gamma: f64,
-    vega: f64,
-    model: &str,
-) -> PyResult<Bound<'py, PyDict>> {
-    for (name, value) in [("delta", delta), ("gamma", gamma), ("vega", vega)] {
-        checked_closed_form_value(value, &format!("{model} {name}")).map_err(core_to_py)?;
-    }
-    let out = PyDict::new(py);
-    out.set_item("delta", delta)?;
-    out.set_item("gamma", gamma)?;
-    out.set_item("vega", vega)?;
-    Ok(out)
+    .map(|inner| PyForwardGreeks { inner })
+    .map_err(core_to_py)
 }
 
 // black_shifted_price / black_shifted_vega
@@ -786,8 +856,9 @@ fn forward_greeks_dict<'py>(
 /// Raises
 /// ------
 /// ValueError
-///     If the inputs produce a non-finite price (for example a shifted
-///     forward or strike that is not positive).
+///     If an input is non-finite, ``forward + shift`` or ``strike + shift`` is
+///     not positive, ``vol`` or ``expiry`` is negative, or the price is
+///     non-finite.
 ///
 /// Examples
 /// --------
@@ -804,12 +875,15 @@ fn black_shifted_price_wrapper(
     shift: f64,
     is_call: bool,
 ) -> PyResult<f64> {
-    let value = if is_call {
-        black_shifted_call(forward, strike, vol, expiry, shift)
-    } else {
-        black_shifted_put(forward, strike, vol, expiry, shift)
-    };
-    checked_closed_form_value(value, "shifted Black price").map_err(core_to_py)
+    black_shifted_price(
+        forward,
+        strike,
+        vol,
+        expiry,
+        shift,
+        OptionType::from(is_call),
+    )
+    .map_err(core_to_py)
 }
 
 /// Shifted (displaced) Black vega per unit (1.0) change in ``vol``.
@@ -835,7 +909,9 @@ fn black_shifted_price_wrapper(
 /// Raises
 /// ------
 /// ValueError
-///     If the inputs produce a non-finite vega.
+///     If an input is non-finite, ``forward + shift`` or ``strike + shift`` is
+///     not positive, ``vol`` or ``expiry`` is negative, or the vega is
+///     non-finite.
 ///
 /// Examples
 /// --------
@@ -851,11 +927,7 @@ fn black_shifted_vega_wrapper(
     expiry: f64,
     shift: f64,
 ) -> PyResult<f64> {
-    checked_closed_form_value(
-        black_shifted_vega(forward, strike, vol, expiry, shift),
-        "shifted Black vega",
-    )
-    .map_err(core_to_py)
+    black_shifted_vega(forward, strike, vol, expiry, shift).map_err(core_to_py)
 }
 
 // barrier_call / barrier_put
@@ -916,8 +988,8 @@ fn barrier_call_wrapper(
     direction: &str,
     knock: &str,
 ) -> PyResult<f64> {
-    barrier_call_str(
-        spot, strike, barrier, expiry, rate, div_yield, vol, direction, knock,
+    barrier_call(
+        spot, strike, barrier, rate, div_yield, vol, expiry, direction, knock,
     )
     .map_err(core_to_py)
 }
@@ -978,8 +1050,8 @@ fn barrier_put_wrapper(
     direction: &str,
     knock: &str,
 ) -> PyResult<f64> {
-    barrier_put_str(
-        spot, strike, barrier, expiry, rate, div_yield, vol, direction, knock,
+    barrier_put(
+        spot, strike, barrier, rate, div_yield, vol, expiry, direction, knock,
     )
     .map_err(core_to_py)
 }
@@ -1029,7 +1101,7 @@ fn barrier_put_wrapper(
 /// - Kemna-Vorst (1990): see docs/REFERENCES.md#kemna-vorst-1990
 /// - Turnbull-Wakeman (1991): see docs/REFERENCES.md#turnbull-wakeman-1991
 #[pyfunction(name = "asian_option_price")]
-#[pyo3(signature = (spot, strike, rate, div_yield, vol, expiry, num_fixings, averaging="arithmetic", is_call=true))]
+#[pyo3(signature = (spot, strike, rate, div_yield, vol, expiry, num_fixings, averaging=DEFAULT_ASIAN_AVERAGING, is_call=true))]
 #[allow(clippy::too_many_arguments)]
 fn asian_option_wrapper(
     spot: f64,
@@ -1042,13 +1114,13 @@ fn asian_option_wrapper(
     averaging: &str,
     is_call: bool,
 ) -> PyResult<f64> {
-    asian_option_price_str(
+    asian_option_price(
         spot,
         strike,
-        expiry,
         rate,
         div_yield,
         vol,
+        expiry,
         num_fixings,
         averaging,
         OptionType::from(is_call),
@@ -1101,7 +1173,7 @@ fn asian_option_wrapper(
 /// -------
 /// - Conze-Viswanathan (1991): see docs/REFERENCES.md#conze-viswanathan-1991
 #[pyfunction(name = "lookback_option_price")]
-#[pyo3(signature = (spot, strike, rate, div_yield, vol, expiry, extremum, strike_type="fixed", is_call=true))]
+#[pyo3(signature = (spot, strike, rate, div_yield, vol, expiry, extremum, strike_type=DEFAULT_LOOKBACK_STRIKE_TYPE, is_call=true))]
 #[allow(clippy::too_many_arguments)]
 fn lookback_option_wrapper(
     spot: f64,
@@ -1114,13 +1186,13 @@ fn lookback_option_wrapper(
     strike_type: &str,
     is_call: bool,
 ) -> PyResult<f64> {
-    lookback_option_price_str(
+    lookback_option_price(
         spot,
         strike,
-        expiry,
         rate,
         div_yield,
         vol,
+        expiry,
         extremum,
         strike_type,
         OptionType::from(is_call),
@@ -1275,19 +1347,15 @@ fn heston_price_wrapper(
 ) -> PyResult<f64> {
     let params = HestonPricingParams::new(rate, div_yield, kappa, theta, sigma_v, rho, v0)
         .map_err(core_to_py)?;
-    py.detach(move || {
-        if is_call {
-            heston_call_price_fourier(spot, strike, expiry, &params, None)
-        } else {
-            heston_put_price_fourier(spot, strike, expiry, &params, None)
-        }
-    })
-    .map_err(core_to_py)
+    let option_type = OptionType::from(is_call);
+    py.detach(move || heston_price(spot, strike, expiry, &params, option_type, None))
+        .map_err(core_to_py)
 }
 
 /// Register the analytic option primitives on the models submodule.
 pub fn register(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyBsGreeks>()?;
+    m.add_class::<PyForwardGreeks>()?;
     m.add_function(wrap_pyfunction!(bs_price_wrapper, m)?)?;
     m.add_function(wrap_pyfunction!(vanilla_expiry_payoff_wrapper, m)?)?;
     m.add_function(wrap_pyfunction!(bs_greeks_wrapper, m)?)?;
