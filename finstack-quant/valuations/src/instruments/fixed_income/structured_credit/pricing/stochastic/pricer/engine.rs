@@ -393,9 +393,8 @@ impl StochasticPricer {
             }
         );
         let per_name_simulator = self.per_name_simulator()?;
-        // `(0..n).into_par_iter()` is an order-preserving
-        // `IndexedParallelIterator`: `collect()` returns outputs in path
-        // order regardless of rayon scheduling, and each path keeps a stable
+        // `try_map_ordered` over `0..n` returns outputs in path order
+        // regardless of rayon scheduling, and each path keeps a stable
         // index for its factor and idiosyncratic-draw substreams. Both
         // properties are required for bit-identical serial/parallel results
         // (the downstream Welford accumulation is order-sensitive).
@@ -420,19 +419,9 @@ impl StochasticPricer {
             )
         };
 
-        #[cfg(not(target_arch = "wasm32"))]
-        let outputs: Vec<PathScenarioOutput> = {
-            use rayon::prelude::*;
-            (0..total_paths)
-                .into_par_iter()
-                .map(price_factors)
-                .collect::<Result<Vec<_>>>()?
-        };
-
-        #[cfg(target_arch = "wasm32")]
-        let outputs: Vec<PathScenarioOutput> = (0..total_paths)
-            .map(price_factors)
-            .collect::<Result<Vec<_>>>()?;
+        // A failure reports the first failing path in path order.
+        let outputs: Vec<PathScenarioOutput> =
+            finstack_quant_core::parallel::try_map_ordered(0..total_paths, price_factors)?;
 
         let mut collector = ScenarioCollector::new(
             instrument,

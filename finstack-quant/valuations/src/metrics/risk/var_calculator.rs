@@ -517,16 +517,9 @@ where
         scenario_pnl(&scenario_market)
     };
 
-    #[cfg(not(target_arch = "wasm32"))]
-    {
-        use rayon::prelude::*;
-        history.scenarios.par_iter().map(map_scenario).collect()
-    }
-
-    #[cfg(target_arch = "wasm32")]
-    {
-        history.scenarios.iter().map(map_scenario).collect()
-    }
+    // Several failing scenarios report the first failing scenario in history
+    // order on every target and thread count.
+    finstack_quant_core::parallel::try_map_ordered(&history.scenarios, map_scenario)
 }
 
 /// Calculate VaR using full revaluation method.
@@ -1272,6 +1265,39 @@ mod tests {
         assert_eq!(collected.per_curve["USD-OIS"]["5y"], 1.0);
         assert_eq!(collected.per_curve["USD_x2dOIS"]["5y"], 2.0);
         assert_eq!(collected.per_curve["USD::OIS"]["5y"], 3.0);
+    }
+
+    #[test]
+    fn several_invalid_scenarios_report_the_first_scenario_in_history_order() {
+        // 64 scenarios, each with an invalid credit tenor on its own curve. The
+        // native parallel map must name CRV-000 on every run, as the serial
+        // (wasm32) loop does.
+        let as_of = sample_as_of();
+        let market = usd_ois_market(as_of).expect("market");
+        let scenarios = (0..64)
+            .map(|i| {
+                MarketScenario::new(
+                    as_of,
+                    vec![RiskFactorShift {
+                        factor: RiskFactorType::CreditSpread {
+                            curve_id: CurveId::from(format!("CRV-{i:03}")),
+                            tenor_years: -1.0,
+                        },
+                        shift: 0.001,
+                    }],
+                )
+            })
+            .collect();
+        let history = history_from_scenarios(as_of, 64, scenarios);
+        for _ in 0..20 {
+            let error = aggregate_scenario_pnls_par(&history, &market, |_| Ok(0.0), None)
+                .expect_err("every scenario is invalid")
+                .to_string();
+            assert!(
+                error.contains("'CRV-000'"),
+                "expected the first scenario, got {error}"
+            );
+        }
     }
 
     #[test]

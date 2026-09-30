@@ -2,7 +2,6 @@
 
 use super::spec::{default_attribution_metrics, AttributionResult, AttributionSpec};
 use super::{attribute_pnl_metrics_based, AttributionMethod};
-use finstack_quant_calibration::recalibration::CachedRecalibrationProvider;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::{currency::Currency, dates::Date, money::Money, Error, Result};
 use finstack_quant_valuations::instruments::model_params::ModelParamsSnapshot;
@@ -239,10 +238,8 @@ impl AttributionSpec {
 
                 // Attach FinstackConfig so sensitivity bump knobs (e.g. rate_bump_bp)
                 // reach the producer instead of silently falling back to defaults.
-                let pricing_options =
-                    finstack_quant_valuations::instruments::PricingOptions::default()
-                        .with_config(&config)
-                        .with_recalibration_provider(Arc::new(CachedRecalibrationProvider::new()));
+                let pricing_options = finstack_quant_calibration::recalibration::pricing_options()
+                    .with_config(&config);
                 let val_t0 = metrics_instrument.price_with_metrics(
                     &market_t0,
                     self.as_of_t0,

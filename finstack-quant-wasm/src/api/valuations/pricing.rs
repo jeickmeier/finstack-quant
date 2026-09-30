@@ -16,8 +16,12 @@
 //! is `None`, the core MC pricers derive a **stable** seed deterministically
 //! from the instrument ID (see
 //! `finstack_quant_valuations::instruments::InstrumentPricingOverrides`). Repricing the same
-//! instrument JSON therefore yields bit-identical results without the caller
-//! supplying a seed. Callers who need a distinct deterministic stream set
+//! instrument JSON on the same build target therefore yields bit-identical
+//! results without the caller supplying a seed. The wasm32 build and the
+//! native (Python) build can differ at the `f64` rounding level, because their
+//! transcendental math libraries differ, and Monte Carlo and finite-difference
+//! metrics amplify that (see `INVARIANTS.md` §2.1); compare across hosts with
+//! a tolerance. Callers who need a distinct deterministic stream set
 //! that label inside the instrument JSON. This contract is verified by
 //! `tests::price_instrument_mc_is_deterministic_without_explicit_seed`.
 
@@ -28,20 +32,8 @@ use crate::utils::input::{
 };
 use crate::utils::{to_js_err, to_js_value, to_js_value_with_bigints};
 use finstack_quant_core::market_data::context::MarketContext;
-use finstack_quant_valuations::instruments::PricingOptions;
 use finstack_quant_valuations::results::ValuationResult;
-use std::sync::Arc;
 use wasm_bindgen::prelude::*;
-
-/// Attach the host-owned cached recalibration provider.
-///
-/// Lives here rather than in `finstack-quant-valuations` because that crate
-/// cannot depend on `finstack-quant-calibration`.
-fn binding_pricing_options() -> PricingOptions {
-    PricingOptions::default().with_recalibration_provider(Arc::new(
-        finstack_quant_calibration::recalibration::CachedRecalibrationProvider::new(),
-    ))
-}
 
 pub(super) fn parse_market_json(market_json: &str) -> Result<MarketContext, JsValue> {
     serde_json::from_str(market_json).map_err(to_js_err)
@@ -89,7 +81,7 @@ pub(super) fn price_result_with_context(
         model,
         &metrics,
         market_history_json,
-        binding_pricing_options(),
+        finstack_quant_calibration::recalibration::pricing_options(),
     )
     .map_err(to_js_err)
 }
@@ -152,7 +144,7 @@ pub(super) fn metric_value_with_context(
         as_of,
         model,
         metric,
-        binding_pricing_options(),
+        finstack_quant_calibration::recalibration::pricing_options(),
     )
     .map_err(to_js_err)
 }
@@ -168,7 +160,7 @@ pub(super) fn standard_option_greeks_with_context(
         market,
         as_of,
         model,
-        binding_pricing_options(),
+        finstack_quant_calibration::recalibration::pricing_options(),
     )
     .map_err(to_js_err)
 }

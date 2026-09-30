@@ -564,16 +564,9 @@ fn execute_batch(
         })
     };
 
-    #[cfg(not(target_arch = "wasm32"))]
-    {
-        use rayon::prelude::*;
-        batch.par_iter().map(run_item).collect()
-    }
-
-    #[cfg(target_arch = "wasm32")]
-    {
-        batch.iter().map(run_item).collect()
-    }
+    // Parallel on native, serial on wasm32; either way a batch with several
+    // failing steps reports the first failing step in batch order.
+    finstack_quant_core::parallel::try_map_ordered(batch, run_item)
 }
 
 /// Apply batch results to context and state.

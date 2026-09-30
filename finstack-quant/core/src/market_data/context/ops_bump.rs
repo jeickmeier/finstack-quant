@@ -6,6 +6,7 @@
 use crate::market_data::bumps::{BumpSpec, Bumpable, MarketBump};
 use crate::types::CurveId;
 use crate::Result;
+use indexmap::IndexMap;
 use std::sync::Arc;
 
 use super::{ContextMutationInfo, ContextScratchBump, CurveStorage, MarketContext};
@@ -210,10 +211,13 @@ impl MarketContext {
     where
         I: IntoIterator<Item = MarketBump>,
     {
-        use crate::collections::HashMap;
         use crate::error::InputError;
 
-        let mut curve_bumps: HashMap<CurveId, BumpSpec> = HashMap::default();
+        // Insertion-ordered so curve bumps apply, and the first missing id is
+        // reported, in caller order on every target (FxHash order differs
+        // between native and wasm32). A repeated id keeps its first position
+        // and its last spec.
+        let mut curve_bumps: IndexMap<CurveId, BumpSpec> = IndexMap::new();
         let mut fx_bumps = Vec::new();
         let mut vol_bumps = Vec::new();
         let mut base_corr_bumps = Vec::new();
@@ -321,13 +325,10 @@ impl MarketContext {
 
     /// Apply curve bumps using the centralized bump-and-rebuild logic in `CurveStorage`.
     ///
-    /// This method iterates over the bump specifications and applies them to curves,
+    /// This method iterates over the bump specifications in caller order and applies them to curves,
     /// surfaces, prices, or series. The `CurveStorage::apply_bump_preserving_id` method
     /// handles the curve-specific bumping and ID preservation logic.
-    fn apply_curve_bumps(
-        &mut self,
-        bumps: crate::collections::HashMap<CurveId, BumpSpec>,
-    ) -> Result<Vec<CurveId>> {
+    fn apply_curve_bumps(&mut self, bumps: IndexMap<CurveId, BumpSpec>) -> Result<Vec<CurveId>> {
         let mut needs_credit_rebind = false;
         for (curve_id, bump_spec) in bumps {
             let cid = curve_id.as_str();
@@ -680,6 +681,38 @@ mod tests {
                 .rate(5.0)
                 .to_bits(),
             forward_before.to_bits()
+        );
+    }
+
+    #[test]
+    fn missing_curve_bumps_report_the_first_missing_id_in_caller_order() {
+        let discount = DiscountCurve::builder("USD-OIS")
+            .base_date(as_of())
+            .knots([(0.0, 1.0), (5.0, 0.85)])
+            .build()
+            .expect("discount curve");
+        let market = MarketContext::new().insert(discount);
+        // Several missing ids in an order unrelated to their hash order; the
+        // error must name the first one the caller passed, on every target.
+        let ids = [
+            "ZZ-MISSING",
+            "AA-MISSING",
+            "MM-MISSING",
+            "QQ-MISSING",
+            "BB-MISSING",
+        ];
+        let bumps = std::iter::once(MarketBump::Curve {
+            id: CurveId::from("USD-OIS"),
+            spec: BumpSpec::parallel_bp(1.0),
+        })
+        .chain(ids.iter().map(|id| MarketBump::Curve {
+            id: CurveId::from(*id),
+            spec: BumpSpec::parallel_bp(1.0),
+        }));
+        let err = market.bump(bumps).expect_err("missing curves must fail");
+        assert!(
+            err.to_string().contains("ZZ-MISSING"),
+            "expected the first missing id, got {err}"
         );
     }
 }

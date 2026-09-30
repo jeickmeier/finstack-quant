@@ -37,6 +37,11 @@ ts-rs = { version = "12", optional = true, features = ["serde-compat", "no-serde
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 time = { workspace = true, features = ["wasm-bindgen"] }
 
+# rayon has no working thread pool on single-threaded wasm32; `parallel` is
+# serial there, so the dependency is native-only.
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+rayon = "1.11"
+
 [features]
 default = ["json-schema"]
 json-schema = ["dep:schemars"]

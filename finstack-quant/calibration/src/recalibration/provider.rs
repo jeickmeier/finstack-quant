@@ -9,6 +9,7 @@ use super::rates::{
 };
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::{DiscountCurve, HazardCurve};
+use finstack_quant_valuations::instruments::PricingOptions;
 use finstack_quant_valuations::recalibration::{
     DiscountCurveRecalibrationRequest, HazardRecalibrationAction, HazardRecalibrationRequest,
     HazardSpreadRiskBucket, RateMarketRecalibrationRequest, RecalibrationProvider,
@@ -28,6 +29,28 @@ impl CachedRecalibrationProvider {
     pub fn new() -> Self {
         Self::default()
     }
+}
+
+/// Default pricing options for one pricing batch: [`PricingOptions::default`]
+/// with a fresh [`CachedRecalibrationProvider`] attached.
+///
+/// Quote-recalibrated metrics such as CS01 and bucketed DV01 need a
+/// recalibration provider, and `finstack-quant-valuations` cannot construct
+/// one because it does not depend on this crate. Every host that prices
+/// instruments (the Python and WASM bindings, portfolio evaluation) starts from
+/// this function so they share one default. The provider's caches live as long
+/// as the returned options, so build new options per independent batch.
+///
+/// # Examples
+///
+/// ```
+/// let options = finstack_quant_calibration::recalibration::pricing_options();
+/// assert!(options.recalibration_provider.is_some());
+/// ```
+#[must_use]
+pub fn pricing_options() -> PricingOptions {
+    PricingOptions::default()
+        .with_recalibration_provider(Arc::new(CachedRecalibrationProvider::new()))
 }
 
 impl RecalibrationProvider for CachedRecalibrationProvider {

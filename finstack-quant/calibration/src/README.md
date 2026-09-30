@@ -249,6 +249,12 @@ the bump.
 - Fixed inputs give identical outputs: Halton multi-start, no system RNG.
 - Residual keys use `BTreeMap` ordering.
 - Solver loops reuse buffers; parallelism is opt-in via `use_parallel`.
+- A parallel batch in which several steps fail reports the first failing step
+  in plan order, the same error as the sequential run and as the wasm32 build.
+- Outputs are reproducible per build target. `f64` results from native
+  (Python) and wasm32 (WASM) builds can differ at the ulp level, and multi-start
+  diagnostics such as iteration counts can differ with them, so cross-host
+  comparisons must use a tolerance (see `INVARIANTS.md` §2.1).
 
 ## Extending
 

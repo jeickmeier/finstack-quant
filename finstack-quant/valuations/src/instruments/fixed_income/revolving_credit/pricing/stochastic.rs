@@ -285,28 +285,16 @@ impl RevolvingCreditPricer {
         // Price each path. Paths carry their own pre-generated randomness and
         // `generate_stochastic_path` / `price_single_path` are pure functions of
         // `path_data` plus the shared (immutable) engine/facility/market, so the
-        // valuation is parallelised. `into_par_iter().collect()` preserves path
-        // order, keeping the antithetic pairing and the PV statistics identical
-        // to the serial implementation.
+        // valuation is parallelised. `try_map_ordered` preserves path order,
+        // keeping the antithetic pairing and the PV statistics identical to the
+        // serial implementation.
         let price_path = |path_data| {
             let schedule = engine.generate_stochastic_path(path_data)?;
             Self::price_single_path(facility, market, as_of, schedule)
         };
 
-        #[cfg(not(target_arch = "wasm32"))]
-        let path_results: Vec<_> = {
-            use rayon::prelude::*;
-            paths
-                .into_par_iter()
-                .map(price_path)
-                .collect::<Result<Vec<_>>>()?
-        };
-
-        #[cfg(target_arch = "wasm32")]
-        let path_results: Vec<_> = paths
-            .into_iter()
-            .map(price_path)
-            .collect::<Result<Vec<_>>>()?;
+        // A failure reports the first failing path in path order.
+        let path_results = finstack_quant_core::parallel::try_map_ordered(paths, price_path)?;
 
         // Compute MC statistics using Bessel-corrected variance (N-1 denominator)
         // for unbiased standard error estimation.

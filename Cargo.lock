@@ -832,6 +832,7 @@ dependencies = [
  "proptest",
  "rand 0.9.5",
  "rand_pcg",
+ "rayon",
  "rust_decimal",
  "rustc-hash",
  "schemars",
@@ -867,6 +868,7 @@ version = "0.9.0"
 dependencies = [
  "criterion",
  "finstack-quant-core",
+ "libm",
  "nalgebra",
  "schemars",
  "serde",

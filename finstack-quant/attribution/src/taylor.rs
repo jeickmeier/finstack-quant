@@ -434,8 +434,7 @@ fn compute_taylor_result(
                 market_t0,
                 as_of_t0,
                 &[finstack_quant_valuations::metrics::MetricId::BucketedCs01],
-                finstack_quant_valuations::instruments::PricingOptions::default()
-                    .with_recalibration_provider(Arc::new(CachedRecalibrationProvider::new())),
+                finstack_quant_calibration::recalibration::pricing_options(),
             )
             .map(|vr| extract_keyrate_per_curve(&vr.measures, credit_curves, "bucketed_cs01"))
             .map_err(|error| {

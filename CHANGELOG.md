@@ -2,6 +2,22 @@
 
 ## [Unreleased]
 
+### WASM binding audit: native vs wasm32 determinism (2026-09-30)
+
+#### Changed
+
+- When several items of a parallel map fail, every target and thread count now reports the lowest-index failure, the same error the serial and wasm32 paths return. Before, native (Python) runs named an arbitrary failing item that changed from run to run. This covers calibration parallel batches (the first failing step), diagonal and tornado sensitivity (the first failing parameter/perturbation), ParCDS scenario runs (the first failing op), historical VaR/ES (the first failing scenario), statements Monte Carlo (the lowest failing path), portfolio-loss simulation, attribution's parallel execution policy, and the revolving-credit and structured-credit stochastic pricers. Native parallel runs now evaluate every item before reporting an error instead of stopping early.
+  - New `finstack_quant_core::parallel::try_map_ordered` is the shared helper.
+- `ewma_vol` (and `ewma_zscore`) use `libm::hypot` on every target, so native and WASM results are bit-identical; native values move by up to 1 ulp.
+- `MarketContext::bump` / `bump_observed` apply curve bumps in caller order, so with several missing curve ids the error names the first one passed.
+- `AssetPool::diversity_score` sums obligor balances in obligor-id order; values can move by an ulp and are now identical across targets.
+- Diagonal sensitivity runs the parallel path on every target, and tornado sensitivity is parallel on native.
+
+#### Added
+
+- `finstack_quant_calibration::recalibration::pricing_options()`: default `PricingOptions` with a fresh `CachedRecalibrationProvider`. The Python and WASM pricing entry points, portfolio evaluation and attribution use it instead of composing the default themselves.
+- `INVARIANTS.md` §2.1 records per-target reproducibility: `f64` results may differ at the ulp level between native and wasm32 (amplified by Monte Carlo and finite-difference metrics), so cross-host parity tests use a tolerance, while structure, ordering and which item an error names must agree.
+
 ### WASM binding audit: analytics (2026-09-30)
 
 #### Changed (BREAKING)

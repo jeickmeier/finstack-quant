@@ -59,14 +59,21 @@ impl<'a> SensitivityAnalyzer<'a> {
     ///
     /// # Parallelism
     ///
-    /// On native targets, diagonal sensitivity runs each
-    /// `(parameter, perturbation)` pair concurrently via Rayon. Each worker
+    /// On native targets, diagonal and tornado sensitivity run each
+    /// `(parameter, perturbation)` pair concurrently via Rayon; WebAssembly
+    /// builds (no Rayon thread pool) run the same pairs serially. Each pair
     /// holds its own cloned `FinancialModelSpec` and `Evaluator`. Results
-    /// match the serial path bit-for-bit given the same seed and model.
+    /// match the serial path bit-for-bit given the same seed and model, and
+    /// so do errors: when several pairs fail, the error is the first failing
+    /// pair's in `(parameter, perturbation)` order on every target.
     ///
-    /// WebAssembly builds use the serial path (no Rayon thread pool).
+    /// Full-grid mode is serial.
     ///
-    /// Full-grid and tornado modes remain serial.
+    /// # Arguments
+    ///
+    /// * `config` - Sensitivity mode, the parameters to perturb (node id,
+    ///   period and absolute perturbed values) and the target metrics used to
+    ///   rank tornado impacts.
     ///
     /// # Errors
     ///
@@ -74,11 +81,6 @@ impl<'a> SensitivityAnalyzer<'a> {
     /// model evaluation, and result-collection errors from the selected mode.
     pub fn run(&self, config: &SensitivityConfig) -> Result<SensitivityResult> {
         match config.mode {
-            // Diagonal runs in parallel on native targets; wasm32 has no
-            // rayon thread pool, so fall back to the serial path.
-            #[cfg(not(target_arch = "wasm32"))]
-            SensitivityMode::Diagonal => self.run_diagonal_parallel(config),
-            #[cfg(target_arch = "wasm32")]
             SensitivityMode::Diagonal => self.run_diagonal(config),
             SensitivityMode::FullGrid => self.run_full_grid(config),
             SensitivityMode::Tornado => self.run_tornado(config),
@@ -86,68 +88,16 @@ impl<'a> SensitivityAnalyzer<'a> {
     }
 
     /// Run diagonal sensitivity (one-at-a-time).
-    fn run_diagonal(&self, config: &SensitivityConfig) -> Result<SensitivityResult> {
-        let mut evaluator = Evaluator::new();
-        let prepared = evaluator.prepare(self.model)?;
-        let mut model_clone = self.model.clone();
-        let mut scenarios = Vec::new();
-
-        for param in &config.parameters {
-            for perturbation in &param.perturbations {
-                self.apply_parameter_override(
-                    &mut model_clone,
-                    &param.node_id,
-                    param.period_id,
-                    *perturbation,
-                )?;
-
-                let results = match evaluator.evaluate_prepared(&model_clone, &prepared) {
-                    Ok(r) => r,
-                    Err(e) => {
-                        // Restore model state before propagating the error
-                        let _ = self.restore_parameter(
-                            &mut model_clone,
-                            &param.node_id,
-                            param.period_id,
-                        );
-                        return Err(e);
-                    }
-                };
-
-                self.restore_parameter(&mut model_clone, &param.node_id, param.period_id)?;
-
-                let mut parameter_values = IndexMap::new();
-                parameter_values.insert(
-                    scenario_parameter_key(&param.node_id, param.period_id),
-                    *perturbation,
-                );
-
-                scenarios.push(SensitivityScenario {
-                    parameter_values,
-                    results,
-                });
-            }
-        }
-
-        Ok(SensitivityResult {
-            config: config.clone(),
-            scenarios,
-            baseline: None,
-        })
-    }
-
-    /// Parallel diagonal sensitivity using rayon.
     ///
-    /// Each `(parameter, perturbation)` pair runs on its own worker with
-    /// an independently-cloned model and evaluator, so there is no shared
-    /// mutable state and no need for the serial path's apply/restore
-    /// bookkeeping. Ordering is preserved to match the serial output.
-    #[cfg(not(target_arch = "wasm32"))]
-    fn run_diagonal_parallel(&self, config: &SensitivityConfig) -> Result<SensitivityResult> {
-        use rayon::prelude::*;
-
-        // Flatten (param, perturbation) into a work list so the parallel
-        // iterator can dispatch uniformly and collect in original order.
+    /// Each `(parameter, perturbation)` pair runs with its own model and
+    /// evaluator clone, so there is no shared mutable state and no
+    /// apply/restore bookkeeping. On native targets the pairs run on the
+    /// Rayon pool; wasm32 runs them serially. Scenarios come back in
+    /// `(parameter, perturbation)` order, and when several pairs fail the error
+    /// is the first failing pair's on every target.
+    fn run_diagonal(&self, config: &SensitivityConfig) -> Result<SensitivityResult> {
+        // Flatten (param, perturbation) into a work list so the map can
+        // dispatch uniformly and collect in original order.
         let work: Vec<(&ParameterSpec, f64)> = config
             .parameters
             .iter()
@@ -167,11 +117,9 @@ impl<'a> SensitivityAnalyzer<'a> {
         let mut base_evaluator = Evaluator::new();
         let prepared = base_evaluator.prepare(self.model)?;
 
-        let scenarios: Result<Vec<SensitivityScenario>> = work
-            .par_iter()
-            .map(|(param, perturbation)| {
-                // Each worker owns its own model and evaluator clone — no shared
-                // mutable state, no restore bookkeeping needed because the local
+        let scenarios: Vec<SensitivityScenario> =
+            finstack_quant_core::parallel::try_map_ordered(&work, |(param, perturbation)| {
+                // Each worker owns its own model and evaluator clone; the local
                 // model is dropped at the end of the closure.
                 let mut local_model = self.model.clone();
                 let mut local_evaluator = base_evaluator.clone();
@@ -191,16 +139,15 @@ impl<'a> SensitivityAnalyzer<'a> {
                     *perturbation,
                 );
 
-                Ok(SensitivityScenario {
+                Ok::<_, Error>(SensitivityScenario {
                     parameter_values,
                     results,
                 })
-            })
-            .collect();
+            })?;
 
         Ok(SensitivityResult {
             config: config.clone(),
-            scenarios: scenarios?,
+            scenarios,
             baseline: None,
         })
     }
@@ -908,5 +855,34 @@ mod tests {
             .expect("monetary result");
         assert_eq!(shocked.currency(), Currency::USD);
         assert_eq!(shocked.amount(), 110_000.0);
+    }
+
+    #[test]
+    fn diagonal_with_several_missing_nodes_reports_the_first_in_order() {
+        let period = PeriodId::quarter(2025, 1).expect("valid period fixture");
+        let model = ModelBuilder::new("missing_nodes")
+            .periods("2025Q1..Q1", None)
+            .expect("valid period range")
+            .value("revenue", &[(period, AmountOrScalar::scalar(100.0))])
+            .build()
+            .expect("valid model");
+        let analyzer = SensitivityAnalyzer::new(&model);
+        let mut config = SensitivityConfig::new(SensitivityMode::Diagonal);
+        config.add_parameter(ParameterSpec::new("revenue", period, 100.0, vec![90.0]));
+        for i in 0..8 {
+            config.add_parameter(ParameterSpec::new(
+                format!("missing_{i}"),
+                period,
+                1.0,
+                vec![1.0, 2.0],
+            ));
+        }
+        for _ in 0..20 {
+            let err = analyzer.run(&config).expect_err("missing nodes must fail");
+            assert!(
+                err.to_string().contains("'missing_0'"),
+                "expected the first missing node, got {err}"
+            );
+        }
     }
 }

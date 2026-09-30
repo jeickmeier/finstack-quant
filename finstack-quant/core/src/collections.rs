@@ -7,15 +7,22 @@
 //!
 //! # Why FxHash?
 //!
-//! - **Determinism**: No random seed initialization, so iteration order is
-//!   reproducible for a given insertion sequence.
+//! - **Determinism (one build target only)**: No random seed initialization,
+//!   so iteration order is reproducible for a given insertion sequence *on one
+//!   build target*. It differs between 64-bit native and wasm32 builds, because
+//!   the FxHash multiplier and mixing depend on pointer width. Never let
+//!   `HashMap`/`HashSet` iteration order reach results, floating-point
+//!   reductions, error selection or emitted `Vec` order; iterate a
+//!   `BTreeMap`/`IndexMap` or sort first.
 //! - **Speed**: ~2× faster than the default `RandomState` hasher for integer keys.
 //! - **Simplicity**: One hash implementation across the crate.
 //!
-//! # When to use `BTreeMap` instead
+//! # When to use `BTreeMap` or `IndexMap` instead
 //!
 //! Use `std::collections::BTreeMap` when you need **stable, sorted iteration**
-//! (e.g., serializing snapshots for golden tests or deterministic JSON output).
+//! (e.g., serializing snapshots for golden tests or deterministic JSON output),
+//! and `indexmap::IndexMap` when iteration must follow insertion order. Both
+//! iterate identically on every target.
 //!
 //! # Example
 //!

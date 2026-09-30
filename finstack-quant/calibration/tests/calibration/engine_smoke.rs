@@ -199,3 +199,87 @@ fn test_v2_simple_usd_calibration() {
         "Spot forward should match first FRA"
     );
 }
+
+/// Plan of `n` independent discount curves `USD-FAIL-{i}`, each fed a quote set
+/// whose deposit rate is `rate`, so all steps land in one parallel batch.
+fn independent_failing_discount_envelope(
+    n: usize,
+    rate: f64,
+    use_parallel: bool,
+) -> CalibrationEnvelope {
+    let base_date = Date::from_calendar_date(2025, Month::January, 2).unwrap();
+    let mut market_data: Vec<MarketDatum> = Vec::new();
+    let mut quote_sets: HashMap<String, Vec<QuoteId>> = HashMap::default();
+    let mut steps = Vec::new();
+    for i in 0..n {
+        let quotes = vec![
+            MarketQuote::Rates(RateQuote::Deposit {
+                id: QuoteId::new(format!("DEP-{i}")),
+                index: IndexId::new("USD-Deposit"),
+                pillar: Pillar::Tenor(Tenor::parse("1M").unwrap()),
+                rate,
+            }),
+            MarketQuote::Rates(RateQuote::Swap {
+                id: QuoteId::new(format!("SWAP-{i}")),
+                index: IndexId::new("USD-OIS"),
+                pillar: Pillar::Tenor(Tenor::parse("1Y").unwrap()),
+                rate,
+                spread_decimal: None,
+            }),
+        ];
+        quote_sets.insert(format!("set_{i}"), cal_utils::quote_set_ids(&quotes));
+        cal_utils::extend_market_data(&mut market_data, &quotes);
+        steps.push(CalibrationStep {
+            id: format!("step_{i}"),
+            quote_set: format!("set_{i}"),
+            params: StepParams::Discount(DiscountCurveParams {
+                curve_id: format!("USD-FAIL-{i}").into(),
+                currency: Currency::USD,
+                base_date,
+                method: CalibrationMethod::Bootstrap,
+                interpolation: Default::default(),
+                extrapolation: ExtrapolationPolicy::FlatForward,
+                pricing_discount_id: None,
+                pricing_forward_id: None,
+                conventions: Default::default(),
+            }),
+        });
+    }
+    CalibrationEnvelope {
+        schema_url: None,
+        schema: finstack_quant_calibration::api::schema::CalibrationSchema::CURRENT,
+        plan: CalibrationPlan {
+            id: "failing_batch".to_string(),
+            description: None,
+            quote_sets: quote_sets.into_iter().collect(),
+            settings: CalibrationConfig {
+                use_parallel,
+                ..Default::default()
+            },
+            steps,
+        },
+        market_data,
+        prior_market: Vec::new(),
+    }
+}
+
+#[test]
+fn parallel_batch_with_several_failing_steps_reports_the_first_step() {
+    // Eight independent discount steps form one parallel batch and every one
+    // fails to bootstrap. The parallel run must name the same (first) step as
+    // the sequential run, on every run.
+    let serial = engine::calibrate(&independent_failing_discount_envelope(8, 25.0, false))
+        .expect_err("every step fails")
+        .to_string();
+    assert!(
+        serial.contains("DEP-0"),
+        "sequential run stops at step_0: {serial}"
+    );
+    let parallel_envelope = independent_failing_discount_envelope(8, 25.0, true);
+    for _ in 0..20 {
+        let error = engine::calibrate(&parallel_envelope)
+            .expect_err("every step fails")
+            .to_string();
+        assert_eq!(error, serial);
+    }
+}

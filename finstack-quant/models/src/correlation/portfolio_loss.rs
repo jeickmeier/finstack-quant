@@ -711,13 +711,23 @@ where
     F: Fn(usize) -> Result<f64> + Sync + Send,
 {
     use rayon::prelude::*;
-    losses
+    // Every path runs; when several fail, the lowest `path_index` wins, so the
+    // error matches the serial (wasm32) loop on every thread count.
+    let first_error = losses
         .par_iter_mut()
         .enumerate()
-        .try_for_each(|(path_index, loss)| {
-            *loss = simulate_path(path_index)?;
-            Ok(())
+        .filter_map(|(path_index, loss)| match simulate_path(path_index) {
+            Ok(value) => {
+                *loss = value;
+                None
+            }
+            Err(error) => Some((path_index, error)),
         })
+        .min_by_key(|(path_index, _)| *path_index);
+    match first_error {
+        Some((_, error)) => Err(error),
+        None => Ok(()),
+    }
 }
 
 #[cfg(target_arch = "wasm32")]
@@ -748,6 +758,33 @@ mod tests {
             *loss = simulate_path(path_index)?;
         }
         PortfolioLossResult::from_losses(losses, config.confidence)
+    }
+
+    #[test]
+    fn parallel_fill_reports_the_lowest_failing_path() {
+        let simulate_path = |path_index: usize| {
+            if path_index % 13 == 9 {
+                Err(validation_error(format!("path {path_index} failed")))
+            } else {
+                Ok(path_index as f64)
+            }
+        };
+        for _ in 0..30 {
+            let mut losses = allocate_loss_buffer(4_096).expect("buffer");
+            let error =
+                fill_parallel_losses(&mut losses, simulate_path).expect_err("several paths fail");
+            assert_eq!(
+                error.to_string(),
+                validation_error("path 9 failed").to_string()
+            );
+        }
+        let mut losses = allocate_loss_buffer(64).expect("buffer");
+        fill_parallel_losses(&mut losses, |path_index| Ok(path_index as f64 * 2.0))
+            .expect("no failures");
+        assert!(losses
+            .iter()
+            .enumerate()
+            .all(|(index, loss)| *loss == index as f64 * 2.0));
     }
 
     #[test]

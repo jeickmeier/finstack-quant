@@ -691,3 +691,48 @@ fn regression_scenario(id: &str, operations: Vec<OperationSpec>) -> ScenarioSpec
         ..Default::default()
     }
 }
+
+#[test]
+fn several_failing_par_cds_ops_report_the_first_op_in_order() {
+    // Sixteen independent ParCDS replacements on missing hazard curves run as
+    // one parallel batch on native targets. The error must name the first op's
+    // curve on every run, as the serial (wasm32) path does.
+    let base_date = Date::from_calendar_date(2025, Month::January, 15).unwrap();
+    let scenario = ScenarioSpec {
+        id: "missing_hazards".into(),
+        name: None,
+        description: None,
+        operations: (0..16)
+            .map(|i| OperationSpec::CurveParallelBp {
+                curve_kind: CurveKind::ParCDS,
+                curve_id: format!("HZ-{i:03}").into(),
+                discount_curve_id: None,
+                bp: 10.0,
+            })
+            .collect(),
+        priority: 0,
+        resolution_mode: Default::default(),
+        hazard_bump_mode: HazardBumpMode::SolveToPar,
+    };
+    let engine = ScenarioEngine::new();
+    for _ in 0..20 {
+        let mut market = MarketContext::new();
+        let mut model = FinancialModelSpec::new("test", vec![]);
+        let mut ctx = ExecutionContext {
+            market: &mut market,
+            model: Some(&mut model),
+            instruments: None,
+            rate_bindings: None,
+            calendar: None,
+            as_of: base_date,
+        };
+        let error = engine
+            .apply(&scenario, &mut ctx)
+            .expect_err("missing hazard curves must fail")
+            .to_string();
+        assert!(
+            error.contains("HZ-000"),
+            "expected the first op's curve, got {error}"
+        );
+    }
+}

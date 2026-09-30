@@ -633,7 +633,8 @@ impl Evaluator {
 
         // Run paths — parallel via rayon on native targets, serial on wasm32
         // (rayon's thread pool is unavailable in single-threaded wasm).
-        // Both paths are deterministic for a given seed.
+        // Both paths are deterministic for a given seed, and both report the
+        // lowest-index failing path when several paths fail.
         let run_single_path = |path_idx: usize| -> Result<PathResult> {
             let mut path_eval = self.clone();
             path_eval.forecast_cache.clear();
@@ -683,23 +684,43 @@ impl Evaluator {
 
         let accumulator_seed = MonteCarloAccumulator::new(model, config)?;
 
+        // Native: each rayon split folds its paths in increasing index order and
+        // stops at its first failure, carrying `(path_idx, error)`; the reduce
+        // keeps the smaller index. The reported error is therefore the
+        // lowest-index failing path's on every thread count, the same error
+        // the serial wasm32 loop returns. A merge failure (not tied to a path)
+        // carries `usize::MAX`, so any path error takes precedence.
         #[cfg(not(target_arch = "wasm32"))]
         let accumulator = {
             use rayon::prelude::*;
+            type Partial = std::result::Result<MonteCarloAccumulator, (usize, Error)>;
             (0..config.n_paths)
                 .into_par_iter()
-                .try_fold(
-                    || accumulator_seed.empty_like(),
-                    |mut acc, path_idx| {
-                        let (path_results, warnings) = run_single_path(path_idx)?;
-                        acc.push_path(path_idx, path_results, warnings)?;
+                .fold(
+                    || -> Partial { Ok(accumulator_seed.empty_like()) },
+                    |state, path_idx| {
+                        let mut acc = state?;
+                        run_single_path(path_idx)
+                            .and_then(|(path_results, warnings)| {
+                                acc.push_path(path_idx, path_results, warnings)
+                            })
+                            .map_err(|error| (path_idx, error))?;
                         Ok(acc)
                     },
                 )
-                .try_reduce(
-                    || accumulator_seed.empty_like(),
-                    |left, right| left.merge(right),
-                )?
+                .reduce(
+                    || Ok(accumulator_seed.empty_like()),
+                    |left, right| match (left, right) {
+                        (Ok(left), Ok(right)) => {
+                            left.merge(right).map_err(|error| (usize::MAX, error))
+                        }
+                        (Err(left), Err(right)) => {
+                            Err(if left.0 <= right.0 { left } else { right })
+                        }
+                        (Err(error), Ok(_)) | (Ok(_), Err(error)) => Err(error),
+                    },
+                )
+                .map_err(|(_, error)| error)?
         };
 
         #[cfg(target_arch = "wasm32")]

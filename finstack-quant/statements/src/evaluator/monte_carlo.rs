@@ -397,7 +397,7 @@ impl MonteCarloAccumulator {
         })
     }
 
-    // Only the rayon `try_reduce` path calls `merge`; the wasm32 serial
+    // Only the rayon `reduce` path calls `merge`; the wasm32 serial
     // accumulator folds in place, so this is dead code there.
     #[cfg_attr(target_arch = "wasm32", allow(dead_code))]
     pub(crate) fn merge(mut self, other: Self) -> Result<Self> {
@@ -663,5 +663,50 @@ mod tests {
             aggregate_monte_carlo_paths(&model, &opt_in_config, &[(path, Vec::new())])
                 .expect("opt-in aggregation should finish");
         assert!(opt_in_results.path_data.is_some());
+    }
+
+    #[test]
+    fn parallel_monte_carlo_reports_the_lowest_failing_path() {
+        // y = sqrt(x) with x ~ N(0.5, 1): many paths go non-finite. The error
+        // must name the lowest failing path's metric/period on every run, the
+        // same error the serial (wasm32) loop returns.
+        use crate::evaluator::Evaluator;
+        use crate::types::ForecastSpec;
+
+        let model = ModelBuilder::new("mc-first-error")
+            .periods("2025Q1..2026Q4", Some("2025Q1"))
+            .expect("valid periods")
+            .mixed("x")
+            .values(&[(
+                PeriodId::quarter(2025, 1).expect("valid period fixture"),
+                AmountOrScalar::scalar(1.0),
+            )])
+            .forecast(ForecastSpec::normal(0.5, 1.0, 7))
+            .build()
+            .expect("valid mixed node")
+            .compute("y", "sqrt(x)")
+            .expect("valid formula")
+            .build()
+            .expect("valid model");
+
+        // Serial reference: path results do not depend on `n_paths`, so the
+        // smallest `n` that fails isolates the lowest failing path, whose error
+        // is then the only one.
+        let serial_error = (1..=64)
+            .find_map(|n| {
+                Evaluator::new()
+                    .evaluate_monte_carlo(&model, &MonteCarloConfig::new(n, 42))
+                    .err()
+            })
+            .expect("some early path must go non-finite")
+            .to_string();
+
+        let config = MonteCarloConfig::new(2_000, 42);
+        for _ in 0..20 {
+            let error = Evaluator::new()
+                .evaluate_monte_carlo(&model, &config)
+                .expect_err("non-finite paths must fail");
+            assert_eq!(error.to_string(), serial_error);
+        }
     }
 }

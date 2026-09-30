@@ -108,3 +108,18 @@ test('JSON and direct results agree and never hide arithmetic overflow', () => {
     validation
   );
 });
+
+test('ewma_vol returns the same bits as the native (Python) build', () => {
+  // The Rust kernel uses libm::hypot on every target; the same vector is
+  // pinned in finstack-quant-py/tests/test_features_audit_regressions.py.
+  assert.deepEqual(
+    features.transformTimeseries(
+      [0.01, -0.02, 0.03, 0.0, 0.01],
+      ['A', 'A', 'A', 'A', 'A'],
+      ['1', '2', '3', '4', '5'],
+      'ewma_vol',
+      { span: 3 }
+    ),
+    [null, 0.015000000000000003, 0.020463381929681126, 0.015761900266148116, 0.011301963325015705]
+  );
+});

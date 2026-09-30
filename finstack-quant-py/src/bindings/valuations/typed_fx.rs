@@ -26,7 +26,6 @@ use super::convert::{
     enum_to_py_string, float_repr, money_repr, money_to_py, opt_repr, tenor_from_py,
 };
 use super::instruments::{enum_from_str, serialize_typed_instrument_json};
-use super::pricing::binding_pricing_options;
 
 /// Compute one scalar metric for a typed instrument envelope.
 ///
@@ -61,7 +60,7 @@ pub(crate) fn envelope_metric_value(
             &as_of,
             &model,
             &metric,
-            binding_pricing_options(),
+            finstack_quant_calibration::recalibration::pricing_options(),
         )
     })
     .map_err(core_to_py)
@@ -101,7 +100,7 @@ pub(crate) fn envelope_option_greeks<'py>(
                 &market,
                 &as_of,
                 &model,
-                binding_pricing_options(),
+                finstack_quant_calibration::recalibration::pricing_options(),
             )
         })
         .map_err(core_to_py)?;

@@ -9,21 +9,10 @@ use crate::bindings::extract::{extract_instrument_json, extract_market};
 use crate::bindings::module_utils::{py_to_json_string, py_to_serde};
 use crate::bindings::pandas_utils::{serde_rows_to_dataframe_with_schema, serde_to_py};
 use crate::errors::{core_to_py, display_to_py, value_error};
-use finstack_quant_valuations::instruments::{MetricPricingOverrides, PricingOptions};
+use finstack_quant_valuations::instruments::MetricPricingOverrides;
 use finstack_quant_valuations::metrics::risk::{MarketHistory, MarketScenario};
 use pyo3::prelude::*;
 use pyo3::types::PyString;
-use std::sync::Arc;
-
-/// Attach the host-owned cached recalibration provider.
-///
-/// Lives here rather than in `finstack-quant-valuations` because that crate
-/// cannot depend on `finstack-quant-calibration`.
-pub(super) fn binding_pricing_options() -> PricingOptions {
-    PricingOptions::default().with_recalibration_provider(Arc::new(
-        finstack_quant_calibration::recalibration::CachedRecalibrationProvider::new(),
-    ))
-}
 
 /// Metric-time pricing overrides merged into an instrument before pricing.
 ///

@@ -283,19 +283,11 @@ pub(super) fn generate_replace_curve_effects_parallel(
 ) -> Result<Vec<Vec<ScenarioEffect>>> {
     let market = &*ctx.market;
     let as_of = ctx.as_of;
-    #[cfg(not(target_arch = "wasm32"))]
-    {
-        use rayon::prelude::*;
-        ops.par_iter()
-            .map(|op| adapters::curves::generate_replace_curve_effects(op, market, as_of, env))
-            .collect()
-    }
-    #[cfg(target_arch = "wasm32")]
-    {
-        ops.iter()
-            .map(|op| adapters::curves::generate_replace_curve_effects(op, market, as_of, env))
-            .collect()
-    }
+    // Several failing ops report the first failing op in op order, the same
+    // error the serial path returns.
+    finstack_quant_core::parallel::try_map_ordered(ops, |op| {
+        adapters::curves::generate_replace_curve_effects(op, market, as_of, env)
+    })
 }
 
 /// Mutable sinks shared while applying one operation's effects.

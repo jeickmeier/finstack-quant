@@ -7,9 +7,8 @@ use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, InstrumentId};
 use rust_decimal::prelude::ToPrimitive;
 
-use finstack_quant_core::HashMap;
-
 use serde::{Deserialize, Serialize};
+use std::collections::BTreeMap;
 
 use super::cmbs::{BalloonSpec, PrepaymentPenalty, SpecialServicingSpec};
 use super::collateral::{InstrumentCollateral, ReserveInterestDestination};
@@ -1229,6 +1228,9 @@ impl AssetPool {
     }
 
     /// Calculate diversity score (simplified Moody's approach)
+    ///
+    /// Obligor balances are summed in obligor-id order, so the score is the
+    /// same bits on every build target and for any asset order.
     pub fn diversity_score(&self) -> f64 {
         let total_balance = match self.total_balance() {
             Ok(b) => b.amount(),
@@ -1239,18 +1241,10 @@ impl AssetPool {
             return 0.0;
         }
 
-        // Collect obligor balances
-        // Optimization: Sort and scan to avoid HashMap allocation if possible,
-        // but since we need to aggregate by string ID, a HashMap is often cleanest.
-        // However, to avoid allocating a new HashMap every time, we could pass a workspace.
-        // For now, we'll stick to the HashMap but pre-allocate capacity.
-        // A better optimization for the future would be to integerize obligor IDs.
-
-        let mut obligor_balances: HashMap<&str, f64> = {
-            let mut m = HashMap::default();
-            m.reserve(self.assets.len());
-            m
-        };
+        // Group balances by obligor in key order: the two f64 sums below are
+        // order-sensitive, and a hash map's iteration order differs between
+        // native and wasm32 builds.
+        let mut obligor_balances: BTreeMap<&str, f64> = BTreeMap::new();
 
         // Group by obligor
         for asset in &self.assets {

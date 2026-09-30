@@ -29,7 +29,7 @@ use super::convert::{
     attributes_from_py, attributes_to_py, enum_to_py_string, money_from_py, money_to_py, opt_repr,
     rate_decimal_from_py,
 };
-use super::pricing::{binding_pricing_options, market_history_json, metric_pricing_overrides_json};
+use super::pricing::{market_history_json, metric_pricing_overrides_json};
 use super::PyValuationResult;
 
 /// Parse a canonical typed-instrument envelope through the shared Rust path.
@@ -206,7 +206,7 @@ pub(crate) fn price_typed_envelope(
                 &model,
                 &metrics,
                 market_history.as_deref(),
-                binding_pricing_options(),
+                finstack_quant_calibration::recalibration::pricing_options(),
             )
         })
         .map_err(core_to_py)?;
@@ -237,7 +237,7 @@ pub(crate) fn metric_typed_envelope(
             &as_of,
             &model,
             &metric_id,
-            binding_pricing_options(),
+            finstack_quant_calibration::recalibration::pricing_options(),
         )
     })
     .map_err(core_to_py)
