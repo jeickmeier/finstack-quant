@@ -1,6 +1,7 @@
 import { expect, it } from "vitest";
 import { readFile } from "node:fs/promises";
 import init, { core } from "../../../finstack-quant-wasm/index.js";
+import type { MoneyValue } from "finstack-quant-wasm";
 import {
   convertRate,
   formatRate,
@@ -68,7 +69,10 @@ it("groups decimal text exactly and preserves the wire string", () => {
   );
   expect(groupDecimal("-0.00100")).toBe("-0.00100");
   expect(() => groupDecimal("1,000.00")).toThrow(/decimal/);
-  const wire = { amount: "12345678901234567890.12345", currency: "USD" };
+  const wire = {
+    amount: "12345678901234567890.12345",
+    currency: "USD" as const,
+  };
   expect(formatRawMoney(wire)).toBe("USD 12,345,678,901,234,567,890.12345");
   expect(wire.amount).toBe("12345678901234567890.12345");
   const native = core.Money.fromJson(JSON.stringify(wire));
@@ -90,7 +94,7 @@ it.each([
   ["ceil", "-1.249", "USD -1.24"],
 ] as const)("honours returned %s rounding for %s", (mode, amount, expected) => {
   const stamp: RoundingStamp = { mode, output_scale_by_currency: { USD: 2 } };
-  const money = { amount, currency: "USD" };
+  const money = { amount, currency: "USD" as const };
   expect(formatMoney(money, stamp, core)).toBe(expected);
   expect(money.amount).toBe(amount);
 });
@@ -99,9 +103,9 @@ it("uses currency-specific stamps and preserves digits where no scale was return
     mode: "bankers",
     output_scale_by_currency: { USD: 4, JPY: 0 },
   };
-  expect(formatMoney({ amount: "1.23456", currency: "USD" }, stamp, core)).toBe(
-    "USD 1.2346",
-  );
+  expect(
+    formatMoney({ amount: "1.23456", currency: "USD" as const }, stamp, core),
+  ).toBe("USD 1.2346");
   expect(formatMoney({ amount: "1.5", currency: "JPY" }, stamp, core)).toBe(
     "JPY 2",
   );
@@ -116,7 +120,7 @@ it("rejects inexact amount text through the native constructor", () => {
   };
   expect(() =>
     formatMoney(
-      { amount: "1.24500000000000000000000000001", currency: "USD" },
+      { amount: "1.24500000000000000000000000001", currency: "USD" as const },
       stamp,
       core,
     ),
@@ -132,7 +136,7 @@ it.each([
   (stamp) => {
     expect(() =>
       formatMoney(
-        { amount: "1.245", currency: "USD" },
+        { amount: "1.245", currency: "USD" as const },
         stamp as unknown as RoundingStamp,
         core,
       ),
@@ -140,7 +144,10 @@ it.each([
   },
 );
 it("keeps arbitrary-precision text raw without a scale stamp", () => {
-  const wide = { amount: "1.24500000000000000000000000001", currency: "USD" };
+  const wide = {
+    amount: "1.24500000000000000000000000001",
+    currency: "USD" as const,
+  };
   expect(formatRawMoney(wide)).toBe("USD 1.24500000000000000000000000001");
   expect(
     formatMoney(wide, { mode: "bankers", output_scale_by_currency: {} }, core),
@@ -171,14 +178,14 @@ it("provides native Table v9 definitions with raw accessors and presentation met
   type Row = {
     id: string;
     date: string;
-    money: { amount: string; currency: string };
+    money: MoneyValue;
     rate: string;
     delta: bigint;
   };
   const row: Row = {
     id: "BOND_A",
     date: "2024-02-29",
-    money: { amount: "1.23", currency: "USD" },
+    money: { amount: "1.23", currency: "USD" as const },
     rate: "0.025",
     delta: 2n,
   };

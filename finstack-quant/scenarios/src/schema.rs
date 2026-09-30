@@ -88,4 +88,25 @@ pub const ARTIFACTS: &[finstack_quant_core::schema::SchemaArtifact] = &[
         "Descriptive metadata of a built-in scenario template.",
     )
     .with_kind(finstack_quant_core::schema::SchemaKind::Output),
+    finstack_quant_core::schema::SchemaArtifact::new::<crate::ApplicationEnvelope>(
+        "schemas/scenarios/1/application_envelope.schema.json",
+        "https://finstack_quant.dev/schemas/scenarios/1/application_envelope.schema.json",
+        "ApplicationEnvelope",
+        "Scenario application result: mutated market, model and instruments with the report.",
+    )
+    .with_kind(finstack_quant_core::schema::SchemaKind::Output),
+    finstack_quant_core::schema::SchemaArtifact::new::<crate::HorizonResult>(
+        "schemas/scenarios/1/horizon_result.schema.json",
+        "https://finstack_quant.dev/schemas/scenarios/1/horizon_result.schema.json",
+        "HorizonResult",
+        "Horizon total return: factor-decomposed P&L with scenario context.",
+    )
+    .with_kind(finstack_quant_core::schema::SchemaKind::Output),
+    finstack_quant_core::schema::SchemaArtifact::new::<crate::HorizonSummary>(
+        "schemas/scenarios/1/horizon_summary.schema.json",
+        "https://finstack_quant.dev/schemas/scenarios/1/horizon_summary.schema.json",
+        "HorizonSummary",
+        "Derived total, annualized and per-factor returns of a horizon result.",
+    )
+    .with_kind(finstack_quant_core::schema::SchemaKind::Output),
 ];

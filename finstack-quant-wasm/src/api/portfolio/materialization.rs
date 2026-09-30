@@ -9,7 +9,7 @@ use wasm_bindgen::prelude::*;
 use wasm_bindgen::JsCast;
 
 use super::JsPortfolio;
-use crate::utils::{materialization_to_js_error, to_js_value_with_kind};
+use crate::utils::{materialization_to_js_error, to_js_value};
 
 /// Reusable bounded cache for decoded content-addressed instrument artifacts.
 ///
@@ -98,11 +98,7 @@ impl JsPortfolio {
             &JsValue::from("portfolio"),
             &JsValue::from(portfolio),
         )?;
-        js_sys::Reflect::set(
-            &result,
-            &JsValue::from("report"),
-            &to_js_value_with_kind(&report, "serialization")?,
-        )?;
+        js_sys::Reflect::set(&result, &JsValue::from("report"), &to_js_value(&report)?)?;
         Ok(result.into())
     }
 
@@ -128,9 +124,9 @@ impl JsPortfolio {
         let bytes = extract_bundle_bytes(bundle)?;
         match RustPortfolio::validate_materialization(&bytes, &cache.inner, &LoadLimits::default())
         {
-            Ok(report) => to_js_value_with_kind(&report, "serialization"),
+            Ok(report) => to_js_value(&report),
             Err(finstack_quant_portfolio::Error::MaterializationFailed(report)) => {
-                to_js_value_with_kind(&report, "serialization")
+                to_js_value(&report)
             }
             Err(error) => Err(materialization_to_js_error(error)),
         }

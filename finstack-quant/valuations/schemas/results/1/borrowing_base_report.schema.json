@@ -1,0 +1,27 @@
+{
+  "$id": "https://finstack_quant.dev/schemas/results/1/borrowing_base_report.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Asset-backed facility borrowing base, availability and advance-rate test.",
+  "properties": {
+    "borrowing_base": {
+      "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
+      "description": "Advance-rate-weighted eligible collateral after the limits."
+    },
+    "concentration_excess": {
+      "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
+      "description": "Eligible balance excluded by the concentration limits."
+    },
+    "eligible_collateral": {
+      "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
+      "description": "Collateral balance that meets the eligibility criteria, before\nconcentration limits."
+    }
+  },
+  "required": [
+    "eligible_collateral",
+    "concentration_excess",
+    "borrowing_base"
+  ],
+  "title": "BorrowingBaseReport",
+  "type": "object"
+}

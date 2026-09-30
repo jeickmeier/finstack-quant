@@ -96,6 +96,10 @@ pub struct ForecastMetrics {
     pub n: usize,
 }
 
+impl finstack_quant_core::wire::NonFiniteFields for ForecastMetrics {
+    const NON_FINITE_FIELDS: &'static [&'static str] = &["mae", "mape", "smape", "rmse"];
+}
+
 impl ForecastMetrics {
     /// Format metrics as a human-readable string.
     ///
@@ -247,6 +251,33 @@ pub fn backtest_forecast(actual: &[f64], forecast: &[f64]) -> Result<ForecastMet
 #[cfg(test)]
 mod tests {
     use super::*;
+    use finstack_quant_core::wire::NonFiniteFields;
+
+    /// `NON_FINITE_FIELDS` names exactly the keys that serialize as sentinel
+    /// strings when every `f64` metric is NaN.
+    #[test]
+    fn non_finite_fields_match_the_serde_attributes() {
+        let metrics = ForecastMetrics {
+            mae: f64::NAN,
+            mape: f64::NAN,
+            mape_effective_n: 0,
+            smape: f64::NAN,
+            rmse: f64::NAN,
+            n: 0,
+        };
+        let json = serde_json::to_value(&metrics).expect("serialize");
+        let mut sentinels: Vec<&str> = json
+            .as_object()
+            .expect("object")
+            .iter()
+            .filter(|(_, value)| value.is_string())
+            .map(|(key, _)| key.as_str())
+            .collect();
+        sentinels.sort_unstable();
+        let mut expected = ForecastMetrics::NON_FINITE_FIELDS.to_vec();
+        expected.sort_unstable();
+        assert_eq!(sentinels, expected);
+    }
 
     /// A NaN metric (MAPE with every actual at zero) writes the `"nan"`
     /// sentinel, so the serde form round-trips instead of degrading to `null`.

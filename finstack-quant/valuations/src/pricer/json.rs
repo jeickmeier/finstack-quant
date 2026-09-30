@@ -259,7 +259,9 @@ pub fn list_standard_metrics_grouped() -> BTreeMap<String, Vec<String>> {
 }
 
 /// Canonical per-key metric interpretation for host presentation.
-#[derive(Debug, Clone, PartialEq, serde::Serialize)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
 pub struct MetricMetadata {
     /// Original canonical wire key, retained without renaming.
     pub key: String,

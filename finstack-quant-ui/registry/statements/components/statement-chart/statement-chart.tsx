@@ -5,7 +5,7 @@ import { scaleBand } from "@tanstack/charts/scales/band";
 import { scaleLinear } from "@tanstack/charts/scales/linear";
 import { whenSelected } from "@tanstack/charts/selection";
 import { tooltip } from "@tanstack/charts/tooltip";
-import type { StatementResultJson } from "finstack-quant-wasm";
+import type { StatementResult } from "finstack-quant-wasm";
 import type { FinancialModelSpecWire } from "@/lib/finstack/generated/types/financial_model_spec";
 import type { LinkedSelection } from "@/hooks/shared/use-linked-selection/use-linked-selection";
 import {
@@ -31,7 +31,7 @@ export function StatementChart({
   link,
 }: {
   model: FinancialModelSpecWire;
-  result: StatementResultJson;
+  result: StatementResult;
   nodeId: string;
   link?: LinkedSelection;
 }) {

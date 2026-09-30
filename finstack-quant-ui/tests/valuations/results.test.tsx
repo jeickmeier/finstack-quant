@@ -8,7 +8,7 @@ import {
   within,
 } from "@testing-library/react";
 import { createRequire } from "node:module";
-import fixture from "../../src/fixtures/results/bond.json";
+import bondFixture from "../../src/fixtures/results/bond.json";
 import {
   ValuationSummary,
   type SuppliedValuation,
@@ -17,7 +17,9 @@ import {
   MeasuresGrid,
   groupMeasures,
 } from "@/components/finstack/valuations/components/measures-grid/measures-grid";
-import type { MetricMetadata } from "finstack-quant-wasm";
+import type { MetricMetadata, ValuationResult } from "finstack-quant-wasm";
+/** The JSON import widens currency codes to `string`; the fixture is a native result. */
+const fixture = bondFixture as typeof bondFixture & { result: ValuationResult };
 import { returnedRounding } from "@/components/finstack/valuations/primitives/stamp-badge/stamp-badge";
 import { formatMoney, formatRawMoney } from "../../src/format/format";
 const native = createRequire(import.meta.url)(
@@ -162,7 +164,7 @@ it("keeps comparison currencies, dates and stamps independent and never calculat
 it("handles missing and partial metadata without invented rounding or stamps", () => {
   const result = {
     ...fixture.result,
-    value: { amount: "1.23456789", currency: "USD" },
+    value: { amount: "1.23456789", currency: "USD" as const },
     meta: { numeric_mode: "f64", rounding: { mode: "bankers" } },
   };
   const view = render(
@@ -211,7 +213,10 @@ it("uses only explicit per-result units and keeps ungrouped metrics in the unava
 it("retains independent supplied model context and exact large money while presenting grouped column headers", () => {
   const result = {
     ...fixture.result,
-    value: { amount: "9007199254740993.1234567890123456789", currency: "USD" },
+    value: {
+      amount: "9007199254740993.1234567890123456789",
+      currency: "USD" as const,
+    },
     meta: null,
     measures: { ytm: 0.043 },
   };

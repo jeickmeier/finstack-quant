@@ -17,7 +17,10 @@ import detailFixtures from "./details/cases.json";
 import cashflowFixtures from "./cashflows/cases.json";
 import scenarioCases from "./scenario-table/cases.json";
 import pricingMarket from "./instruments/pricing-market.json";
-import fixture from "../../src/fixtures/results/bond.json";
+import type { ValuationResult } from "finstack-quant-wasm";
+import bondFixture from "../../src/fixtures/results/bond.json";
+/** The JSON import widens currency codes to `string`; the fixture is a native result. */
+const fixture = bondFixture as typeof bondFixture & { result: ValuationResult };
 import {
   type PriceRequest,
   FinstackError,

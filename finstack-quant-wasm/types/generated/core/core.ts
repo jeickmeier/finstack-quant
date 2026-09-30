@@ -1050,6 +1050,54 @@ export type VolQuoteType = "black_lognormal" | "normal";
  * strikes.
  */
 export type VolSurfaceAxis = "strike" | "tenor";
+/**
+ * Column storage variants supported by the table envelope.
+ */
+export type TableColumnData =
+  | {
+      type: "string";
+      values: string[];
+      [k: string]: unknown;
+    }
+  | {
+      type: "nullable_string";
+      values: (string | null)[];
+      [k: string]: unknown;
+    }
+  | {
+      type: "float64";
+      values: number[];
+      [k: string]: unknown;
+    }
+  | {
+      type: "nullable_float64";
+      values: (number | null)[];
+      [k: string]: unknown;
+    }
+  | {
+      type: "u_int32";
+      values: number[];
+      [k: string]: unknown;
+    }
+  | {
+      type: "nullable_u_int32";
+      values: (number | null)[];
+      [k: string]: unknown;
+    }
+  | {
+      type: "int64";
+      values: number[];
+      [k: string]: unknown;
+    }
+  | {
+      type: "nullable_int64";
+      values: (number | null)[];
+      [k: string]: unknown;
+    };
+/**
+ * Optional semantic hint for a column.
+ */
+export type TableColumnRole = "dimension" | "index" | "measure" | "attribute";
 
 /**
  * Serializable state for credit index data.
@@ -1787,4 +1835,48 @@ export interface SabrParameterData {
   nu: number;
   rho: number;
   shift?: number | null;
+}
+/**
+ * A single named column in a [`TableEnvelope`].
+ */
+export interface TableColumn {
+  /**
+   * Column values.
+   */
+  data: TableColumnData;
+  /**
+   * Optional per-column metadata.
+   */
+  metadata?: {
+    [k: string]: unknown;
+  };
+  /**
+   * Column name.
+   */
+  name: string;
+  /**
+   * Optional semantic hint for bindings and consumers.
+   */
+  role?: TableColumnRole | null;
+  [k: string]: unknown;
+}
+/**
+ * Column-oriented table with a shared row count and typed column storage.
+ */
+export interface TableEnvelope {
+  /**
+   * Ordered set of columns.
+   */
+  columns: TableColumn[];
+  /**
+   * Table-level metadata for downstream bindings and documentation.
+   */
+  metadata?: {
+    [k: string]: unknown;
+  };
+  /**
+   * Number of rows in the table.
+   */
+  row_count: number;
+  [k: string]: unknown;
 }

@@ -4277,6 +4277,113 @@ export type Function =
   | "sqrt"
   | "clamp"
   | "is_missing";
+/**
+ * Strongly-typed instrument classification for pricer dispatch.
+ *
+ * Each variant represents a distinct instrument type with its own pricing
+ * logic and risk characteristics. Used by the pricing registry to route
+ * instruments to appropriate pricer implementations.
+ */
+export type InstrumentType =
+  | "bond"
+  | "credit_default_swap"
+  | "cds_index"
+  | "cds_tranche"
+  | "cds_option"
+  | "interest_rate_swap"
+  | "cap_floor"
+  | "swaption"
+  | "bermudan_swaption"
+  | "basis_swap"
+  | "basket"
+  | "convertible_bond"
+  | "deposit"
+  | "equity_option"
+  | "fx_option"
+  | "fx_spot"
+  | "fx_swap"
+  | "xccy_swap"
+  | "inflation_linked_bond"
+  | "inflation_swap"
+  | "yoy_inflation_swap"
+  | "inflation_cap_floor"
+  | "interest_rate_future"
+  | "variance_swap"
+  | "fx_variance_swap"
+  | "equity"
+  | "repo"
+  | "forward_rate_agreement"
+  | "structured_credit"
+  | "private_markets_fund"
+  | "revolving_credit"
+  | "asian_option"
+  | "barrier_option"
+  | "lookback_option"
+  | "quanto_option"
+  | "autocallable"
+  | "cms_option"
+  | "cms_swap"
+  | "cliquet_option"
+  | "range_accrual"
+  | "fx_barrier_option"
+  | "term_loan"
+  | "discounted_cash_flow"
+  | "real_estate_asset"
+  | "levered_real_estate_equity"
+  | "trs_equity"
+  | "trs_fixed_income_index"
+  | "bond_future"
+  | "commodity_forward"
+  | "commodity_swap"
+  | "commodity_option"
+  | "commodity_asian_option"
+  | "commodity_swaption"
+  | "commodity_spread_option"
+  | "volatility_index_future"
+  | "fx_forward"
+  | "ndf"
+  | "agency_mbs_passthrough"
+  | "agency_tba"
+  | "dollar_roll"
+  | "agency_cmo"
+  | "fx_digital_option"
+  | "fx_touch_option"
+  | "tarn"
+  | "cms_spread_option"
+  | "callable_range_accrual"
+  | "snowball"
+  | "composite"
+  | "commodity_future"
+  | "fx_future"
+  | "equity_future"
+  | "equity_total_return_future"
+  | "interest_rate_future_option"
+  | "equity_future_option"
+  | "fx_future_option"
+  | "commodity_future_option"
+  | "volatility_index_future_option"
+  | "asset_backed_facility";
+/**
+ * Readiness of the mapped valuation route.
+ */
+export type ListedCoverageStatus = "native" | "composed" | "partial";
+/**
+ * Supported exchange catalog.
+ */
+export type ListedExchange = "cme" | "eurex" | "montreal" | "sgx";
+/**
+ * High-level listed product form.
+ */
+export type ListedProductKind = "future" | "option_on_future" | "option";
+/**
+ * Unit family of a metric value.
+ *
+ * The classification follows the unit documented on each `MetricId`
+ * constant. Currency-per-bump sensitivities (`dv01`, `cs01`, `vega`) are
+ * reported as [`MetricUnit::Currency`]: the value is a currency amount and
+ * the bump is part of the metric's definition, not of its unit.
+ */
+export type MetricUnit = "currency" | "decimal" | "basis_points" | "years" | "percent" | "dimensionless" | "unknown";
 
 /**
  * Advance rate applied to one collateral class.
@@ -18444,6 +18551,24 @@ export interface BasketPricingConfig {
   fx_policy: FxConversionPolicy;
 }
 /**
+ * Asset-backed facility borrowing base, availability and advance-rate test.
+ */
+export interface BorrowingBaseReport {
+  /**
+   * Advance-rate-weighted eligible collateral after the limits.
+   */
+  borrowing_base: Money;
+  /**
+   * Eligible balance excluded by the concentration limits.
+   */
+  concentration_excess: Money;
+  /**
+   * Collateral balance that meets the eligibility criteria, before
+   * concentration limits.
+   */
+  eligible_collateral: Money;
+}
+/**
  * Single-row enriched cashflow view.
  */
 export interface CashflowRow {
@@ -18605,6 +18730,69 @@ export interface PrimitiveExposure {
    * Reporting-currency signed value for this path.
    */
   value: Money;
+}
+/**
+ * One dated composite holdings state and its accumulated trades.
+ */
+export interface CompositeHistoryRow {
+  /**
+   * Signed primitive cashflows on `(previous_date, date]`; zero on the first row.
+   */
+  cashflows: Money;
+  /**
+   * Market observation date of this close.
+   */
+  date: DateWire;
+  /**
+   * Primitive path, net, and gross exposures under the held (pre-rebalance) state.
+   */
+  exposures: CompositeExposureReport;
+  /**
+   * Effective date of quantities held into this close.
+   */
+  held_state_effective_date: DateWire;
+  /**
+   * New state date made effective for the next interval, when rebalanced.
+   */
+  next_state_effective_date?: DateWire | null;
+  /**
+   * `pnl / capital` for one composite unit; zero on the first row.
+   */
+  period_return: number;
+  /**
+   * `Δvalue + cashflows` versus the prior interval's financed opening value;
+   * zero on the first row.
+   */
+  pnl: Money;
+  /**
+   * Primitive quantity deltas emitted by a close-of-period rebalance.
+   */
+  rebalance_trades: CompositeTrade[];
+  /**
+   * Chained total-return index, initialized to `100` on the first row.
+   */
+  return_index: number;
+  /**
+   * Composite value before any close-of-period rebalance, in reporting currency.
+   */
+  value: Money;
+}
+/**
+ * Primitive execution delta produced by initialization or rebalance.
+ */
+export interface CompositeTrade {
+  /**
+   * Primitive instrument identifier.
+   */
+  instrument_id: Id;
+  /**
+   * Canonical primitive instrument type discriminator.
+   */
+  instrument_type: string;
+  /**
+   * Signed change in primitive quantity.
+   */
+  quantity_delta: number;
 }
 /**
  * One top-level leg result retained in composite valuation details.
@@ -19236,23 +19424,6 @@ export interface InstrumentEnvelope {
   schema: InstrumentSchema;
 }
 /**
- * Primitive execution delta produced by initialization or rebalance.
- */
-export interface CompositeTrade {
-  /**
-   * Primitive instrument identifier.
-   */
-  instrument_id: Id;
-  /**
-   * Canonical primitive instrument type discriminator.
-   */
-  instrument_type: string;
-  /**
-   * Signed change in primitive quantity.
-   */
-  quantity_delta: number;
-}
-/**
  * One structured finding emitted while loading a persisted contract.
  */
 export interface Diagnostic {
@@ -19696,6 +19867,80 @@ export interface InstrumentCashflowEnvelope {
    */
   total_pv: number;
   [k: string]: unknown;
+}
+/**
+ * Listed-product catalog coverage for one exchange product.
+ */
+export interface ListedProductCoverage {
+  /**
+   * Rates, fixed income, equity, FX, commodity, volatility, or digital assets.
+   */
+  asset_class: string;
+  /**
+   * Exchange venue.
+   */
+  exchange: ListedExchange;
+  /**
+   * Exchange features exercised by this mapping.
+   */
+  features: string[];
+  /**
+   * Canonical valuation type selected by the library.
+   */
+  instrument_type: InstrumentType;
+  /**
+   * Human-readable exchange product family.
+   */
+  name: string;
+  /**
+   * Future, option on future, or direct option.
+   */
+  product_kind: ListedProductKind;
+  /**
+   * Residual feature not included in the canonical valuation, if any.
+   */
+  residual_gap?: string | null;
+  /**
+   * Current official exchange page used to verify the family.
+   */
+  source_url: string;
+  /**
+   * Native, composed, or partial coverage.
+   */
+  status: ListedCoverageStatus;
+  /**
+   * Exchange root symbols, comma-separated where one row covers a close family.
+   */
+  symbols: string;
+}
+/**
+ * Canonical per-key metric interpretation for host presentation.
+ */
+export interface MetricMetadata {
+  /**
+   * Whether this is a DV01/CS01 bucket with nonempty identifier and bucket coordinates.
+   */
+  bucketed: boolean;
+  /**
+   * Decoded coordinate labels in original order; empty for scalar metrics.
+   */
+  components: string[];
+  /**
+   * Native display group; absent for a non-standard base metric.
+   */
+  group?: string | null;
+  /**
+   * Original canonical wire key, retained without renaming.
+   */
+  key: string;
+  /**
+   * Base metric name without composite coordinates.
+   */
+  metric: string;
+  /**
+   * Native unit family; custom or calculator-dependent units remain unknown.
+   */
+  unit: MetricUnit;
 }
 /**
  * Structured-credit option-adjusted spread and its solver diagnostics.

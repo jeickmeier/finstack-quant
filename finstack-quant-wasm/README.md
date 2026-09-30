@@ -341,7 +341,7 @@ The rules that the gates actually enforce:
   `src/lib.rs` does not `pub use api::*`, which is what keeps the `core` module from
   shadowing `std::core`.
 - Serialize with `crate::utils::to_js_value`; map errors with
-  `crate::utils::to_js_err` / `to_js_error`. No `unwrap`, `expect`, or `panic`
+  `crate::utils::to_js_err`. No `unwrap`, `expect`, or `panic`
   (denied at the crate root).
 - Keep validation logic in a private `*_inner` helper returning the domain error and
   make the `#[wasm_bindgen]` function a thin converter, so native tests can assert on

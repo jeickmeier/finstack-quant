@@ -29,20 +29,11 @@
 // `validateCalibrationJson` is a fast pre-flight check that canonicalizes
 // the envelope without solving — use it to surface schema errors early.
 //
-// Structured diagnostics: errors thrown by `calibrate`,
-// `validateCalibrationJson`, `dryRun`, and `dryRunJson` have:
-//   - name: 'CalibrationEnvelopeError'
-//   - kind: Rust-owned execution category such as 'strict_load' or
-//     'solver_not_converged'
-//   - stage: 'ingestion', 'configuration', 'context', 'preflight', 'target',
-//     or 'solver'
-//   - step_id: offending step ID, or undefined for plan-wide failures
-//   - solver_diagnostics: structured fit diagnostics, or undefined when unavailable
-//   - diagnostics: strict-load diagnostics array (empty unless ingestion
-//     rejected the document)
-//   - details: JSON-serialized stable execution-error payload
-//   - cause: the same stable execution-error payload as a structured object
-// `kind` and `step_id` are independent: never use a step ID as the category.
+// Errors: every thrown error is a `FinstackError` (`kind` mirrors the Rust
+// `ErrorKind`; a wrong-type argument is a `TypeError` with kind
+// 'invalid_type'). Calibration execution failures are
+// `CalibrationEnvelopeError`s and persisted-contract failures are
+// `ContractValidationError`s; both are declared below.
 
 // WASM ownership: every wasm-bindgen class exposed below owns a wasm heap
 // allocation. Call `free()` when a handle is no longer needed. On runtimes
@@ -76,20 +67,151 @@ export default function init(
 ): Promise<InitOutput>;
 
 // --- JSON contract types (generated from the Rust JSON Schemas) ---
+//
+// Every Rust data type that crosses the boundary (spec, config, result) is
+// typed by the TypeScript generated from its JSON Schema under
+// `types/generated/<crate>/`, and re-exported here under its Rust type name.
+// Hand-written declarations below are limited to host-only shapes: wasm-bindgen
+// handle classes and namespaces, error objects, argument aliases, and the few
+// results whose JavaScript form differs from the JSON wire (typed arrays,
+// numeric non-finite values, lossless `bigint` valuation integers).
+//
+// Map key order: results keyed by an identifier (position, entity, node or
+// period ids) are plain objects. JavaScript enumerates integer-like keys
+// ("0".."4294967294") in ascending numeric order before all other keys, so a
+// map keyed by ids such as "10" and "2" iterates differently from the Rust
+// `IndexMap` insertion order that Python dicts preserve. Keyed lookup is
+// unaffected; take ordering from the corresponding input (for example
+// `spec.positions`) when it matters.
+import type * as generated from './types/generated/index.js';
 import type {
   CalibrationEnvelope,
   CalibrationResultEnvelope,
   CalibrationValidationReport,
+  StrictLoadDiagnostic,
 } from './types/generated/calibration/index.js';
-import type { MaterializationReport } from './types/generated/portfolio/index.js';
-import type { ValidationReport } from './types/generated/valuations/index.js';
-
-export type { CalibrationEnvelope, CalibrationResultEnvelope, CalibrationValidationReport };
-export type { Diagnostic, ValidationReport } from './types/generated/valuations/index.js';
-export type {
-  MaterializationPhases,
+import type { TableColumn, TableColumnData, TableEnvelope } from './types/generated/core/index.js';
+import type {
+  DrawdownEpisode,
+  LookbackReturns,
+  PeriodicReturn,
+} from './types/generated/analytics/index.js';
+import type { CovenantReport } from './types/generated/covenants/index.js';
+import type { VmResult, XvaResult } from './types/generated/margin/index.js';
+import type {
+  ArbitrageValidationResult,
+  BsGreeks,
+  BumpSizeConfig,
+  ExchangeOfferAnalysis,
+  FactorContribution,
+  FactorCovarianceMatrix,
+  FactorDefinition,
+  FactorModelConfig,
+  FactorType,
+  ForwardGreeks,
+  ImpactEstimate,
+  LeverageImpact,
+  LmeAnalysis,
+  LvarBangiaScalar,
+  MoneyEstimate,
+  ParametricEsDecompositionView,
+  PositionEsContribution,
+  PositionEsContributionView,
+  PositionFactorContribution,
+  PositionRiskDecomposition,
+  PositionVarContribution,
+  RiskDecomposition,
+  RiskMeasure,
+  SviParams,
+  TrancheLossStatistics,
+  VolatilityConvention,
+} from './types/generated/models/index.js';
+import type {
+  BorrowingBaseReport,
+  CompositeExposureReport,
+  CompositeHistoryRow,
+  CompositeRebalanceResult,
+  CompositeTrade,
+  EnhancedMonteCarloResult,
+  ListedProductCoverage,
+  MetricMetadata,
+  OasResult,
+  PrimitiveAggregate,
+  PrimitiveExposure,
+  ResultsMeta,
+  ScenarioCell,
+  ScenarioTable,
+  TrancheMetrics,
+  ValidationReport,
+} from './types/generated/valuations/index.js';
+import type {
+  AttributionResultEnvelope,
+  PnlAttribution,
+} from './types/generated/attribution/index.js';
+import type {
+  CheckCategory,
+  CheckFinding,
+  CheckReport,
+  CheckResult,
+  CheckSeverity,
+  CheckSummary,
+  Materiality,
+  MonteCarloResults,
+  StatementResult,
+} from './types/generated/statements/index.js';
+import type {
+  CreditAssessment,
+  DcfSensitivityResult,
+  DependencyTree,
+  DimensionScore,
+  GoalSeekResult,
+  LboResult,
+  PeerStats,
+  RegressionResult,
+  RelativeValueResult,
+  ScenarioResults,
+  SensitivityResult,
+  TornadoEntry,
+  VarianceReport,
+} from './types/generated/statements_analytics/index.js';
+import type {
+  BrinsonPeriodResult,
+  CarinoLinkedAttribution,
+  DurationCellTable,
+  ExcessReturnResult,
+  FactorBrinsonResult,
+  FactorPnlProfile,
+  FiAttributionResult,
+  FiCarinoLinkedResult,
+  FiReconciliationReport,
+  GridAttributionResult,
+  GridCarinoLinkedResult,
+  LinkedReturn,
   MaterializationReport,
+  PortfolioCashflows,
+  PortfolioMetrics,
+  ScenarioPnlView,
+  SensitivityMatrixJson,
 } from './types/generated/portfolio/index.js';
+import type {
+  ApplicationEnvelope,
+  ApplicationReport,
+  HorizonResult,
+  HorizonSummary,
+  OperationSpec,
+  RollForwardReport,
+  ScenarioChangeManifest,
+  ScenarioSpec,
+  TemplateMetadata,
+  Warning,
+} from './types/generated/scenarios/index.js';
+
+export type {
+  CalibrationEnvelope,
+  CalibrationResultEnvelope,
+  CalibrationValidationReport,
+  StrictLoadDiagnostic,
+};
 export type {
   CalibrationPlan,
   CalibrationReport,
@@ -99,6 +221,261 @@ export type {
   PriorMarketObject,
   StepParams,
 } from './types/generated/calibration/index.js';
+export type { TableColumn, TableColumnData, TableEnvelope };
+export type { DrawdownEpisode, LookbackReturns, PeriodicReturn };
+export type { CovenantReport };
+export type { VmResult, XvaResult };
+export type {
+  ArbitrageValidationResult,
+  BsGreeks,
+  BumpSizeConfig,
+  ExchangeOfferAnalysis,
+  FactorContribution,
+  FactorCovarianceMatrix,
+  FactorDefinition,
+  FactorModelConfig,
+  FactorType,
+  ForwardGreeks,
+  ImpactEstimate,
+  LeverageImpact,
+  LmeAnalysis,
+  LvarBangiaScalar,
+  MoneyEstimate,
+  ParametricEsDecompositionView,
+  PositionEsContribution,
+  PositionEsContributionView,
+  PositionFactorContribution,
+  PositionRiskDecomposition,
+  PositionVarContribution,
+  RiskDecomposition,
+  RiskMeasure,
+  SviParams,
+  TrancheLossStatistics,
+  VolatilityConvention,
+};
+export type {
+  BorrowingBaseReport,
+  CompositeExposureReport,
+  CompositeHistoryRow,
+  CompositeRebalanceResult,
+  CompositeTrade,
+  EnhancedMonteCarloResult,
+  ListedProductCoverage,
+  MetricMetadata,
+  OasResult,
+  PrimitiveAggregate,
+  PrimitiveExposure,
+  ResultsMeta,
+  ScenarioCell,
+  ScenarioTable,
+  TrancheMetrics,
+  ValidationReport,
+};
+export type { Diagnostic } from './types/generated/valuations/index.js';
+export type { AttributionResultEnvelope, PnlAttribution };
+export type {
+  CheckCategory,
+  CheckFinding,
+  CheckReport,
+  CheckResult,
+  CheckSeverity,
+  CheckSummary,
+  Materiality,
+  MonteCarloResults,
+  StatementResult,
+};
+export type {
+  CreditAssessment,
+  DcfSensitivityResult,
+  DependencyTree,
+  DimensionScore,
+  GoalSeekResult,
+  LboResult,
+  PeerStats,
+  RegressionResult,
+  RelativeValueResult,
+  ScenarioResults,
+  SensitivityResult,
+  TornadoEntry,
+  VarianceReport,
+};
+export type {
+  BrinsonPeriodResult,
+  CarinoLinkedAttribution,
+  DurationCellTable,
+  ExcessReturnResult,
+  FactorBrinsonResult,
+  FactorPnlProfile,
+  FiAttributionResult,
+  FiCarinoLinkedResult,
+  FiReconciliationReport,
+  GridAttributionResult,
+  GridCarinoLinkedResult,
+  LinkedReturn,
+  MaterializationReport,
+  PortfolioCashflows,
+  PortfolioMetrics,
+  ScenarioPnlView,
+  SensitivityMatrixJson,
+};
+export type { MaterializationPhases } from './types/generated/portfolio/index.js';
+export type {
+  ApplicationEnvelope,
+  ApplicationReport,
+  HorizonResult,
+  HorizonSummary,
+  OperationSpec,
+  RollForwardReport,
+  ScenarioChangeManifest,
+  ScenarioSpec,
+  TemplateMetadata,
+  Warning,
+};
+
+/**
+ * JSON sentinel strings (`"nan"`, `"inf"`, `"-inf"`) that the Rust wire uses for non-finite floats.
+ */
+export type NonFiniteSentinel = generated.analytics.NonFiniteSentinel;
+
+/**
+ * A generated result type whose top-level non-finite fields arrive as JavaScript numbers.
+ *
+ * The Rust type names those fields (`NonFiniteFields`); the binding turns their
+ * JSON sentinel strings back into `NaN` / `±Infinity`, so the sentinel strings
+ * never appear at runtime.
+ */
+export type NonFiniteNumbers<T> = { [K in keyof T]: Exclude<T[K], NonFiniteSentinel> };
+
+/**
+ * A generated type with some fields retyped for their JavaScript form; every other field, and
+ * whether each field is optional, is unchanged.
+ */
+export type WithFields<T, R> = { [K in keyof T]: K extends keyof R ? R[K] : T[K] };
+
+/**
+ * Exact-decimal money `{amount, currency}` (Rust `Money` serde form): `amount` is a decimal string.
+ *
+ * Named `MoneyValue` in JavaScript because `Money` is the wasm-bindgen class.
+ */
+export type MoneyValue = generated.core.Money;
+
+/**
+ * Aggregate statistics for grouped periodic returns (Rust `PeriodStats`); non-finite ratios are numbers.
+ */
+export type PeriodStats = NonFiniteNumbers<generated.analytics.PeriodStats>;
+
+/**
+ * OLS beta with standard error and confidence interval (Rust `BetaResult`); non-finite values are numbers.
+ */
+export type BetaResult = NonFiniteNumbers<generated.analytics.BetaResult>;
+
+/**
+ * Benchmark regression alpha, beta and R² (Rust `GreeksResult`); non-finite values are numbers.
+ */
+export type GreeksResult = NonFiniteNumbers<generated.analytics.GreeksResult>;
+
+/**
+ * Multi-factor regression result (Rust `MultiFactorResult`); non-finite fit statistics are numbers.
+ */
+export type MultiFactorResult = NonFiniteNumbers<generated.analytics.MultiFactorResult>;
+
+/**
+ * Forecast accuracy metrics (Rust `ForecastMetrics`); a non-finite metric is `NaN` or `±Infinity`.
+ */
+export type ForecastMetrics = NonFiniteNumbers<generated.statements_analytics.ForecastMetrics>;
+
+/**
+ * One component of a formula explanation (Rust `ExplanationStep`); a non-finite `value` is a number.
+ */
+export type ExplanationStep = NonFiniteNumbers<generated.statements_analytics.ExplanationStep>;
+
+/**
+ * Structured formula explanation (Rust `Explanation`); non-finite values are numbers.
+ */
+export type Explanation = WithFields<
+  NonFiniteNumbers<generated.statements_analytics.Explanation>,
+  { breakdown: ExplanationStep[] }
+>;
+
+/**
+ * One position's risk-budget row (Rust `PositionBudgetEntry`); a non-finite `utilization` is a number.
+ */
+export type PositionBudgetEntry = NonFiniteNumbers<generated.models.PositionBudgetEntry>;
+
+/**
+ * Per-position risk-budget evaluation (Rust `RiskBudgetResult`).
+ */
+export type RiskBudgetResult = WithFields<
+  generated.models.RiskBudgetResult,
+  { positions: PositionBudgetEntry[] }
+>;
+
+type HostValuationResult = import('./types/valuation-result.js').ValuationResult;
+
+/**
+ * Valuation envelope returned by the `priceInstrument*` entry points (Rust `ValuationResult`).
+ *
+ * Generated from the host valuation-result schema: 64-bit integers (Monte Carlo
+ * seeds, path counts) are lossless `bigint`s, so serialize stochastic results
+ * with `valuations.valuationResultToJson` rather than `JSON.stringify`. The
+ * emitted-field presence is stricter than the schema's input view: `covenants`
+ * is always present (`null` when the instrument has none), while `details` and
+ * `explanation` are omitted rather than `null` when absent.
+ */
+export type ValuationResult = Omit<HostValuationResult, 'covenants' | 'details' | 'explanation'> & {
+  covenants: NonNullable<HostValuationResult['covenants']> | null;
+  details?: NonNullable<HostValuationResult['details']>;
+  explanation?: NonNullable<HostValuationResult['explanation']>;
+};
+
+/**
+ * One position's valuation (Rust `PositionValue`), with its embedded `ValuationResult` in host form.
+ */
+export type PositionValue = WithFields<
+  generated.portfolio.PositionValue,
+  { valuation_result?: ValuationResult | null }
+>;
+
+/**
+ * Portfolio valuation (Rust `PortfolioValuation`), with each position's valuation in host form.
+ */
+export type PortfolioValuation = WithFields<
+  generated.portfolio.PortfolioValuation,
+  { position_values: { [positionId: string]: PositionValue } }
+>;
+
+/**
+ * Stressed portfolio valuation plus the scenario report (Rust `ScenarioRevalueView`).
+ */
+export type ScenarioRevalueView = WithFields<
+  generated.portfolio.ScenarioRevalueView,
+  { valuation: PortfolioValuation }
+>;
+
+/**
+ * One historical replay step (Rust `ReplayStep`), with its valuation in host form.
+ */
+export type ReplayStep = WithFields<
+  generated.portfolio.ReplayStep,
+  { valuation: PortfolioValuation }
+>;
+
+/**
+ * Historical portfolio replay (Rust `ReplayResult`), with each step's valuation in host form.
+ */
+export type ReplayResult = WithFields<generated.portfolio.ReplayResult, { steps: ReplayStep[] }>;
+
+/**
+ * Solution of a portfolio optimization problem (Rust `PortfolioOptimizationResult`, serialized
+ * through its `PortfolioOptimizationResultWire` form).
+ */
+export type PortfolioOptimizationResult = generated.portfolio.PortfolioOptimizationResultWire;
+
+/**
+ * Horizon total return (Rust `HorizonReport`): the `HorizonResult` fields plus its derived `summary`.
+ */
+export type HorizonReport = HorizonResult & { summary: HorizonSummary };
+
 // wasm-bindgen handle classes are reached through their namespace (for example
 // `valuations.instruments.Bond`); the package root exports their types only.
 export type {
@@ -1909,287 +2286,6 @@ export interface MarketContextConstructor {
 }
 
 /**
- * Monte Carlo estimate of a money-valued price: the canonical serde form of the
- * Rust `MoneyEstimate` (identical to Python `MoneyEstimate.to_json()`).
- *
- * Optional statistics are `null` (not absent) when they were not captured.
- * The relative standard error is `stderr / |mean.amount|`; it is not part of
- * the payload.
- */
-export interface MoneyEstimate {
-  /**
-   * Discounted mean estimate as an exact decimal-string money value.
-   */
-  mean: MoneyValue;
-  /**
-   * Standard error of the mean estimate, in the currency units of `mean`.
-   */
-  stderr: number;
-  /**
-   * 95% confidence interval `[lower, upper]` around `mean`, as money values.
-   */
-  ci_95: [MoneyValue, MoneyValue];
-  /**
-   * Number of independent path estimators; equals `num_simulated_paths` without variance reduction, half of it with antithetic pairing.
-   */
-  num_paths: number;
-  /**
-   * Total number of simulated sample paths; `2 * num_paths` with antithetic variates, otherwise equals `num_paths`.
-   */
-  num_simulated_paths: number;
-  /**
-   * Sample standard deviation, or `null` when not computed.
-   */
-  std_dev: number | null;
-  /**
-   * Median of captured discounted path values, or `null` when paths are not captured.
-   */
-  median: number | null;
-  /**
-   * 25th percentile of captured discounted path values, or `null` when paths are not captured.
-   */
-  percentile_25: number | null;
-  /**
-   * 75th percentile of captured discounted path values, or `null` when paths are not captured.
-   */
-  percentile_75: number | null;
-  /**
-   * Minimum of captured discounted path values, or `null` when paths are not captured.
-   */
-  min: number | null;
-  /**
-   * Maximum of captured discounted path values, or `null` when paths are not captured.
-   */
-  max: number | null;
-}
-
-/**
- * Variation margin result: the canonical serde form of Rust `VmResult`
- * (identical to Python `VmResult.to_json()`).
- *
- * Every amount is a {@link MoneyValue} in the CSA base currency with an exact
- * decimal-string amount. The net cash outflow is `post_amount` when it is
- * positive, else minus `collect_amount`; a call is required when either is
- * positive.
- */
-export interface VmResult {
-  /**
-   * ISO-8601 calculation date.
-   */
-  date: string;
-  /**
-   * Signed mark-to-market exposure; positive means the counterparty owes the desk.
-   */
-  gross_exposure: MoneyValue;
-  /**
-   * Net exposure after applying threshold and independent amount.
-   */
-  net_exposure: MoneyValue;
-  /**
-   * Amount the desk pays, including new postings and collateral returned.
-   */
-  post_amount: MoneyValue;
-  /**
-   * Amount the desk receives, including collections and collateral returned to it.
-   */
-  collect_amount: MoneyValue;
-  /**
-   * ISO-8601 settlement date after the contractual business-day lag.
-   */
-  settlement_date: string;
-}
-
-/**
- * Bilateral XVA result (JSON object from Rust).
- *
- * Adjustments are positive when they cost the desk and compose as
- * `total_xva = cva - dva + fva + mva`. Optional funding legs are absent when
- * they were not computed.
- */
-export interface XvaResultJson {
-  /**
-   * CVA: expected loss from counterparty default.
-   */
-  cva: number;
-  /**
-   * DVA: own-default benefit. Absent when not computed.
-   */
-  dva?: number;
-  /**
-   * FVA: net funding cost/benefit. Absent when no funding config was given.
-   */
-  fva?: number;
-  /**
-   * MVA: funding cost of posted initial margin. Absent when no `im_profile`
-   * was given.
-   */
-  mva?: number;
-  /**
-   * Required all-in adjustment = `cva - dva + fva + mva`.
-   */
-  total_xva: number;
-  /**
-   * Expected positive exposure profile as `[time, value]` pairs.
-   */
-  epe_profile: Array<[number, number]>;
-  /**
-   * Expected negative exposure profile as `[time, value]` pairs.
-   */
-  ene_profile: Array<[number, number]>;
-  /**
-   * Potential future exposure profile as `[time, value]` pairs.
-   */
-  pfe_profile: Array<[number, number]>;
-  /**
-   * Maximum PFE across the profile.
-   */
-  max_pfe: number;
-  /**
-   * Effective EPE profile as `[time, value]` pairs.
-   */
-  effective_epe_profile: Array<[number, number]>;
-  /**
-   * Time-weighted average effective EPE (regulatory scalar).
-   */
-  effective_epe: number;
-}
-
-/**
- * Forecast backtest metrics (JSON object from Rust). A non-finite metric is the
- * string `"nan"`, `"inf"` or `"-inf"`, so the object survives `JSON.stringify`.
- */
-export interface BacktestForecastMetricsJson {
-  /**
-   * Mean absolute error of the forecast versus realized values.
-   */
-  mae: number | 'nan' | 'inf' | '-inf';
-  /**
-   * Mean absolute percentage error, in percent; `"nan"` when no sample had a
-   * non-zero actual (see `mape_effective_n`).
-   */
-  mape: number | 'nan' | 'inf' | '-inf';
-  /**
-   * Number of samples that contributed to `mape` (those with a non-zero actual).
-   */
-  mape_effective_n: number;
-  /**
-   * Symmetric mean absolute percentage error, in percent, bounded in `[0, 200]`.
-   */
-  smape: number | 'nan' | 'inf' | '-inf';
-  /**
-   * Root-mean-square error of the forecast versus realized values.
-   */
-  rmse: number | 'nan' | 'inf' | '-inf';
-  /**
-   * Number of forecast observations in the backtest window.
-   */
-  n: number;
-}
-
-/**
- * Gross-leverage impact of a liability management exercise.
- * Leverage is gross debt over EBITDA, so `8.0` reads as 8.0x.
- */
-export interface LmeLeverageImpact {
-  /**
-   * Gross debt of the target instrument before the exercise.
-   */
-  pre_total_debt: number;
-  /**
-   * Gross debt of the target instrument after the exercise.
-   */
-  post_total_debt: number;
-  /**
-   * Gross debt over EBITDA before the exercise, as a multiple.
-   */
-  pre_leverage: number;
-  /**
-   * Gross debt over EBITDA after the exercise, as a multiple.
-   */
-  post_leverage: number;
-  /**
-   * Turns of leverage removed: `pre_leverage - post_leverage`.
-   */
-  leverage_reduction: number;
-}
-
-/**
- * Hold-versus-tender economics of a distressed exchange offer.
- */
-export interface ExchangeOfferAnalysis {
-  /**
-   * Canonical offer structure, echoed back from the request.
-   */
-  exchange_type: 'par_for_par' | 'discount' | 'uptier' | 'downtier';
-  /**
-   * Present value of the existing claim if it is not tendered.
-   */
-  old_npv: number;
-  /**
-   * Present value of the new instrument received on tendering.
-   */
-  new_npv: number;
-  /**
-   * Cash consent or early-tender fee.
-   */
-  consent_fee: number;
-  /**
-   * Estimated value of attached equity or warrants.
-   */
-  equity_sweetener_value: number;
-  /**
-   * Total tender consideration: `new_npv + consent_fee + equity_sweetener_value`.
-   */
-  tender_total: number;
-  /**
-   * Tender consideration less the hold-out present value.
-   */
-  delta_npv: number;
-  /**
-   * Hold-out recovery fraction that matches the tender; capped at 1.0.
-   */
-  breakeven_recovery: number;
-  /**
-   * True when `tender_total` exceeds `old_npv * 1.02`.
-   */
-  tender_recommended: boolean;
-}
-
-/**
- * Issuer-side economics of a liability management exercise.
- */
-export interface LmeAnalysis {
-  /**
-   * Canonical LME structure, echoed back from the request.
-   */
-  lme_type: 'open_market_repurchase' | 'tender_offer' | 'amend_and_extend' | 'dropdown';
-  /**
-   * Cash paid by the issuer, in the caller's monetary unit.
-   */
-  cost: number;
-  /**
-   * Face amount retired; zero for structures that do not extinguish debt.
-   */
-  notional_reduction: number;
-  /**
-   * Par retired less cash paid — the discount captured by the issuer.
-   */
-  discount_capture: number;
-  /**
-   * Discount captured as a fraction of par retired; zero when no par is retired.
-   */
-  discount_capture_pct: number;
-  /**
-   * Value fraction diverted from non-participating holders; nonzero only for a dropdown.
-   */
-  remaining_holder_impact_pct: number;
-  /**
-   * Gross-leverage block, or null when no positive EBITDA was supplied.
-   */
-  leverage_impact: LmeLeverageImpact | null;
-}
-
-/**
  * Namespaced TypeScript entry points for core calculations and types.
  * @example
  * ```typescript
@@ -2487,274 +2583,12 @@ export type NumericArray = number[] | Float64Array;
 export type NumericMatrix = NumericArray[];
 
 /**
- * Descriptive statistics returned by `peerStats`.
- */
-export interface PeerStatsJson {
-  /**
-   * Number of peer observations in the sample.
-   */
-  count: number;
-  /**
-   * Arithmetic mean of the peer metric, in the same units as the input.
-   */
-  mean: number;
-  /**
-   * Median of the peer metric, in the same units as the input.
-   */
-  median: number;
-  /**
-   * Sample standard deviation of the peer metric.
-   */
-  std_dev: number;
-  /**
-   * Minimum peer observation, in the same units as the input.
-   */
-  min: number;
-  /**
-   * Maximum peer observation, in the same units as the input.
-   */
-  max: number;
-  /**
-   * First quartile of the peer metric.
-   */
-  q1: number;
-  /**
-   * Third quartile of the peer metric.
-   */
-  q3: number;
-  /**
-   * Interquartile range (`q3 - q1`).
-   */
-  iqr: number;
-}
-
-/**
- * Single-factor OLS regression result returned by `regressionFairValue`.
- */
-export interface RegressionResultJson {
-  /**
-   * OLS intercept of the fitted peer regression.
-   */
-  intercept: number;
-  /**
-   * OLS slope of the fitted peer regression.
-   */
-  slope: number;
-  /**
-   * Coefficient of determination of the fitted peer regression, in `[0, 1]`.
-   */
-  r_squared: number;
-  /**
-   * Regression prediction at the subject company's independent-variable value.
-   */
-  fitted_value: number;
-  /**
-   * Subject residual: observed dependent value minus the fitted value.
-   */
-  residual: number;
-  /**
-   * Number of paired peer observations used in the fit.
-   */
-  n: number;
-}
-
-/**
- * Per-dimension decomposition in a relative value score.
- */
-export interface DimensionScoreJson {
-  /**
-   * Dimension name matching the requested relative-value metric.
-   */
-  label: string;
-  /**
-   * Peer percentile rank of the subject on this dimension, on a 0-1 scale.
-   */
-  percentile: number;
-  /**
-   * Standardized subject score versus the peer sample on this dimension.
-   */
-  z_score: number;
-  /**
-   * Optional OLS residual when this dimension was scored by regression; `null` otherwise.
-   */
-  regression_residual: number | null;
-  /**
-   * Optional regression R² when this dimension was scored by regression; `null` otherwise.
-   */
-  r_squared: number | null;
-  /**
-   * Weight of this dimension in the composite relative-value score.
-   */
-  weight: number;
-}
-
-/**
- * Composite relative value result returned by `scoreRelativeValue`.
- */
-export interface RelativeValueResultJson {
-  /**
-   * Identifier of the subject company being scored.
-   */
-  company_id: string;
-  /**
-   * Weighted composite rich/cheap score across the requested dimensions.
-   */
-  composite_score: number;
-  /**
-   * Per-dimension percentile, z-score, and optional regression diagnostics.
-   */
-  dimensions: DimensionScoreJson[];
-  /**
-   * Score confidence in `[0, 1]` from peer coverage and dimension completeness.
-   */
-  confidence: number;
-  /**
-   * Number of peer companies included in the scoring sample.
-   */
-  peer_count: number;
-}
-
-/**
- * Structured formula explanation returned by `explainFormula`.
- */
-export interface FormulaExplanationJson {
-  /**
-   * Statement-model node whose formula was explained.
-   */
-  node_id: string;
-  /**
-   * Period identifier at which the formula was evaluated.
-   */
-  period_id: string;
-  /**
-   * Evaluated node value after applying the formula in this period; a
-   * non-finite value is `"nan"`, `"inf"` or `"-inf"`.
-   */
-  final_value: number | 'nan' | 'inf' | '-inf';
-  /**
-   * Node kind in the statement model, such as input, formula, or calculated.
-   */
-  node_type: string;
-  /**
-   * Source formula text when the node is formula-driven; omitted otherwise.
-   */
-  formula_text?: string | null;
-  /**
-   * Ordered formula components that sum or combine to `final_value`.
-   */
-  breakdown: FormulaExplanationStepJson[];
-}
-
-/**
- * One component in a structured formula explanation.
- */
-export interface FormulaExplanationStepJson {
-  /**
-   * Label of this formula term, such as a referenced node id or literal.
-   */
-  component: string;
-  /**
-   * Numeric contribution of this term in the explained period; a non-finite
-   * value is `"nan"`, `"inf"` or `"-inf"`.
-   */
-  value: number | 'nan' | 'inf' | '-inf';
-  /**
-   * Operator that combines this term with the running total, when present.
-   */
-  operation?: string | null;
-}
-
-/**
- * A single drawdown episode returned by `drawdownDetails`.
- */
-export interface DrawdownEpisode {
-  /**
-   * ISO-8601 date when the drawdown episode began.
-   */
-  start: string;
-  /**
-   * ISO-8601 date of the trough (maximum drawdown) within the episode.
-   */
-  valley: string;
-  /**
-   * ISO-8601 recovery date, or `null` if the episode is still open.
-   */
-  end: string | null;
-  /**
-   * Episode length in calendar days from `start` to `end` or the series end.
-   */
-  duration_days: number;
-  /**
-   * Peak-to-trough decline as a negative decimal fraction (for example `-0.12`).
-   */
-  max_drawdown: number;
-  /**
-   * Recovery threshold used to mark the episode as nearly recovered.
-   */
-  near_recovery_threshold: number;
-  /**
-   * True when the episode is truncated because the series starts in drawdown.
-   */
-  truncated_at_start: boolean;
-}
-
-/**
- * Aggregate statistics for grouped periodic returns.
- */
-export interface PeriodStats {
-  /**
-   * Best period return as a decimal fraction.
-   */
-  best: number;
-  /**
-   * Worst period return as a decimal fraction.
-   */
-  worst: number;
-  /**
-   * Longest run of strictly positive period returns.
-   */
-  consecutive_wins: number;
-  /**
-   * Longest run of strictly negative period returns.
-   */
-  consecutive_losses: number;
-  /**
-   * Share of periods with a strictly positive return, in `[0, 1]`.
-   */
-  win_rate: number;
-  /**
-   * Mean period return as a decimal fraction.
-   */
-  avg_return: number;
-  /**
-   * Mean of strictly positive period returns as a decimal fraction.
-   */
-  avg_win: number;
-  /**
-   * Mean of strictly negative period returns as a decimal fraction.
-   */
-  avg_loss: number;
-  /**
-   * Average win divided by the absolute average loss; may be infinite.
-   */
-  payoff_ratio: number;
-  /**
-   * Gross profits divided by gross losses; may be infinite.
-   */
-  profit_factor: number;
-  /**
-   * Count of profitable periods over count of losing periods; may be infinite.
-   */
-  cpc_ratio: number;
-  /**
-   * Kelly-criterion fraction from the period win rate and payoff ratio.
-   */
-  kelly_criterion: number;
-}
-
-/**
  * Dated rolling result returned by per-ticker rolling analytics: the serde
  * form of Rust `DatedSeries`, with `values` as a typed array.
+ *
+ * Hand-declared because the JavaScript form differs from the generated wire
+ * type (`number[]`, with non-finite sentinels): `values` is a `Float64Array`
+ * holding `NaN` for an undefined window.
  *
  * Identical keys to Python `DatedSeries.to_json()`.
  */
@@ -2772,60 +2606,17 @@ export interface DatedSeries {
    * `"sortino"` (`rollingSortino`), `"sharpe"` (`rollingSharpe`) or `"return"`
    * (`rollingReturns`).
    */
-  value_column: "volatility" | "sortino" | "sharpe" | "return";
+  value_column: 'volatility' | 'sortino' | 'sharpe' | 'return';
 }
 
 /**
- * OLS beta result with standard error and 95% confidence interval.
+ * Rolling greeks aligned with rolling-window end dates: the serde form of Rust
+ * `RollingGreeks`, with `alphas` and `betas` as typed arrays.
  *
- * The interval uses Student-t critical values for finite samples and an
- * asymptotic normal approximation once n - 2 >= 240.
+ * Hand-declared because the JavaScript form differs from the generated wire
+ * type (`number[]`): the numeric columns are `Float64Array`s.
  */
-export interface BetaResult {
-  /**
-   * OLS beta versus the benchmark.
-   */
-  beta: number;
-  /**
-   * Standard error of the beta estimate.
-   */
-  std_err: number;
-  /**
-   * Lower bound of the 95% confidence interval for beta.
-   */
-  ci_lower: number;
-  /**
-   * Upper bound of the 95% confidence interval for beta.
-   */
-  ci_upper: number;
-}
-
-/**
- * Single-factor greeks (annualized Jensen alpha, beta, R², adjusted R²).
- */
-export interface GreeksResult {
-  /**
-   * Annualized Jensen alpha versus the benchmark, as a decimal fraction.
-   */
-  alpha: number;
-  /**
-   * OLS beta versus the benchmark.
-   */
-  beta: number;
-  /**
-   * Coefficient of determination of the benchmark regression.
-   */
-  r_squared: number;
-  /**
-   * Adjusted R² of the benchmark regression.
-   */
-  adjusted_r_squared: number;
-}
-
-/**
- * Rolling greeks output aligned with rolling-window end dates.
- */
-export interface RollingGreeksResult {
+export interface RollingGreeks {
   /**
    * ISO-8601 end dates of each rolling window, in chronological order.
    */
@@ -2839,128 +2630,6 @@ export interface RollingGreeksResult {
    */
   betas: Float64Array;
 }
-
-/**
- * Multi-factor regression result. Alpha is the raw regression intercept, annualized.
- */
-export interface MultiFactorResult {
-  /**
-   * Annualized regression intercept, as a decimal fraction.
-   */
-  alpha: number;
-  /**
-   * Factor betas, one per supplied factor series, in input order.
-   */
-  betas: number[];
-  /**
-   * Coefficient of determination of the multi-factor regression.
-   */
-  r_squared: number;
-  /**
-   * Adjusted R² of the multi-factor regression.
-   */
-  adjusted_r_squared: number;
-  /**
-   * Residual volatility of the regression, as an annualized decimal fraction.
-   */
-  residual_vol: number;
-}
-
-/**
- * Period-to-date lookback returns (per ticker) returned by `lookbackReturns`.
- */
-export interface LookbackReturns {
-  /**
-   * Ticker names aligned with every per-ticker vector below.
-   */
-  ticker_names: string[];
-  /**
-   * Month-to-date simple returns per ticker in `tickerNames()` order.
-   */
-  mtd: number[];
-  /**
-   * Quarter-to-date simple returns per ticker in `tickerNames()` order.
-   */
-  qtd: number[];
-  /**
-   * Year-to-date simple returns per ticker in `tickerNames()` order.
-   */
-  ytd: number[];
-  /**
-   * Fiscal-year-to-date simple returns per ticker in `tickerNames()` order.
-   */
-  fytd: number[];
-}
-
-/**
- * One calendar-bucketed return emitted by `Performance.periodicReturns`: the
- * serde form of Rust `PeriodicReturn`.
- */
-export interface PeriodicReturn {
-  /**
-   * ISO-8601 date of the final observation in the calendar bucket.
-   */
-  date: string;
-  /**
-   * Compounded simple return as a decimal fraction (`0.01` means 1%).
-   */
-  value: number;
-}
-
-/**
- * Column-oriented table: the serde form of Rust
- * `finstack_quant_core::table::TableEnvelope`, as returned by
- * `Performance.summary`. Every column holds `row_count` values.
- */
-export interface TableEnvelope {
-  /**
-   * Number of rows; every column's `values` has this length.
-   */
-  row_count: number;
-  /**
-   * Columns in display order.
-   */
-  columns: TableColumn[];
-  /**
-   * Table-level metadata; omitted when empty.
-   */
-  metadata?: Record<string, unknown>;
-}
-
-/**
- * One named column of a `TableEnvelope`.
- */
-export interface TableColumn {
-  /**
-   * Column name, unique within the table.
-   */
-  name: string;
-  /**
-   * Typed column storage.
-   */
-  data: TableColumnData;
-  /**
-   * Optional semantic hint; omitted when unset.
-   */
-  role?: 'dimension' | 'index' | 'measure' | 'attribute';
-  /**
-   * Column-level metadata; omitted when empty.
-   */
-  metadata?: Record<string, unknown>;
-}
-
-/**
- * Typed column storage, tagged by `type` (Rust `TableColumnData`).
- */
-export type TableColumnData =
-  | { type: 'string'; values: string[] }
-  | { type: 'nullable_string'; values: (string | null)[] }
-  | { type: 'float64'; values: number[] }
-  | { type: 'nullable_float64'; values: (number | null)[] }
-  | { type: 'u_int32'; values: number[] }
-  | { type: 'nullable_u_int32'; values: (number | null)[] }
-  | { type: 'int64'; values: number[] }
-  | { type: 'nullable_int64'; values: (number | null)[] };
 
 /**
  * Stateful performance analytics engine over a panel of ticker series.
@@ -3424,7 +3093,7 @@ declare class Performance {
    * @returns `{ dates, alphas, betas }` series for the selected ticker.
    * @throws Error - Rejects when `ticker_idx` is outside the loaded ticker columns or the JavaScript result object's properties cannot be created.
    */
-  rollingGreeks(tickerIdx: number, window?: number, riskFreeRate?: number): RollingGreeksResult;
+  rollingGreeks(tickerIdx: number, window?: number, riskFreeRate?: number): RollingGreeks;
   /**
    * Rolling volatility series for one asset over a window.
    * @param tickerIdx - Finite non-negative integer column index in tickerNames order; fractional or out-of-range values are rejected.
@@ -3785,132 +3454,6 @@ declare class PeriodDecomposition {
    * Release the underlying wasm heap allocation. Do not use this handle after calling `free()`.
    */
   free(): void;
-}
-
-/**
- * Validated factor covariance matrix in deterministic row-major order.
- */
-export interface FactorCovarianceMatrix {
-  /**
-   * Factor identifiers in row and column order.
-   */
-  factor_ids: string[];
-  /**
-   * Matrix dimension, equal to `factor_ids.length`.
-   */
-  n: number;
-  /**
-   * Annualized covariance values in row-major order.
-   */
-  data: number[];
-}
-
-/**
- * Canonical broad factor classification.
- */
-export type FactorTypeValue =
-  | 'rates'
-  | 'credit'
-  | 'equity'
-  | 'fx'
-  | 'volatility'
-  | 'commodity'
-  | 'inflation'
-  | { custom: string };
-
-/**
- * Canonical risk-factor definition used by a factor-model configuration.
- */
-export interface FactorDefinition {
-  /**
-   * Stable factor identifier.
-   */
-  id: string;
-  /**
-   * Canonical factor classification.
-   */
-  factor_type: FactorTypeValue;
-  /**
-   * Structured mapping from factor moves to market-data perturbations.
-   */
-  market_mapping: Record<string, unknown>;
-  /**
-   * Optional human-readable description.
-   */
-  description?: string;
-}
-
-/**
- * Risk measure used when aggregating factor exposures.
- */
-export type FactorRiskMeasure =
-  | 'variance'
-  | 'volatility'
-  | { var: { confidence: number } }
-  | { expected_shortfall: { confidence: number } };
-
-/**
- * Finite-difference bump magnitudes in each factor type's canonical units.
- */
-export interface FactorBumpSizeConfig {
-  /**
-   * Rates bump in basis points.
-   */
-  rates_bp: number;
-  /**
-   * Credit bump in basis points.
-   */
-  credit_bp: number;
-  /**
-   * Equity and commodity spot bump in percent.
-   */
-  equity_pct: number;
-  /**
-   * FX spot bump in percent.
-   */
-  fx_pct: number;
-  /**
-   * Volatility bump in vol points.
-   */
-  vol_points: number;
-  /**
-   * Per-factor overrides in the factor type's canonical units.
-   */
-  overrides: Record<string, number>;
-}
-
-/**
- * Portfolio factor-model configuration assembled at a forecast horizon.
- */
-export interface FactorModelConfig {
-  /**
-   * Ordered factor definitions spanning the model universe.
-   */
-  factors: FactorDefinition[];
-  /**
-   * Covariance matrix aligned to `factors`.
-   */
-  covariance: FactorCovarianceMatrix;
-  /**
-   * Declarative dependency-to-factor matching configuration.
-   */
-  matching: Record<string, unknown>;
-  /**
-   * Sensitivity extraction strategy.
-   */
-  pricing_mode: 'delta_based' | 'full_repricing';
-  /**
-   * Risk measure used for factor aggregation.
-   */
-  risk_measure: FactorRiskMeasure;
-  /**
-   * Optional finite-difference bump overrides.
-   */
-  bump_config?: FactorBumpSizeConfig;
-  /**
-   * Optional policy for unmatched dependencies.
-   */
-  unmatched_policy?: 'strict' | 'residual' | 'warn';
 }
 
 /**
@@ -4708,61 +4251,6 @@ export interface PortfolioLossResultConstructor {
 }
 
 /**
- * Tranche loss statistics returned by
- * {@link PortfolioLossResult.trancheLossStatistics} (Rust and Python
- * `TrancheLossStatistics`).
- *
- * Fractions are expressed relative to the tranche notional unless the field
- * name says otherwise; amounts are in the same unit as the input losses.
- */
-export interface TrancheLossStatistics {
-  /**
-   * Tranche attachment point as a fraction of pool notional, in `[0, 1)`.
-   */
-  attachment: number;
-  /**
-   * Tranche detachment point as a fraction of pool notional, in `(0, 1]`.
-   */
-  detachment: number;
-  /**
-   * Tranche notional `(detachment - attachment) * poolNotional`.
-   */
-  tranche_notional: number;
-  /**
-   * Mean tranche loss as a fraction of tranche notional, in `[0, 1]`.
-   */
-  expected_loss_fraction: number;
-  /**
-   * Mean tranche loss in pool-notional units.
-   */
-  expected_loss_amount: number;
-  /**
-   * Nearest-rank tranche loss fraction at the distribution's confidence.
-   */
-  var_fraction: number;
-  /**
-   * Nearest-rank tranche loss amount at the distribution's confidence.
-   */
-  var_amount: number;
-  /**
-   * Probability-weighted mean tranche loss fraction in the worst confidence tail.
-   */
-  expected_shortfall_fraction: number;
-  /**
-   * Probability-weighted mean tranche loss amount in the worst confidence tail.
-   */
-  expected_shortfall_amount: number;
-  /**
-   * Share of paths whose pool loss fraction strictly exceeds `attachment`.
-   */
-  prob_attachment_breached: number;
-  /**
-   * Share of paths whose pool loss fraction reaches or exceeds `detachment`.
-   */
-  prob_full_writedown: number;
-}
-
-/**
  * Namespaced TypeScript entry points for correlation calculations and types.
  * @example
  * ```typescript
@@ -5052,7 +4540,7 @@ export interface MarginNamespace {
     counterpartyRecoveryRate: number,
     ownRecoveryRate: number,
     fundingJson?: JsonInput | null
-  ): XvaResultJson;
+  ): XvaResult;
 }
 
 /**
@@ -5186,47 +4674,6 @@ export interface CashflowsNamespace {
 export declare const cashflows: CashflowsNamespace;
 
 // --- covenants -------------------------------------------------------------
-
-/**
- * One evaluated covenant test, as returned by `covenants.evaluateEngine`.
- *
- * Mirrors the Python `CovenantReport` getters field-for-field.
- */
-export interface CovenantReport {
-  /**
-   * Human-readable description of the test, e.g. `"Debt/EBITDA <= 5.00x"`.
-   * The object key, not this field, carries the covenant instance key.
-   */
-  covenant_type: string;
-  /**
-   * Stable machine-readable covenant instance identifier, when the engine set one.
-   */
-  covenant_id?: string;
-  /**
-   * Whether the covenant passed at the evaluation date.
-   */
-  passed: boolean;
-  /**
-   * Observed metric value in the covenant's own units.
-   */
-  actual_value: number | null;
-  /**
-   * Threshold the metric was tested against.
-   */
-  threshold: number | null;
-  /**
-   * Human-readable explanation of the pass/fail decision.
-   */
-  details: string | null;
-  /**
-   * Cushion relative to the threshold; positive means a passing buffer.
-   */
-  headroom: number | null;
-  /**
-   * Audit stamp: numeric mode, rounding context, and FX policy in force.
-   */
-  meta: Record<string, unknown>;
-}
 
 /**
  * Namespaced TypeScript entry points for covenants calculations and types.
@@ -5544,27 +4991,6 @@ export interface TermLoanConstructor {
 }
 
 /**
- * Borrowing base of a collateral pool on the closing balances, as returned by
- * `AssetBackedFacility.borrowingBase`. Money values are plain
- * `{ amount, currency }` objects.
- */
-export interface BorrowingBaseReport {
-  /**
-   * Collateral balance that meets the eligibility criteria, before the
-   * concentration limits.
-   */
-  eligible_collateral: MoneyValue;
-  /**
-   * Eligible balance excluded by the concentration limits.
-   */
-  concentration_excess: MoneyValue;
-  /**
-   * Advance-rate-weighted eligible collateral after the limits.
-   */
-  borrowing_base: MoneyValue;
-}
-
-/**
  * Typed asset-backed facility handle (a warehouse line against a collateral pool); serialize with `toJson()` for generic pricing entry points.
  *
  * Thin wrapper over the canonical Rust `AssetBackedFacility`. Serialize with
@@ -5668,33 +5094,6 @@ export interface RevolvingCredit extends WasmOwned {
 }
 
 /**
- * Path-retaining Monte Carlo result of a stochastic revolving credit facility
- * (`RevolvingCredit.priceWithPaths`), in the serde wire shape of the Rust
- * `EnhancedMonteCarloResult`.
- */
-export interface EnhancedMonteCarloResult {
-  /**
-   * Aggregate Monte Carlo result: the present-value `estimate` (`mean` money
-   * value, `stderr`, `ci_95` bounds, `num_paths` antithetic pairs and
-   * `num_simulated_paths` as plain numbers) plus `paths` and `run`, both
-   * `null` for this pricer (serde shape of the Rust `MonteCarloResult`).
-   */
-  mc_result: Record<string, unknown>;
-  /**
-   * One entry per simulated path in path order: `pv` and `draw_option_cost`
-   * money values, the utilization, credit-spread and rate samples under
-   * `path_data`, and the path's dated `cashflows`.
-   */
-  path_results: Array<Record<string, unknown>>;
-  /**
-   * Draw option cost across paths: `mean` money value, `stderr`, `ci_95`
-   * bounds and the path counts; negative when draws at the fixed margin are
-   * worth less than at the path's fair spread.
-   */
-  draw_option_cost: MoneyEstimate;
-}
-
-/**
  * Constructor surface for the typed `RevolvingCredit` WebAssembly instrument.
  *
  * Construct via `fromJson` with a canonical v1 instrument envelope or start
@@ -5733,24 +5132,6 @@ export interface RevolvingCreditConstructor {
 }
 
 /**
- * Currency-tagged monetary amount as carried on the wire.
- *
- * `amount` is an exact decimal **string** (not a JS number) so no precision is
- * lost crossing the boundary; parse it with `Number(...)` when a float is
- * acceptable.
- */
-export interface MoneyValue {
-  /**
-   * Exact major-unit decimal amount; display rounding is separate and explicit.
-   */
-  amount: string;
-  /**
-   * ISO 4217 currency code, e.g. `"USD"`.
-   */
-  currency: string;
-}
-
-/**
  * Convergence and reproducibility diagnostics for a Monte Carlo valuation.
  */
 export type MonteCarloValuationDetails =
@@ -5760,105 +5141,6 @@ export type MonteCarloValuationDetails =
  * Model-specific native detail, generated from Rust with exact host integer representations.
  */
 export type ValuationDetails = import('./types/valuation-result.js').ValuationDetails;
-
-/**
- * Valuation envelope returned by the `priceInstrument*` entry points.
- *
- * This is the same document Python callers hold as
- * `finstack_quant.valuations.ValuationResult` — field names are the canonical
- * Rust serde names. Monte Carlo details carry `seed` as a lossless `bigint`,
- * so serialize stochastic results with `valuations.valuationResultToJson`
- * rather than `JSON.stringify`, which throws on `bigint`.
- * Python's `price` / `currency` getters correspond to `value.amount` /
- * `value.currency` here.
- */
-export interface ValuationResult {
-  /**
-   * Wire-format schema version; only `1` is emitted.
-   */
-  schema_version: number;
-  /**
-   * Identifier of the priced instrument.
-   */
-  instrument_id: string;
-  /**
-   * ISO-8601 valuation date.
-   */
-  as_of: string;
-  /**
-   * Present value in the instrument's native currency.
-   */
-  value: MoneyValue;
-  /**
-   * Requested risk measures keyed by canonical metric ID.
-   */
-  measures: Record<string, number>;
-  /**
-   * Model-specific structured detail, when the pricer emits one.
-   *
-   * Stochastic `"rates_credit"` bond pricing emits `type: "monte_carlo"` with
-   * convergence, path-count, seed, time-grid, and variance-reduction data.
-   */
-  details?: ValuationDetails;
-  /**
-   * Policy stamps: numeric mode, rounding context, FX policy, timing.
-   */
-  meta: import('./types/valuation-result.js').ValuationResult['meta'];
-  /**
-   * Covenant reports for instruments that carry covenants; `null` otherwise.
-   */
-  covenants: NonNullable<import('./types/valuation-result.js').ValuationResult['covenants']> | null;
-  /**
-   * Computation trace, present only when explain mode is enabled.
-   */
-  explanation?: NonNullable<import('./types/valuation-result.js').ValuationResult['explanation']>;
-}
-
-/**
- * Maintained valuation-routing row for one liquid exchange-listed derivative family.
- */
-export interface ListedProductCoverage {
-  /**
-   * Exchange venue that lists the product family.
-   */
-  exchange: 'cme' | 'eurex' | 'montreal' | 'sgx';
-  /**
-   * Comma-separated exchange root symbols covered by this row.
-   */
-  symbols: string;
-  /**
-   * Human-readable name of the exchange product family.
-   */
-  name: string;
-  /**
-   * Broad asset class used to organize the product family.
-   */
-  asset_class: string;
-  /**
-   * Exchange form: future, option on future, or direct option.
-   */
-  product_kind: 'future' | 'option_on_future' | 'option';
-  /**
-   * Canonical Finstack instrument-type tag used for valuation dispatch.
-   */
-  instrument_type: string;
-  /**
-   * Core valuation readiness of the mapped instrument route.
-   */
-  status: 'native' | 'composed' | 'partial';
-  /**
-   * Exchange-contract features exercised by the mapped valuation route.
-   */
-  features: string[];
-  /**
-   * Residual exchange feature not included in the model value, when applicable.
-   */
-  residual_gap?: string;
-  /**
-   * Official exchange page used to verify the listed product family.
-   */
-  source_url: string;
-}
 
 /**
  * Listed-market product coverage and exchange routing metadata.
@@ -5880,36 +5162,6 @@ export interface ValuationMarketNamespace {
   listedProductCatalog(
     exchange?: 'cme' | 'eurex' | 'montreal' | 'sgx' | null
   ): ListedProductCoverage[];
-}
-
-/**
- * Canonical per-key metric interpretation for host presentation.
- */
-export interface MetricMetadata {
-  /**
-   * Original canonical wire key, retained without renaming.
-   */
-  key: string;
-  /**
-   * Base metric name without composite coordinates.
-   */
-  metric: string;
-  /**
-   * Decoded coordinate labels in original order; empty for scalar metrics.
-   */
-  components: string[];
-  /**
-   * Native unit family; custom or calculator-dependent units remain unknown.
-   */
-  unit: 'currency' | 'decimal' | 'basis_points' | 'years' | 'percent' | 'dimensionless' | 'unknown';
-  /**
-   * Native display group; absent (`null`) for a non-standard base metric.
-   */
-  group: string | null;
-  /**
-   * Whether this is a DV01/CS01 bucket with nonempty identifier and bucket coordinates.
-   */
-  bucketed: boolean;
 }
 
 /**
@@ -6237,172 +5489,12 @@ export interface ValuationInstrumentsNamespace {
 }
 
 /**
- * Option-adjusted-spread result for a structured-credit tranche, as returned
- * by `valuations.instruments.structuredCreditTrancheOas`. Field names and
- * units match the Rust `OasResult` and Python's typed `OasResult` wrapper.
+ * Bare FX instrument spec object for one exact FX instrument type.
+ *
+ * Tagged payloads, envelopes and JSON strings are rejected; use `fromJson` for
+ * a canonical envelope string.
  */
-export interface OasResult {
-  /**
-   * Option-adjusted spread, as an annual decimal (`0.01` = 100 bp).
-   */
-  oas: number;
-  /**
-   * Model price at the solved OAS, as a percentage of the tranche's current
-   * balance (the factor-adjusted quote basis).
-   */
-  model_price: number;
-  /**
-   * Target market price, as a percentage of current balance.
-   */
-  market_price: number;
-  /**
-   * Number of Monte-Carlo scenarios used.
-   */
-  num_paths: number;
-  /**
-   * Monte-Carlo standard error of the mean price, as a percentage of
-   * current balance.
-   */
-  price_std_error: number;
-}
-
-/**
- * Summary risk/pricing metrics for a structured-credit tranche, as returned
- * by `valuations.instruments.structuredCreditTrancheMetrics`. Field names and
- * units match the Rust `TrancheMetrics` and Python's typed wrapper.
- */
-export interface TrancheMetrics {
-  /**
-   * Identifier of the tranche.
-   */
-  tranche_id: string;
-  /**
-   * ISO-4217 code of the currency `pv` and `cs01` are denominated in.
-   */
-  currency: string;
-  /**
-   * Present value of the tranche, in `currency` units.
-   */
-  pv: number;
-  /**
-   * Model clean price, as a percentage of the tranche's current balance (the
-   * factor-adjusted secondary-market quote basis).
-   */
-  price_pct: number;
-  /**
-   * Pool factor of the note: current balance over original balance, so a
-   * price on original face is `price_pct * factor`.
-   */
-  factor: number;
-  /**
-   * Weighted-average life, in years.
-   */
-  wal: number;
-  /**
-   * Z-spread to `target_price_pct`, in basis points.
-   */
-  z_spread_bp: number;
-  /**
-   * Credit-spread DV01 — currency change for a +1 bp z-spread shock, in
-   * `currency` units. Negative for a long tranche.
-   */
-  cs01: number;
-  /**
-   * Spread duration, in years (`-cs01 / (pv * 1bp)`).
-   */
-  spread_duration: number;
-  /**
-   * Spread convexity at the solved z-spread, in years squared.
-   */
-  spread_convexity: number;
-  /**
-   * Effective (rate) duration, in years: the cashflows are re-projected with
-   * every rate curve bumped ±1 bp, so a floater's coupon resets move with the
-   * curve and its duration is short.
-   */
-  modified_duration: number;
-  /**
-   * Effective convexity from the same ±1 bp re-projection, in years squared.
-   */
-  convexity: number;
-  /**
-   * Price the z-spread/CS01 were solved against, as a percentage of current
-   * balance.
-   */
-  target_price_pct: number;
-  /**
-   * Weighted-average life to the deal's assumed call, in years. Absent when
-   * the deal carries no `call_assumption` covering this tranche.
-   */
-  wal_to_call?: number;
-  /**
-   * Z-spread of the to-call cashflows to `target_price_pct`, in basis
-   * points. Absent without a call.
-   */
-  z_spread_to_call_bp?: number;
-  /**
-   * Discount margin to call for a floating-rate tranche, in basis points.
-   * Absent for fixed-rate tranches or without a call.
-   */
-  dm_to_call_bp?: number;
-  /**
-   * Discount margin to maturity at `target_price_pct` for a floating-rate
-   * tranche, in basis points. Absent for fixed-rate tranches.
-   */
-  dm_bp?: number;
-}
-
-/**
- * One evaluated scenario cell of a structured-credit tranche scenario table.
- */
-export interface TrancheScenarioCell {
-  /**
-   * Constant prepayment rate for the cell, annual decimal.
-   */
-  cpr: number;
-  /**
-   * Constant default rate for the cell, annual decimal.
-   */
-  cdr: number;
-  /**
-   * Loss severity for the cell, decimal.
-   */
-  severity: number;
-  /**
-   * Clean settlement price as a percentage of current outstanding balance.
-   */
-  price: number;
-  /**
-   * Weighted-average life, in years.
-   */
-  wal: number;
-  /**
-   * Principal writedown, in currency units.
-   */
-  writedown: number;
-}
-
-/**
- * Scenario (CPR x CDR x severity) table for a structured-credit tranche, as
- * returned by `valuations.instruments.structuredCreditTrancheScenarioTable`.
- * Field names and units match the Rust `ScenarioTable` and Python's typed
- * wrapper.
- */
-export interface ScenarioTable {
-  /**
-   * Identifier of the tranche evaluated.
-   */
-  tranche_id: string;
-  /**
-   * Evaluated cells, in CPR-major, then CDR, then severity order.
-   */
-  cells: TrancheScenarioCell[];
-}
-
-/**
- * FX instrument specification as a JSON object or a canonical JSON string.
- */
-export type FxInstrumentSpec = Record<string, unknown> | string;
+export type FxInstrumentSpec = Record<string, unknown>;
 
 /**
  * FX instrument handle priced against a market context.
@@ -6668,9 +5760,10 @@ export interface FxBarrierOptionInstrument extends FxTouchOptionInstrument {
  */
 export interface FxInstrumentConstructor<T extends FxInstrument> {
   /**
-   * Construct an FX instrument from a JSON object or canonical JSON string.
-   * @param spec - FX instrument specification as a JSON object or canonical JSON string.
+   * Construct an FX instrument from a bare spec object.
+   * @param spec - Bare FX instrument spec object for this exact instrument type (not a JSON string, tagged payload, or envelope; use `fromJson` for canonical envelope JSON).
    * @returns A typed FX instrument handle.
+   * @throws Error - Throws a `FinstackError` with kind `validation` when `spec` is not a bare spec object or does not describe this instrument type.
    */
   new (spec: FxInstrumentSpec): T;
   /**
@@ -6864,34 +5957,6 @@ export interface SabrModelConstructor {
    * @param params - SABR parameter object containing alpha, beta, nu, rho, and optional shift.
    */
   new (params: SabrParameters): SabrModel;
-}
-
-/**
- * Static-arbitrage check of a SABR smile: the serde form of the Rust
- * `ArbitrageValidationResult` returned by `SabrSmile.validateNoArbitrage`.
- */
-export interface ArbitrageValidationResult {
-  /**
-   * Whether the smile has no butterfly or call-price monotonicity violations on the tested strikes (set by Rust).
-   */
-  arbitrage_free: boolean;
-  /**
-   * Strikes where butterfly convexity fails, with the butterfly value and severity.
-   */
-  butterfly_violations: Array<{
-    strike: number;
-    butterfly_value: number;
-    severity_pct: number;
-  }>;
-  /**
-   * Strike pairs where call prices increase with strike, violating call-price monotonicity.
-   */
-  monotonicity_violations: Array<{
-    strike_low: number;
-    strike_high: number;
-    price_low: number;
-    price_high: number;
-  }>;
 }
 
 /**
@@ -7495,108 +6560,6 @@ export interface CreditDerivativesNamespace {
 export type JsonInput = string | Record<string, unknown> | readonly unknown[];
 
 /**
- * Primitive execution delta emitted by composite initialization or rebalance.
- */
-export interface CompositeTrade {
-  /**
-   * Primitive instrument identifier.
-   */
-  instrument_id: string;
-  /**
-   * Canonical primitive instrument discriminator.
-   */
-  instrument_type: string;
-  /**
-   * Signed primitive quantity change.
-   */
-  quantity_delta: number;
-}
-
-/**
- * Serde form of the Rust `CompositeRebalanceResult`: the canonical resolved
- * composite envelope plus primitive trade deltas. Python
- * `CompositeRebalanceResult.to_json()` / `from_json()` use the same shape.
- */
-export interface CompositeRebalanceResult {
-  /**
-   * Canonical `finstack_quant.instrument/1` envelope accepted by `priceInstrument`.
-   */
-  instrument: Record<string, unknown>;
-  /**
-   * Net primitive quantity deltas required to establish the returned state.
-   */
-  trades: CompositeTrade[];
-}
-
-/**
- * Recursive primitive exposure report for one resolved composite, with its
- * path (`PrimitiveExposure`) and aggregate (`PrimitiveAggregate`) rows. These
- * are the generated valuation-result contract types, re-exported unchanged.
- */
-export type CompositeExposureReport = import('./types/valuation-result.js').CompositeExposureReport;
-/**
- * One primitive exposure path in a resolved composite.
- */
-export type PrimitiveExposure = import('./types/valuation-result.js').PrimitiveExposure;
-/**
- * Net and gross concentration for one primitive identifier.
- */
-export type PrimitiveAggregate = import('./types/valuation-result.js').PrimitiveAggregate;
-
-/**
- * One dated composite total-return and rebalance observation.
- *
- * The first row reports zero cashflows, P&L, and period return, with
- * `return_index` equal to 100. Later rows use `period_return = pnl / capital`
- * and chain `return_index *= 1 + period_return`. A scheduled rebalance is
- * close-effective: this row still uses pre-trade holdings, and the next
- * interval opens at the post-trade financed value.
- */
-export interface CompositeHistoryRow {
-  /**
-   * ISO-8601 observation date of this close.
-   */
-  date: string;
-  /**
-   * Pre-rebalance close value in the composite reporting currency.
-   */
-  value: MoneyValue;
-  /**
-   * Signed primitive cashflows on `(previousDate, date]`; zero on the first row.
-   */
-  cashflows: MoneyValue;
-  /**
-   * `Δvalue + cashflows` versus the prior interval's financed opening value;
-   * zero on the first row. External rebalance financing is excluded.
-   */
-  pnl: MoneyValue;
-  /**
-   * `pnl / capital` for one composite unit; zero on the first row.
-   */
-  period_return: number;
-  /**
-   * Chained total-return index, initialized to 100 on the first row.
-   */
-  return_index: number;
-  /**
-   * Effective date of quantities held into this close.
-   */
-  held_state_effective_date: string;
-  /**
-   * New close-effective state date, when a rebalance occurred.
-   */
-  next_state_effective_date?: string | null;
-  /**
-   * Primitive exposures under the held (pre-rebalance) state.
-   */
-  exposures: CompositeExposureReport;
-  /**
-   * Primitive quantity deltas emitted by a close-of-period rebalance.
-   */
-  rebalance_trades: CompositeTrade[];
-}
-
-/**
  * Composite-instrument construction, decomposition, execution, and history.
  *
  * Pricing uses frozen quantities. Only `initialize` and `rebalance` calculate
@@ -7915,38 +6878,6 @@ export interface VolatilityNamespace {
 }
 
 /**
- * Volatility quoting convention (serde form of the Rust `VolatilityConvention` enum).
- */
-export type VolatilityConvention =
-  'normal' | 'lognormal' | { shifted_lognormal: { shift: number } };
-
-/**
- * Gatheral SVI total-variance parameters `w(k) = a + b (rho (k - m) + sqrt((k - m)^2 + sigma^2))`.
- */
-export interface SviParams {
-  /**
-   * Overall total-variance level.
-   */
-  a: number;
-  /**
-   * Wing slope (non-negative).
-   */
-  b: number;
-  /**
-   * Rotation / asymmetry in `(-1, 1)`.
-   */
-  rho: number;
-  /**
-   * Log-moneyness translation of the minimum-variance point.
-   */
-  m: number;
-  /**
-   * Vertex smoothing (positive).
-   */
-  sigma: number;
-}
-
-/**
  * Product-independent liquidity risk and market-impact models.
  *
  * @example
@@ -8005,7 +6936,7 @@ export interface LiquidityNamespace {
     spreadVol: number,
     confidence: number,
     positionValue: number
-  ): LvarBangiaResult;
+  ): LvarBangiaScalar;
   /**
    * Estimate uniform Almgren-Chriss execution-impact components.
    * @param positionSize - Finite signed quantity in shares or contracts.
@@ -8037,56 +6968,11 @@ export interface LiquidityNamespace {
    * @returns Estimated price-space impact coefficient, or `undefined` for invalid inputs.
    * @throws Error - Throws a `TypeError` if `returns` or `volumes` is not an array of numbers. Invalid estimator samples return `undefined`.
    */
-  kyleLambda(returns: NumericArray, volumes: NumericArray, referencePrice: number): number | undefined;
-}
-
-/**
- * Black-Scholes / Garman-Kohlhagen Greeks (canonical Rust `BsGreeks` fields).
- * `vega`, `rho_r`, `rho_q` are per 1% move; `theta` is per day.
- */
-export interface BsGreeks {
-  /**
-   * Spot delta per unit of underlying.
-   */
-  delta: number;
-  /**
-   * Gamma per unit of underlying.
-   */
-  gamma: number;
-  /**
-   * Vega per 1% (0.01) move in volatility.
-   */
-  vega: number;
-  /**
-   * Theta per day under the `thetaDaysPerYear` basis.
-   */
-  theta: number;
-  /**
-   * Rho to the domestic / risk-free rate per 1% move.
-   */
-  rho_r: number;
-  /**
-   * Rho to the dividend yield / foreign rate per 1% move.
-   */
-  rho_q: number;
-}
-
-/**
- * Undiscounted forward-measure Greeks returned by `black76Greeks` / `bachelierGreeks`.
- */
-export interface ForwardGreeks {
-  /**
-   * First derivative of undiscounted option value with respect to the forward level.
-   */
-  delta: number;
-  /**
-   * Second derivative of undiscounted option value with respect to the forward level.
-   */
-  gamma: number;
-  /**
-   * Vega per unit (1.0) change in the model volatility.
-   */
-  vega: number;
+  kyleLambda(
+    returns: NumericArray,
+    volumes: NumericArray,
+    referencePrice: number
+  ): number | undefined;
 }
 
 /**
@@ -8929,161 +7815,6 @@ export interface AttributionJsonInputs extends WasmOwned {
 }
 
 /**
- * Result envelope returned by `attributePnlEnvelope`: the canonical serde
- * form of Rust `AttributionResultEnvelope` (identical to Python
- * `AttributionResultEnvelope.to_json()` and to `attributePnlEnvelopeJson`).
- */
-export interface AttributionResultEnvelope {
-  /**
-   * Attribution contract marker, always `"finstack_quant.attribution/1"`.
-   */
-  schema: 'finstack_quant.attribution/1';
-  /**
-   * Attribution output plus the result-policy audit stamp.
-   */
-  result: {
-    /**
-     * The P&L attribution document.
-     */
-    attribution: PnlAttribution;
-    /**
-     * Numeric mode, rounding context and FX-policy audit stamp.
-     */
-    results_meta: ResultsMeta;
-  };
-}
-
-/**
- * P&L attribution result returned by `attributePnl`.
- *
- * This is the same document Python callers hold as
- * `finstack_quant.attribution.PnlAttribution` — field names are the canonical
- * Rust serde names, so `JSON.stringify(result)` is byte-comparable with the
- * Python `to_json()` output and with `attributePnlJson`.
- */
-export interface PnlAttribution {
-  /**
-   * Total P&L as reported by this attribution (total-return convention:
-   * intra-period coupon income is included so the factor sum reconciles).
-   */
-  total_pnl: MoneyValue;
-  /**
-   * Pure mark-to-market change `val_t1 - val_t0` with no cashflow
-   * adjustment; absent for attribution paths that cannot provide it.
-   */
-  mark_to_market_pnl?: MoneyValue;
-  /**
-   * Carry P&L (theta + accruals).
-   */
-  carry: MoneyValue;
-  /**
-   * Interest rate curves P&L.
-   */
-  rates_curves_pnl: MoneyValue;
-  /**
-   * Credit hazard curves P&L.
-   */
-  credit_curves_pnl: MoneyValue;
-  /**
-   * Inflation curves P&L.
-   */
-  inflation_curves_pnl: MoneyValue;
-  /**
-   * Base correlation curves P&L.
-   */
-  correlations_pnl: MoneyValue;
-  /**
-   * FX rate changes P&L (pricing impact on cross-currency instruments).
-   */
-  fx_pnl: MoneyValue;
-  /**
-   * FX translation P&L (reporting-currency component; zero unless an
-   * explicit target currency differs from the native pricing currency).
-   */
-  fx_translation_pnl: MoneyValue;
-  /**
-   * Implied volatility changes P&L.
-   */
-  vol_pnl: MoneyValue;
-  /**
-   * Cross-factor interaction P&L.
-   */
-  cross_factor_pnl: MoneyValue;
-  /**
-   * Model parameter changes P&L.
-   */
-  model_params_pnl: MoneyValue;
-  /**
-   * Market scalar changes P&L.
-   */
-  market_scalars_pnl: MoneyValue;
-  /**
-   * Unexplained residual P&L.
-   */
-  residual: MoneyValue;
-  /**
-   * Gross carry decomposition, with funding reported separately as a financing overlay; or `null` when not produced.
-   */
-  carry_detail: Record<string, unknown> | null;
-  /**
-   * Detailed rates curves attribution, or `null` when not produced.
-   */
-  rates_detail: Record<string, unknown> | null;
-  /**
-   * Detailed credit curves attribution, or `null` when not produced.
-   */
-  credit_detail: Record<string, unknown> | null;
-  /**
-   * Detailed inflation curves attribution, or `null` when not produced.
-   */
-  inflation_detail: Record<string, unknown> | null;
-  /**
-   * Detailed correlations attribution, or `null` when not produced.
-   */
-  correlations_detail: Record<string, unknown> | null;
-  /**
-   * Detailed FX attribution, or `null` when not produced.
-   */
-  fx_detail: Record<string, unknown> | null;
-  /**
-   * Detailed volatility attribution, or `null` when not produced.
-   */
-  vol_detail: Record<string, unknown> | null;
-  /**
-   * Detailed cross-factor attribution, or `null` when not produced.
-   */
-  cross_factor_detail: Record<string, unknown> | null;
-  /**
-   * Detailed model parameters attribution, or `null` when not produced.
-   */
-  model_params_detail: Record<string, unknown> | null;
-  /**
-   * Detailed market scalars attribution, or `null` when not produced.
-   */
-  scalars_detail: Record<string, unknown> | null;
-  /**
-   * Credit-factor-hierarchy decomposition of `credit_curves_pnl`; present
-   * only when a calibrated credit factor model was supplied.
-   */
-  credit_factor_detail?: Record<string, unknown>;
-  /**
-   * Credit-factor-hierarchy decomposition of carry; present only when a
-   * calibrated credit factor model was supplied.
-   */
-  credit_carry_decomposition?: Record<string, unknown>;
-  /**
-   * Attribution metadata: method, instrument id, tolerances, rounding
-   * context, and policy stamps.
-   */
-  meta: Record<string, unknown>;
-  /**
-   * True when residual computation hit non-finite inputs; the attribution
-   * should then be treated as invalid.
-   */
-  result_invalid: boolean;
-}
-
-/**
  * Namespaced TypeScript entry points for attribution calculations and types.
  * @example
  * ```typescript
@@ -9109,8 +7840,8 @@ export interface AttributionNamespace {
     asOfT0: string,
     asOfT1: string,
     methodJson: JsonInput,
-    configJson?: JsonInput,
-    fullCrossAttribution?: boolean
+    configJson?: JsonInput | null,
+    fullCrossAttribution?: boolean | null
   ) => AttributionJsonInputs;
   /**
    * Run P&L attribution for a single instrument.
@@ -9193,27 +7924,6 @@ export declare const attribution: AttributionNamespace;
 // --- statements ------------------------------------------------------------
 
 /**
- * Evaluated statement model, as returned by `statements.evaluateModel` and
- * `statements.evaluateModelWithMarket`.
- *
- * Structurally identical to the Rust `StatementResult` serde form (the same
- * payload the Python binding exposes as a typed `StatementResult`); pass it
- * back to the JSON-taking analytics entry points via `JSON.stringify`.
- */
-export interface StatementResultJson {
-  /**
-   * Evaluated values keyed by node id and period. Missing/non-finite numeric
-   * results use canonical strings "nan", "inf", or "-inf" and survive JSON.stringify.
-   */
-  nodes: Record<string, Record<string, number | 'nan' | 'inf' | '-inf'>>;
-  /**
-   * Audit stamp: numeric mode, rounding context, and FX policy in force.
-   */
-  meta?: Record<string, unknown>;
-  [key: string]: unknown;
-}
-
-/**
  * Namespaced TypeScript entry points for statements calculations and types.
  * @example
  * ```typescript
@@ -9267,7 +7977,6 @@ export interface StatementsNamespace {
    * when an ECF sweep is configured).
    * @returns Canonical waterfall JSON after schema validation.
    * @param json - Canonical JSON string for a `WaterfallSpec`, including `priority_of_payments`, `available_cash_node`, optional `ecf_sweep`, `pik_toggle`, `payment_classes`, `mandatory_prepay_node`, and `voluntary_prepay_node`.
-   * @param json - Canonical JSON string defining the object to deserialize or normalize.
    * @throws Error - Rejects malformed or schema-incompatible `json`; duplicate or inconsistent payment priorities; incomplete available-cash priorities; invalid PIK, payment-class, prepay-node, or ECF-sweep settings; or failure to serialize the validated waterfall.
    */
   validateWaterfallSpecJson(json: JsonInput): string;
@@ -9286,12 +7995,17 @@ export interface StatementsNamespace {
    */
   validatePikToggleSpecJson(json: JsonInput): string;
   /**
-   * Evaluate a `FinancialModelSpec` and return the `StatementResult` JSON.
+   * Evaluate a `FinancialModelSpec` and return the `StatementResult`.
+   *
+   * Returns a structured JavaScript object (the Python binding returns a typed
+   * `StatementResult` from the same Rust evaluator). Non-finite node values and
+   * warning values use canonical strings `"nan"`, `"inf"`, and `"-inf"`, so a
+   * `JSON.stringify`/parse round trip preserves missing-data semantics.
    * @returns Evaluated statement result with node values and optional audit metadata.
    * @param modelJson - JSON-serialized FinancialModelSpec to evaluate across its statement periods.
    * @throws Error - Rejects malformed `model_json`, model semantic failures, invalid formula or dependency graphs, missing evaluation inputs, unsupported capital-structure requirements, or failure to serialize the statement result to JavaScript.
    */
-  evaluateModel(modelJson: JsonInput): StatementResultJson;
+  evaluateModel(modelJson: JsonInput): StatementResult;
   /**
    * Evaluate a `FinancialModelSpec` against a `MarketContext` as of a given date.
    *
@@ -9307,17 +8021,19 @@ export interface StatementsNamespace {
     modelJson: JsonInput,
     marketJson: JsonInput,
     asOf: string
-  ): StatementResultJson;
+  ): StatementResult;
   /**
-   * Evaluate a financial model under Monte Carlo simulation (JSON in, structured object out).
+   * Evaluate a financial model under Monte Carlo simulation.
    *
-   * The Python twin is the `Evaluator.evaluate_monte_carlo` method.
-   * @returns Canonical JSON containing percentile summaries and optional path data.
+   * Takes JSON inputs and returns a structured JavaScript object; the Python
+   * twin is the `Evaluator.evaluate_monte_carlo` method, which returns a typed
+   * `MonteCarloResults` from the same Rust `Evaluator::evaluate_monte_carlo`.
+   * @returns Structured Monte Carlo results with percentile summaries and optional path data.
    * @param modelJson - Financial-model specification JSON.
    * @param configJson - Monte Carlo configuration JSON.
    * @throws Error - Rejects malformed model or configuration JSON, model semantic failures, zero simulation paths, a model containing capital structure, model compilation or dependency failures, any path-evaluation failure, or failure to serialize the results to JavaScript.
    */
-  evaluateMonteCarlo(modelJson: JsonInput, configJson: JsonInput): Record<string, unknown>;
+  evaluateMonteCarlo(modelJson: JsonInput, configJson: JsonInput): MonteCarloResults;
   /**
    * Parse a DSL formula and return its canonical source text.
    *
@@ -9355,308 +8071,6 @@ export declare const statements: StatementsNamespace;
 // --- statements_analytics -------------------------------------------------
 
 /**
- * Enterprise-value swing for one shocked DCF assumption.
- */
-export interface DcfSensitivityEntry {
-  /**
-   * Identifier of the shocked assumption.
-   */
-  parameter_id: string;
-  /**
-   * Enterprise-value delta at the downside shock.
-   */
-  downside: number;
-  /**
-   * Enterprise-value delta at the upside shock.
-   */
-  upside: number;
-}
-
-/**
- * Ranked DCF assumption sensitivities, as returned by
- * `statements_analytics.dcfSensitivity`.
- */
-export interface DcfSensitivityResult {
-  /**
-   * Unshocked enterprise value as a `Money` wire object (exact decimal
-   * `amount` string plus ISO-4217 `currency`).
-   */
-  baseline_enterprise_value: MoneyValue;
-  /**
-   * Tornado entries sorted by descending absolute swing.
-   */
-  entries: DcfSensitivityEntry[];
-  /**
-   * Effective downside WACC after any clamping.
-   */
-  wacc_down: number;
-  /**
-   * Whether the downside WACC hit the denominator floor.
-   */
-  wacc_down_clamped: boolean;
-  /**
-   * Effective upside terminal growth rate after any clamping.
-   */
-  terminal_growth_up: number;
-  /**
-   * Whether the upside terminal growth rate hit the denominator floor.
-   */
-  terminal_growth_up_clamped: boolean;
-}
-
-/**
- * Leveraged-buyout transaction result, as returned by
- * `statements_analytics.evaluateLbo`. Monetary fields are `Money` wire
- * objects (exact decimal `amount` string plus ISO-4217 `currency`).
- */
-export interface LboResult {
-  /**
-   * Entry enterprise value priced at the model's first period.
-   */
-  entry_enterprise_value: MoneyValue;
-  /**
-   * Entry metric value read from the entry metric node.
-   */
-  entry_metric: number;
-  /**
-   * Total funded debt at close.
-   */
-  debt_total: MoneyValue;
-  /**
-   * Sponsor equity check solved as the sources-and-uses residual.
-   */
-  equity_check: MoneyValue;
-  /**
-   * Total sources at close.
-   */
-  sources_total: MoneyValue;
-  /**
-   * Total uses at close.
-   */
-  uses_total: MoneyValue;
-  /**
-   * Whether sources and uses balance within tolerance.
-   */
-  sources_uses_balanced: boolean;
-  /**
-   * Exit enterprise value at the exit period.
-   */
-  exit_enterprise_value: MoneyValue;
-  /**
-   * Exit metric value read from the exit metric node.
-   */
-  exit_metric: number;
-  /**
-   * Modelled net debt outstanding at the exit period.
-   */
-  exit_net_debt: MoneyValue;
-  /**
-   * Exit equity proceeds: exit enterprise value less exit net debt.
-   */
-  exit_equity_proceeds: MoneyValue;
-  /**
-   * Multiple on invested capital.
-   */
-  moic: number;
-  /**
-   * Report from the Rust LBO check suite when the config carried
-   * `check_mappings`; `null` otherwise.
-   */
-  checks: CheckReport | null;
-}
-
-/**
- * Solved input and optional updated model from a goal-seek (the Rust
- * `GoalSeekResult`).
- */
-export interface GoalSeekResult {
-  /**
-   * Input value that meets the goal-seek target within solver tolerance.
-   */
-  solved_value: number;
-  /**
-   * `FinancialModelSpec` object with the solved input written in when
-   * `updateModel` is `true`; `null` otherwise. Pass it back as `modelJson`.
-   */
-  model: Record<string, unknown> | null;
-}
-
-/**
- * Dependency tree of one statement node (the Rust `DependencyTree`), as
- * returned by `statements_analytics.dependencyTree`.
- */
-export interface DependencyTree {
-  /**
-   * Node identifier; a dependency already on the current path appears as a
-   * leaf named `"<id> (cycle)"`.
-   */
-  node_id: string;
-  /**
-   * Formula text when the node is calculated; `null` for a value node.
-   */
-  formula: string | null;
-  /**
-   * One tree per direct dependency, in formula reference order.
-   */
-  children: DependencyTree[];
-}
-
-/**
- * One parameter's downside and upside impact in a tornado chart.
- */
-export interface TornadoEntry {
-  /**
-   * Parameter node identifier represented by this entry.
-   */
-  parameter_id: string;
-  /**
-   * Metric change at the parameter's minimum perturbation.
-   */
-  downside: number;
-  /**
-   * Metric change at the parameter's maximum perturbation.
-   */
-  upside: number;
-}
-
-/**
- * Severity assigned to one statement-check finding.
- */
-export type CheckSeverity = 'info' | 'warning' | 'error';
-
-/**
- * Category grouping for a statement check.
- */
-export type CheckCategory =
-  | 'accounting_identity'
-  | 'cross_statement_reconciliation'
-  | 'internal_consistency'
-  | 'credit_reasonableness'
-  | 'data_quality';
-
-/**
- * Quantitative materiality context attached to a check finding.
- */
-export interface CheckMateriality {
-  /**
-   * Absolute discrepancy in the compared nodes' units.
-   */
-  absolute: number;
-  /**
-   * Discrepancy as a percentage of the reference value.
-   */
-  relative_pct: number;
-  /**
-   * Denominator used to calculate `relative_pct`.
-   */
-  reference_value: number;
-  /**
-   * Human-readable denominator label.
-   */
-  reference_label: string;
-}
-
-/**
- * One diagnostic produced by a statement check.
- */
-export interface CheckFinding {
-  /**
-   * Identifier of the check that produced this finding.
-   */
-  check_id: string;
-  /**
-   * Diagnostic severity.
-   */
-  severity: CheckSeverity;
-  /**
-   * Human-readable issue description.
-   */
-  message: string;
-  /**
-   * Optional statement period associated with the finding.
-   */
-  period?: string;
-  /**
-   * Optional quantitative materiality context.
-   */
-  materiality?: CheckMateriality;
-  /**
-   * Statement node identifiers involved in the finding.
-   */
-  nodes?: string[];
-}
-
-/**
- * Outcome of one statement-check execution.
- */
-export interface CheckResult {
-  /**
-   * Stable check identifier.
-   */
-  check_id: string;
-  /**
-   * Human-readable check name.
-   */
-  check_name: string;
-  /**
-   * Category of this `CheckResult`.
-   */
-  category: CheckCategory;
-  /**
-   * Whether no error-severity finding was retained.
-   */
-  passed: boolean;
-  /**
-   * Retained findings after suite reporting filters.
-   */
-  findings: CheckFinding[];
-}
-
-/**
- * Aggregate counts for a completed statement-check run.
- */
-export interface CheckSummary {
-  /**
-   * Number of checks executed.
-   */
-  total_checks: number;
-  /**
-   * Number of checks that passed.
-   */
-  passed: number;
-  /**
-   * Number of checks that failed.
-   */
-  failed: number;
-  /**
-   * Number of retained error findings.
-   */
-  errors: number;
-  /**
-   * Number of retained warning findings.
-   */
-  warnings: number;
-  /**
-   * Number of retained informational findings.
-   */
-  infos: number;
-}
-
-/**
- * Structured report returned by statement-check runners.
- */
-export interface CheckReport {
-  /**
-   * One result per executed check.
-   */
-  results: CheckResult[];
-  /**
-   * Aggregate check and finding counts.
-   */
-  summary: CheckSummary;
-}
-
-/**
  * Namespaced TypeScript entry points for statements analytics calculations and types.
  * @example
  * ```typescript
@@ -9670,17 +8084,19 @@ export interface StatementsAnalyticsNamespace {
    * Run a sensitivity analysis on a financial model.
    *
    * Accepts JSON strings for the model spec and sensitivity configuration,
-   * evaluates all perturbation scenarios, and returns JSON results.
+   * evaluates all perturbation scenarios, and returns the `SensitivityResult`
+   * as a structured JavaScript object. `generateTornadoEntries` still takes the
+   * result as JSON, so pass `JSON.stringify(result)` when chaining the two.
    * @returns Sensitivity results for each perturbation scenario.
    * @param modelJson - Financial-model specification JSON.
    * @param configJson - Configuration JSON for this call.
    * @throws Error - Rejects malformed model or configuration JSON, invalid sensitivity modes or parameter perturbations, missing model nodes or periods, model-evaluation failures, or failure to serialize the sensitivity result to JavaScript.
    */
-  runSensitivity(modelJson: JsonInput, configJson: JsonInput): Record<string, unknown>;
+  runSensitivity(modelJson: JsonInput, configJson: JsonInput): SensitivityResult;
   /**
    * Run a variance analysis comparing two evaluated statement results.
    *
-   * Returns JSON-serialized variance report.
+   * Returns the variance report as a structured JavaScript object.
    * @returns Variance report comparing the two evaluated statement results.
    * @param baseJson - Base statement-result JSON.
    * @param comparisonJson - Comparison statement-result JSON.
@@ -9691,34 +8107,32 @@ export interface StatementsAnalyticsNamespace {
     baseJson: JsonInput,
     comparisonJson: JsonInput,
     configJson: JsonInput
-  ): Record<string, unknown>;
+  ): VarianceReport;
   /**
    * Evaluate all scenarios in a scenario set against a base model.
    *
-   * Returns a JSON object mapping scenario names to their statement results.
+   * Returns a structured JavaScript object mapping scenario names to their
+   * statement results.
    * @returns Statement results keyed by scenario name.
    * @param modelJson - Financial-model specification JSON.
    * @param scenarioSetJson - Scenario-set JSON keyed by scenario name.
    * @throws Error - Rejects malformed model or scenario-set JSON, an empty scenario set, invalid parent chains, overrides of missing nodes, failure to evaluate any scenario, or failure to serialize the result map to JavaScript.
    */
-  evaluateScenarioSet(
-    modelJson: JsonInput,
-    scenarioSetJson: JsonInput
-  ): Record<string, StatementResultJson>;
+  evaluateScenarioSet(modelJson: JsonInput, scenarioSetJson: JsonInput): ScenarioResults;
   /**
-   * Compute forecast accuracy metrics (MAE, MAPE, RMSE).
+   * Compute forecast accuracy metrics (MAE, MAPE, sMAPE, RMSE).
    *
    * Takes two float arrays (actual, forecast) and returns the serde form of
    * the Rust `ForecastMetrics` (`mae`, `mape`, `mape_effective_n`, `smape`,
-   * `rmse`, `n`). A non-finite metric is the string `"nan"`, `"inf"` or
-   * `"-inf"` (for example `mape` when every actual is zero), matching the
-   * statement-result convention, so the object survives a JSON round trip.
+   * `rmse`, `n`). A non-finite metric (for example `mape` when every actual is
+   * zero) is the JavaScript number `NaN` or `±Infinity`; the Rust JSON form
+   * writes it as the string `"nan"`, `"inf"` or `"-inf"`.
    * @returns Backtest forecast accuracy metrics for the selected series.
    * @param actual - Actual realized values aligned one-for-one with the forecast series.
    * @param forecast - Forecast values aligned one-for-one with the actual realized series.
    * @throws Error - Rejects inputs that cannot be decoded as numeric JavaScript arrays, arrays with unequal lengths, empty arrays, or metrics that cannot be serialized to JavaScript.
    */
-  backtestForecast(actual: number[], forecast: number[]): BacktestForecastMetricsJson;
+  backtestForecast(actual: number[], forecast: number[]): ForecastMetrics;
   /**
    * Generate tornado chart entries for a sensitivity result.
    * @param resultJson - Result JSON produced by a prior call.
@@ -9730,7 +8144,7 @@ export interface StatementsAnalyticsNamespace {
   generateTornadoEntries(
     resultJson: JsonInput,
     metricNode: string,
-    period?: string
+    period?: string | null
   ): TornadoEntry[];
   /**
    * Find the driver value that makes a target node reach a target value.
@@ -9764,9 +8178,9 @@ export interface StatementsAnalyticsNamespace {
    * Rank the headline DCF assumptions by enterprise-value impact.
    *
    * The statement model is evaluated once; each shocked point re-runs only the
-   * DCF. Returns JSON with the baseline enterprise value, tornado entries as
-   * deltas versus that baseline sorted by descending absolute swing, and the
-   * effective (possibly clamped) shock levels.
+   * DCF. Returns a structured JavaScript object with the baseline enterprise
+   * value, tornado entries as deltas versus that baseline sorted by descending
+   * absolute swing, and the effective (possibly clamped) shock levels.
    * @returns Ranked DCF-assumption impacts on enterprise value.
    * @param modelJson - Financial-model specification JSON.
    * @param wacc - Baseline weighted average cost of capital in decimal form (0.10 = 10%).
@@ -9851,11 +8265,13 @@ export interface StatementsAnalyticsNamespace {
    */
   dependencyTreeText(modelJson: JsonInput, nodeId: string): string;
   /**
-   * Explain a formula for a specific node and period (JSON in/out).
+   * Explain a formula for a specific node and period (JSON in, structured
+   * object out).
    *
-   * Returns the serde form of the Rust `Explanation`; a non-finite
-   * `final_value` or breakdown `value` is the string `"nan"`, `"inf"` or
-   * `"-inf"` (for example a `lag` node at the first period).
+   * Returns the Rust `Explanation` as a structured object; a non-finite
+   * `final_value` or breakdown `value` (for example a `lag` node at the first
+   * period) is the JavaScript number `NaN` or `±Infinity`. The Rust JSON form
+   * writes it as the string `"nan"`, `"inf"` or `"-inf"`.
    * @returns Structured formula breakdown for the selected node and period.
    * @param modelJson - Financial-model specification JSON.
    * @param resultsJson - Evaluated statement-result JSON.
@@ -9868,7 +8284,7 @@ export interface StatementsAnalyticsNamespace {
     resultsJson: JsonInput,
     nodeId: string,
     period: string
-  ): FormulaExplanationJson;
+  ): Explanation;
   /**
    * Explain a formula for a specific node and period as formatted text.
    * @returns Formatted formula explanation for the selected node and period.
@@ -9902,13 +8318,15 @@ export interface StatementsAnalyticsNamespace {
    */
   creditAssessmentReportText(resultsJson: JsonInput, period: string): string;
   /**
-   * Compute a credit assessment from statement results (JSON in/out).
+   * Compute a structured credit assessment (leverage, coverage, FCF).
+   *
+   * Returns a structured JavaScript object.
    * @returns Credit-assessment result object from the statement results.
    * @param resultsJson - Evaluated statement-result JSON.
    * @param period - Statement period identifier, such as `2025Q4` or `2025A`.
    * @throws Error - Rejects malformed `results_json`, an `period` value that is not a valid statement period identifier, or failure to serialize the assessment to JavaScript.
    */
-  creditAssessment(resultsJson: JsonInput, period: string): Record<string, unknown>;
+  creditAssessment(resultsJson: JsonInput, period: string): CreditAssessment;
   /**
    * Run checks from a suite spec against a model.
    *
@@ -9999,7 +8417,7 @@ export interface StatementsAnalyticsNamespace {
    * @param values - Peer metric observations; non-finite entries are ignored.
    * @throws Error - Rejects when `values` is not a numeric JavaScript array or the statistics cannot be serialized. No finite observations return `undefined`.
    */
-  peerStats(values: number[]): PeerStatsJson | undefined;
+  peerStats(values: number[]): PeerStats | undefined;
   /**
    * Single-factor OLS fit of `y_values` on `x_values` evaluated at the subject
    * observation (Rust `regression_fair_value(x_values, y_values, subject_x, subject_y)`).
@@ -10015,7 +8433,7 @@ export interface StatementsAnalyticsNamespace {
     yValues: number[],
     subjectX: number,
     subjectY: number
-  ): RegressionResultJson | undefined;
+  ): RegressionResult | undefined;
   /**
    * Compute a canonical valuation multiple for a company-metric bag.
    * @returns The requested multiple, or `undefined` when inputs are missing or the denominator is not positive.
@@ -10034,7 +8452,7 @@ export interface StatementsAnalyticsNamespace {
    * @param dimensions - Metric dimensions and weights; each has one optional `x_extractor` for single-factor regression, or null for distribution scoring.
    * @throws Error - Rejects when `peer_set` or `dimensions` cannot be decoded into its declared schema, when no scoring dimensions are supplied, or when the result cannot be serialized to JavaScript.
    */
-  scoreRelativeValue(peerSet: unknown, dimensions: unknown[]): RelativeValueResultJson;
+  scoreRelativeValue(peerSet: unknown, dimensions: unknown[]): RelativeValueResult;
 }
 
 /**
@@ -10045,418 +8463,90 @@ export declare const statements_analytics: StatementsAnalyticsNamespace;
 // --- portfolio -------------------------------------------------------------
 
 /**
- * Revalued result and application report after a scenario.
- */
-export interface ScenarioRevalueResult {
-  /**
-   * Revalued portfolio or instrument result after applying the scenario.
-   */
-  valuation: Record<string, unknown>;
-  /**
-   * Scenario application report describing effects applied and any warnings.
-   */
-  report: Record<string, unknown>;
-}
-
-/**
- * Scenario-attributable profit and loss together with the scenario
- * application report.
- */
-export interface ScenarioPnlResult {
-  /**
-   * Profit-and-loss ladder: base-currency `total` plus a `by_position`
-   * map of per-position base-currency amounts. Positions added or removed
-   * by the scenario are zero-filled against the missing side, so
-   * `by_position` always sums to `total`.
-   */
-  pnl: Record<string, unknown>;
-  /**
-   * Scenario application report describing effects applied and any warnings.
-   */
-  report: Record<string, unknown>;
-}
-
-/**
- * First-order factor sensitivity matrix in its canonical wire form, shared by
- * both hosts.
- *
- * `decomposeFactorRisk` accepts this object (or its `JSON.stringify` text),
- * and it is exactly the JSON the Python `SensitivityMatrix.to_json` emits and
- * `SensitivityMatrix.from_json` accepts. Unknown keys are rejected on input.
- */
-export interface SensitivityMatrixResult {
-  /**
-   * ISO reporting currency for all monetary sensitivity entries.
-   */
-  base_currency: string;
-  /**
-   * Ordered position identifiers, one per row of `data`.
-   */
-  position_ids: string[];
-  /**
-   * Ordered factor identifiers, one per column of `data`.
-   */
-  factor_ids: string[];
-  /**
-   * Row-major sensitivity matrix, `data[position][factor]`.
-   */
-  data: number[][];
-}
-
-/**
- * Repriced scenario P&L profile for one shocked factor.
- */
-export interface FactorPnlProfile {
-  /**
-   * ISO reporting currency for all P&L entries.
-   */
-  base_currency: string;
-  /**
-   * Ordered position identifiers indexing each P&L row.
-   */
-  position_ids: string[];
-  /**
-   * Shocked factor identifier.
-   */
-  factor_id: string;
-  /**
-   * Scenario shift coordinates applied to the factor.
-   */
-  shifts: number[];
-  /**
-   * P&L rows indexed as `[shift_idx][position_idx]`.
-   */
-  position_pnls: number[][];
-}
-
-/**
- * Factor-level risk contribution row.
- */
-export interface FactorRiskContribution {
-  /**
-   * Factor identifier.
-   */
-  factor_id: string;
-  /**
-   * Absolute risk attributed to the factor.
-   */
-  absolute_risk: number;
-  /**
-   * Share of total risk attributed to the factor.
-   */
-  relative_risk: number;
-  /**
-   * Marginal risk of the factor.
-   */
-  marginal_risk: number;
-}
-
-/**
- * Position x factor risk contribution row.
- */
-export interface PositionFactorRiskContribution {
-  /**
-   * Position identifier.
-   */
-  position_id: string;
-  /**
-   * Factor identifier.
-   */
-  factor_id: string;
-  /**
-   * Risk contribution of this position/factor pair.
-   */
-  risk_contribution: number;
-}
-
-/**
- * Parametric (covariance-based) Euler risk decomposition.
- */
-export interface FactorRiskDecomposition {
-  /**
-   * Total portfolio risk under the selected measure.
-   */
-  total_risk: number;
-  /**
-   * Risk measure in its canonical serde form (same shape as the
-   * `riskMeasureJson` input): `'variance'` or `'volatility'`, or an object
-   * carrying `confidence` for `var` / `expected_shortfall`.
-   */
-  measure: FactorRiskMeasure;
-  /**
-   * Residual (idiosyncratic) risk not attributed to any factor.
-   */
-  residual_risk: number;
-  /**
-   * Factor-level contributions.
-   */
-  factor_contributions: FactorRiskContribution[];
-  /**
-   * Position x factor contributions.
-   */
-  position_factor_contributions: PositionFactorRiskContribution[];
-  /**
-   * Per-position residual (idiosyncratic) variance contributions. Empty for
-   * the parametric decomposer; populated only by credit-aware position
-   * decomposers.
-   */
-  position_residual_contributions: {
-    position_id: string;
-    residual_variance: number;
-    source: { kind: string; [key: string]: unknown };
-  }[];
-}
-
-/**
- * Per-position VaR contribution row of a `PositionRiskDecomposition`.
- */
-export interface PositionVarContribution {
-  /**
-   * Position identifier.
-   */
-  position_id: string;
-  /**
-   * Component VaR: the position's Euler-allocated share of portfolio VaR
-   * (loss-signed, portfolio currency).
-   */
-  component_var: number;
-  /**
-   * Component VaR as a fraction of portfolio VaR; sums to 1, negative for a
-   * diversifier.
-   */
-  relative_var: number;
-  /**
-   * Marginal VaR per unit of the position, or `null` when the engine has no
-   * gradient (historical mode).
-   */
-  marginal_var: number | null;
-  /**
-   * Incremental VaR (change from removing the position), or `null` when not
-   * requested.
-   */
-  incremental_var: number | null;
-}
-
-/**
- * Per-position Expected Shortfall contribution row of a
- * `PositionRiskDecomposition`.
- */
-export interface PositionEsContribution {
-  /**
-   * Position identifier.
-   */
-  position_id: string;
-  /**
-   * Component ES allocated to the position (loss-signed, portfolio currency).
-   */
-  component_es: number;
-  /**
-   * Component ES as a fraction of portfolio ES.
-   */
-  relative_es: number;
-  /**
-   * Marginal ES per unit of the position, or `null` when the engine has no
-   * gradient (historical mode).
-   */
-  marginal_es: number | null;
-}
-
-/**
- * Complete position-level VaR and ES decomposition (Rust
- * `PositionRiskDecomposition`, Python `PositionRiskDecomposition.to_json()`).
- *
- * VaR and ES follow the P&L sign: losses are negative.
- */
-export interface PositionRiskDecomposition {
-  /**
-   * Total portfolio VaR (losses negative).
-   */
-  portfolio_var: number;
-  /**
-   * Total portfolio Expected Shortfall (losses negative; at or beyond VaR).
-   */
-  portfolio_es: number;
-  /**
-   * Confidence level used for both VaR and ES.
-   */
-  confidence: number;
-  /**
-   * Decomposition method.
-   */
-  method: 'parametric' | 'historical';
-  /**
-   * Per-position VaR contributions.
-   */
-  var_contributions: PositionVarContribution[];
-  /**
-   * Per-position ES contributions.
-   */
-  es_contributions: PositionEsContribution[];
-  /**
-   * Number of positions in the portfolio.
-   */
-  n_positions: number;
-  /**
-   * Euler residual `portfolio_var - sum(component_var)` for the parametric
-   * engine; `null` in historical mode.
-   */
-  euler_residual: number | null;
-}
-
-/**
- * Per-position row of a `ParametricEsDecompositionView`.
- */
-export interface PositionEsContributionView {
-  /**
-   * Position identifier.
-   */
-  position_id: string;
-  /**
-   * Component ES allocated to the position.
-   */
-  component_es: number;
-  /**
-   * Marginal ES, when the engine computed one.
-   */
-  marginal_es: number | null;
-  /**
-   * Fraction of total ES contributed by this position.
-   */
-  pct_contribution: number;
-}
-
-/**
- * Expected Shortfall reporting view returned by `parametricEsDecomposition`
- * (Rust and Python `ParametricEsDecompositionView`).
- */
-export interface ParametricEsDecompositionView {
-  /**
-   * Total portfolio VaR.
-   */
-  portfolio_var: number;
-  /**
-   * Total portfolio Expected Shortfall.
-   */
-  portfolio_es: number;
-  /**
-   * Confidence level used for ES.
-   */
-  confidence: number;
-  /**
-   * Number of positions in the decomposition.
-   */
-  n_positions: number;
-  /**
-   * Per-position ES contributions.
-   */
-  contributions: PositionEsContributionView[];
-}
-
-/**
- * Per-position risk-budget row of a `RiskBudgetResult`.
- */
-export interface PositionBudgetEntry {
-  /**
-   * Position identifier.
-   */
-  position_id: string;
-  /**
-   * Actual component VaR, signed as reported by the engine.
-   */
-  actual_component_var: number;
-  /**
-   * Target component VaR level: target share times `|portfolioVar|`.
-   */
-  target_component_var: number;
-  /**
-   * Consuming-side utilization ratio (negative for a diversifier); a non-zero
-   * component against a zero target is `'inf'` or `'-inf'`.
-   */
-  utilization: number | 'nan' | 'inf' | '-inf';
-  /**
-   * Consuming-side component VaR minus the target level.
-   */
-  excess: number;
-}
-
-/**
- * Risk-budget evaluation across positions (Rust and Python
- * `RiskBudgetResult`).
- */
-export interface RiskBudgetResult {
-  /**
-   * Per-position budget rows.
-   */
-  positions: PositionBudgetEntry[];
-  /**
-   * Sum of positive consuming-side exceedances.
-   */
-  total_overbudget: number;
-  /**
-   * Whether any position's utilization exceeds the threshold.
-   */
-  has_breach: boolean;
-}
-
-/**
- * Bangia, Diebold, Schuermann & Stroughair (1999) liquidity-adjusted VaR.
- *
- * Field-for-field identical to the Python binding's dict.
- */
-export interface LvarBangiaResult {
-  /**
-   * Input VaR, echoed back (non-positive loss number).
-   */
-  var: number;
-  /**
-   * Non-negative magnitude of the Bangia spread-cost add-on.
-   */
-  spread_cost: number;
-  /**
-   * Bangia-adjusted LVaR; `lvar <= var <= 0`.
-   */
-  lvar: number;
-  /**
-   * Ratio `lvar / var`; `NaN` when `var` is zero.
-   */
-  lvar_ratio: number;
-}
-
-/**
- * Almgren-Chriss (2001) market-impact decomposition.
- *
- * Field-for-field identical to the Python binding's dict.
- */
-export interface ImpactEstimate {
-  /**
-   * Permanent market impact in model cost units.
-   */
-  permanent_impact: number;
-  /**
-   * Temporary market impact in model cost units.
-   */
-  temporary_impact: number;
-  /**
-   * Total expected execution cost.
-   */
-  total_cost: number;
-  /**
-   * Expected cost in basis points.
-   */
-  cost_bp: number;
-  /**
-   * Timing-risk standard deviation of execution cost, in cost units.
-   */
-  execution_risk: number;
-}
-
-/**
  * Browser-native materialization input accepted without Node.js APIs.
  */
 export type MaterializationBundleInput = string | Uint8Array;
 
 /**
+ * Error kind carried by every structured error the package throws.
+ *
+ * Mirrors Rust `finstack_quant_core::error::ErrorKind` (`not_found`,
+ * `validation`, `computation`), which the Python binding maps to `KeyError`,
+ * `ValueError` and `RuntimeError`. `invalid_type` marks a JavaScript argument
+ * of the wrong type, thrown as a `TypeError` (Python raises `TypeError`).
+ */
+export type FinstackErrorKind = 'not_found' | 'validation' | 'computation' | 'invalid_type';
+
+/**
+ * Structured error thrown by the namespace functions and handle methods.
+ *
+ * `name` is `'FinstackError'`, or `'TypeError'` for an argument of the wrong
+ * JavaScript type (`kind` `'invalid_type'`). `kind` is decided by the Rust
+ * error type, never by the message text. `code` refines `kind` where the Rust
+ * error defines one (portfolio contract failures: `'report'`,
+ * `'limit_exceeded'`).
+ */
+export interface FinstackError extends Error {
+  /**
+   * `'FinstackError'`, or `'TypeError'` for a wrong-type argument.
+   */
+  name: 'FinstackError' | 'TypeError';
+  /**
+   * Rust-owned error kind.
+   */
+  kind: FinstackErrorKind;
+  /**
+   * Stable machine-readable refinement of `kind`, when the Rust error defines one.
+   */
+  code?: string;
+}
+
+/**
+ * Structured error thrown by `calibration.calibrate`, `validateCalibrationJson`,
+ * `dryRun` and `dryRunJson`.
+ *
+ * `kind` and `step_id` are independent: never use a step id as the category.
+ */
+export interface CalibrationEnvelopeError extends Error {
+  /**
+   * Stable public error class name.
+   */
+  name: 'CalibrationEnvelopeError';
+  /**
+   * Rust-owned execution category, such as `'strict_load'` or `'solver_not_converged'`.
+   */
+  kind: string;
+  /**
+   * Execution stage that failed.
+   */
+  stage: 'ingestion' | 'configuration' | 'context' | 'preflight' | 'target' | 'solver';
+  /**
+   * Offending step id, or `undefined` for a plan-wide failure.
+   */
+  step_id?: string;
+  /**
+   * Structured solver fit diagnostics, or `undefined` when unavailable.
+   */
+  solver_diagnostics?: Record<string, unknown>;
+  /**
+   * Strict-load diagnostics; empty unless ingestion rejected the document.
+   */
+  diagnostics: StrictLoadDiagnostic[];
+  /**
+   * JSON-serialized stable execution-error payload.
+   */
+  details: string;
+  /**
+   * The same stable execution-error payload as a structured object.
+   */
+  cause: unknown;
+}
+
+/**
  * Typed error thrown when a persisted contract cannot be loaded.
+ *
+ * A `FinstackError`-shaped error with a distinct `name`, `kind` `'validation'`
+ * and a `code`.
  */
 export interface ContractValidationError extends Error {
   /**
@@ -10628,11 +8718,11 @@ export interface PortfolioNamespace {
    *
    * Accepts a JSON array of `SectorPeriod` objects and returns a structured
    * `BrinsonPeriodResult` object.
-   * @returns Returns a plain structured JavaScript object; `JSON.stringify` it for a canonical JSON string.
+   * @returns Returns a plain structured JavaScript object; `JSON.stringify` it for a JSON string (integer-like map keys enumerate in numeric order, so it is not byte-identical to the Rust wire JSON).
    * @param sectorsJson - Sector-classification JSON.
    * @throws Error - Throws a JavaScript exception if `sectorsJson` is malformed, contains no sectors or a non-finite weight or return, portfolio or benchmark weights do not sum to one, or the result cannot be converted to a JavaScript value.
    */
-  brinsonFachler(sectorsJson: JsonInput): Record<string, unknown>;
+  brinsonFachler(sectorsJson: JsonInput): BrinsonPeriodResult;
   /**
    * Carino-link already-computed single-period Brinson-Fachler results.
    *
@@ -10641,11 +8731,11 @@ export interface PortfolioNamespace {
    * returns a structured `CarinoLinkedAttribution` object whose linked effects
    * reconstruct the geometrically compounded active return. Use
    * `carinoLinkFromSectorPeriods` to link raw sector inputs instead.
-   * @returns Returns a plain structured JavaScript object; `JSON.stringify` it for a canonical JSON string.
+   * @returns Returns a plain structured JavaScript object; `JSON.stringify` it for a JSON string (integer-like map keys enumerate in numeric order, so it is not byte-identical to the Rust wire JSON).
    * @param periodsJson - Chronological JSON array of `BrinsonPeriodResult` objects with identical sector ordering in every period.
    * @throws Error - Throws a JavaScript exception if `periodsJson` is malformed, the sequence is empty or changes sector ordering, or a period return is non-finite or at most `-1`.
    */
-  carinoLink(periodsJson: JsonInput): Record<string, unknown>;
+  carinoLink(periodsJson: JsonInput): CarinoLinkedAttribution;
   /**
    * Compute Carino-linked multi-period Brinson attribution from raw sector
    * periods.
@@ -10653,11 +8743,11 @@ export interface PortfolioNamespace {
    * Binds Rust `carino_link_from_sector_periods`: runs `brinsonFachler` on
    * each period, then Carino-links the results. Returns a structured
    * `CarinoLinkedAttribution` object.
-   * @returns Returns a plain structured JavaScript object; `JSON.stringify` it for a canonical JSON string.
+   * @returns Returns a plain structured JavaScript object; `JSON.stringify` it for a JSON string (integer-like map keys enumerate in numeric order, so it is not byte-identical to the Rust wire JSON).
    * @param periodsJson - Chronological JSON array of periods, each an array of `SectorPeriod` objects (`sector`, `portfolio_weight`, `benchmark_weight`, `portfolio_return`, `benchmark_return`).
    * @throws Error - Throws a JavaScript exception if `periodsJson` is malformed, any period fails Brinson validation, the sequence is empty or changes sector ordering, or a period return is non-finite or at most `-1`.
    */
-  carinoLinkFromSectorPeriods(periodsJson: JsonInput): Record<string, unknown>;
+  carinoLinkFromSectorPeriods(periodsJson: JsonInput): CarinoLinkedAttribution;
   /**
    * Compute a single-period Campisi fixed-income attribution from JSON.
    *
@@ -10678,7 +8768,7 @@ export interface PortfolioNamespace {
    * present on either side has `|net sector weight| <= 1e-6 * gross absolute
    * sector weight`. Spread-basis provenance cannot be validated from numeric
    * JSON alone.
-   * @returns Returns a plain structured JavaScript object; `JSON.stringify` it for a canonical JSON string.
+   * @returns Returns a plain structured JavaScript object; `JSON.stringify` it for a JSON string (integer-like map keys enumerate in numeric order, so it is not byte-identical to the Rust wire JSON).
    * @param portfolioJson - Canonical JSON array of `FiPositionSnapshot` objects describing the portfolio side on the quote-reproducing Z-spread basis; weights must sum to 1.
    * @param benchmarkJson - Canonical JSON array of `FiPositionSnapshot` objects describing the benchmark side on the quote-reproducing Z-spread basis; weights must sum to 1.
    * @param configJson - Canonical JSON `FiAttributionConfig`; `period_years` is its only field, is required (no default), and unknown keys are rejected.
@@ -10688,7 +8778,7 @@ export interface PortfolioNamespace {
     portfolioJson: JsonInput,
     benchmarkJson: JsonInput,
     configJson: JsonInput
-  ): Record<string, unknown>;
+  ): FiAttributionResult;
   /**
    * Carino-link already-computed single-period Campisi results.
    *
@@ -10706,11 +8796,11 @@ export interface PortfolioNamespace {
    * totals do not reconcile to `active_return` within the overflow-safe
    * scaled-L1 tolerance, a reconciliation residual is non-finite, or a return
    * is outside the Carino domain.
-   * @returns Returns a plain structured JavaScript object; `JSON.stringify` it for a canonical JSON string.
+   * @returns Returns a plain structured JavaScript object; `JSON.stringify` it for a JSON string (integer-like map keys enumerate in numeric order, so it is not byte-identical to the Rust wire JSON).
    * @param periodsJson - Canonical JSON array of `FiAttributionResult` objects in chronological order, as returned by `campisiAttribution`.
    * @throws Error - Throws a JavaScript exception if `periodsJson` is malformed, the sequence is empty or changes sector ordering, a consumed value or reconciliation is non-finite or inconsistent, a return is at most `-1`, or the linked result cannot be converted to a JavaScript value.
    */
-  campisiCarinoLink(periodsJson: JsonInput): Record<string, unknown>;
+  campisiCarinoLink(periodsJson: JsonInput): FiCarinoLinkedResult;
   /**
    * Compute per-period Campisi attributions from snapshots and Carino-link them.
    *
@@ -10718,7 +8808,7 @@ export interface PortfolioNamespace {
    * one shared `period_years` — is applied to every period, so this entry point
    * is only correct for equal-length periods; use `campisiCarinoLink` for
    * unequal periods. Returns a structured `FiCarinoLinkedResult` object.
-   * @returns Returns a plain structured JavaScript object; `JSON.stringify` it for a canonical JSON string.
+   * @returns Returns a plain structured JavaScript object; `JSON.stringify` it for a JSON string (integer-like map keys enumerate in numeric order, so it is not byte-identical to the Rust wire JSON).
    * @param periodsJson - Canonical JSON array of `FiPeriodInput` objects, each holding `portfolio` and `benchmark` arrays of `FiPositionSnapshot`.
    * @param configJson - Canonical JSON `FiAttributionConfig` applied to every period; `period_years` is its only field and is required (no default).
    * @throws Error - Throws a JavaScript exception if either JSON input is malformed, any period fails Campisi attribution validation, the computed periods fail Carino linking validation, or the result cannot be converted to a JavaScript value.
@@ -10726,7 +8816,7 @@ export interface PortfolioNamespace {
   campisiCarinoLinkFromSnapshots(
     periodsJson: JsonInput,
     configJson: JsonInput
-  ): Record<string, unknown>;
+  ): FiCarinoLinkedResult;
   /**
    * Reconcile the five Campisi effect totals against the active return.
    *
@@ -10736,12 +8826,12 @@ export interface PortfolioNamespace {
    * callers must re-sum the five totals by hand. Returns a structured
    * `FiReconciliationReport` object with `total_residual`, `is_reconciled`
    * and `tolerance`.
-   * @returns Returns a plain structured JavaScript object; `JSON.stringify` it for a canonical JSON string.
+   * @returns Returns a plain structured JavaScript object; `JSON.stringify` it for a JSON string (integer-like map keys enumerate in numeric order, so it is not byte-identical to the Rust wire JSON).
    * @param resultJson - Canonical JSON `FiAttributionResult` as returned by `campisiAttribution` (`JSON.stringify` its structured result); unknown fields are rejected.
    * @param tolerance - Absolute reconciliation tolerance in return units; `1e-10` suits return-space values.
    * @throws Error - Throws a JavaScript exception if `resultJson` is malformed or does not match `FiAttributionResult`, or if the reconciliation report cannot be converted to a JavaScript value.
    */
-  campisiReconciliationCheck(resultJson: JsonInput, tolerance: number): Record<string, unknown>;
+  campisiReconciliationCheck(resultJson: JsonInput, tolerance: number): FiReconciliationReport;
   /**
    * Build a duration-cell base-return table from a reference universe.
    *
@@ -10751,7 +8841,7 @@ export interface PortfolioNamespace {
    * and flat-extrapolating leading/trailing gaps. Returns a structured
    * `DurationCellTable` object; `JSON.stringify` it to chain into
    * `excessReturns`.
-   * @returns Returns a plain structured JavaScript object; `JSON.stringify` it for a canonical JSON string.
+   * @returns Returns a plain structured JavaScript object; `JSON.stringify` it for a JSON string (integer-like map keys enumerate in numeric order, so it is not byte-identical to the Rust wire JSON).
    * @param referenceJson - Canonical JSON array of `ReferenceReturn` objects (`duration`, `total_return`, both decimals with duration in years); must be non-empty.
    * @param baseLabel - Label identifying the resulting curve (e.g. `"UST"`), carried through to the output's `base_label` for policy visibility.
    * @param configJson - Canonical JSON `CellConfig`; `width` is its only field (cell width in years, finite and positive) and is required, with no default.
@@ -10761,7 +8851,7 @@ export interface PortfolioNamespace {
     referenceJson: JsonInput,
     baseLabel: string,
     configJson: JsonInput
-  ): Record<string, unknown>;
+  ): DurationCellTable;
   /**
    * Build a duration-cell base-return table from start/end discount curves.
    *
@@ -10772,7 +8862,7 @@ export interface PortfolioNamespace {
    * the reference-universe path in `cellReturnsFromReference`. Returns a
    * structured `DurationCellTable` object; `JSON.stringify` it to chain into
    * `excessReturns`.
-   * @returns Returns a plain structured JavaScript object; `JSON.stringify` it for a canonical JSON string.
+   * @returns Returns a plain structured JavaScript object; `JSON.stringify` it for a JSON string (integer-like map keys enumerate in numeric order, so it is not byte-identical to the Rust wire JSON).
    * @param start - Discount curve observed at the start of the holding period.
    * @param end - Discount curve observed `horizonYears` later, at period end.
    * @param horizonYears - Length of the holding period, in years; must be finite and positive.
@@ -10788,7 +8878,7 @@ export interface PortfolioNamespace {
     maxDuration: number,
     baseLabel: string,
     configJson: JsonInput
-  ): Record<string, unknown>;
+  ): DurationCellTable;
   /**
    * Compute duration-matched credit excess returns against a base-return table.
    *
@@ -10804,12 +8894,12 @@ export interface PortfolioNamespace {
    * non-finite/negative/zero-width, non-ascending, or overlapping cells; any
    * position is invalid or falls in no cell (including a valid gap); or
    * position weights do not sum to one.
-   * @returns Returns a plain structured JavaScript object; `JSON.stringify` it for a canonical JSON string.
+   * @returns Returns a plain structured JavaScript object; `JSON.stringify` it for a JSON string (integer-like map keys enumerate in numeric order, so it is not byte-identical to the Rust wire JSON).
    * @param positionsJson - Canonical JSON array of `ExcessReturnPosition` objects (`id`, `weight`, `duration`, `total_return`); weights must sum to 1.
    * @param tableJson - Canonical JSON `DurationCellTable`; `JSON.stringify` the structured table returned by `cellReturnsFromReference` or `cellReturnsFromCurves`.
    * @throws Error - Throws a JavaScript exception if either JSON input is malformed, the cell table is invalid, a position is invalid or falls in no cell, position weights do not sum to one, or the result cannot be converted to a JavaScript value.
    */
-  excessReturns(positionsJson: JsonInput, tableJson: JsonInput): Record<string, unknown>;
+  excessReturns(positionsJson: JsonInput, tableJson: JsonInput): ExcessReturnResult;
   /**
    * Compute a single-period hierarchical duration-cell x sector grid attribution.
    *
@@ -10824,12 +8914,12 @@ export interface PortfolioNamespace {
    * residual grows the closer any bucket's net weight sits to the
    * near-zero-net-weight rejection boundary (see the Rust module docs for
    * measured magnitudes).
-   * @returns Returns a plain structured JavaScript object; `JSON.stringify` it for a canonical JSON string.
+   * @returns Returns a plain structured JavaScript object; `JSON.stringify` it for a JSON string (integer-like map keys enumerate in numeric order, so it is not byte-identical to the Rust wire JSON).
    * @param portfolioJson - Canonical JSON array of `GridPosition` objects (`cell`, `sector`, `weight`, `total_return`) for the portfolio side; weights must sum to 1.
    * @param benchmarkJson - Canonical JSON array of `GridPosition` objects for the benchmark side; same weight-sum requirement.
    * @throws Error - Throws a JavaScript exception if either JSON input is malformed, a weight or return is non-finite, either side's weights do not sum to one, a cell or cell-sector bucket has a zero or near-zero net weight relative to gross weight, or the result cannot be converted to a JavaScript value.
    */
-  gridAttribution(portfolioJson: JsonInput, benchmarkJson: JsonInput): Record<string, unknown>;
+  gridAttribution(portfolioJson: JsonInput, benchmarkJson: JsonInput): GridAttributionResult;
   /**
    * Carino-link multi-period hierarchical grid attribution results.
    *
@@ -10847,11 +8937,11 @@ export interface PortfolioNamespace {
    * `active_return` within the overflow-safe scaled-L1 tolerance; a return-
    * identity or reconciliation residual is non-finite; or a return is outside
    * the Carino domain.
-   * @returns Returns a plain structured JavaScript object; `JSON.stringify` it for a canonical JSON string.
+   * @returns Returns a plain structured JavaScript object; `JSON.stringify` it for a JSON string (integer-like map keys enumerate in numeric order, so it is not byte-identical to the Rust wire JSON).
    * @param periodsJson - Canonical JSON array of `GridAttributionResult` objects, in chronological order; `JSON.stringify` the structured results returned by `gridAttribution`.
    * @throws Error - Throws a JavaScript exception if `periodsJson` is malformed, the sequence is empty, a consumed value is non-finite or inconsistent, a return is at most `-1`, or the linked result cannot be converted to a JavaScript value.
    */
-  gridCarinoLink(periodsJson: JsonInput): Record<string, unknown>;
+  gridCarinoLink(periodsJson: JsonInput): GridCarinoLinkedResult;
   /**
    * Compute Jeet-Partani (2023) factor-Brinson unified attribution.
    *
@@ -10861,15 +8951,12 @@ export interface PortfolioNamespace {
    * caller-supplied benchmark factor-return vector. Returns a structured
    * `FactorBrinsonResult` object with `allocation`, `selection`, and their
    * per-factor / per-asset breakdowns.
-   * @returns Returns a plain structured JavaScript object; `JSON.stringify` it for a canonical JSON string.
+   * @returns Returns a plain structured JavaScript object; `JSON.stringify` it for a JSON string (integer-like map keys enumerate in numeric order, so it is not byte-identical to the Rust wire JSON).
    * @param inputJson - Canonical JSON `FactorBrinsonInput` with `asset_ids`, `asset_returns`, `exposures` (row-major n_assets x n_factors), `factor_names`, `portfolio_weights` and `benchmark_weights`; each weight vector must sum to 1.
    * @param factorReturns - Caller-supplied benchmark factor returns `f_b` as a `number[]` or `Float64Array`, length `input.factor_names`; the `Float64Array` returned by `analytics.constrainedLeastSquares` can be passed directly.
    * @throws Error - Throws a JavaScript exception if `inputJson` is malformed; the asset or factor sets are empty; dimensions disagree; a value is non-finite; either weight vector does not sum to one; benchmark factor completeness is outside tolerance; or the result cannot be converted to a JavaScript value.
    */
-  factorBrinsonAttribution(
-    inputJson: JsonInput,
-    factorReturns: NumericArray
-  ): Record<string, unknown>;
+  factorBrinsonAttribution(inputJson: JsonInput, factorReturns: NumericArray): FactorBrinsonResult;
   /**
    * Compute a Modified-Dietz TWRR sub-period return from period JSON.
    * @returns Sub-period time-weighted return as a decimal.
@@ -10884,7 +8971,7 @@ export interface PortfolioNamespace {
    * @param horizonYears - Return-linking horizon measured in years for annualization.
    * @throws Error - Throws a JavaScript exception if `returnsJson` is malformed, the return series is invalid (non-finite sub-period return or return at most -1, non-positive compounded growth factor), or the linked result cannot be converted to a JavaScript value.
    */
-  twrrLinked(returnsJson: JsonInput, horizonYears: number): Record<string, unknown>;
+  twrrLinked(returnsJson: JsonInput, horizonYears: number): LinkedReturn;
   /**
    * Compute money-weighted return via XIRR from dated cashflow JSON.
    *
@@ -10908,7 +8995,7 @@ export interface PortfolioNamespace {
   buildPortfolioFromSpecJson(specJson: JsonInput): string;
   /**
    * Aggregate portfolio metrics from a valuation JSON.
-   * @returns Returns a plain structured JavaScript object; `JSON.stringify` it for a canonical JSON string.
+   * @returns Returns a plain structured JavaScript object; `JSON.stringify` it for a JSON string (integer-like map keys enumerate in numeric order, so it is not byte-identical to the Rust wire JSON).
    * @param valuationJson - `PortfolioValuation` JSON, for example `JSON.stringify(valuePortfolio(...))`.
    * @param baseCurrency - ISO-4217 base currency in which aggregate portfolio values are reported.
    * @param marketJson - Canonical market-context JSON supplying curves, quotes, and FX data.
@@ -10920,14 +9007,14 @@ export interface PortfolioNamespace {
     baseCurrency: string,
     marketJson: JsonInput,
     asOf: string
-  ): Record<string, unknown>;
+  ): PortfolioMetrics;
   /**
    * Value a portfolio from its spec and market context.
-   * @returns Returns a plain structured JavaScript object; `JSON.stringify` it for a canonical JSON string.
+   * @returns Returns a plain structured JavaScript object; `JSON.stringify` it for a JSON string (integer-like map keys enumerate in numeric order, so it is not byte-identical to the Rust wire JSON).
    * @param specJson - Canonical portfolio specification JSON defining positions, quantities, and base currency.
    * @param marketJson - Canonical market-context JSON supplying curves, quotes, and FX data.
    * @param strictRisk - Optional; when omitted or `undefined`, uses the Rust `PortfolioValuationOptions` default, `true` (fail closed when a requested risk metric fails to compute). Pass `false` only for an intentional PV-preserving fallback.
-   * @param metrics - Optional risk-metric ids to offer every position. Omit for the standard set (PV plus `dv01`; pricer-specific metrics such as `theta` or `cs01` must be listed explicitly); an empty array performs PV-only valuation. Names resolve exactly as in `priceInstrument`: every id `listStandardMetrics()` returns is accepted and an unknown name throws. The list is a menu, not a per-position request: one list is chosen for a book of mixed instrument types, so each position is asked for exactly the entries its own instrument can compute (a composite position: the additive entries at least one leg supports), and the rest appear on that position's `inapplicable_metrics`. Narrowing covers structural inapplicability only; `strictRisk` still governs a metric an instrument supports but fails to compute. `priceInstrument` keeps the opposite contract and throws on a metric its instrument cannot produce. Mirrors the Python `metrics=` keyword. Each position's `valuation_result` keeps 64-bit fields (the Monte Carlo `seed` and path counts) as `BigInt`, exactly as `priceInstrument` returns them; serialize one with `valuations.valuationResultToJson`.
+   * @param metrics - Optional risk-metric ids to offer every position. Omit for the standard set (PV plus `dv01`; pricer-specific metrics such as `theta` or `cs01` must be listed explicitly); an empty array performs PV-only valuation. Names resolve exactly as in `priceInstrument`: every id `listStandardMetrics()` returns is accepted and an unknown name throws. The list is a menu, not a per-position request: one list is chosen for a book of mixed instrument types, so each position is asked for exactly the entries its own instrument can compute (a composite position: the additive entries at least one leg supports), and the rest appear on that position's `inapplicable_metrics`. Narrowing covers structural inapplicability only; `strictRisk` still governs a metric an instrument supports but fails to compute. `priceInstrument` keeps the opposite contract and throws on a metric its instrument cannot produce. Mirrors the Python `metrics=` keyword. Each position's `valuation_result` keeps 64-bit fields (the Monte Carlo `seed` and path counts) as `BigInt`, exactly as `priceInstrument` returns them; serialize one with `valuations.valuationResultToJson`. `position_values` and `by_entity` are plain objects keyed by id: JavaScript enumerates integer-like ids (such as `"10"`, `"2"`) in ascending numeric order before other keys, not in the Rust (and Python) insertion order; take valuation order from `spec.positions` when it matters.
    * @throws Error - Throws a JavaScript exception if the portfolio or market JSON is malformed, a requested metric name is unknown, portfolio construction or valuation fails, strict risk calculation cannot produce a requested metric, a required FX conversion is unavailable, or the valuation cannot be converted to a JavaScript value.
    */
   valuePortfolio(
@@ -10935,17 +9022,17 @@ export interface PortfolioNamespace {
     marketJson: JsonInput,
     strictRisk?: boolean,
     metrics?: string[]
-  ): Record<string, unknown>;
+  ): PortfolioValuation;
   /**
    * Value an already-built [`Portfolio`] handle. Skips the per-call
    * `PortfolioSpec` parse + `Portfolio::from_spec` rebuild that
    * [`value_portfolio`] performs; use this when sweeping market scenarios
    * against a fixed portfolio.
-   * @returns Returns a plain structured JavaScript object; `JSON.stringify` it for a canonical JSON string.
+   * @returns Returns a plain structured JavaScript object; `JSON.stringify` it for a JSON string (integer-like map keys enumerate in numeric order, so it is not byte-identical to the Rust wire JSON).
    * @param portfolio - Built portfolio object whose positions and weights are used by the calculation.
    * @param marketJson - Canonical market-context JSON supplying curves, quotes, and FX data.
    * @param strictRisk - Optional; when omitted or `undefined`, uses the Rust `PortfolioValuationOptions` default, `true` (fail closed when a requested risk metric fails to compute). Pass `false` only for an intentional PV-preserving fallback.
-   * @param metrics - Optional risk-metric ids to offer every position. Omit for the standard set (PV plus `dv01`; pricer-specific metrics such as `theta` or `cs01` must be listed explicitly); an empty array performs PV-only valuation. Names resolve exactly as in `priceInstrument`: every id `listStandardMetrics()` returns is accepted and an unknown name throws. The list is a menu, not a per-position request: one list is chosen for a book of mixed instrument types, so each position is asked for exactly the entries its own instrument can compute (a composite position: the additive entries at least one leg supports), and the rest appear on that position's `inapplicable_metrics`. Narrowing covers structural inapplicability only; `strictRisk` still governs a metric an instrument supports but fails to compute. `priceInstrument` keeps the opposite contract and throws on a metric its instrument cannot produce. Mirrors the Python `metrics=` keyword. Each position's `valuation_result` keeps 64-bit fields (the Monte Carlo `seed` and path counts) as `BigInt`, exactly as `priceInstrument` returns them; serialize one with `valuations.valuationResultToJson`.
+   * @param metrics - Optional risk-metric ids to offer every position. Omit for the standard set (PV plus `dv01`; pricer-specific metrics such as `theta` or `cs01` must be listed explicitly); an empty array performs PV-only valuation. Names resolve exactly as in `priceInstrument`: every id `listStandardMetrics()` returns is accepted and an unknown name throws. The list is a menu, not a per-position request: one list is chosen for a book of mixed instrument types, so each position is asked for exactly the entries its own instrument can compute (a composite position: the additive entries at least one leg supports), and the rest appear on that position's `inapplicable_metrics`. Narrowing covers structural inapplicability only; `strictRisk` still governs a metric an instrument supports but fails to compute. `priceInstrument` keeps the opposite contract and throws on a metric its instrument cannot produce. Mirrors the Python `metrics=` keyword. Each position's `valuation_result` keeps 64-bit fields (the Monte Carlo `seed` and path counts) as `BigInt`, exactly as `priceInstrument` returns them; serialize one with `valuations.valuationResultToJson`. `position_values` and `by_entity` are plain objects keyed by id: JavaScript enumerates integer-like ids (such as `"10"`, `"2"`) in ascending numeric order before other keys, not in the Rust (and Python) insertion order; take valuation order from `spec.positions` when it matters.
    * @throws Error - Throws a JavaScript exception if `marketJson` is malformed, a requested metric name is unknown, portfolio valuation fails, strict risk calculation cannot produce a requested metric, a required FX conversion is unavailable, or the valuation cannot be converted to a JavaScript value.
    */
   valuePortfolioBuilt(
@@ -10953,10 +9040,10 @@ export interface PortfolioNamespace {
     marketJson: JsonInput,
     strictRisk?: boolean,
     metrics?: string[]
-  ): Record<string, unknown>;
+  ): PortfolioValuation;
   /**
    * Aggregate the full classified cashflow ladder for a portfolio.
-   * @returns Returns a plain structured JavaScript object; `JSON.stringify` it for a canonical JSON string.
+   * @returns Returns a plain structured JavaScript object; `JSON.stringify` it for a JSON string (integer-like map keys enumerate in numeric order, so it is not byte-identical to the Rust wire JSON).
    * @param specJson - Canonical portfolio specification JSON defining positions, quantities, and base currency.
    * @param marketJson - Canonical market-context JSON supplying curves, quotes, and FX data.
    * @param allowPartial - Optional; when omitted or `undefined`, uses the Rust `CashflowAggregationOptions` default, `false` (fail closed if any position fails schedule construction). Pass `true` to keep a partial ladder with issues on the result.
@@ -10966,7 +9053,7 @@ export interface PortfolioNamespace {
     specJson: JsonInput,
     marketJson: JsonInput,
     allowPartial?: boolean
-  ): Record<string, unknown>;
+  ): PortfolioCashflows;
   /**
    * Aggregate the full classified cashflow ladder for an already-built
    * [`Portfolio`] handle.
@@ -10974,7 +9061,7 @@ export interface PortfolioNamespace {
    * Skips the per-call `PortfolioSpec` parse + `Portfolio::from_spec` rebuild.
    * For batched or chained workflows (repeated cashflow builds across market
    * scenarios on the same portfolio), this is the cheap path.
-   * @returns Returns a plain structured JavaScript object; `JSON.stringify` it for a canonical JSON string.
+   * @returns Returns a plain structured JavaScript object; `JSON.stringify` it for a JSON string (integer-like map keys enumerate in numeric order, so it is not byte-identical to the Rust wire JSON).
    * @param portfolio - Built portfolio object whose positions and weights are used by the calculation.
    * @param marketJson - Canonical market-context JSON supplying curves, quotes, and FX data.
    * @param allowPartial - Optional; when omitted or `undefined`, uses the Rust `CashflowAggregationOptions` default, `false` (fail closed if any position fails schedule construction). Pass `true` to keep a partial ladder with issues on the result.
@@ -10984,7 +9071,7 @@ export interface PortfolioNamespace {
     portfolio: Portfolio,
     marketJson: JsonInput,
     allowPartial?: boolean
-  ): Record<string, unknown>;
+  ): PortfolioCashflows;
   /**
    * Apply a scenario to a portfolio and revalue.
    *
@@ -10992,28 +9079,28 @@ export interface PortfolioNamespace {
    * @returns Revalued result object and scenario application report.
    * @param specJson - Canonical portfolio specification JSON defining positions, quantities, and base currency.
    * @param scenarioJson - Scenario specification JSON.
-   * @param marketJson - Canonical market-context JSON supplying curves, quotes, and FX data. Each position's `valuation_result` keeps 64-bit fields (the Monte Carlo `seed` and path counts) as `BigInt`, exactly as `priceInstrument` returns them; serialize one with `valuations.valuationResultToJson`.
+   * @param marketJson - Canonical market-context JSON supplying curves, quotes, and FX data. Each position's `valuation_result` keeps 64-bit fields (the Monte Carlo `seed` and path counts) as `BigInt`, exactly as `priceInstrument` returns them; serialize one with `valuations.valuationResultToJson`. `position_values` and `by_entity` are plain objects keyed by id: JavaScript enumerates integer-like ids (such as `"10"`, `"2"`) in ascending numeric order before other keys, not in the Rust (and Python) insertion order; take valuation order from `spec.positions` when it matters.
    * @throws Error - Throws a JavaScript exception if the portfolio, scenario, or market JSON is malformed; portfolio construction, scenario application, or revaluation fails; or the structured result cannot be converted to a JavaScript value.
    */
   applyScenarioAndRevalue(
     specJson: JsonInput,
     scenarioJson: JsonInput,
     marketJson: JsonInput
-  ): ScenarioRevalueResult;
+  ): ScenarioRevalueView;
   /**
    * Apply a scenario to an already-built [`Portfolio`] handle and revalue.
    * Returns a JS object with structured `valuation` and `report` values.
    * @returns Revalued result object and scenario application report.
    * @param portfolio - Built portfolio object whose positions and weights are used by the calculation.
    * @param scenarioJson - Scenario specification JSON.
-   * @param marketJson - Canonical market-context JSON supplying curves, quotes, and FX data. Each position's `valuation_result` keeps 64-bit fields (the Monte Carlo `seed` and path counts) as `BigInt`, exactly as `priceInstrument` returns them; serialize one with `valuations.valuationResultToJson`.
+   * @param marketJson - Canonical market-context JSON supplying curves, quotes, and FX data. Each position's `valuation_result` keeps 64-bit fields (the Monte Carlo `seed` and path counts) as `BigInt`, exactly as `priceInstrument` returns them; serialize one with `valuations.valuationResultToJson`. `position_values` and `by_entity` are plain objects keyed by id: JavaScript enumerates integer-like ids (such as `"10"`, `"2"`) in ascending numeric order before other keys, not in the Rust (and Python) insertion order; take valuation order from `spec.positions` when it matters.
    * @throws Error - Throws a JavaScript exception if the scenario or market JSON is malformed, scenario application or portfolio revaluation fails, or the structured result cannot be converted to a JavaScript value.
    */
   applyScenarioAndRevalueBuilt(
     portfolio: Portfolio,
     scenarioJson: JsonInput,
     marketJson: JsonInput
-  ): ScenarioRevalueResult;
+  ): ScenarioRevalueView;
   /**
    * Compute the profit and loss attributable to a scenario.
    *
@@ -11026,11 +9113,7 @@ export interface PortfolioNamespace {
    * @param marketJson - Canonical market-context JSON supplying the unshocked curves, quotes, and FX data used for the base leg.
    * @throws Error - Throws a JavaScript exception if the portfolio, scenario, or market JSON is malformed; portfolio construction, scenario application, or either valuation fails; valuation currencies are inconsistent; or the structured result cannot be converted to JavaScript.
    */
-  scenarioPnl(
-    specJson: JsonInput,
-    scenarioJson: JsonInput,
-    marketJson: JsonInput
-  ): ScenarioPnlResult;
+  scenarioPnl(specJson: JsonInput, scenarioJson: JsonInput, marketJson: JsonInput): ScenarioPnlView;
   /**
    * Compute the profit and loss attributable to a scenario for an
    * already-built [`Portfolio`] handle.
@@ -11050,35 +9133,35 @@ export interface PortfolioNamespace {
     portfolio: Portfolio,
     scenarioJson: JsonInput,
     marketJson: JsonInput
-  ): ScenarioPnlResult;
+  ): ScenarioPnlView;
   /**
    * Optimize portfolio weights using the LP-based optimizer.
    *
    * Accepts a `PortfolioOptimizationSpec` JSON (portfolio + objective +
    * constraints + options) and a `MarketContext` JSON, and returns a
    * structured `PortfolioOptimizationResult` object.
-   * @returns Returns a plain structured JavaScript object; `JSON.stringify` it for a canonical JSON string.
+   * @returns Returns a plain structured JavaScript object; `JSON.stringify` it for a JSON string (integer-like map keys enumerate in numeric order, so it is not byte-identical to the Rust wire JSON).
    * @param specJson - `PortfolioOptimizationSpec` JSON: `portfolio` (a `PortfolioSpec`) plus `objective`, and optional `constraints`, `weighting`, `missing_metric_policy`, `label` and `trade_universe`.
    * @param marketJson - Canonical market-context JSON supplying curves, quotes, and FX data.
    * @throws Error - Throws a JavaScript exception if either JSON input is malformed, the portfolio, objective, constraints, weighting, or missing-metric policy is invalid, a required market-dependent valuation fails, the solver cannot produce a result, or the result cannot be converted to a JavaScript value.
    */
-  optimizePortfolio(specJson: JsonInput, marketJson: JsonInput): Record<string, unknown>;
+  optimizePortfolio(specJson: JsonInput, marketJson: JsonInput): PortfolioOptimizationResult;
   /**
    * Replay a portfolio through dated market snapshots.
    *
    * Accepts a portfolio spec, an array of dated market snapshots, and a
    * replay configuration. Returns a structured `ReplayResult` object.
-   * @returns Returns a plain structured JavaScript object; `JSON.stringify` it for a canonical JSON string.
+   * @returns Returns a plain structured JavaScript object; `JSON.stringify` it for a JSON string (integer-like map keys enumerate in numeric order, so it is not byte-identical to the Rust wire JSON).
    * @param specJson - Canonical portfolio specification JSON defining positions, quantities, and base currency.
    * @param snapshotsJson - Market-snapshot JSON array.
-   * @param configJson - `ReplayConfig` JSON with a required `mode` (`pv_only` | `pv_and_pnl` | `full_attribution`) and optional `attribution_method`, `valuation_options` and `on_error`; unknown keys are rejected. Each position's `valuation_result` keeps 64-bit fields (the Monte Carlo `seed` and path counts) as `BigInt`, exactly as `priceInstrument` returns them; serialize one with `valuations.valuationResultToJson`.
+   * @param configJson - `ReplayConfig` JSON with a required `mode` (`pv_only` | `pv_and_pnl` | `full_attribution`) and optional `attribution_method`, `valuation_options` and `on_error`; unknown keys are rejected. Each position's `valuation_result` keeps 64-bit fields (the Monte Carlo `seed` and path counts) as `BigInt`, exactly as `priceInstrument` returns them; serialize one with `valuations.valuationResultToJson`. `position_values` and `by_entity` are plain objects keyed by id: JavaScript enumerates integer-like ids (such as `"10"`, `"2"`) in ascending numeric order before other keys, not in the Rust (and Python) insertion order; take valuation order from `spec.positions` when it matters.
    * @throws Error - Throws a JavaScript exception if any JSON input is malformed; the portfolio, replay configuration, or snapshot dates and ordering are invalid; valuation, attribution, or currency conversion fails; best-effort replay retains no step; or the result cannot be converted to a JavaScript value.
    */
   replayPortfolio(
     specJson: JsonInput,
     snapshotsJson: JsonInput,
     configJson: JsonInput
-  ): Record<string, unknown>;
+  ): ReplayResult;
   /**
    * Compute first-order factor sensitivities and return the matrix.
    *
@@ -11088,7 +9171,7 @@ export interface PortfolioNamespace {
    * `{ base_currency, position_ids, factor_ids, data }` with `data` as nested
    * rows (`data[position][factor]`): the same shape `decomposeFactorRisk`
    * accepts and the Python `SensitivityMatrix.to_json` emits.
-   * @returns Returns a structured `SensitivityMatrixResult` object.
+   * @returns Returns a structured `SensitivityMatrixJson` object.
    * @param positionsJson - Canonical portfolio-positions JSON to bump and revalue.
    * @param factorsJson - Canonical factor-definition JSON identifying the market factors to shock.
    * @param marketJson - Canonical market-context JSON supplying curves, quotes, and FX data.
@@ -11104,12 +9187,12 @@ export interface PortfolioNamespace {
     asOf: string,
     baseCurrency: string,
     bumpConfigJson?: JsonInput
-  ): SensitivityMatrixResult;
+  ): SensitivityMatrixJson;
   /**
    * Compute first-order factor sensitivities using a pre-parsed `core.MarketContext` handle.
    *
    * Avoids reparsing market JSON for repeated factor analytics calls.
-   * @returns Returns a structured `SensitivityMatrixResult` object.
+   * @returns Returns a structured `SensitivityMatrixJson` object.
    * @param positionsJson - Canonical portfolio-positions JSON to bump and revalue.
    * @param factorsJson - Canonical factor-definition JSON identifying the market factors to shock.
    * @param market - Pre-parsed `core.MarketContext` handle supplying curves, quotes, and FX data.
@@ -11125,7 +9208,7 @@ export interface PortfolioNamespace {
     asOf: string,
     baseCurrency: string,
     bumpConfigJson?: JsonInput
-  ): SensitivityMatrixResult;
+  ): SensitivityMatrixJson;
   /**
    * Compute scenario P&L profiles via full repricing.
    *
@@ -11189,8 +9272,8 @@ export interface PortfolioNamespace {
    * `measure` is the risk measure in its canonical serde form, the same shape
    * as the `riskMeasureJson` input: `"variance"` or `"volatility"`, or an
    * object carrying `confidence` for `var` / `expected_shortfall`. The Python
-   * `FactorRiskDecomposition.measure` getter returns the same value.
-   * @returns Returns a structured `FactorRiskDecomposition` object.
+   * `RiskDecomposition.measure` getter returns the same value.
+   * @returns Returns a structured `RiskDecomposition` object.
    * @param sensitivitiesJson - Canonical sensitivity-matrix JSON `{ base_currency, position_ids, factor_ids, data }` with one `data` row per position and one entry per factor; unknown keys are rejected.
    * @param covarianceJson - Factor covariance-matrix JSON aligned with the supplied sensitivities.
    * @param riskMeasureJson - Risk-measure JSON selecting the decomposition metric; omit for `"variance"`.
@@ -11200,7 +9283,7 @@ export interface PortfolioNamespace {
     sensitivitiesJson: JsonInput,
     covarianceJson: JsonInput,
     riskMeasureJson?: JsonInput
-  ): FactorRiskDecomposition;
+  ): RiskDecomposition;
 }
 
 /**
@@ -11209,321 +9292,6 @@ export interface PortfolioNamespace {
 export declare const portfolio: PortfolioNamespace;
 
 // --- scenarios -------------------------------------------------------------
-
-/**
- * Non-fatal warning raised while applying a scenario.
- */
-export interface ScenarioWarning {
-  /**
-   * Warning category raised while applying the scenario, such as a skipped or clamped effect.
-   */
-  kind: string;
-  [key: string]: unknown;
-}
-
-/**
- * Authoritative manifest of the state changed by applied scenario effects.
- */
-export interface ScenarioChangeManifest {
-  /**
-   * Concrete market-data targets changed by applied effects.
-   */
-  market_targets: unknown[];
-  /**
-   * Zero-based indices of portfolio instruments mutated in place.
-   */
-  changed_instrument_indices: number[];
-  /**
-   * Whether the effective valuation date changed.
-   */
-  as_of_changed: boolean;
-  /**
-   * Whether instruments were inserted, removed, or reordered.
-   */
-  portfolio_shape_changed: boolean;
-  /**
-   * Whether callers must conservatively treat every dependency as dirty.
-   */
-  all_dirty: boolean;
-}
-
-/**
- * Audit stamp describing the numeric mode, rounding context, and FX policy
- * under which a result was produced.
- */
-export interface ResultsMeta {
-  /**
-   * Numeric engine mode used to produce the results.
-   */
-  numeric_mode: string;
-  /**
-   * Rounding context snapshot applied at IO boundaries.
-   */
-  rounding: Record<string, unknown>;
-  /**
-   * FX policy applied by the computing layer, when one was applied.
-   */
-  fx_policy_applied?: string | null;
-  /**
-   * Whether the producing computation ran in parallel (omitted when serial).
-   */
-  parallel?: boolean;
-  /**
-   * ISO-8601 timestamp when the result was computed.
-   */
-  timestamp?: string;
-  /**
-   * Finstack Quant library version used to produce the result.
-   */
-  version?: string;
-  [key: string]: unknown;
-}
-
-/**
- * Per-instrument carry decomposition returned by a `time_roll_forward`
- * scenario operation.
- */
-export interface RollForwardReport {
-  [key: string]: unknown;
-}
-
-/**
- * Mutated market and optional model after applying a scenario.
- *
- * Mirrors the Rust `ApplicationEnvelope`: the mutated contexts cross the
- * boundary as objects, not JSON strings.
- */
-export interface ScenarioApplyResult {
-  /**
-   * Mutated market context, as an object.
-   */
-  market: Record<string, unknown>;
-  /**
-   * Shocked canonical instrument envelopes in input order; absent when no inventory was supplied.
-   */
-  instruments?: Record<string, unknown>[];
-  /**
-   * Mutated financial model, as an object. Absent when no model was supplied.
-   */
-  model?: Record<string, unknown>;
-  /**
-   * Count of effects successfully applied. One operation can produce zero,
-   * one, or many effects; inspect `changes` and `warnings` for coverage.
-   */
-  operations_applied: number;
-  /**
-   * Count of caller-supplied operations before template or hierarchy expansion.
-   */
-  user_operations: number;
-  /**
-   * Count of operations after template expansion and hierarchy resolution.
-   */
-  expanded_operations: number;
-  /**
-   * Authoritative manifest of the state changed by applied effects.
-   */
-  changes: ScenarioChangeManifest;
-  /**
-   * Non-fatal warnings produced while applying the scenario.
-   */
-  warnings: ScenarioWarning[];
-  /**
-   * Audit stamp (numeric mode, rounding context, FX policy). Omitted when absent.
-   */
-  meta?: ResultsMeta;
-  /**
-   * Roll-forward report, present only when the scenario contained a
-   * `time_roll_forward` operation.
-   */
-  time_roll?: RollForwardReport;
-}
-
-/**
- * Mutated market after applying a market-only scenario.
- *
- * The same `ApplicationEnvelope` shape as `ScenarioApplyResult` minus `model`.
- */
-export interface ScenarioApplyMarketResult {
-  /**
-   * Mutated market context, as an object.
-   */
-  market: Record<string, unknown>;
-  /**
-   * Shocked canonical instrument envelopes in input order; absent when no inventory was supplied.
-   */
-  instruments?: Record<string, unknown>[];
-  /**
-   * Count of effects successfully applied. One operation can produce zero,
-   * one, or many effects; inspect `changes` and `warnings` for coverage.
-   */
-  operations_applied: number;
-  /**
-   * Count of caller-supplied operations before template or hierarchy expansion.
-   */
-  user_operations: number;
-  /**
-   * Count of operations after template expansion and hierarchy resolution.
-   */
-  expanded_operations: number;
-  /**
-   * Authoritative manifest of the state changed by applied effects.
-   */
-  changes: ScenarioChangeManifest;
-  /**
-   * Non-fatal warnings produced while applying the scenario to the market.
-   */
-  warnings: ScenarioWarning[];
-  /**
-   * Audit stamp (numeric mode, rounding context, FX policy). Omitted when absent.
-   */
-  meta?: ResultsMeta;
-  /**
-   * Roll-forward report, present only when the scenario contained a
-   * `time_roll_forward` operation.
-   */
-  time_roll?: RollForwardReport;
-}
-
-/**
- * Derived horizon returns computed in Rust by the `HorizonResult` accessors.
- *
- * Undefined returns (currency mismatch, zero or negative initial value) are
- * `null`; Python's `HorizonResult` accessors report the same cases as NaN.
- */
-export interface HorizonSummary {
-  /**
-   * Total return as a decimal fraction (`0.05` = +5%), or `null` when undefined.
-   */
-  total_return: number | null;
-  /**
-   * Annualized total return as a decimal fraction; `null` without a time roll
-   * or when the total return is undefined.
-   */
-  annualized_return: number | null;
-  /**
-   * ISO 4217 currency of the initial and terminal values.
-   */
-  currency: string;
-  /**
-   * Each attribution factor's P&L as a fraction of the initial value, keyed by
-   * factor name (`carry`, `rates_curves`, `credit_curves`, `inflation_curves`,
-   * `correlations`, `fx`, `volatility`, `model_parameters`, `market_scalars`);
-   * `null` when undefined.
-   */
-  factor_contributions: Record<string, number | null>;
-}
-
-/**
- * Horizon total return: the serde `HorizonResult` document plus its
- * Rust-computed `summary`.
- *
- * Money fields are exact-decimal `MoneyValue` objects; Python's
- * `HorizonResult` exposes them as floats plus a `currency` accessor.
- */
-export interface HorizonResult {
-  /**
-   * Factor-decomposed P&L between the opening and scenario states.
-   */
-  attribution: PnlAttribution;
-  /**
-   * Instrument value at the opening market and date.
-   */
-  initial_value: MoneyValue;
-  /**
-   * Instrument value after the scenario (and time roll, when present).
-   */
-  terminal_value: MoneyValue;
-  /**
-   * Calendar days in the horizon; `null` when the scenario has no time roll.
-   */
-  horizon_days: number | null;
-  /**
-   * Report from applying the scenario to the opening market.
-   */
-  scenario_report: Omit<ScenarioApplyMarketResult, 'market' | 'instruments'>;
-  /**
-   * Total, annualized and per-factor returns computed by the Rust accessors.
-   */
-  summary: HorizonSummary;
-}
-
-/**
- * A structured scenario operation using the canonical Rust `kind` discriminator.
- */
-export type ScenarioOperation = Record<string, unknown> & { kind: string };
-
-/**
- * Validated scenario specification consumed by the scenario engine.
- */
-export interface ScenarioSpec {
-  /**
-   * Stable scenario identifier.
-   */
-  id: string;
-  /**
-   * Optional human-readable name.
-   */
-  name?: string;
-  /**
-   * Optional human-readable description.
-   */
-  description?: string;
-  /**
-   * Ordered scenario operations.
-   */
-  operations: ScenarioOperation[];
-  /**
-   * Composition priority; lower values execute first.
-   */
-  priority: number;
-  /**
-   * Hierarchy conflict policy.
-   */
-  resolution_mode: 'most_specific_wins' | 'cumulative';
-  /**
-   * Optional ParCDS delivery. Omitted when left at the default
-   * `"solve_to_par"`. `"first_order_shift"` applies delta hazard = delta spread / (1 - recovery) and reports an approximation warning.
-   */
-  hazard_bump_mode?: 'solve_to_par' | 'first_order_shift';
-}
-
-/**
- * Discovery metadata for one built-in historical scenario template.
- */
-export interface TemplateMetadata {
-  /**
-   * Stable template identifier.
-   */
-  id: string;
-  /**
-   * Human-readable template name.
-   */
-  name: string;
-  /**
-   * Historical event and modeled-effects description.
-   */
-  description: string;
-  /**
-   * Primary historical event date in ISO-8601 form.
-   */
-  event_date: string;
-  /**
-   * Canonical asset-class labels affected by the scenario.
-   */
-  asset_classes: Array<'rates' | 'credit' | 'equity' | 'fx' | 'volatility' | 'commodity'>;
-  /**
-   * Freeform discovery tags.
-   */
-  tags: string[];
-  /**
-   * Scenario severity classification.
-   */
-  severity: 'mild' | 'moderate' | 'severe';
-  /**
-   * Component identifiers in deterministic build order.
-   */
-  components: string[];
-}
 
 /**
  * Namespaced TypeScript entry points for scenarios calculations and types.
@@ -11619,7 +9387,7 @@ export interface ScenariosNamespace {
    */
   buildScenarioSpec(
     id: string,
-    operations: ScenarioOperation[],
+    operations: OperationSpec[],
     name?: string,
     description?: string,
     priority?: number,
@@ -11657,7 +9425,7 @@ export interface ScenariosNamespace {
     asOf: string,
     instrumentsJson?: JsonInput,
     configJson?: JsonInput
-  ): ScenarioApplyResult;
+  ): ApplicationEnvelope;
   /**
    * Apply a scenario to a market context only (no model mutations).
    *
@@ -11677,7 +9445,7 @@ export interface ScenariosNamespace {
     asOf: string,
     instrumentsJson?: JsonInput,
     configJson?: JsonInput
-  ): ScenarioApplyMarketResult;
+  ): ApplicationEnvelope;
   /**
    * Compute horizon total return under a scenario.
    *
@@ -11702,7 +9470,7 @@ export interface ScenariosNamespace {
     method?: 'parallel' | 'waterfall' | 'metrics_based' | 'taylor',
     configJson?: JsonInput,
     calendarId?: string
-  ): HorizonResult;
+  ): HorizonReport;
 }
 
 /**

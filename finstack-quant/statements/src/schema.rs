@@ -237,4 +237,11 @@ pub const ARTIFACTS: &[finstack_quant_core::schema::SchemaArtifact] = &[
     .with_kind(finstack_quant_core::schema::SchemaKind::Output)
     .with_summary("Evaluated node values per period, with policy stamps.")
     .with_examples(statement_result_examples),
+    finstack_quant_core::schema::SchemaArtifact::new::<crate::evaluator::MonteCarloResults>(
+        "schemas/statements/1/monte_carlo_results.schema.json",
+        "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json",
+        "MonteCarloResults",
+        "Percentile summaries of a Monte Carlo statement-model evaluation.",
+    )
+    .with_kind(finstack_quant_core::schema::SchemaKind::Output),
 ];

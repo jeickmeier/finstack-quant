@@ -967,6 +967,40 @@ pub fn artifacts() -> Vec<SchemaArtifact> {
         )
         .with_packager(package_valuations_schema)
         .with_kind(SchemaKind::Output),
+        SchemaArtifact::new::<
+            crate::instruments::fixed_income::structured_credit::BorrowingBaseReport,
+        >(
+            "schemas/results/1/borrowing_base_report.schema.json",
+            "https://finstack_quant.dev/schemas/results/1/borrowing_base_report.schema.json",
+            "BorrowingBaseReport",
+            "Asset-backed facility borrowing base, availability and advance-rate test.",
+        )
+        .with_packager(package_valuations_schema)
+        .with_kind(SchemaKind::Output),
+        SchemaArtifact::new::<crate::instruments::CompositeHistoryRow>(
+            "schemas/results/1/composite_history_row.schema.json",
+            "https://finstack_quant.dev/schemas/results/1/composite_history_row.schema.json",
+            "CompositeHistoryRow",
+            "One dated composite holdings state and its accumulated trades.",
+        )
+        .with_packager(package_valuations_schema)
+        .with_kind(SchemaKind::Output),
+        SchemaArtifact::new::<crate::market::listed::ListedProductCoverage>(
+            "schemas/results/1/listed_product_coverage.schema.json",
+            "https://finstack_quant.dev/schemas/results/1/listed_product_coverage.schema.json",
+            "ListedProductCoverage",
+            "Listed-product catalog coverage for one exchange product.",
+        )
+        .with_packager(package_valuations_schema)
+        .with_kind(SchemaKind::Output),
+        SchemaArtifact::new::<crate::pricer::MetricMetadata>(
+            "schemas/results/1/metric_metadata.schema.json",
+            "https://finstack_quant.dev/schemas/results/1/metric_metadata.schema.json",
+            "MetricMetadata",
+            "Canonical per-key metric interpretation for host presentation.",
+        )
+        .with_packager(package_valuations_schema)
+        .with_kind(SchemaKind::Output),
     ];
 
     artifacts.extend(

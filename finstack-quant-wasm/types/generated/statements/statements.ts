@@ -1932,6 +1932,54 @@ export type PeriodId = string;
  */
 export type SchemaVersion = number;
 /**
+ * Column storage variants supported by the table envelope.
+ */
+export type TableColumnData =
+  | {
+      type: "string";
+      values: string[];
+      [k: string]: unknown;
+    }
+  | {
+      type: "nullable_string";
+      values: (string | null)[];
+      [k: string]: unknown;
+    }
+  | {
+      type: "float64";
+      values: number[];
+      [k: string]: unknown;
+    }
+  | {
+      type: "nullable_float64";
+      values: (number | null)[];
+      [k: string]: unknown;
+    }
+  | {
+      type: "u_int32";
+      values: number[];
+      [k: string]: unknown;
+    }
+  | {
+      type: "nullable_u_int32";
+      values: (number | null)[];
+      [k: string]: unknown;
+    }
+  | {
+      type: "int64";
+      values: number[];
+      [k: string]: unknown;
+    }
+  | {
+      type: "nullable_int64";
+      values: (number | null)[];
+      [k: string]: unknown;
+    };
+/**
+ * Optional semantic hint for a column.
+ */
+export type TableColumnRole = "dimension" | "index" | "measure" | "attribute";
+/**
  * Numeric mode used for evaluation.
  */
 export type StatementNumericMode = "float64";
@@ -6685,6 +6733,103 @@ export interface Period {
    * Inclusive start date.
    */
   start: string;
+}
+/**
+ * Percentile summaries of a Monte Carlo statement-model evaluation.
+ */
+export interface MonteCarloResults {
+  /**
+   * Forecast (non-actual) periods included in the simulation.
+   */
+  forecast_periods: PeriodId[];
+  /**
+   * Number of Monte Carlo paths simulated.
+   */
+  n_paths: number;
+  /**
+   * Optional full path data in long-format table form.
+   */
+  path_data?: TableEnvelope | null;
+  /**
+   * Aggregated percentile results: `metric → PercentileSeries`.
+   */
+  percentile_results: {
+    [k: string]: PercentileSeries;
+  };
+  /**
+   * Percentiles computed for each metric/period.
+   */
+  percentiles: number[];
+  /**
+   * Warnings encountered while evaluating Monte Carlo paths.
+   */
+  warnings?: EvalWarning[];
+  [k: string]: unknown;
+}
+/**
+ * Serializable columnar table envelope.
+ *
+ * Tables preserve column order and validate that every column has the same row
+ * count. Optional metadata can record domain-specific hints such as which
+ * column is a metric, what a numeric field represents, or how a host-language
+ * binding should interpret the data.
+ */
+export interface TableEnvelope {
+  /**
+   * Ordered set of columns.
+   */
+  columns: TableColumn[];
+  /**
+   * Table-level metadata for downstream bindings and documentation.
+   */
+  metadata?: {
+    [k: string]: unknown;
+  };
+  /**
+   * Number of rows in the table.
+   */
+  row_count: number;
+  [k: string]: unknown;
+}
+/**
+ * A single named column in a [`TableEnvelope`].
+ */
+export interface TableColumn {
+  /**
+   * Column values.
+   */
+  data: TableColumnData;
+  /**
+   * Optional per-column metadata.
+   */
+  metadata?: {
+    [k: string]: unknown;
+  };
+  /**
+   * Column name.
+   */
+  name: string;
+  /**
+   * Optional semantic hint for bindings and consumers.
+   */
+  role?: TableColumnRole | null;
+  [k: string]: unknown;
+}
+/**
+ * Per-metric percentile time series.
+ */
+export interface PercentileSeries {
+  /**
+   * Metric / node identifier.
+   */
+  metric: string;
+  /**
+   * Period → ordered list of `(percentile, value)` pairs.
+   */
+  values: {
+    [k: string]: [unknown, unknown][];
+  };
+  [k: string]: unknown;
 }
 /**
  * Financial statement normalization policy and adjustment catalog.

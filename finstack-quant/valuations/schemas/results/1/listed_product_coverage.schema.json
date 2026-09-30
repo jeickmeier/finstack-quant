@@ -1,0 +1,529 @@
+{
+  "$defs": {
+    "InstrumentType": {
+      "description": "Strongly-typed instrument classification for pricer dispatch.\n\nEach variant represents a distinct instrument type with its own pricing\nlogic and risk characteristics. Used by the pricing registry to route\ninstruments to appropriate pricer implementations.",
+      "oneOf": [
+        {
+          "const": "bond",
+          "description": "Fixed or floating-rate bond (plain vanilla, callable, amortizing).",
+          "type": "string"
+        },
+        {
+          "const": "credit_default_swap",
+          "description": "Credit Default Swap (single-name credit protection).",
+          "type": "string"
+        },
+        {
+          "const": "cds_index",
+          "description": "CDS Index (portfolio credit protection, e.g., CDX, iTraxx).",
+          "type": "string"
+        },
+        {
+          "const": "cds_tranche",
+          "description": "CDS Tranche (mezzanine credit exposure via synthetic CDO).",
+          "type": "string"
+        },
+        {
+          "const": "cds_option",
+          "description": "Option on Credit Default Swap.",
+          "type": "string"
+        },
+        {
+          "const": "interest_rate_swap",
+          "description": "Interest Rate Swap (fixed-for-floating exchange).",
+          "type": "string"
+        },
+        {
+          "const": "cap_floor",
+          "description": "Interest rate cap or floor (portfolio of caplets/floorlets).",
+          "type": "string"
+        },
+        {
+          "const": "swaption",
+          "description": "Option on interest rate swap (European exercise).",
+          "type": "string"
+        },
+        {
+          "const": "bermudan_swaption",
+          "description": "Bermudan swaption (multiple exercise dates).",
+          "type": "string"
+        },
+        {
+          "const": "basis_swap",
+          "description": "Basis swap (floating-for-floating with spread).",
+          "type": "string"
+        },
+        {
+          "const": "basket",
+          "description": "Multi-asset basket (worst-of, best-of, or weighted).",
+          "type": "string"
+        },
+        {
+          "const": "convertible_bond",
+          "description": "Convertible bond (bond with embedded equity option).",
+          "type": "string"
+        },
+        {
+          "const": "deposit",
+          "description": "Money market deposit (single-period).",
+          "type": "string"
+        },
+        {
+          "const": "equity_option",
+          "description": "Vanilla equity option (call or put on single stock or index).",
+          "type": "string"
+        },
+        {
+          "const": "fx_option",
+          "description": "FX option (Garman-Kohlhagen model).",
+          "type": "string"
+        },
+        {
+          "const": "fx_spot",
+          "description": "FX spot position (currency pair).",
+          "type": "string"
+        },
+        {
+          "const": "fx_swap",
+          "description": "FX forward or FX swap.",
+          "type": "string"
+        },
+        {
+          "const": "xccy_swap",
+          "description": "Cross-currency swap (multi-currency floating legs).",
+          "type": "string"
+        },
+        {
+          "const": "inflation_linked_bond",
+          "description": "Inflation-linked bond (TIPS, index-linked gilts).",
+          "type": "string"
+        },
+        {
+          "const": "inflation_swap",
+          "description": "Zero-coupon inflation swap.",
+          "type": "string"
+        },
+        {
+          "const": "yoy_inflation_swap",
+          "description": "Year-on-year inflation swap.",
+          "type": "string"
+        },
+        {
+          "const": "inflation_cap_floor",
+          "description": "Inflation cap/floor (YoY inflation options).",
+          "type": "string"
+        },
+        {
+          "const": "interest_rate_future",
+          "description": "Interest rate futures contract.",
+          "type": "string"
+        },
+        {
+          "const": "variance_swap",
+          "description": "Variance swap (volatility exposure).",
+          "type": "string"
+        },
+        {
+          "const": "fx_variance_swap",
+          "description": "FX variance swap (volatility exposure on FX).",
+          "type": "string"
+        },
+        {
+          "const": "equity",
+          "description": "Equity spot position (shares in single stock or fund).",
+          "type": "string"
+        },
+        {
+          "const": "repo",
+          "description": "Repurchase agreement (repo or reverse repo).",
+          "type": "string"
+        },
+        {
+          "const": "forward_rate_agreement",
+          "description": "Forward Rate Agreement (forward-starting interest rate contract).",
+          "type": "string"
+        },
+        {
+          "const": "structured_credit",
+          "description": "Structured credit (ABS, RMBS, CMBS, CLO with tranches and waterfall).",
+          "type": "string"
+        },
+        {
+          "const": "private_markets_fund",
+          "description": "Private markets fund (PE/credit fund with waterfall).",
+          "type": "string"
+        },
+        {
+          "const": "revolving_credit",
+          "description": "Revolving credit facility with drawdown/repayment.",
+          "type": "string"
+        },
+        {
+          "const": "asian_option",
+          "description": "Asian option (payoff based on average price).",
+          "type": "string"
+        },
+        {
+          "const": "barrier_option",
+          "description": "Barrier option (knock-in or knock-out on barrier cross).",
+          "type": "string"
+        },
+        {
+          "const": "lookback_option",
+          "description": "Lookback option (payoff based on path extremum).",
+          "type": "string"
+        },
+        {
+          "const": "quanto_option",
+          "description": "Quanto option (cross-currency option with quanto adjustment).",
+          "type": "string"
+        },
+        {
+          "const": "autocallable",
+          "description": "Autocallable structured note (early redemption feature).",
+          "type": "string"
+        },
+        {
+          "const": "cms_option",
+          "description": "CMS option (constant maturity swap option).",
+          "type": "string"
+        },
+        {
+          "const": "cms_swap",
+          "description": "CMS swap (constant maturity swap).",
+          "type": "string"
+        },
+        {
+          "const": "cliquet_option",
+          "description": "Cliquet option (ratchet option with periodic resets).",
+          "type": "string"
+        },
+        {
+          "const": "range_accrual",
+          "description": "Range accrual note (coupon accrues when rate in range).",
+          "type": "string"
+        },
+        {
+          "const": "fx_barrier_option",
+          "description": "FX barrier option (FX option with knock-in/out barrier).",
+          "type": "string"
+        },
+        {
+          "const": "term_loan",
+          "description": "Term loan (optionally Delayed Draw Term Loan)",
+          "type": "string"
+        },
+        {
+          "const": "discounted_cash_flow",
+          "description": "Discounted Cash Flow (corporate valuation)",
+          "type": "string"
+        },
+        {
+          "const": "real_estate_asset",
+          "description": "Real estate asset valuation (DCF or direct cap).",
+          "type": "string"
+        },
+        {
+          "const": "levered_real_estate_equity",
+          "description": "Levered real estate equity (asset minus financing).",
+          "type": "string"
+        },
+        {
+          "const": "trs_equity",
+          "description": "Equity Total Return Swap.",
+          "type": "string"
+        },
+        {
+          "const": "trs_fixed_income_index",
+          "description": "Fixed Income Index Total Return Swap.",
+          "type": "string"
+        },
+        {
+          "const": "bond_future",
+          "description": "Bond future (futures on a deliverable bond basket with CTD mechanics).",
+          "type": "string"
+        },
+        {
+          "const": "commodity_forward",
+          "description": "Commodity forward or futures contract.",
+          "type": "string"
+        },
+        {
+          "const": "commodity_swap",
+          "description": "Commodity swap (fixed-for-floating commodity price exchange).",
+          "type": "string"
+        },
+        {
+          "const": "commodity_option",
+          "description": "Commodity option (option on commodity forward or spot).",
+          "type": "string"
+        },
+        {
+          "const": "commodity_asian_option",
+          "description": "Commodity Asian option (option on arithmetic/geometric average of commodity prices).",
+          "type": "string"
+        },
+        {
+          "const": "commodity_swaption",
+          "description": "Commodity swaption (option on a fixed-for-floating commodity swap).",
+          "type": "string"
+        },
+        {
+          "const": "commodity_spread_option",
+          "description": "Commodity spread option (option on the spread between two commodities).",
+          "type": "string"
+        },
+        {
+          "const": "volatility_index_future",
+          "description": "Volatility index future (VIX, VXN, VSTOXX).",
+          "type": "string"
+        },
+        {
+          "const": "fx_forward",
+          "description": "FX forward (outright forward, single exchange at maturity).",
+          "type": "string"
+        },
+        {
+          "const": "ndf",
+          "description": "Non-deliverable forward (NDF) for restricted currencies.",
+          "type": "string"
+        },
+        {
+          "const": "agency_mbs_passthrough",
+          "description": "Agency MBS passthrough (FNMA, FHLMC, GNMA pools).",
+          "type": "string"
+        },
+        {
+          "const": "agency_tba",
+          "description": "Agency TBA (To-Be-Announced) forward.",
+          "type": "string"
+        },
+        {
+          "const": "dollar_roll",
+          "description": "Dollar roll (TBA financing trade).",
+          "type": "string"
+        },
+        {
+          "const": "agency_cmo",
+          "description": "Agency CMO (Collateralized Mortgage Obligation).",
+          "type": "string"
+        },
+        {
+          "const": "fx_digital_option",
+          "description": "FX digital (binary) option (cash-or-nothing / asset-or-nothing).",
+          "type": "string"
+        },
+        {
+          "const": "fx_touch_option",
+          "description": "FX touch option (one-touch / no-touch American binary).",
+          "type": "string"
+        },
+        {
+          "const": "tarn",
+          "description": "Target Redemption Note (path-dependent coupon with knockout).",
+          "type": "string"
+        },
+        {
+          "const": "cms_spread_option",
+          "description": "CMS Spread Option (option on spread between two CMS rates).",
+          "type": "string"
+        },
+        {
+          "const": "callable_range_accrual",
+          "description": "Callable Range Accrual (range accrual with Bermudan call).",
+          "type": "string"
+        },
+        {
+          "const": "snowball",
+          "description": "Snowball / Inverse Floater structured note.",
+          "type": "string"
+        },
+        {
+          "const": "composite",
+          "description": "Generic resolved basket of signed underlying instrument quantities.",
+          "type": "string"
+        },
+        {
+          "const": "commodity_future",
+          "description": "Linear listed future on a single or average observed price.",
+          "type": "string"
+        },
+        {
+          "const": "fx_future",
+          "description": "Exchange-listed future on a deliverable currency pair.",
+          "type": "string"
+        },
+        {
+          "const": "equity_future",
+          "description": "Exchange-listed equity or equity-index future, including fixed-currency quantos.",
+          "type": "string"
+        },
+        {
+          "const": "equity_total_return_future",
+          "description": "Listed equity total-return future quoted as an annualized financing spread.",
+          "type": "string"
+        },
+        {
+          "const": "interest_rate_future_option",
+          "description": "Listed or bilateral option on an interest-rate futures price.",
+          "type": "string"
+        },
+        {
+          "const": "equity_future_option",
+          "description": "Exchange-listed option on an equity or equity-index futures contract.",
+          "type": "string"
+        },
+        {
+          "const": "fx_future_option",
+          "description": "Exchange-listed option on an FX futures contract.",
+          "type": "string"
+        },
+        {
+          "const": "commodity_future_option",
+          "description": "Exchange-listed option on a commodity futures contract.",
+          "type": "string"
+        },
+        {
+          "const": "volatility_index_future_option",
+          "description": "Exchange-listed option on a volatility-index futures contract.",
+          "type": "string"
+        },
+        {
+          "const": "asset_backed_facility",
+          "description": "Asset-backed facility (warehouse line against a collateral pool).",
+          "type": "string"
+        }
+      ]
+    },
+    "ListedCoverageStatus": {
+      "description": "Readiness of the mapped valuation route.",
+      "oneOf": [
+        {
+          "const": "native",
+          "description": "Direct canonical instrument with complete core pricing and first-order risk.",
+          "type": "string"
+        },
+        {
+          "const": "composed",
+          "description": "Supported by composing existing canonical instruments.",
+          "type": "string"
+        },
+        {
+          "const": "partial",
+          "description": "Core price/risk is supported but a named exchange optionality remains external.",
+          "type": "string"
+        }
+      ]
+    },
+    "ListedExchange": {
+      "description": "Supported exchange catalog.",
+      "oneOf": [
+        {
+          "const": "cme",
+          "description": "CME Group exchanges (CME, CBOT, NYMEX, COMEX).",
+          "type": "string"
+        },
+        {
+          "const": "eurex",
+          "description": "Eurex.",
+          "type": "string"
+        },
+        {
+          "const": "montreal",
+          "description": "Montréal Exchange.",
+          "type": "string"
+        },
+        {
+          "const": "sgx",
+          "description": "Singapore Exchange.",
+          "type": "string"
+        }
+      ]
+    },
+    "ListedProductKind": {
+      "description": "High-level listed product form.",
+      "oneOf": [
+        {
+          "const": "future",
+          "description": "Exchange future.",
+          "type": "string"
+        },
+        {
+          "const": "option_on_future",
+          "description": "Option whose exercise delivers or references a future.",
+          "type": "string"
+        },
+        {
+          "const": "option",
+          "description": "Cash-index or single-security option.",
+          "type": "string"
+        }
+      ]
+    }
+  },
+  "$id": "https://finstack_quant.dev/schemas/results/1/listed_product_coverage.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Listed-product catalog coverage for one exchange product.",
+  "properties": {
+    "asset_class": {
+      "description": "Rates, fixed income, equity, FX, commodity, volatility, or digital assets.",
+      "type": "string"
+    },
+    "exchange": {
+      "$ref": "#/$defs/ListedExchange",
+      "description": "Exchange venue."
+    },
+    "features": {
+      "description": "Exchange features exercised by this mapping.",
+      "items": {
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "instrument_type": {
+      "$ref": "#/$defs/InstrumentType",
+      "description": "Canonical valuation type selected by the library."
+    },
+    "name": {
+      "description": "Human-readable exchange product family.",
+      "type": "string"
+    },
+    "product_kind": {
+      "$ref": "#/$defs/ListedProductKind",
+      "description": "Future, option on future, or direct option."
+    },
+    "residual_gap": {
+      "description": "Residual feature not included in the canonical valuation, if any.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "source_url": {
+      "description": "Current official exchange page used to verify the family.",
+      "type": "string"
+    },
+    "status": {
+      "$ref": "#/$defs/ListedCoverageStatus",
+      "description": "Native, composed, or partial coverage."
+    },
+    "symbols": {
+      "description": "Exchange root symbols, comma-separated where one row covers a close family.",
+      "type": "string"
+    }
+  },
+  "required": [
+    "exchange",
+    "symbols",
+    "name",
+    "asset_class",
+    "product_kind",
+    "instrument_type",
+    "status",
+    "features",
+    "source_url"
+  ],
+  "title": "ListedProductCoverage",
+  "type": "object"
+}

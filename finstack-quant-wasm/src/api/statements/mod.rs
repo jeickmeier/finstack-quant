@@ -1,6 +1,8 @@
 //! WASM bindings for the `finstack-quant-statements` crate.
 //!
-//! Exposes JSON-in / JSON-out functions for:
+//! Inputs are JSON strings or plain objects. The `validate*Json` helpers
+//! return canonical JSON strings; the evaluators return structured JavaScript
+//! objects. Covers:
 //! - `FinancialModelSpec` validation and node enumeration
 //! - `CheckSuiteSpec`, `WaterfallSpec`, `EcfSweepSpec`, `PikToggleSpec`,
 //!   `CapitalStructureSpec` validation
@@ -106,20 +108,13 @@ pub fn validate_capital_structure_spec_json(json: JsValue) -> Result<String, JsV
 /// consistency check (for example rejecting `Sweep` ordered after `Equity`
 /// when an ECF sweep is configured).
 ///
-/// # Arguments
-///
-/// * `json` - Canonical JSON string for a `WaterfallSpec`, including
-///   `priority_of_payments`, `available_cash_node`, optional `ecf_sweep`,
-///   `pik_toggle`, `payment_classes`, `mandatory_prepay_node`, and
-///   `voluntary_prepay_node`.
-///
 /// # Errors
 ///
 /// Rejects malformed or schema-incompatible `json`; duplicate or inconsistent
 /// payment priorities; incomplete available-cash priorities; invalid PIK,
 /// payment-class, prepay-node, or ECF-sweep settings; or failure to serialize
 /// the validated waterfall.
-/// @param json - Canonical JSON string defining the object to deserialize or normalize.
+/// @param json - Canonical JSON string for a `WaterfallSpec`, including `priority_of_payments`, `available_cash_node`, optional `ecf_sweep`, `pik_toggle`, `payment_classes`, `mandatory_prepay_node`, and `voluntary_prepay_node`.
 #[wasm_bindgen(js_name = validateWaterfallSpecJson)]
 pub fn validate_waterfall_spec_json(json: JsValue) -> Result<String, JsValue> {
     let json: &str = &json_text(&json, "json")?;

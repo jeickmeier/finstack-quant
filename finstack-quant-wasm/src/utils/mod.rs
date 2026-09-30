@@ -185,6 +185,14 @@ fn named_js_error(name: &str, e: &impl IntoJsError) -> JsValue {
 /// JS objects — matching the shapes declared in `index.d.ts` and the dict
 /// shapes returned by the Python bindings.
 ///
+/// Key order: JavaScript enumerates map keys that are canonical array indices
+/// (decimal integer strings `"0"`..`"4294967294"`, e.g. position or entity ids
+/// like `"10"`) in ascending numeric order before all other keys. Iteration
+/// order of such a map can therefore differ from the Rust `IndexMap`
+/// insertion order that Python dicts preserve; keyed lookup is unaffected.
+/// The object is not byte-identical to the Rust wire JSON either: integral
+/// floats print as `1`, not `1.0`, under `JSON.stringify`.
+///
 /// # Errors
 ///
 /// Returns a structured `JsValue` error if serialization fails.
@@ -264,19 +272,11 @@ fn restore_non_finite<T: NonFiniteFields>(object: &JsValue) -> Result<(), JsValu
 ///
 /// This is reserved for structured host results whose full-width integer
 /// fields, such as Monte Carlo seeds, must remain lossless.
+/// Map key order follows the same JavaScript rule as [`to_js_value`].
 pub(crate) fn to_js_value_with_bigints<T: serde::Serialize>(value: &T) -> Result<JsValue, JsValue> {
     let serializer = serde_wasm_bindgen::Serializer::json_compatible()
         .serialize_large_number_types_as_bigints(true);
     value.serialize(&serializer).map_err(to_js_err)
-}
-
-pub(crate) fn to_js_value_with_kind<T: serde::Serialize>(
-    value: &T,
-    kind: &'static str,
-) -> Result<JsValue, JsValue> {
-    value
-        .serialize(&serde_wasm_bindgen::Serializer::json_compatible())
-        .map_err(|error| structured_js_error("FinstackError", &error.to_string(), Some(kind), None))
 }
 
 /// Build a named JS `Error` with optional structured `kind` and `cause`
@@ -331,7 +331,7 @@ pub fn materialization_to_js_error(error: finstack_quant_portfolio::Error) -> Js
                 None,
             );
             #[cfg(target_arch = "wasm32")]
-            if let Ok(value) = to_js_value_with_kind(report.as_ref(), "serialization") {
+            if let Ok(value) = to_js_value(report.as_ref()) {
                 let _ = js_sys::Reflect::set(&js, &JsValue::from("report"), &value);
             }
             js

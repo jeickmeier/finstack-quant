@@ -1,0 +1,89 @@
+{
+  "$defs": {
+    "MetricUnit": {
+      "description": "Unit family of a metric value.\n\nThe classification follows the unit documented on each `MetricId`\nconstant. Currency-per-bump sensitivities (`dv01`, `cs01`, `vega`) are\nreported as [`MetricUnit::Currency`]: the value is a currency amount and\nthe bump is part of the metric's definition, not of its unit.",
+      "oneOf": [
+        {
+          "const": "currency",
+          "description": "Amount in the result currency (PV components, currency-per-bump\nsensitivities, Greeks scaled by notional, jump-to-default).",
+          "type": "string"
+        },
+        {
+          "const": "decimal",
+          "description": "Decimal rate, probability, fraction or spread (`0.05` = 5%,\n`0.01` = 100bp).",
+          "type": "string"
+        },
+        {
+          "const": "basis_points",
+          "description": "Basis points (`164.7` = 164.7bp).",
+          "type": "string"
+        },
+        {
+          "const": "years",
+          "description": "Years (durations, WAL/WAM, time to maturity, calendar-day counts\nexpressed in years).",
+          "type": "string"
+        },
+        {
+          "const": "percent",
+          "description": "Percent or percentage-point value (`5.0` = 5%), including prices quoted\nas a percentage of par and speeds quoted as `% PSA`/`% SDA`.",
+          "type": "string"
+        },
+        {
+          "const": "dimensionless",
+          "description": "Pure number: ratios, multiples, counts, discount factors, flags, epoch\ndays, index levels, and FX rates.",
+          "type": "string"
+        },
+        {
+          "const": "unknown",
+          "description": "Custom metric or a standard metric whose unit depends on the producing\ncalculator.",
+          "type": "string"
+        }
+      ]
+    }
+  },
+  "$id": "https://finstack_quant.dev/schemas/results/1/metric_metadata.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Canonical per-key metric interpretation for host presentation.",
+  "properties": {
+    "bucketed": {
+      "description": "Whether this is a DV01/CS01 bucket with nonempty identifier and bucket coordinates.",
+      "type": "boolean"
+    },
+    "components": {
+      "description": "Decoded coordinate labels in original order; empty for scalar metrics.",
+      "items": {
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "group": {
+      "description": "Native display group; absent for a non-standard base metric.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "key": {
+      "description": "Original canonical wire key, retained without renaming.",
+      "type": "string"
+    },
+    "metric": {
+      "description": "Base metric name without composite coordinates.",
+      "type": "string"
+    },
+    "unit": {
+      "$ref": "#/$defs/MetricUnit",
+      "description": "Native unit family; custom or calculator-dependent units remain unknown."
+    }
+  },
+  "required": [
+    "key",
+    "metric",
+    "components",
+    "unit",
+    "bucketed"
+  ],
+  "title": "MetricMetadata",
+  "type": "object"
+}

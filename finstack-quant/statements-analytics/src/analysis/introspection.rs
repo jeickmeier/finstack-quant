@@ -608,6 +608,10 @@ pub struct Explanation {
     pub breakdown: Vec<ExplanationStep>,
 }
 
+impl finstack_quant_core::wire::NonFiniteFields for Explanation {
+    const NON_FINITE_FIELDS: &'static [&'static str] = &["final_value"];
+}
+
 impl Explanation {
     /// Convert explanation to detailed string format.
     ///
@@ -660,12 +664,53 @@ pub struct ExplanationStep {
     pub operation: Option<String>,
 }
 
+impl finstack_quant_core::wire::NonFiniteFields for ExplanationStep {
+    const NON_FINITE_FIELDS: &'static [&'static str] = &["value"];
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use finstack_quant_core::wire::NonFiniteFields;
     use finstack_quant_statements::builder::ModelBuilder;
     use finstack_quant_statements::evaluator::Evaluator;
     use finstack_quant_statements::types::AmountOrScalar;
+
+    /// Keys of `value` that carry the `"nan"` sentinel string.
+    fn sentinel_keys(value: &serde_json::Value) -> Vec<String> {
+        let mut keys: Vec<String> = value
+            .as_object()
+            .expect("object")
+            .iter()
+            .filter(|(_, field)| field.as_str() == Some("nan"))
+            .map(|(key, _)| key.clone())
+            .collect();
+        keys.sort_unstable();
+        keys
+    }
+
+    /// `NON_FINITE_FIELDS` names exactly the NaN-carrying keys that
+    /// serialize as sentinel strings, for the explanation and its steps.
+    #[test]
+    fn non_finite_fields_match_the_serde_attributes() {
+        let step = ExplanationStep {
+            component: "revenue".into(),
+            value: f64::NAN,
+            operation: Some("+".into()),
+        };
+        let explanation = Explanation {
+            node_id: "ebitda".into(),
+            period_id: "2025Q1".parse().expect("period"),
+            final_value: f64::NAN,
+            node_type: NodeType::Calculated,
+            formula_text: None,
+            breakdown: vec![step.clone()],
+        };
+        let json = serde_json::to_value(&explanation).expect("serialize");
+        assert_eq!(sentinel_keys(&json), Explanation::NON_FINITE_FIELDS);
+        let json = serde_json::to_value(&step).expect("serialize");
+        assert_eq!(sentinel_keys(&json), ExplanationStep::NON_FINITE_FIELDS);
+    }
 
     #[test]
     fn test_direct_dependencies() {

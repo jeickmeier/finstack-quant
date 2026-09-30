@@ -127,15 +127,6 @@ NON_MAINTAINED_SERDE_EXCEPTIONS = (
         "Embedded rating-scale registry uses component validation and is explicitly outside "
         "the maintained public persistence catalog.",
     ),
-    *_classification(
-        "scenarios",
-        "src/engine/types.rs",
-        ("ApplicationEnvelope",),
-        "in-process-execution-envelope",
-        "Scenario application receipt is an immediate execution handoff, not a maintained "
-        "persisted envelope from the contract catalog.",
-    ),
-    *_computed_output("scenarios", "src/horizon.rs", ("HorizonResult",)),
     *_computed_output("statements", "src/adjustments/types.rs", ("NormalizationResult",)),
     *_in_process_spec(
         "statements",

@@ -260,9 +260,9 @@ test('computeMultiple treats a null metric as missing', () => {
   );
 });
 
-test('non-finite forecast and explanation values use the "nan" sentinel', () => {
+test('non-finite forecast and explanation values are JavaScript numbers', () => {
   const metrics = sa.backtestForecast([0.0, 0.0], [1.0, 2.0]);
-  assert.equal(metrics.mape, 'nan');
+  assert.ok(Number.isNaN(metrics.mape));
   assert.equal(metrics.mae, 1.5);
 
   const model = {
@@ -276,7 +276,9 @@ test('non-finite forecast and explanation values use the "nan" sentinel', () => 
   };
   const results = statements.evaluateModel(model);
   const explanation = sa.explainFormula(model, JSON.stringify(results), 'lagged', '2025Q1');
-  assert.equal(explanation.final_value, 'nan');
+  assert.ok(Number.isNaN(explanation.final_value));
+  // The statement result itself keeps the JSON sentinel for its nested node map.
+  assert.equal(results.nodes.lagged['2025Q1'], 'nan');
 });
 
 test('mappings and variance config reject unknown keys', () => {

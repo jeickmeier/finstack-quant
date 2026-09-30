@@ -847,6 +847,24 @@
       "type_name": "SingleInstrumentEnvelope"
     },
     {
+      "$id": "https://finstack_quant.dev/schemas/results/1/borrowing_base_report.schema.json",
+      "bytes": 1066,
+      "kind": "output",
+      "path": "schemas/results/1/borrowing_base_report.schema.json",
+      "summary": "Asset-backed facility borrowing base, availability and advance-rate test.",
+      "title": "BorrowingBaseReport",
+      "type_name": "BorrowingBaseReport"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/results/1/composite_history_row.schema.json",
+      "bytes": 7780,
+      "kind": "output",
+      "path": "schemas/results/1/composite_history_row.schema.json",
+      "summary": "One dated composite holdings state and its accumulated trades.",
+      "title": "CompositeHistoryRow",
+      "type_name": "CompositeHistoryRow"
+    },
+    {
       "$id": "https://finstack_quant.dev/schemas/results/1/composite_rebalance_result.schema.json",
       "bytes": 998415,
       "kind": "output",
@@ -872,6 +890,24 @@
       "summary": "Native cashflow rows, reporting-currency PV and reconciliation status.",
       "title": "Instrument Cashflow",
       "type_name": "InstrumentCashflowEnvelope"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/results/1/listed_product_coverage.schema.json",
+      "bytes": 17040,
+      "kind": "output",
+      "path": "schemas/results/1/listed_product_coverage.schema.json",
+      "summary": "Listed-product catalog coverage for one exchange product.",
+      "title": "ListedProductCoverage",
+      "type_name": "ListedProductCoverage"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/results/1/metric_metadata.schema.json",
+      "bytes": 3138,
+      "kind": "output",
+      "path": "schemas/results/1/metric_metadata.schema.json",
+      "summary": "Canonical per-key metric interpretation for host presentation.",
+      "title": "MetricMetadata",
+      "type_name": "MetricMetadata"
     },
     {
       "$id": "https://finstack_quant.dev/schemas/results/1/oas_result.schema.json",

@@ -253,6 +253,7 @@ impl HorizonAnalysis {
 /// Wraps a [`PnlAttribution`] with scenario context and convenience
 /// accessors for total return percentage and annualized return.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct HorizonResult {
     /// Full factor-decomposed P&L from the attribution framework.
     pub attribution: PnlAttribution,
@@ -484,6 +485,7 @@ impl HorizonResult {
 /// NaN (currency mismatch, zero or negative initial value) is `None` here, so
 /// it serializes as JSON `null`.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct HorizonSummary {
     /// Total return as a decimal fraction (`0.05` = +5%); `None` when undefined.

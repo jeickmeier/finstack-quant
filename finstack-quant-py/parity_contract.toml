@@ -2653,7 +2653,7 @@ backlog = [
 
 [parity.modules."finstack_quant.portfolio"]
 js = "portfolio"
-types = { ContractValidationError = "ContractValidationError", FactorPnlProfile = "FactorPnlProfile", FactorRiskDecomposition = "FactorRiskDecomposition", MaterializationReport = "MaterializationReport" }
+types = { ContractValidationError = "ContractValidationError", FactorPnlProfile = "FactorPnlProfile", FactorRiskDecomposition = "RiskDecomposition", MaterializationReport = "MaterializationReport" }
 backlog = [
     "BrinsonPeriodResult",
     "CandidatePosition",

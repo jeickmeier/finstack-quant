@@ -712,6 +712,10 @@ pub fn aggregate_metrics(
 /// Each position's `valuation_result` keeps 64-bit fields (the Monte Carlo
 /// `seed` and path counts) as `BigInt`, exactly as `priceInstrument` returns
 /// them; serialize one with `valuations.valuationResultToJson`.
+/// `position_values` and `by_entity` are plain objects keyed by id: JavaScript
+/// enumerates integer-like ids (such as `"10"`, `"2"`) in ascending numeric
+/// order before other keys, not in the Rust (and Python) insertion order; take
+/// valuation order from `spec.positions` when it matters.
 ///
 /// # Errors
 ///
@@ -825,6 +829,10 @@ pub fn aggregate_full_cashflows_built(
 /// Each position's `valuation_result` keeps 64-bit fields (the Monte Carlo
 /// `seed` and path counts) as `BigInt`, exactly as `priceInstrument` returns
 /// them; serialize one with `valuations.valuationResultToJson`.
+/// `position_values` and `by_entity` are plain objects keyed by id: JavaScript
+/// enumerates integer-like ids (such as `"10"`, `"2"`) in ascending numeric
+/// order before other keys, not in the Rust (and Python) insertion order; take
+/// valuation order from `spec.positions` when it matters.
 ///
 /// # Errors
 ///
@@ -877,6 +885,10 @@ pub fn value_portfolio_built(
 /// Each position's `valuation_result` keeps 64-bit fields (the Monte Carlo
 /// `seed` and path counts) as `BigInt`, exactly as `priceInstrument` returns
 /// them; serialize one with `valuations.valuationResultToJson`.
+/// `position_values` and `by_entity` are plain objects keyed by id: JavaScript
+/// enumerates integer-like ids (such as `"10"`, `"2"`) in ascending numeric
+/// order before other keys, not in the Rust (and Python) insertion order; take
+/// valuation order from `spec.positions` when it matters.
 ///
 /// # Errors
 ///
@@ -916,6 +928,10 @@ pub fn apply_scenario_and_revalue_built(
 /// Each position's `valuation_result` keeps 64-bit fields (the Monte Carlo
 /// `seed` and path counts) as `BigInt`, exactly as `priceInstrument` returns
 /// them; serialize one with `valuations.valuationResultToJson`.
+/// `position_values` and `by_entity` are plain objects keyed by id: JavaScript
+/// enumerates integer-like ids (such as `"10"`, `"2"`) in ascending numeric
+/// order before other keys, not in the Rust (and Python) insertion order; take
+/// valuation order from `spec.positions` when it matters.
 ///
 /// # Errors
 ///
@@ -1037,6 +1053,10 @@ pub fn optimize_portfolio(spec_json: JsValue, market_json: JsValue) -> Result<Js
 /// Each position's `valuation_result` keeps 64-bit fields (the Monte Carlo
 /// `seed` and path counts) as `BigInt`, exactly as `priceInstrument` returns
 /// them; serialize one with `valuations.valuationResultToJson`.
+/// `position_values` and `by_entity` are plain objects keyed by id: JavaScript
+/// enumerates integer-like ids (such as `"10"`, `"2"`) in ascending numeric
+/// order before other keys, not in the Rust (and Python) insertion order; take
+/// valuation order from `spec.positions` when it matters.
 ///
 /// # Errors
 ///

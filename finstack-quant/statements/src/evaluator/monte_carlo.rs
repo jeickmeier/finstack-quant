@@ -87,6 +87,7 @@ impl MonteCarloConfig {
 
 /// Per-metric percentile time series.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct PercentileSeries {
     /// Metric / node identifier.
     pub metric: String,
@@ -96,6 +97,7 @@ pub struct PercentileSeries {
 
 /// Monte Carlo results for a statement model.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct MonteCarloResults {
     /// Aggregated percentile results: `metric → PercentileSeries`.
     pub percentile_results: IndexMap<String, PercentileSeries>,

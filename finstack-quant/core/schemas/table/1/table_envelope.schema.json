@@ -1,0 +1,277 @@
+{
+  "$defs": {
+    "TableColumn": {
+      "description": "A single named column in a [`TableEnvelope`].",
+      "properties": {
+        "data": {
+          "$ref": "#/$defs/TableColumnData",
+          "description": "Column values."
+        },
+        "metadata": {
+          "additionalProperties": true,
+          "description": "Optional per-column metadata.",
+          "type": "object"
+        },
+        "name": {
+          "description": "Column name.",
+          "type": "string"
+        },
+        "role": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TableColumnRole"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Optional semantic hint for bindings and consumers."
+        }
+      },
+      "required": [
+        "name",
+        "data"
+      ],
+      "type": "object"
+    },
+    "TableColumnData": {
+      "description": "Column storage variants supported by the table envelope.",
+      "oneOf": [
+        {
+          "description": "Non-null string column.",
+          "properties": {
+            "type": {
+              "const": "string",
+              "type": "string"
+            },
+            "values": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "type",
+            "values"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Nullable string column.",
+          "properties": {
+            "type": {
+              "const": "nullable_string",
+              "type": "string"
+            },
+            "values": {
+              "items": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "type",
+            "values"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Non-null floating-point column.",
+          "properties": {
+            "type": {
+              "const": "float64",
+              "type": "string"
+            },
+            "values": {
+              "items": {
+                "format": "double",
+                "type": "number"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "type",
+            "values"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Nullable floating-point column.",
+          "properties": {
+            "type": {
+              "const": "nullable_float64",
+              "type": "string"
+            },
+            "values": {
+              "items": {
+                "format": "double",
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "type",
+            "values"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Non-null unsigned 32-bit integer column.",
+          "properties": {
+            "type": {
+              "const": "u_int32",
+              "type": "string"
+            },
+            "values": {
+              "items": {
+                "format": "uint32",
+                "minimum": 0,
+                "type": "integer"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "type",
+            "values"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Nullable unsigned 32-bit integer column.",
+          "properties": {
+            "type": {
+              "const": "nullable_u_int32",
+              "type": "string"
+            },
+            "values": {
+              "items": {
+                "format": "uint32",
+                "minimum": 0,
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "type",
+            "values"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Non-null signed 64-bit integer column.",
+          "properties": {
+            "type": {
+              "const": "int64",
+              "type": "string"
+            },
+            "values": {
+              "items": {
+                "format": "int64",
+                "type": "integer"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "type",
+            "values"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Nullable signed 64-bit integer column.",
+          "properties": {
+            "type": {
+              "const": "nullable_int64",
+              "type": "string"
+            },
+            "values": {
+              "items": {
+                "format": "int64",
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "type",
+            "values"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "TableColumnRole": {
+      "description": "Optional semantic hint for a column.",
+      "oneOf": [
+        {
+          "const": "dimension",
+          "description": "Row identifier or primary grouping field.",
+          "type": "string"
+        },
+        {
+          "const": "index",
+          "description": "Ordinal or time-like axis column.",
+          "type": "string"
+        },
+        {
+          "const": "measure",
+          "description": "Numeric value column.",
+          "type": "string"
+        },
+        {
+          "const": "attribute",
+          "description": "Auxiliary classification column.",
+          "type": "string"
+        }
+      ]
+    }
+  },
+  "$id": "https://finstack_quant.dev/schemas/table/1/table_envelope.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Column-oriented table with a shared row count and typed column storage.",
+  "properties": {
+    "columns": {
+      "description": "Ordered set of columns.",
+      "items": {
+        "$ref": "#/$defs/TableColumn"
+      },
+      "type": "array"
+    },
+    "metadata": {
+      "additionalProperties": true,
+      "description": "Table-level metadata for downstream bindings and documentation.",
+      "type": "object"
+    },
+    "row_count": {
+      "description": "Number of rows in the table.",
+      "format": "uint",
+      "minimum": 0,
+      "type": "integer"
+    }
+  },
+  "required": [
+    "row_count",
+    "columns"
+  ],
+  "title": "TableEnvelope",
+  "type": "object"
+}

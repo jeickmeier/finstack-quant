@@ -1,0 +1,237 @@
+{
+  "$defs": {
+    "CompositeExposureReport": {
+      "additionalProperties": false,
+      "description": "Complete primitive decomposition with path, net, and gross views.",
+      "properties": {
+        "aggregates": {
+          "description": "Primitive aggregates ordered by identifier.",
+          "items": {
+            "$ref": "#/$defs/PrimitiveAggregate"
+          },
+          "type": "array"
+        },
+        "paths": {
+          "description": "Every primitive path before overlap netting.",
+          "items": {
+            "$ref": "#/$defs/PrimitiveExposure"
+          },
+          "type": "array"
+        },
+        "reporting_currency": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/currency.schema.json",
+          "description": "Composite reporting currency."
+        }
+      },
+      "required": [
+        "reporting_currency",
+        "paths",
+        "aggregates"
+      ],
+      "type": "object"
+    },
+    "CompositeTrade": {
+      "additionalProperties": false,
+      "description": "Primitive execution delta produced by initialization or rebalance.",
+      "properties": {
+        "instrument_id": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+          "description": "Primitive instrument identifier."
+        },
+        "instrument_type": {
+          "description": "Canonical primitive instrument type discriminator.",
+          "type": "string"
+        },
+        "quantity_delta": {
+          "description": "Signed change in primitive quantity.",
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "required": [
+        "instrument_id",
+        "instrument_type",
+        "quantity_delta"
+      ],
+      "type": "object"
+    },
+    "PrimitiveAggregate": {
+      "additionalProperties": false,
+      "description": "Net and gross exposure aggregated by primitive instrument identifier.",
+      "properties": {
+        "gross_measures": {
+          "additionalProperties": {
+            "format": "double",
+            "type": "number"
+          },
+          "description": "Sum of absolute path risk by metric.",
+          "type": "object"
+        },
+        "gross_quantity": {
+          "description": "Sum of absolute path quantities.",
+          "format": "double",
+          "type": "number"
+        },
+        "gross_value": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
+          "description": "Sum of absolute reporting-currency path values."
+        },
+        "instrument_id": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+          "description": "Primitive instrument identifier."
+        },
+        "instrument_type": {
+          "description": "Canonical primitive instrument type discriminator.",
+          "type": "string"
+        },
+        "net_measures": {
+          "additionalProperties": {
+            "format": "double",
+            "type": "number"
+          },
+          "description": "Algebraic additive risk by metric.",
+          "type": "object"
+        },
+        "net_quantity": {
+          "description": "Algebraic sum of path quantities.",
+          "format": "double",
+          "type": "number"
+        },
+        "net_value": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
+          "description": "Algebraic reporting-currency value."
+        }
+      },
+      "required": [
+        "instrument_id",
+        "instrument_type",
+        "net_quantity",
+        "gross_quantity",
+        "net_value",
+        "gross_value",
+        "net_measures",
+        "gross_measures"
+      ],
+      "type": "object"
+    },
+    "PrimitiveExposure": {
+      "additionalProperties": false,
+      "description": "Path-level primitive exposure in a resolved composite tree.",
+      "properties": {
+        "instrument_id": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+          "description": "Primitive instrument identifier."
+        },
+        "instrument_type": {
+          "description": "Canonical primitive instrument type discriminator.",
+          "type": "string"
+        },
+        "measures": {
+          "additionalProperties": {
+            "format": "double",
+            "type": "number"
+          },
+          "description": "Reporting-currency additive risk measures for this path.",
+          "type": "object"
+        },
+        "path": {
+          "description": "Composite and leg identifiers from the root to the primitive.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "quantity": {
+          "description": "Signed primitive quantity after multiplying every nested state quantity.",
+          "format": "double",
+          "type": "number"
+        },
+        "value": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
+          "description": "Reporting-currency signed value for this path."
+        }
+      },
+      "required": [
+        "path",
+        "instrument_id",
+        "instrument_type",
+        "quantity",
+        "value",
+        "measures"
+      ],
+      "type": "object"
+    }
+  },
+  "$id": "https://finstack_quant.dev/schemas/results/1/composite_history_row.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "One dated composite holdings state and its accumulated trades.",
+  "properties": {
+    "cashflows": {
+      "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
+      "description": "Signed primitive cashflows on `(previous_date, date]`; zero on the first row."
+    },
+    "date": {
+      "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
+      "description": "Market observation date of this close."
+    },
+    "exposures": {
+      "$ref": "#/$defs/CompositeExposureReport",
+      "description": "Primitive path, net, and gross exposures under the held (pre-rebalance) state."
+    },
+    "held_state_effective_date": {
+      "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
+      "description": "Effective date of quantities held into this close."
+    },
+    "next_state_effective_date": {
+      "anyOf": [
+        {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "New state date made effective for the next interval, when rebalanced."
+    },
+    "period_return": {
+      "description": "`pnl / capital` for one composite unit; zero on the first row.",
+      "format": "double",
+      "type": "number"
+    },
+    "pnl": {
+      "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
+      "description": "`Δvalue + cashflows` versus the prior interval's financed opening value;\nzero on the first row."
+    },
+    "rebalance_trades": {
+      "description": "Primitive quantity deltas emitted by a close-of-period rebalance.",
+      "items": {
+        "$ref": "#/$defs/CompositeTrade"
+      },
+      "type": "array"
+    },
+    "return_index": {
+      "description": "Chained total-return index, initialized to `100` on the first row.",
+      "format": "double",
+      "type": "number"
+    },
+    "value": {
+      "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
+      "description": "Composite value before any close-of-period rebalance, in reporting currency."
+    }
+  },
+  "required": [
+    "date",
+    "value",
+    "cashflows",
+    "pnl",
+    "period_return",
+    "return_index",
+    "held_state_effective_date",
+    "exposures",
+    "rebalance_trades"
+  ],
+  "title": "CompositeHistoryRow",
+  "type": "object"
+}

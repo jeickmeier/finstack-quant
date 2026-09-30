@@ -327,6 +327,7 @@ pub fn instrument_envelopes(
 /// JSON envelope returned after applying a scenario to market data and,
 /// optionally, a financial model.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct ApplicationEnvelope {
     /// Mutated market context.

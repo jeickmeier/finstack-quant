@@ -10,6 +10,15 @@
       "type_name": "FinancialModelSpec"
     },
     {
+      "$id": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json",
+      "bytes": 31334,
+      "kind": "output",
+      "path": "schemas/statements/1/monte_carlo_results.schema.json",
+      "summary": "Percentile summaries of a Monte Carlo statement-model evaluation.",
+      "title": "MonteCarloResults",
+      "type_name": "MonteCarloResults"
+    },
+    {
       "$id": "https://finstack_quant.dev/schemas/statements/1/normalization_config.schema.json",
       "bytes": 5883,
       "kind": "component",

@@ -6,8 +6,8 @@ import type {
   MetricMetadata,
   MoneyValue,
   ScenarioTable,
-  StatementResultJson,
-  FormulaExplanationJson,
+  StatementResult,
+  Explanation,
   CheckReport,
 } from "finstack-quant-wasm";
 /** Complete immutable facade request; JSON strings retain wide integer tokens. */
@@ -107,10 +107,10 @@ export interface WorkerApi {
   validateStatementFormula(formula: string): Promise<Envelope<string>>;
   evaluateStatement(
     request: StatementRequest,
-  ): Promise<Envelope<StatementResultJson>>;
+  ): Promise<Envelope<StatementResult>>;
   explainStatement(
     request: StatementExplanationRequest,
-  ): Promise<Envelope<FormulaExplanationJson>>;
+  ): Promise<Envelope<Explanation>>;
   explainStatementText(
     request: StatementExplanationRequest,
   ): Promise<Envelope<string>>;

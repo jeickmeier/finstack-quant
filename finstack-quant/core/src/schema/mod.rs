@@ -91,17 +91,24 @@ fn market_context_state_examples() -> Result<Vec<Value>> {
 /// This lives beside the emitter rather than in the generator binary, so the
 /// generator, the contract tests and the bindings all render from one
 /// definition. Render an entry with [`SchemaArtifact::generate`].
-pub const ARTIFACTS: &[SchemaArtifact] = &[SchemaArtifact::new::<
-    crate::market_data::context::MarketContextState,
->(
-    "schemas/market_data/1/market_context_state.schema.json",
-    "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
-    "Market Context State",
-    "Canonical v1 persisted snapshot of a complete market-data context.",
-)
-.with_kind(SchemaKind::Input)
-.with_summary(
-    "Curves, surfaces, prices, series and FX for one valuation date; the market input to \
+pub const ARTIFACTS: &[SchemaArtifact] = &[
+    SchemaArtifact::new::<crate::market_data::context::MarketContextState>(
+        "schemas/market_data/1/market_context_state.schema.json",
+        "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
+        "Market Context State",
+        "Canonical v1 persisted snapshot of a complete market-data context.",
+    )
+    .with_kind(SchemaKind::Input)
+    .with_summary(
+        "Curves, surfaces, prices, series and FX for one valuation date; the market input to \
              every pricing, scenario and attribution call.",
-)
-.with_examples(market_context_state_examples)];
+    )
+    .with_examples(market_context_state_examples),
+    SchemaArtifact::new::<crate::table::TableEnvelope>(
+        "schemas/table/1/table_envelope.schema.json",
+        "https://finstack_quant.dev/schemas/table/1/table_envelope.schema.json",
+        "TableEnvelope",
+        "Column-oriented table with a shared row count and typed column storage.",
+    )
+    .with_kind(SchemaKind::Output),
+];

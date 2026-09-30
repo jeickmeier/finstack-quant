@@ -1,7 +1,8 @@
 //! WASM bindings for the `finstack-quant-statements-analytics` crate.
 //!
-//! Exposes financial statement analysis functions that accept and return
-//! JSON strings, suitable for consumption from JavaScript/TypeScript.
+//! Exposes financial statement analysis functions. Inputs are JSON strings
+//! or plain objects; results are structured JavaScript objects, except the
+//! `*Text` functions, which return formatted text.
 
 mod comps;
 
@@ -119,9 +120,9 @@ pub fn evaluate_scenario_set(
 ///
 /// Takes two float arrays (actual, forecast) and returns the serde form of
 /// the Rust `ForecastMetrics` (`mae`, `mape`, `mape_effective_n`, `smape`,
-/// `rmse`, `n`). A non-finite metric is the string `"nan"`, `"inf"` or
-/// `"-inf"` (for example `mape` when every actual is zero), matching the
-/// statement-result convention, so the object survives a JSON round trip.
+/// `rmse`, `n`). A non-finite metric (for example `mape` when every actual is
+/// zero) is the JavaScript number `NaN` or `±Infinity`; the Rust JSON form
+/// writes it as the string `"nan"`, `"inf"` or `"-inf"`.
 ///
 /// # Errors
 ///
@@ -140,7 +141,7 @@ pub fn backtest_forecast(actual: JsValue, forecast: JsValue) -> Result<JsValue, 
         &forecast_vec,
     )
     .map_err(to_js_err)?;
-    to_js_value(&metrics)
+    crate::utils::to_js_value_numeric(&metrics)
 }
 
 /// Generate tornado chart entries for a sensitivity result.
@@ -178,10 +179,9 @@ pub fn generate_tornado_entries(
 /// Rank the headline DCF assumptions by enterprise-value impact.
 ///
 /// The statement model is evaluated once; each shocked point re-runs only the
-/// DCF. Returns JSON with the baseline enterprise value, tornado entries as
-/// deltas versus that baseline sorted by descending absolute swing, and the
-/// effective (possibly clamped) shock levels, as a structured JavaScript
-/// object.
+/// DCF. Returns a structured JavaScript object with the baseline enterprise
+/// value, tornado entries as deltas versus that baseline sorted by descending
+/// absolute swing, and the effective (possibly clamped) shock levels.
 ///
 /// # Errors
 ///
@@ -435,11 +435,13 @@ pub fn dependency_tree_text(model_json: JsValue, node_id: JsValue) -> Result<Str
         .map_err(to_js_err)
 }
 
-/// Explain a formula for a specific node and period (JSON in/out).
+/// Explain a formula for a specific node and period (JSON in, structured
+/// object out).
 ///
-/// Returns the serde form of the Rust `Explanation`; a non-finite
-/// `final_value` or breakdown `value` is the string `"nan"`, `"inf"` or
-/// `"-inf"` (for example a `lag` node at the first period).
+/// Returns the Rust `Explanation` as a structured object; a non-finite
+/// `final_value` or breakdown `value` (for example a `lag` node at the first
+/// period) is the JavaScript number `NaN` or `±Infinity`. The Rust JSON form
+/// writes it as the string `"nan"`, `"inf"` or `"-inf"`.
 ///
 /// # Errors
 ///
@@ -468,7 +470,12 @@ pub fn explain_formula(
     let explainer =
         finstack_quant_statements_analytics::analysis::FormulaExplainer::new(&model, &results);
     let explanation = explainer.explain(node_id, &pid).map_err(to_js_err)?;
-    to_js_value(&explanation)
+    let js = crate::utils::to_js_value_numeric(&explanation)?;
+    let breakdown = js_sys::Reflect::get(&js, &JsValue::from("breakdown"))?;
+    crate::utils::restore_non_finite_rows::<
+        finstack_quant_statements_analytics::analysis::ExplanationStep,
+    >(&breakdown)?;
+    Ok(js)
 }
 
 /// Explain a formula for a specific node and period as formatted text.

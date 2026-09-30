@@ -8,6 +8,15 @@
       "summary": "Curves, surfaces, prices, series and FX for one valuation date; the market input to every pricing, scenario and attribution call.",
       "title": "Market Context State",
       "type_name": "MarketContextState"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/table/1/table_envelope.schema.json",
+      "bytes": 6862,
+      "kind": "output",
+      "path": "schemas/table/1/table_envelope.schema.json",
+      "summary": "Column-oriented table with a shared row count and typed column storage.",
+      "title": "TableEnvelope",
+      "type_name": "TableEnvelope"
     }
   ],
   "schema_index_version": 1

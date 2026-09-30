@@ -4,6 +4,7 @@ import {
   features,
   models,
   portfolio,
+  type FactorBrinsonResult,
   type MaterializationPhases,
   type MaterializationReport,
   type WasmOwned,
@@ -84,7 +85,7 @@ const projectionGrid: Float64Array | undefined = forwardFromTyped.projectionGrid
 const expiries: Float64Array = fxVolFromTyped.expiries;
 const pillarVols: Float64Array = models.volatility.getFxDeltaPillarVols(fxVolFromArrays, 0);
 const factorReturns = analytics.constrainedLeastSquares([1], 1, [0.01], [1]);
-const factorAttribution: Record<string, unknown> = portfolio.factorBrinsonAttribution(
+const factorAttribution: FactorBrinsonResult = portfolio.factorBrinsonAttribution(
   '{}',
   factorReturns
 );

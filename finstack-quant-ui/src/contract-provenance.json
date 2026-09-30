@@ -1258,8 +1258,8 @@
     {
       "name": "ValuationResult",
       "source": "finstack-quant-wasm/index.d.ts",
-      "declaration": "/**\n * Valuation envelope returned by the `priceInstrument*` entry points.\n *\n * This is the same document Python callers hold as\n * `finstack_quant.valuations.ValuationResult` — field names are the canonical\n * Rust serde names. Monte Carlo details carry `seed` as a lossless `bigint`,\n * so serialize stochastic results with `valuations.valuationResultToJson`\n * rather than `JSON.stringify`, which throws on `bigint`.\n * Python's `price` / `currency` getters correspond to `value.amount` /\n * `value.currency` here.\n */\nexport interface ValuationResult {\n  /**\n   * Wire-format schema version; only `1` is emitted.\n   */\n  schema_version: number;\n  /**\n   * Identifier of the priced instrument.\n   */\n  instrument_id: string;\n  /**\n   * ISO-8601 valuation date.\n   */\n  as_of: string;\n  /**\n   * Present value in the instrument's native currency.\n   */\n  value: MoneyValue;\n  /**\n   * Requested risk measures keyed by canonical metric ID.\n   */\n  measures: Record<string, number>;\n  /**\n   * Model-specific structured detail, when the pricer emits one.\n   *\n   * Stochastic `\"rates_credit\"` bond pricing emits `type: \"monte_carlo\"` with\n   * convergence, path-count, seed, time-grid, and variance-reduction data.\n   */\n  details?: ValuationDetails;\n  /**\n   * Policy stamps: numeric mode, rounding context, FX policy, timing.\n   */\n  meta: import('./types/valuation-result.js').ValuationResult['meta'];\n  /**\n   * Covenant reports for instruments that carry covenants; `null` otherwise.\n   */\n  covenants: NonNullable<import('./types/valuation-result.js').ValuationResult['covenants']> | null;\n  /**\n   * Computation trace, present only when explain mode is enabled.\n   */\n  explanation?: NonNullable<import('./types/valuation-result.js').ValuationResult['explanation']>;\n}",
-      "sha256": "4cd93c4925576a2056419aa42bd5b766e9935580aecf50c2e2fc6f0fe651c110"
+      "declaration": "/**\n * Valuation envelope returned by the `priceInstrument*` entry points (Rust `ValuationResult`).\n *\n * Generated from the host valuation-result schema: 64-bit integers (Monte Carlo\n * seeds, path counts) are lossless `bigint`s, so serialize stochastic results\n * with `valuations.valuationResultToJson` rather than `JSON.stringify`. The\n * emitted-field presence is stricter than the schema's input view: `covenants`\n * is always present (`null` when the instrument has none), while `details` and\n * `explanation` are omitted rather than `null` when absent.\n */\nexport type ValuationResult = Omit<HostValuationResult, 'covenants' | 'details' | 'explanation'> & {\n  covenants: NonNullable<HostValuationResult['covenants']> | null;\n  details?: NonNullable<HostValuationResult['details']>;\n  explanation?: NonNullable<HostValuationResult['explanation']>;\n};",
+      "sha256": "dc2fa90eda95a8dbca63f421c533ee46e7edc11b61acf2e20bcb740458375de3"
     },
     {
       "name": "ValuationDetails",
@@ -1276,14 +1276,8 @@
     {
       "name": "MoneyValue",
       "source": "finstack-quant-wasm/index.d.ts",
-      "declaration": "/**\n * Currency-tagged monetary amount as carried on the wire.\n *\n * `amount` is an exact decimal **string** (not a JS number) so no precision is\n * lost crossing the boundary; parse it with `Number(...)` when a float is\n * acceptable.\n */\nexport interface MoneyValue {\n  /**\n   * Exact major-unit decimal amount; display rounding is separate and explicit.\n   */\n  amount: string;\n  /**\n   * ISO 4217 currency code, e.g. `\"USD\"`.\n   */\n  currency: string;\n}",
-      "sha256": "66c0b06a89afa738efb626f6f1c7c73503275a4bd802ac22ed0ee33c1e58215d"
-    },
-    {
-      "name": "TrancheScenarioCell",
-      "source": "finstack-quant-wasm/index.d.ts",
-      "declaration": "/**\n * One evaluated scenario cell of a structured-credit tranche scenario table.\n */\nexport interface TrancheScenarioCell {\n  /**\n   * Constant prepayment rate for the cell, annual decimal.\n   */\n  cpr: number;\n  /**\n   * Constant default rate for the cell, annual decimal.\n   */\n  cdr: number;\n  /**\n   * Loss severity for the cell, decimal.\n   */\n  severity: number;\n  /**\n   * Clean settlement price as a percentage of current outstanding balance.\n   */\n  price: number;\n  /**\n   * Weighted-average life, in years.\n   */\n  wal: number;\n  /**\n   * Principal writedown, in currency units.\n   */\n  writedown: number;\n}",
-      "sha256": "4a1cf80e484e09ad14c815a8674e59af3b17ac58ca13fec42daa58c6fb99d5bd"
+      "declaration": "/**\n * Exact-decimal money `{amount, currency}` (Rust `Money` serde form): `amount` is a decimal string.\n *\n * Named `MoneyValue` in JavaScript because `Money` is the wasm-bindgen class.\n */\nexport type MoneyValue = generated.core.Money;",
+      "sha256": "66436cb3303a3ddf29ae01153b42f37cb6859af6e567808bf302243b8f9b30a1"
     },
     {
       "name": "VolCubeConstructor",

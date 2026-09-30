@@ -2,6 +2,49 @@
 
 ## [Unreleased]
 
+### WASM binding audit: index.d.ts uses the generated types (2026-09-30)
+
+#### Changed (BREAKING)
+
+- `finstack-quant-wasm/index.d.ts` imports about 110 result and input types from the schema-generated `types/generated/<crate>/`, and 95 hand-written interfaces are deleted. About 25 functions that returned `Record<string, unknown>` now return typed Rust results. Generated types are stricter: currency codes are an ISO literal union, and serde-defaulted fields are optional.
+- TypeScript type renames to the Rust names:
+  - models and factor risk:
+    - `RollingGreeksResult` → `RollingGreeks`
+    - `XvaResultJson` → `XvaResult`
+    - `LmeLeverageImpact` → `LeverageImpact`
+    - `LvarBangiaResult` → `LvarBangiaScalar`
+    - `FactorTypeValue` → `FactorType`
+    - `FactorRiskMeasure` → `RiskMeasure`
+    - `FactorBumpSizeConfig` → `BumpSizeConfig`
+    - `TrancheScenarioCell` → `ScenarioCell`
+  - statements analytics:
+    - `BacktestForecastMetricsJson` → `ForecastMetrics`
+    - `PeerStatsJson` → `PeerStats`
+    - `RegressionResultJson` → `RegressionResult`
+    - `DimensionScoreJson` → `DimensionScore`
+    - `RelativeValueResultJson` → `RelativeValueResult`
+    - `FormulaExplanationJson` / `FormulaExplanationStepJson` → `Explanation` / `ExplanationStep`
+    - `DcfSensitivityEntry` → `TornadoEntry`
+    - `CheckMateriality` → `Materiality`
+  - portfolio:
+    - `ScenarioRevalueResult` / `ScenarioPnlResult` → `ScenarioRevalueView` / `ScenarioPnlView`
+    - `SensitivityMatrixResult` → `SensitivityMatrixJson`
+    - `FactorRiskContribution` / `PositionFactorRiskContribution` / `FactorRiskDecomposition` → `FactorContribution` / `PositionFactorContribution` / `RiskDecomposition`
+  - statements and scenarios:
+    - `StatementResultJson` → `StatementResult`
+    - `ScenarioWarning` → `Warning`
+    - `ScenarioApplyResult` / `ScenarioApplyMarketResult` → `ApplicationEnvelope`
+    - `ScenarioOperation` → `OperationSpec`
+  - `computeHorizonReturn` returns `HorizonReport`.
+- Error types: `FinstackError` (`kind: 'not_found' | 'validation' | 'computation' | 'invalid_type'`, optional `code`), `CalibrationEnvelopeError` and `ContractValidationError` are declared. A materialization-report serialization failure is `validation`; the binding-chosen `serialization` kind is gone.
+- `statements_analytics.backtestForecast` and `explainFormula` return non-finite metrics as `NaN` / `±Infinity`, through `NonFiniteFields` on `ForecastMetrics`, `Explanation` and `ExplanationStep`. `StatementResult` keeps the `"nan"` / `"inf"` sentinel strings in its nested node map, and its type says so.
+- `generateTornadoEntries(period?: string | null)`. The `AttributionJsonInputs` optional arguments accept `null`.
+
+#### Added
+
+- JSON Schemas for `TableEnvelope`, `MetricMetadata`, `MonteCarloResults`, `ApplicationEnvelope`, `HorizonResult`, `HorizonSummary`, `BorrowingBaseReport`, `CompositeHistoryRow` and `ListedProductCoverage`.
+- `contract_types.test.mjs` compiles real runtime output of every namespace against the published types.
+
 ### WASM binding audit: JSON Schemas for every boundary type (2026-09-30)
 
 #### Changed (BREAKING)

@@ -48,7 +48,7 @@ function dimensionalEntries(props: DimensionalMeasuresProps): MeasureEntry[] {
       {
         key,
         metric: descriptor.metric,
-        group: descriptor.group,
+        group: descriptor.group ?? null,
         coordinates: descriptor.components,
         unit: primary.get(key)?.unit ?? descriptor.unit,
         comparisonUnit: comparison.get(key)?.unit,

@@ -545,14 +545,13 @@ def test_documented_one_way_inventory_is_exact() -> None:
     assert Counter(entry.category for entry in _MODULE.REVIEWED_EXCEPTIONS) == {
         "attribution-report": 5,
         "generic-error-result-alias": 7,
-        "in-process-execution-envelope": 1,
         "in-process-serde-spec": 5,
         "internal-registry-document": 3,
-        "non-maintained-serde-output": 5,
+        "non-maintained-serde-output": 4,
         "runtime-result": 10,
         "runtime-spec": 3,
     }
-    assert len(_MODULE.REVIEWED_EXCEPTIONS) == 39
+    assert len(_MODULE.REVIEWED_EXCEPTIONS) == 37
 
 
 def test_maintained_contract_capability_matrix_is_complete() -> None:
