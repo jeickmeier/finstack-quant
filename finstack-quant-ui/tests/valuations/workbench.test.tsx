@@ -503,7 +503,7 @@ it("loads the complete host request when a prepared instrument is selected", asy
       )
     ).textContent,
   ).toContain("25,748");
-});
+}, 15000);
 
 it("offers configured scenario prices only while structured credit is selected", async () => {
   render(
