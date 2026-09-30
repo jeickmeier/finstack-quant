@@ -77,7 +77,7 @@ it("groups decimal text exactly and preserves the wire string", () => {
   expect(wire.amount).toBe("12345678901234567890.12345");
   const native = core.Money.fromJson(JSON.stringify(wire));
   try {
-    expect(native.amountDecimal()).toBe(wire.amount);
+    expect(native.amountDecimal).toBe(wire.amount);
   } finally {
     native.free();
   }

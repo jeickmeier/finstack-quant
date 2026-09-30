@@ -1214,7 +1214,7 @@ mod tests {
 
         // VolCube stores SABR params; verify calibrated alpha matches ground truth.
         // For beta=0 (normal SABR), alpha IS the ATM normal vol.
-        let calibrated = cube.params_at(0, 0);
+        let calibrated = cube.params_at(0, 0).expect("node (0, 0)");
         assert!(
             (calibrated.alpha - true_alpha).abs() <= 0.0005,
             "alpha mismatch: calibrated={} true={}",

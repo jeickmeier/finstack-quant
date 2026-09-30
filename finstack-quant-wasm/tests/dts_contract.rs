@@ -1336,24 +1336,171 @@ fn core_market_data_dts_exposes_data_only_fx_surface_and_rate_result() {
     ));
     assert!(!fx_result.contains("getPolicy"));
     assert!(!fx_result.contains("getRate"));
+    assert!(contains_signature(fx_result, "toJson(): string;"));
+    assert!(contains_signature(
+        interface_block(&dts, "FxRateResultConstructor "),
+        "fromJson(json: JsonInput): FxRateResult;"
+    ));
 
-    // Money exposes the lossless decimal-string accessor.
+    // Money exposes the lossless decimal-string getter and the Rust-named arithmetic.
     let money = interface_block(&dts, "Money ");
-    assert!(contains_signature(money, "amountDecimal(): string;"));
+    assert!(contains_signature(money, "readonly amountDecimal: string;"));
     assert!(contains_signature(
         money,
         "convertAtRate(target: Currency, rate: number): Money;"
     ));
-
-    // DayCountContext exposes the coupon-period builder.
-    let ctx = interface_block(&dts, "DayCountContext ");
+    for sig in [
+        "checkedAdd(other: Money): Money;",
+        "checkedSub(other: Money): Money;",
+        "checkedMulF64(factor: number): Money;",
+        "checkedDivF64(divisor: number): Money;",
+        "checkedNeg(): Money;",
+    ] {
+        assert!(contains_signature(money, sig), "Money: {sig}");
+    }
+    for legacy in ["add(", "sub(", "mulScalar(", "divScalar(", "negate("] {
+        assert!(!money.contains(&format!("\n  {legacy}")), "Money: {legacy}");
+    }
     assert!(contains_signature(
-        ctx,
-        "withCouponPeriod(startEpochDays: number, endEpochDays: number): DayCountContext;"
+        interface_block(&dts, "MoneyConstructor "),
+        "fromDecimalStr(amount: string, currency: Currency): Money;"
+    ));
+
+    // Rate / Bps / Percentage accessors are getters, as in Rust-shaped Python.
+    for (name, getters) in [
+        (
+            "Rate ",
+            &[
+                "asDecimal: number",
+                "asPercent: number",
+                "asBp: number",
+                "asBasisPoints: Bps",
+                "asPercentage: Percentage",
+            ][..],
+        ),
+        (
+            "Bps ",
+            &[
+                "asDecimal: number",
+                "asBp: number",
+                "asPercent: number",
+                "asRate: Rate",
+                "asPercentage: Percentage",
+            ][..],
+        ),
+        (
+            "Percentage ",
+            &[
+                "asDecimal: number",
+                "asPercent: number",
+                "asBp: number",
+                "asRate: Rate",
+                "asBasisPoints: Bps",
+            ][..],
+        ),
+    ] {
+        let block = interface_block(&dts, name);
+        for getter in getters {
+            assert!(
+                contains_signature(block, &format!("readonly {getter};")),
+                "{name}{getter}"
+            );
+        }
+        assert!(
+            contains_signature(block, "toJson(): string;"),
+            "{name}toJson"
+        );
+        assert!(
+            contains_signature(block, "isZero(): boolean;"),
+            "{name}isZero"
+        );
+    }
+    assert!(contains_signature(
+        interface_block(&dts, "RateConstructor "),
+        "parse(text: string): Rate;"
+    ));
+
+    // DayCountContext mirrors DayCountContextState: constructor, getters and JSON.
+    let ctx = interface_block(&dts, "DayCountContext ");
+    for sig in [
+        "readonly calendarId: string | undefined;",
+        "readonly frequency: Tenor | undefined;",
+        "readonly busBasis: number | undefined;",
+        "readonly couponPeriod: Int32Array | undefined;",
+        "readonly endIsTerminationDate: boolean;",
+        "toJson(): string;",
+    ] {
+        assert!(contains_signature(ctx, sig), "DayCountContext: {sig}");
+    }
+    assert!(!ctx.contains("withCouponPeriod"));
+    assert!(!ctx.contains("withCalendar"));
+    let ctx_constructor = interface_block(&dts, "DayCountContextConstructor ");
+    assert!(contains_signature(
+        ctx_constructor,
+        "fromJson(json: JsonInput): DayCountContext;"
     ));
     assert!(contains_signature(
-        ctx,
-        "withEndIsTerminationDate(value: boolean): DayCountContext;"
+        ctx_constructor,
+        "couponPeriod?: readonly [number, number] | null,"
+    ));
+
+    // Tenor binds the Rust Tenor API.
+    let tenor = interface_block(&dts, "Tenor ");
+    for sig in [
+        "readonly unit: string;",
+        "readonly months: number | undefined;",
+        "readonly days: number | undefined;",
+        "paymentsPerYear(): number;",
+        "toDaysApprox(): number;",
+        "addToDate(epochDays: number, calendarCode?: string | null, convention?: string | null): number;",
+    ] {
+        assert!(contains_signature(tenor, sig), "Tenor: {sig}");
+    }
+    let tenor_constructor = interface_block(&dts, "TenorConstructor ");
+    for sig in [
+        "parse(s: string): Tenor;",
+        "fromYears(years: number, dayCount: DayCount): Tenor;",
+        "fromPaymentsPerYear(payments: number): Tenor;",
+        "biweekly(): Tenor;",
+        "bimonthly(): Tenor;",
+    ] {
+        assert!(
+            contains_signature(tenor_constructor, sig),
+            "TenorConstructor: {sig}"
+        );
+    }
+
+    // Curve and surface handles round-trip their canonical JSON.
+    for name in [
+        "HazardCurve ",
+        "ForwardCurve ",
+        "VolCube ",
+        "FxDeltaVolSurface ",
+    ] {
+        assert!(
+            contains_signature(interface_block(&dts, name), "toJson(): string;"),
+            "{name}toJson"
+        );
+    }
+    let hazard_constructor = interface_block(&dts, "HazardCurveConstructor ");
+    for sig in [
+        "new (options: HazardCurveOptions | string): HazardCurve;",
+        "flat(id: string, baseDate: string, hazardRate: number, recoveryRate: number): HazardCurve;",
+        "fromJson(json: JsonInput): HazardCurve;",
+    ] {
+        assert!(contains_signature(hazard_constructor, sig), "HazardCurveConstructor: {sig}");
+    }
+    assert!(contains_signature(
+        interface_block(&dts, "ForwardCurveConstructor "),
+        "fromJson(json: JsonInput): ForwardCurve;"
+    ));
+    assert!(contains_signature(
+        interface_block(&dts, "VolCube "),
+        "forwardAt(expIdx: number, tenorIdx: number): number;"
+    ));
+    assert!(contains_signature(
+        interface_block(&dts, "FxDeltaVolSurface "),
+        "readonly rr10d: Float64Array | undefined;"
     ));
 
     let fx = interface_block(&dts, "FxMatrix ");
@@ -1377,6 +1524,17 @@ fn core_market_data_dts_exposes_data_only_fx_surface_and_rate_result() {
         day_count_constructor,
         "act365l(): DayCount;"
     ));
+    for sig in [
+        "fromName(name: string): DayCount;",
+        "parse(s: string): DayCount;",
+        "nl365(): DayCount;",
+    ] {
+        assert!(
+            contains_signature(day_count_constructor, sig),
+            "DayCountConstructor: {sig}"
+        );
+    }
+    assert!(!day_count_constructor.contains("new (name: string)"));
     assert!(contains_signature(
         day_count_constructor,
         "actActAfb(): DayCount;"

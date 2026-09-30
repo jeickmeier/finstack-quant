@@ -1,12 +1,13 @@
 //! WASM bindings for `finstack_quant_core::market_data` term structures and FX.
 
 use crate::utils::input::{
-    from_js_json, js_f64, js_f64_seq, js_opt_f64_seq, js_opt_string, js_string, json_text,
+    from_js_json, js_f64, js_f64_seq, js_opt_f64_seq, js_opt_string, js_string, js_string_seq,
+    js_uint, json_text,
 };
 use std::sync::Arc;
 
 use crate::api::core::currency::JsCurrency;
-use crate::utils::{date_to_iso, parse_iso_date, to_js_err};
+use crate::utils::{date_to_iso, parse_iso_date, parse_iso_dates, to_js_err};
 use finstack_quant_core::currency::Currency as RustCurrency;
 use finstack_quant_core::dates::DayCount;
 use finstack_quant_core::market_data::surfaces::{
@@ -25,6 +26,7 @@ use finstack_quant_core::money::fx::{
     FxPairConvention as RustFxPairConvention, FxQuery, FxQuoteConvention as RustFxQuoteConvention,
     FxRateResult as RustFxRateResult, SimpleFxProvider,
 };
+use finstack_quant_core::wire::{serde_label, serde_parse};
 use js_sys::{Array, Float64Array};
 use serde::Deserialize;
 use wasm_bindgen::prelude::*;
@@ -143,7 +145,9 @@ impl JsDiscountCurve {
     ///   array, `t` in years, `df` strictly positive, even length); and the
     ///   optional `interp` (`"linear"`, `"log_linear"`, `"monotone_convex"`,
     ///   `"cubic_hermite"`, `"piecewise_quadratic_forward"`), `extrapolation`
-    ///   (`"flat_zero"`, `"flat_forward"`, `"nan"`), `dayCount`,
+    ///   (`"flat_zero"`, `"flat_forward"`, or `"none"`, which returns NaN
+    ///   outside the pillar range), `dayCount` (used to convert dates to curve
+    ///   time; not inferred from the ID),
     ///   `validationMode` (`"market_standard"` or `"negative_rate_friendly"`)
     ///   and `forwardFloor` (decimal minimum implied forward, required with
     ///   `"negative_rate_friendly"` and rejected otherwise). Omitted options use
@@ -170,8 +174,9 @@ impl JsDiscountCurve {
     /// # Errors
     ///
     /// Throws a JavaScript exception if `baseDate` is not a valid ISO date,
-    /// `continuousRate` is non-finite, or the implied discount factors are not
-    /// finite and strictly positive.
+    /// `continuousRate` is non-finite or `|continuousRate| > 1` (rates are
+    /// decimals: `0.05` is 5%), or the implied discount factors are not finite
+    /// and strictly positive.
     #[wasm_bindgen(js_name = flat)]
     pub fn flat(
         id: JsValue,
@@ -231,6 +236,25 @@ impl JsDiscountCurve {
     }
 }
 
+/// Split a flat `[x0, y0, x1, y1, …]` array into `(x, y)` pairs.
+///
+/// # Errors
+///
+/// Returns a validation error naming `label` when the array has odd length.
+fn flat_pairs(values: &[f64], label: &str) -> Result<Vec<(f64, f64)>, JsValue> {
+    if !values.len().is_multiple_of(2) {
+        return Err(to_js_err(format!(
+            "{label} array must have even length (flat [x0, y0, x1, y1, …] pairs)"
+        )));
+    }
+    Ok(values.chunks_exact(2).map(|c| (c[0], c[1])).collect())
+}
+
+/// Flatten `(x, y)` pairs into `[x0, y0, x1, y1, …]`.
+fn flatten_pairs(points: impl Iterator<Item = (f64, f64)>) -> Box<[f64]> {
+    points.flat_map(|(x, y)| [x, y]).collect()
+}
+
 /// Credit hazard-rate curve for default-probability modelling.
 ///
 /// Built from `(time, hazard_rate)` pillars where `time` is a year fraction
@@ -242,68 +266,207 @@ impl JsDiscountCurve {
 /// import init, { core } from "finstack-quant-wasm";
 /// await init();
 /// // Flat 200bp hazard rate, 40% recovery.
-/// const hz = new core.HazardCurve(
-///   "ACME-HZD",
-///   "2025-01-02",
-///   [0.0, 0.02, 30.0, 0.02],
-///   0.4,
-/// );
+/// const hz = new core.HazardCurve({
+///   id: "ACME-HZD",
+///   baseDate: "2025-01-02",
+///   knots: [0.0, 0.02, 30.0, 0.02],
+///   recoveryRate: 0.4,
+/// });
 /// hz.sp(5.0);          // survival probability at 5y
 /// hz.hazardRate(5.0);  // instantaneous hazard rate at 5y
+/// const copy = core.HazardCurve.fromJson(hz.toJson());
 /// ```
 #[wasm_bindgen(js_name = HazardCurve)]
 pub struct JsHazardCurve {
     pub(crate) inner: Arc<RustHazardCurve>,
 }
 
-#[wasm_bindgen(js_class = HazardCurve)]
+/// Named constructor options for [`JsHazardCurve`]; unknown keys are rejected.
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct HazardCurveOptions {
+    id: String,
+    base_date: String,
+    knots: Vec<f64>,
+    recovery_rate: f64,
+    #[serde(default)]
+    day_count: Option<String>,
+    #[serde(default)]
+    par_spreads: Option<Vec<f64>>,
+    #[serde(default)]
+    interp: Option<String>,
+    #[serde(default)]
+    par_interp: Option<String>,
+    #[serde(default)]
+    issuer: Option<String>,
+    #[serde(default)]
+    seniority: Option<String>,
+    #[serde(default)]
+    currency: Option<String>,
+    #[serde(default)]
+    max_hazard_rate: Option<f64>,
+}
+
 impl JsHazardCurve {
-    /// Construct from an array of `[time, hazardRate]` pairs.
-    ///
-    /// @param id - Curve identifier (e.g. `"ACME-HZD"`).
-    /// @param baseDate - ISO-8601 date string (`"YYYY-MM-DD"`). All `time`
-    /// values are year fractions from this date under `dayCount`.
-    /// @param knots - Flat `[t0, lambda0, t1, lambda1, …]` array. `t` in
-    /// years, `lambda` a non-negative intensity. Length must be even.
-    /// @param recoveryRate - Required recovery on default as a decimal fraction in `[0, 1]`.
-    /// @param dayCount - Day-count convention (default `"act_365f"`).
-    /// @returns The constructed `HazardCurve`.
-    /// @throws If `knots` length is odd, or (from the Rust curve builder, in its
-    /// order: knots first, then recovery) the date is malformed, the day-count
-    /// is unknown, a knot is invalid, or `recoveryRate` is missing (it reaches
-    /// Rust as `NaN`), non-finite, or outside `[0, 1]`.
-    #[wasm_bindgen(constructor)]
-    pub fn new(
-        id: JsValue,
-        base_date: JsValue,
-        knots: JsValue,
-        recovery_rate: JsValue,
-        day_count: Option<JsValue>,
-    ) -> Result<JsHazardCurve, JsValue> {
-        let knots: &[f64] = &js_f64_seq(&knots, "knots")?;
-        let recovery_rate = js_f64(&recovery_rate, "recoveryRate")?;
-        let id: &str = &js_string(&id, "id")?;
-        let base_date: &str = &js_string(&base_date, "baseDate")?;
-        let day_count = js_opt_string(day_count.as_ref(), "dayCount")?;
-        let base = parse_iso_date(base_date)?;
-        if !knots.len().is_multiple_of(2) {
-            return Err(to_js_err(
-                "knots array must have even length (t, hazardRate pairs)",
-            ));
+    fn wrap(curve: RustHazardCurve) -> Self {
+        Self {
+            inner: Arc::new(curve),
         }
-        let pairs: Vec<(f64, f64)> = knots.chunks_exact(2).map(|c| (c[0], c[1])).collect();
-        let mut builder = RustHazardCurve::builder(id)
-            .base_date(base)
-            .knots(pairs)
-            .recovery_rate(recovery_rate);
-        if let Some(ref day_count) = day_count {
+    }
+
+    fn build(options: HazardCurveOptions) -> Result<JsHazardCurve, JsValue> {
+        let mut builder = RustHazardCurve::builder(options.id)
+            .base_date(parse_iso_date(&options.base_date)?)
+            .knots(flat_pairs(&options.knots, "knots")?)
+            .recovery_rate(options.recovery_rate);
+        if let Some(day_count) = options.day_count.as_deref() {
             builder = builder.day_count(parse_day_count(day_count)?);
         }
-        let curve = builder.build().map_err(to_js_err)?;
+        if let Some(par_spreads) = options.par_spreads.as_deref() {
+            builder = builder.par_spreads(flat_pairs(par_spreads, "parSpreads")?);
+        }
+        if let Some(interp) = options.interp.as_deref() {
+            builder = builder.interp(parse_interp_style(interp)?);
+        }
+        if let Some(par_interp) = options.par_interp.as_deref() {
+            builder = builder.par_interp(serde_parse(par_interp).map_err(to_js_err)?);
+        }
+        if let Some(issuer) = options.issuer {
+            builder = builder.issuer(issuer);
+        }
+        if let Some(seniority) = options.seniority.as_deref() {
+            builder = builder.seniority(serde_parse(seniority).map_err(to_js_err)?);
+        }
+        if let Some(currency) = options.currency.as_deref() {
+            builder = builder.currency(currency.parse::<RustCurrency>().map_err(to_js_err)?);
+        }
+        if let Some(max_hazard_rate) = options.max_hazard_rate {
+            builder = builder.max_hazard_rate(max_hazard_rate);
+        }
+        builder.build().map(Self::wrap).map_err(to_js_err)
+    }
+}
 
-        Ok(Self {
-            inner: Arc::new(curve),
-        })
+#[wasm_bindgen(js_class = HazardCurve)]
+impl JsHazardCurve {
+    /// Construct a hazard curve from named options.
+    ///
+    /// # Arguments
+    ///
+    /// * `options` - HazardCurveOptions object (or its JSON text) with: `id`
+    ///   (curve identifier, the `MarketContext` lookup key); `baseDate`
+    ///   (ISO-8601 `"YYYY-MM-DD"`; knot times are year fractions from it under
+    ///   `dayCount`); `knots` (flat `[t0, lambda0, t1, lambda1, …]` array or
+    ///   typed array, `t` in years, `lambda` a non-negative annual default
+    ///   intensity as a decimal); `recoveryRate` (required recovery on default,
+    ///   decimal in `[0, 1]`); and the optional `dayCount` (default
+    ///   `"act_365f"`), `parSpreads` (flat `[t0, bp0, …]` par CDS quotes in
+    ///   basis points, kept for reporting), `interp` (survival interpolation;
+    ///   only `"log_linear"` is accepted), `parInterp` (`"linear"` default or
+    ///   `"log_linear"`), `issuer`, `seniority` (`"senior_secured"`,
+    ///   `"senior"`, `"subordinated"`, `"junior"`), `currency` (ISO-4217 code of
+    ///   the protection leg) and `maxHazardRate` (sanity ceiling on any knot,
+    ///   default `10.0`). Omitted options use the Rust builder defaults.
+    ///   Unknown keys are rejected.
+    ///
+    /// @returns The constructed `HazardCurve`.
+    /// @throws `TypeError` (kind `invalid_type`) if `options` is not a JSON
+    /// string or plain object, or holds a non-finite number; `FinstackError`
+    /// (kind `validation`) for an unknown, missing or mistyped key, an
+    /// odd-length `knots`/`parSpreads`, a malformed date, an unknown label, a
+    /// knot the curve builder rejects, or `recoveryRate` outside `[0, 1]`.
+    #[wasm_bindgen(constructor)]
+    pub fn new(options: JsValue) -> Result<JsHazardCurve, JsValue> {
+        Self::build(from_js_json(&options, "options")?)
+    }
+
+    /// Construct a flat (constant-intensity) hazard curve (Rust `HazardCurve::flat`).
+    ///
+    /// # Arguments
+    ///
+    /// * `id` - Curve identifier stored on the curve.
+    /// * `base_date` - ISO-8601 valuation date anchoring `t = 0`.
+    /// * `hazard_rate` - Constant annual default intensity as a decimal (`0.02` is 2%).
+    /// * `recovery_rate` - Recovery on default as a decimal fraction in `[0, 1]`.
+    ///
+    /// @returns Curve with `sp(t) === Math.exp(-hazardRate * t)`.
+    /// @throws If `baseDate` is not an ISO date, `hazardRate` is non-finite or
+    /// negative, or `recoveryRate` is outside `[0, 1]`.
+    #[wasm_bindgen(js_name = flat)]
+    pub fn flat(
+        id: JsValue,
+        base_date: JsValue,
+        hazard_rate: JsValue,
+        recovery_rate: JsValue,
+    ) -> Result<JsHazardCurve, JsValue> {
+        let id = js_string(&id, "id")?;
+        let base_date = js_string(&base_date, "baseDate")?;
+        let hazard_rate = js_f64(&hazard_rate, "hazardRate")?;
+        let recovery_rate = js_f64(&recovery_rate, "recoveryRate")?;
+        RustHazardCurve::flat(id, parse_iso_date(&base_date)?, hazard_rate, recovery_rate)
+            .map(Self::wrap)
+            .map_err(to_js_err)
+    }
+
+    /// Construct a hazard curve from survival-probability pillars (Rust
+    /// `HazardCurve::from_survival_probs`).
+    ///
+    /// # Arguments
+    ///
+    /// * `id` - Curve identifier stored on the curve.
+    /// * `base_date` - ISO-8601 valuation date anchoring `t = 0`.
+    /// * `points` - Flat `[t0, s0, t1, s1, …]` array: times in years and
+    ///   survival probabilities in `(0, 1]`, non-increasing in time; a `t = 0`
+    ///   pillar must be `1.0`.
+    /// * `recovery_rate` - Recovery on default as a decimal fraction in `[0, 1]`.
+    ///
+    /// @returns Piecewise-constant hazard curve reproducing every pillar.
+    /// @throws If `points` is empty or odd-length, a probability is outside
+    /// `(0, 1]` or increases with time, or `recoveryRate` is outside `[0, 1]`.
+    #[wasm_bindgen(js_name = fromSurvivalProbs)]
+    pub fn from_survival_probs(
+        id: JsValue,
+        base_date: JsValue,
+        points: JsValue,
+        recovery_rate: JsValue,
+    ) -> Result<JsHazardCurve, JsValue> {
+        let id = js_string(&id, "id")?;
+        let base_date = js_string(&base_date, "baseDate")?;
+        let points = flat_pairs(&js_f64_seq(&points, "points")?, "points")?;
+        let recovery_rate = js_f64(&recovery_rate, "recoveryRate")?;
+        RustHazardCurve::from_survival_probs(
+            id,
+            parse_iso_date(&base_date)?,
+            &points,
+            recovery_rate,
+        )
+        .map(Self::wrap)
+        .map_err(to_js_err)
+    }
+
+    /// Deserialize a hazard curve from its canonical JSON wire form (the
+    /// Rust serde schema shared with Python `HazardCurve.to_json`).
+    ///
+    /// # Arguments
+    ///
+    /// * `json` - Canonical HazardCurve JSON text or plain object, such as
+    ///   `HazardCurve.toJson()` or `models.credit.mertonToHazardCurveJson`
+    ///   output. Unknown fields are rejected and the curve is re-validated.
+    ///
+    /// @returns The validated `HazardCurve`.
+    /// @throws If `json` is malformed, has unknown fields, or fails curve validation.
+    #[wasm_bindgen(js_name = fromJson)]
+    pub fn from_json(json: JsValue) -> Result<JsHazardCurve, JsValue> {
+        from_js_json::<RustHazardCurve>(&json, "json").map(Self::wrap)
+    }
+
+    /// Serialize to the canonical JSON wire form accepted by `fromJson` and Python.
+    ///
+    /// @returns Compact JSON text.
+    /// @throws If serialization fails (not expected for a valid curve).
+    #[wasm_bindgen(js_name = toJson)]
+    pub fn to_json(&self) -> Result<String, JsValue> {
+        serde_json::to_string(&*self.inner).map_err(to_js_err)
     }
 
     /// Survival probability `S(t)` at year fraction `t`.
@@ -325,6 +488,110 @@ impl JsHazardCurve {
         Ok(self.inner.hazard_rate(t))
     }
 
+    /// Survival probability on a date, measured with the curve day count.
+    ///
+    /// # Arguments
+    ///
+    /// * `date` - ISO-8601 target date on or after `baseDate`.
+    ///
+    /// @returns Survival probability in `(0, 1]`.
+    /// @throws If `date` is not an ISO date or the year fraction cannot be computed.
+    #[wasm_bindgen(js_name = spOnDate)]
+    pub fn sp_on_date(&self, date: JsValue) -> Result<f64, JsValue> {
+        let date = js_string(&date, "date")?;
+        self.inner
+            .sp_on_date(parse_iso_date(&date)?)
+            .map_err(to_js_err)
+    }
+
+    /// Hazard rate (decimal per year) on a date, measured with the curve day count.
+    ///
+    /// # Arguments
+    ///
+    /// * `date` - ISO-8601 target date on or after `baseDate`.
+    ///
+    /// @returns Annual default intensity as a decimal.
+    /// @throws If `date` is not an ISO date or the year fraction cannot be computed.
+    #[wasm_bindgen(js_name = hazardRateOnDate)]
+    pub fn hazard_rate_on_date(&self, date: JsValue) -> Result<f64, JsValue> {
+        let date = js_string(&date, "date")?;
+        self.inner
+            .hazard_rate_on_date(parse_iso_date(&date)?)
+            .map_err(to_js_err)
+    }
+
+    /// Survival probabilities on several dates.
+    ///
+    /// # Arguments
+    ///
+    /// * `dates` - ISO-8601 target dates on or after `baseDate`.
+    ///
+    /// @returns One survival probability per input date, in order.
+    /// @throws If a date is not an ISO date or a year fraction cannot be computed.
+    #[wasm_bindgen(js_name = survivalAtDates)]
+    pub fn survival_at_dates(&self, dates: JsValue) -> Result<Box<[f64]>, JsValue> {
+        let dates = parse_iso_dates(&js_string_seq(&dates, "dates")?)?;
+        self.inner
+            .survival_at_dates(&dates)
+            .map(Vec::into_boxed_slice)
+            .map_err(to_js_err)
+    }
+
+    /// Probability of default in `[t1, t2]`: `sp(t1) - sp(t2)`.
+    ///
+    /// # Arguments
+    ///
+    /// * `t1` - Start year fraction from `baseDate`.
+    /// * `t2` - End year fraction; must not precede `t1`.
+    ///
+    /// @returns Default probability in `[0, 1]`.
+    /// @throws If `t2 < t1`.
+    #[wasm_bindgen(js_name = defaultProb)]
+    pub fn default_prob(&self, t1: JsValue, t2: JsValue) -> Result<f64, JsValue> {
+        let t1 = js_f64(&t1, "t1")?;
+        let t2 = js_f64(&t2, "t2")?;
+        self.inner.default_prob(t1, t2).map_err(to_js_err)
+    }
+
+    /// Interpolated par CDS spread in basis points at year fraction `t`.
+    ///
+    /// Uses the stored `parSpreads` quotes; with fewer than two quotes it
+    /// falls back to a hazard-based approximation.
+    ///
+    /// # Arguments
+    ///
+    /// * `t` - Year fraction from `baseDate`.
+    /// * `method` - `"linear"` or `"log_linear"`; omitted uses the curve's `parInterp`.
+    ///
+    /// @returns Par spread in basis points.
+    /// @throws If `method` is not a recognised label.
+    #[wasm_bindgen(js_name = cdsQuoteBp)]
+    pub fn cds_quote_bp(&self, t: JsValue, method: Option<JsValue>) -> Result<f64, JsValue> {
+        let t = js_f64(&t, "t")?;
+        let method = match js_opt_string(method.as_ref(), "method")? {
+            Some(label) => serde_parse(&label).map_err(to_js_err)?,
+            None => self.inner.par_interp(),
+        };
+        Ok(self.inner.cds_quote_bp(t, method))
+    }
+
+    /// Copy of this curve with a different recovery rate (survival unchanged).
+    ///
+    /// # Arguments
+    ///
+    /// * `recovery_rate` - New recovery as a decimal fraction in `[0, 1]`.
+    ///
+    /// @returns A new `HazardCurve`.
+    /// @throws If `recoveryRate` is outside `[0, 1]`.
+    #[wasm_bindgen(js_name = withRecoveryRate)]
+    pub fn with_recovery_rate(&self, recovery_rate: JsValue) -> Result<JsHazardCurve, JsValue> {
+        let recovery_rate = js_f64(&recovery_rate, "recoveryRate")?;
+        self.inner
+            .with_recovery_rate(recovery_rate)
+            .map(Self::wrap)
+            .map_err(to_js_err)
+    }
+
     /// Curve identifier.
     #[wasm_bindgen(getter, js_name = id)]
     pub fn id(&self) -> String {
@@ -341,6 +608,49 @@ impl JsHazardCurve {
     #[wasm_bindgen(getter, js_name = recoveryRate)]
     pub fn recovery_rate(&self) -> f64 {
         self.inner.recovery_rate()
+    }
+
+    /// Knots as a flat `[t0, lambda0, t1, lambda1, …]` array (years, decimal intensities).
+    #[wasm_bindgen(getter, js_name = knotPoints)]
+    pub fn knot_points(&self) -> Box<[f64]> {
+        flatten_pairs(self.inner.knot_points())
+    }
+
+    /// Par CDS quotes as a flat `[t0, bp0, …]` array in basis points (may be empty).
+    #[wasm_bindgen(getter, js_name = parSpreadPoints)]
+    pub fn par_spread_points(&self) -> Box<[f64]> {
+        flatten_pairs(self.inner.par_spread_points())
+    }
+
+    /// Day-count convention label (e.g. `"act_365f"`).
+    #[wasm_bindgen(getter, js_name = dayCount)]
+    pub fn day_count(&self) -> String {
+        self.inner.day_count().to_string()
+    }
+
+    /// Currency of the protection leg, or `undefined`.
+    #[wasm_bindgen(getter, js_name = currency)]
+    pub fn currency(&self) -> Option<JsCurrency> {
+        self.inner.currency().map(|inner| JsCurrency { inner })
+    }
+
+    /// Issuer name metadata, or `undefined`.
+    #[wasm_bindgen(getter, js_name = issuer)]
+    pub fn issuer(&self) -> Option<String> {
+        self.inner.issuer().map(str::to_owned)
+    }
+
+    /// Debt seniority label (`"senior_secured"`, `"senior"`, `"subordinated"`,
+    /// `"junior"`), or `undefined`.
+    #[wasm_bindgen(getter, js_name = seniority)]
+    pub fn seniority(&self) -> Option<String> {
+        self.inner.seniority.map(|s| s.to_string())
+    }
+
+    /// Par-spread readout interpolation label (`"linear"` or `"log_linear"`).
+    #[wasm_bindgen(getter, js_name = parInterp)]
+    pub fn par_interp(&self) -> Result<String, JsValue> {
+        serde_label(&self.inner.par_interp()).map_err(to_js_err)
     }
 }
 
@@ -474,6 +784,142 @@ impl JsForwardCurve {
     pub fn reset_lag(&self) -> i32 {
         self.inner.reset_lag()
     }
+
+    /// Construct a flat forward curve (Rust `ForwardCurve::flat`).
+    ///
+    /// # Arguments
+    ///
+    /// * `id` - Curve identifier stored on the curve.
+    /// * `tenor` - Index tenor in years (e.g. `0.25` for a 3M index).
+    /// * `base_date` - ISO-8601 valuation date anchoring `t = 0`.
+    /// * `rate` - Constant forward rate as a decimal.
+    ///
+    /// @returns A `ForwardCurve` with the Rust builder defaults.
+    /// @throws If `baseDate` is not an ISO date, or `tenor` or `rate` is invalid.
+    #[wasm_bindgen(js_name = flat)]
+    pub fn flat(
+        id: JsValue,
+        tenor: JsValue,
+        base_date: JsValue,
+        rate: JsValue,
+    ) -> Result<JsForwardCurve, JsValue> {
+        let id = js_string(&id, "id")?;
+        let tenor = js_f64(&tenor, "tenor")?;
+        let base_date = js_string(&base_date, "baseDate")?;
+        let rate = js_f64(&rate, "rate")?;
+        RustForwardCurve::flat(id, tenor, parse_iso_date(&base_date)?, rate)
+            .map(|curve| Self {
+                inner: Arc::new(curve),
+            })
+            .map_err(to_js_err)
+    }
+
+    /// Deserialize a forward curve from its canonical JSON wire form (the
+    /// Rust serde schema shared with Python `ForwardCurve.to_json`).
+    ///
+    /// # Arguments
+    ///
+    /// * `json` - Canonical ForwardCurve JSON text or plain object; unknown
+    ///   fields are rejected and the curve is re-validated.
+    ///
+    /// @returns The validated `ForwardCurve`.
+    /// @throws If `json` is malformed, has unknown fields, or fails curve validation.
+    #[wasm_bindgen(js_name = fromJson)]
+    pub fn from_json(json: JsValue) -> Result<JsForwardCurve, JsValue> {
+        from_js_json::<RustForwardCurve>(&json, "json").map(|curve| Self {
+            inner: Arc::new(curve),
+        })
+    }
+
+    /// Serialize to the canonical JSON wire form accepted by `fromJson` and Python.
+    ///
+    /// @returns Compact JSON text.
+    /// @throws If serialization fails (not expected for a valid curve).
+    #[wasm_bindgen(js_name = toJson)]
+    pub fn to_json(&self) -> Result<String, JsValue> {
+        serde_json::to_string(&*self.inner).map_err(to_js_err)
+    }
+
+    /// Simple forward rate over `[t1, t2]` implied by the curve (Rust `rate_period`).
+    ///
+    /// # Arguments
+    ///
+    /// * `t1` - Start of the accrual period in years from `baseDate`.
+    /// * `t2` - End of the accrual period in years from `baseDate`.
+    ///
+    /// @returns The average forward over the period as a decimal.
+    #[wasm_bindgen(js_name = ratePeriod)]
+    pub fn rate_period(&self, t1: JsValue, t2: JsValue) -> Result<f64, JsValue> {
+        let t1 = js_f64(&t1, "t1")?;
+        let t2 = js_f64(&t2, "t2")?;
+        Ok(self.inner.rate_period(t1, t2))
+    }
+
+    /// Projection discount factor implied by the forwards at year fraction `t`.
+    ///
+    /// # Arguments
+    ///
+    /// * `t` - Time from `baseDate` in years.
+    ///
+    /// @returns Projection discount factor.
+    /// @throws If the implied discount factor is non-finite or non-positive.
+    pub fn df(&self, t: JsValue) -> Result<f64, JsValue> {
+        let t = js_f64(&t, "t")?;
+        self.inner.df(t).map_err(to_js_err)
+    }
+
+    /// Projection discount factor on a date, measured with the curve day count.
+    ///
+    /// # Arguments
+    ///
+    /// * `date` - ISO-8601 target date.
+    ///
+    /// @returns Projection discount factor.
+    /// @throws If `date` is not an ISO date, the year fraction cannot be
+    /// computed, or the implied discount factor is invalid.
+    #[wasm_bindgen(js_name = dfOnDateCurve)]
+    pub fn df_on_date_curve(&self, date: JsValue) -> Result<f64, JsValue> {
+        let date = js_string(&date, "date")?;
+        self.inner
+            .df_on_date_curve(parse_iso_date(&date)?)
+            .map_err(to_js_err)
+    }
+
+    /// Index tenor in years.
+    #[wasm_bindgen(getter, js_name = tenor)]
+    pub fn tenor(&self) -> f64 {
+        self.inner.tenor()
+    }
+
+    /// Knot times in years.
+    #[wasm_bindgen(getter, js_name = knots)]
+    pub fn knots(&self) -> Box<[f64]> {
+        self.inner.knots().into()
+    }
+
+    /// Forward rates at the knots, as decimals.
+    #[wasm_bindgen(getter, js_name = forwards)]
+    pub fn forwards(&self) -> Box<[f64]> {
+        self.inner.forwards().into()
+    }
+
+    /// Day-count convention label (e.g. `"act_360"`).
+    #[wasm_bindgen(getter, js_name = dayCount)]
+    pub fn day_count(&self) -> String {
+        self.inner.day_count().to_string()
+    }
+
+    /// Interpolation style label (e.g. `"linear"`).
+    #[wasm_bindgen(getter, js_name = interpStyle)]
+    pub fn interp_style(&self) -> String {
+        self.inner.interp_style().to_string()
+    }
+
+    /// Extrapolation policy label (e.g. `"flat_forward"`).
+    #[wasm_bindgen(getter, js_name = extrapolation)]
+    pub fn extrapolation(&self) -> String {
+        self.inner.extrapolation().to_string()
+    }
 }
 
 /// Typed FX conversion policy wrapper for WASM callers.
@@ -550,6 +996,28 @@ impl JsFxRateResult {
     #[wasm_bindgen(getter, js_name = triangulated)]
     pub fn triangulated(&self) -> bool {
         self.inner.triangulated
+    }
+
+    /// Serialize to the canonical JSON wire form shared with Python `FxRateResult.to_json`.
+    ///
+    /// @returns Compact JSON text with `rate` and `triangulated`.
+    /// @throws If serialization fails (not expected for a valid result).
+    #[wasm_bindgen(js_name = toJson)]
+    pub fn to_json(&self) -> Result<String, JsValue> {
+        serde_json::to_string(&self.inner).map_err(to_js_err)
+    }
+
+    /// Deserialize from the canonical JSON wire form produced by `toJson`.
+    ///
+    /// # Arguments
+    ///
+    /// * `json` - Canonical FxRateResult JSON text or plain object; unknown fields are rejected.
+    ///
+    /// @returns The parsed `FxRateResult`.
+    /// @throws If `json` is malformed or has unknown or missing fields.
+    #[wasm_bindgen(js_name = fromJson)]
+    pub fn from_json(json: JsValue) -> Result<JsFxRateResult, JsValue> {
+        from_js_json::<RustFxRateResult>(&json, "json").map(|inner| JsFxRateResult { inner })
     }
 }
 
@@ -1019,6 +1487,89 @@ impl JsVolCube {
     pub fn id(&self) -> String {
         self.inner.id().as_str().to_string()
     }
+
+    /// Serialize to the canonical JSON wire form accepted by `fromJson` and Python.
+    ///
+    /// @returns Compact JSON text.
+    /// @throws If serialization fails (not expected for a valid cube).
+    #[wasm_bindgen(js_name = toJson)]
+    pub fn to_json(&self) -> Result<String, JsValue> {
+        serde_json::to_string(&*self.inner).map_err(to_js_err)
+    }
+
+    /// Option expiry axis in years.
+    #[wasm_bindgen(getter, js_name = expiries)]
+    pub fn expiries(&self) -> Box<[f64]> {
+        self.inner.expiries().into()
+    }
+
+    /// Underlying swap tenor axis in years.
+    #[wasm_bindgen(getter, js_name = tenors)]
+    pub fn tenors(&self) -> Box<[f64]> {
+        self.inner.tenors().into()
+    }
+
+    /// Grid shape as `[nExpiries, nTenors]`.
+    #[wasm_bindgen(getter, js_name = gridShape)]
+    pub fn grid_shape(&self) -> Result<Box<[u32]>, JsValue> {
+        let (n_exp, n_ten) = self.inner.grid_shape();
+        let n_exp = u32::try_from(n_exp).map_err(|e| to_js_err(e.to_string()))?;
+        let n_ten = u32::try_from(n_ten).map_err(|e| to_js_err(e.to_string()))?;
+        Ok(Box::new([n_exp, n_ten]))
+    }
+
+    /// Row-major forward rates (decimals), one per grid node.
+    #[wasm_bindgen(getter, js_name = forwards)]
+    pub fn forwards(&self) -> Box<[f64]> {
+        self.inner.forwards().into()
+    }
+
+    /// Row-major SABR nodes as plain `{alpha, beta, rho, nu, shift?}` objects.
+    ///
+    /// @returns One object per grid node in row-major (expiry, tenor) order.
+    /// @throws If serialization fails (not expected for a valid cube).
+    #[wasm_bindgen(getter, js_name = params)]
+    pub fn params(&self) -> Result<JsValue, JsValue> {
+        crate::utils::to_js_value(&self.inner.params())
+    }
+
+    /// SABR parameters at grid indices, as a plain `{alpha, beta, rho, nu, shift?}` object.
+    ///
+    /// # Arguments
+    ///
+    /// * `exp_idx` - Zero-based index into `expiries`.
+    /// * `tenor_idx` - Zero-based index into `tenors`.
+    ///
+    /// @returns The node's SABR parameters.
+    /// @throws `TypeError` if an index is not a non-negative integer;
+    /// `FinstackError` (kind `validation`) if it lies outside `gridShape`.
+    #[wasm_bindgen(js_name = paramsAt)]
+    pub fn params_at(&self, exp_idx: JsValue, tenor_idx: JsValue) -> Result<JsValue, JsValue> {
+        let exp_idx: usize = js_uint(&exp_idx, "expIdx")?;
+        let tenor_idx: usize = js_uint(&tenor_idx, "tenorIdx")?;
+        let params = self
+            .inner
+            .params_at(exp_idx, tenor_idx)
+            .map_err(to_js_err)?;
+        crate::utils::to_js_value(params)
+    }
+
+    /// Forward rate (decimal) at grid indices.
+    ///
+    /// # Arguments
+    ///
+    /// * `exp_idx` - Zero-based index into `expiries`.
+    /// * `tenor_idx` - Zero-based index into `tenors`.
+    ///
+    /// @returns The node's forward rate.
+    /// @throws `TypeError` if an index is not a non-negative integer;
+    /// `FinstackError` (kind `validation`) if it lies outside `gridShape`.
+    #[wasm_bindgen(js_name = forwardAt)]
+    pub fn forward_at(&self, exp_idx: JsValue, tenor_idx: JsValue) -> Result<f64, JsValue> {
+        let exp_idx: usize = js_uint(&exp_idx, "expIdx")?;
+        let tenor_idx: usize = js_uint(&tenor_idx, "tenorIdx")?;
+        self.inner.forward_at(exp_idx, tenor_idx).map_err(to_js_err)
+    }
 }
 
 /// FX vol surface quoted in **delta space** (ATM, 25-delta RR/BF, optional
@@ -1123,6 +1674,45 @@ impl JsFxDeltaVolSurface {
     pub fn num_expiries(&self) -> usize {
         self.inner.num_expiries()
     }
+
+    /// Serialize to the canonical JSON wire form accepted by `fromJson` and Python.
+    ///
+    /// @returns Compact JSON text.
+    /// @throws If serialization fails (not expected for a valid surface).
+    #[wasm_bindgen(js_name = toJson)]
+    pub fn to_json(&self) -> Result<String, JsValue> {
+        serde_json::to_string(&*self.inner).map_err(to_js_err)
+    }
+
+    /// ATM delta-neutral straddle vols per expiry (decimals).
+    #[wasm_bindgen(getter, js_name = atmVols)]
+    pub fn atm_vols(&self) -> Box<[f64]> {
+        self.inner.atm_vols().into()
+    }
+
+    /// 25-delta risk reversals per expiry (call vol minus put vol, decimals).
+    #[wasm_bindgen(getter, js_name = rr25d)]
+    pub fn rr_25d(&self) -> Box<[f64]> {
+        self.inner.rr_25d().into()
+    }
+
+    /// 25-delta butterflies per expiry (wing average minus ATM, decimals).
+    #[wasm_bindgen(getter, js_name = bf25d)]
+    pub fn bf_25d(&self) -> Box<[f64]> {
+        self.inner.bf_25d().into()
+    }
+
+    /// 10-delta risk reversals per expiry, or `undefined` without 10-delta wings.
+    #[wasm_bindgen(getter, js_name = rr10d)]
+    pub fn rr_10d(&self) -> Option<Box<[f64]>> {
+        self.inner.rr_10d().map(Into::into)
+    }
+
+    /// 10-delta butterflies per expiry, or `undefined` without 10-delta wings.
+    #[wasm_bindgen(getter, js_name = bf10d)]
+    pub fn bf_10d(&self) -> Option<Box<[f64]>> {
+        self.inner.bf_10d().map(Into::into)
+    }
 }
 
 #[cfg(test)]
@@ -1197,6 +1787,69 @@ mod tests {
         assert_eq!(curve.id(), "USD-3M");
         assert_eq!(curve.base_date(), "2024-01-15");
         assert!((curve.inner.rate(1.0) - 0.045).abs() < 1e-6);
+    }
+
+    fn hazard_options() -> HazardCurveOptions {
+        HazardCurveOptions {
+            id: "ACME-HZD".into(),
+            base_date: "2025-01-02".into(),
+            knots: vec![1.0, 0.02, 5.0, 0.03],
+            recovery_rate: 0.4,
+            day_count: None,
+            par_spreads: Some(vec![1.0, 120.0, 5.0, 180.0]),
+            interp: None,
+            par_interp: Some("log_linear".into()),
+            issuer: Some("ACME".into()),
+            seniority: Some("senior".into()),
+            currency: Some("USD".into()),
+            max_hazard_rate: None,
+        }
+    }
+
+    #[test]
+    fn hazard_curve_options_reach_the_rust_builder() {
+        let curve = JsHazardCurve::build(hazard_options()).expect("hazard curve");
+        assert_eq!(&*curve.knot_points(), &[1.0, 0.02, 5.0, 0.03]);
+        assert_eq!(&*curve.par_spread_points(), &[1.0, 120.0, 5.0, 180.0]);
+        assert_eq!(curve.day_count(), "act_365f");
+        assert_eq!(curve.issuer().as_deref(), Some("ACME"));
+        assert_eq!(curve.seniority().as_deref(), Some("senior"));
+        assert_eq!(
+            curve.currency().map(|c| c.inner.to_string()).as_deref(),
+            Some("USD")
+        );
+        assert_eq!(curve.par_interp().expect("label"), "log_linear");
+    }
+
+    #[test]
+    fn hazard_curve_json_round_trips() {
+        let curve = JsHazardCurve::build(hazard_options()).expect("hazard curve");
+        let json = curve.to_json().expect("json");
+        let back: RustHazardCurve = serde_json::from_str(&json).expect("parse");
+        assert_eq!(serde_json::to_string(&back).expect("json"), json);
+        assert!((back.sp(3.0) - curve.inner.sp(3.0)).abs() < 1e-15);
+    }
+
+    #[test]
+    fn forward_curve_accessors_and_json() {
+        let curve = JsForwardCurve::build(ForwardCurveOptions {
+            id: "USD-3M".into(),
+            tenor: 0.25,
+            base_date: "2024-01-15".into(),
+            knots: vec![0.5, 0.04, 1.0, 0.045, 2.0, 0.05],
+            day_count: None,
+            interp: None,
+            extrapolation: None,
+            projection_grid: None,
+            reset_lag: None,
+        })
+        .expect("forward curve");
+        assert_eq!(&*curve.knots(), &[0.5, 1.0, 2.0]);
+        assert_eq!(&*curve.forwards(), &[0.04, 0.045, 0.05]);
+        assert!((curve.tenor() - 0.25).abs() < 1e-15);
+        let back: RustForwardCurve =
+            serde_json::from_str(&curve.to_json().expect("json")).expect("parse");
+        assert_eq!(back.knots(), curve.inner.knots());
     }
 
     // JsVolCube tests require a WASM runtime (JsValue) — run via wasm-pack test.

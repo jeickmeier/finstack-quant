@@ -90,7 +90,12 @@ import type {
   CalibrationValidationReport,
   StrictLoadDiagnostic,
 } from './types/generated/calibration/index.js';
-import type { TableColumn, TableColumnData, TableEnvelope } from './types/generated/core/index.js';
+import type {
+  SabrParameterData,
+  TableColumn,
+  TableColumnData,
+  TableEnvelope,
+} from './types/generated/core/index.js';
 import type {
   DrawdownEpisode,
   LookbackReturns,
@@ -657,9 +662,10 @@ export interface CurrencyConstructor {
 /**
  * Currency-tagged monetary amount.
  *
- * Money values pin a numeric amount to a [`JsCurrency`]. Arithmetic
- * (`add`, `sub`) refuses to mix currencies; scalar multiplication and
- * division preserve the currency.
+ * Money values pin a numeric amount to a [`JsCurrency`]. The arithmetic
+ * methods carry the Rust names: `checkedAdd` / `checkedSub` refuse to mix
+ * currencies; `checkedMulF64` / `checkedDivF64` scale by a number and keep
+ * the currency; `checkedNeg` negates exactly.
  *
  * @example
  * ```javascript
@@ -668,8 +674,8 @@ export interface CurrencyConstructor {
  * const usd = new core.Currency("USD");
  * const total = new core.Money(1_000_000, usd);
  * const fee   = new core.Money(50, usd);
- * const net   = total.sub(fee);                 // Money { amount: 999950, currency: USD }
- * const tax   = net.mulScalar(0.07);            // 7% of net
+ * const net   = total.checkedSub(fee);          // Money { amount: 999950, currency: USD }
+ * const tax   = net.checkedMulF64(0.07);        // 7% of net
  * console.log(net.toString(), tax.toString());  // "USD 999950.00", "USD 69996.50"
  * ```
  */
@@ -697,7 +703,7 @@ export interface Money extends WasmOwned {
    *
    * @returns The exact decimal amount as a string.
    */
-  amountDecimal(): string;
+  readonly amountDecimal: string;
   /**
    * Convert using an already-resolved positive FX rate.
    * @returns Converted `Money` amount in the target currency.
@@ -707,44 +713,44 @@ export interface Money extends WasmOwned {
    */
   convertAtRate(target: Currency, rate: number): Money;
   /**
-   * Add two amounts.
+   * Add two amounts (Rust `Money::checked_add`).
    *
    * @example
    * ```javascript
    * const usd = new core.Currency("USD");
    * const a = new core.Money(10, usd);
    * const b = new core.Money(5, usd);
-   * a.add(b).amount;  // 15
+   * a.checkedAdd(b).amount;  // 15
    * ```
    * @param other - Another `Money` value.
    * @returns Sum, in the same currency.
    * @throws If `other.currency` differs from `this.currency`, or the operation is not representable as a `Decimal`.
    */
-  add(other: Money): Money;
+  checkedAdd(other: Money): Money;
   /**
-   * Subtract two amounts.
+   * Subtract two amounts (Rust `Money::checked_sub`).
    *
    * @param other - Another `Money` value.
    * @returns Difference, in the same currency.
    * @throws If `other.currency` differs from `this.currency`, or the operation is not representable as a `Decimal`.
    */
-  sub(other: Money): Money;
+  checkedSub(other: Money): Money;
   /**
-   * Multiply by a scalar.
+   * Multiply by a number (Rust `Money::checked_mul_f64`).
    *
    * @param factor - Dimensionless multiplier (must be finite).
    * @returns Scaled amount, in the same currency.
    * @throws If `factor` is non-finite or the result is not representable.
    */
-  mulScalar(factor: number): Money;
+  checkedMulF64(factor: number): Money;
   /**
-   * Divide by a scalar.
+   * Divide by a number (Rust `Money::checked_div_f64`).
    *
    * @param divisor - Dimensionless divisor (must be finite and non-zero).
    * @returns Scaled amount, in the same currency.
    * @throws If `divisor` is zero, non-finite, or the result is not representable.
    */
-  divScalar(divisor: number): Money;
+  checkedDivF64(divisor: number): Money;
   /**
    * Negate the monetary amount (Rust `Money::checked_neg`).
    *
@@ -753,7 +759,7 @@ export interface Money extends WasmOwned {
    *
    * @returns Negated amount in the same currency.
    */
-  negate(): Money;
+  checkedNeg(): Money;
   /**
    * Format the amount with explicit display options.
    *
@@ -767,11 +773,13 @@ export interface Money extends WasmOwned {
    *
    * @example
    * ```javascript
-   * const m = core.Money.fromDecimalStr("1234.567", "USD");
+   * const usd = new core.Currency("USD");
+   * const m = core.Money.fromDecimalStr("1234.567", usd);
    * try {
    *   m.formatWith(2, true, ",", "bankers");  // "USD 1,234.57"
    * } finally {
    *   m.free();
+   *   usd.free();
    * }
    * ```
    * @param decimals - JavaScript number of fractional digits, an integer in `0..=1_000_000`; null or undefined selects ISO minor units.
@@ -805,9 +813,10 @@ export interface Money extends WasmOwned {
 /**
  * Currency-tagged monetary amount.
  *
- * Money values pin a numeric amount to a [`JsCurrency`]. Arithmetic
- * (`add`, `sub`) refuses to mix currencies; scalar multiplication and
- * division preserve the currency.
+ * Money values pin a numeric amount to a [`JsCurrency`]. The arithmetic
+ * methods carry the Rust names: `checkedAdd` / `checkedSub` refuse to mix
+ * currencies; `checkedMulF64` / `checkedDivF64` scale by a number and keep
+ * the currency; `checkedNeg` negates exactly.
  *
  * @example
  * ```javascript
@@ -816,8 +825,8 @@ export interface Money extends WasmOwned {
  * const usd = new core.Currency("USD");
  * const total = new core.Money(1_000_000, usd);
  * const fee   = new core.Money(50, usd);
- * const net   = total.sub(fee);                 // Money { amount: 999950, currency: USD }
- * const tax   = net.mulScalar(0.07);            // 7% of net
+ * const net   = total.checkedSub(fee);          // Money { amount: 999950, currency: USD }
+ * const tax   = net.checkedMulF64(0.07);        // 7% of net
  * console.log(net.toString(), tax.toString());  // "USD 999950.00", "USD 69996.50"
  * ```
  */
@@ -863,19 +872,21 @@ export interface MoneyConstructor {
    *
    * @example
    * ```javascript
-   * const m = core.Money.fromDecimalStr("1.245", "USD");
+   * const usd = new core.Currency("USD");
+   * const m = core.Money.fromDecimalStr("1.245", usd);
    * try {
-   *   m.amountDecimal();  // "1.245"
+   *   m.amountDecimal;  // "1.245"
    * } finally {
    *   m.free();
+   *   usd.free();
    * }
    * ```
    * @param amount - Exact fixed-point or scientific decimal text in major currency units.
-   * @param currency - Case-insensitive ISO-4217 code; surrounding whitespace is not trimmed.
+   * @param currency - ISO-4217 `Currency` object that tags the amount, as for the `Money` constructor (build one with `new Currency(code)`).
    * @returns The constructed `Money`.
-   * @throws If `amount` is malformed, non-finite, needs more precision than `Decimal` can hold, or underflows its supported scale; or if `currency` is not a recognised code.
+   * @throws If `amount` is malformed, non-finite, needs more precision than `Decimal` can hold, or underflows its supported scale; or if `currency` is not a `Currency` object.
    */
-  fromDecimalStr(amount: string, currency: string): Money;
+  fromDecimalStr(amount: string, currency: Currency): Money;
 }
 
 /**
@@ -918,6 +929,45 @@ export interface Rate extends WasmOwned {
    * @returns Rate in bp.
    */
   readonly asBp: number;
+  /**
+   * The rate as `Bps`, rounded to the nearest whole basis point.
+   */
+  readonly asBasisPoints: Bps;
+  /**
+   * The rate as a `Percentage`.
+   */
+  readonly asPercentage: Percentage;
+  /**
+   * Absolute value (Rust `Rate::abs`).
+   *
+   * @returns A new `Rate` with the sign removed.
+   */
+  abs(): Rate;
+  /**
+   * Whether the value is exactly zero.
+   *
+   * @returns `true` when the rate is zero.
+   */
+  isZero(): boolean;
+  /**
+   * Whether the value is strictly positive.
+   *
+   * @returns `true` when the rate is above zero.
+   */
+  isPositive(): boolean;
+  /**
+   * Whether the value is strictly negative.
+   *
+   * @returns `true` when the rate is below zero.
+   */
+  isNegative(): boolean;
+  /**
+   * Serialize to the canonical JSON wire form shared with Python `Rate.to_json`.
+   *
+   * @returns Compact JSON text.
+   * @throws If serialization fails (not expected for a valid value).
+   */
+  toJson(): string;
 }
 
 /**
@@ -988,6 +1038,26 @@ export interface RateConstructor {
    * @throws If `bp` is non-finite or not a whole number of basis points.
    */
   fromBp(bp: number): Rate;
+  /**
+   * Parse a rate quote through Rust `Rate::from_str` (the twin of Python `Rate(text)`).
+   *
+   * @example
+   * ```javascript
+   * core.Rate.parse("12.5bp").asDecimal;  // 0.00125
+   * ```
+   * @param text - Quote text: a decimal (`"0.05"`), a percent (`"5%"`) or basis points (`"25bp"`, fractional bp allowed).
+   * @returns The parsed `Rate`.
+   * @throws `TypeError` if `text` is not a string; `FinstackError` (kind `validation`) if it is not a recognised rate quote.
+   */
+  parse(text: string): Rate;
+  /**
+   * Deserialize from the canonical JSON wire form produced by `toJson`.
+   *
+   * @param json - Canonical `Rate` JSON text (or the equivalent plain value).
+   * @returns The parsed `Rate`.
+   * @throws If `json` is malformed or holds an invalid value.
+   */
+  fromJson(json: JsonInput): Rate;
 }
 
 /**
@@ -1000,8 +1070,9 @@ export interface RateConstructor {
  * import init, { core } from "finstack-quant-wasm";
  * await init();
  * const spread = new core.Bps(125);
- * spread.asDecimal();  // 0.0125
- * spread.asBp();      // 125
+ * spread.asDecimal;  // 0.0125
+ * spread.asBp;       // 125
+ * spread.asRate.asPercent;  // 1.25
  * ```
  */
 export interface Bps extends WasmOwned {
@@ -1010,13 +1081,56 @@ export interface Bps extends WasmOwned {
    *
    * @returns Decimal equivalent.
    */
-  asDecimal(): number;
+  readonly asDecimal: number;
   /**
    * Value in whole basis points.
    *
    * @returns Integer bp.
    */
-  asBp(): number;
+  readonly asBp: number;
+  /**
+   * Value in percent (e.g. 25 bp → 0.25).
+   */
+  readonly asPercent: number;
+  /**
+   * Value as a decimal `Rate`.
+   */
+  readonly asRate: Rate;
+  /**
+   * Value as a `Percentage`.
+   */
+  readonly asPercentage: Percentage;
+  /**
+   * Absolute value (Rust `Bps::abs`).
+   *
+   * @returns A new `Bps` with the sign removed.
+   */
+  abs(): Bps;
+  /**
+   * Whether the value is exactly zero.
+   *
+   * @returns `true` when the basis-point value is zero.
+   */
+  isZero(): boolean;
+  /**
+   * Whether the value is strictly positive.
+   *
+   * @returns `true` when the basis-point value is above zero.
+   */
+  isPositive(): boolean;
+  /**
+   * Whether the value is strictly negative.
+   *
+   * @returns `true` when the basis-point value is below zero.
+   */
+  isNegative(): boolean;
+  /**
+   * Serialize to the canonical JSON wire form shared with Python `Bps.to_json`.
+   *
+   * @returns Compact JSON text.
+   * @throws If serialization fails (not expected for a valid value).
+   */
+  toJson(): string;
 }
 
 /**
@@ -1029,8 +1143,9 @@ export interface Bps extends WasmOwned {
  * import init, { core } from "finstack-quant-wasm";
  * await init();
  * const spread = new core.Bps(125);
- * spread.asDecimal();  // 0.0125
- * spread.asBp();      // 125
+ * spread.asDecimal;  // 0.0125
+ * spread.asBp;       // 125
+ * spread.asRate.asPercent;  // 1.25
  * ```
  */
 export interface BpsConstructor {
@@ -1042,6 +1157,14 @@ export interface BpsConstructor {
    * @throws If `bp` is non-finite or not a whole number of basis points. Sub-bp spreads must use the JSON instrument path (which preserves fractional values) or a decimal `Rate`.
    */
   new (bp: number): Bps;
+  /**
+   * Deserialize from the canonical JSON wire form produced by `toJson`.
+   *
+   * @param json - Canonical `Bps` JSON text (or the equivalent plain value).
+   * @returns The parsed `Bps`.
+   * @throws If `json` is malformed or holds an invalid value.
+   */
+  fromJson(json: JsonInput): Bps;
 }
 
 /**
@@ -1055,8 +1178,9 @@ export interface BpsConstructor {
  * import init, { core } from "finstack-quant-wasm";
  * await init();
  * const p = new core.Percentage(5.0);
- * p.asDecimal();  // 0.05
- * p.asPercent();  // 5
+ * p.asDecimal;  // 0.05
+ * p.asPercent;  // 5
+ * p.asBp;       // 500
  * ```
  */
 export interface Percentage extends WasmOwned {
@@ -1065,13 +1189,56 @@ export interface Percentage extends WasmOwned {
    *
    * @returns Decimal equivalent.
    */
-  asDecimal(): number;
+  readonly asDecimal: number;
   /**
    * Value in percent points.
    *
    * @returns Percent value.
    */
-  asPercent(): number;
+  readonly asPercent: number;
+  /**
+   * Value in basis points, rounded to the nearest integer (e.g. 17.5% → 1750).
+   */
+  readonly asBp: number;
+  /**
+   * Value as a decimal `Rate`.
+   */
+  readonly asRate: Rate;
+  /**
+   * Value as `Bps`, rounded to the nearest whole basis point.
+   */
+  readonly asBasisPoints: Bps;
+  /**
+   * Absolute value (Rust `Percentage::abs`).
+   *
+   * @returns A new `Percentage` with the sign removed.
+   */
+  abs(): Percentage;
+  /**
+   * Whether the value is exactly zero.
+   *
+   * @returns `true` when the percentage is zero.
+   */
+  isZero(): boolean;
+  /**
+   * Whether the value is strictly positive.
+   *
+   * @returns `true` when the percentage is above zero.
+   */
+  isPositive(): boolean;
+  /**
+   * Whether the value is strictly negative.
+   *
+   * @returns `true` when the percentage is below zero.
+   */
+  isNegative(): boolean;
+  /**
+   * Serialize to the canonical JSON wire form shared with Python `Percentage.to_json`.
+   *
+   * @returns Compact JSON text.
+   * @throws If serialization fails (not expected for a valid value).
+   */
+  toJson(): string;
 }
 
 /**
@@ -1085,8 +1252,9 @@ export interface Percentage extends WasmOwned {
  * import init, { core } from "finstack-quant-wasm";
  * await init();
  * const p = new core.Percentage(5.0);
- * p.asDecimal();  // 0.05
- * p.asPercent();  // 5
+ * p.asDecimal;  // 0.05
+ * p.asPercent;  // 5
+ * p.asBp;       // 500
  * ```
  */
 export interface PercentageConstructor {
@@ -1098,6 +1266,14 @@ export interface PercentageConstructor {
    * @throws If `percent` is non-finite.
    */
   new (percent: number): Percentage;
+  /**
+   * Deserialize from the canonical JSON wire form produced by `toJson`.
+   *
+   * @param json - Canonical `Percentage` JSON text (or the equivalent plain value).
+   * @returns The parsed `Percentage`.
+   * @throws If `json` is malformed or holds an invalid value.
+   */
+  fromJson(json: JsonInput): Percentage;
 }
 
 /**
@@ -1106,9 +1282,12 @@ export interface PercentageConstructor {
  * Dates are represented as **epoch days** (`i32`, days since 1970-01-01).
  * Use `createDate` to convert from a `(year, month, day)` triple.
  *
- * Available conventions and their factories:
+ * Available conventions (canonical names for `DayCount.fromName`) and their factories:
+ * - `one_one` → `DayCount.oneOne`
  * - `act_360` → `DayCount.act360`
  * - `act_365f` → `DayCount.act365f`
+ * - `act_365l` → `DayCount.act365l`
+ * - `nl_365` (No-Leap/365) → `DayCount.nl365`
  * - `30_360` → `DayCount.thirty360`
  * - `30e_360` → `DayCount.thirtyE360`
  * - `30e_360_isda` → `DayCount.thirtyE360Isda`
@@ -1117,6 +1296,9 @@ export interface PercentageConstructor {
  * - `act_act_afb` (AFB / Actual/Actual Euro) → `DayCount.actActAfb`
  * - `30_360_it` (Italian) → `DayCount.thirty360It`
  * - `bus_252` → `DayCount.bus252`
+ *
+ * Term-sheet spellings such as `"ACT/360"` or `"30/360 ISDA"` go through the
+ * lenient `DayCount.parse`.
  *
  * @example
  * ```javascript
@@ -1144,7 +1326,7 @@ export interface DayCount extends WasmOwned {
    * const start = core.createDate(2025, 1, 15);
    * const end   = core.createDate(2025, 4, 15);
    * dayCount.yearFraction(start, end); // 90 / 360 = 0.25
-   * const bus = new core.DayCountContext().withCalendar("nyse");
+   * const bus = new core.DayCountContext("nyse");
    * core.DayCount.bus252().yearFraction(start, end, bus);
    * ```
    * @param startEpochDays - Start date as days since 1970-01-01.
@@ -1180,9 +1362,12 @@ export interface DayCount extends WasmOwned {
  * Dates are represented as **epoch days** (`i32`, days since 1970-01-01).
  * Use `createDate` to convert from a `(year, month, day)` triple.
  *
- * Available conventions and their factories:
+ * Available conventions (canonical names for `DayCount.fromName`) and their factories:
+ * - `one_one` → `DayCount.oneOne`
  * - `act_360` → `DayCount.act360`
  * - `act_365f` → `DayCount.act365f`
+ * - `act_365l` → `DayCount.act365l`
+ * - `nl_365` (No-Leap/365) → `DayCount.nl365`
  * - `30_360` → `DayCount.thirty360`
  * - `30e_360` → `DayCount.thirtyE360`
  * - `30e_360_isda` → `DayCount.thirtyE360Isda`
@@ -1191,6 +1376,9 @@ export interface DayCount extends WasmOwned {
  * - `act_act_afb` (AFB / Actual/Actual Euro) → `DayCount.actActAfb`
  * - `30_360_it` (Italian) → `DayCount.thirty360It`
  * - `bus_252` → `DayCount.bus252`
+ *
+ * Term-sheet spellings such as `"ACT/360"` or `"30/360 ISDA"` go through the
+ * lenient `DayCount.parse`.
  *
  * @example
  * ```javascript
@@ -1205,13 +1393,37 @@ export interface DayCount extends WasmOwned {
  */
 export interface DayCountConstructor {
   /**
-   * Parse a day-count convention from its string name.
-   *
-   * @param name - Convention name (e.g. `"act_360"`, `"30_360"`, `"act_act"`). Underscored snake_case is canonical.
-   * @returns The parsed `DayCount`.
-   * @throws If `name` is not a recognized day-count convention.
+   * JavaScript prototype of `DayCount`; instances come from `fromName`, `parse` and the named factories, not `new`.
    */
-  new (name: string): DayCount;
+  readonly prototype: DayCount;
+  /**
+   * Look up a convention by its canonical name (Rust `DayCount::from_str`,
+   * the twin of Python `DayCount.from_name`).
+   *
+   * @param name - Canonical snake_case convention name, for example `"act_360"`, `"30_360"` or `"act_act"` (see the class list).
+   * @returns The matching `DayCount`.
+   * @throws `TypeError` if `name` is not a string; `FinstackError` (kind `validation`) if it is not a canonical convention name. Use `DayCount.parse` for term-sheet spellings.
+   */
+  fromName(name: string): DayCount;
+  /**
+   * Parse a convention leniently (Rust `DayCount::parse`): case, spaces,
+   * `/` and `-` are normalised, so term-sheet spellings such as
+   * `"ACT/360"`, `"Act/Act ICMA"` or `"30E/360 ISDA"` are accepted.
+   *
+   * @example
+   * ```javascript
+   * core.DayCount.parse("Act/Act ICMA").toString();  // "act_act_isma"
+   * ```
+   * @param s - Convention text in canonical or term-sheet spelling.
+   * @returns The matching `DayCount`.
+   * @throws `TypeError` if `s` is not a string; `FinstackError` (kind `validation`) if no convention matches.
+   */
+  parse(s: string): DayCount;
+  /**
+   * No-Leap/365: actual days excluding February 29, over 365.
+   * @returns A `DayCount` handle for this convention.
+   */
+  nl365(): DayCount;
   /**
    * Count the calendar days between two dates (epoch days), independent of the
    * convention (Rust associated fn `DayCount::calendar_days`).
@@ -1301,40 +1513,32 @@ export interface DayCountConstructor {
  */
 export interface DayCountContext extends WasmOwned {
   /**
-   * Return a copy with the calendar used by Bus/252.
-   * @param calendarCode - Registered holiday-calendar identifier used by the Bus/252 convention.
-   * @returns A new `DayCountContext` handle.
+   * Holiday-calendar identifier, or `undefined`.
    */
-  withCalendar(calendarCode: string): DayCountContext;
+  readonly calendarId: string | undefined;
   /**
-   * Return a copy with the coupon frequency used by Act/Act ISMA.
-   * @param frequency - Coupon-frequency Tenor required by Actual/Actual ICMA calculations.
-   * @returns A new `DayCountContext` handle.
+   * Coupon frequency, or `undefined`.
    */
-  withFrequency(frequency: Tenor): DayCountContext;
+  readonly frequency: Tenor | undefined;
   /**
-   * Return a copy with the business-day basis used by Bus/252.
-   * @param busBasis - Business-day denominator for Bus/252, normally 252.
-   * @returns A new `DayCountContext` handle.
+   * Custom business-day denominator, or `undefined`.
    */
-  withBusBasis(busBasis: number): DayCountContext;
+  readonly busBasis: number | undefined;
   /**
-   * Return a copy with the reference coupon period (epoch days) used by
-   * Act/Act ICMA. Errors when either date is out of range or
-   * `start >= end`.
-   * @param startEpochDays - Reference coupon-period start as days since 1970-01-01.
-   * @param endEpochDays - Reference coupon-period end as days since 1970-01-01.
-   * @returns A new `DayCountContext` handle.
-   * @throws Error - Throws a JavaScript exception if either epoch-day value is outside the representable date range or the start is not strictly before the end.
+   * Reference coupon period as `[startEpochDays, endEpochDays]`, or `undefined`.
    */
-  withCouponPeriod(startEpochDays: number, endEpochDays: number): DayCountContext;
+  readonly couponPeriod: Int32Array | undefined;
   /**
-   * Return a copy indicating whether the accrual end is the instrument's
-   * termination date (required by 30E/360 ISDA February-end handling).
-   * @param value - Whether the accrual end is the contractual termination date for 30E/360 ISDA.
-   * @returns A new `DayCountContext` handle.
+   * Whether the accrual end is the instrument termination date.
    */
-  withEndIsTerminationDate(value: boolean): DayCountContext;
+  readonly endIsTerminationDate: boolean;
+  /**
+   * Serialize to the canonical JSON wire form shared with Python `DayCountContext.to_json`.
+   *
+   * @returns Compact JSON text (dates in the coupon period are ISO-8601).
+   * @throws If serialization fails (not expected for a valid context).
+   */
+  toJson(): string;
 }
 
 /**
@@ -1343,30 +1547,58 @@ export interface DayCountContext extends WasmOwned {
  * ```typescript
  * import init, { core } from "finstack-quant-wasm";
  * await init();
- * const context = new core.DayCountContext()
- *   .withBusBasis(252)
- *   .withEndIsTerminationDate(true);
- * console.log(context);
+ * const context = new core.DayCountContext("nyse", "3M", 252);
+ * console.log(context.frequency?.toString()); // "3M"
  * ```
  */
 export interface DayCountContextConstructor {
   /**
-   * Create an empty day-count context (Rust `DayCountContextState::default()`).
+   * Create a day-count context (Rust `DayCountContextState::try_new`, the
+   * validation point shared with Python `DayCountContext(...)`).
    *
-   * `DayCount.yearFraction` / `signedYearFraction` use this context when none
-   * is passed.
-   * @returns An empty `DayCountContext` handle.
+   * Every argument is optional; `new DayCountContext()` is the empty
+   * context `DayCount.yearFraction` / `signedYearFraction` use when none is
+   * passed.
+   *
+   * @example
+   * ```javascript
+   * const ctx = new core.DayCountContext("nyse", "3M", 252);
+   * ctx.frequency.toString();  // "3M"
+   * core.DayCountContext.fromJson(ctx.toJson()).busBasis;  // 252
+   * ```
+   * @param calendarId - Registered holiday-calendar identifier (for example `"nyse"`) used by Bus/252; resolved when the context is used.
+   * @param frequency - Coupon frequency as tenor text (for example `"6M"`; use `tenor.toString()` for a `Tenor`), required by Act/Act ICMA and used by Act/365L.
+   * @param busBasis - Business-day denominator for Bus/252 (an integer in `0..=65535`, normally `252`).
+   * @param couponPeriod - Reference coupon period `[startEpochDays, endEpochDays]` (days since 1970-01-01) for Act/Act ICMA; the start must precede the end.
+   * @param endIsTerminationDate - Whether the accrual end is the instrument's termination date (30E/360 ISDA February-end handling); omitted means `false`.
+   * @returns A new `DayCountContext`.
+   * @throws `TypeError` (kind `invalid_type`) for a mistyped argument or a `couponPeriod` that is not a two-element array of epoch days; `FinstackError` (kind `validation`) if `frequency` is not a tenor or the coupon period is inverted or out of range.
    */
-  new (): DayCountContext;
+  new (
+    calendarId?: string | null,
+    frequency?: string | null,
+    busBasis?: number | null,
+    couponPeriod?: readonly [number, number] | null,
+    endIsTerminationDate?: boolean | null
+  ): DayCountContext;
+  /**
+   * Deserialize from the canonical JSON wire form produced by `toJson`.
+   *
+   * @param json - Canonical DayCountContext JSON text or plain object; unknown fields are rejected. As in Rust and Python, the coupon period is validated when the context is used (`DayCountContextState::to_ctx`).
+   * @returns The parsed `DayCountContext`.
+   * @throws If `json` is malformed or has unknown or mistyped fields.
+   */
+  fromJson(json: JsonInput): DayCountContext;
 }
 
 /**
  * A financial tenor such as `3M`, `1Y`, or `2W`.
  *
  * Tenors carry a numeric count and a unit (days, weeks, months, years).
- * Parse from strings or use the named-period factories (`Tenor.daily`,
- * `Tenor.weekly`, `Tenor.monthly`, `Tenor.quarterly`, `Tenor.semiAnnual`,
- * `Tenor.annual`).
+ * Parse from strings (`new Tenor(s)` or `Tenor.parse(s)`) or use the
+ * named-period factories (`Tenor.daily`, `Tenor.weekly`, `Tenor.biweekly`,
+ * `Tenor.monthly`, `Tenor.bimonthly`, `Tenor.quarterly`, `Tenor.semiAnnual`,
+ * `Tenor.annual`), `Tenor.fromPaymentsPerYear` or `Tenor.fromYears`.
  *
  * @example
  * ```javascript
@@ -1386,10 +1618,63 @@ export interface Tenor extends WasmOwned {
    */
   readonly count: number;
   /**
+   * Unit designator: `"D"`, `"W"`, `"M"` or `"Y"` (Rust `TenorUnit::designator`).
+   */
+  readonly unit: string;
+  /**
+   * Equivalent whole months, or `undefined` for day/week tenors.
+   */
+  readonly months: number | undefined;
+  /**
+   * Equivalent whole days, or `undefined` for month/year tenors.
+   */
+  readonly days: number | undefined;
+  /**
    * Approximate length in years (simple estimate, no calendar).
    * @returns Approximate tenor length in years, such as `0.25` for `"3M"`.
    */
   toYears(): number;
+  /**
+   * Coupon payments per year implied by this tenor (`3M` gives `4`, `2Y` gives `0.5`).
+   * @returns Payments per year.
+   */
+  paymentsPerYear(): number;
+  /**
+   * Approximate length in calendar days (no calendar).
+   *
+   * @returns Whole days as a number.
+   * @throws Never for a valid tenor (the Rust tenor bounds keep it within range).
+   */
+  toDaysApprox(): number;
+  /**
+   * Add this tenor to a date (Rust `Tenor::add_to_date`).
+   *
+   * Month and year tenors clamp to the last valid day of the target month.
+   *
+   * @param epochDays - Anchor date as days since 1970-01-01.
+   * @param calendarCode - Registered holiday-calendar identifier used to roll the result; omitted skips adjustment.
+   * @param convention - Business-day convention name applied with the calendar; omitted uses the Rust default (`"modified_following"`).
+   * @returns The (optionally adjusted) end date as epoch days.
+   * @throws `TypeError` for a mistyped argument; `FinstackError` if the date is out of range, the convention is unknown, the calendar is unknown (kind `not_found`), or no business day is found.
+   */
+  addToDate(epochDays: number, calendarCode?: string | null, convention?: string | null): number;
+  /**
+   * Exact year fraction of this tenor from a date under a day count
+   * (Rust `Tenor::to_years_with_context`).
+   *
+   * @param asOfEpochDays - Start date as days since 1970-01-01.
+   * @param dayCount - Convention used to measure the span.
+   * @param calendarCode - Registered holiday-calendar identifier used to roll the end date; omitted skips adjustment.
+   * @param convention - Business-day convention name applied with the calendar; omitted uses the Rust default (`"modified_following"`).
+   * @returns Year fraction between the start and the rolled end date.
+   * @throws `TypeError` for a mistyped argument; `FinstackError` if the date is out of range, the convention or calendar is unknown, or the day count needs context it cannot get (e.g. Bus/252 without a calendar).
+   */
+  toYearsWithContext(
+    asOfEpochDays: number,
+    dayCount: DayCount,
+    calendarCode?: string | null,
+    convention?: string | null
+  ): number;
   /**
    * Tenor string representation.
    * @returns Human-readable string form of this value.
@@ -1401,9 +1686,10 @@ export interface Tenor extends WasmOwned {
  * A financial tenor such as `3M`, `1Y`, or `2W`.
  *
  * Tenors carry a numeric count and a unit (days, weeks, months, years).
- * Parse from strings or use the named-period factories (`Tenor.daily`,
- * `Tenor.weekly`, `Tenor.monthly`, `Tenor.quarterly`, `Tenor.semiAnnual`,
- * `Tenor.annual`).
+ * Parse from strings (`new Tenor(s)` or `Tenor.parse(s)`) or use the
+ * named-period factories (`Tenor.daily`, `Tenor.weekly`, `Tenor.biweekly`,
+ * `Tenor.monthly`, `Tenor.bimonthly`, `Tenor.quarterly`, `Tenor.semiAnnual`,
+ * `Tenor.annual`), `Tenor.fromPaymentsPerYear` or `Tenor.fromYears`.
  *
  * @example
  * ```javascript
@@ -1426,6 +1712,43 @@ export interface TenorConstructor {
    * @throws If `s` cannot be parsed (unknown unit, missing count).
    */
   new (s: string): Tenor;
+  /**
+   * Parse a tenor string (Rust `Tenor::parse`; same as `new Tenor(s)`).
+   *
+   * @param s - Tenor text such as `"3M"`, `"1Y"`, `"2W"` or `"7D"`.
+   * @returns The parsed `Tenor`.
+   * @throws If `s` is not a string or cannot be parsed.
+   */
+  parse(s: string): Tenor;
+  /**
+   * Tenor for a year fraction under a day count (Rust `Tenor::from_years`):
+   * a whole number of months when the fraction is one, otherwise days.
+   *
+   * @param years - Positive, finite length in years.
+   * @param dayCount - Convention used to interpret `years`.
+   * @returns The matching `Tenor`.
+   * @throws If `years` is not finite and positive or the tenor is out of range.
+   */
+  fromYears(years: number, dayCount: DayCount): Tenor;
+  /**
+   * Tenor for a coupon frequency (Rust `Tenor::from_payments_per_year`;
+   * `4` gives `3M`).
+   *
+   * @param payments - Coupon payments per year; must be positive and divide 12 (`12` monthly, `4` quarterly, `2` semi-annual, `1` annual).
+   * @returns The matching `Tenor`.
+   * @throws `TypeError` if `payments` is not a non-negative integer; `FinstackError` (kind `validation`) if no tenor matches.
+   */
+  fromPaymentsPerYear(payments: number): Tenor;
+  /**
+   * Return a `Tenor` handle configured for biweekly.
+   * @returns A `Tenor` handle for this named period.
+   */
+  biweekly(): Tenor;
+  /**
+   * Return a `Tenor` handle configured for bimonthly.
+   * @returns A `Tenor` handle for this named period.
+   */
+  bimonthly(): Tenor;
   /**
    * One-day tenor (`"1D"`).
    * @returns A `Tenor` handle for this named period.
@@ -1588,7 +1911,7 @@ export interface DiscountCurveConstructor {
   /**
    * Construct a discount curve from named options.
    *
-   * @param options - DiscountCurveOptions object (or its JSON text) with: `id` (curve identifier, the `MarketContext` lookup key); `baseDate` (ISO-8601 `"YYYY-MM-DD"`; knot times are year fractions from it under `dayCount`); `knots` (flat `[t0, df0, t1, df1, …]` array or typed array, `t` in years, `df` strictly positive, even length); and the optional `interp` (`"linear"`, `"log_linear"`, `"monotone_convex"`, `"cubic_hermite"`, `"piecewise_quadratic_forward"`), `extrapolation` (`"flat_zero"`, `"flat_forward"`, `"nan"`), `dayCount`, `validationMode` (`"market_standard"` or `"negative_rate_friendly"`) and `forwardFloor` (decimal minimum implied forward, required with `"negative_rate_friendly"` and rejected otherwise). Omitted options use the Rust builder defaults: `monotone_convex`, `flat_forward`, `act_365f` and `market_standard`. Unknown keys are rejected.
+   * @param options - DiscountCurveOptions object (or its JSON text) with: `id` (curve identifier, the `MarketContext` lookup key); `baseDate` (ISO-8601 `"YYYY-MM-DD"`; knot times are year fractions from it under `dayCount`); `knots` (flat `[t0, df0, t1, df1, …]` array or typed array, `t` in years, `df` strictly positive, even length); and the optional `interp` (`"linear"`, `"log_linear"`, `"monotone_convex"`, `"cubic_hermite"`, `"piecewise_quadratic_forward"`), `extrapolation` (`"flat_zero"`, `"flat_forward"`, or `"none"`, which returns NaN outside the pillar range), `dayCount` (used to convert dates to curve time; not inferred from the ID), `validationMode` (`"market_standard"` or `"negative_rate_friendly"`) and `forwardFloor` (decimal minimum implied forward, required with `"negative_rate_friendly"` and rejected otherwise). Omitted options use the Rust builder defaults: `monotone_convex`, `flat_forward`, `act_365f` and `market_standard`. Unknown keys are rejected.
    * @returns The constructed `DiscountCurve`.
    * @throws `TypeError` (kind `invalid_type`) if `options` is not a JSON string or plain object; `FinstackError` (kind `validation`) for an unknown or mistyped key, an odd `knots` length, a malformed date, an unknown interpolation/extrapolation/day-count/validation name, a misplaced or missing `forwardFloor`, or discount factors the curve validation rejects.
    */
@@ -1599,7 +1922,7 @@ export interface DiscountCurveConstructor {
    * @param id - Curve identifier stored on the constructed discount curve.
    * @param baseDate - ISO-8601 curve base date from which time coordinates are measured.
    * @param continuousRate - Flat continuously compounded zero rate expressed as a decimal.
-   * @throws Error - Throws a JavaScript exception if `baseDate` is not a valid ISO date, `continuousRate` is non-finite, or the implied discount factors are not finite and strictly positive.
+   * @throws Error - Throws a JavaScript exception if `baseDate` is not a valid ISO date, `continuousRate` is non-finite or `|continuousRate| > 1` (rates are decimals: `0.05` is 5%), or the implied discount factors are not finite and strictly positive.
    */
   flat(id: string, baseDate: string, continuousRate: number): DiscountCurve;
 }
@@ -1616,14 +1939,15 @@ export interface DiscountCurveConstructor {
  * import init, { core } from "finstack-quant-wasm";
  * await init();
  * // Flat 200bp hazard rate, 40% recovery.
- * const hz = new core.HazardCurve(
- *   "ACME-HZD",
- *   "2025-01-02",
- *   [0.0, 0.02, 30.0, 0.02],
- *   0.4,
- * );
+ * const hz = new core.HazardCurve({
+ *   id: "ACME-HZD",
+ *   baseDate: "2025-01-02",
+ *   knots: [0.0, 0.02, 30.0, 0.02],
+ *   recoveryRate: 0.4,
+ * });
  * hz.sp(5.0);          // survival probability at 5y
  * hz.hazardRate(5.0);  // instantaneous hazard rate at 5y
+ * const copy = core.HazardCurve.fromJson(hz.toJson());
  * ```
  */
 export interface HazardCurve extends WasmOwned {
@@ -1651,6 +1975,95 @@ export interface HazardCurve extends WasmOwned {
    * @returns The annualized default intensity at `t`, expressed as a decimal rate. This operation does not throw.
    */
   hazardRate(t: number): number;
+  /**
+   * Knots as a flat `[t0, lambda0, t1, lambda1, …]` array (years, decimal intensities).
+   */
+  readonly knotPoints: Float64Array;
+  /**
+   * Par CDS quotes as a flat `[t0, bp0, …]` array in basis points (may be empty).
+   */
+  readonly parSpreadPoints: Float64Array;
+  /**
+   * Day-count convention label (e.g. `"act_365f"`).
+   */
+  readonly dayCount: string;
+  /**
+   * Currency of the protection leg, or `undefined`.
+   */
+  readonly currency: Currency | undefined;
+  /**
+   * Issuer name metadata, or `undefined`.
+   */
+  readonly issuer: string | undefined;
+  /**
+   * Debt seniority label (`"senior_secured"`, `"senior"`, `"subordinated"`,
+   * `"junior"`), or `undefined`.
+   */
+  readonly seniority: string | undefined;
+  /**
+   * Par-spread readout interpolation label (`"linear"` or `"log_linear"`).
+   */
+  readonly parInterp: string;
+  /**
+   * Serialize to the canonical JSON wire form accepted by `fromJson` and Python.
+   *
+   * @returns Compact JSON text.
+   * @throws If serialization fails (not expected for a valid curve).
+   */
+  toJson(): string;
+  /**
+   * Survival probability on a date, measured with the curve day count.
+   *
+   * @param date - ISO-8601 target date on or after `baseDate`.
+   * @returns Survival probability in `(0, 1]`.
+   * @throws If `date` is not an ISO date or the year fraction cannot be computed.
+   */
+  spOnDate(date: string): number;
+  /**
+   * Hazard rate (decimal per year) on a date, measured with the curve day count.
+   *
+   * @param date - ISO-8601 target date on or after `baseDate`.
+   * @returns Annual default intensity as a decimal.
+   * @throws If `date` is not an ISO date or the year fraction cannot be computed.
+   */
+  hazardRateOnDate(date: string): number;
+  /**
+   * Survival probabilities on several dates.
+   *
+   * @param dates - ISO-8601 target dates on or after `baseDate`.
+   * @returns One survival probability per input date, in order.
+   * @throws If a date is not an ISO date or a year fraction cannot be computed.
+   */
+  survivalAtDates(dates: readonly string[]): Float64Array;
+  /**
+   * Probability of default in `[t1, t2]`: `sp(t1) - sp(t2)`.
+   *
+   * @param t1 - Start year fraction from `baseDate`.
+   * @param t2 - End year fraction; must not precede `t1`.
+   * @returns Default probability in `[0, 1]`.
+   * @throws If `t2 < t1`.
+   */
+  defaultProb(t1: number, t2: number): number;
+  /**
+   * Interpolated par CDS spread in basis points at year fraction `t`.
+   *
+   * Uses the stored `parSpreads` quotes; with fewer than two quotes it
+   * falls back to a hazard-based approximation.
+   *
+   * @param t - Year fraction from `baseDate`.
+   * @param method - `"linear"` or `"log_linear"`; omitted uses the curve's `parInterp`.
+   * @returns Par spread in basis points.
+   * @throws If `method` is not a recognised label.
+   */
+  cdsQuoteBp(t: number, method?: string | null): number;
+  /**
+   * Copy of this curve with a different recovery rate (survival unchanged).
+   *
+   * @param recoveryRate - New recovery as a decimal fraction in `[0, 1]`.
+   * @returns A new `HazardCurve`.
+   * @throws If `recoveryRate` is outside `[0, 1]`.
+   */
+  withRecoveryRate(recoveryRate: number): HazardCurve;
 }
 
 /**
@@ -1665,35 +2078,117 @@ export interface HazardCurve extends WasmOwned {
  * import init, { core } from "finstack-quant-wasm";
  * await init();
  * // Flat 200bp hazard rate, 40% recovery.
- * const hz = new core.HazardCurve(
- *   "ACME-HZD",
- *   "2025-01-02",
- *   [0.0, 0.02, 30.0, 0.02],
- *   0.4,
- * );
+ * const hz = new core.HazardCurve({
+ *   id: "ACME-HZD",
+ *   baseDate: "2025-01-02",
+ *   knots: [0.0, 0.02, 30.0, 0.02],
+ *   recoveryRate: 0.4,
+ * });
  * hz.sp(5.0);          // survival probability at 5y
  * hz.hazardRate(5.0);  // instantaneous hazard rate at 5y
+ * const copy = core.HazardCurve.fromJson(hz.toJson());
  * ```
  */
 export interface HazardCurveConstructor {
   /**
-   * Construct from an array of `[time, hazardRate]` pairs.
+   * Construct a hazard curve from named options.
    *
-   * @param id - Curve identifier (e.g. `"ACME-HZD"`).
-   * @param baseDate - ISO-8601 date string (`"YYYY-MM-DD"`). All `time` values are year fractions from this date under `dayCount`.
-   * @param knots - Flat `[t0, lambda0, t1, lambda1, …]` array. `t` in years, `lambda` a non-negative intensity. Length must be even.
-   * @param recoveryRate - Required recovery on default as a decimal fraction in `[0, 1]`.
-   * @param dayCount - Day-count convention (default `"act_365f"`).
+   * @param options - HazardCurveOptions object (or its JSON text) with: `id` (curve identifier, the `MarketContext` lookup key); `baseDate` (ISO-8601 `"YYYY-MM-DD"`; knot times are year fractions from it under `dayCount`); `knots` (flat `[t0, lambda0, t1, lambda1, …]` array or typed array, `t` in years, `lambda` a non-negative annual default intensity as a decimal); `recoveryRate` (required recovery on default, decimal in `[0, 1]`); and the optional `dayCount` (default `"act_365f"`), `parSpreads` (flat `[t0, bp0, …]` par CDS quotes in basis points, kept for reporting), `interp` (survival interpolation; only `"log_linear"` is accepted), `parInterp` (`"linear"` default or `"log_linear"`), `issuer`, `seniority` (`"senior_secured"`, `"senior"`, `"subordinated"`, `"junior"`), `currency` (ISO-4217 code of the protection leg) and `maxHazardRate` (sanity ceiling on any knot, default `10.0`). Omitted options use the Rust builder defaults. Unknown keys are rejected.
    * @returns The constructed `HazardCurve`.
-   * @throws If `knots` length is odd, or (from the Rust curve builder, in its order: knots first, then recovery) the date is malformed, the day-count is unknown, a knot is invalid, or `recoveryRate` is missing (it reaches Rust as `NaN`), non-finite, or outside `[0, 1]`.
+   * @throws `TypeError` (kind `invalid_type`) if `options` is not a JSON string or plain object, or holds a non-finite number; `FinstackError` (kind `validation`) for an unknown, missing or mistyped key, an odd-length `knots`/`parSpreads`, a malformed date, an unknown label, a knot the curve builder rejects, or `recoveryRate` outside `[0, 1]`.
    */
-  new (
+  new (options: HazardCurveOptions | string): HazardCurve;
+  /**
+   * Construct a flat (constant-intensity) hazard curve (Rust `HazardCurve::flat`).
+   *
+   * @param id - Curve identifier stored on the curve.
+   * @param baseDate - ISO-8601 valuation date anchoring `t = 0`.
+   * @param hazardRate - Constant annual default intensity as a decimal (`0.02` is 2%).
+   * @param recoveryRate - Recovery on default as a decimal fraction in `[0, 1]`.
+   * @returns Curve with `sp(t) === Math.exp(-hazardRate * t)`.
+   * @throws If `baseDate` is not an ISO date, `hazardRate` is non-finite or negative, or `recoveryRate` is outside `[0, 1]`.
+   */
+  flat(id: string, baseDate: string, hazardRate: number, recoveryRate: number): HazardCurve;
+  /**
+   * Construct a hazard curve from survival-probability pillars (Rust
+   * `HazardCurve::from_survival_probs`).
+   *
+   * @param id - Curve identifier stored on the curve.
+   * @param baseDate - ISO-8601 valuation date anchoring `t = 0`.
+   * @param points - Flat `[t0, s0, t1, s1, …]` array: times in years and survival probabilities in `(0, 1]`, non-increasing in time; a `t = 0` pillar must be `1.0`.
+   * @param recoveryRate - Recovery on default as a decimal fraction in `[0, 1]`.
+   * @returns Piecewise-constant hazard curve reproducing every pillar.
+   * @throws If `points` is empty or odd-length, a probability is outside `(0, 1]` or increases with time, or `recoveryRate` is outside `[0, 1]`.
+   */
+  fromSurvivalProbs(
     id: string,
     baseDate: string,
-    knots: NumericArray,
-    recoveryRate: number,
-    dayCount?: string
+    points: NumericArray,
+    recoveryRate: number
   ): HazardCurve;
+  /**
+   * Deserialize a hazard curve from its canonical JSON wire form (the
+   * Rust serde schema shared with Python `HazardCurve.to_json`).
+   *
+   * @param json - Canonical HazardCurve JSON text or plain object, such as `HazardCurve.toJson()` or `models.credit.mertonToHazardCurveJson` output. Unknown fields are rejected and the curve is re-validated.
+   * @returns The validated `HazardCurve`.
+   * @throws If `json` is malformed, has unknown fields, or fails curve validation.
+   */
+  fromJson(json: JsonInput): HazardCurve;
+}
+
+/**
+ * Named options for constructing a `HazardCurve`; unknown keys are rejected.
+ */
+export interface HazardCurveOptions {
+  /**
+   * Curve identifier; the lookup key inside a `MarketContext`.
+   */
+  id: string;
+  /**
+   * ISO-8601 base date; knot times are year fractions from it under `dayCount`.
+   */
+  baseDate: string;
+  /**
+   * Flat `[t0, lambda0, t1, lambda1, …]` pairs: `t` in years, `lambda` a non-negative decimal intensity.
+   */
+  knots: NumericArray;
+  /**
+   * Recovery on default as a decimal fraction in `[0, 1]`.
+   */
+  recoveryRate: number;
+  /**
+   * Day-count convention for the time axis; the Rust builder default is `"act_365f"`.
+   */
+  dayCount?: string;
+  /**
+   * Flat `[t0, bp0, …]` par CDS quotes in basis points, kept for reporting and re-bootstrap risk.
+   */
+  parSpreads?: NumericArray;
+  /**
+   * Survival interpolation; only `"log_linear"` preserves piecewise-constant hazards.
+   */
+  interp?: string;
+  /**
+   * Par-spread readout interpolation: `"linear"` (Rust default) or `"log_linear"`.
+   */
+  parInterp?: string;
+  /**
+   * Issuer name metadata.
+   */
+  issuer?: string;
+  /**
+   * Debt seniority: `"senior_secured"`, `"senior"`, `"subordinated"` or `"junior"`.
+   */
+  seniority?: string;
+  /**
+   * ISO-4217 code of the protection-leg currency (metadata).
+   */
+  currency?: string;
+  /**
+   * Sanity ceiling on any knot hazard rate; the Rust builder default is `10.0`.
+   */
+  maxHazardRate?: number;
 }
 
 /**
@@ -1709,7 +2204,7 @@ export interface ForwardCurve extends WasmOwned {
    */
   readonly baseDate: string;
   /**
-   * Contractual projection boundaries, or `null` for legacy tenor stepping.
+   * Contractual projection boundaries, or `undefined` for legacy tenor stepping.
    */
   readonly projectionGrid: Float64Array | undefined;
   /**
@@ -1730,6 +2225,61 @@ export interface ForwardCurve extends WasmOwned {
    * @throws Error - Throws a JavaScript exception if either time is non-finite, `t2` is not later than `t1`, a projection discount factor cannot be computed, or the implied rate is non-finite.
    */
   rateBetween(t1: number, t2: number): number;
+  /**
+   * Index tenor in years.
+   */
+  readonly tenor: number;
+  /**
+   * Knot times in years.
+   */
+  readonly knots: Float64Array;
+  /**
+   * Forward rates at the knots, as decimals.
+   */
+  readonly forwards: Float64Array;
+  /**
+   * Day-count convention label (e.g. `"act_360"`).
+   */
+  readonly dayCount: string;
+  /**
+   * Interpolation style label (e.g. `"linear"`).
+   */
+  readonly interpStyle: string;
+  /**
+   * Extrapolation policy label (e.g. `"flat_forward"`).
+   */
+  readonly extrapolation: string;
+  /**
+   * Serialize to the canonical JSON wire form accepted by `fromJson` and Python.
+   *
+   * @returns Compact JSON text.
+   * @throws If serialization fails (not expected for a valid curve).
+   */
+  toJson(): string;
+  /**
+   * Simple forward rate over `[t1, t2]` implied by the curve (Rust `rate_period`).
+   *
+   * @param t1 - Start of the accrual period in years from `baseDate`.
+   * @param t2 - End of the accrual period in years from `baseDate`.
+   * @returns The average forward over the period as a decimal.
+   */
+  ratePeriod(t1: number, t2: number): number;
+  /**
+   * Projection discount factor implied by the forwards at year fraction `t`.
+   *
+   * @param t - Time from `baseDate` in years.
+   * @returns Projection discount factor.
+   * @throws If the implied discount factor is non-finite or non-positive.
+   */
+  df(t: number): number;
+  /**
+   * Projection discount factor on a date, measured with the curve day count.
+   *
+   * @param date - ISO-8601 target date.
+   * @returns Projection discount factor.
+   * @throws If `date` is not an ISO date, the year fraction cannot be computed, or the implied discount factor is invalid.
+   */
+  dfOnDateCurve(date: string): number;
 }
 
 /**
@@ -1753,6 +2303,26 @@ export interface ForwardCurveConstructor {
    * @throws Error - Throws Error when options cannot be decoded or canonical curve validation rejects dates, conventions, knots, tenor, reset lag, or projection grid.
    */
   new (options: ForwardCurveOptions): ForwardCurve;
+  /**
+   * Construct a flat forward curve (Rust `ForwardCurve::flat`).
+   *
+   * @param id - Curve identifier stored on the curve.
+   * @param tenor - Index tenor in years (e.g. `0.25` for a 3M index).
+   * @param baseDate - ISO-8601 valuation date anchoring `t = 0`.
+   * @param rate - Constant forward rate as a decimal.
+   * @returns A `ForwardCurve` with the Rust builder defaults.
+   * @throws If `baseDate` is not an ISO date, or `tenor` or `rate` is invalid.
+   */
+  flat(id: string, tenor: number, baseDate: string, rate: number): ForwardCurve;
+  /**
+   * Deserialize a forward curve from its canonical JSON wire form (the
+   * Rust serde schema shared with Python `ForwardCurve.to_json`).
+   *
+   * @param json - Canonical ForwardCurve JSON text or plain object; unknown fields are rejected and the curve is re-validated.
+   * @returns The validated `ForwardCurve`.
+   * @throws If `json` is malformed, has unknown fields, or fails curve validation.
+   */
+  fromJson(json: JsonInput): ForwardCurve;
 }
 
 /**
@@ -1812,6 +2382,53 @@ export interface VolCube extends WasmOwned {
    * Interpolation contract used across the expiry axis.
    */
   readonly interpolationMode: string;
+  /**
+   * Option expiry axis in years.
+   */
+  readonly expiries: Float64Array;
+  /**
+   * Underlying swap tenor axis in years.
+   */
+  readonly tenors: Float64Array;
+  /**
+   * Grid shape as `[nExpiries, nTenors]`.
+   */
+  readonly gridShape: Uint32Array;
+  /**
+   * Row-major forward rates (decimals), one per grid node.
+   */
+  readonly forwards: Float64Array;
+  /**
+   * Row-major SABR nodes as plain `{alpha, beta, rho, nu, shift?}` objects.
+   * @returns One object per grid node in row-major (expiry, tenor) order.
+   * @throws If serialization fails (not expected for a valid cube).
+   */
+  readonly params: SabrParameterData[];
+  /**
+   * Serialize to the canonical JSON wire form accepted by `fromJson` and Python.
+   *
+   * @returns Compact JSON text.
+   * @throws If serialization fails (not expected for a valid cube).
+   */
+  toJson(): string;
+  /**
+   * SABR parameters at grid indices, as a plain `{alpha, beta, rho, nu, shift?}` object.
+   *
+   * @param expIdx - Zero-based index into `expiries`.
+   * @param tenorIdx - Zero-based index into `tenors`.
+   * @returns The node's SABR parameters.
+   * @throws `TypeError` if an index is not a non-negative integer; `FinstackError` (kind `validation`) if it lies outside `gridShape`.
+   */
+  paramsAt(expIdx: number, tenorIdx: number): SabrParameterData;
+  /**
+   * Forward rate (decimal) at grid indices.
+   *
+   * @param expIdx - Zero-based index into `expiries`.
+   * @param tenorIdx - Zero-based index into `tenors`.
+   * @returns The node's forward rate.
+   * @throws `TypeError` if an index is not a non-negative integer; `FinstackError` (kind `validation`) if it lies outside `gridShape`.
+   */
+  forwardAt(expIdx: number, tenorIdx: number): number;
 }
 
 /**
@@ -1943,10 +2560,18 @@ export interface FxRateResult extends WasmOwned {
    * Whether the rate was obtained via triangulation.
    */
   readonly triangulated: boolean;
+  /**
+   * Serialize to the canonical JSON wire form shared with Python `FxRateResult.to_json`.
+   *
+   * @returns Compact JSON text with `rate` and `triangulated`.
+   * @throws If serialization fails (not expected for a valid result).
+   */
+  toJson(): string;
 }
 
 /**
- * `FxRateResult` has no public constructor; instances come from `FxMatrix.rate`.
+ * `FxRateResult` has no public constructor; instances come from `FxMatrix.rate`
+ * or `FxRateResult.fromJson`.
  * @example
  * ```typescript
  * import init, { core } from "finstack-quant-wasm";
@@ -1967,6 +2592,14 @@ export interface FxRateResultConstructor {
    * JavaScript prototype of `FxRateResult`; instances come from `FxMatrix.rate`, not `new`.
    */
   readonly prototype: FxRateResult;
+  /**
+   * Deserialize from the canonical JSON wire form produced by `toJson`.
+   *
+   * @param json - Canonical FxRateResult JSON text or plain object; unknown fields are rejected.
+   * @returns The parsed `FxRateResult`.
+   * @throws If `json` is malformed or has unknown or missing fields.
+   */
+  fromJson(json: JsonInput): FxRateResult;
 }
 
 /**
@@ -2162,6 +2795,33 @@ export interface FxDeltaVolSurface extends WasmOwned {
    * Number of expiry pillars.
    */
   readonly numExpiries: number;
+  /**
+   * ATM delta-neutral straddle vols per expiry (decimals).
+   */
+  readonly atmVols: Float64Array;
+  /**
+   * 25-delta risk reversals per expiry (call vol minus put vol, decimals).
+   */
+  readonly rr25d: Float64Array;
+  /**
+   * 25-delta butterflies per expiry (wing average minus ATM, decimals).
+   */
+  readonly bf25d: Float64Array;
+  /**
+   * 10-delta risk reversals per expiry, or `undefined` without 10-delta wings.
+   */
+  readonly rr10d: Float64Array | undefined;
+  /**
+   * 10-delta butterflies per expiry, or `undefined` without 10-delta wings.
+   */
+  readonly bf10d: Float64Array | undefined;
+  /**
+   * Serialize to the canonical JSON wire form accepted by `fromJson` and Python.
+   *
+   * @returns Compact JSON text.
+   * @throws If serialization fails (not expected for a valid surface).
+   */
+  toJson(): string;
 }
 
 /**
@@ -2515,6 +3175,46 @@ export interface CoreNamespace {
    * @returns R-7 interpolated quantile, or NaN when `data` is empty or non-finite.
    */
   quantile(data: NumericArray, q: number): number;
+  /**
+   * Annualized realized variance of a close price series (Rust
+   * `stats::realized_variance`): the mean of squared log returns times the
+   * annualization factor, with no mean subtraction.
+   *
+   * @example
+   * ```javascript
+   * core.realizedVariance([100, 101, 99.5, 100.2]);  // close-to-close, 252/yr
+   * ```
+   * @param prices - Close prices in time order; each must be finite and positive.
+   * @param method - Estimator name; only `"close_to_close"` applies to closes (the OHLC estimators need `realizedVarianceOhlc`). Omitted selects the Rust default (`"close_to_close"`).
+   * @param annualizationFactor - Observations per year (for example `252` for daily closes); omitted selects the Rust daily default (252).
+   * @returns Annualized realized variance (decimal, not volatility).
+   * @throws `TypeError` for a mistyped argument; `FinstackError` (kind `validation`) for an unknown or OHLC-only method, a non-positive or non-finite price, or a non-positive annualization factor.
+   */
+  realizedVariance(
+    prices: NumericArray,
+    method?: string | null,
+    annualizationFactor?: number | null
+  ): number;
+  /**
+   * Annualized realized variance from OHLC bars (Rust `stats::realized_variance_ohlc`).
+   *
+   * @param open - Opening prices, one per bar.
+   * @param high - High prices, one per bar.
+   * @param low - Low prices, one per bar.
+   * @param close - Closing prices, one per bar.
+   * @param method - Estimator name: `"close_to_close"`, `"parkinson"`, `"garman_klass"`, `"rogers_satchell"` or `"yang_zhang"`. Omitted selects the Rust OHLC default (`"yang_zhang"`).
+   * @param annualizationFactor - Bars per year (for example `252` for daily bars); omitted selects the Rust daily default (252).
+   * @returns Annualized realized variance (decimal, not volatility).
+   * @throws `TypeError` for a mistyped argument; `FinstackError` (kind `validation`) for an unknown method, series of different lengths, an invalid bar, or a non-positive annualization factor.
+   */
+  realizedVarianceOhlc(
+    open: NumericArray,
+    high: NumericArray,
+    low: NumericArray,
+    close: NumericArray,
+    method?: string | null,
+    annualizationFactor?: number | null
+  ): number;
   /**
    * Standard normal CDF Φ(x).
    * @param x - Real-valued point at which to evaluate Φ; any finite or infinite `x` is accepted.
@@ -4514,7 +5214,7 @@ export interface MarginNamespace {
    * import init, { core, margin } from "finstack-quant-wasm";
    * await init();
    * const df = new core.DiscountCurve("USD-OIS", "2025-01-01", [0.0, 1.0, 5.0, 1.0], "log_linear");
-   * const hz = new core.HazardCurve("CPTY", "2025-01-01", [0.0, 0.02, 30.0, 0.02], 0.4);
+   * const hz = core.HazardCurve.flat("CPTY", "2025-01-01", 0.02, 0.4);
    * const result = margin.computeBilateralXva(
    *   JSON.stringify({ times: [1, 2], mtm_values: [1e6, 1e6], epe: [1e6, 1e6], ene: [0, 0] }),
    *   hz, hz, df, 0.4, 0.4,

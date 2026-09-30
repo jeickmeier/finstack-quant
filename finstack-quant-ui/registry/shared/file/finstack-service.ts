@@ -22,6 +22,7 @@ export function createService(native: {
   core: Pick<
     typeof core,
     | "availableCalendars"
+    | "Currency"
     | "FxDeltaVolSurface"
     | "MarketContext"
     | "Money"

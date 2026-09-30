@@ -2,7 +2,7 @@
   "artifacts": [
     {
       "$id": "https://finstack_quant.dev/schemas/scenarios/1/application_envelope.schema.json",
-      "bytes": 1118084,
+      "bytes": 1118312,
       "kind": "output",
       "path": "schemas/scenarios/1/application_envelope.schema.json",
       "summary": "Scenario application result: mutated market, model and instruments with the report.",

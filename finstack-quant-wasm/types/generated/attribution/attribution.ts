@@ -1236,6 +1236,12 @@ export type CashflowSpec =
  * assert_eq!(adj.day(), 3);
  * # Ok::<(), finstack_quant_core::Error>(())
  * ```
+ *
+ * # Default
+ *
+ * `BusinessDayConvention::default()` is `ModifiedFollowing`, the ISDA 2006
+ * Definitions Section 4.12(c) convention used for swap and bond period dates.
+ * Host bindings use it whenever a caller omits the convention.
  */
 export type BusinessDayConvention =
   "unadjusted" | "following" | "modified_following" | "preceding" | "modified_preceding" | "nearest";

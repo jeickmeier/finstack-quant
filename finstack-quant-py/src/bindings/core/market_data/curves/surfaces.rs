@@ -734,19 +734,14 @@ impl PyVolCube {
     ///
     /// Raises
     /// ------
-    /// IndexError
-    ///     If an index is outside the grid.
+    /// ValueError
+    ///     If an index is outside the grid (checked by Rust ``VolCube``).
     #[pyo3(text_signature = "(self, exp_idx, tenor_idx)")]
     fn params_at(&self, exp_idx: usize, tenor_idx: usize) -> PyResult<PySabrParameterData> {
-        let (n_exp, n_ten) = self.inner.grid_shape();
-        if exp_idx >= n_exp || tenor_idx >= n_ten {
-            return Err(pyo3::exceptions::PyIndexError::new_err(format!(
-                "grid index ({exp_idx}, {tenor_idx}) outside shape ({n_exp}, {n_ten})"
-            )));
-        }
-        Ok(PySabrParameterData::from_inner(
-            *self.inner.params_at(exp_idx, tenor_idx),
-        ))
+        self.inner
+            .params_at(exp_idx, tenor_idx)
+            .map(|params| PySabrParameterData::from_inner(*params))
+            .map_err(core_to_py)
     }
 
     /// Forward swap rate (decimal) at grid indices.
@@ -764,17 +759,13 @@ impl PyVolCube {
     ///
     /// Raises
     /// ------
-    /// IndexError
-    ///     If an index is outside the grid.
+    /// ValueError
+    ///     If an index is outside the grid (checked by Rust ``VolCube``).
     #[pyo3(text_signature = "(self, exp_idx, tenor_idx)")]
     fn forward_at(&self, exp_idx: usize, tenor_idx: usize) -> PyResult<f64> {
-        let (n_exp, n_ten) = self.inner.grid_shape();
-        if exp_idx >= n_exp || tenor_idx >= n_ten {
-            return Err(pyo3::exceptions::PyIndexError::new_err(format!(
-                "grid index ({exp_idx}, {tenor_idx}) outside shape ({n_exp}, {n_ten})"
-            )));
-        }
-        Ok(self.inner.forward_at(exp_idx, tenor_idx))
+        self.inner
+            .forward_at(exp_idx, tenor_idx)
+            .map_err(core_to_py)
     }
 
     /// Export nodes in long form.

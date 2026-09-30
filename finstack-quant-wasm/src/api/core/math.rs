@@ -1,7 +1,7 @@
 //! WASM bindings for `finstack_quant_core::math` — linear algebra, statistics,
 //! special functions, and compensated summation.
 
-use crate::utils::input::{js_f64, js_f64_seq, js_uint};
+use crate::utils::input::{js_f64, js_f64_seq, js_opt_f64, js_opt_string, js_uint};
 use crate::utils::to_js_err;
 use finstack_quant_core::math::{self, linalg, special_functions, stats, summation};
 use wasm_bindgen::prelude::*;
@@ -124,6 +124,82 @@ pub fn covariance(x: JsValue, y: JsValue) -> Result<f64, JsValue> {
     let x: &[f64] = &js_f64_seq(&x, "x")?;
     let y: &[f64] = &js_f64_seq(&y, "y")?;
     Ok(stats::covariance(x, y))
+}
+
+/// Annualized realized variance of a close price series (Rust
+/// `stats::realized_variance`): the mean of squared log returns times the
+/// annualization factor, with no mean subtraction.
+///
+/// # Arguments
+///
+/// * `prices` - Close prices in time order; each must be finite and positive.
+/// * `method` - Estimator name; only `"close_to_close"` applies to closes
+///   (the OHLC estimators need `realizedVarianceOhlc`). Omitted selects the
+///   Rust default (`"close_to_close"`).
+/// * `annualization_factor` - Observations per year (for example `252` for
+///   daily closes); omitted selects the Rust daily default (252).
+///
+/// @returns Annualized realized variance (decimal, not volatility).
+/// @throws `TypeError` for a mistyped argument; `FinstackError` (kind
+/// `validation`) for an unknown or OHLC-only method, a non-positive or
+/// non-finite price, or a non-positive annualization factor.
+#[wasm_bindgen(js_name = realizedVariance)]
+pub fn realized_variance(
+    prices: JsValue,
+    method: Option<JsValue>,
+    annualization_factor: Option<JsValue>,
+) -> Result<f64, JsValue> {
+    let prices: &[f64] = &js_f64_seq(&prices, "prices")?;
+    let method = realized_var_method(method)?;
+    let annualization_factor = js_opt_f64(annualization_factor.as_ref(), "annualizationFactor")?;
+    stats::realized_variance(prices, method, annualization_factor).map_err(to_js_err)
+}
+
+/// Annualized realized variance from OHLC bars (Rust `stats::realized_variance_ohlc`).
+///
+/// # Arguments
+///
+/// * `open` - Opening prices, one per bar.
+/// * `high` - High prices, one per bar.
+/// * `low` - Low prices, one per bar.
+/// * `close` - Closing prices, one per bar.
+/// * `method` - Estimator name: `"close_to_close"`, `"parkinson"`,
+///   `"garman_klass"`, `"rogers_satchell"` or `"yang_zhang"`. Omitted selects
+///   the Rust OHLC default (`"yang_zhang"`).
+/// * `annualization_factor` - Bars per year (for example `252` for daily
+///   bars); omitted selects the Rust daily default (252).
+///
+/// @returns Annualized realized variance (decimal, not volatility).
+/// @throws `TypeError` for a mistyped argument; `FinstackError` (kind
+/// `validation`) for an unknown method, series of different lengths, an
+/// invalid bar, or a non-positive annualization factor.
+#[wasm_bindgen(js_name = realizedVarianceOhlc)]
+pub fn realized_variance_ohlc(
+    open: JsValue,
+    high: JsValue,
+    low: JsValue,
+    close: JsValue,
+    method: Option<JsValue>,
+    annualization_factor: Option<JsValue>,
+) -> Result<f64, JsValue> {
+    let open: &[f64] = &js_f64_seq(&open, "open")?;
+    let high: &[f64] = &js_f64_seq(&high, "high")?;
+    let low: &[f64] = &js_f64_seq(&low, "low")?;
+    let close: &[f64] = &js_f64_seq(&close, "close")?;
+    let method = realized_var_method(method)?;
+    let annualization_factor = js_opt_f64(annualization_factor.as_ref(), "annualizationFactor")?;
+    stats::realized_variance_ohlc(open, high, low, close, method, annualization_factor)
+        .map_err(to_js_err)
+}
+
+/// Parse an optional `RealizedVarMethod` from its serde name.
+fn realized_var_method(
+    method: Option<JsValue>,
+) -> Result<Option<stats::RealizedVarMethod>, JsValue> {
+    js_opt_string(method.as_ref(), "method")?
+        .map(|name| finstack_quant_core::wire::serde_parse(&name))
+        .transpose()
+        .map_err(to_js_err)
 }
 
 /// Empirical quantile over a typed numeric array.

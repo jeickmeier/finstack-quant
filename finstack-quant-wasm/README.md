@@ -78,11 +78,11 @@ import init, { analytics, calibration, core, models, valuations } from 'finstack
 
 await init();
 
-// Currency-tagged amounts. `amount` is the f64 view; `amountDecimal()` is exact.
+// Currency-tagged amounts. `amount` is the f64 view; `amountDecimal` is exact.
 const usd = new core.Currency('USD');
 const notional = new core.Money(1_000_000, usd);
 notional.amount; // 1000000
-notional.amountDecimal(); // '1000000'
+notional.amountDecimal; // '1000000'
 
 // Rates are decimals internally; use the factories for quoted units.
 core.Rate.fromBp(250).asDecimal; // 0.025
@@ -208,8 +208,11 @@ category (`strict_load`, `solver_not_converged`, …) alongside the failing `sta
 **Money.** `new core.Money(amount, currency)` takes a finite JavaScript `number`,
 converts it to a Rust `Decimal`, and does **not** round to the currency's minor
 units. Precision already lost in the `number` cannot be recovered. `toString()` and
-other formatting do not mutate the stored amount; `amountDecimal()` renders the exact
-stored `Decimal` as a string. `add` and `sub` refuse to mix currencies.
+other formatting do not mutate the stored amount; `amountDecimal` renders the exact
+stored `Decimal` as a string. The arithmetic carries the Rust method names:
+`checkedAdd` and `checkedSub` refuse to mix currencies, `checkedMulF64` /
+`checkedDivF64` scale by a number and `checkedNeg` negates exactly.
+`Money.fromDecimalStr(text, currency)` takes a `Currency` handle, like the constructor.
 
 **Rates.** Rates are decimals: `0.05` is 5%. Use `Rate.fromPercent` / `Rate.fromBp`
 for quoted units. `Rate.fromBp` is integer-backed and rejects fractional basis points

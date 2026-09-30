@@ -105,6 +105,20 @@ impl TenorUnit {
             .into()),
         }
     }
+
+    /// Single-character unit code: `'D'`, `'W'`, `'M'` or `'Y'`.
+    ///
+    /// The inverse of `TenorUnit::from_char` and the unit suffix of the
+    /// tenor's `Display` form (`"3M"`).
+    #[must_use]
+    pub const fn designator(self) -> char {
+        match self {
+            Self::Days => 'D',
+            Self::Weeks => 'W',
+            Self::Months => 'M',
+            Self::Years => 'Y',
+        }
+    }
 }
 
 /// A parsed tenor representing a time period.
@@ -775,13 +789,7 @@ impl Tenor {
 
 impl std::fmt::Display for Tenor {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let unit_char = match self.unit {
-            TenorUnit::Days => 'D',
-            TenorUnit::Weeks => 'W',
-            TenorUnit::Months => 'M',
-            TenorUnit::Years => 'Y',
-        };
-        write!(f, "{}{}", self.count, unit_char)
+        write!(f, "{}{}", self.count, self.unit.designator())
     }
 }
 
@@ -797,6 +805,27 @@ impl std::str::FromStr for Tenor {
 mod tests {
     use super::*;
     use time::Month;
+
+    #[test]
+    fn unit_designator_round_trips_from_char() {
+        for unit in [
+            TenorUnit::Days,
+            TenorUnit::Weeks,
+            TenorUnit::Months,
+            TenorUnit::Years,
+        ] {
+            assert_eq!(TenorUnit::from_char(unit.designator()).expect("unit"), unit);
+        }
+        assert_eq!(Tenor::parse("3M").expect("3M").unit().designator(), 'M');
+    }
+
+    #[test]
+    fn business_day_convention_default_is_modified_following() {
+        assert_eq!(
+            BusinessDayConvention::default(),
+            BusinessDayConvention::ModifiedFollowing
+        );
+    }
 
     #[test]
     fn test_parse_valid_tenors() {

@@ -1,11 +1,15 @@
 //! WASM bindings for date utilities from [`finstack_quant_core::dates`].
 
-use crate::utils::input::{js_bool, js_epoch_days, js_int, js_string, js_uint};
+use crate::utils::input::{
+    from_js_json, invalid_type, js_epoch_days, js_f64, js_int, js_opt_bool, js_opt_string,
+    js_opt_uint, js_string, js_uint,
+};
 use crate::utils::to_js_err;
 use finstack_quant_core::dates::{
     adjust as core_adjust, available_calendars as core_available_calendars,
-    fx::resolve_calendar as rust_resolve_calendar, BusinessDayConvention, DayCount as RustDayCount,
-    DayCountContext as RustDayCountContext, DayCountContextState, Tenor as RustTenor,
+    fx::resolve_calendar as rust_resolve_calendar, BusinessDayConvention, Date,
+    DayCount as RustDayCount, DayCountContext as RustDayCountContext, DayCountContextState,
+    HolidayCalendar, Tenor as RustTenor,
 };
 use wasm_bindgen::prelude::*;
 
@@ -32,91 +36,154 @@ impl JsDayCountContext {
 
 #[wasm_bindgen(js_class = DayCountContext)]
 impl JsDayCountContext {
-    /// Create an empty day-count context (Rust `DayCountContextState::default()`).
+    /// Create a day-count context (Rust `DayCountContextState::try_new`, the
+    /// validation point shared with Python `DayCountContext(...)`).
     ///
-    /// `DayCount.yearFraction` / `signedYearFraction` use this context when
-    /// none is passed.
+    /// Every argument is optional; `new DayCountContext()` is the empty
+    /// context `DayCount.yearFraction` / `signedYearFraction` use when none is
+    /// passed.
+    ///
+    /// # Arguments
+    ///
+    /// * `calendar_id` - Registered holiday-calendar identifier (for example
+    ///   `"nyse"`) used by Bus/252; resolved when the context is used.
+    /// * `frequency` - Coupon frequency as tenor text (for example `"6M"`; use
+    ///   `tenor.toString()` for a `Tenor`), required by Act/Act ICMA and used
+    ///   by Act/365L.
+    /// * `bus_basis` - Business-day denominator for Bus/252 (an integer in
+    ///   `0..=65535`, normally `252`).
+    /// * `coupon_period` - Reference coupon period `[startEpochDays,
+    ///   endEpochDays]` (days since 1970-01-01) for Act/Act ICMA; the start must
+    ///   precede the end.
+    /// * `end_is_termination_date` - Whether the accrual end is the
+    ///   instrument's termination date (30E/360 ISDA February-end handling);
+    ///   omitted means `false`.
+    ///
+    /// @returns A new `DayCountContext`.
+    /// @throws `TypeError` (kind `invalid_type`) for a mistyped argument or a
+    /// `couponPeriod` that is not a two-element array of epoch days;
+    /// `FinstackError` (kind `validation`) if `frequency` is not a tenor or
+    /// the coupon period is inverted or out of range.
+    ///
+    /// @example
+    /// ```javascript
+    /// const ctx = new core.DayCountContext("nyse", "3M", 252);
+    /// ctx.frequency.toString();  // "3M"
+    /// core.DayCountContext.fromJson(ctx.toJson()).busBasis;  // 252
+    /// ```
     #[wasm_bindgen(constructor)]
-    pub fn new() -> JsDayCountContext {
-        JsDayCountContext::default()
-    }
-
-    /// Return a copy with the calendar used by Bus/252.
-    /// @param calendar_code - Registered holiday-calendar identifier used by the Bus/252 convention.
-    /// @returns A new `DayCountContext` handle.
-    #[wasm_bindgen(js_name = withCalendar)]
-    pub fn with_calendar(&self, calendar_code: JsValue) -> Result<JsDayCountContext, JsValue> {
-        let calendar_code: &str = &js_string(&calendar_code, "calendarCode")?;
-        let mut next = self.clone();
-        next.inner.calendar_id = Some(calendar_code.to_string());
-        Ok(next)
-    }
-
-    /// Return a copy with the coupon frequency used by Act/Act ISMA.
-    /// @param frequency - Coupon-frequency Tenor required by Actual/Actual ICMA calculations.
-    /// @returns A new `DayCountContext` handle.
-    #[wasm_bindgen(js_name = withFrequency)]
-    pub fn with_frequency(&self, frequency: &JsTenor) -> JsDayCountContext {
-        let mut next = self.clone();
-        next.inner.frequency = Some(frequency.inner);
-        next
-    }
-
-    /// Return a copy with the business-day basis used by Bus/252.
-    /// @param bus_basis - Business-day denominator for Bus/252, normally 252.
-    /// @returns A new `DayCountContext` handle.
-    #[wasm_bindgen(js_name = withBusBasis)]
-    pub fn with_bus_basis(&self, bus_basis: JsValue) -> Result<JsDayCountContext, JsValue> {
-        let bus_basis: u16 = js_uint(&bus_basis, "busBasis")?;
-        let mut next = self.clone();
-        next.inner.bus_basis = Some(bus_basis);
-        Ok(next)
-    }
-
-    /// Return a copy with the reference coupon period (epoch days) used by
-    /// Act/Act ICMA. Errors when either date is out of range or
-    /// `start >= end`.
-    /// @param start_epoch_days - Reference coupon-period start as days since 1970-01-01.
-    /// @param end_epoch_days - Reference coupon-period end as days since 1970-01-01.
-    /// @returns A new `DayCountContext` handle.
-    ///
-    /// # Errors
-    ///
-    /// Throws a JavaScript exception if either epoch-day value is outside the
-    /// representable date range or the start is not strictly before the end.
-    #[wasm_bindgen(js_name = withCouponPeriod)]
-    pub fn with_coupon_period(
-        &self,
-        start_epoch_days: JsValue,
-        end_epoch_days: JsValue,
+    pub fn new(
+        calendar_id: Option<JsValue>,
+        frequency: Option<JsValue>,
+        bus_basis: Option<JsValue>,
+        coupon_period: Option<JsValue>,
+        end_is_termination_date: Option<JsValue>,
     ) -> Result<JsDayCountContext, JsValue> {
-        let start = js_epoch_days(&start_epoch_days, "startEpochDays")?;
-        let end = js_epoch_days(&end_epoch_days, "endEpochDays")?;
-        let inner = DayCountContextState::try_new(
-            self.inner.calendar_id.clone(),
-            self.inner.frequency,
-            self.inner.bus_basis,
-            Some((start, end)),
-            self.inner.end_is_termination_date,
+        let calendar_id = js_opt_string(calendar_id.as_ref(), "calendarId")?;
+        let frequency = js_opt_string(frequency.as_ref(), "frequency")?
+            .map(|text| RustTenor::parse(&text))
+            .transpose()
+            .map_err(to_js_err)?;
+        let bus_basis: Option<u16> = js_opt_uint(bus_basis.as_ref(), "busBasis")?;
+        let coupon_period = match coupon_period {
+            Some(value) if !(value.is_null() || value.is_undefined()) => {
+                Some(epoch_day_pair(&value, "couponPeriod")?)
+            }
+            _ => None,
+        };
+        let end_is_termination_date =
+            js_opt_bool(end_is_termination_date.as_ref(), "endIsTerminationDate")?
+                .unwrap_or_default();
+        DayCountContextState::try_new(
+            calendar_id,
+            frequency,
+            bus_basis,
+            coupon_period,
+            end_is_termination_date,
         )
-        .map_err(to_js_err)?;
-        Ok(JsDayCountContext { inner })
+        .map(|inner| JsDayCountContext { inner })
+        .map_err(to_js_err)
     }
 
-    /// Return a copy indicating whether the accrual end is the instrument's
-    /// termination date (required by 30E/360 ISDA February-end handling).
-    /// @param value - Whether the accrual end is the contractual termination date for 30E/360 ISDA.
-    /// @returns A new `DayCountContext` handle.
-    #[wasm_bindgen(js_name = withEndIsTerminationDate)]
-    pub fn with_end_is_termination_date(
-        &self,
-        value: JsValue,
-    ) -> Result<JsDayCountContext, JsValue> {
-        let value = js_bool(&value, "value")?;
-        let mut next = self.clone();
-        next.inner.end_is_termination_date = value;
-        Ok(next)
+    /// Holiday-calendar identifier, or `undefined`.
+    #[wasm_bindgen(getter, js_name = calendarId)]
+    pub fn calendar_id(&self) -> Option<String> {
+        self.inner.calendar_id.clone()
     }
+
+    /// Coupon frequency, or `undefined`.
+    #[wasm_bindgen(getter, js_name = frequency)]
+    pub fn frequency(&self) -> Option<JsTenor> {
+        self.inner.frequency.map(|inner| JsTenor { inner })
+    }
+
+    /// Custom business-day denominator, or `undefined`.
+    #[wasm_bindgen(getter, js_name = busBasis)]
+    pub fn bus_basis(&self) -> Option<u16> {
+        self.inner.bus_basis
+    }
+
+    /// Reference coupon period as `[startEpochDays, endEpochDays]`, or `undefined`.
+    #[wasm_bindgen(getter, js_name = couponPeriod)]
+    pub fn coupon_period(&self) -> Option<Box<[i32]>> {
+        self.inner.coupon_period.map(|(start, end)| {
+            Box::new([
+                finstack_quant_core::dates::days_since_epoch(start),
+                finstack_quant_core::dates::days_since_epoch(end),
+            ]) as Box<[i32]>
+        })
+    }
+
+    /// Whether the accrual end is the instrument termination date.
+    #[wasm_bindgen(getter, js_name = endIsTerminationDate)]
+    pub fn end_is_termination_date(&self) -> bool {
+        self.inner.end_is_termination_date
+    }
+
+    /// Serialize to the canonical JSON wire form shared with Python `DayCountContext.to_json`.
+    ///
+    /// @returns Compact JSON text (dates in the coupon period are ISO-8601).
+    /// @throws If serialization fails (not expected for a valid context).
+    #[wasm_bindgen(js_name = toJson)]
+    pub fn to_json(&self) -> Result<String, JsValue> {
+        serde_json::to_string(&self.inner).map_err(to_js_err)
+    }
+
+    /// Deserialize from the canonical JSON wire form produced by `toJson`.
+    ///
+    /// # Arguments
+    ///
+    /// * `json` - Canonical DayCountContext JSON text or plain object; unknown
+    ///   fields are rejected. As in Rust and Python, the coupon period is
+    ///   validated when the context is used (`DayCountContextState::to_ctx`).
+    ///
+    /// @returns The parsed `DayCountContext`.
+    /// @throws If `json` is malformed or has unknown or mistyped fields.
+    #[wasm_bindgen(js_name = fromJson)]
+    pub fn from_json(json: JsValue) -> Result<JsDayCountContext, JsValue> {
+        from_js_json::<DayCountContextState>(&json, "json").map(|inner| JsDayCountContext { inner })
+    }
+}
+
+/// Read a `[startEpochDays, endEpochDays]` pair.
+fn epoch_day_pair(value: &JsValue, label: &str) -> Result<(Date, Date), JsValue> {
+    if !js_sys::Array::is_array(value) {
+        return Err(invalid_type(
+            label,
+            "expected a [startEpochDays, endEpochDays] array",
+        ));
+    }
+    let pair = js_sys::Array::from(value);
+    if pair.length() != 2 {
+        return Err(invalid_type(
+            label,
+            &format!("expected 2 elements, got {}", pair.length()),
+        ));
+    }
+    Ok((
+        js_epoch_days(&pair.get(0), &format!("{label}[0]"))?,
+        js_epoch_days(&pair.get(1), &format!("{label}[1]"))?,
+    ))
 }
 
 /// Day-count convention for computing year fractions and day counts.
@@ -124,9 +191,12 @@ impl JsDayCountContext {
 /// Dates are represented as **epoch days** (`i32`, days since 1970-01-01).
 /// Use `createDate` to convert from a `(year, month, day)` triple.
 ///
-/// Available conventions and their factories:
+/// Available conventions (canonical names for `DayCount.fromName`) and their factories:
+/// - `one_one` → `DayCount.oneOne`
 /// - `act_360` → `DayCount.act360`
 /// - `act_365f` → `DayCount.act365f`
+/// - `act_365l` → `DayCount.act365l`
+/// - `nl_365` (No-Leap/365) → `DayCount.nl365`
 /// - `30_360` → `DayCount.thirty360`
 /// - `30e_360` → `DayCount.thirtyE360`
 /// - `30e_360_isda` → `DayCount.thirtyE360Isda`
@@ -135,6 +205,9 @@ impl JsDayCountContext {
 /// - `act_act_afb` (AFB / Actual/Actual Euro) → `DayCount.actActAfb`
 /// - `30_360_it` (Italian) → `DayCount.thirty360It`
 /// - `bus_252` → `DayCount.bus252`
+///
+/// Term-sheet spellings such as `"ACT/360"` or `"30/360 ISDA"` go through the
+/// lenient `DayCount.parse`.
 ///
 /// @example
 /// ```javascript
@@ -153,18 +226,56 @@ pub struct JsDayCount {
 
 #[wasm_bindgen(js_class = DayCount)]
 impl JsDayCount {
-    /// Parse a day-count convention from its string name.
+    /// Look up a convention by its canonical name (Rust `DayCount::from_str`,
+    /// the twin of Python `DayCount.from_name`).
     ///
-    /// @param name - Convention name (e.g. `"act_360"`, `"30_360"`, `"act_act"`).
-    /// Underscored snake_case is canonical.
-    /// @returns The parsed `DayCount`.
-    /// @throws If `name` is not a recognized day-count convention.
-    #[wasm_bindgen(constructor)]
-    pub fn new(name: JsValue) -> Result<JsDayCount, JsValue> {
+    /// # Arguments
+    ///
+    /// * `name` - Canonical snake_case convention name, for example
+    ///   `"act_360"`, `"30_360"` or `"act_act"` (see the class list).
+    ///
+    /// @returns The matching `DayCount`.
+    /// @throws `TypeError` if `name` is not a string; `FinstackError` (kind
+    /// `validation`) if it is not a canonical convention name. Use
+    /// `DayCount.parse` for term-sheet spellings.
+    #[wasm_bindgen(js_name = fromName)]
+    pub fn from_name(name: JsValue) -> Result<JsDayCount, JsValue> {
         let name: &str = &js_string(&name, "name")?;
         name.parse::<RustDayCount>()
             .map(|inner| JsDayCount { inner })
             .map_err(to_js_err)
+    }
+
+    /// Parse a convention leniently (Rust `DayCount::parse`): case, spaces,
+    /// `/` and `-` are normalised, so term-sheet spellings such as
+    /// `"ACT/360"`, `"Act/Act ICMA"` or `"30E/360 ISDA"` are accepted.
+    ///
+    /// # Arguments
+    ///
+    /// * `s` - Convention text in canonical or term-sheet spelling.
+    ///
+    /// @returns The matching `DayCount`.
+    /// @throws `TypeError` if `s` is not a string; `FinstackError` (kind
+    /// `validation`) if no convention matches.
+    ///
+    /// @example
+    /// ```javascript
+    /// core.DayCount.parse("Act/Act ICMA").toString();  // "act_act_isma"
+    /// ```
+    #[wasm_bindgen(js_name = parse)]
+    pub fn parse(s: JsValue) -> Result<JsDayCount, JsValue> {
+        let s: &str = &js_string(&s, "s")?;
+        RustDayCount::parse(s)
+            .map(|inner| JsDayCount { inner })
+            .map_err(to_js_err)
+    }
+
+    /// No-Leap/365: actual days excluding February 29, over 365.
+    #[wasm_bindgen(js_name = nl365)]
+    pub fn nl365() -> JsDayCount {
+        JsDayCount {
+            inner: RustDayCount::Nl365,
+        }
     }
 
     /// One unit per nonempty contractual accrual period; empty periods return zero.
@@ -380,9 +491,10 @@ impl JsDayCount {
 /// A financial tenor such as `3M`, `1Y`, or `2W`.
 ///
 /// Tenors carry a numeric count and a unit (days, weeks, months, years).
-/// Parse from strings or use the named-period factories (`Tenor.daily`,
-/// `Tenor.weekly`, `Tenor.monthly`, `Tenor.quarterly`, `Tenor.semiAnnual`,
-/// `Tenor.annual`).
+/// Parse from strings (`new Tenor(s)` or `Tenor.parse(s)`) or use the
+/// named-period factories (`Tenor.daily`, `Tenor.weekly`, `Tenor.biweekly`,
+/// `Tenor.monthly`, `Tenor.bimonthly`, `Tenor.quarterly`, `Tenor.semiAnnual`,
+/// `Tenor.annual`), `Tenor.fromPaymentsPerYear` or `Tenor.fromYears`.
 ///
 /// @example
 /// ```javascript
@@ -414,6 +526,72 @@ impl JsTenor {
         RustTenor::parse(s)
             .map(|inner| JsTenor { inner })
             .map_err(to_js_err)
+    }
+
+    /// Parse a tenor string (Rust `Tenor::parse`; same as `new Tenor(s)`).
+    ///
+    /// # Arguments
+    ///
+    /// * `s` - Tenor text such as `"3M"`, `"1Y"`, `"2W"` or `"7D"`.
+    ///
+    /// @returns The parsed `Tenor`.
+    /// @throws If `s` is not a string or cannot be parsed.
+    #[wasm_bindgen(js_name = parse)]
+    pub fn parse(s: JsValue) -> Result<JsTenor, JsValue> {
+        Self::new(s)
+    }
+
+    /// Tenor for a year fraction under a day count (Rust `Tenor::from_years`):
+    /// a whole number of months when the fraction is one, otherwise days.
+    ///
+    /// # Arguments
+    ///
+    /// * `years` - Positive, finite length in years.
+    /// * `day_count` - Convention used to interpret `years`.
+    ///
+    /// @returns The matching `Tenor`.
+    /// @throws If `years` is not finite and positive or the tenor is out of range.
+    #[wasm_bindgen(js_name = fromYears)]
+    pub fn from_years(years: JsValue, day_count: &JsDayCount) -> Result<JsTenor, JsValue> {
+        let years = js_f64(&years, "years")?;
+        RustTenor::from_years(years, day_count.inner)
+            .map(|inner| JsTenor { inner })
+            .map_err(to_js_err)
+    }
+
+    /// Tenor for a coupon frequency (Rust `Tenor::from_payments_per_year`;
+    /// `4` gives `3M`).
+    ///
+    /// # Arguments
+    ///
+    /// * `payments` - Coupon payments per year; must be positive and divide 12
+    ///   (`12` monthly, `4` quarterly, `2` semi-annual, `1` annual).
+    ///
+    /// @returns The matching `Tenor`.
+    /// @throws `TypeError` if `payments` is not a non-negative integer;
+    /// `FinstackError` (kind `validation`) if no tenor matches.
+    #[wasm_bindgen(js_name = fromPaymentsPerYear)]
+    pub fn from_payments_per_year(payments: JsValue) -> Result<JsTenor, JsValue> {
+        let payments: u32 = js_uint(&payments, "payments")?;
+        RustTenor::from_payments_per_year(payments)
+            .map(|inner| JsTenor { inner })
+            .map_err(to_js_err)
+    }
+
+    /// 2-week tenor.
+    #[wasm_bindgen(js_name = biweekly)]
+    pub fn biweekly() -> JsTenor {
+        JsTenor {
+            inner: RustTenor::biweekly(),
+        }
+    }
+
+    /// 2-month tenor.
+    #[wasm_bindgen(js_name = bimonthly)]
+    pub fn bimonthly() -> JsTenor {
+        JsTenor {
+            inner: RustTenor::bimonthly(),
+        }
     }
 
     /// 1-day tenor.
@@ -470,10 +648,106 @@ impl JsTenor {
         self.inner.count()
     }
 
+    /// Unit designator: `"D"`, `"W"`, `"M"` or `"Y"` (Rust `TenorUnit::designator`).
+    #[wasm_bindgen(getter, js_name = unit)]
+    pub fn unit(&self) -> String {
+        self.inner.unit().designator().to_string()
+    }
+
+    /// Equivalent whole months, or `undefined` for day/week tenors.
+    #[wasm_bindgen(getter, js_name = months)]
+    pub fn months(&self) -> Option<u32> {
+        self.inner.months()
+    }
+
+    /// Equivalent whole days, or `undefined` for month/year tenors.
+    #[wasm_bindgen(getter, js_name = days)]
+    pub fn days(&self) -> Option<u32> {
+        self.inner.days()
+    }
+
     /// Approximate length in years (simple estimate, no calendar).
     #[wasm_bindgen(js_name = toYears)]
     pub fn to_years(&self) -> f64 {
         self.inner.to_years()
+    }
+
+    /// Coupon payments per year implied by this tenor (`3M` gives `4`, `2Y` gives `0.5`).
+    #[wasm_bindgen(js_name = paymentsPerYear)]
+    pub fn payments_per_year(&self) -> f64 {
+        self.inner.payments_per_year()
+    }
+
+    /// Approximate length in calendar days (no calendar).
+    ///
+    /// @returns Whole days as a number.
+    /// @throws Never for a valid tenor (the Rust tenor bounds keep it within range).
+    #[wasm_bindgen(js_name = toDaysApprox)]
+    pub fn to_days_approx(&self) -> Result<i32, JsValue> {
+        i32::try_from(self.inner.to_days_approx()).map_err(|e| to_js_err(e.to_string()))
+    }
+
+    /// Add this tenor to a date (Rust `Tenor::add_to_date`).
+    ///
+    /// Month and year tenors clamp to the last valid day of the target month.
+    ///
+    /// # Arguments
+    ///
+    /// * `epoch_days` - Anchor date as days since 1970-01-01.
+    /// * `calendar_code` - Registered holiday-calendar identifier used to roll
+    ///   the result; omitted skips adjustment.
+    /// * `convention` - Business-day convention name applied with the
+    ///   calendar; omitted uses the Rust default (`"modified_following"`).
+    ///
+    /// @returns The (optionally adjusted) end date as epoch days.
+    /// @throws `TypeError` for a mistyped argument; `FinstackError` if the date
+    /// is out of range, the convention is unknown, the calendar is unknown
+    /// (kind `not_found`), or no business day is found.
+    #[wasm_bindgen(js_name = addToDate)]
+    pub fn add_to_date(
+        &self,
+        epoch_days: JsValue,
+        calendar_code: Option<JsValue>,
+        convention: Option<JsValue>,
+    ) -> Result<i32, JsValue> {
+        let date = js_epoch_days(&epoch_days, "epochDays")?;
+        let (calendar, convention) = roll_rule(calendar_code, convention)?;
+        let end = self
+            .inner
+            .add_to_date(date, calendar, convention)
+            .map_err(to_js_err)?;
+        Ok(finstack_quant_core::dates::days_since_epoch(end))
+    }
+
+    /// Exact year fraction of this tenor from a date under a day count
+    /// (Rust `Tenor::to_years_with_context`).
+    ///
+    /// # Arguments
+    ///
+    /// * `as_of_epoch_days` - Start date as days since 1970-01-01.
+    /// * `day_count` - Convention used to measure the span.
+    /// * `calendar_code` - Registered holiday-calendar identifier used to roll
+    ///   the end date; omitted skips adjustment.
+    /// * `convention` - Business-day convention name applied with the
+    ///   calendar; omitted uses the Rust default (`"modified_following"`).
+    ///
+    /// @returns Year fraction between the start and the rolled end date.
+    /// @throws `TypeError` for a mistyped argument; `FinstackError` if the date
+    /// is out of range, the convention or calendar is unknown, or the day count
+    /// needs context it cannot get (e.g. Bus/252 without a calendar).
+    #[wasm_bindgen(js_name = toYearsWithContext)]
+    pub fn to_years_with_context(
+        &self,
+        as_of_epoch_days: JsValue,
+        day_count: &JsDayCount,
+        calendar_code: Option<JsValue>,
+        convention: Option<JsValue>,
+    ) -> Result<f64, JsValue> {
+        let as_of = js_epoch_days(&as_of_epoch_days, "asOfEpochDays")?;
+        let (calendar, convention) = roll_rule(calendar_code, convention)?;
+        self.inner
+            .to_years_with_context(as_of, calendar, convention, day_count.inner)
+            .map_err(to_js_err)
     }
 
     /// Tenor string representation.
@@ -482,6 +756,24 @@ impl JsTenor {
     pub fn to_string(&self) -> String {
         self.inner.to_string()
     }
+}
+
+/// Resolve the optional calendar and business-day convention of a tenor roll.
+///
+/// An omitted convention is `BusinessDayConvention::default()`.
+fn roll_rule(
+    calendar_code: Option<JsValue>,
+    convention: Option<JsValue>,
+) -> Result<(Option<&'static dyn HolidayCalendar>, BusinessDayConvention), JsValue> {
+    let calendar = js_opt_string(calendar_code.as_ref(), "calendarCode")?
+        .map(|code| rust_resolve_calendar(Some(&code)))
+        .transpose()
+        .map_err(to_js_err)?;
+    let convention = match js_opt_string(convention.as_ref(), "convention")? {
+        Some(name) => name.parse().map_err(|e: String| to_js_err(e))?,
+        None => BusinessDayConvention::default(),
+    };
+    Ok((calendar, convention))
 }
 
 /// Create a date and return it as epoch days (days since 1970-01-01).
@@ -653,6 +945,70 @@ mod tests {
     fn date_from_epoch_days_extreme() {
         assert!(finstack_quant_core::dates::date_from_epoch_days(i32::MAX).is_none());
         assert!(finstack_quant_core::dates::date_from_epoch_days(i32::MIN).is_none());
+    }
+
+    #[test]
+    fn daycount_nl365_factory_and_lenient_parse() {
+        assert_eq!(JsDayCount::nl365().to_string(), "nl_365");
+        assert_eq!(
+            RustDayCount::parse("Act/Act ICMA").expect("lenient"),
+            RustDayCount::ActActIsma
+        );
+        assert!("ACT/360".parse::<RustDayCount>().is_err());
+    }
+
+    #[test]
+    fn tenor_members_pass_through_rust() {
+        let t = JsTenor {
+            inner: RustTenor::parse("3M").expect("3M"),
+        };
+        assert_eq!(t.unit(), "M");
+        assert_eq!(t.months(), Some(3));
+        assert_eq!(t.days(), None);
+        assert!((t.payments_per_year() - 4.0).abs() < 1e-12);
+        assert_eq!(
+            t.to_days_approx().expect("days"),
+            i32::try_from(t.inner.to_days_approx()).expect("fits")
+        );
+        assert_eq!(JsTenor::biweekly().days(), Some(14));
+        assert_eq!(JsTenor::bimonthly().months(), Some(2));
+    }
+
+    #[test]
+    fn day_count_context_getters_read_the_rust_state() {
+        let start =
+            finstack_quant_core::dates::create_date(2025, time::Month::January, 15).expect("start");
+        let end =
+            finstack_quant_core::dates::create_date(2025, time::Month::July, 15).expect("end");
+        let ctx = JsDayCountContext {
+            inner: DayCountContextState::try_new(
+                Some("nyse".into()),
+                Some(RustTenor::semi_annual()),
+                Some(252),
+                Some((start, end)),
+                true,
+            )
+            .expect("state"),
+        };
+        assert_eq!(ctx.calendar_id().as_deref(), Some("nyse"));
+        assert_eq!(
+            ctx.frequency().map(|t| t.to_string()).as_deref(),
+            Some("6M")
+        );
+        assert_eq!(ctx.bus_basis(), Some(252));
+        assert_eq!(
+            ctx.coupon_period().as_deref(),
+            Some(
+                &[
+                    finstack_quant_core::dates::days_since_epoch(start),
+                    finstack_quant_core::dates::days_since_epoch(end)
+                ][..]
+            )
+        );
+        assert!(ctx.end_is_termination_date());
+        let back: DayCountContextState =
+            serde_json::from_str(&ctx.to_json().expect("json")).expect("parse");
+        assert_eq!(back, ctx.inner);
     }
 
     #[test]

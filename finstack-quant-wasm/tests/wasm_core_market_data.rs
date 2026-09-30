@@ -2,7 +2,7 @@
 
 #![cfg(target_arch = "wasm32")]
 
-use finstack_quant_wasm::api::core::dates::{create_date, JsDayCount, JsDayCountContext, JsTenor};
+use finstack_quant_wasm::api::core::dates::{create_date, JsDayCount, JsDayCountContext};
 use finstack_quant_wasm::api::core::market_data::*;
 use finstack_quant_wasm::api::core::market_data::{
     JsDiscountCurve, JsForwardCurve, JsFxConversionPolicy, JsFxDeltaVolSurface, JsFxMatrix,
@@ -302,18 +302,18 @@ fn day_count_context_supports_context_dependent_conventions() {
         .year_fraction(
             JsValue::from(start),
             JsValue::from(end),
-            &JsDayCountContext::new()
+            &JsDayCountContext::new(None, None, None, None, None).expect("empty context")
         )
         .is_err());
 
-    let isma_ctx = JsDayCountContext::new().with_frequency(&JsTenor::semi_annual());
+    let isma_ctx =
+        JsDayCountContext::new(None, Some(JsValue::from("6M")), None, None, None).expect("context");
     let isma = JsDayCount::act_act_isma()
         .year_fraction(JsValue::from(start), JsValue::from(end), &isma_ctx)
         .unwrap();
     assert!((isma - 0.5).abs() < 1e-12);
 
-    let bus_ctx = JsDayCountContext::new()
-        .with_calendar(JsValue::from("target2"))
+    let bus_ctx = JsDayCountContext::new(Some(JsValue::from("target2")), None, None, None, None)
         .expect("context");
     let bus = JsDayCount::bus252()
         .year_fraction(JsValue::from(start), JsValue::from(end), &bus_ctx)
@@ -330,7 +330,7 @@ fn day_count_exposes_act365l_and_signed_fraction() {
             .signed_year_fraction(
                 JsValue::from(start),
                 JsValue::from(end),
-                &JsDayCountContext::new()
+                &JsDayCountContext::new(None, None, None, None, None).expect("empty context")
             )
             .unwrap(),
         1.0
@@ -340,7 +340,7 @@ fn day_count_exposes_act365l_and_signed_fraction() {
             .signed_year_fraction(
                 JsValue::from(end),
                 JsValue::from(start),
-                &JsDayCountContext::new()
+                &JsDayCountContext::new(None, None, None, None, None).expect("empty context")
             )
             .unwrap(),
         -1.0

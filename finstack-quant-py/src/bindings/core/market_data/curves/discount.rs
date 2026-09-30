@@ -71,10 +71,12 @@ impl PyDiscountCurve {
     ///     and must be positive. A ``(0.0, 1.0)`` anchor is conventional.
     /// interp : str, optional
     ///     Interpolation style (``"monotone_convex"``, ``"linear"``,
-    ///     ``"log_linear"``, ``"cubic"``, ...). Default ``"monotone_convex"``.
+    ///     ``"log_linear"``, ``"cubic_hermite"``,
+    ///     ``"piecewise_quadratic_forward"``). Default ``"monotone_convex"``.
     /// extrapolation : str, optional
-    ///     Extrapolation policy (``"flat_forward"``, ``"flat_zero"``, ``"linear"``,
-    ///     ``"error"``). Default ``"flat_forward"``.
+    ///     Extrapolation policy (``"flat_forward"``, ``"flat_zero"``, or
+    ///     ``"none"``, which returns NaN outside the pillar range). Default
+    ///     ``"flat_forward"``.
     /// day_count : str, optional
     ///     Day-count convention used to convert query dates to curve time.
     ///     Default is fixed at ``"act_365f"`` (not inferred from the ID).

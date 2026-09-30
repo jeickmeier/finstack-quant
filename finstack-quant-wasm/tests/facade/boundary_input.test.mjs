@@ -158,7 +158,7 @@ test('narrow integers reject out-of-range values instead of wrapping', () => {
   assert.throws(() => core.createDate(2025, 257, 1), invalidType('month'));
   assert.throws(() => core.createDate(2025, 1.9, 15), invalidType('month'));
   assert.throws(() => core.createDate('2025', 1, 1), invalidType('year'));
-  assert.throws(() => new core.DayCountContext().withBusBasis(65_788), invalidType('busBasis'));
+  assert.throws(() => new core.DayCountContext(null, null, 65_788), invalidType('busBasis'));
   assert.deepEqual(Array.from(core.dateFromEpochDays(core.createDate(2025, 1, 15))), [2025, 1, 15]);
 });
 
@@ -324,8 +324,8 @@ test('optional numbers: omitted and null mean the default, other types throw', (
 test('class methods and constructors check numbers too', () => {
   const usd = new core.Currency('USD');
   const money = new core.Money(10, usd);
-  assert.equal(money.mulScalar(2.5).amount, 25);
-  assert.throws(() => money.mulScalar('2'), invalidType('factor'));
-  assert.throws(() => money.mulScalar(null), invalidType('factor'));
+  assert.equal(money.checkedMulF64(2.5).amount, 25);
+  assert.throws(() => money.checkedMulF64('2'), invalidType('factor'));
+  assert.throws(() => money.checkedMulF64(null), invalidType('factor'));
   assert.throws(() => new core.Money('10', usd), invalidType('amount'));
 });

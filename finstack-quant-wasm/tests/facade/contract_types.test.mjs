@@ -359,7 +359,7 @@ test('namespace results match their published result types', () => {
     knots: [0.0, 1.0, 4.0, 1.0],
     interp: 'log_linear',
   });
-  const hazard = new core.HazardCurve('HZ', '2025-01-01', [0.0, 0.02, 30.0, 0.02], 0.4);
+  const hazard = core.HazardCurve.flat('HZ', '2025-01-01', 0.02, 0.4);
   try {
     const xva = margin.computeBilateralXva(
       JSON.stringify({ times: [1.0, 2.0], mtm_values: [1e6, 1e6], epe: [1e6, 1e6], ene: [0, 0] }),

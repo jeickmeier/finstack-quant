@@ -248,6 +248,8 @@
       "normPdf",
       "populationVariance",
       "quantile",
+      "realizedVariance",
+      "realizedVarianceOhlc",
       "standardNormalInvCdf",
       "variance"
     ]
@@ -262,37 +264,36 @@
     "kind": "class",
     "statics": ["fromDecimalStr", "fromJson"],
     "methods": [
-      "add",
-      "amountDecimal",
+      "checkedAdd",
+      "checkedDivF64",
+      "checkedMulF64",
+      "checkedNeg",
+      "checkedSub",
       "convertAtRate",
-      "divScalar",
       "formatWith",
       "free",
-      "mulScalar",
-      "negate",
-      "sub",
       "toJson",
       "toString"
     ],
-    "getters": ["amount", "currency"]
+    "getters": ["amount", "amountDecimal", "currency"]
   },
   "core.Rate": {
     "kind": "class",
-    "statics": ["fromBp", "fromPercent"],
-    "methods": ["free"],
-    "getters": ["asBp", "asDecimal", "asPercent"]
+    "statics": ["fromBp", "fromJson", "fromPercent", "parse"],
+    "methods": ["abs", "free", "isNegative", "isPositive", "isZero", "toJson"],
+    "getters": ["asBasisPoints", "asBp", "asDecimal", "asPercent", "asPercentage"]
   },
   "core.Bps": {
     "kind": "class",
-    "statics": [],
-    "methods": ["asBp", "asDecimal", "free"],
-    "getters": []
+    "statics": ["fromJson"],
+    "methods": ["abs", "free", "isNegative", "isPositive", "isZero", "toJson"],
+    "getters": ["asBp", "asDecimal", "asPercent", "asPercentage", "asRate"]
   },
   "core.Percentage": {
     "kind": "class",
-    "statics": [],
-    "methods": ["asDecimal", "asPercent", "free"],
-    "getters": []
+    "statics": ["fromJson"],
+    "methods": ["abs", "free", "isNegative", "isPositive", "isZero", "toJson"],
+    "getters": ["asBasisPoints", "asBp", "asDecimal", "asPercent", "asRate"]
   },
   "core.DayCount": {
     "kind": "class",
@@ -305,7 +306,10 @@
       "actActIsma",
       "bus252",
       "calendarDays",
+      "fromName",
+      "nl365",
       "oneOne",
+      "parse",
       "thirty360",
       "thirty360It",
       "thirtyE360",
@@ -316,22 +320,35 @@
   },
   "core.DayCountContext": {
     "kind": "class",
-    "statics": [],
-    "methods": [
-      "free",
-      "withBusBasis",
-      "withCalendar",
-      "withCouponPeriod",
-      "withEndIsTerminationDate",
-      "withFrequency"
-    ],
-    "getters": []
+    "statics": ["fromJson"],
+    "methods": ["free", "toJson"],
+    "getters": ["busBasis", "calendarId", "couponPeriod", "endIsTerminationDate", "frequency"]
   },
   "core.Tenor": {
     "kind": "class",
-    "statics": ["annual", "daily", "monthly", "quarterly", "semiAnnual", "weekly"],
-    "methods": ["free", "toString", "toYears"],
-    "getters": ["count"]
+    "statics": [
+      "annual",
+      "bimonthly",
+      "biweekly",
+      "daily",
+      "fromPaymentsPerYear",
+      "fromYears",
+      "monthly",
+      "parse",
+      "quarterly",
+      "semiAnnual",
+      "weekly"
+    ],
+    "methods": [
+      "addToDate",
+      "free",
+      "paymentsPerYear",
+      "toDaysApprox",
+      "toString",
+      "toYears",
+      "toYearsWithContext"
+    ],
+    "getters": ["count", "days", "months", "unit"]
   },
   "core.createDate": {
     "kind": "function"
@@ -353,27 +370,60 @@
   },
   "core.HazardCurve": {
     "kind": "class",
-    "statics": [],
-    "methods": ["free", "hazardRate", "sp"],
-    "getters": ["baseDate", "id", "recoveryRate"]
+    "statics": ["flat", "fromJson", "fromSurvivalProbs"],
+    "methods": [
+      "cdsQuoteBp",
+      "defaultProb",
+      "free",
+      "hazardRate",
+      "hazardRateOnDate",
+      "sp",
+      "spOnDate",
+      "survivalAtDates",
+      "toJson",
+      "withRecoveryRate"
+    ],
+    "getters": [
+      "baseDate",
+      "currency",
+      "dayCount",
+      "id",
+      "issuer",
+      "knotPoints",
+      "parInterp",
+      "parSpreadPoints",
+      "recoveryRate",
+      "seniority"
+    ]
   },
   "core.ForwardCurve": {
     "kind": "class",
-    "statics": [],
-    "methods": ["free", "rate", "rateBetween"],
-    "getters": ["baseDate", "id", "projectionGrid", "resetLag"]
+    "statics": ["flat", "fromJson"],
+    "methods": ["df", "dfOnDateCurve", "free", "rate", "rateBetween", "ratePeriod", "toJson"],
+    "getters": [
+      "baseDate",
+      "dayCount",
+      "extrapolation",
+      "forwards",
+      "id",
+      "interpStyle",
+      "knots",
+      "projectionGrid",
+      "resetLag",
+      "tenor"
+    ]
   },
   "core.VolCube": {
     "kind": "class",
     "statics": ["fromJson"],
-    "methods": ["free"],
-    "getters": ["id", "interpolationMode"]
+    "methods": ["forwardAt", "free", "paramsAt", "toJson"],
+    "getters": ["expiries", "forwards", "gridShape", "id", "interpolationMode", "params", "tenors"]
   },
   "core.FxDeltaVolSurface": {
     "kind": "class",
     "statics": ["fromJson"],
-    "methods": ["free"],
-    "getters": ["expiries", "id", "numExpiries"]
+    "methods": ["free", "toJson"],
+    "getters": ["atmVols", "bf10d", "bf25d", "expiries", "id", "numExpiries", "rr10d", "rr25d"]
   },
   "core.MarketContext": {
     "kind": "class",
@@ -389,8 +439,8 @@
   },
   "core.FxRateResult": {
     "kind": "class",
-    "statics": [],
-    "methods": ["free"],
+    "statics": ["fromJson"],
+    "methods": ["free", "toJson"],
     "getters": ["rate", "triangulated"]
   },
   "core.FxMatrix": {
@@ -448,6 +498,12 @@
     "kind": "function"
   },
   "core.quantile": {
+    "kind": "function"
+  },
+  "core.realizedVariance": {
+    "kind": "function"
+  },
+  "core.realizedVarianceOhlc": {
     "kind": "function"
   },
   "core.normCdf": {

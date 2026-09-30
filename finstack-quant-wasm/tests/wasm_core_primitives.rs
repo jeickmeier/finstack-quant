@@ -44,12 +44,11 @@ fn thirty_e_360_isda_uses_termination_context() {
         .year_fraction(
             JsValue::from(start),
             JsValue::from(end),
-            &JsDayCountContext::new(),
+            &JsDayCountContext::new(None, None, None, None, None).expect("empty context"),
         )
         .expect("regular period");
-    let terminal_ctx = JsDayCountContext::new()
-        .with_end_is_termination_date(JsValue::from(true))
-        .expect("context");
+    let terminal_ctx =
+        JsDayCountContext::new(None, None, None, None, Some(JsValue::from(true))).expect("context");
     let terminal = day_count
         .year_fraction(JsValue::from(start), JsValue::from(end), &terminal_ctx)
         .expect("terminal period");
@@ -60,8 +59,11 @@ fn thirty_e_360_isda_uses_termination_context() {
 
 #[wasm_bindgen_test]
 fn daycount_from_string() {
-    let day_count = JsDayCount::new(JsValue::from("act_360")).expect("valid");
+    let day_count = JsDayCount::from_name(JsValue::from("act_360")).expect("valid");
     assert_eq!(day_count.to_string(), "act_360");
+    let lenient = JsDayCount::parse(JsValue::from("ACT/360")).expect("lenient");
+    assert_eq!(lenient.to_string(), "act_360");
+    assert!(JsDayCount::from_name(JsValue::from("ACT/360")).is_err());
 }
 
 #[wasm_bindgen_test]
@@ -120,7 +122,7 @@ fn construct_and_getters() {
 fn add_same_currency() {
     let a = JsMoney::new(JsValue::from(10.0), &usd()).expect("valid");
     let b = JsMoney::new(JsValue::from(5.0), &usd()).expect("valid");
-    let c = a.add(&b).expect("add");
+    let c = a.checked_add(&b).expect("add");
     assert!((c.amount() - 15.0).abs() < 1e-10);
 }
 
@@ -128,28 +130,30 @@ fn add_same_currency() {
 fn sub_same_currency() {
     let a = JsMoney::new(JsValue::from(10.0), &usd()).expect("valid");
     let b = JsMoney::new(JsValue::from(3.0), &usd()).expect("valid");
-    let c = a.sub(&b).expect("sub");
+    let c = a.checked_sub(&b).expect("sub");
     assert!((c.amount() - 7.0).abs() < 1e-10);
 }
 
 #[wasm_bindgen_test]
-fn mul_scalar() {
+fn checked_mul_f64() {
     let m = JsMoney::new(JsValue::from(10.0), &usd()).expect("valid");
-    let scaled = m.mul_scalar(JsValue::from(2.5)).expect("finite factor");
+    let scaled = m
+        .checked_mul_f64(JsValue::from(2.5))
+        .expect("finite factor");
     assert!((scaled.amount() - 25.0).abs() < 1e-10);
 }
 
 #[wasm_bindgen_test]
-fn div_scalar() {
+fn checked_div_f64() {
     let m = JsMoney::new(JsValue::from(10.0), &usd()).expect("valid");
-    let half = m.div_scalar(JsValue::from(2.0)).expect("div");
+    let half = m.checked_div_f64(JsValue::from(2.0)).expect("div");
     assert!((half.amount() - 5.0).abs() < 1e-10);
 }
 
 #[wasm_bindgen_test]
-fn negate() {
+fn checked_neg() {
     let m = JsMoney::new(JsValue::from(10.0), &usd()).expect("valid");
-    let neg = m.negate();
+    let neg = m.checked_neg();
     assert!((neg.amount() + 10.0).abs() < 1e-10);
 }
 

@@ -443,10 +443,10 @@ fn cube_params(cube: &VolCube, expiry: f64, tenor: f64) -> (SabrParameters, f64,
     let (n0, n1, u) = segment(cube.tenors(), tenor).unwrap_or((0, 0, 0.0));
     let columns = cube.tenors().len();
     let index = |e: usize, n: usize| e * columns + n;
-    let p00 = cube.params_at(e0, n0);
-    let p10 = cube.params_at(e1, n0);
-    let p01 = cube.params_at(e0, n1);
-    let p11 = cube.params_at(e1, n1);
+    let p00 = &cube.params()[index(e0, n0)];
+    let p10 = &cube.params()[index(e1, n0)];
+    let p01 = &cube.params()[index(e0, n1)];
+    let p11 = &cube.params()[index(e1, n1)];
     let nearest = index(
         if t <= 0.5 { e0 } else { e1 },
         if u <= 0.5 { n0 } else { n1 },

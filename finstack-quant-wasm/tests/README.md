@@ -121,21 +121,22 @@ silently exporting `undefined`. `plain_object_returns.test.mjs` is the one
 exception — it imports the generated Node module directly, because the bug it
 hunts lives below the facade (see below).
 
-| File                                                       | Asserts                                                                                                                                           |
-| ---------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `core_namespace.test.mjs`                                  | `Currency`, `Money` (including lossless `amountDecimal()`), `FxDeltaVolSurface`, `FxMatrix`, `FxRateResult` getters                               |
-| `cashflows.test.mjs`                                       | every exported key is a live function, plus an end-to-end build/validate/flows/accrual round trip                                                 |
-| `covenants.test.mjs`                                       | the covenants namespace                                                                                                                           |
-| `statements.test.mjs`                                      | statements / statements-analytics results come back as structured objects, matching the Python twins                                              |
-| `portfolio.test.mjs`, `portfolio_materialization.test.mjs` | portfolio runtime contract and the materialization API                                                                                            |
-| `valuations_instruments.test.mjs`                          | typed `Bond` / `TermLoan`                                                                                                                         |
-| `margin_xva.test.mjs`                                      | `computeBilateralXva` through `core.HazardCurve`, against a fixture byte-equivalent to the Rust integration test                                  |
-| `return_floor.test.mjs`                                    | `moic` / `moic_to_worst` / `xirr` / `xirr_to_worst` through the JSON-native Bond path                                                             |
-| `analytics_period_stats.test.mjs`                          | non-finite ratio round-tripping in `Performance.periodStats`                                                                                      |
-| `plain_object_returns.test.mjs`                            | map-returning functions produce plain objects, not ES2015 `Map`s                                                                                  |
-| `boundary_input.test.mjs`                                  | wrong argument types throw `TypeError` (`kind: "invalid_type"`) without trapping or leaking; JSON inputs accept objects with unknown-field checks |
-| `core_rust_owned.test.mjs`                                 | core currency/money/date/curve behaviour owned by Rust; asserts the same values and messages as `finstack-quant-py/tests/test_core_rust_owned.py` |
-| `contract_types.test.mjs`                                  | runtime calibration, materialization and valuation outputs type-check against the schema-generated TypeScript types under NodeNext                |
+| File                                                       | Asserts                                                                                                                                                                              |
+| ---------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `core_namespace.test.mjs`                                  | `Currency`, `Money` (including the lossless `amountDecimal` getter), `FxDeltaVolSurface`, `FxMatrix`, `FxRateResult` getters                                                         |
+| `cashflows.test.mjs`                                       | every exported key is a live function, plus an end-to-end build/validate/flows/accrual round trip                                                                                    |
+| `covenants.test.mjs`                                       | the covenants namespace                                                                                                                                                              |
+| `statements.test.mjs`                                      | statements / statements-analytics results come back as structured objects, matching the Python twins                                                                                 |
+| `portfolio.test.mjs`, `portfolio_materialization.test.mjs` | portfolio runtime contract and the materialization API                                                                                                                               |
+| `valuations_instruments.test.mjs`                          | typed `Bond` / `TermLoan`                                                                                                                                                            |
+| `margin_xva.test.mjs`                                      | `computeBilateralXva` through `core.HazardCurve`, against a fixture byte-equivalent to the Rust integration test                                                                     |
+| `return_floor.test.mjs`                                    | `moic` / `moic_to_worst` / `xirr` / `xirr_to_worst` through the JSON-native Bond path                                                                                                |
+| `analytics_period_stats.test.mjs`                          | non-finite ratio round-tripping in `Performance.periodStats`                                                                                                                         |
+| `plain_object_returns.test.mjs`                            | map-returning functions produce plain objects, not ES2015 `Map`s                                                                                                                     |
+| `boundary_input.test.mjs`                                  | wrong argument types throw `TypeError` (`kind: "invalid_type"`) without trapping or leaking; JSON inputs accept objects with unknown-field checks                                    |
+| `core_members.test.mjs`                                    | S20 handle members and JSON round-trips (Rate/Bps/Percentage, DayCount, Tenor, curves, surfaces, FxRateResult, realized variance); goldens shared with `test_core_members_parity.py` |
+| `core_rust_owned.test.mjs`                                 | core currency/money/date/curve behaviour owned by Rust; asserts the same values and messages as `finstack-quant-py/tests/test_core_rust_owned.py`                                    |
+| `contract_types.test.mjs`                                  | runtime calibration, materialization and valuation outputs type-check against the schema-generated TypeScript types under NodeNext                                                   |
 
 **These need a build.** All of them except `plain_object_returns.test.mjs` load
 the web target from `pkg/finstack_quant_wasm_bg.wasm` (Node has no fetchable

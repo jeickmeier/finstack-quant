@@ -2,6 +2,30 @@
 
 ## [Unreleased]
 
+### WASM binding audit: handle members and JSON round trips (2026-09-30)
+
+#### Changed (BREAKING)
+
+- WASM `Money` arithmetic uses the Rust names: `checkedAdd`, `checkedSub`, `checkedMulF64`, `checkedDivF64` and `checkedNeg` replace `add`, `sub`, `mulScalar`, `divScalar` and `negate`. `amountDecimal` is a getter, and `Money.fromDecimalStr(amount, currency)` takes a `Currency` handle.
+- WASM `Bps` / `Percentage` accessors (`asDecimal`, `asBp`, `asPercent`) are getters.
+- WASM `DayCount`: `new DayCount(name)` is replaced by `DayCount.fromName(name)` (strict). `DayCount.parse(text)` (lenient) and `DayCount.nl365()` are new.
+- WASM `DayCountContext` takes everything in its constructor, `new DayCountContext(calendarId?, frequency?, busBasis?, couponPeriod?, endIsTerminationDate?)`, validated by `DayCountContextState::try_new`. The five `with*` setters are removed, and getters plus `toJson`/`fromJson` are new.
+- WASM `HazardCurve` takes one options object, `{ id, baseDate, knots, recoveryRate, dayCount?, parSpreads?, interp?, parInterp?, issuer?, seniority?, currency?, maxHazardRate? }`, and rejects unknown keys.
+- `VolCube::params_at` / `forward_at` return `Result`; Python raises `ValueError` for an out-of-range index (was `IndexError`).
+- `BusinessDayConvention` implements `Default` (ModifiedFollowing, ISDA 4.12(c)); the Python fallbacks now use it.
+
+#### Added
+
+- WASM handle members:
+  - `Rate` / `Bps` / `Percentage`: cross conversions, `abs`, sign predicates and `toJson`/`fromJson`; `Rate.parse` is new.
+  - `Tenor`: `parse`, `fromYears`, `fromPaymentsPerYear`, `biweekly`, `bimonthly`, `unit` / `months` / `days`, `paymentsPerYear`, `toDaysApprox`, `addToDate` and `toYearsWithContext`.
+  - `HazardCurve`: `flat`, `fromSurvivalProbs`, `fromJson` / `toJson`, date-based survival and hazard methods, `defaultProb`, `cdsQuoteBp`, `withRecoveryRate`, and its data getters.
+  - `ForwardCurve`: `flat`, `fromJson` / `toJson`, `ratePeriod`, `df`, `dfOnDateCurve`, and its getters.
+  - `VolCube` and `FxDeltaVolSurface`: `toJson` and grid getters; VolCube also has `paramsAt` / `forwardAt`.
+  - `FxRateResult`: `toJson` / `fromJson`.
+  - `core.realizedVariance` and `core.realizedVarianceOhlc`, using the Rust defaults.
+- `TenorUnit::designator()`.
+
 ### WASM binding audit: index.d.ts uses the generated types (2026-09-30)
 
 #### Changed (BREAKING)

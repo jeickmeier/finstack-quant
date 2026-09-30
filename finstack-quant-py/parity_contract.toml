@@ -111,7 +111,7 @@ note = "Subset scope: the Rust config module also exposes ConfigExtensions, Curr
 [crates.core.module_symbols.types]
 python_package = "finstack_quant.core.types"
 public = ["Rate", "Bps", "Percentage", "CreditRating", "CurveId", "InstrumentId", "Attributes"]
-note = "Subset scope: Rust-only extras are BarrierType, RatingLabel, and the remaining id newtypes (CalendarId, DealId, Id, IndexId, IssuerId, PoolId, PriceId, UnderlyingId) — hosts pass those ids as plain strings on JSON/typed surfaces. Rating-factor behavior is owned by models.credit. Python binds the full Rate/Bps/Percentage value API (abs, is_zero/is_positive/is_negative, checked arithmetic dunders, as_rate/as_basis_points/as_percentage cross conversions, Rate FromStr via Rate('5%'|'25bp'|'0.05')), CreditRating predicates/to_moodys_string/notches_to with ord + str equality, CurveId/InstrumentId ord/len/is_empty, and Attributes tags/add_tag/has_tag/matches_selector + mapping dunders; all seven carry to_json/from_json/pickle. WASM exposes Rate, Bps, and Percentage; CreditRating and identifier wrappers remain outside its core types subset."
+note = "Subset scope: Rust-only extras are BarrierType, RatingLabel, and the remaining id newtypes (CalendarId, DealId, Id, IndexId, IssuerId, PoolId, PriceId, UnderlyingId) — hosts pass those ids as plain strings on JSON/typed surfaces. Rating-factor behavior is owned by models.credit. Python binds the full Rate/Bps/Percentage value API (abs, is_zero/is_positive/is_negative, checked arithmetic dunders, as_rate/as_basis_points/as_percentage cross conversions, Rate FromStr via Rate('5%'|'25bp'|'0.05')), CreditRating predicates/to_moodys_string/notches_to with ord + str equality, CurveId/InstrumentId ord/len/is_empty, and Attributes tags/add_tag/has_tag/matches_selector + mapping dunders; all seven carry to_json/from_json/pickle. WASM binds the same Rate/Bps/Percentage value API (getters, cross conversions, abs/isZero/isPositive/isNegative, toJson/fromJson, and Rate.parse for Rust FromStr) except the ZERO constants and the arithmetic dunders (JS has no operator overloading); CreditRating and identifier wrappers remain outside its core types subset."
 
 [crates.core.module_symbols.currency]
 python_package = "finstack_quant.core.currency"
@@ -1852,7 +1852,7 @@ js_rule_members = { free = "wasm ownership: releases the wasm-bindgen handle", t
 # Ratchet: remaining backlog sizes. Lower these as names are bound; never raise them.
 # S16 moved MarketContext from the module backlog to a bound WASM class: its 29
 # unbound methods now count as member backlog (a reclassification, not growth).
-backlog_ceiling = { modules = 827, members = 420 }
+backlog_ceiling = { modules = 825, members = 327 }
 
 [parity.modules."finstack_quant"]
 js = ""
@@ -2287,8 +2287,6 @@ backlog = [
     "mean_var",
     "median_or_nan",
     "quantile_linear_or_nan",
-    "realized_variance",
-    "realized_variance_ohlc",
     "sample_std_or_nan",
     "sample_variance_or_nan",
 ]
@@ -3143,41 +3141,6 @@ backlog = [
     "from_numeric",
 ]
 
-[parity.members."finstack_quant.core.dates.DayCount"]
-backlog = [
-    "NL_365",
-    "from_name",
-    "parse",
-]
-
-[parity.members."finstack_quant.core.dates.DayCountContext"]
-backlog = [
-    "bus_basis",
-    "calendar_id",
-    "coupon_period",
-    "end_is_termination_date",
-    "frequency",
-    "from_json",
-    "to_json",
-]
-wasm_only = { withBusBasis = "S10: WASM-only builder setter (Python sets context fields in the constructor)", withCalendar = "S10: WASM-only builder setter (Python sets context fields in the constructor)", withCouponPeriod = "S10: WASM-only builder setter (Python sets context fields in the constructor)", withEndIsTerminationDate = "S10: WASM-only builder setter (Python sets context fields in the constructor)", withFrequency = "S10: WASM-only builder setter (Python sets context fields in the constructor)" }
-
-[parity.members."finstack_quant.core.dates.Tenor"]
-backlog = [
-    "add_to_date",
-    "bimonthly",
-    "biweekly",
-    "days",
-    "from_payments_per_year",
-    "from_years",
-    "months",
-    "parse",
-    "payments_per_year",
-    "to_days_approx",
-    "to_years_with_context",
-    "unit",
-]
-
 [parity.members."finstack_quant.core.market_data.context.MarketContext"]
 # WASM core.MarketContext binds the fromJson/toJson round trip only (S16);
 # the insertion, lookup and conversion methods are the remaining gap.
@@ -3232,76 +3195,11 @@ backlog = [
     "zero_rate_on_date",
 ]
 
-[parity.members."finstack_quant.core.market_data.curves.ForwardCurve"]
-backlog = [
-    "day_count",
-    "df",
-    "df_on_date_curve",
-    "extrapolation",
-    "flat",
-    "forwards",
-    "from_json",
-    "interp_style",
-    "knots",
-    "rate_period",
-    "tenor",
-    "to_json",
-]
-
-[parity.members."finstack_quant.core.market_data.curves.FxDeltaVolSurface"]
-backlog = [
-    "atm_vols",
-    "bf_10d",
-    "bf_25d",
-    "rr_10d",
-    "rr_25d",
-    "to_json",
-]
-
-[parity.members."finstack_quant.core.market_data.curves.HazardCurve"]
-backlog = [
-    "cds_quote_bp",
-    "currency",
-    "day_count",
-    "default_prob",
-    "flat",
-    "from_json",
-    "from_survival_probs",
-    "hazard_rate_on_date",
-    "issuer",
-    "knot_points",
-    "par_interp",
-    "par_spread_points",
-    "seniority",
-    "sp_on_date",
-    "survival_at_dates",
-    "to_json",
-    "with_recovery_rate",
-]
-
-[parity.members."finstack_quant.core.market_data.curves.VolCube"]
-backlog = [
-    "expiries",
-    "forward_at",
-    "forwards",
-    "grid_shape",
-    "params",
-    "params_at",
-    "tenors",
-    "to_json",
-]
-
 [parity.members."finstack_quant.core.market_data.fx.FxMatrix"]
 backlog = [
     "from_dict",
     "quotes",
     "set_quotes",
-]
-
-[parity.members."finstack_quant.core.market_data.fx.FxRateResult"]
-backlog = [
-    "from_json",
-    "to_json",
 ]
 
 [parity.members."finstack_quant.core.money.Money"]
@@ -3311,48 +3209,23 @@ backlog = [
     "to_tuple",
     "zero",
 ]
-wasm_only = { add = "twin of Python Money.__add__; S20 renames the arithmetic to the Rust method names", divScalar = "twin of Python Money.__truediv__; S20 renames the arithmetic to the Rust method names", mulScalar = "twin of Python Money.__mul__; S20 renames the arithmetic to the Rust method names", negate = "twin of Python Money.__neg__; S20 renames the arithmetic to the Rust method names", sub = "twin of Python Money.__sub__; S20 renames the arithmetic to the Rust method names" }
+wasm_only = { checkedAdd = "Rust Money::checked_add; twin of Python Money.__add__ (JS has no operator overloading)", checkedDivF64 = "Rust Money::checked_div_f64; twin of Python Money.__truediv__ (JS has no operator overloading)", checkedMulF64 = "Rust Money::checked_mul_f64; twin of Python Money.__mul__ (JS has no operator overloading)", checkedNeg = "Rust Money::checked_neg; twin of Python Money.__neg__ (JS has no operator overloading)", checkedSub = "Rust Money::checked_sub; twin of Python Money.__sub__ (JS has no operator overloading)" }
 
 [parity.members."finstack_quant.core.types.Bps"]
 backlog = [
     "ZERO",
-    "abs",
-    "as_percent",
-    "as_percentage",
-    "as_rate",
-    "from_json",
-    "is_negative",
-    "is_positive",
-    "is_zero",
-    "to_json",
 ]
 
 [parity.members."finstack_quant.core.types.Percentage"]
 backlog = [
     "ZERO",
-    "abs",
-    "as_basis_points",
-    "as_bp",
-    "as_rate",
-    "from_json",
-    "is_negative",
-    "is_positive",
-    "is_zero",
-    "to_json",
 ]
 
 [parity.members."finstack_quant.core.types.Rate"]
 backlog = [
     "ZERO",
-    "abs",
-    "as_basis_points",
-    "as_percentage",
-    "from_json",
-    "is_negative",
-    "is_positive",
-    "is_zero",
-    "to_json",
 ]
+wasm_only = { parse = "Rust Rate::from_str; twin of the Python Rate(text) constructor, which parses quotes such as \"25bp\" and \"5%\"" }
 
 [parity.members."finstack_quant.models.correlation.CopulaSpec"]
 backlog = [

@@ -67,6 +67,8 @@ export const core = {
   correlation: wasm.correlation,
   covariance: wasm.covariance,
   quantile: wasm.quantile,
+  realizedVariance: wasm.realizedVariance,
+  realizedVarianceOhlc: wasm.realizedVarianceOhlc,
   normCdf: wasm.normCdf,
   normPdf: wasm.normPdf,
   standardNormalInvCdf: wasm.standardNormalInvCdf,

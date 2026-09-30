@@ -563,8 +563,8 @@ async function main() {
   });
 
   bench('core', 'Money add / sub', 8000, () => {
-    moneyA.add(moneyB);
-    moneyA.sub(moneyB);
+    moneyA.checkedAdd(moneyB);
+    moneyA.checkedSub(moneyB);
   });
 
   bench('core', 'DayCount.yearFraction', 10000, () => {
@@ -693,8 +693,8 @@ async function main() {
     const r = new w.Rate(0.05);
     const _sum = r.asDecimal + r.asPercent + r.asBp;
     void _sum;
-    new w.Bps(50).asDecimal();
-    new w.Percentage(5).asDecimal();
+    void new w.Bps(50).asDecimal;
+    void new w.Percentage(5).asDecimal;
   });
 
   bench('core', 'Tenor construction + toYears', 8000, () => {

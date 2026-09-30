@@ -72,8 +72,20 @@ fn test_vol_cube_serde_roundtrips_interpolation_mode_and_grid_state() {
     assert_eq!(roundtrip.expiries(), cube.expiries());
     assert_eq!(roundtrip.tenors(), cube.tenors());
     assert_eq!(roundtrip.grid_shape(), cube.grid_shape());
-    assert_eq!(roundtrip.params_at(0, 1), cube.params_at(0, 1));
-    assert_eq!(roundtrip.forward_at(1, 0), cube.forward_at(1, 0));
+    assert_eq!(
+        roundtrip.params_at(0, 1).unwrap(),
+        cube.params_at(0, 1).unwrap()
+    );
+    assert_eq!(
+        roundtrip.forward_at(1, 0).unwrap(),
+        cube.forward_at(1, 0).unwrap()
+    );
+    let (n_exp, n_ten) = cube.grid_shape();
+    for (e, t) in [(n_exp, 0), (0, n_ten)] {
+        let err = cube.params_at(e, t).unwrap_err().to_string();
+        assert!(err.contains("outside shape"), "{err}");
+        assert!(cube.forward_at(e, t).is_err());
+    }
 
     let serialized = serde_json::to_value(roundtrip).unwrap();
     assert_eq!(serialized["interpolation_mode"], "total_variance");
