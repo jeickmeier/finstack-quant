@@ -617,7 +617,7 @@ mod cases {
     }
 
     #[test]
-    fn collateral_term_rate_is_discount_factor_implied() {
+    fn collateral_term_rate_is_tenor_forward_at_fixing_value_date() {
         let base = Date::from_calendar_date(2025, Month::January, 1).expect("valid base date");
         let curve = finstack_quant_core::market_data::term_structures::ForwardCurve::builder(
             "USD-3M", 0.25,
@@ -628,36 +628,156 @@ mod cases {
         .knots([(0.0, 0.01), (1.0, 0.21)])
         .build()
         .expect("forward curve should build");
+        // Accrual starts Tue 2025-04-01; the index fixes two business days
+        // earlier (Fri 2025-03-28) for the deposit value-dated 2025-04-01.
         let start_date = Date::from_calendar_date(2025, Month::April, 1).expect("valid start date");
-        let calendar = crate::cashflow::builder::calendar::resolve_calendar_strict("weekends_only")
-            .expect("calendar");
-        let fixing_date = start_date
-            .add_business_days(-curve.reset_lag(), calendar)
-            .expect("fixing date");
-        let reset_end =
-            crate::instruments::fixed_income::structured_credit::utils::rate_helpers::try_tenor_to_period_end(
-                fixing_date,
-                curve.tenor(),
-                curve.day_count(),
-            )
-            .expect("reset end");
-        let t1 = curve
-            .day_count()
-            .year_fraction(base, fixing_date, DayCountContext::default())
-            .expect("valid start time");
-        let t2 = curve
-            .day_count()
-            .year_fraction(base, reset_end, DayCountContext::default())
-            .expect("valid end time");
-        let expected = curve
-            .rate_between(t1, t2)
-            .expect("valid term forward interval");
+        let fixing_date =
+            Date::from_calendar_date(2025, Month::March, 28).expect("valid fixing date");
+        let expected = curve.rate_on_date(start_date).expect("value-date forward");
 
         let actual = term_rate_for_period(&curve, &MarketContext::new(), start_date)
             .expect("term projection should succeed");
+        let recorded =
+            super::super::period_helpers::projected_collateral_fixing(&curve, start_date)
+                .expect("recorded fixing");
 
-        assert!((expected - curve.rate_period(t1, t2)).abs() > 1e-6);
-        assert!((actual - expected).abs() < 1e-14);
+        assert_eq!(actual, expected);
+        assert_eq!(recorded.date, fixing_date);
+        assert_eq!(recorded.value, Some(expected));
+        // Neither the fixing-date forward nor the DF-implied rate over
+        // [fixing, fixing + tenor] (the former collateral projection).
+        let old = crate::instruments::common_impl::pricing::time::rate_between_on_dates(
+            &curve,
+            fixing_date,
+            Date::from_calendar_date(2025, Month::June, 28).expect("reset end"),
+        )
+        .expect("DF-implied forward");
+        assert!((actual - old).abs() > 1e-6);
+        assert!((actual - curve.rate_on_date(fixing_date).expect("fixing-date rate")).abs() > 1e-6);
+    }
+
+    fn sofr_tranche_coupon(fixing_calendar_id: &str) -> RateSpec {
+        RateSpec::Floating(crate::cashflow::builder::FloatingRateSpec {
+            forward_curve_id: finstack_quant_core::types::CurveId::new("USD-3M"),
+            spread_bp: rust_decimal::Decimal::ZERO,
+            gearing: rust_decimal::Decimal::ONE,
+            gearing_includes_spread: true,
+            index_floor_bp: None,
+            all_in_cap_bp: None,
+            all_in_floor_bp: None,
+            index_cap_bp: None,
+            overnight_index_constraints: Default::default(),
+            reset_frequency: finstack_quant_core::dates::Tenor::quarterly(),
+            index_tenor: None,
+            reset_lag_days: 2,
+            fixing_calendar_id: Some(fixing_calendar_id.into()),
+            compounding: None,
+            overnight_basis: None,
+            fallback: Default::default(),
+        })
+    }
+
+    /// One term fixing has one projected value whether a tranche coupon or a
+    /// collateral coupon observes it, even when their accrual starts differ
+    /// (unadjusted vs payment date) and their fixing calendars differ across a
+    /// US holiday; otherwise theta's fixing materialization sees conflicting
+    /// pre-roll projections of the same fixing.
+    #[test]
+    fn tranche_and_collateral_project_one_value_per_fixing() {
+        let base = Date::from_calendar_date(2026, Month::April, 30).expect("base");
+        let curve = ForwardCurve::builder("USD-3M", 0.25)
+            .base_date(base)
+            .day_count(DayCount::Act360)
+            .reset_lag(2)
+            .knots([(0.0, 0.03), (1.0, 0.06)])
+            .build()
+            .expect("forward curve");
+        let market = MarketContext::new().insert(curve.clone());
+        let date = |m, d| Date::from_calendar_date(2026, m, d).expect("valid date");
+        // (tranche accrual start, tranche calendar, collateral accrual start, shared fixing)
+        let cases = [
+            // Tranche accrues from Sat 05-30 (unadjusted), collateral from Mon 06-01.
+            (
+                date(Month::May, 30),
+                "weekends_only",
+                date(Month::June, 1),
+                date(Month::May, 28),
+            ),
+            // USNY closes for Labor Day (Mon 09-07): the tranche accruing
+            // Wed 09-09 and the collateral accruing Tue 09-08 both fix Fri 09-04.
+            (
+                date(Month::September, 9),
+                "usny",
+                date(Month::September, 8),
+                date(Month::September, 4),
+            ),
+        ];
+        for (tranche_start, calendar, collateral_start, fixing_date) in cases {
+            let coupon = sofr_tranche_coupon(calendar);
+            let tranche = coupon
+                .projected_term_fixing(tranche_start, &market)
+                .expect("tranche fixing")
+                .expect("floating term coupon");
+            let collateral =
+                super::super::period_helpers::projected_collateral_fixing(&curve, collateral_start)
+                    .expect("collateral fixing");
+            assert_eq!(tranche.date, fixing_date);
+            assert_eq!(collateral.date, fixing_date);
+            assert_eq!(tranche.series_id, collateral.series_id);
+            assert_eq!(tranche.value, collateral.value);
+            let tranche_rate = coupon
+                .try_rate_for_period(tranche_start, base, &market)
+                .expect("tranche coupon");
+            let collateral_rate =
+                term_rate_for_period(&curve, &market, collateral_start).expect("collateral rate");
+            assert_eq!(Some(tranche_rate), tranche.value);
+            assert_eq!(collateral_rate, tranche_rate);
+        }
+    }
+
+    /// A fixing dated the valuation date is projected until published and
+    /// read from the series once it is, identically for tranche and pool.
+    #[test]
+    fn same_day_fixing_uses_published_value_on_both_paths() {
+        let base = Date::from_calendar_date(2026, Month::May, 28).expect("base");
+        let curve = ForwardCurve::builder("USD-3M", 0.25)
+            .base_date(base)
+            .day_count(DayCount::Act360)
+            .reset_lag(2)
+            .knots([(0.0, 0.03), (1.0, 0.06)])
+            .build()
+            .expect("forward curve");
+        let accrual_start = Date::from_calendar_date(2026, Month::June, 1).expect("start");
+        let coupon = sofr_tranche_coupon("weekends_only");
+        let projected_market = MarketContext::new().insert(curve.clone());
+        let projected = crate::cashflow::builder::rate_helpers::project_term_fixing(base, &curve)
+            .expect("projection");
+        assert_eq!(
+            coupon
+                .try_rate_for_period(accrual_start, base, &projected_market)
+                .expect("unpublished tranche"),
+            projected
+        );
+        assert_eq!(
+            term_rate_for_period(&curve, &projected_market, accrual_start)
+                .expect("unpublished collateral"),
+            projected
+        );
+
+        let series = ScalarTimeSeries::new(fixing_series_id("USD-3M"), vec![(base, 0.0425)], None)
+            .expect("fixing series");
+        let published_market = projected_market.insert_series(series);
+        assert_eq!(
+            coupon
+                .try_rate_for_period(accrual_start, base, &published_market)
+                .expect("published tranche"),
+            0.0425
+        );
+        assert_eq!(
+            term_rate_for_period(&curve, &published_market, accrual_start)
+                .expect("published collateral"),
+            0.0425
+        );
     }
 
     #[test]

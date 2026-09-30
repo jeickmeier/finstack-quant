@@ -611,7 +611,6 @@ impl XccySwap {
             adjust_overnight_accrual_boundaries, project_overnight_coupon,
             OvernightCouponProjectionInput, OvernightProjectionCurve,
         };
-        use crate::instruments::common_impl::pricing::time::rate_between_on_dates;
         use crate::instruments::rates::irs::FloatingLegCompounding;
 
         let projected = if !matches!(leg.leg.compounding, FloatingLegCompounding::Simple) {
@@ -662,7 +661,11 @@ impl XccySwap {
             }
         } else {
             let fixing_date = period.reset_date.unwrap_or(period.accrual_start);
-            let forward_rate = if fixing_date < as_of {
+            let forward_rate = if crate::cashflow::builder::rate_helpers::term_fixing_is_observed(
+                fixings,
+                fixing_date,
+                as_of,
+            ) {
                 finstack_quant_core::market_data::fixings::require_fixing_value_exact(
                     fixings,
                     leg.leg.forward_curve_id.as_str(),
@@ -670,7 +673,7 @@ impl XccySwap {
                     as_of,
                 )?
             } else {
-                rate_between_on_dates(fwd, period.accrual_start, period.accrual_end)?
+                crate::cashflow::builder::rate_helpers::project_term_fixing(fixing_date, fwd)?
             };
             if let Some(out) = projected_fixings {
                 out.push(crate::cashflow::fixings::ProjectedFixing {

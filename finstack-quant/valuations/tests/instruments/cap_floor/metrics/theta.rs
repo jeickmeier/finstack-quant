@@ -5,6 +5,7 @@
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{BusinessDayConvention, Date, DayCount, StubKind, Tenor};
 use finstack_quant_core::market_data::context::MarketContext;
+use finstack_quant_core::market_data::scalars::ScalarTimeSeries;
 use finstack_quant_core::market_data::surfaces::VolSurface;
 use finstack_quant_core::market_data::term_structures::{DiscountCurve, ForwardCurve};
 use finstack_quant_core::money::Money;
@@ -265,15 +266,19 @@ fn test_short_maturity_higher_theta() {
 }
 
 #[test]
-fn same_day_unpublished_fixing_caps_theta_without_historical_series() {
+fn same_day_unpublished_fixing_is_observed_at_the_as_of_forward() {
+    // The caplet fixes on `as_of`: unpublished at start of day, past once
+    // theta rolls a day. Theta observes it at the as-of forward, which for a
+    // 90-day ACT/360 period on the flat 3M curve is exactly 7%.
     let as_of = date!(2024 - 03 - 01);
+    let rolled = date!(2024 - 03 - 02);
     let caplet = CapFloor::new(
         "SAME-DAY-THETA",
         RateOptionType::Caplet,
         Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         0.05,
         as_of,
-        date!(2024 - 06 - 01),
+        date!(2024 - 05 - 30),
         None,
         DayCount::Act360,
         "USD_OIS",
@@ -293,7 +298,17 @@ fn same_day_unpublished_fixing_caps_theta_without_historical_series() {
             &[MetricId::Theta],
             finstack_quant_valuations::instruments::PricingOptions::default(),
         )
-        .expect("same-day theta must not require tomorrow's historical fixing");
+        .expect("theta observes the same-day fixing without a historical series");
 
-    assert_eq!(result.measures["theta"], 0.0);
+    let fixing =
+        ScalarTimeSeries::new("FIXING:USD_LIBOR_3M", vec![(as_of, 0.07)], None).expect("fixing");
+    let injected = market.insert_series(fixing).roll_forward(1).expect("roll");
+    let expected =
+        caplet.value(&injected, rolled).expect("rolled PV").amount() - result.value.amount();
+    let theta = result.measures["theta"];
+    assert!(theta != 0.0, "the caplet decays to its intrinsic value");
+    assert!(
+        (theta - expected).abs() < 1e-8,
+        "theta {theta} != explicit reprice {expected}"
+    );
 }

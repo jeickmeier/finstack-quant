@@ -9,7 +9,6 @@
 //! - Gamma
 //! - Vega (market normal-vol quote sensitivity)
 //! - HwSigmaVega (direct Hull-White short-rate sigma sensitivity)
-//! - Theta
 //! - Rho
 //! - ImpliedVol (placeholder)
 
@@ -19,7 +18,6 @@ mod dv01;
 mod forward_pv01;
 mod gamma;
 mod implied_vol;
-mod theta;
 mod vega;
 
 use crate::metrics::MetricRegistry;
@@ -40,7 +38,6 @@ pub(crate) fn register_cap_floor_metrics(
             (Vega, vega::VegaCalculator),
             (HwSigmaVega, vega::HwSigmaVegaCalculator),
             (Dv01, dv01::Dv01Calculator),
-            (Theta, theta::ThetaCalculator),
             // Rho = parallel bump of the discount curve only. Routing through
             // the unified DV01 calculator keeps Rho aligned with the workspace
             // bump-size config and central-difference convention.

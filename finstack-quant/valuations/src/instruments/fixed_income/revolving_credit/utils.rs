@@ -163,12 +163,16 @@ pub(super) fn fixed_rate_at(facility: &RevolvingCredit, rate: f64, date: Date) -
 ///
 /// # Arguments
 ///
-/// * `date` - Reset-effective date of the fixing being projected.
+/// * `fixing_date` - Date the term index is observed; its projected value
+///   comes from [`crate::cashflow::builder::rate_helpers::project_term_fixing`].
+/// * `date` - Reset-effective date at which the simulated short rate is
+///   observed and the OIS instantaneous forward is read.
 /// * `anchor` - Simulation anchor (t = 0 of the short-rate process): the later
 ///   of the valuation and commitment dates.
 /// * `fwd` - Term index forward curve (e.g. `USD-SOFR-3M`).
 /// * `disc` - Facility discount curve the Hull-White process was fitted to.
 pub(super) fn index_basis_at(
+    fixing_date: Date,
     date: Date,
     anchor: Date,
     fwd: &ForwardCurve,
@@ -176,7 +180,8 @@ pub(super) fn index_basis_at(
 ) -> Result<f64> {
     use finstack_quant_models::rates::clock::{model_time, ModelDiscountCurve};
 
-    let index_forward = crate::cashflow::builder::rate_helpers::project_index_rate(date, fwd)?;
+    let index_forward =
+        crate::cashflow::builder::rate_helpers::project_term_fixing(fixing_date, fwd)?;
     let model_curve = ModelDiscountCurve::new(disc, anchor)?;
     let ois_forward = model_curve.instantaneous_forward(model_time(anchor, date).max(0.0))?;
     Ok(index_forward - ois_forward)
@@ -328,11 +333,8 @@ pub(super) fn project_revolver_floating_rate(
     let mut params = crate::cashflow::builder::FloatingRateParams::try_from(input.spec)?;
     params.spread_bp += input.margin_delta_bp;
     let Some(compounding) = resolved_overnight_compounding(input.spec)? else {
-        return crate::cashflow::builder::project_floating_rate(
-            input.accrual_start,
-            input.fwd,
-            &params,
-        );
+        let fixing_date = floating_fixing_date(input.spec, input.accrual_start, input.calendar_id)?;
+        return crate::cashflow::builder::project_floating_rate(fixing_date, input.fwd, &params);
     };
 
     let calendar_id = input

@@ -25,6 +25,7 @@ mod determinism;
 mod edge_cases;
 mod graceful_metrics_test;
 mod greek_relationships;
+mod horizon_market_fixings;
 mod invariants;
 mod option_provider_consolidation;
 mod sign_conventions;

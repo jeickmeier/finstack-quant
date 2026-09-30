@@ -30,6 +30,30 @@
 //!    - Swaps: Net interest payments
 //!    - Options: Usually zero (no interim cashflows)
 //!
+//! ## Market-Held Fixings
+//!
+//! Theta rolls only the valuation date: the market is held fixed. Curves are
+//! rolled with `MarketContext::roll_forward` (realized forwards), and spot,
+//! volatility and every other quote stay at their `as_of` values. An index
+//! observation dated in `[as_of, rolled_date]` that the market does not
+//! already hold as an exact-date fixing is therefore observed at the value
+//! the `as_of` market implies for it:
+//!
+//! - IBOR and RFR fixings (`FIXING:*` series) at the forward the unrolled
+//!   projection curve gives for that fixing, the value the `as_of` pricer
+//!   itself projects. A fixing dated `as_of` is included: valuation is at
+//!   start of day, so it is projected at `as_of` but past at the rolled date.
+//! - Price series observed on a schedule at the `as_of` spot level.
+//!
+//! The observations come from the canonical cashflow schedule's
+//! `CashFlowMeta::projected_fixings` and are added with
+//! `materialize_fixings_from_projections` (the same step a scenario time
+//! roll runs) to the market used for the rolled repricing only. The `as_of`
+//! valuation and the period cash use the market unchanged, existing fixings
+//! take precedence, and ordinary pricing still requires every past fixing.
+//! A crossed observation whose projection was unavailable at `as_of` is an
+//! error, not a silent fallback.
+//!
 //! ## Sign Convention
 //!
 //! - **Negative theta**: Instrument loses value over time (e.g., long options)
@@ -305,7 +329,11 @@ fn compute_theta_breakdown(context: &mut crate::metrics::MetricContext) -> Resul
     let base_currency = context.base_value.currency();
 
     let horizon_days = (rolled_date - context.as_of).whole_days();
-    let rolled_market = context.curves.roll_forward(horizon_days)?;
+    // Market held fixed: index observations crossed by the roll are observed
+    // at their as-of projections (module docs, "Market-Held Fixings").
+    let rolled_market = context
+        .fixings_held_market(rolled_date)?
+        .roll_forward(horizon_days)?;
     let rolled_pv = context.reprice_money(&rolled_market, rolled_date)?.amount();
 
     let start_date = context.as_of;
@@ -344,6 +372,11 @@ fn store_theta_breakdown(context: &mut crate::metrics::MetricContext, breakdown:
 ///
 /// This calculator works with `dyn Instrument` directly, using the trait's `value()` method,
 /// and is registered as the default theta calculator for all instruments.
+///
+/// The market is held fixed over the horizon: `PV(end_date)` is priced on the
+/// rolled market with every index observation in `[start_date, end_date]`
+/// observed at its as-of projection. See the module docs, "Market-Held
+/// Fixings".
 #[derive(Default)]
 pub(crate) struct GenericThetaAny;
 

@@ -281,10 +281,10 @@ fn test_equity_trs_cashflow_provider_emits_financing_flows() {
 /// Since the engine unification, `pv_financing_leg` prices through
 /// `TrsEngine` (the same engine as the par-spread/annuity metrics, honoring
 /// `FloatingLegCompounding`), while the exported schedule keeps the
-/// cashflow-builder convention (term-index fixing at the reset date). The two
-/// projection conventions — index fixing at reset vs discrete forward over
-/// the accrual period — differ by curve-shape detail only (~$40 on a $260k
-/// leg here), never by structure. The tolerance below (1bp of notional)
+/// cashflow-builder schedule (fixing on the lagged reset date). Both project
+/// each term fixing at its value date, so the two differ only by which
+/// fixing each period observes (the engine's fixes on the period start) —
+/// curve-shape detail, never structure. The tolerance below (1bp of notional)
 /// admits that convention gap while still failing loudly on a structural
 /// break (a dropped period or wrong discounting is worth thousands).
 ///

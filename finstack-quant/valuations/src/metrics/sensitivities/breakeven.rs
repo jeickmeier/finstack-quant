@@ -151,12 +151,16 @@ fn iterative_mode_error(context: &MetricContext, target: BreakevenTarget) -> Opt
     None
 }
 
-/// Bump a market context by `delta` for the given breakeven target.
+/// Bump `base` by `delta` for the given breakeven target.
+///
+/// Curve and surface ids are resolved from `context`; the bump is applied to
+/// `base`, so any fixings `base` holds are carried into the bumped market.
 ///
 /// Returns the bumped [`MarketContext`] or an error if the required
 /// curve / surface cannot be determined.
 fn bump_market_for_target(
     context: &MetricContext,
+    base: &MarketContext,
     delta: f64,
     target: BreakevenTarget,
 ) -> Result<MarketContext> {
@@ -173,7 +177,7 @@ fn bump_market_for_target(
                 .ok_or_else(|| finstack_quant_core::InputError::NotFound {
                     id: "iterative_breakeven: no discount curve found for instrument".into(),
                 })?;
-            crate::metrics::bump_discount_curve_parallel(context.curves.as_ref(), &curve_id, delta)
+            crate::metrics::bump_discount_curve_parallel(base, &curve_id, delta)
         }
         BreakevenTarget::ImpliedVol => {
             let vol_surface_ids = context
@@ -193,7 +197,7 @@ fn bump_market_for_target(
             // breakeven ~100x the Linear value.)
             let bump_abs = delta * 0.01;
             crate::metrics::core::finite_difference::bump_surfaces_vol_absolute(
-                context.curves.as_ref(),
+                base,
                 &vol_surface_ids,
                 bump_abs,
             )
@@ -209,8 +213,24 @@ fn bump_market_for_target(
 ///
 /// Finds the parameter shift `delta` such that:
 ///   carry_total + PV(bumped market, rolled_date) - base_pv_at_horizon = 0
+///
+/// # Market-held fixings
+///
+/// Both horizon reprices run on the unrolled market with every index
+/// observation the as-of schedule projected in `[as_of, rolled_date]` added as
+/// an exact-date fixing at its as-of projection (as theta and carry
+/// decomposition do), so instruments whose horizon crosses a fixing reprice
+/// instead of failing on the unpublished fixing.
+///
+/// The bump is applied **on top of** that fixings-held market: crossed
+/// fixings stay at their unbumped as-of projections in the base and in every
+/// bumped reprice. The objective therefore isolates the parameter shift's
+/// effect on the remaining flows, on the same footing as `carry_total`, which
+/// holds the same fixings. (Materializing after bumping would insert the same
+/// cached as-of projections anyway; bumping on top materializes once rather
+/// than per solver iteration.)
 fn iterative_breakeven(
-    context: &MetricContext,
+    context: &mut MetricContext,
     carry_total: f64,
     sensitivity: f64,
     config: &BreakevenConfig,
@@ -220,10 +240,11 @@ fn iterative_breakeven(
     let expiry_date = context.instrument.expiry();
     let rolled_date = calculate_theta_date(context.as_of, period, expiry_date)?;
 
+    let held_market = context.fixings_held_market(rolled_date)?;
+    let context: &MetricContext = context;
+
     // Base PV at the horizon with current (un-bumped) curves.
-    let base_pv_at_horizon = context
-        .reprice_money(context.curves.as_ref(), rolled_date)?
-        .amount();
+    let base_pv_at_horizon = context.reprice_money(&held_market, rolled_date)?.amount();
 
     // Linear estimate as initial guess.
     let initial_guess = -carry_total / sensitivity;
@@ -243,7 +264,7 @@ fn iterative_breakeven(
     };
 
     let objective = |delta: f64| -> f64 {
-        let bumped_market = match bump_market_for_target(context, delta, target) {
+        let bumped_market = match bump_market_for_target(context, &held_market, delta, target) {
             Ok(market) => market,
             Err(err) => return record(err),
         };

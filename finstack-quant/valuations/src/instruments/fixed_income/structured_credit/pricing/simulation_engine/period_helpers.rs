@@ -1,32 +1,46 @@
 use super::*;
 
+/// Fixing date of a collateral term-index coupon accruing from `accrual_start`:
+/// the curve's reset lag in weekends-only business days before the start.
+fn term_fixing_date(fwd: &ForwardCurve, accrual_start: Date) -> Result<Date> {
+    let calendar = crate::cashflow::builder::calendar::resolve_calendar_strict("weekends_only")?;
+    accrual_start.add_business_days(-fwd.reset_lag(), calendar)
+}
+
+/// Raw term-index rate for a collateral coupon accruing from `accrual_start`:
+/// the fixing observed `reset_lag` business days before the start, read from
+/// the `FIXING:` series or projected at its value date by the shared
+/// [`crate::instruments::fixed_income::loan_terms::term_index_rate`] rule the
+/// tranche coupons also use.
 pub(crate) fn term_rate_for_period(
     fwd: &ForwardCurve,
     context: &MarketContext,
     accrual_start: Date,
 ) -> Result<f64> {
-    let calendar = crate::cashflow::builder::calendar::resolve_calendar_strict("weekends_only")?;
-    let fixing_date = accrual_start.add_business_days(-fwd.reset_lag(), calendar)?;
-    if fixing_date < fwd.base_date() {
-        let series = fixings::get_fixing_series(context, fwd.id().as_str())?;
-        return fixings::require_fixing_value_exact(
-            Some(series),
-            fwd.id().as_str(),
-            fixing_date,
-            fwd.base_date(),
-        );
-    }
-    let reset_end =
-        crate::instruments::fixed_income::structured_credit::utils::rate_helpers::try_tenor_to_period_end(
-            fixing_date,
-            fwd.tenor(),
-            fwd.day_count(),
-        )?;
-    crate::instruments::common_impl::pricing::time::rate_between_on_dates(
+    let fixing_date = term_fixing_date(fwd, accrual_start)?;
+    crate::instruments::fixed_income::loan_terms::term_index_rate(
+        context,
         fwd,
         fixing_date,
-        reset_end,
+        fwd.base_date(),
     )
+}
+
+/// Term-index fixing a floating collateral coupon accruing from
+/// `accrual_start` observes, at the rate `term_rate_for_period` projects;
+/// `None` value when the fixing precedes the curve base (already observed).
+pub(crate) fn projected_collateral_fixing(
+    fwd: &ForwardCurve,
+    accrual_start: Date,
+) -> Result<crate::cashflow::fixings::ProjectedFixing> {
+    let date = term_fixing_date(fwd, accrual_start)?;
+    Ok(crate::cashflow::fixings::ProjectedFixing {
+        series_id: fixings::fixing_series_id(fwd.id().as_str()),
+        date,
+        value: crate::instruments::fixed_income::loan_terms::projected_term_fixing_value(
+            fwd, date,
+        )?,
+    })
 }
 
 /// Resolve an asset's all-in coupon without re-projecting an already-reset
@@ -42,15 +56,19 @@ pub(crate) fn collateral_asset_rate_for_period(
     rate_shift: f64,
     index_floor_rate: Option<f64>,
 ) -> Result<f64> {
-    let calendar = crate::cashflow::builder::calendar::resolve_calendar_strict("weekends_only")?;
-    let fixing_date = accrual_start.add_business_days(-fwd.reset_lag(), calendar)?;
+    let fixing_date = term_fixing_date(fwd, accrual_start)?;
     let spread = spread_bp.unwrap_or(0.0) / 10_000.0;
     // The floor applies to the index before the spread (`FloatingRateSpec`
     // convention), so a floored loan pays `max(index, floor) + spread`.
     let floored = |index: f64| index_floor_rate.map_or(index, |floor| index.max(floor));
 
-    if fixing_date < fwd.base_date() {
-        if let Ok(series) = fixings::get_fixing_series(context, fwd.id().as_str()) {
+    let series = fixings::get_fixing_series(context, fwd.id().as_str()).ok();
+    if crate::cashflow::builder::rate_helpers::term_fixing_is_observed(
+        series,
+        fixing_date,
+        fwd.base_date(),
+    ) {
+        if let Some(series) = series {
             let fixing = fixings::require_fixing_value_exact(
                 Some(series),
                 fwd.id().as_str(),
@@ -67,10 +85,10 @@ pub(crate) fn collateral_asset_rate_for_period(
     // Shift the PROJECTED forward, so a floating asset's coupon follows
     // the simulated rate path. Floored at zero — a deeply negative shift must
     // not manufacture a negative all-in coupon.
-    Ok(
-        (floored(term_rate_for_period(fwd, context, accrual_start)? + rate_shift) + spread)
-            .max(0.0),
-    )
+    Ok((floored(
+        crate::cashflow::builder::rate_helpers::project_term_fixing(fixing_date, fwd)? + rate_shift,
+    ) + spread)
+        .max(0.0))
 }
 
 /// Live collateral weighted-average coupon from the *current* pool state:

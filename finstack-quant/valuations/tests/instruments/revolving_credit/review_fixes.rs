@@ -280,13 +280,15 @@ fn stochastic_facility_with_credit_curve_requires_market_anchored_process() {
 fn intra_period_resets_refix_the_coupon_in_both_engines() {
     let as_of = COMMITMENT;
     // Knots placed exactly on the Act/360 year fractions of the monthly reset
-    // dates so the expected coupon is exact.
+    // dates so the expected coupon is exact. A zero-spot-lag index values each
+    // fixing on its own date.
     let t_feb = 31.0 / 360.0;
     let t_mar = 59.0 / 360.0;
     let t_apr = 90.0 / 360.0;
     let fwd = ForwardCurve::builder("USD-SOFR-3M", 0.25)
         .base_date(as_of)
         .day_count(DayCount::Act360)
+        .reset_lag(0)
         .knots([
             (0.0, 0.02),
             (t_feb, 0.04),

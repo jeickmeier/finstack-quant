@@ -23,7 +23,7 @@
 //! ### Gearing Excludes Spread (Affine Model)
 //! `rate = cap( max( all_in_floor, (gearing * max(index, floor)) + spread ) )`
 
-use finstack_quant_core::dates::{Date, DayCountContext};
+use finstack_quant_core::dates::{Date, DateExt, DayCountContext};
 use finstack_quant_core::market_data::term_structures::ForwardCurve;
 use finstack_quant_core::Result;
 use rust_decimal::prelude::ToPrimitive;
@@ -323,17 +323,17 @@ pub fn calculate_floating_rate(index_rate: f64, params: &FloatingRateParams) -> 
     rate
 }
 
-/// Project the all-in floating rate from a resolved forward curve and coupon parameters.
+/// Project the all-in floating rate of a term-index coupon from its fixing date.
 ///
-/// Looks up the term-index rate at `reset_date`, then applies
+/// Projects the raw index with [`project_term_fixing`], then applies
 /// [`calculate_floating_rate`].
 ///
 /// # Arguments
 ///
-/// * `reset_date` - Rate fixing date used to locate the term-index forward on
-///   `fwd`.
-/// * `fwd` - Resolved forward curve supplying the underlying index rate at the
-///   reset date.
+/// * `fixing_date` - Date the term index is observed for the coupon (its
+///   accrual start less the coupon's reset lag). The forward is read at the
+///   fixing's value date, not at this date; see [`project_term_fixing`].
+/// * `fwd` - Resolved term-index forward curve supplying the index rate.
 /// * `params` - Floating-rate adjustments: spread and gearing plus index and
 ///   all-in floors or caps, quoted in the documented parameter units.
 ///
@@ -346,16 +346,15 @@ pub fn calculate_floating_rate(index_rate: f64, params: &FloatingRateParams) -> 
 /// Returns an error if:
 ///
 /// - `params` fails validation
-/// - `reset_date` is strictly before the curve base date. A strictly-past
+/// - `fixing_date` is strictly before the curve base date. A strictly-past
 ///   observation is a realized historical fixing that the curve cannot
 ///   supply; this function projects only. The emission layer resolves
 ///   seasoned resets from a `MarketContext` `ScalarTimeSeries` with id
 ///   `FIXING:{forward_curve_id}` *before* calling this function, and routes this
 ///   error through the spec's
 ///   [`crate::builder::specs::FloatingRateFallback`] policy when no series
-///   is provided. A reset exactly on the curve base date (T+0) is projected
-///   from `t = 0`.
-/// - day-count conversion from the curve base date to the reset date fails
+///   is provided.
+/// - the value date cannot be computed or measured on the curve clock
 ///
 /// # References
 ///
@@ -370,36 +369,152 @@ pub fn calculate_floating_rate(index_rate: f64, params: &FloatingRateParams) -> 
 /// use finstack_quant_cashflows::builder::rate_helpers::{project_floating_rate, FloatingRateParams};
 /// use time::Month;
 ///
-/// let reset = Date::from_calendar_date(2025, Month::January, 15).expect("valid date");
-/// let period_end = Date::from_calendar_date(2025, Month::April, 15).expect("valid date");
+/// let fixing = Date::from_calendar_date(2025, Month::January, 13).expect("valid date");
 ///
 /// let fwd = ForwardCurve::builder("USD-SOFR-3M", 0.25)
-///     .base_date(reset)
+///     .base_date(fixing)
 ///     .day_count(DayCount::Act360)
 ///     .knots([(0.0, 0.03), (1.0, 0.04)])
 ///     .build()
 ///     .expect("curve");
 ///
 /// let params = FloatingRateParams::with_spread(200.0); // SOFR + 200 bp
-/// let rate = project_floating_rate(reset, &fwd, &params)?;
+/// let rate = project_floating_rate(fixing, &fwd, &params)?;
 /// # Ok::<(), finstack_quant_core::Error>(())
 /// ```
 pub fn project_floating_rate(
-    reset_date: Date,
+    fixing_date: Date,
     fwd: &ForwardCurve,
     params: &FloatingRateParams,
 ) -> Result<f64> {
     params.validate()?;
-    let index_rate = project_index_rate(reset_date, fwd)?;
+    let index_rate = project_term_fixing(fixing_date, fwd)?;
     Ok(calculate_floating_rate(index_rate, params))
 }
 
-/// Project the raw term-index rate at a reset date before coupon adjustments.
+/// Project the value of the term-index fixing observed on `fixing_date`.
+///
+/// Market convention for a term IBOR / Term SOFR fixing (ISDA Interest Rate
+/// Derivatives Definitions, Reset Date / Effective Date; the same date
+/// convention as QuantLib `IborIndex::forecastFixing`): the rate published on
+/// the fixing date is the index tenor rate for the deposit starting on the
+/// fixing's value date, the index's spot lag later. The instrument decides
+/// *which* fixing a coupon observes (accrual start less its own reset lag);
+/// the index decides the fixing's value date.
+///
+/// The value date is the fixing date plus [`ForwardCurve::reset_lag`]
+/// business days on the weekends-only calendar, so the projected value is a
+/// function of the curve and the fixing date alone: every coupon observing
+/// one fixing — whatever its accrual calendar or reset lag — projects the same
+/// value. This is also the date forward-curve calibration aligns its
+/// projection grid to (quote accrual starts), so projected fixings agree with
+/// the instruments the curve was fitted to.
 ///
 /// # Arguments
 ///
-/// * `reset_date` - Contractual reset-effective date on or after the forward
-///   curve base date; past resets require recorded observations instead.
+/// * `fixing_date` - Date the index is observed, on or after the curve base
+///   date; earlier fixings are realized and must come from the `FIXING:`
+///   series.
+/// * `fwd` - Term-index forward curve whose `rate(t)` is the tenor forward
+///   starting at `t`, and whose `reset_lag` is the index's fixing-to-spot lag
+///   in business days.
+///
+/// # Returns
+///
+/// Raw annualized index rate as a decimal, before spread, gearing, caps or
+/// floors.
+///
+/// # Errors
+///
+/// Returns a validation error when `fixing_date` precedes the curve base
+/// date, or a date/day-count error if the value date cannot be computed or
+/// measured on the curve clock.
+///
+/// # Examples
+///
+/// ```rust
+/// use finstack_quant_core::dates::{Date, DayCount};
+/// use finstack_quant_core::market_data::term_structures::ForwardCurve;
+/// use finstack_quant_cashflows::builder::rate_helpers::project_term_fixing;
+/// use time::Month;
+///
+/// let base = Date::from_calendar_date(2025, Month::January, 2).expect("valid date");
+/// let fwd = ForwardCurve::builder("USD-SOFR-3M", 0.25)
+///     .base_date(base)
+///     .day_count(DayCount::Act360)
+///     .reset_lag(2)
+///     .knots([(0.0, 0.03), (1.0, 0.04)])
+///     .build()
+///     .expect("curve");
+///
+/// // Fixed Thursday 2025-01-09, value-dated Monday 2025-01-13.
+/// let fixing = Date::from_calendar_date(2025, Month::January, 9).expect("valid date");
+/// let value = Date::from_calendar_date(2025, Month::January, 13).expect("valid date");
+/// assert_eq!(project_term_fixing(fixing, &fwd)?, fwd.rate_on_date(value)?);
+/// # Ok::<(), finstack_quant_core::Error>(())
+/// ```
+pub fn project_term_fixing(fixing_date: Date, fwd: &ForwardCurve) -> Result<f64> {
+    if fixing_date < fwd.base_date() {
+        return project_index_rate(fixing_date, fwd);
+    }
+    let calendar = super::calendar::resolve_calendar_strict(super::calendar::WEEKENDS_ONLY_ID)?;
+    let value_date = fixing_date.add_business_days(fwd.reset_lag(), calendar)?;
+    project_index_rate(value_date, fwd)
+}
+
+/// Whether the fixing on `fixing_date` is observed rather than projected at
+/// start of day `as_of`.
+///
+/// Valuation is at start of day: every earlier fixing is realized, and a
+/// fixing dated `as_of` counts as observed once `series` publishes it
+/// (otherwise it is still projected). Pricers use this one rule so that a
+/// fixing is never read from the series on one path and projected on another.
+///
+/// # Arguments
+///
+/// * `series` - The index's `FIXING:{forward_curve_id}` series, when the
+///   market holds one.
+/// * `fixing_date` - Date the index is observed.
+/// * `as_of` - Valuation date separating observed fixings from projections.
+///
+/// # Returns
+///
+/// `true` when the value must come from `series`, `false` when it is projected.
+///
+/// # Examples
+///
+/// ```rust
+/// use finstack_quant_core::dates::Date;
+/// use finstack_quant_cashflows::builder::rate_helpers::term_fixing_is_observed;
+/// use time::Month;
+///
+/// let today = Date::from_calendar_date(2025, Month::January, 9).expect("valid date");
+/// let yesterday = Date::from_calendar_date(2025, Month::January, 8).expect("valid date");
+/// assert!(term_fixing_is_observed(None, yesterday, today));
+/// assert!(!term_fixing_is_observed(None, today, today));
+/// ```
+pub fn term_fixing_is_observed(
+    series: Option<&finstack_quant_core::market_data::scalars::ScalarTimeSeries>,
+    fixing_date: Date,
+    as_of: Date,
+) -> bool {
+    fixing_date < as_of
+        || (fixing_date == as_of
+            && series.is_some_and(|series| series.value_on_exact(fixing_date).is_ok()))
+}
+
+/// Project the raw term-index rate for a deposit starting on `value_date`.
+///
+/// This is the curve read-out primitive: the forward curve's tenor forward
+/// `rate(t)` starting at `value_date`. Term-index coupons should call
+/// [`project_term_fixing`] with their fixing date instead, which derives the
+/// value date from the index convention.
+///
+/// # Arguments
+///
+/// * `value_date` - Start of the index deposit (the fixing's value date), on
+///   or after the forward curve base date; past dates require recorded
+///   observations instead.
 /// * `fwd` - Term-index forward curve. Its own day count maps the date to curve
 ///   time; the result is an annualized decimal index rate, without coupon
 ///   spread, gearing, caps or floors.
@@ -408,33 +523,30 @@ pub fn project_floating_rate(
 ///
 /// Returns a validation error when the date precedes the projection curve's
 /// base date, or a day-count error if that clock cannot be evaluated.
-pub fn project_index_rate(reset_date: Date, fwd: &ForwardCurve) -> Result<f64> {
+pub fn project_index_rate(value_date: Date, fwd: &ForwardCurve) -> Result<f64> {
     let fwd_day_count = fwd.day_count();
     let fwd_base = fwd.base_date();
 
     // Strictly-past resets are realized fixings; the curve must not clamp them
     // to today's short end. Emission resolves `FIXING:{forward_curve_id}` first.
-    if reset_date < fwd_base {
+    if value_date < fwd_base {
         return Err(finstack_quant_core::Error::Validation(format!(
             "floating-rate observation date {} is before the '{}' curve base date {}; the \
              realized historical fixings are missing — provide a MarketContext \
              ScalarTimeSeries with id 'FIXING:{}', supply a curve based on/before the \
              observation date, or configure a FloatingRateFallback",
-            reset_date,
+            value_date,
             fwd.id(),
             fwd_base,
             fwd.id(),
         )));
     }
-    let t0 = if reset_date == fwd_base {
+    let t0 = if value_date == fwd_base {
         0.0
     } else {
-        fwd_day_count.year_fraction(fwd_base, reset_date, DayCountContext::default())?
+        fwd_day_count.year_fraction(fwd_base, value_date, DayCountContext::default())?
     };
-    // Term coupons fix the curve tenor at the reset date, not an average over the accrual window.
-    let index_rate = fwd.rate(t0);
-
-    Ok(index_rate)
+    Ok(fwd.rate(t0))
 }
 
 #[cfg(test)]

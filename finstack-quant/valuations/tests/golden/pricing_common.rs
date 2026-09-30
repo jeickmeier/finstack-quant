@@ -53,7 +53,7 @@ pub(crate) fn requested_metrics(fixture: &GoldenFixture) -> Vec<String> {
     metrics
 }
 
-fn resolve_market(market: &Market) -> Result<MarketContext, String> {
+pub(crate) fn resolve_market(market: &Market) -> Result<MarketContext, String> {
     match market {
         Market::Snapshot { data } => serde_json::from_value::<MarketContext>(data.clone())
             .map_err(|err| format!("parse market snapshot: {err}")),
@@ -603,8 +603,8 @@ mod tests {
         .expect("registry DV01 should price");
         let registry_dv01 = registry_result.measures["dv01"];
 
-        assert_close(discount, -3_082.891_017_534_77, 1e-6);
-        assert_close(sofr_3m, 2_836.106_479_169_801, 1e-6);
+        assert_close(discount, -3_082.840_589_949_861, 1e-6);
+        assert_close(sofr_3m, 2_835.453_923_810_273, 1e-6);
         // Take the combined target from the fixture rather than repeating the
         // literal here, so a re-blessed fixture cannot leave this test stale.
         assert_close(combined, fixture.expected["dv01"], 1e-6);

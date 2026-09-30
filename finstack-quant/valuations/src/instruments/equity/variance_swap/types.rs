@@ -600,9 +600,34 @@ impl finstack_quant_cashflows::CashflowScheduleSource for VarianceSwap {
 
     fn raw_cashflow_schedule(
         &self,
-        _context: &MarketContext,
-        _as_of: Date,
+        context: &MarketContext,
+        as_of: Date,
     ) -> Result<crate::cashflow::builder::CashFlowSchedule> {
+        let spot = context.get_price(&self.spot_id).ok().and_then(|scalar| {
+            crate::instruments::common_impl::helpers::scalar_price_amount(
+                scalar,
+                self.notional.currency(),
+            )
+            .ok()
+        });
+        let series_ids: Vec<&str> = std::iter::once(self.close_series_id())
+            .chain(
+                [
+                    &self.open_series_id,
+                    &self.high_series_id,
+                    &self.low_series_id,
+                ]
+                .into_iter()
+                .filter_map(Option::as_deref),
+            )
+            .collect();
+        let projected_fixings =
+            crate::instruments::common_impl::pricing::variance_observations::projected_price_observations(
+                &series_ids,
+                &self.observation_dates()?,
+                as_of,
+                spot,
+            );
         Ok(crate::cashflow::traits::schedule_from_classified_flows(
             Vec::new(),
             self.day_count,
@@ -610,6 +635,7 @@ impl finstack_quant_cashflows::CashflowScheduleSource for VarianceSwap {
                 notional_hint: self.notional()?,
                 meta: crate::cashflow::builder::CashFlowMeta {
                     representation: crate::cashflow::builder::CashflowRepresentation::Placeholder,
+                    projected_fixings,
                     ..Default::default()
                 },
             },

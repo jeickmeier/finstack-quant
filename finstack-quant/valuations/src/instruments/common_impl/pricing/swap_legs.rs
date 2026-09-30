@@ -766,11 +766,21 @@ where
         //     date never reach this branch — their accrual start is also in the
         //     past, so they are handled above.
         //
-        //   • Simple leg with a future reset: project the rate from the forward
-        //     curve at `reset_date` (correct window for a term-rate index).
+        //   • Simple leg with a future reset: project the term fixing observed on
+        //     `reset_date` — the index-tenor forward from that fixing's value
+        //     date (`project_term_fixing`).
         //
         //   • Compounded leg, accrual period is entirely in the future: compute the
         //     true daily-compounded coupon via `compounded_forward_projection`.
+        // A term fixing dated `as_of` is read once published (start-of-day
+        // rule shared with emission); compounded legs keep the strict test.
+        let reset_observed = if is_compounded {
+            reset_date < as_of
+        } else {
+            crate::cashflow::builder::rate_helpers::term_fixing_is_observed(
+                fixings, reset_date, as_of,
+            )
+        };
         let index_rate = if is_compounded && period.accrual_start <= as_of {
             // OIS / RFR coupon whose accrual period has started (`accrual_start
             // <= as_of`). This covers two cases handled uniformly by
@@ -804,7 +814,7 @@ where
                 index_cap_decimal,
                 matches!(params.compounding, FloatingLegCompounding::SimpleAverage),
             )?
-        } else if reset_date < as_of {
+        } else if reset_observed {
             // Past reset, term-rate (`Simple`) leg: require a single historical
             // fixing (exact date match). Pass the actual forward-curve
             // identifier so the resulting validation error tells the operator
@@ -823,22 +833,11 @@ where
                 as_of,
             )?
         } else if !is_compounded {
-            // Future reset, term-rate leg (`Simple`, e.g.
-            // EURIBOR-6M): the rate is *set* at `reset_date` as the index-tenor
-            // forward observed on that date. The forward curve's `rate(t)` is
-            // exactly "the forward starting at time `t` for the curve's tenor",
-            // so we anchor at the fixing date. When a reset lag places
-            // `reset_date` materially before `accrual_start`, projecting over
-            // the accrual interval instead would read the wrong forward window
-            // — on a steep curve a 2-business-day lag is worth ~1-3 bp of rate.
-            let fwd_base = fwd.base_date();
-            let t_reset = if reset_date <= fwd_base {
-                0.0
-            } else {
-                fwd.day_count()
-                    .year_fraction(fwd_base, reset_date, DayCountContext::default())?
-            };
-            fwd.rate(t_reset)
+            // Future reset, term-rate leg (`Simple`, e.g. EURIBOR-6M): the
+            // fixing observed on `reset_date` is the index-tenor forward for the
+            // deposit starting on its value date (`project_term_fixing`), the
+            // same value every other coupon observing that fixing projects.
+            crate::cashflow::builder::rate_helpers::project_term_fixing(reset_date, fwd)?
         } else {
             // Future reset, OIS / genuinely-compounding leg (compounded
             // in arrears / observation shift / `SimpleAverage`) whose accrual period is entirely
@@ -1465,13 +1464,20 @@ mod tests {
     }
 
     /// W-48: For a term-rate (`Simple`) leg with a non-zero reset lag, the
-    /// projected rate must be the index-tenor forward anchored at the *fixing
-    /// date*, not the average forward over the accrual interval.
+    /// projected rate is the term fixing observed on the reset date — the
+    /// index-tenor forward from that fixing's value date (reset date plus the
+    /// index spot lag) — not the average forward over the accrual interval.
     #[test]
-    fn pv_floating_leg_term_rate_anchors_projection_at_fixing_date() {
+    fn pv_floating_leg_term_rate_projects_the_reset_fixing_at_its_value_date() {
         let base_date = date(2024, 1, 1);
         let disc = test_discount_curve(base_date);
-        let fwd = steep_forward_curve(base_date);
+        let fwd = ForwardCurve::builder(CurveId::new("TEST-STEEP-FWD"), 0.5)
+            .base_date(base_date)
+            .day_count(DayCount::Act360)
+            .reset_lag(2)
+            .knots(vec![(0.0, 0.02), (1.0, 0.07), (5.0, 0.27)])
+            .build()
+            .expect("steep curve should build");
 
         // Term-rate leg with a reset materially before accrual_start (reset lag).
         // accrual_start = Jul 1 2024, accrual_end = Jan 1 2025.
@@ -1508,12 +1514,17 @@ mod tests {
         let df = relative_df_discount_curve(&disc, base_date, payment_date).expect("df");
         let implied_rate = pv / (1_000_000.0 * year_fraction * df);
 
-        // Expected: fixing-date-anchored forward.
+        // Expected: the forward from the fixing's value date, Wed 2024-04-03
+        // (fixing Mon 2024-04-01 plus the 2-business-day spot lag).
         let fwd_day_count = fwd.day_count();
+        let t_value = fwd_day_count
+            .year_fraction(base_date, date(2024, 4, 3), DayCountContext::default())
+            .expect("yf");
+        let expected_fixing_anchored = fwd.rate(t_value);
         let t_reset = fwd_day_count
             .year_fraction(base_date, reset_date, DayCountContext::default())
             .expect("yf");
-        let expected_fixing_anchored = fwd.rate(t_reset);
+        assert!((expected_fixing_anchored - fwd.rate(t_reset)).abs() > 1e-5);
 
         // The (incorrect) accrual-interval projection, for contrast.
         let t0 = fwd_day_count
@@ -1527,7 +1538,7 @@ mod tests {
         // The fix must use the fixing-date-anchored forward.
         assert!(
             (implied_rate - expected_fixing_anchored).abs() < 1e-12,
-            "term-rate leg must project the fixing-date-anchored forward: \
+            "term-rate leg must project the reset fixing at its value date: \
              implied={implied_rate}, expected={expected_fixing_anchored}"
         );
 

@@ -69,9 +69,9 @@ pub(crate) use instrument_flows::PreparedInstrumentSchedules;
 pub(crate) use instrument_paths::InstrumentPathFlowSource;
 pub use orchestration::SimulationRun;
 pub(crate) use orchestration::{
-    aggregate_tranche_cashflows, prepare_deal_simulation, run_simulation_with_source,
-    simulate_instrument_pool, simulate_prepared, simulate_with_source, take_tranche_cashflows,
-    PreparedDealSimulation,
+    aggregate_tranche_cashflows, deal_projected_fixings, prepare_deal_simulation,
+    run_simulation_with_source, simulate_instrument_pool, simulate_prepared, simulate_with_source,
+    take_tranche_cashflows, PreparedDealSimulation,
 };
 pub(crate) use pool_flow_source::{
     DeterministicPoolFlowSource, OasPathFlowSource, PathShocks, PerNameDefaultEngine,

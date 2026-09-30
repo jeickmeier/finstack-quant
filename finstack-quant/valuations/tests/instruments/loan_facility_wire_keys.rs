@@ -72,30 +72,16 @@ fn set_path(root: &mut Value, path: &[Value], value: Value) {
     *cur = value;
 }
 
-/// Price the UI pricing case for `ty` after applying the case's own patches and
-/// then `extra` (`(path, value)` pairs on the instrument envelope). Returns the
-/// exact `Money` amount string.
-fn price_case(cases: &Value, ty: &str, extra: &[(Value, Value)]) -> String {
+/// Instrument envelope and market of one UI pricing case, with the case's own
+/// instrument and market patches applied.
+pub(crate) fn pricing_case_inputs(case: &Value) -> (Value, MarketContext) {
     let root = workspace_root();
-    let case = cases["cases"]
-        .as_array()
-        .expect("cases")
-        .iter()
-        .find(|c| c["type"] == ty)
-        .unwrap_or_else(|| panic!("no pricing case for {ty}"));
     let mut instrument = read_source(&root, &case["instrumentSource"]);
     for patch in case["instrumentPatches"].as_array().expect("patches") {
         set_path(
             &mut instrument,
             patch["path"].as_array().expect("path"),
             patch["value"].clone(),
-        );
-    }
-    for (path, value) in extra {
-        set_path(
-            &mut instrument,
-            path.as_array().expect("path"),
-            value.clone(),
         );
     }
     let mut market = read_source(&root, &case["marketSource"]);
@@ -107,6 +93,27 @@ fn price_case(cases: &Value, ty: &str, extra: &[(Value, Value)]) -> String {
         );
     }
     let market: MarketContext = serde_json::from_value(market).expect("market");
+    (instrument, market)
+}
+
+/// Price the UI pricing case for `ty` after applying the case's own patches and
+/// then `extra` (`(path, value)` pairs on the instrument envelope). Returns the
+/// exact `Money` amount string.
+fn price_case(cases: &Value, ty: &str, extra: &[(Value, Value)]) -> String {
+    let case = cases["cases"]
+        .as_array()
+        .expect("cases")
+        .iter()
+        .find(|c| c["type"] == ty)
+        .unwrap_or_else(|| panic!("no pricing case for {ty}"));
+    let (mut instrument, market) = pricing_case_inputs(case);
+    for (path, value) in extra {
+        set_path(
+            &mut instrument,
+            path.as_array().expect("path"),
+            value.clone(),
+        );
+    }
     let parsed = parse_boxed_instrument_from_json(&instrument.to_string(), None)
         .unwrap_or_else(|e| panic!("{ty}: {e}"));
     let request = &case["request"];
@@ -124,7 +131,7 @@ fn price_case(cases: &Value, ty: &str, extra: &[(Value, Value)]) -> String {
     value["amount"].as_str().expect("amount").to_string()
 }
 
-fn pricing_cases() -> Value {
+pub(crate) fn pricing_cases() -> Value {
     read_json(
         &workspace_root().join("finstack-quant-ui/tests/valuations/instruments/pricing-cases.json"),
     )

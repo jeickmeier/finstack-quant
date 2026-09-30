@@ -19,9 +19,10 @@
 //! project each period's floating rate according to the financing leg's
 //! `FinancingLegSpec.compounding` setting:
 //!
-//! - `simple` — the **discount-factor-implied simple forward** over the accrual
-//!   period ([`rate_between_on_dates`]), correct for a term-rate-financed TRS
-//!   (e.g. 3M Term SOFR) where the period length matches the index tenor.
+//! - `simple` — the **term fixing observed on the period start**
+//!   ([`crate::cashflow::builder::rate_helpers::project_term_fixing`]): the
+//!   index-tenor forward from the fixing's value date, for a term-rate-financed
+//!   TRS (e.g. 3M Term SOFR).
 //! - `compounded_*` — **daily-compounds** the overnight forward via
 //!   [`crate::instruments::common_impl::pricing::overnight::project_overnight_coupon`]
 //!   with the leg's lookback / observation shift / rate cut-off
@@ -48,9 +49,7 @@ use crate::instruments::common_impl::pricing::overnight::{
     adjust_overnight_accrual_boundaries, project_overnight_coupon, OvernightCouponProjectionInput,
     OvernightProjectionCurve,
 };
-use crate::instruments::common_impl::pricing::time::{
-    rate_between_on_dates, relative_df_discount_curve,
-};
+use crate::instruments::common_impl::pricing::time::relative_df_discount_curve;
 use crate::instruments::rates::irs::FloatingLegCompounding;
 use finstack_quant_core::currency::Currency;
 
@@ -137,7 +136,13 @@ fn financing_period_projection(
                 .to_string(),
         )),
         FloatingLegCompounding::Simple => {
-            let rate = if period_start <= as_of {
+            // The simple financing rate is the term fixing observed on the
+            // period start, projected like every other coupon on that fixing.
+            let rate = if crate::cashflow::builder::rate_helpers::term_fixing_is_observed(
+                fixings,
+                period_start,
+                as_of,
+            ) {
                 finstack_quant_core::market_data::fixings::require_fixing_value_exact(
                     fixings,
                     financing.forward_curve_id.as_str(),
@@ -145,7 +150,7 @@ fn financing_period_projection(
                     as_of,
                 )?
             } else {
-                rate_between_on_dates(fwd, period_start, period_end)?
+                crate::cashflow::builder::rate_helpers::project_term_fixing(period_start, fwd)?
             };
             FinancingPeriodProjection::new(
                 rate,
@@ -637,9 +642,7 @@ mod tests {
     use crate::instruments::common_impl::parameters::legs::FinancingLegSpec;
     use crate::instruments::common_impl::parameters::trs_common::TrsScheduleSpec;
     use crate::instruments::common_impl::pricing::swap_legs;
-    use crate::instruments::common_impl::pricing::time::{
-        rate_between_on_dates, relative_df_discount_curve,
-    };
+    use crate::instruments::common_impl::pricing::time::relative_df_discount_curve;
     use crate::instruments::rates::irs::FloatingLegCompounding;
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::{
@@ -890,7 +893,9 @@ mod tests {
                 .day_count
                 .year_fraction(period_start, period_end, ctx_day_count)
                 .expect("yf");
-            let fwd_rate = rate_between_on_dates(&fwd, period_start, period_end).expect("fwd");
+            let fwd_rate =
+                crate::cashflow::builder::rate_helpers::project_term_fixing(period_start, &fwd)
+                    .expect("fwd");
             let df = relative_df_discount_curve(&disc, as_of, period_end).expect("df");
             expected += 1_000_000.0 * fwd_rate * yf * df;
 

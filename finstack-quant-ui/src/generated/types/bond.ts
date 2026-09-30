@@ -2042,18 +2042,25 @@ export interface DFf91F56De5Ec0B73D330 {
   representation?: "contractual" | "projected" | "placeholder" | "no_residual";
 }
 /**
- * One raw index observation needed by a projected floating coupon.
+ * One raw market observation a schedule projected at its valuation date.
+ *
+ * Floating coupons record their rate-index fixings; instruments that observe
+ * a price history on a schedule (variance swaps) record those observations at
+ * the valuation-date spot level.
  */
 export interface DC4190F1F5Bda84C722E6 {
   date: Date8;
   /**
-   * Canonical market-series identifier, including the `FIXING:` prefix.
+   * Market-series identifier: `FIXING:{index}` for a rate or FX fixing
+   * series, or the price series an instrument observes (for example an
+   * underlying's close history).
    */
   series_id: string;
   /**
    * Raw observed quantity in the index convention: annualized decimal rate
-   * before spread/gearing/caps/floors for rates, or quote currency per base
-   * currency for an FX fixing series. The series identifier fixes orientation.
+   * before spread/gearing/caps/floors for rates, quote currency per base
+   * currency for an FX fixing series, or the price level for a price series.
+   * The series identifier fixes orientation.
    * `None` records an observation for which the coupon's fallback policy
    * masked a missing projection dependency; a time roll must supply an
    * existing fixing or fail explicitly when crossing that date.

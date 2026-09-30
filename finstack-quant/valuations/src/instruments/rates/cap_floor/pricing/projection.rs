@@ -28,6 +28,24 @@ pub(crate) struct OptionedCouponProjection {
     pub is_compounded_overnight: bool,
     /// Date-specific stochastic exposures for compounded overnight observations.
     pub observation_exposures: Vec<OvernightObservationExposure>,
+    /// Raw term-index fixing before spread (observed or projected); `None`
+    /// for a compounded overnight coupon, whose fixings are the observations.
+    pub term_index_rate: Option<f64>,
+}
+
+impl OptionedCouponProjection {
+    /// Raw index observations `(date, decimal rate)` this coupon uses: each
+    /// compounded overnight observation, or the single term fixing.
+    pub(crate) fn index_observations(&self) -> Vec<(Date, f64)> {
+        match self.term_index_rate {
+            Some(rate) => vec![(self.fixing_date, rate)],
+            None => self
+                .observation_exposures
+                .iter()
+                .map(|exposure| (exposure.observation_start, exposure.projected_rate))
+                .collect(),
+        }
+    }
 }
 
 /// Canonical market inputs shared by standard pricing, HW pricing, Greeks, and implied vol.
@@ -120,16 +138,22 @@ pub(crate) fn resolve_optioned_coupon(
             parallel_forward_second_sensitivity: projection.parallel_forward_second_sensitivity,
             is_compounded_overnight: true,
             observation_exposures: projection.observation_exposures,
+            term_index_rate: None,
         });
     }
 
     let forward_curve = market.get_forward(cap_floor.forward_curve_id.as_ref())?;
     let fixing_date = period.reset_date.unwrap_or(period.accrual_start);
-    // Valuation is at start of day: a fixing dated exactly `as_of` is not yet
-    // published, while earlier fixings must be supplied as observations.
-    let index_forward = if fixing_date < as_of {
-        let series_id = fixing_series_id(cap_floor);
-        let series = market.get_series(&series_id).map_err(|_| {
+    // Valuation is at start of day: earlier fixings must be supplied as
+    // observations, and a fixing dated `as_of` is read once published.
+    let series_id = fixing_series_id(cap_floor);
+    let series = market.get_series(&series_id).ok();
+    let index_forward = if crate::cashflow::builder::rate_helpers::term_fixing_is_observed(
+        series,
+        fixing_date,
+        as_of,
+    ) {
+        let series = series.ok_or_else(|| {
             finstack_quant_core::Error::Validation(format!(
                 "Seasoned cap/floor requires historical fixing series '{}' for fixing date {}. \
                  Fixed-but-unpaid coupons must be valued off observed fixings, not the live \
@@ -139,10 +163,9 @@ pub(crate) fn resolve_optioned_coupon(
         })?;
         series.value_on_exact(fixing_date)?
     } else {
-        crate::instruments::common_impl::pricing::time::rate_between_on_dates(
+        crate::cashflow::builder::rate_helpers::project_term_fixing(
+            fixing_date,
             forward_curve.as_ref(),
-            period.accrual_start,
-            period.accrual_end,
         )?
     };
 
@@ -155,6 +178,7 @@ pub(crate) fn resolve_optioned_coupon(
         parallel_forward_second_sensitivity: 0.0,
         is_compounded_overnight: false,
         observation_exposures: Vec::new(),
+        term_index_rate: Some(index_forward),
     })
 }
 
@@ -382,17 +406,16 @@ mod tests {
         let period = caplet.pricing_periods().expect("periods").remove(0);
         let projected =
             resolve_optioned_coupon(&caplet, &period, &market, as_of).expect("term projection");
-        let simple = crate::instruments::common_impl::pricing::time::rate_between_on_dates(
+        let fixing = crate::cashflow::builder::rate_helpers::project_term_fixing(
+            projected.fixing_date,
             market
                 .get_forward(caplet.forward_curve_id.as_ref())
                 .expect("forward")
                 .as_ref(),
-            period.accrual_start,
-            period.accrual_end,
         )
-        .expect("simple forward");
+        .expect("term fixing");
 
-        assert!((projected.forward - (simple + 0.01)).abs() < 1.0e-12);
+        assert!((projected.forward - (fixing + 0.01)).abs() < 1.0e-12);
     }
 
     #[test]

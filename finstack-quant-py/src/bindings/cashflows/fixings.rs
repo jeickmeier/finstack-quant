@@ -9,7 +9,7 @@ use crate::bindings::core::market_data::context::PyMarketContext;
 use crate::bindings::date_utils::{date_to_py, extract_date};
 use crate::errors::core_to_py;
 
-/// Raw rate or FX observation retained by canonical coupon projection.
+/// Raw rate, FX or price observation a schedule projected at its valuation date.
 #[pyclass(
     name = "ProjectedFixing",
     module = "finstack_quant.cashflows.fixings",
@@ -36,7 +36,7 @@ impl PyProjectedFixing {
         })
     }
 
-    /// Canonical FIXING-prefixed series identifier, including FX quote orientation.
+    /// `FIXING:` rate/FX series identifier (with quote orientation) or observed price series.
     #[getter]
     fn series_id(&self) -> &str {
         &self.inner.series_id
@@ -48,7 +48,7 @@ impl PyProjectedFixing {
         date_to_py(py, self.inner.date)
     }
 
-    /// Raw annualized decimal rate or oriented FX rate; None means unavailable.
+    /// Raw annualized decimal rate, oriented FX rate or price level; None means unavailable.
     #[getter]
     fn value(&self) -> Option<f64> {
         self.inner.value

@@ -4,10 +4,8 @@
 //! - Rate conversions (CPR↔SMM, CDR↔MDR, PSA→CPR)
 //! - Simulation helpers (recovery queue, period flows)
 //! - Validation framework for waterfall specifications
-//! - Rate projection helpers for floating rate assets
 
 pub(crate) mod amortization;
-pub(crate) mod rate_helpers;
 pub(crate) mod rates;
 pub(crate) mod simulation;
 pub(crate) mod validation;

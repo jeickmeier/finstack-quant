@@ -45,6 +45,9 @@ impl finstack_quant_cashflows::CashflowScheduleSource for StructuredCredit {
                 notional_hint: self.notional()?,
                 meta: crate::cashflow::builder::CashFlowMeta {
                     representation: crate::cashflow::builder::CashflowRepresentation::Projected,
+                    projected_fixings: crate::instruments::fixed_income::structured_credit::pricing::simulation_engine::deal_projected_fixings(
+                        self, context, as_of,
+                    )?,
                     ..Default::default()
                 },
             },

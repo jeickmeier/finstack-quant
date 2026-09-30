@@ -436,9 +436,31 @@ impl finstack_quant_cashflows::CashflowScheduleSource for FxVarianceSwap {
 
     fn raw_cashflow_schedule(
         &self,
-        _context: &MarketContext,
-        _as_of: Date,
+        context: &MarketContext,
+        as_of: Date,
     ) -> Result<crate::cashflow::builder::CashFlowSchedule> {
+        let close_series_id = self
+            .close_series_id
+            .clone()
+            .unwrap_or_else(|| self.series_id());
+        let series_ids: Vec<&str> = std::iter::once(close_series_id.as_str())
+            .chain(
+                [
+                    &self.open_series_id,
+                    &self.high_series_id,
+                    &self.low_series_id,
+                ]
+                .into_iter()
+                .filter_map(Option::as_deref),
+            )
+            .collect();
+        let projected_fixings =
+            crate::instruments::common_impl::pricing::variance_observations::projected_price_observations(
+                &series_ids,
+                &self.observation_dates()?,
+                as_of,
+                self.spot_rate(context, as_of).ok(),
+            );
         Ok(crate::cashflow::traits::schedule_from_classified_flows(
             Vec::new(),
             self.day_count,
@@ -446,6 +468,7 @@ impl finstack_quant_cashflows::CashflowScheduleSource for FxVarianceSwap {
                 notional_hint: self.notional()?,
                 meta: crate::cashflow::builder::CashFlowMeta {
                     representation: crate::cashflow::builder::CashflowRepresentation::Placeholder,
+                    projected_fixings,
                     ..Default::default()
                 },
             },

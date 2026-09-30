@@ -112,6 +112,34 @@ pub(crate) fn variance_observation_dates(
     Ok(dates)
 }
 
+/// Price-series observations a realized-variance swap makes on or after
+/// `as_of`, each recorded at the `as_of` spot level.
+///
+/// The market is held fixed over a time roll or theta horizon, so an
+/// observation crossed by the roll sees the current spot (zero realized return
+/// over the horizon). A missing spot records `None`, which a roll crossing the
+/// observation reports as an unavailable projection.
+pub(crate) fn projected_price_observations(
+    series_ids: &[&str],
+    observation_dates: &[Date],
+    as_of: Date,
+    spot: Option<f64>,
+) -> Vec<crate::cashflow::fixings::ProjectedFixing> {
+    series_ids
+        .iter()
+        .flat_map(|series_id| {
+            observation_dates
+                .iter()
+                .filter(move |date| **date >= as_of)
+                .map(move |date| crate::cashflow::fixings::ProjectedFixing {
+                    series_id: (*series_id).to_string(),
+                    date: *date,
+                    value: spot,
+                })
+        })
+        .collect()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

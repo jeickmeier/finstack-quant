@@ -550,6 +550,64 @@ pub(crate) fn prepare_deal_simulation(
     }))
 }
 
+/// Term-index fixings the deal's floating coupons observe on or after the
+/// valuation date, each at the index the simulation projects for it.
+///
+/// Floating tranche coupons fix at their reset dates; floating pool assets
+/// (deterministic pools, not instrument collateral, whose own schedules record
+/// theirs) fix off each collection period's start. The values are the
+/// unshifted projections on `market`, so a time roll or theta that holds the
+/// market fixed observes what the `as_of` pricing projected.
+///
+/// # Errors
+///
+/// Propagates deal-preparation failures, missing projection curves and
+/// unknown fixing calendars.
+pub(crate) fn deal_projected_fixings(
+    instrument: &StructuredCredit,
+    market: &MarketContext,
+    as_of: Date,
+) -> Result<Vec<crate::cashflow::fixings::ProjectedFixing>> {
+    let Some(prepared) = prepare_deal_simulation(instrument, as_of)? else {
+        return Ok(Vec::new());
+    };
+    let mut fixings = Vec::new();
+    for tranche in &instrument.tranches.tranches {
+        for period in &prepared.periods {
+            fixings.extend(
+                tranche
+                    .coupon
+                    .projected_term_fixing(period.accrual_start, market)?,
+            );
+        }
+    }
+    if instrument.pool.instruments.is_none() {
+        // Collection period `k` accrues from the previous payment date.
+        let period_starts: Vec<Date> = std::iter::once(prepared.state_anchor)
+            .chain(prepared.periods.iter().map(|period| period.payment_date))
+            .take(prepared.periods.len())
+            .collect();
+        let mut curve_ids: Vec<&str> = instrument
+            .pool
+            .assets
+            .iter()
+            .filter_map(|asset| asset.forward_curve_id.as_deref())
+            .collect();
+        curve_ids.sort_unstable();
+        curve_ids.dedup();
+        for curve_id in curve_ids {
+            let fwd = market.get_forward(curve_id)?;
+            for start in &period_starts {
+                fixings.push(super::period_helpers::projected_collateral_fixing(
+                    fwd.as_ref(),
+                    *start,
+                )?);
+            }
+        }
+    }
+    Ok(fixings)
+}
+
 /// Tranche cashflows plus the deal-level accounting of one simulation run.
 #[derive(Debug, Clone)]
 pub struct SimulationRun {

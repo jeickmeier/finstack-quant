@@ -487,7 +487,11 @@ impl<'a> CashflowEngine<'a> {
                                 },
                                 Some(&mut projected_fixings),
                             )?
-                        } else if fixing_date < self.as_of {
+                        } else if crate::cashflow::builder::rate_helpers::term_fixing_is_observed(
+                            self.fixing_series,
+                            fixing_date,
+                            self.as_of,
+                        ) {
                             let fixing_rate =
                                 finstack_quant_core::market_data::fixings::require_fixing_value_exact(
                                     self.fixing_series,
@@ -511,8 +515,8 @@ impl<'a> CashflowEngine<'a> {
                                 )
                             })?;
                             let index_rate =
-                                crate::cashflow::builder::rate_helpers::project_index_rate(
-                                    reset_effective,
+                                crate::cashflow::builder::rate_helpers::project_term_fixing(
+                                    fixing_date,
                                     fwd.as_ref(),
                                 )?;
                             projected_fixings.push(crate::cashflow::fixings::ProjectedFixing {
@@ -992,29 +996,35 @@ impl<'a> CashflowEngine<'a> {
                         } else {
                             let params =
                                 super::utils::floating_params_at(self.facility, spec, sub_start)?;
-                            let base_rate = if fixing_date < self.as_of {
-                                finstack_quant_core::market_data::fixings::require_fixing_value_exact(
+                            let base_rate =
+                                if crate::cashflow::builder::rate_helpers::term_fixing_is_observed(
+                                    self.fixing_series,
+                                    fixing_date,
+                                    self.as_of,
+                                ) {
+                                    finstack_quant_core::market_data::fixings::require_fixing_value_exact(
                                     self.fixing_series,
                                     spec.forward_curve_id.as_ref(),
                                     fixing_date,
                                     self.as_of,
                                 )?
-                            } else {
-                                let simulated =
-                                    path.short_rate_path[observation_index(reset_effective)?];
-                                match term_basis_curves.as_ref() {
-                                    Some((fwd, disc)) => {
-                                        simulated
-                                            + super::utils::index_basis_at(
-                                                reset_effective,
-                                                anchor,
-                                                fwd.as_ref(),
-                                                disc.as_ref(),
-                                            )?
+                                } else {
+                                    let simulated =
+                                        path.short_rate_path[observation_index(reset_effective)?];
+                                    match term_basis_curves.as_ref() {
+                                        Some((fwd, disc)) => {
+                                            simulated
+                                                + super::utils::index_basis_at(
+                                                    fixing_date,
+                                                    reset_effective,
+                                                    anchor,
+                                                    fwd.as_ref(),
+                                                    disc.as_ref(),
+                                                )?
+                                        }
+                                        None => simulated,
                                     }
-                                    None => simulated,
-                                }
-                            };
+                                };
                             crate::cashflow::builder::rate_helpers::calculate_floating_rate(
                                 base_rate, &params,
                             )

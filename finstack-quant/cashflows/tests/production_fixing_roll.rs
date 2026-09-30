@@ -110,35 +110,16 @@ fn production_roll_materializes_once_and_reports_conflicting_or_missing_projecti
 }
 
 #[test]
-fn production_roll_uses_exclusive_origin_and_inclusive_horizon() {
+fn production_roll_uses_inclusive_origin_and_horizon() {
+    // The fixing is dated 2025-01-03 and has no projection.
     let market = MarketContext::new();
     let unavailable = schedule(&[None]);
-    assert!(materialize_fixings(
-        &market,
-        [&unavailable],
-        date!(2025 - 01 - 01),
-        date!(2025 - 01 - 02)
-    )
-    .is_ok());
-    assert!(materialize_fixings(
-        &market,
-        [&unavailable],
-        date!(2025 - 01 - 03),
-        date!(2025 - 01 - 04)
-    )
-    .is_ok());
-    assert!(materialize_fixings(
-        &market,
-        [&unavailable],
-        date!(2025 - 01 - 02),
-        date!(2025 - 01 - 03)
-    )
-    .is_err());
-    assert!(materialize_fixings(
-        &market,
-        [&unavailable],
-        date!(2025 - 01 - 04),
-        date!(2025 - 01 - 03)
-    )
-    .is_err());
+    let crosses = |old, new| materialize_fixings(&market, [&unavailable], old, new);
+    assert!(crosses(date!(2025 - 01 - 01), date!(2025 - 01 - 02)).is_ok());
+    assert!(crosses(date!(2025 - 01 - 04), date!(2025 - 01 - 05)).is_ok());
+    // A fixing dated on the pre-roll valuation date was projected at start of
+    // day and is past once the roll moves beyond it.
+    assert!(crosses(date!(2025 - 01 - 03), date!(2025 - 01 - 04)).is_err());
+    assert!(crosses(date!(2025 - 01 - 02), date!(2025 - 01 - 03)).is_err());
+    assert!(crosses(date!(2025 - 01 - 04), date!(2025 - 01 - 03)).is_err());
 }

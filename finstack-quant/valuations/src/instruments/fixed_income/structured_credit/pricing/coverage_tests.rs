@@ -1626,14 +1626,22 @@ mod haircut_tests {
         let expected_cure = 100_000.0 - collections / (trigger_level * rate * accrual);
         assert!((result.cure_amount.unwrap().amount() - expected_cure).abs() < 1e-6);
 
-        let missing_fixing = TestContext {
+        // Start-of-day policy shared with cashflow emission and the collateral
+        // path: a reset dated the valuation date is projected until its fixing
+        // is published.
+        let unpublished_fixing = TestContext {
             valuation_date: start,
             ..projected
         };
-        let error = CoverageTestSpec::ic("A", trigger_level)
-            .evaluate(&missing_fixing)
-            .expect_err("a reset on the valuation date still requires its exact fixing");
-        assert!(error.to_string().contains("2025-05-01"), "{error}");
+        let result = CoverageTestSpec::ic("A", trigger_level)
+            .evaluate(&unpublished_fixing)
+            .expect("an unpublished same-day reset projects");
+        let projected_rate = tranches.tranches[0]
+            .coupon
+            .try_rate_for_period(start, start, &market)
+            .unwrap();
+        assert_eq!(projected_rate, rate);
+        assert!((result.ratio - collections / (100_000.0 * rate * accrual)).abs() < 1e-12);
     }
 
     /// A configured haircut must track the CURRENT pool balance, not

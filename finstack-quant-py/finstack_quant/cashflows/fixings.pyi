@@ -17,7 +17,11 @@ from finstack_quant.core.market_data import MarketContext
 __all__ = ["ProjectedFixing", "materialize_fixings"]
 
 class ProjectedFixing:
-    """Raw observation used by coupon projection before contractual adjustments.
+    """Raw market observation a schedule projected at its valuation date.
+
+    Floating coupons record their rate-index fixings before contractual
+    adjustments; instruments that observe a price history on a schedule
+    (variance swaps) record those observations at the valuation-date spot.
 
     Examples
     --------
@@ -33,13 +37,15 @@ class ProjectedFixing:
         Parameters
         ----------
         series_id : str
-            Canonical ``FIXING:`` identifier, including the tenor of a CMS index
-            or the quote orientation of an FX reset series.
+            ``FIXING:`` identifier of a rate or FX fixing series, including the
+            tenor of a CMS index or the quote orientation of an FX reset series,
+            or the identifier of an observed price series.
         date : datetime.date or str
             Contractual observation date after fixing-calendar adjustments.
         value : float, optional
             Raw annualized decimal index rate before spread, gearing, caps and
-            floors, or quote currency per base currency for FX observations.
+            floors, quote currency per base currency for FX observations, or the
+            price level for a price series.
             ``None`` records an unavailable projection dependency.
 
         Raises
@@ -52,7 +58,7 @@ class ProjectedFixing:
 
     @property
     def series_id(self) -> str:
-        """Return the canonical fixing-series identifier and quote orientation.
+        """Return the observed market-series identifier and quote orientation.
 
         Returns
         -------
@@ -82,12 +88,12 @@ class ProjectedFixing:
 
     @property
     def value(self) -> float | None:
-        """Return the raw rate or FX quote before coupon transformations.
+        """Return the raw rate, FX quote or price level before coupon transformations.
 
         Returns
         -------
         float, optional
-            Annualized decimal index rate or oriented FX quote; ``None`` denotes
+            Annualized decimal index rate, oriented FX quote or price level; ``None`` denotes
             an unavailable projection that must be supplied before crossing.
 
         Notes
@@ -102,7 +108,11 @@ def materialize_fixings(
     old_date: datetime.date | str,
     new_date: datetime.date | str,
 ) -> MarketContext:
-    """Return a new market containing observations crossed in ``(old_date, new_date]``.
+    """Return a new market containing observations crossed in ``[old_date, new_date]``.
+
+    Valuation is at start of day, so a fixing dated ``old_date`` is still a
+    projection on the pre-roll market but a past observation after the roll;
+    it is materialized with the other crossed fixings.
 
     Parameters
     ----------
@@ -113,7 +123,8 @@ def materialize_fixings(
         Canonical schedules projected on the pre-roll market. Raw observations
         come from their ``meta.projected_fixings``; coupon spreads are excluded.
     old_date : datetime.date or str
-        Exclusive fixing-window origin. Earlier missing fixings are not invented.
+        Inclusive fixing-window origin (the pre-roll valuation date). Earlier
+        missing fixings are not invented.
     new_date : datetime.date or str
         Inclusive fixing horizon on or after the origin. Curves are not rolled
         by this helper; scenario time rolls call it before changing curve dates.

@@ -25305,7 +25305,7 @@ export default [
   {
     "path": "#/$defs/ProjectedFixing",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/ProjectedFixing",
-    "description": "One raw index observation needed by a projected floating coupon."
+    "description": "One raw market observation a schedule projected at its valuation date.\n\nFloating coupons record their rate-index fixings; instruments that observe\na price history on a schedule (variance swaps) record those observations at\nthe valuation-date spot level."
   },
   {
     "path": "#/$defs/ProjectedFixing/properties/date",
@@ -25317,12 +25317,12 @@ export default [
   {
     "path": "#/$defs/ProjectedFixing/properties/series_id",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/ProjectedFixing/properties/series_id",
-    "description": "Canonical market-series identifier, including the `FIXING:` prefix."
+    "description": "Market-series identifier: `FIXING:{index}` for a rate or FX fixing\nseries, or the price series an instrument observes (for example an\nunderlying's close history)."
   },
   {
     "path": "#/$defs/ProjectedFixing/properties/value",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/ProjectedFixing/properties/value",
-    "description": "Raw observed quantity in the index convention: annualized decimal rate\nbefore spread/gearing/caps/floors for rates, or quote currency per base\ncurrency for an FX fixing series. The series identifier fixes orientation.\n`None` records an observation for which the coupon's fallback policy\nmasked a missing projection dependency; a time roll must supply an\nexisting fixing or fail explicitly when crossing that date.",
+    "description": "Raw observed quantity in the index convention: annualized decimal rate\nbefore spread/gearing/caps/floors for rates, quote currency per base\ncurrency for an FX fixing series, or the price level for a price series.\nThe series identifier fixes orientation.\n`None` records an observation for which the coupon's fallback policy\nmasked a missing projection dependency; a time roll must supply an\nexisting fixing or fail explicitly when crossing that date.",
     "format": "double"
   },
   {

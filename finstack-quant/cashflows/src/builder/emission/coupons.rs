@@ -653,21 +653,20 @@ pub(crate) fn emit_float_coupons_on(
                     }
                     FloatingRateObservation::Term { .. } => {
                         let index_rate = if let Some(fwd) = resolved_curve.as_deref() {
-                            let same_day_fixing_exists = reset_date == fwd.base_date()
-                                && resolved_fixing.as_ref().is_some_and(|series| {
-                                    series.value_on_exact(reset_date).is_ok()
-                                });
-                            let projected =
-                                if reset_date < fwd.base_date() || same_day_fixing_exists {
-                                    require_fixing_value_exact(
-                                        resolved_fixing.as_ref(),
-                                        spec.rate_spec.forward_curve_id.as_str(),
-                                        reset_date,
-                                        fwd.base_date(),
-                                    )
-                                } else {
-                                    super::super::rate_helpers::project_index_rate(reset_date, fwd)
-                                };
+                            let projected = if super::super::rate_helpers::term_fixing_is_observed(
+                                resolved_fixing.as_ref(),
+                                reset_date,
+                                fwd.base_date(),
+                            ) {
+                                require_fixing_value_exact(
+                                    resolved_fixing.as_ref(),
+                                    spec.rate_spec.forward_curve_id.as_str(),
+                                    reset_date,
+                                    fwd.base_date(),
+                                )
+                            } else {
+                                super::super::rate_helpers::project_term_fixing(reset_date, fwd)
+                            };
                             match projected {
                                 Ok(rate) => {
                                     projected_fixings.push(crate::fixings::ProjectedFixing {

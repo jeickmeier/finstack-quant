@@ -306,10 +306,12 @@ fn test_non_seasoned_facility_ignores_fixings() {
     let fwd_curve = build_flat_forward_curve(0.04, as_of, "USD-SOFR-3M", 0.25);
     let disc_curve = build_flat_discount_curve(0.03, as_of, "USD-OIS");
 
-    // Provide fixings even though none should be used (all resets are >= as_of)
+    // Provide a fixing on a future reset date; it must not be used (all
+    // resets after as_of are projected). A fixing dated as_of itself is read
+    // once published (start-of-day rule), checked at the end of this test.
     let fixing_series = ScalarTimeSeries::new(
         "FIXING:USD-SOFR-3M",
-        vec![(date!(2025 - 01 - 15), 0.10)], // 10% fixing (very different from forward)
+        vec![(date!(2025 - 04 - 15), 0.10)], // 10% fixing (very different from forward)
         None,
     )
     .unwrap();
@@ -356,6 +358,29 @@ fn test_non_seasoned_facility_ignores_fixings() {
          With: {:.6}, Without: {:.6}",
         total_with,
         total_without,
+    );
+
+    let same_day = ScalarTimeSeries::new("FIXING:USD-SOFR-3M", vec![(as_of, 0.10)], None).unwrap();
+    let market_same_day = market_without.clone().insert_series(same_day);
+    let same_day_fixings = finstack_quant_core::market_data::fixings::get_fixing_series(
+        &market_same_day,
+        "USD-SOFR-3M",
+    )
+    .ok();
+    let total_same_day: f64 =
+        CashflowEngine::new(&facility, Some(&market_same_day), as_of, same_day_fixings)
+            .unwrap()
+            .generate_deterministic()
+            .unwrap()
+            .schedule
+            .get_flows()
+            .iter()
+            .filter(|cf| cf.kind == finstack_quant_core::cashflow::CFKind::FloatReset)
+            .map(|cf| cf.amount.amount())
+            .sum();
+    assert!(
+        total_same_day > total_without + 1.0,
+        "a published fixing dated as_of sets the first coupon: {total_same_day} vs {total_without}"
     );
 }
 

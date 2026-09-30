@@ -206,7 +206,8 @@ impl InterestRateSwap {
         // Delegate rate projection to the cashflow builder so the pricer and
         // the signed schedule surfaced by `cashflow_schedule` / `dated_cashflows`
         // use bit-for-bit identical coupon amounts. The builder reads the
-        // named term-index curve at `reset_date` (`fwd.rate(t_reset)`);
+        // term fixing observed on `reset_date` at its value date
+        // (`rate_helpers::project_term_fixing`);
         // `index_tenor` is diagnostic error-context only, not a FRA window.
         use finstack_quant_core::cashflow::CFKind;
 

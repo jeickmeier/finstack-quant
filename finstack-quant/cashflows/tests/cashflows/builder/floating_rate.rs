@@ -59,7 +59,7 @@ fn make_float_spec(fallback: FloatingRateFallback, spread_bp: Decimal) -> Floati
 }
 
 #[test]
-fn term_coupon_uses_the_actual_reset_date_fixing() {
+fn term_coupon_reads_its_fixing_at_the_value_date() {
     use finstack_quant_core::market_data::context::MarketContext;
     use finstack_quant_core::market_data::term_structures::ForwardCurve;
 
@@ -107,7 +107,11 @@ fn term_coupon_uses_the_actual_reset_date_fixing() {
         .day_count()
         .year_fraction(base, first_float.date, DayCountContext::default())
         .expect("valid payment year fraction");
-    let reset_fixing = fwd.rate(reset_t);
+    // The coupon fixes Mon 2025-01-13 for the 3M deposit value-dated two
+    // business days later, Wed 2025-01-15 (the accrual start).
+    let value_date = Date::from_calendar_date(2025, Month::January, 15).expect("valid date");
+    let value_fixing = fwd.rate_on_date(value_date).expect("value-date forward");
+    let fixing_date_forward = fwd.rate(reset_t);
     let integrated_average = fwd.rate_period(reset_t, payment_t);
     let built_rate = first_float
         .rate
@@ -117,8 +121,68 @@ fn term_coupon_uses_the_actual_reset_date_fixing() {
         reset_date,
         Date::from_calendar_date(2025, Month::January, 13).expect("valid reset date")
     );
-    assert!((reset_fixing - integrated_average).abs() > 1e-6);
-    assert!((built_rate - reset_fixing).abs() < RATE_TOLERANCE);
+    assert!((value_fixing - fixing_date_forward).abs() > 1e-6);
+    assert!((value_fixing - integrated_average).abs() > 1e-6);
+    assert!((built_rate - value_fixing).abs() < RATE_TOLERANCE);
+}
+
+/// Forward-curve calibration places the projection grid on quote accrual
+/// starts, so on such a curve the FRA / deposit forward over an accrual period
+/// (discount-factor implied) and a lagged swap coupon over the same period
+/// (its term fixing, read at the value date) are one and the same rate.
+#[test]
+fn lagged_term_coupon_matches_grid_forward_over_its_accrual_period() {
+    use finstack_quant_core::market_data::context::MarketContext;
+    use finstack_quant_core::market_data::term_structures::ForwardCurve;
+
+    let base = Date::from_calendar_date(2025, Month::January, 2).unwrap();
+    let start = Date::from_calendar_date(2025, Month::April, 15).unwrap();
+    let end = Date::from_calendar_date(2025, Month::July, 15).unwrap();
+    let mut spec = make_float_spec(FloatingRateFallback::Error, dec!(0.0));
+    spec.rate_spec.reset_lag_days = 2;
+    let time = |date| {
+        DayCount::Act360
+            .year_fraction(base, date, DayCountContext::default())
+            .expect("valid year fraction")
+    };
+    let (t_start, t_end) = (time(start), time(end));
+    let fwd = ForwardCurve::builder("USD-SOFR-3M", 0.25)
+        .base_date(base)
+        .day_count(DayCount::Act360)
+        .knots([(0.0, 0.03), (1.0, 0.06)])
+        .projection_grid(vec![0.0, t_start, t_end, 1.0])
+        .build()
+        .expect("ForwardCurve builder should succeed");
+    let grid_forward = fwd.rate_between(t_start, t_end).expect("grid forward");
+    let market = MarketContext::new().insert(fwd);
+
+    let mut builder = CashFlowSchedule::builder();
+    let _ = builder
+        .principal(
+            Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
+            start,
+            end,
+        )
+        .floating_cf(spec);
+    let schedule = builder
+        .build(Some(&market))
+        .expect("floating schedule should build");
+    let coupon = schedule
+        .get_flows()
+        .iter()
+        .find(|cf| cf.kind == CFKind::FloatReset)
+        .expect("expected a floating coupon");
+
+    // Accrual starts Tue 2025-04-15, fixes Fri 2025-04-11, value-dated 04-15.
+    assert_eq!(
+        coupon.reset_date,
+        Some(Date::from_calendar_date(2025, Month::April, 11).expect("valid date"))
+    );
+    let built_rate = coupon.rate.expect("floating coupon should store its rate");
+    assert!(
+        (built_rate - grid_forward).abs() < 1e-14,
+        "coupon {built_rate} vs grid forward {grid_forward}"
+    );
 }
 
 #[test]
@@ -161,20 +225,21 @@ fn term_index_rate_is_invariant_to_payment_frequency() {
         .get_forward("USD-SOFR-3M")
         .expect("curve should exist");
 
-    // A term-index coupon fixes its curve tenor at the reset date. The payment
-    // frequency has no effect on that fixing.
-    let reset_t = fwd_curve
-        .day_count()
-        .year_fraction(issue, reset_date, DayCountContext::default())
-        .expect("valid reset year fraction");
-    let expected_reset_fixing = fwd_curve.rate(reset_t);
+    // A term-index coupon observes the fixing on its reset date: the curve
+    // tenor forward from that fixing's value date (two business days later,
+    // the index spot lag). The payment frequency has no effect on it.
+    assert_eq!(reset_date, issue);
+    let value_date = Date::from_calendar_date(2025, Month::January, 17).expect("valid date");
+    let expected_reset_fixing = fwd_curve
+        .rate_on_date(value_date)
+        .expect("value-date forward");
 
     let built_rate = first_float
         .rate
         .expect("floating coupon should store built rate");
     assert!(
         (built_rate - expected_reset_fixing).abs() < RATE_TOLERANCE,
-        "built rate should use the reset-date fixing: expected {}, got {}",
+        "built rate should use the reset-date fixing's value-date forward: expected {}, got {}",
         expected_reset_fixing,
         built_rate
     );

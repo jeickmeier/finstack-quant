@@ -201,6 +201,10 @@ pub struct MetricContext {
     /// Cached detailed cashflows with CFKind metadata.
     pub tagged_cashflows: Option<Vec<CashFlow>>,
 
+    /// Index observations the canonical cashflow schedule projected at
+    /// `as_of` (`CashFlowMeta::projected_fixings`), cached with the flows.
+    pub(crate) projected_fixings: Option<Vec<crate::cashflow::fixings::ProjectedFixing>>,
+
     /// Cached internal cashflow schedule with full structural metadata
     /// (notional path, principal events, funding legs).
     ///
@@ -293,6 +297,7 @@ impl MetricContext {
             computed_matrix: finstack_quant_core::HashMap::default(),
             cashflows: None,
             tagged_cashflows: None,
+            projected_fixings: None,
             internal_schedule: None,
             detailed_tranche_cashflows: None,
             bond_workout_path: None,
@@ -583,14 +588,65 @@ impl MetricContext {
         &mut self,
     ) -> finstack_quant_core::Result<&Vec<CashFlow>> {
         if self.tagged_cashflows.is_none() {
-            let schedule = self
-                .instrument
-                .cashflow_schedule(&self.curves, self.as_of)?;
-            self.tagged_cashflows = Some(schedule.into_flows());
+            self.cache_canonical_schedule()?;
         }
         self.tagged_cashflows
             .as_ref()
             .ok_or_else(|| finstack_quant_core::InputError::Invalid.into())
+    }
+
+    /// Return the index observations the canonical cashflow schedule projected
+    /// at `as_of`, building and caching the schedule on first access.
+    pub(crate) fn projected_fixings_cached(
+        &mut self,
+    ) -> finstack_quant_core::Result<&[crate::cashflow::fixings::ProjectedFixing]> {
+        if self.projected_fixings.is_none() {
+            self.cache_canonical_schedule()?;
+        }
+        self.projected_fixings
+            .as_deref()
+            .ok_or_else(|| finstack_quant_core::InputError::Invalid.into())
+    }
+
+    /// The context market with every index observation the canonical schedule
+    /// projected in `[as_of, horizon]` added as an exact-date fixing at its
+    /// as-of projection, for repricing at `horizon` with the market held fixed.
+    ///
+    /// Existing fixings take precedence; the context market is unchanged.
+    ///
+    /// # Arguments
+    ///
+    /// * `horizon` - Date the caller reprices at; on or after `as_of`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the schedule cannot be built or a crossed
+    /// observation has no finite as-of projection (see
+    /// `materialize_fixings_from_projections`).
+    pub(crate) fn fixings_held_market(
+        &mut self,
+        horizon: Date,
+    ) -> finstack_quant_core::Result<MarketContext> {
+        let (curves, as_of) = (Arc::clone(&self.curves), self.as_of);
+        crate::cashflow::fixings::materialize_fixings_from_projections(
+            &curves,
+            self.projected_fixings_cached()?,
+            as_of,
+            horizon,
+        )
+    }
+
+    /// Build the canonical schedule once and cache its projected fixings and,
+    /// unless a pricer already supplied them, its tagged flows.
+    fn cache_canonical_schedule(&mut self) -> finstack_quant_core::Result<()> {
+        let schedule = self
+            .instrument
+            .cashflow_schedule(&self.curves, self.as_of)?;
+        self.projected_fixings = Some(schedule.get_meta().projected_fixings.clone());
+        if self.tagged_cashflows.is_none() {
+            self.tagged_cashflows = Some(schedule.into_flows());
+        }
+        Ok(())
     }
 
     /// Downcast the instrument to a specific concrete type.

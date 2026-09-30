@@ -70,9 +70,14 @@ fn set_path(root: &mut Value, path: &[Value], value: Value) {
 }
 
 /// Native PV of each pricing case, captured on the pre-migration source.
+///
+/// `cap_floor` was re-captured on 2026-09-30 when term caplets moved from the
+/// discount-factor-implied accrual-period forward to the shared term-fixing
+/// projection (tenor forward at the fixing's value date): 515716.67931458101
+/// -> 515701.30620389282. The input migration it guards is unaffected.
 const PINNED_PV: &[(&str, &str)] = &[
     ("asset_backed_facility", "77045997.819227106393914245443"),
-    ("cap_floor", "515716.67931458101"),
+    ("cap_floor", "515701.30620389282"),
     ("cms_option", "153240.2421427181"),
     ("cms_spread_option", "14788.25095109598"),
     ("cms_swap", "-105219.6877460222"),
@@ -186,7 +191,9 @@ fn rescaled_inputs_reprice_to_recorded_reference() {
             // 15bp margin over the cap index (was the decimal `spread` 0.0015).
             "cap_floor",
             vec![(spec("spread_bp"), json!("15"))],
-            "578605.83223393675",
+            // Re-captured 2026-09-30 with the shared term-fixing projection
+            // (was 578605.83223393675).
+            "578590.04678681926",
         ),
         (
             // 25bp over the CMS rate and a 10bp floating funding margin (were

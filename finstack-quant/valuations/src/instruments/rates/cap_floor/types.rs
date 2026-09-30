@@ -874,6 +874,26 @@ impl crate::instruments::common_impl::traits::Instrument for CapFloor {
         self.final_fixing_date().ok()
     }
 
+    /// The final optioned coupon pays after its last fixing (`expiry`), on the
+    /// contractual payment date including any overnight payment delay.
+    fn last_payment_date(
+        &self,
+        curves: &finstack_quant_core::market_data::context::MarketContext,
+        as_of: finstack_quant_core::dates::Date,
+    ) -> finstack_quant_core::Result<Option<finstack_quant_core::dates::Date>> {
+        let Some(period) = self.pricing_periods()?.into_iter().last() else {
+            return Ok(self.expiry());
+        };
+        if period.payment_date <= as_of {
+            return Ok(Some(period.payment_date));
+        }
+        let coupon =
+            crate::instruments::rates::cap_floor::pricing::projection::resolve_optioned_coupon(
+                self, &period, curves, as_of,
+            )?;
+        Ok(Some(coupon.payment_date))
+    }
+
     fn effective_start_date(&self) -> Option<finstack_quant_core::dates::Date> {
         Some(self.start_date)
     }
@@ -881,10 +901,56 @@ impl crate::instruments::common_impl::traits::Instrument for CapFloor {
     crate::impl_focused_pricing_overrides!();
 }
 
-crate::impl_empty_cashflow_provider!(
-    CapFloor,
-    crate::cashflow::builder::CashflowRepresentation::Placeholder
-);
+/// A cap/floor has no deterministic cashflows (the schedule is an empty
+/// placeholder), but its metadata records the index observations every unpaid
+/// optioned coupon uses, so a time roll or theta can hold them fixed.
+impl crate::__private::finstack_quant_cashflows::traits::CashflowScheduleSource for CapFloor {
+    fn notional(&self) -> finstack_quant_core::Result<Option<Money>> {
+        Ok(None)
+    }
+
+    fn raw_cashflow_schedule(
+        &self,
+        market: &finstack_quant_core::market_data::context::MarketContext,
+        as_of: finstack_quant_core::dates::Date,
+    ) -> finstack_quant_core::Result<crate::cashflow::builder::CashFlowSchedule> {
+        let series_id = finstack_quant_core::market_data::fixings::fixing_series_id(
+            self.forward_curve_id.as_str(),
+        );
+        let mut projected_fixings = Vec::new();
+        for period in self.pricing_periods()? {
+            if period.payment_date <= as_of {
+                continue;
+            }
+            let coupon =
+                crate::instruments::rates::cap_floor::pricing::projection::resolve_optioned_coupon(
+                    self, &period, market, as_of,
+                )?;
+            projected_fixings.extend(coupon.index_observations().into_iter().map(
+                |(date, value)| crate::cashflow::fixings::ProjectedFixing {
+                    series_id: series_id.clone(),
+                    date,
+                    value: Some(value),
+                },
+            ));
+        }
+        Ok(
+            crate::__private::finstack_quant_cashflows::traits::schedule_from_classified_flows(
+                Vec::new(),
+                finstack_quant_core::dates::DayCount::Act365F,
+                crate::__private::finstack_quant_cashflows::traits::ScheduleBuildOpts {
+                    notional_hint: None,
+                    meta: crate::cashflow::builder::CashFlowMeta {
+                        representation:
+                            crate::cashflow::builder::CashflowRepresentation::Placeholder,
+                        projected_fixings,
+                        ..Default::default()
+                    },
+                },
+            ),
+        )
+    }
+}
 
 #[cfg(test)]
 mod tests {
@@ -998,35 +1064,17 @@ mod tests {
         let disc = ctx.get_discount(CurveId::new("TEST-DISC")).expect("disc");
         let fwd = ctx.get_forward(CurveId::new("USD-SOFR-3M")).expect("fwd");
 
-        // Use the instrument's resolved market calendar and stub so the parity
-        // reference shares exactly the priced schedule.
-        let periods = crate::cashflow::builder::periods::build_periods(
-            crate::cashflow::builder::periods::BuildPeriodsParams {
-                start: start_date,
-                end: end_date,
-                frequency: Tenor::quarterly(),
-                stub: cap.stub,
-                business_day_convention: BusinessDayConvention::ModifiedFollowing,
-                calendar_id: cap
-                    .resolved_schedule_calendar_id()
-                    .expect("resolved calendar"),
-                end_of_month: false,
-                day_count: DayCount::Act360,
-                payment_lag_days: 0,
-                reset_lag_days: None,
-                adjust_accrual_dates: false,
-                roll_rule: crate::cashflow::builder::specs::RollRule::None,
-            },
-        )
-        .expect("periods");
+        // Use the instrument's own priced periods so the parity reference
+        // shares exactly its schedule and fixing dates; each caplet's forward
+        // is the term fixing it observes.
+        let periods = cap.pricing_periods().expect("periods");
 
         let mut expected_swap_pv = 0.0;
         for p in periods {
             let tau = p.accrual_year_fraction;
-            let forward = crate::instruments::common_impl::pricing::time::rate_between_on_dates(
+            let forward = crate::cashflow::builder::rate_helpers::project_term_fixing(
+                p.reset_date.unwrap_or(p.accrual_start),
                 &fwd,
-                p.accrual_start,
-                p.accrual_end,
             )
             .expect("forward");
             let df = disc
