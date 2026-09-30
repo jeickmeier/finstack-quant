@@ -79,7 +79,9 @@ pub fn apply_time_roll_forward(
     period_str: &str,
     mode: TimeRollMode,
 ) -> Result<RollForwardReport> {
-    apply_time_roll_forward_with_credit(ctx, period_str, mode, &[], None)
+    // No hazard curves are replayed, so the provider is never consulted.
+    let provider = finstack_quant_calibration::recalibration::CachedRecalibrationProvider::new();
+    apply_time_roll_forward_with_credit(ctx, period_str, mode, &[], &provider)
 }
 
 pub(crate) fn apply_time_roll_forward_with_credit(
@@ -90,7 +92,7 @@ pub(crate) fn apply_time_roll_forward_with_credit(
         finstack_quant_core::types::CurveId,
         finstack_quant_core::types::CurveId,
     )],
-    provider: Option<&dyn finstack_quant_valuations::recalibration::RecalibrationProvider>,
+    provider: &dyn finstack_quant_valuations::recalibration::RecalibrationProvider,
 ) -> Result<RollForwardReport> {
     use crate::error::Error;
 
@@ -169,11 +171,6 @@ pub(crate) fn apply_time_roll_forward_with_credit(
         use finstack_quant_valuations::recalibration::{
             HazardRecalibrationAction, HazardRecalibrationRequest,
         };
-        let provider = provider.ok_or_else(|| {
-            Error::Core(finstack_quant_valuations::recalibration::provider_missing(
-                "hazard_horizon_replay",
-            ))
-        })?;
         let rebuilt = provider.rebuild_hazard_curve(&HazardRecalibrationRequest {
             hazard: ctx.market.get_hazard(hazard_id)?,
             source_market: std::sync::Arc::new(ctx.market.clone()),

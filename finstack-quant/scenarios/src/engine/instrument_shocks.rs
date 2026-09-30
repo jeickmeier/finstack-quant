@@ -18,32 +18,10 @@ pub(super) fn apply_instrument_shock(
     types: Option<&[InstrumentType]>,
     attrs: Option<&indexmap::IndexMap<String, String>>,
     value: f64,
-    kind: &'static str,
-    instruments: &mut Option<&mut Vec<Box<dyn Instrument>>>,
+    portfolio: &mut [Box<dyn Instrument>],
     type_fn: TypeShockFn,
     attr_fn: AttrShockFn,
 ) -> InstrumentShockOutcome {
-    let Some(portfolio) = instruments.as_mut() else {
-        let mut warnings = Vec::new();
-        if types.is_some() {
-            warnings.push(Warning::InstrumentShockNoPortfolio {
-                shock_kind: kind.to_string(),
-                filter: "type".to_string(),
-            });
-        }
-        if attrs.is_some() {
-            warnings.push(Warning::InstrumentShockNoPortfolio {
-                shock_kind: kind.to_string(),
-                filter: "attr".to_string(),
-            });
-        }
-        return InstrumentShockOutcome {
-            count: 0,
-            changed_indices: Vec::new(),
-            warnings,
-        };
-    };
-
     let mut applied = 0;
     let mut changed_indices = Vec::new();
     let mut warnings = Vec::new();
@@ -78,12 +56,8 @@ pub(super) enum CorrelationKind {
 pub(super) fn apply_correlation_effect(
     kind: CorrelationKind,
     delta_pts: f64,
-    ctx: &mut super::ExecutionContext,
+    instruments: &mut [Box<dyn Instrument>],
 ) -> (usize, Vec<usize>, Vec<Warning>) {
-    let Some(instruments) = ctx.instruments.as_mut() else {
-        return (0, Vec::new(), vec![Warning::CorrelationShockNoPortfolio]);
-    };
-
     let mut changed_indices = Vec::new();
     let mut warnings = Vec::new();
 

@@ -14,8 +14,8 @@ mod tests;
 
 pub(crate) use types::HazardApplyEnv;
 pub use types::{
-    ApplicationEnvelope, ApplicationReport, ExecutionContext, RollForwardReport,
-    ScenarioChangeManifest, ScenarioMarketTarget,
+    instrument_envelopes, ApplicationEnvelope, ApplicationReport, ExecutionContext,
+    RollForwardReport, ScenarioChangeManifest, ScenarioMarketTarget,
 };
 
 use crate::adapters::traits::ScenarioEffect;
@@ -26,6 +26,7 @@ use effects::{
     apply_generated_effects, flush_pending_bumps, generate_replace_curve_effects_parallel,
     independent_replace_curve_run_len, process_effects, should_parallel_replace_curves, EffectSink,
 };
+use finstack_quant_calibration::recalibration::CachedRecalibrationProvider;
 use finstack_quant_core::dates::HolidayCalendar;
 use finstack_quant_core::market_data::bumps::MarketBump;
 use finstack_quant_core::market_data::context::MarketContext;
@@ -140,18 +141,34 @@ fn par_cds_hazard_rolls(
     Ok(hazard_rolls)
 }
 
+/// Error message for instrument-scoped operations applied without an inventory.
+const MISSING_INSTRUMENTS: &str = "scenario contains instrument-scoped operations \
+    (instrument_price_pct_by_*, instrument_spread_bp_by_*, asset_correlation_pts, \
+    prepay_default_correlation_pts) but no instruments were supplied; supply the \
+    instrument inventory or remove those operations";
+
 /// Deterministic scenario applicator.
 ///
 /// Owns the active [`FinstackConfig`](finstack_quant_core::config::FinstackConfig)
-/// (stamped into reports) and an optional shared quote-recalibration provider.
+/// (stamped into reports) and the quote-recalibration provider used by
+/// solve-to-par ParCDS shocks and hazard time-roll replay. Every constructor
+/// attaches a fresh [`CachedRecalibrationProvider`]; callers sharing one cache
+/// across an immutable batch replace it with
+/// [`with_recalibration_provider`](Self::with_recalibration_provider).
 /// All other mutable inputs come from [`ExecutionContext`].
-#[derive(Default, Clone)]
+#[derive(Clone)]
 pub struct ScenarioEngine {
     /// Active configuration; its rounding mode is stamped into
     /// [`ApplicationReport::meta`].
     config: finstack_quant_core::config::FinstackConfig,
-    /// Optional provider reused across calls belonging to one immutable batch.
-    recalibration_provider: Option<Arc<dyn RecalibrationProvider>>,
+    /// Provider reused across calls belonging to one immutable batch.
+    recalibration_provider: Arc<dyn RecalibrationProvider>,
+}
+
+impl Default for ScenarioEngine {
+    fn default() -> Self {
+        Self::with_config(finstack_quant_core::config::FinstackConfig::default())
+    }
 }
 
 impl std::fmt::Debug for ScenarioEngine {
@@ -159,23 +176,20 @@ impl std::fmt::Debug for ScenarioEngine {
         formatter
             .debug_struct("ScenarioEngine")
             .field("config", &self.config)
-            .field(
-                "has_recalibration_provider",
-                &self.recalibration_provider.is_some(),
-            )
             .finish()
     }
 }
 
 impl ScenarioEngine {
-    /// Create a new scenario engine with the default configuration.
+    /// Create a new scenario engine with the default configuration and a
+    /// fresh [`CachedRecalibrationProvider`].
     ///
     /// # Examples
     /// ```rust
     /// use finstack_quant_scenarios::ScenarioEngine;
     ///
     /// let engine = ScenarioEngine::new();
-    /// assert!(engine.recalibration_provider().is_none());
+    /// let _provider = engine.recalibration_provider();
     /// ```
     #[must_use]
     pub fn new() -> Self {
@@ -185,7 +199,9 @@ impl ScenarioEngine {
     /// Create a scenario engine carrying the caller's active configuration.
     ///
     /// The configuration's rounding mode is stamped into
-    /// [`ApplicationReport::meta`].
+    /// [`ApplicationReport::meta`]. A fresh [`CachedRecalibrationProvider`]
+    /// is attached, so solve-to-par ParCDS shocks and hazard time-roll replay
+    /// work without further wiring.
     ///
     /// # Arguments
     ///
@@ -195,11 +211,12 @@ impl ScenarioEngine {
     pub fn with_config(config: finstack_quant_core::config::FinstackConfig) -> Self {
         Self {
             config,
-            recalibration_provider: None,
+            recalibration_provider: Arc::new(CachedRecalibrationProvider::new()),
         }
     }
 
-    /// Inject the quote-recalibration service for one immutable scenario batch.
+    /// Replace the default quote-recalibration service with one shared across
+    /// an immutable scenario batch.
     ///
     /// # Arguments
     ///
@@ -207,15 +224,16 @@ impl ScenarioEngine {
     ///   operations on this engine.
     #[must_use]
     pub fn with_recalibration_provider(mut self, provider: Arc<dyn RecalibrationProvider>) -> Self {
-        self.recalibration_provider = Some(provider);
+        self.recalibration_provider = provider;
         self
     }
 
-    /// The recalibration provider attached with
-    /// [`with_recalibration_provider`](Self::with_recalibration_provider), if any.
+    /// The recalibration provider this engine uses: the default
+    /// [`CachedRecalibrationProvider`] or the one attached with
+    /// [`with_recalibration_provider`](Self::with_recalibration_provider).
     #[must_use]
-    pub fn recalibration_provider(&self) -> Option<&Arc<dyn RecalibrationProvider>> {
-        self.recalibration_provider.as_ref()
+    pub fn recalibration_provider(&self) -> &Arc<dyn RecalibrationProvider> {
+        &self.recalibration_provider
     }
 
     /// Apply a scenario specification to the execution context.
@@ -246,7 +264,11 @@ impl ScenarioEngine {
     ///
     /// # Errors
     ///
-    /// Returns validation errors for an invalid spec, unsupported operation
+    /// Returns a validation error when `spec` contains instrument-scoped
+    /// operations (instrument price or spread shocks, asset or prepay-default
+    /// correlation shocks) and `ctx.instruments` is `None`; this check runs
+    /// after spec validation and before any mutation. Returns validation
+    /// errors for an invalid spec, unsupported operation
     /// data, missing market objects, or hierarchy-targeted operations without
     /// an attached hierarchy. Because execution is not atomic, an error can
     /// follow successful mutation by earlier operations.
@@ -262,6 +284,9 @@ impl ScenarioEngine {
         ctx: &mut ExecutionContext,
     ) -> Result<ApplicationReport> {
         spec.validate()?;
+        if spec.mutates_instruments() && ctx.instruments.is_none() {
+            return Err(crate::error::Error::validation(MISSING_INSTRUMENTS));
+        }
 
         let mut applied = 0;
         let mut warnings: Vec<Warning> = Vec::new();
@@ -298,7 +323,7 @@ impl ScenarioEngine {
                 period,
                 roll_mode,
                 &hazard_rolls,
-                self.recalibration_provider.as_deref(),
+                &*self.recalibration_provider,
             )?;
             applied += 1;
             for (instrument_id, reason) in &roll_report.failed_instruments {
@@ -363,7 +388,7 @@ impl ScenarioEngine {
 
                 let env = HazardApplyEnv {
                     mode: spec.hazard_bump_mode,
-                    provider: self.recalibration_provider.as_deref(),
+                    provider: &*self.recalibration_provider,
                     source_markets: Some(&hazard_sources),
                 };
                 let run_len = independent_replace_curve_run_len(&expanded_ops[idx..]);

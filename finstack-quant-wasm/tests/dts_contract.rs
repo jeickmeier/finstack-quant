@@ -682,7 +682,17 @@ fn scenarios_dts_matches_structured_surface() {
     assert!(contains_ignoring_ws(&dts, "warnings: ScenarioWarning[];"));
     assert!(contains_ignoring_ws(
         &dts,
-        "computeHorizonReturn(instrumentJson: JsonInput, marketJson: JsonInput, asOf: string, scenarioJson: JsonInput, method?: string, configJson?: JsonInput, calendarId?: string): Record<string, unknown>;",
+        "computeHorizonReturn(instrumentJson: JsonInput, marketJson: JsonInput, asOf: string, scenarioJson: JsonInput, method?: 'parallel' | 'waterfall' | 'metrics_based' | 'taylor', configJson?: JsonInput, calendarId?: string): HorizonResult;",
+    ));
+    assert!(dts.contains("export interface HorizonResult"));
+    assert!(contains_ignoring_ws(&dts, "summary: HorizonSummary;"));
+    assert!(contains_ignoring_ws(
+        &dts,
+        "applyScenario(scenarioJson: JsonInput, marketJson: JsonInput, modelJson: JsonInput, asOf: string, instrumentsJson?: JsonInput, configJson?: JsonInput): ScenarioApplyResult;",
+    ));
+    assert!(contains_ignoring_ws(
+        &dts,
+        "applyScenarioToMarket(scenarioJson: JsonInput, marketJson: JsonInput, asOf: string, instrumentsJson?: JsonInput, configJson?: JsonInput): ScenarioApplyMarketResult;",
     ));
     // `priority` mirrors the Rust serde default (0) and the Python keyword
     // default, so it must stay optional.

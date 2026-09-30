@@ -386,6 +386,41 @@ pub fn parse_boxed_instrument_from_json(
     ))
 }
 
+/// Parse a JSON array of canonical instrument envelopes into validated
+/// instruments, in input order.
+///
+/// This is the inventory counterpart of [`parse_boxed_instrument_from_json`]:
+/// the whole array is capped at [`MAX_JSON_BYTES`], parse failures carry the
+/// same `invalid instrument envelope JSON` prefix, and every instrument is
+/// validated before it is boxed.
+///
+/// # Arguments
+///
+/// * `json` - UTF-8 JSON array whose elements are canonical v1 instrument
+///   envelopes (`{"schema": ..., "instrument": {...}}`). An empty array yields
+///   an empty inventory.
+///
+/// # Errors
+///
+/// Returns `Error::Validation` when `json` exceeds the size cap, is not an
+/// array of well-formed envelopes, or any instrument fails domain validation.
+pub fn parse_boxed_instruments_from_json(
+    json: &str,
+) -> finstack_quant_core::Result<Vec<Box<dyn Instrument>>> {
+    if json.len() > MAX_JSON_BYTES {
+        return Err(Error::Validation(format!(
+            "Instrument JSON input exceeds the {} MiB size limit",
+            MAX_JSON_BYTES / (1024 * 1024)
+        )));
+    }
+    let envelopes: Vec<InstrumentEnvelope> = serde_json::from_str(json)
+        .map_err(|error| Error::Validation(format!("invalid instrument envelope JSON: {error}")))?;
+    envelopes
+        .into_iter()
+        .map(InstrumentEnvelope::into_boxed)
+        .collect()
+}
+
 /// Parse a concrete model key used by the JSON pricing helpers.
 ///
 /// This function only accepts named [`ModelKey`] values. The special
@@ -1206,6 +1241,40 @@ mod tests {
             .expect_err("bad options")
             .to_string()
             .contains("invalid metric_pricing_overrides JSON"));
+    }
+
+    #[test]
+    fn instrument_inventory_parses_envelopes_in_order_and_shares_error_text() {
+        let json = bond_instrument_json();
+        let inventory =
+            parse_boxed_instruments_from_json(&format!("[{json},{json}]")).expect("inventory");
+        assert_eq!(inventory.len(), 2);
+        assert_eq!(inventory[0].id(), "TEST-BOND");
+        assert!(parse_boxed_instruments_from_json("[]")
+            .expect("empty inventory")
+            .is_empty());
+
+        let bare: Value = serde_json::from_str::<Value>(&json).expect("json")["instrument"].clone();
+        let single = parse_boxed_instrument_from_json(&bare.to_string(), None)
+            .err()
+            .expect("bare instrument must be rejected")
+            .to_string();
+        let many = parse_boxed_instruments_from_json(&format!("[{bare}]"))
+            .err()
+            .expect("bare instrument must be rejected")
+            .to_string();
+        assert!(
+            single.contains("invalid instrument envelope JSON"),
+            "{single}"
+        );
+        assert!(many.contains("invalid instrument envelope JSON"), "{many}");
+
+        let oversized = format!("[{}]", " ".repeat(MAX_JSON_BYTES));
+        let error = parse_boxed_instruments_from_json(&oversized)
+            .err()
+            .expect("oversized inventory must be rejected")
+            .to_string();
+        assert!(error.contains("size limit"), "{error}");
     }
 
     #[test]

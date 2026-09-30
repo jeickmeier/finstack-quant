@@ -65,7 +65,7 @@ pub(crate) struct HazardApplyEnv<'a> {
     /// Solve-to-par versus first-order hazard-knot delivery.
     pub mode: HazardBumpMode,
     /// Quote-recalibration service shared by this immutable scenario batch.
-    pub provider: Option<&'a dyn RecalibrationProvider>,
+    pub provider: &'a dyn RecalibrationProvider,
     /// Dependency snapshots against which each current hazard recipe was calibrated.
     pub source_markets: Option<
         &'a IndexMap<
@@ -273,6 +273,40 @@ pub struct ApplicationReport {
     pub time_roll: Option<RollForwardReport>,
 }
 
+/// Encode an instrument inventory as canonical envelopes, in input order.
+///
+/// This is the encoding [`ApplicationEnvelope::from_contexts`] uses for its
+/// `instruments` field; host bindings call it to return shocked copies without
+/// serializing the whole envelope.
+///
+/// # Arguments
+///
+/// * `inventory` - Instruments to encode, typically the shocked copies left in
+///   [`ExecutionContext::instruments`] after [`super::ScenarioEngine::apply`].
+///
+/// # Errors
+///
+/// Returns a serialization error naming the instrument when an instrument does
+/// not support its canonical JSON serializer (custom instruments).
+pub fn instrument_envelopes(
+    inventory: &[Box<dyn Instrument>],
+) -> serde_json::Result<Vec<InstrumentEnvelope>> {
+    inventory
+        .iter()
+        .map(|instrument| {
+            instrument
+                .to_instrument_json()
+                .map(InstrumentEnvelope::new)
+                .ok_or_else(|| {
+                    <serde_json::Error as serde::ser::Error>::custom(format!(
+                        "Instrument '{}' does not support canonical serialization",
+                        instrument.id()
+                    ))
+                })
+        })
+        .collect()
+}
+
 /// JSON envelope returned after applying a scenario to market data and,
 /// optionally, a financial model.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -331,24 +365,7 @@ impl ApplicationEnvelope {
         Ok(Self {
             market: serde_json::to_value(market)?,
             model: model.map(serde_json::to_value).transpose()?,
-            instruments: instruments
-                .map(|inventory| {
-                    inventory
-                        .iter()
-                        .map(|instrument| {
-                            instrument
-                                .to_instrument_json()
-                                .map(InstrumentEnvelope::new)
-                                .ok_or_else(|| {
-                                    <serde_json::Error as serde::ser::Error>::custom(format!(
-                                        "Instrument '{}' does not support canonical serialization",
-                                        instrument.id()
-                                    ))
-                                })
-                        })
-                        .collect::<serde_json::Result<Vec<_>>>()
-                })
-                .transpose()?,
+            instruments: instruments.map(instrument_envelopes).transpose()?,
             operations_applied: report.operations_applied,
             user_operations: report.user_operations,
             expanded_operations: report.expanded_operations,

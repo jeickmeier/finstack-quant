@@ -20,17 +20,8 @@ fn apply_with_context(
     model: Option<&mut finstack_quant_statements::FinancialModelSpec>,
     as_of: time::Date,
     instruments: Option<&mut Vec<Box<dyn finstack_quant_valuations::instruments::Instrument>>>,
+    config: finstack_quant_core::config::FinstackConfig,
 ) -> Result<finstack_quant_scenarios::engine::ApplicationReport, JsValue> {
-    if spec.mutates_instruments() && instruments.is_none() {
-        return Err(to_js_err(
-            "scenario contains instrument-scoped operations but no instruments were supplied",
-        ));
-    }
-    let engine = finstack_quant_scenarios::ScenarioEngine::new().with_recalibration_provider(
-        std::sync::Arc::new(
-            finstack_quant_calibration::recalibration::CachedRecalibrationProvider::new(),
-        ),
-    );
     let mut ctx = finstack_quant_scenarios::ExecutionContext {
         market,
         model,
@@ -39,7 +30,21 @@ fn apply_with_context(
         calendar: None,
         as_of,
     };
-    engine.apply(spec, &mut ctx).map_err(to_js_err)
+    finstack_quant_scenarios::ScenarioEngine::with_config(config)
+        .apply(spec, &mut ctx)
+        .map_err(to_js_err)
+}
+
+/// Parse the optional `FinstackConfig` argument; omitted means the Rust default.
+fn parse_config(
+    config_json: Option<&JsValue>,
+) -> Result<finstack_quant_core::config::FinstackConfig, JsValue> {
+    opt_json_text(config_json, "configJson")?
+        .as_deref()
+        .map(serde_json::from_str)
+        .transpose()
+        .map_err(to_js_err)
+        .map(Option::unwrap_or_default)
 }
 
 /// Parse and validate a scenario specification from JSON.
@@ -65,10 +70,13 @@ pub fn parse_scenario_spec(json_str: JsValue) -> Result<JsValue, JsValue> {
 ///
 /// # Errors
 ///
-/// Rejects malformed structured specs, input specs with mixed
-/// `hazard_bump_mode` values, composition that contains more than one time-roll
-/// operation, or failure to convert the composed specification.
-/// @param specs - Validated ScenarioSpec objects to compose in priority order.
+/// Rejects malformed structured specs, any input spec that fails
+/// `ScenarioSpec` validation (blank ID, non-finite numbers, invalid
+/// identifiers, tenors or operations; the message names the scenario), input
+/// specs with mixed `hazard_bump_mode` values, composition that contains more
+/// than one time-roll operation, or failure to convert the composed
+/// specification.
+/// @param specs - ScenarioSpec objects to validate and compose in priority order.
 #[wasm_bindgen(js_name = composeScenarios)]
 pub fn compose_scenarios(specs: JsValue) -> Result<JsValue, JsValue> {
     let specs: Vec<finstack_quant_scenarios::ScenarioSpec> = from_js_json(&specs, "specs")?;
@@ -92,10 +100,7 @@ pub fn compose_scenarios(specs: JsValue) -> Result<JsValue, JsValue> {
 #[wasm_bindgen(js_name = validateScenarioSpec)]
 pub fn validate_scenario_spec(json_str: JsValue) -> Result<(), JsValue> {
     let json_str: &str = &json_text(&json_str, "jsonStr")?;
-    let spec: finstack_quant_scenarios::ScenarioSpec =
-        serde_json::from_str(json_str).map_err(to_js_err)?;
-
-    spec.validate().map_err(to_js_err)?;
+    finstack_quant_scenarios::ScenarioSpec::from_json(json_str).map_err(to_js_err)?;
     Ok(())
 }
 
@@ -252,15 +257,10 @@ pub fn build_scenario_spec(
 fn extract_instruments(
     json: Option<String>,
 ) -> Result<Option<Vec<Box<dyn finstack_quant_valuations::instruments::Instrument>>>, JsValue> {
-    json.map(|json| {
-        let envelopes: Vec<finstack_quant_valuations::instruments::InstrumentEnvelope> =
-            serde_json::from_str(&json).map_err(to_js_err)?;
-        envelopes
-            .into_iter()
-            .map(|envelope| envelope.into_boxed().map_err(to_js_err))
-            .collect()
-    })
-    .transpose()
+    json.as_deref()
+        .map(finstack_quant_valuations::pricer::json::parse_boxed_instruments_from_json)
+        .transpose()
+        .map_err(to_js_err)
 }
 
 /// Apply a scenario to a market context and financial model.
@@ -274,12 +274,15 @@ fn extract_instruments(
 /// scenario contained a `time_roll_forward` operation).
 ///
 /// Optional instrument envelopes are copied and returned in `instruments`, in
-/// input order. Instrument-scoped operations require an inventory. No holiday
-/// calendar is supplied; business-day rolls adjust without holiday information.
+/// input order. The Rust engine rejects instrument-scoped operations without
+/// an inventory. No holiday calendar is supplied; business-day rolls adjust
+/// without holiday information.
 ///
 /// # Errors
 ///
-/// Rejects malformed scenario, market, or model JSON, a model that fails
+/// Rejects a malformed or invalid scenario (checked before the market is
+/// parsed), malformed market, model, instrument, or configuration JSON,
+/// instrument-scoped operations without `instruments_json`, a model that fails
 /// semantic validation (the same `FinancialModelSpec::from_json` check the
 /// statements exports and Python `apply_scenario` apply), an invalid ISO
 /// `as_of` date, an invalid scenario operation, missing market objects or
@@ -291,6 +294,7 @@ fn extract_instruments(
 /// @param model_json - JSON-serialized FinancialModelSpec that scenario operations may mutate.
 /// @param as_of - ISO-8601 valuation date used to resolve date-dependent market data.
 /// @param instruments_json - Optional JSON array of canonical instrument envelopes; required for instrument shocks and returned as shocked copies in input order.
+/// @param config_json - Optional FinstackConfig JSON; its rounding policy is stamped into `meta`. Omit for the library default.
 #[wasm_bindgen(js_name = applyScenario)]
 pub fn apply_scenario(
     scenario_json: JsValue,
@@ -298,14 +302,16 @@ pub fn apply_scenario(
     model_json: JsValue,
     as_of: JsValue,
     instruments_json: Option<JsValue>,
+    config_json: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
     let scenario_json: &str = &json_text(&scenario_json, "scenarioJson")?;
     let market_json: &str = &json_text(&market_json, "marketJson")?;
     let model_json: &str = &json_text(&model_json, "modelJson")?;
     let as_of: &str = &js_string(&as_of, "asOf")?;
     let instruments_json = opt_json_text(instruments_json.as_ref(), "instrumentsJson")?;
-    let spec: finstack_quant_scenarios::ScenarioSpec =
-        serde_json::from_str(scenario_json).map_err(to_js_err)?;
+    let config = parse_config(config_json.as_ref())?;
+    let spec =
+        finstack_quant_scenarios::ScenarioSpec::from_json(scenario_json).map_err(to_js_err)?;
     let mut market: finstack_quant_core::market_data::context::MarketContext =
         serde_json::from_str(market_json).map_err(to_js_err)?;
     let mut model =
@@ -318,6 +324,7 @@ pub fn apply_scenario(
         Some(&mut model),
         date,
         instruments.as_mut(),
+        config,
     )?;
     let out = finstack_quant_scenarios::ApplicationEnvelope::from_contexts(
         report,
@@ -332,11 +339,13 @@ pub fn apply_scenario(
 /// Apply a scenario to a market context only (no model mutations).
 ///
 /// Returns the same envelope shape as [`apply_scenario`] minus `model`;
-/// the same inventory and calendar rules apply.
+/// the same inventory, configuration and calendar rules apply.
 ///
 /// # Errors
 ///
-/// Rejects malformed scenario or market JSON, an invalid ISO `as_of` date, an
+/// Rejects a malformed or invalid scenario (checked before the market is
+/// parsed), malformed market, instrument, or configuration JSON,
+/// instrument-scoped operations without `instruments_json`, an invalid ISO `as_of` date, an
 /// invalid scenario operation, missing market objects or hierarchy context,
 /// failure to encode the mutated market, or failure to serialize the
 /// application envelope to JavaScript.
@@ -344,24 +353,27 @@ pub fn apply_scenario(
 /// @param market_json - Canonical market-context JSON supplying curves, quotes, and FX data.
 /// @param as_of - ISO-8601 valuation date used to resolve date-dependent market data.
 /// @param instruments_json - Optional JSON array of canonical instrument envelopes; required for instrument shocks and returned as shocked copies in input order.
+/// @param config_json - Optional FinstackConfig JSON; its rounding policy is stamped into `meta`. Omit for the library default.
 #[wasm_bindgen(js_name = applyScenarioToMarket)]
 pub fn apply_scenario_to_market(
     scenario_json: JsValue,
     market_json: JsValue,
     as_of: JsValue,
     instruments_json: Option<JsValue>,
+    config_json: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
     let scenario_json: &str = &json_text(&scenario_json, "scenarioJson")?;
     let market_json: &str = &json_text(&market_json, "marketJson")?;
     let as_of: &str = &js_string(&as_of, "asOf")?;
     let instruments_json = opt_json_text(instruments_json.as_ref(), "instrumentsJson")?;
-    let spec: finstack_quant_scenarios::ScenarioSpec =
-        serde_json::from_str(scenario_json).map_err(to_js_err)?;
+    let config = parse_config(config_json.as_ref())?;
+    let spec =
+        finstack_quant_scenarios::ScenarioSpec::from_json(scenario_json).map_err(to_js_err)?;
     let mut market: finstack_quant_core::market_data::context::MarketContext =
         serde_json::from_str(market_json).map_err(to_js_err)?;
     let date = parse_iso_date(as_of)?;
     let mut instruments = extract_instruments(instruments_json)?;
-    let report = apply_with_context(&spec, &mut market, None, date, instruments.as_mut())?;
+    let report = apply_with_context(&spec, &mut market, None, date, instruments.as_mut(), config)?;
     let out = finstack_quant_scenarios::ApplicationEnvelope::from_contexts(
         report,
         &market,
@@ -383,16 +395,24 @@ pub fn apply_scenario_to_market(
 /// * `market_json` - JSON-serialized `MarketContext`.
 /// * `as_of` - Valuation date (ISO 8601).
 /// * `scenario_json` - JSON-serialized `ScenarioSpec`.
-/// * `method` - Attribution method: "parallel", "waterfall", "metrics_based", "taylor".
+/// * `method` - Attribution method: "parallel", "waterfall", "metrics_based",
+///   "taylor". Omit for the Rust default (`AttributionMethod::default()`,
+///   currently "parallel").
 ///
 /// # Returns
 ///
-/// The `HorizonResult` as a structured JavaScript object, matching the Python
-/// binding's typed `HorizonResult`.
+/// The serde `HorizonResult` (`attribution`, `initial_value` and
+/// `terminal_value` as exact-decimal Money objects, `horizon_days`, null
+/// without a time roll, and `scenario_report`) plus `summary`: the Rust-computed
+/// `total_return`, `annualized_return`, `currency` and `factor_contributions`
+/// that Python exposes as `HorizonResult` accessors. Undefined returns
+/// (currency mismatch, non-positive initial value) are null here and NaN in
+/// Python.
 ///
 /// # Errors
 ///
-/// Rejects malformed instrument, market, scenario, or configuration JSON; an
+/// Rejects a malformed or invalid scenario; malformed instrument, market, or
+/// configuration JSON; an
 /// invalid ISO `as_of` date; an unsupported attribution `method`; an unknown
 /// `calendar_id`; invalid, unsupported, or unresolved scenario operations;
 /// missing market data; pricing or attribution failures; or failure to
@@ -416,7 +436,7 @@ pub fn compute_horizon_return(
     let as_of: &str = &js_string(&as_of, "asOf")?;
     let scenario_json: &str = &json_text(&scenario_json, "scenarioJson")?;
     let method = js_opt_string(method.as_ref(), "method")?;
-    let config_json = opt_json_text(config_json.as_ref(), "configJson")?;
+    let config = parse_config(config_json.as_ref())?;
     let calendar_id = js_opt_string(calendar_id.as_ref(), "calendarId")?;
     use std::sync::Arc;
 
@@ -433,27 +453,18 @@ pub fn compute_horizon_return(
 
     let date = parse_iso_date(as_of)?;
 
-    let scenario: finstack_quant_scenarios::ScenarioSpec =
-        serde_json::from_str(scenario_json).map_err(to_js_err)?;
+    let scenario =
+        finstack_quant_scenarios::ScenarioSpec::from_json(scenario_json).map_err(to_js_err)?;
 
-    let method_str = method.as_deref().unwrap_or("parallel");
-    let attribution_method =
-        finstack_quant_scenarios::horizon::attribution_method_from_str(method_str)
-            .map_err(to_js_err)?;
+    let attribution_method = method
+        .as_deref()
+        .map(finstack_quant_scenarios::horizon::attribution_method_from_str)
+        .transpose()
+        .map_err(to_js_err)?
+        .unwrap_or_default();
 
-    let finstack_config: finstack_quant_core::config::FinstackConfig = match config_json.as_deref()
-    {
-        Some(json) => serde_json::from_str(json).map_err(to_js_err)?,
-        None => finstack_quant_core::config::FinstackConfig::default(),
-    };
-
-    let mut analyzer = finstack_quant_scenarios::horizon::HorizonAnalysis::new(
-        attribution_method,
-        finstack_config,
-    )
-    .with_recalibration_provider(Arc::new(
-        finstack_quant_calibration::recalibration::CachedRecalibrationProvider::new(),
-    ));
+    let mut analyzer =
+        finstack_quant_scenarios::horizon::HorizonAnalysis::new(attribution_method, config);
     if let Some(id) = calendar_id.as_deref() {
         analyzer = analyzer.with_calendar_id(id);
     }
@@ -461,7 +472,7 @@ pub fn compute_horizon_return(
         .compute(&instrument, &market, date, &scenario)
         .map_err(to_js_err)?;
 
-    crate::utils::to_js_value(&result)
+    crate::utils::to_js_value(&result.report())
 }
 
 #[cfg(test)]

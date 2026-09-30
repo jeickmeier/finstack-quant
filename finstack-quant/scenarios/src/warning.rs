@@ -118,23 +118,11 @@ pub enum Warning {
         label: String,
     },
 
-    /// Instrument shock was requested but no instruments were supplied via the
-    /// execution context.
-    InstrumentShockNoPortfolio {
-        /// Whether the shock is a price (`"price"`) or spread (`"spread"`).
-        shock_kind: String,
-        /// Whether the filter was by type (`"type"`) or attribute (`"attr"`).
-        filter: String,
-    },
-
     /// Instrument shock found no instruments matching the filter.
     InstrumentShockNoMatch {
         /// Free-text description of the filter (e.g. `IndexMap` debug form).
         filter_desc: String,
     },
-
-    /// Correlation shock requested but no instruments supplied.
-    CorrelationShockNoPortfolio,
 
     /// Correlation shock found no `StructuredCredit` instruments with a
     /// correlation structure.
@@ -274,15 +262,8 @@ impl fmt::Display for Warning {
                  so the shock is recorded under scenario_{shock_kind}_shock_* but will not affect \
                  valuation unless the downstream consumer reads that metadata."
             ),
-            Warning::InstrumentShockNoPortfolio { shock_kind, filter } => write!(
-                f,
-                "Instrument {filter} {shock_kind} shock requested but no instruments provided"
-            ),
             Warning::InstrumentShockNoMatch { filter_desc } => {
                 write!(f, "No instruments matched attribute filter {filter_desc}")
-            }
-            Warning::CorrelationShockNoPortfolio => {
-                f.write_str("Correlation shock requested but no instruments provided")
             }
             Warning::CorrelationShockNoMatch => f.write_str(
                 "Correlation shock: no StructuredCredit instruments with correlation structure found",

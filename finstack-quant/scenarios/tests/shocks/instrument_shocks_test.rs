@@ -582,12 +582,14 @@ fn test_instrument_shock_without_instruments_provided() {
         as_of: base_date,
     };
 
-    let report = engine.apply(&scenario, &mut ctx).unwrap();
-    assert_eq!(report.operations_applied, 0);
-    assert!(!report.warnings.is_empty(), "Should have warning");
-    assert!(report.warnings[0]
-        .to_string()
-        .contains("no instruments provided"));
+    let error = engine
+        .apply(&scenario, &mut ctx)
+        .expect_err("instrument-scoped operations need an inventory");
+    assert!(
+        matches!(&error, finstack_quant_scenarios::Error::Validation(message)
+            if message.contains("no instruments were supplied")),
+        "{error}"
+    );
 }
 
 #[test]

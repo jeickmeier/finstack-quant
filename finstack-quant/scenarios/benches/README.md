@@ -35,7 +35,7 @@ save and diff a `main` baseline, failing above a 10% median regression.
 | `vol_surface_shock` | `parallel`, `bucket` equity vol |
 | `credit_vol_shock` | `parallel`, `bucket` credit vol |
 | `base_correlation_shock` | `parallel`, `bucket` base correlation |
-| `instrument_spread_shock` | `by_type` spread shock, no instruments in context (measures dispatch, not mutation) |
+| `instrument_spread_shock` | `by_type` spread shock over an empty inventory (measures dispatch, not mutation) |
 | `statement_operations` | `forecast_percent`, `forecast_assign` |
 | `complex_multi_operation` | `10_operations` mixed scenario |
 | `comprehensive_credit_scenario` | `credit_stress` multi-leg |

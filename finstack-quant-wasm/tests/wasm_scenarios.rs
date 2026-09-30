@@ -69,6 +69,7 @@ fn apply_scenario_empty_spec() {
         JsValue::from(&model),
         JsValue::from("2024-01-15"),
         None,
+        None,
     )
     .unwrap();
     let obj: serde_json::Value = serde_wasm_bindgen::from_value(result).unwrap();
@@ -89,6 +90,7 @@ fn apply_scenario_rejects_a_model_without_periods() {
         JsValue::from(&serde_json::to_string(&model).unwrap()),
         JsValue::from("2024-01-15"),
         None,
+        None,
     )
     .expect_err("applyScenario validates the model like Python apply_scenario");
     let message = js_sys::Reflect::get(&err, &JsValue::from("message"))
@@ -106,6 +108,7 @@ fn apply_scenario_to_market_empty_spec() {
         JsValue::from(&scenario),
         JsValue::from(&market),
         JsValue::from("2024-06-01"),
+        None,
         None,
     )
     .unwrap();
@@ -200,6 +203,7 @@ fn instrument_copies_are_returned_and_missing_inventory_is_rejected() {
         JsValue::from(&scenario),
         JsValue::from(&empty_market_json()),
         JsValue::from("2025-01-15"),
+        None,
         None
     )
     .is_err());
@@ -211,6 +215,7 @@ fn instrument_copies_are_returned_and_missing_inventory_is_rejected() {
                 JsValue::from(&empty_model_json()),
                 JsValue::from("2025-01-15"),
                 Some(JsValue::from(inventory.clone())),
+                None,
             )
         } else {
             apply_scenario_to_market(
@@ -218,6 +223,7 @@ fn instrument_copies_are_returned_and_missing_inventory_is_rejected() {
                 JsValue::from(&empty_market_json()),
                 JsValue::from("2025-01-15"),
                 Some(JsValue::from(inventory.clone())),
+                None,
             )
         }
         .unwrap();

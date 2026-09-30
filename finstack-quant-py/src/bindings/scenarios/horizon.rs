@@ -7,7 +7,7 @@ use crate::errors::{core_to_py, display_to_py, scenarios_to_py};
 use pyo3::prelude::*;
 
 use super::engine::PyApplicationReport;
-use super::extract::{extract_config, extract_scenario_spec, recalibration_provider};
+use super::extract::{extract_config, extract_scenario_spec};
 
 /// Compute horizon total return under a scenario.
 ///
@@ -27,9 +27,10 @@ use super::extract::{extract_config, extract_scenario_spec, recalibration_provid
 ///     Valuation date (ISO 8601 accepted, e.g. ``"2025-01-15"``).
 /// scenario : ScenarioSpec | str
 ///     Typed scenario or JSON-serialized ``ScenarioSpec``.
-/// method : str, default "parallel"
+/// method : str | None, default None
 ///     Attribution method: ``"parallel"``, ``"waterfall"``,
-///     ``"metrics_based"``, or ``"taylor"``. ``"metrics_based"`` re-prices
+///     ``"metrics_based"``, or ``"taylor"``. ``None`` selects the Rust default
+///     (``AttributionMethod::default()``, currently ``"parallel"``). ``"metrics_based"`` re-prices
 ///     the instrument with the default attribution metric set (DV01, CS01,
 ///     vega, ...) under the same configuration and recalibration provider
 ///     the scenario engine uses; instruments lacking a metric raise
@@ -68,7 +69,7 @@ use super::extract::{extract_config, extract_scenario_spec, recalibration_provid
 /// in that case. The GIL is released while the scenario and attribution
 /// computations run.
 #[pyfunction]
-#[pyo3(signature = (instrument, market, as_of, scenario, method = "parallel", config = None, calendar_id = None))]
+#[pyo3(signature = (instrument, market, as_of, scenario, method = None, config = None, calendar_id = None))]
 // Arity is fixed by the documented Python keyword signature; grouping into a
 // params struct would change the public API.
 #[allow(clippy::too_many_arguments)]
@@ -78,23 +79,30 @@ pub(crate) fn compute_horizon_return<'py>(
     market: &Bound<'py, PyAny>,
     as_of: &Bound<'py, PyAny>,
     scenario: &Bound<'py, PyAny>,
-    method: &str,
+    method: Option<&str>,
     config: Option<&Bound<'py, PyAny>>,
     calendar_id: Option<&str>,
 ) -> PyResult<PyHorizonResult> {
-    use finstack_quant_valuations::instruments::InstrumentEnvelope;
     use std::sync::Arc;
 
     let instrument_json = extract_instrument_json(instrument)?;
-    let boxed = InstrumentEnvelope::from_str(&instrument_json).map_err(core_to_py)?;
-    let instrument: Arc<dyn finstack_quant_valuations::instruments::Instrument> = Arc::from(boxed);
+    let boxed = finstack_quant_valuations::pricer::json::parse_boxed_instrument_from_json(
+        &instrument_json,
+        None,
+    )
+    .map_err(core_to_py)?;
+    let instrument: Arc<dyn finstack_quant_valuations::instruments::Instrument> =
+        Arc::from(boxed.into_boxed());
 
     // Owned copy so the compute can run without the GIL.
     let market_ctx = extract_market(py, market)?;
     let date = crate::bindings::date_utils::extract_date(as_of)?;
     let scenario = extract_scenario_spec(scenario)?;
-    let attribution_method = finstack_quant_scenarios::horizon::attribution_method_from_str(method)
-        .map_err(scenarios_to_py)?;
+    let attribution_method = method
+        .map(finstack_quant_scenarios::horizon::attribution_method_from_str)
+        .transpose()
+        .map_err(scenarios_to_py)?
+        .unwrap_or_default();
     let finstack_config = extract_config(config)?;
 
     // Run analysis with the GIL released: horizon attribution revalues the
@@ -103,8 +111,7 @@ pub(crate) fn compute_horizon_return<'py>(
     let mut analyzer = finstack_quant_scenarios::horizon::HorizonAnalysis::new(
         attribution_method,
         finstack_config,
-    )
-    .with_recalibration_provider(recalibration_provider());
+    );
     if let Some(id) = calendar_id {
         analyzer = analyzer.with_calendar_id(id);
     }

@@ -357,55 +357,41 @@ fn first_order_par_spread_shift_scales_by_loss_given_default() {
 }
 
 #[test]
-fn solve_to_par_without_provider_is_a_hard_error() {
-    use finstack_quant_core::market_data::context::MarketContextState;
-
-    let (base_date, mut solved) = par_cds_market();
-    let before = serde_json::to_value(MarketContextState::from(&solved)).unwrap();
-    let mut model = FinancialModelSpec::new("test", vec![]);
+fn default_engine_solves_to_par_without_explicit_provider_wiring() {
+    use finstack_quant_calibration::api::{engine, schema::CalibrationEnvelope};
+    let envelope: CalibrationEnvelope = serde_json::from_str(include_str!(
+        "../../calibration/examples/market_bootstrap/03_single_name_hazard.json"
+    ))
+    .unwrap();
+    let calibrated = engine::calibrate(&envelope).expect("source calibration");
+    let mut market = MarketContext::try_from(calibrated.result.final_market).unwrap();
+    let base = market.get_hazard("ISSUER-A-CDS").unwrap().base_date();
+    let before = market.get_hazard("ISSUER-A-CDS").unwrap().hazard_rate(5.0);
     let mut ctx = ExecutionContext {
-        market: &mut solved,
-        model: Some(&mut model),
+        market: &mut market,
+        model: None,
         instruments: None,
         rate_bindings: None,
         calendar: None,
-        as_of: base_date,
+        as_of: base,
     };
-    let error = ScenarioEngine::new()
+    ScenarioEngine::new()
         .apply(
-            &ScenarioSpec {
-                id: "solve".into(),
-                name: None,
-                description: None,
-                operations: vec![OperationSpec::CurveParallelBp {
+            &regression_scenario(
+                "solve",
+                vec![OperationSpec::CurveParallelBp {
                     curve_kind: CurveKind::ParCDS,
-                    curve_id: "USD-CDS".into(),
+                    curve_id: "ISSUER-A-CDS".into(),
                     discount_curve_id: Some("USD-OIS".into()),
                     bp: 25.0,
                 }],
-                priority: 0,
-                resolution_mode: Default::default(),
-                hazard_bump_mode: HazardBumpMode::SolveToPar,
-            },
+            ),
             &mut ctx,
         )
-        .expect_err("solve-to-par requires an injected provider");
+        .expect("the default engine carries a recalibration provider");
 
-    assert_eq!(ctx.as_of, base_date);
-    assert_eq!(
-        serde_json::to_value(MarketContextState::from(&*ctx.market)).unwrap(),
-        before
-    );
-    match error {
-        finstack_quant_scenarios::Error::Core(finstack_quant_core::Error::Calibration {
-            message,
-            category,
-        }) => {
-            assert_eq!(category, "recalibration_provider_missing");
-            assert!(message.contains("par_cds_scenario"));
-        }
-        other => panic!("unexpected missing-provider error: {other}"),
-    }
+    let after = market.get_hazard("ISSUER-A-CDS").unwrap().hazard_rate(5.0);
+    assert!(after > before, "{after} vs {before}");
 }
 
 #[test]

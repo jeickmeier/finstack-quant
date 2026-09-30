@@ -10,6 +10,7 @@ use crate::warning::Warning;
 use finstack_quant_core::market_data::bumps::MarketBump;
 use finstack_quant_core::types::{CurveId, PriceId};
 use finstack_quant_core::HashSet;
+use finstack_quant_valuations::instruments::Instrument;
 
 /// Dispatch one operation to its adapter and produce effects.
 ///
@@ -352,8 +353,7 @@ pub(super) fn apply_generated_effects(
                     types.as_deref(),
                     attrs.as_ref(),
                     pct,
-                    "price",
-                    &mut ctx.instruments,
+                    inventory(&mut ctx.instruments)?,
                     adapters::instruments::apply_instrument_type_price_shock,
                     adapters::instruments::apply_instrument_attr_price_shock,
                 );
@@ -368,8 +368,7 @@ pub(super) fn apply_generated_effects(
                     types.as_deref(),
                     attrs.as_ref(),
                     bp,
-                    "spread",
-                    &mut ctx.instruments,
+                    inventory(&mut ctx.instruments)?,
                     adapters::instruments::apply_instrument_type_spread_shock,
                     adapters::instruments::apply_instrument_attr_spread_shock,
                 );
@@ -380,16 +379,22 @@ pub(super) fn apply_generated_effects(
             }
             ScenarioEffect::AssetCorrelationShock { delta_pts } => {
                 flush_pending_bumps(sink.pending_bumps, ctx.market)?;
-                let (count, indices, ws) =
-                    apply_correlation_effect(CorrelationKind::Asset, delta_pts, ctx);
+                let (count, indices, ws) = apply_correlation_effect(
+                    CorrelationKind::Asset,
+                    delta_pts,
+                    inventory(&mut ctx.instruments)?,
+                );
                 *sink.applied += count;
                 sink.changes.record_instrument_indices(indices);
                 sink.warnings.extend(ws);
             }
             ScenarioEffect::PrepayDefaultCorrelationShock { delta_pts } => {
                 flush_pending_bumps(sink.pending_bumps, ctx.market)?;
-                let (count, indices, ws) =
-                    apply_correlation_effect(CorrelationKind::PrepayDefault, delta_pts, ctx);
+                let (count, indices, ws) = apply_correlation_effect(
+                    CorrelationKind::PrepayDefault,
+                    delta_pts,
+                    inventory(&mut ctx.instruments)?,
+                );
                 *sink.applied += count;
                 sink.changes.record_instrument_indices(indices);
                 sink.warnings.extend(ws);
@@ -402,6 +407,21 @@ pub(super) fn apply_generated_effects(
         }
     }
     Ok(())
+}
+
+/// The instrument inventory an instrument-scoped effect mutates.
+///
+/// [`super::ScenarioEngine::apply`] rejects instrument-scoped operations
+/// without an inventory before any effect runs, so a missing inventory here is
+/// an engine invariant violation.
+fn inventory<'a>(
+    instruments: &'a mut Option<&mut Vec<Box<dyn Instrument>>>,
+) -> Result<&'a mut Vec<Box<dyn Instrument>>> {
+    instruments.as_deref_mut().ok_or_else(|| {
+        crate::error::Error::internal(
+            "instrument-scoped effect reached the engine without an instrument inventory",
+        )
+    })
 }
 
 /// Flush any accumulated [`MarketBump`]s through `MarketContext::bump` in a

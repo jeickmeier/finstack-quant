@@ -140,8 +140,20 @@ def test_instrument_mutating_scenario_without_instruments_raises_value_error() -
     spec = ScenarioSpec("px", [OperationSpec.instrument_price_pct_by_type(["bond"], -5.0)])
     assert spec.mutates_instruments()
     assert spec.requires_instruments()
-    with pytest.raises(ValueError, match="instruments"):
+    # Same Rust engine message as WASM applyScenarioToMarket.
+    with pytest.raises(ValueError, match="no instruments were supplied"):
         apply_scenario_to_market(spec, _market(), AS_OF)
+    blank = json.dumps({"id": "", "operations": [json.loads(spec.to_json())["operations"][0]]})
+    with pytest.raises(ValueError, match="Scenario ID cannot be empty"):
+        apply_scenario_to_market(blank, _market(), AS_OF)
+
+
+def test_bare_instrument_payloads_use_the_shared_envelope_loader() -> None:
+    bare = json.dumps(json.loads(_deposit_json())["instrument"])
+    with pytest.raises(ValueError, match="invalid instrument envelope JSON"):
+        apply_scenario_to_market(_up_25(), _market(), AS_OF, instruments=[bare])
+    with pytest.raises(ValueError, match="invalid instrument envelope JSON"):
+        compute_horizon_return(bare, _market(), AS_OF, _up_25())
 
 
 def test_time_roll_without_instruments_still_rolls_market() -> None:
@@ -250,10 +262,29 @@ def test_compute_horizon_return_config_and_method_handling() -> None:
     )
     assert with_config.total_return == pytest.approx(default.total_return)
     assert with_json_config.total_return == pytest.approx(default.total_return)
+    explicit = compute_horizon_return(_deposit_json(), _market(), AS_OF, spec, method="parallel")
+    omitted = compute_horizon_return(_deposit_json(), _market(), AS_OF, spec, method=None)
+    assert explicit.to_json() == default.to_json() == omitted.to_json()
     with pytest.raises(ValueError, match="Unknown attribution method"):
         compute_horizon_return(_deposit_json(), _market(), AS_OF, spec, method="bogus")
     with pytest.raises(KeyError):
         compute_horizon_return(_deposit_json(), _market(), AS_OF, spec, calendar_id="not-a-calendar")
+
+
+def test_compute_horizon_return_matches_the_wasm_summary() -> None:
+    # finstack-quant-wasm/tests/facade/scenarios.test.mjs pins the same values
+    # from computeHorizonReturn(...).summary on these inputs.
+    spec = ScenarioSpec(
+        "hold_1m_up25",
+        [
+            OperationSpec.time_roll_forward("1M", roll_mode="calendar_days"),
+            OperationSpec.curve_parallel_bp(CurveKind.discount(), "USD-OIS", 25.0),
+        ],
+    )
+    result = compute_horizon_return(_deposit_json(), _market(), AS_OF, spec)
+    assert result.total_return == pytest.approx(0.0023777484103168997, abs=1e-12)
+    assert result.annualized_return == pytest.approx(0.02835746876872225, abs=1e-12)
+    assert result.factor_contribution("carry") == pytest.approx(0.003408116341277966, abs=1e-12)
 
 
 def test_compute_horizon_return_rejects_instrument_scoped_operations() -> None:

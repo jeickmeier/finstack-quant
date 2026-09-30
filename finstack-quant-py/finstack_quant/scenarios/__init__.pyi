@@ -1254,8 +1254,9 @@ def apply_scenario(
     Raises
     ------
     ValueError
-        If an input fails to parse or validate, or the scenario mutates
-        instruments and ``instruments`` is ``None``.
+        If an input fails to parse or validate, or the scenario contains
+        instrument-scoped operations and ``instruments`` is ``None`` (the Rust
+        engine rejects it after validating the scenario).
     KeyError
         If the scenario references market data, statement nodes, tenors or
         instruments that do not exist.
@@ -1321,8 +1322,9 @@ def apply_scenario_to_market(
     Raises
     ------
     ValueError
-        If an input fails to parse or validate, or the scenario mutates
-        instruments and ``instruments`` is ``None``.
+        If an input fails to parse or validate, or the scenario contains
+        instrument-scoped operations and ``instruments`` is ``None`` (the Rust
+        engine rejects it after validating the scenario).
     KeyError
         If the scenario references market data, tenors or instruments that
         do not exist.
@@ -1676,7 +1678,7 @@ def compute_horizon_return(
     market: MarketContext | str,
     as_of: datetime.date | datetime.datetime | pd.Timestamp | str,
     scenario: ScenarioSpec | str,
-    method: Literal["parallel", "waterfall", "metrics_based", "taylor"] = "parallel",
+    method: Literal["parallel", "waterfall", "metrics_based", "taylor"] | None = None,
     config: FinstackConfig | str | None = None,
     calendar_id: str | None = None,
 ) -> HorizonResult:
@@ -1695,8 +1697,10 @@ def compute_horizon_return(
         Valuation date (ISO 8601 accepted).
     scenario : ScenarioSpec | str
         Typed scenario or JSON-serialized ``ScenarioSpec``.
-    method : {"parallel", "waterfall", "metrics_based", "taylor"}
-        Attribution method. ``"metrics_based"`` re-prices the instrument with
+    method : {"parallel", "waterfall", "metrics_based", "taylor"} | None, default None
+        Attribution method; ``None`` selects the Rust default
+        (``AttributionMethod::default()``, currently ``"parallel"``).
+        ``"metrics_based"`` re-prices the instrument with
         the default attribution metric set (DV01, CS01, vega, ...) using the
         same configuration and recalibration provider as the scenario
         engine; instruments lacking one of those metrics raise

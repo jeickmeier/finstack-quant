@@ -2,6 +2,21 @@
 
 ## [Unreleased]
 
+### WASM binding audit: scenarios (2026-09-30)
+
+#### Changed (BREAKING)
+
+- `ScenarioEngine::apply` rejects instrument-scoped operations when no instruments are supplied. It used to warn; `Warning::InstrumentShockNoPortfolio` and `CorrelationShockNoPortfolio` are removed. The binding guards are gone, and both hosts report the engine's message.
+- Every `ScenarioEngine` and `HorizonAnalysis` carries a `CachedRecalibrationProvider`, so solve-to-par CDS shocks work with a default engine, including the portfolio `apply_scenario` path. `recalibration_provider()` returns `&Arc<dyn RecalibrationProvider>`.
+- `ScenarioSpec::compose` validates its inputs. Every scenario entry point in both hosts parses specs with `ScenarioSpec::from_json` (serde plus `validate`), including the portfolio scenario exports and Python portfolio scenario arguments.
+- WASM `computeHorizonReturn` returns `HorizonResult` with a `summary` (`HorizonSummary { total_return, annualized_return, currency, factor_contributions }`), and its `method` is one of `parallel | waterfall | metrics_based | taylor`. Python `compute_horizon_return(method=None)` takes the Rust default `AttributionMethod`.
+- WASM `applyScenario` and `applyScenarioToMarket` accept a trailing `configJson`.
+- Instrument inventories are parsed by the new `valuations::pricer::json::parse_boxed_instruments_from_json`, with one size cap and one error prefix (`invalid instrument envelope JSON`) in both hosts.
+
+#### Added
+
+- `HorizonSummary`, `HorizonReport`, `HorizonResult::{summary, report}` and `scenarios::engine::instrument_envelopes`.
+
 ### WASM binding audit: theta for path-dependent options (2026-09-30)
 
 #### Fixed

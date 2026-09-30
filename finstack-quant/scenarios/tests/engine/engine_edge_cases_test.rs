@@ -210,7 +210,7 @@ fn test_warnings_missing_equity() {
 }
 
 #[test]
-fn test_warnings_attribute_based_operations() {
+fn test_attribute_based_operations_without_inventory_are_rejected() {
     let base_date = Date::from_calendar_date(2025, Month::January, 1).unwrap();
     let mut market = MarketContext::new();
     let mut model = FinancialModelSpec::new("test", vec![]);
@@ -244,14 +244,14 @@ fn test_warnings_attribute_based_operations() {
         as_of: base_date,
     };
 
-    let report = engine.apply(&scenario, &mut ctx).unwrap();
-    assert_eq!(report.warnings.len(), 2);
-    assert!(report.warnings[0]
-        .to_string()
-        .contains("no instruments provided"));
-    assert!(report.warnings[1]
-        .to_string()
-        .contains("no instruments provided"));
+    let error = engine
+        .apply(&scenario, &mut ctx)
+        .expect_err("instrument-scoped operations need an inventory");
+    assert!(
+        matches!(&error, finstack_quant_scenarios::Error::Validation(message)
+            if message.contains("no instruments were supplied")),
+        "{error}"
+    );
 }
 
 #[test]

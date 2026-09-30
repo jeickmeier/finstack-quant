@@ -2,16 +2,12 @@
 //!
 //! Every entry point accepts the typed wrapper or its canonical JSON string:
 //! `ScenarioSpec | str`, `FinstackConfig | str | None`, and typed instrument
-//! wrappers or envelope JSON. The scenario engine is built in one place so
-//! `apply_scenario`, `apply_scenario_to_market`, and `compute_horizon_return`
-//! attach the same recalibration provider and configuration.
+//! wrappers or envelope JSON. The Rust scenario engine attaches its own
+//! recalibration provider, so the bindings only thread the configuration.
 
-use std::sync::Arc;
-
-use finstack_quant_calibration::recalibration::CachedRecalibrationProvider;
 use finstack_quant_core::config::FinstackConfig;
-use finstack_quant_scenarios::{ScenarioEngine, ScenarioSpec};
-use finstack_quant_valuations::instruments::{Instrument, InstrumentEnvelope};
+use finstack_quant_scenarios::ScenarioSpec;
+use finstack_quant_valuations::instruments::Instrument;
 use pyo3::prelude::*;
 
 use super::spec::PyScenarioSpec;
@@ -71,26 +67,10 @@ pub(crate) fn extract_instruments(
     objs.iter()
         .map(|obj| {
             let json = extract_instrument_json(obj)?;
-            InstrumentEnvelope::from_str(&json).map_err(core_to_py)
+            finstack_quant_valuations::pricer::json::parse_boxed_instrument_from_json(&json, None)
+                .map(|parsed| parsed.into_boxed())
+                .map_err(core_to_py)
         })
         .collect::<PyResult<Vec<_>>>()
         .map(Some)
-}
-
-/// Build the scenario engine every Python entry point uses.
-///
-/// Threads the caller's configuration (rounding policy stamped into
-/// `ApplicationReport.meta`) and attaches a fresh
-/// [`CachedRecalibrationProvider`] so quote-replay operations re-bootstrap
-/// curves instead of being skipped.
-pub(crate) fn scenario_engine(config: Option<FinstackConfig>) -> ScenarioEngine {
-    ScenarioEngine::with_config(config.unwrap_or_default())
-        .with_recalibration_provider(recalibration_provider())
-}
-
-/// The recalibration provider shared by scenario application and horizon
-/// analysis.
-pub(crate) fn recalibration_provider(
-) -> Arc<dyn finstack_quant_valuations::recalibration::RecalibrationProvider> {
-    Arc::new(CachedRecalibrationProvider::new())
 }

@@ -440,7 +440,8 @@ pub fn extract_credit_rating(
 /// # Errors
 ///
 /// Returns `TypeError` when `obj` is neither, and `ValueError` when the
-/// JSON string does not deserialize as a `ScenarioSpec`.
+/// JSON string does not deserialize as a `ScenarioSpec` or fails
+/// `ScenarioSpec::validate` (both through `ScenarioSpec::from_json`).
 pub fn extract_scenario_spec(
     py: Python<'_>,
     obj: &Bound<'_, PyAny>,
@@ -453,8 +454,8 @@ pub fn extract_scenario_spec(
             "expected a ScenarioSpec instance or a canonical ScenarioSpec JSON string",
         )
     })?;
-    py.detach(move || serde_json::from_str(&json))
-        .map_err(to_py)
+    py.detach(move || finstack_quant_scenarios::ScenarioSpec::from_json(&json))
+        .map_err(crate::errors::scenarios_to_py)
 }
 
 /// Extract an ordered batch of scenario specs from either a JSON array string
@@ -464,15 +465,19 @@ pub fn extract_scenario_spec(
 /// # Errors
 ///
 /// Returns `TypeError` for an item that is neither form and `ValueError` for
-/// malformed JSON.
+/// malformed JSON or a spec that fails `ScenarioSpec::validate`.
 pub fn extract_scenario_specs(
     py: Python<'_>,
     obj: &Bound<'_, PyAny>,
 ) -> PyResult<Vec<finstack_quant_scenarios::ScenarioSpec>> {
     if let Ok(json) = obj.extract::<String>() {
-        return py
+        let specs: Vec<finstack_quant_scenarios::ScenarioSpec> = py
             .detach(move || serde_json::from_str(&json))
-            .map_err(to_py);
+            .map_err(to_py)?;
+        for spec in &specs {
+            spec.validate().map_err(crate::errors::scenarios_to_py)?;
+        }
+        return Ok(specs);
     }
     let mut specs = Vec::new();
     for item in obj.try_iter()? {

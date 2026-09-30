@@ -159,7 +159,7 @@ pub struct HorizonAnalysis {
 impl Default for HorizonAnalysis {
     fn default() -> Self {
         Self {
-            attribution_method: AttributionMethod::Parallel,
+            attribution_method: AttributionMethod::default(),
             config: FinstackConfig::default(),
             engine: ScenarioEngine::new(),
             calendar_id: None,
@@ -208,7 +208,8 @@ impl HorizonAnalysis {
         self
     }
 
-    /// Attach a quote-recalibration provider to the internal scenario engine.
+    /// Replace the internal scenario engine's default quote-recalibration
+    /// provider (a fresh `CachedRecalibrationProvider`) with a shared one.
     ///
     /// The same provider is threaded into the [`PricingOptions`] used by the
     /// metrics-based attribution path, so quote-replay operations and the
@@ -224,14 +225,12 @@ impl HorizonAnalysis {
         self
     }
 
-    /// Pricing options carrying this analyzer's configuration and, when one
-    /// was attached, the engine's recalibration provider.
+    /// Pricing options carrying this analyzer's configuration and the
+    /// engine's recalibration provider.
     fn pricing_options(&self) -> PricingOptions {
-        let mut options = PricingOptions::default().with_config(&self.config);
-        if let Some(provider) = self.engine.recalibration_provider() {
-            options = options.with_recalibration_provider(Arc::clone(provider));
-        }
-        options
+        PricingOptions::default()
+            .with_config(&self.config)
+            .with_recalibration_provider(Arc::clone(self.engine.recalibration_provider()))
     }
 
     /// Resolve [`Self::calendar_id`] against core's built-in calendar registry.
@@ -474,6 +473,84 @@ impl HorizonResult {
             return f64::NAN;
         }
         factor_money.amount() / iv
+    }
+}
+
+/// Derived horizon returns computed by the [`HorizonResult`] accessors.
+///
+/// Every value comes from [`HorizonResult::total_return`],
+/// [`HorizonResult::annualized_return`] and
+/// [`HorizonResult::factor_contribution`]. A value those accessors report as
+/// NaN (currency mismatch, zero or negative initial value) is `None` here, so
+/// it serializes as JSON `null`.
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct HorizonSummary {
+    /// Total return as a decimal fraction (`0.05` = +5%); `None` when undefined.
+    pub total_return: Option<f64>,
+    /// Annualized total return as a decimal fraction; `None` without a time
+    /// roll or when the total return is undefined.
+    pub annualized_return: Option<f64>,
+    /// ISO-4217 currency of the initial and terminal values.
+    pub currency: finstack_quant_core::currency::Currency,
+    /// Each attribution factor's P&L as a fraction of the initial value, keyed
+    /// by the factor's serde name in the default waterfall order; `None` when
+    /// undefined.
+    pub factor_contributions: indexmap::IndexMap<AttributionFactor, Option<f64>>,
+}
+
+/// Wire view of a [`HorizonResult`] with its derived [`HorizonSummary`].
+///
+/// Serializes the result's own fields flat, plus a `summary` object. This is
+/// the shape host bindings return when they cannot call the result's methods
+/// (WASM); [`HorizonResult`]'s own serde shape is unchanged.
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct HorizonReport<'a> {
+    /// The horizon result being reported.
+    #[serde(flatten)]
+    pub result: &'a HorizonResult,
+    /// Derived returns computed from `result`.
+    pub summary: HorizonSummary,
+}
+
+impl HorizonResult {
+    /// The derived returns of this result, with undefined (NaN) values as `None`.
+    ///
+    /// # Returns
+    ///
+    /// A [`HorizonSummary`] holding the total, annualized and per-factor
+    /// returns for every [`AttributionFactor`] (in the default waterfall
+    /// order, which lists each factor once).
+    #[must_use]
+    pub fn summary(&self) -> HorizonSummary {
+        let finite = |value: f64| value.is_finite().then_some(value);
+        HorizonSummary {
+            total_return: finite(self.total_return()),
+            annualized_return: self.annualized_return(),
+            currency: self.initial_value.currency(),
+            factor_contributions: finstack_quant_attribution::default_waterfall_order()
+                .into_iter()
+                .map(|factor| {
+                    let contribution = finite(self.factor_contribution(&factor));
+                    (factor, contribution)
+                })
+                .collect(),
+        }
+    }
+
+    /// Borrow this result together with its [`summary`](Self::summary) for
+    /// serialization.
+    ///
+    /// # Returns
+    ///
+    /// A [`HorizonReport`] that serializes the result fields flat plus
+    /// `summary`.
+    #[must_use]
+    pub fn report(&self) -> HorizonReport<'_> {
+        HorizonReport {
+            result: self,
+            summary: self.summary(),
+        }
     }
 }
 
@@ -883,6 +960,32 @@ mod tests {
                 .is_nan());
             assert!(result.annualized_return().is_none());
         }
+    }
+
+    #[test]
+    fn summary_reports_the_accessor_values_with_nan_as_none() {
+        let result = synthetic_result(Currency::USD, 100.0, Currency::USD, 5.0, 30);
+        let summary = result.summary();
+        assert_eq!(summary.total_return, Some(result.total_return()));
+        assert_eq!(summary.annualized_return, result.annualized_return());
+        assert_eq!(summary.currency, Currency::USD);
+        assert_eq!(summary.factor_contributions.len(), 9);
+        assert_eq!(
+            summary.factor_contributions[&AttributionFactor::Carry],
+            Some(result.factor_contribution(&AttributionFactor::Carry))
+        );
+
+        let mismatch = synthetic_result(Currency::USD, 100.0, Currency::EUR, 10.0, 30).summary();
+        assert_eq!(mismatch.total_return, None);
+        assert_eq!(mismatch.annualized_return, None);
+
+        let report = serde_json::to_value(result.report()).expect("serialize report");
+        let plain = serde_json::to_value(&result).expect("serialize result");
+        for (key, value) in plain.as_object().expect("object") {
+            assert_eq!(&report[key], value, "flattened field {key}");
+        }
+        assert_eq!(report["summary"]["total_return"], serde_json::json!(0.05));
+        assert!(report["summary"]["factor_contributions"]["carry"].is_number());
     }
 
     /// An unknown calendar identifier must fail loudly at compute time rather

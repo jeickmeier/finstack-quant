@@ -1739,10 +1739,10 @@ status = "exists"
 # single pathway.
 # (`adapters` and `utils` are pub(crate) in the Rust crate and therefore out
 # of contract scope by the scoping rule; they are intentionally not listed.)
-engine    = { python = "finstack_quant.scenarios",           status = "flattened", note = "ApplicationReport (typed) plus apply_scenario / apply_scenario_to_market are exported flat on finstack_quant.scenarios; ScenarioEngine, ExecutionContext, ApplicationEnvelope, and RollForwardReport remain Rust-only (reports cross the boundary as ApplicationResult / structured objects). All three Python entry points (apply_scenario, apply_scenario_to_market, compute_horizon_return) build the engine through one bindings::scenarios::extract::scenario_engine(config) helper that threads the caller's FinstackConfig and attaches a CachedRecalibrationProvider; HorizonAnalysis::with_recalibration_provider carries the same provider into metrics_based pricing" }
+engine    = { python = "finstack_quant.scenarios",           status = "flattened", note = "ApplicationReport (typed) plus apply_scenario / apply_scenario_to_market are exported flat on finstack_quant.scenarios; ScenarioEngine, ExecutionContext, ApplicationEnvelope, and RollForwardReport remain Rust-only (reports cross the boundary as ApplicationResult / structured objects). Both hosts build the engine with ScenarioEngine::with_config(config) (Python `config=`, WASM trailing `configJson` on applyScenario / applyScenarioToMarket / computeHorizonReturn; omitted means FinstackConfig::default()). Every Rust ScenarioEngine constructor attaches a fresh CachedRecalibrationProvider, so neither binding wires one; HorizonAnalysis carries the engine's provider into metrics_based pricing. Instrument inventories parse through valuations::pricer::json (parse_boxed_instrument_from_json per item in Python and for the horizon instrument, parse_boxed_instruments_from_json for the WASM array) and ApplicationResult.instruments encodes through scenarios::engine::instrument_envelopes" }
 envelope  = { python = "finstack_quant.scenarios.envelope",  status = "missing", note = "Versioned persistence envelope (ScenarioEnvelope, ScenarioSchema, SCENARIO_CONTRACT) is bound in no host; Rust-only" }
 error     = { python = "finstack_quant.scenarios.error",     status = "missing", note = "No typed exception classes are bound; errors map through errors::scenarios_to_py on scenarios::Error::kind() (lookup misses MarketDataNotFound/NodeNotFound/TenorNotFound/InstrumentNotFound -> KeyError, Internal -> RuntimeError, wrapped core/statements/valuations errors keep their own kind, everything else -> ValueError). From<scenarios::Error> for core::Error keeps the kind" }
-horizon   = { python = "finstack_quant.scenarios",           status = "flattened", note = "compute_horizon_return and the typed HorizonResult are exported flat on finstack_quant.scenarios; HorizonAnalysis (builder-style analyzer) remains Rust-only. Both hosts parse the attribution method through the canonical scenarios::horizon::attribution_method_from_str" }
+horizon   = { python = "finstack_quant.scenarios",           status = "flattened", note = "compute_horizon_return and the typed HorizonResult are exported flat on finstack_quant.scenarios; HorizonAnalysis (builder-style analyzer) remains Rust-only. Both hosts parse the attribution method through the canonical scenarios::horizon::attribution_method_from_str; an omitted method is AttributionMethod::default(). WASM computeHorizonReturn returns the Rust HorizonReport: the serde HorizonResult (Money as exact-decimal objects) plus `summary` (HorizonResult::summary), whose total_return / annualized_return / currency / factor_contributions[f] are the Python total_return / annualized_return / currency / factor_contribution(f) accessors; undefined returns are null in WASM and NaN in Python. explain() (Rust Display text) stays Python-only, so HorizonResult remains in the [parity] backlog." }
 spec      = { python = "finstack_quant.scenarios",           status = "flattened", note = "ScenarioSpec, OperationSpec (typed classmethod constructors), RateBindingSpec, HierarchyTarget (core::market_data::hierarchy::HierarchyTarget, bound here because only hierarchy-targeted operations consume it), and the enums CurveKind/TenorMatchMode/TimeRollMode/Compounding are exported flat; every enum also constructs from its wire label (CurveKind('par_cds')) and OperationSpec constructors accept the wrapper or the label. ScenarioSpec.hazard_bump_mode is a shared string-literal field in both hosts (solve_to_par / first_order_shift), not a typed host enum. Construction is ScenarioSpec(...) / ScenarioSpec.from_json (the former build_scenario_spec / parse_scenario_spec free functions were removed as duplicates); compose_scenarios returns a typed ScenarioSpec and validate_scenario_spec accepts ScenarioSpec | str. OperationSpec.curve_parallel_bp(curve_id=list[str]) expands via Rust ScenarioSpec::parallel_bp_many." }
 templates = { python = "finstack_quant.scenarios",           status = "flattened", note = "TemplateMetadata plus registry access (list_builtin_templates, list_builtin_template_metadata, build_from_template, list_template_components, build_template_component) are exported flat; TemplateRegistry/RegisteredTemplate types remain Rust-only. WASM returns equivalent plain objects." }
 warning   = { python = "finstack_quant.scenarios.warning",   status = "missing", note = "The structured Warning enum has no typed host class; ApplicationReport.warnings / HorizonResult.warnings surface it as list[dict] via serde (each dict carries the `kind` tag plus variant fields), matching the WASM plain-object shape, with warnings_json as the JSON twin" }
@@ -1750,14 +1750,16 @@ schema = { python = "finstack_quant.scenarios.schema", status = "exists", note =
 
 # ExecutionContext: the Python entry points (apply_scenario,
 # apply_scenario_to_market) accept `instruments: list[Instrument | str] | None`
-# and wire it into ExecutionContext.instruments; when a scenario
-# mutates_instruments() and none are supplied they raise ValueError instead of
-# silently producing warnings. ApplicationResult.instruments returns shocked
-# copies in input order as canonical envelope JSON strings, including JSON and
-# pickle round trips. WASM accepts instrumentsJson (an optional JSON array of
-# canonical envelopes) and returns those envelopes as objects in instruments.
-# Both hosts reject instrument-scoped operations without an inventory.
-# rate_bindings/calendar stay None in both hosts.
+# and wire it into ExecutionContext.instruments. ApplicationResult.instruments
+# returns shocked copies in input order as canonical envelope JSON strings,
+# including JSON and pickle round trips. WASM accepts instrumentsJson (an
+# optional JSON array of canonical envelopes) and returns those envelopes as
+# objects in instruments. ScenarioEngine::apply itself rejects
+# instrument-scoped operations (mutates_instruments()) without an inventory,
+# after spec validation, with one Validation error (Python ValueError, WASM
+# kind "validation"). Both hosts parse the scenario with ScenarioSpec::from_json
+# before the market, so spec errors come first. rate_bindings/calendar stay
+# None in both hosts.
 
 [crates.scenarios.symbols]
 public = [

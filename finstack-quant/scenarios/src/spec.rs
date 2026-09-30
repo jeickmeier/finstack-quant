@@ -154,9 +154,10 @@ impl ScenarioSpec {
     /// ascending priority, returning an error at compose time when the
     /// concatenated operations would be rejected at apply time.
     ///
-    /// Composition rejects scenarios with different [`HazardBumpMode`] values
-    /// and scenarios that together contain more than one
-    /// [`OperationSpec::TimeRollForward`].
+    /// Every input is validated first (see [`ScenarioSpec::validate`]), so
+    /// the composed spec is built only from valid scenarios. Composition then
+    /// rejects scenarios with different [`HazardBumpMode`] values and scenarios
+    /// that together contain more than one [`OperationSpec::TimeRollForward`].
     ///
     /// # Arguments
     ///
@@ -166,11 +167,20 @@ impl ScenarioSpec {
     ///
     /// # Errors
     ///
-    /// Returns a validation error if `scenarios` contain conflicting
-    /// `hazard_bump_mode` values or more than one time-roll operation. Other
-    /// conflicts remain in the composed spec and are validated when
-    /// [`crate::engine::ScenarioEngine::apply`] is called.
+    /// Returns a validation error, prefixed with the offending scenario id,
+    /// when any input fails [`ScenarioSpec::validate`] (blank id, invalid or
+    /// non-finite operation fields, more than one time roll), and a validation
+    /// error when `scenarios` contain conflicting `hazard_bump_mode` values or
+    /// together contain more than one time-roll operation.
     pub fn compose(mut scenarios: Vec<ScenarioSpec>) -> crate::Result<Self> {
+        for scenario in &scenarios {
+            scenario.validate().map_err(|error| {
+                crate::error::Error::validation(format!(
+                    "Cannot compose scenario '{}': {error}",
+                    scenario.id
+                ))
+            })?;
+        }
         if let Some(first) = scenarios.first() {
             if let Some(conflicting) = scenarios
                 .iter()

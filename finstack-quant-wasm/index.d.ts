@@ -11382,6 +11382,69 @@ export interface ScenarioApplyMarketResult {
 }
 
 /**
+ * Derived horizon returns computed in Rust by the `HorizonResult` accessors.
+ *
+ * Undefined returns (currency mismatch, zero or negative initial value) are
+ * `null`; Python's `HorizonResult` accessors report the same cases as NaN.
+ */
+export interface HorizonSummary {
+  /**
+   * Total return as a decimal fraction (`0.05` = +5%), or `null` when undefined.
+   */
+  total_return: number | null;
+  /**
+   * Annualized total return as a decimal fraction; `null` without a time roll
+   * or when the total return is undefined.
+   */
+  annualized_return: number | null;
+  /**
+   * ISO 4217 currency of the initial and terminal values.
+   */
+  currency: string;
+  /**
+   * Each attribution factor's P&L as a fraction of the initial value, keyed by
+   * factor name (`carry`, `rates_curves`, `credit_curves`, `inflation_curves`,
+   * `correlations`, `fx`, `volatility`, `model_parameters`, `market_scalars`);
+   * `null` when undefined.
+   */
+  factor_contributions: Record<string, number | null>;
+}
+
+/**
+ * Horizon total return: the serde `HorizonResult` document plus its
+ * Rust-computed `summary`.
+ *
+ * Money fields are exact-decimal `MoneyValue` objects; Python's
+ * `HorizonResult` exposes them as floats plus a `currency` accessor.
+ */
+export interface HorizonResult {
+  /**
+   * Factor-decomposed P&L between the opening and scenario states.
+   */
+  attribution: PnlAttribution;
+  /**
+   * Instrument value at the opening market and date.
+   */
+  initial_value: MoneyValue;
+  /**
+   * Instrument value after the scenario (and time roll, when present).
+   */
+  terminal_value: MoneyValue;
+  /**
+   * Calendar days in the horizon; `null` when the scenario has no time roll.
+   */
+  horizon_days: number | null;
+  /**
+   * Report from applying the scenario to the opening market.
+   */
+  scenario_report: Omit<ScenarioApplyMarketResult, 'market' | 'instruments'>;
+  /**
+   * Total, annualized and per-factor returns computed by the Rust accessors.
+   */
+  summary: HorizonSummary;
+}
+
+/**
  * A structured scenario operation using the canonical Rust `kind` discriminator.
  */
 export type ScenarioOperation = Record<string, unknown> & { kind: string };
@@ -11483,8 +11546,8 @@ export interface ScenariosNamespace {
    *
    * Specs are merged in priority order (lower number runs first).
    * @returns Structured composed scenario specification.
-   * @param specs - Validated ScenarioSpec objects to compose in priority order.
-   * @throws Error - Rejects malformed structured specs, input specs with mixed `hazard_bump_mode` values, composition that contains more than one time-roll operation, or failure to convert the composed specification.
+   * @param specs - ScenarioSpec objects to validate and compose in priority order.
+   * @throws Error - Rejects malformed structured specs, any input spec that fails `ScenarioSpec` validation (blank ID, non-finite numbers, invalid identifiers, tenors or operations; the message names the scenario), input specs with mixed `hazard_bump_mode` values, composition that contains more than one time-roll operation, or failure to convert the composed specification.
    */
   composeScenarios(specs: ScenarioSpec[]): ScenarioSpec;
   /**
@@ -11572,40 +11635,45 @@ export interface ScenariosNamespace {
    * scenario contained a `time_roll_forward` operation).
    *
    * Optional instrument envelopes are copied and returned in `instruments`, in
-   * input order. Instrument-scoped operations require an inventory. No holiday
-   * calendar is supplied; business-day rolls use weekends-only adjustment.
+   * input order. The Rust engine rejects instrument-scoped operations without
+   * an inventory. No holiday calendar is supplied; business-day rolls use
+   * weekends-only adjustment.
    * @returns Mutated market and optional model after applying the scenario.
    * @param scenarioJson - JSON-serialized ScenarioSpec to validate and apply.
    * @param marketJson - Canonical market-context JSON supplying curves, quotes, and FX data.
    * @param modelJson - JSON-serialized FinancialModelSpec that scenario operations may mutate.
    * @param asOf - ISO-8601 valuation date used to resolve date-dependent market data.
    * @param instrumentsJson - Optional JSON array of canonical instrument envelopes; required for instrument shocks and returned as shocked copies in input order.
-   * @throws Error - Rejects malformed scenario, market, or model JSON, a model that fails semantic validation (the same `FinancialModelSpec::from_json` check the statements exports and Python `apply_scenario` apply), an invalid ISO `as_of` date, an invalid scenario operation, missing market objects or hierarchy context, statement-model execution failures, failure to encode the mutated contexts, or failure to serialize the application envelope to JavaScript.
+   * @param configJson - Optional FinstackConfig JSON; its rounding policy is stamped into `meta`. Omit for the library default.
+   * @throws Error - Rejects a malformed or invalid scenario (checked before the market is parsed), malformed market, model, instrument, or configuration JSON, instrument-scoped operations without `instruments_json`, a model that fails semantic validation (the same `FinancialModelSpec::from_json` check the statements exports and Python `apply_scenario` apply), an invalid ISO `as_of` date, an invalid scenario operation, missing market objects or hierarchy context, statement-model execution failures, failure to encode the mutated contexts, or failure to serialize the application envelope to JavaScript.
    */
   applyScenario(
     scenarioJson: JsonInput,
     marketJson: JsonInput,
     modelJson: JsonInput,
     asOf: string,
-    instrumentsJson?: JsonInput
+    instrumentsJson?: JsonInput,
+    configJson?: JsonInput
   ): ScenarioApplyResult;
   /**
    * Apply a scenario to a market context only (no model mutations).
    *
    * Returns the same envelope shape as [`apply_scenario`] minus `model`;
-   * the same inventory and calendar rules apply.
+   * the same inventory, configuration and calendar rules apply.
    * @returns Mutated market after applying the scenario.
    * @param scenarioJson - JSON-serialized ScenarioSpec to validate and apply.
    * @param marketJson - Canonical market-context JSON supplying curves, quotes, and FX data.
    * @param asOf - ISO-8601 valuation date used to resolve date-dependent market data.
    * @param instrumentsJson - Optional JSON array of canonical instrument envelopes; required for instrument shocks and returned as shocked copies in input order.
-   * @throws Error - Rejects malformed scenario or market JSON, an invalid ISO `as_of` date, an invalid scenario operation, missing market objects or hierarchy context, failure to encode the mutated market, or failure to serialize the application envelope to JavaScript.
+   * @param configJson - Optional FinstackConfig JSON; its rounding policy is stamped into `meta`. Omit for the library default.
+   * @throws Error - Rejects a malformed or invalid scenario (checked before the market is parsed), malformed market, instrument, or configuration JSON, instrument-scoped operations without `instruments_json`, an invalid ISO `as_of` date, an invalid scenario operation, missing market objects or hierarchy context, failure to encode the mutated market, or failure to serialize the application envelope to JavaScript.
    */
   applyScenarioToMarket(
     scenarioJson: JsonInput,
     marketJson: JsonInput,
     asOf: string,
-    instrumentsJson?: JsonInput
+    instrumentsJson?: JsonInput,
+    configJson?: JsonInput
   ): ScenarioApplyMarketResult;
   /**
    * Compute horizon total return under a scenario.
@@ -11617,21 +11685,21 @@ export interface ScenariosNamespace {
    * @param marketJson - JSON-serialized `MarketContext`.
    * @param asOf - Valuation date (ISO 8601).
    * @param scenarioJson - JSON-serialized `ScenarioSpec`.
-   * @param method - Attribution method: "parallel", "waterfall", "metrics_based", "taylor".
+   * @param method - Attribution method: "parallel", "waterfall", "metrics_based", "taylor". Omit for the Rust default (`AttributionMethod::default()`, currently "parallel").
    * @param configJson - Optional FinstackConfig JSON for horizon analysis; omit to use defaults.
    * @param calendarId - Optional holiday calendar (e.g. "nyse", "target") used to business-day adjust `time_roll_forward` targets under `business_days` mode. Omit for a weekends-only calendar; unknown identifiers throw.
-   * @returns The `HorizonResult` as a structured JavaScript object, matching the Python binding's typed `HorizonResult`.
-   * @throws Error - Rejects malformed instrument, market, scenario, or configuration JSON; an invalid ISO `as_of` date; an unsupported attribution `method`; an unknown `calendar_id`; invalid, unsupported, or unresolved scenario operations; missing market data; pricing or attribution failures; or failure to serialize the horizon result to JavaScript.
+   * @returns The serde `HorizonResult` (`attribution`, `initial_value` and `terminal_value` as exact-decimal Money objects, `horizon_days`, null without a time roll, and `scenario_report`) plus `summary`: the Rust-computed `total_return`, `annualized_return`, `currency` and `factor_contributions` that Python exposes as `HorizonResult` accessors. Undefined returns (currency mismatch, non-positive initial value) are null here and NaN in Python.
+   * @throws Error - Rejects a malformed or invalid scenario; malformed instrument, market, or configuration JSON; an invalid ISO `as_of` date; an unsupported attribution `method`; an unknown `calendar_id`; invalid, unsupported, or unresolved scenario operations; missing market data; pricing or attribution failures; or failure to serialize the horizon result to JavaScript.
    */
   computeHorizonReturn(
     instrumentJson: JsonInput,
     marketJson: JsonInput,
     asOf: string,
     scenarioJson: JsonInput,
-    method?: string,
+    method?: 'parallel' | 'waterfall' | 'metrics_based' | 'taylor',
     configJson?: JsonInput,
     calendarId?: string
-  ): Record<string, unknown>;
+  ): HorizonResult;
 }
 
 /**

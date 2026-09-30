@@ -891,8 +891,8 @@ pub fn apply_scenario_and_revalue_built(
 ) -> Result<JsValue, JsValue> {
     let scenario_json: &str = &json_text(&scenario_json, "scenarioJson")?;
     let market_json: &str = &json_text(&market_json, "marketJson")?;
-    let scenario: finstack_quant_scenarios::ScenarioSpec =
-        serde_json::from_str(scenario_json).map_err(to_js_err)?;
+    let scenario =
+        finstack_quant_scenarios::ScenarioSpec::from_json(scenario_json).map_err(to_js_err)?;
     let market: finstack_quant_core::market_data::context::MarketContext =
         serde_json::from_str(market_json).map_err(to_js_err)?;
     let config = finstack_quant_core::config::FinstackConfig::default();
@@ -957,8 +957,8 @@ pub fn scenario_pnl_built(
 ) -> Result<JsValue, JsValue> {
     let scenario_json: &str = &json_text(&scenario_json, "scenarioJson")?;
     let market_json: &str = &json_text(&market_json, "marketJson")?;
-    let scenario: finstack_quant_scenarios::ScenarioSpec =
-        serde_json::from_str(scenario_json).map_err(to_js_err)?;
+    let scenario =
+        finstack_quant_scenarios::ScenarioSpec::from_json(scenario_json).map_err(to_js_err)?;
     let market: finstack_quant_core::market_data::context::MarketContext =
         serde_json::from_str(market_json).map_err(to_js_err)?;
     let config = finstack_quant_core::config::FinstackConfig::default();

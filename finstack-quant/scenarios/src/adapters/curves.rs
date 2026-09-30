@@ -618,11 +618,7 @@ fn par_cds_effects(
             Ok(update_effects(new_curve, warnings))
         }
         HazardBumpMode::SolveToPar => {
-            let provider = env.provider.ok_or_else(|| {
-                Error::Core(finstack_quant_valuations::recalibration::provider_missing(
-                    "par_cds_scenario",
-                ))
-            })?;
+            let provider = env.provider;
             let (discount_id, warning) =
                 resolve_discount_curve_id(market, discount_curve_id, Some(curve_id))?;
             let target_market = std::sync::Arc::new(market.clone());
@@ -1110,7 +1106,7 @@ mod tests {
     fn solve_env(provider: &CachedRecalibrationProvider) -> HazardApplyEnv<'_> {
         HazardApplyEnv {
             mode: HazardBumpMode::SolveToPar,
-            provider: Some(provider),
+            provider,
             source_markets: None,
         }
     }
