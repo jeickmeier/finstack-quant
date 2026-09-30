@@ -38,7 +38,7 @@ test('all scalar facade exports exist and preserve invalid risk', () => {
   assert.ok(Number.isNaN(analytics.sharpe([0, 0], NaN)));
   assert.ok(Number.isNaN(analytics.sharpe([0.01])));
   assert.ok(Number.isNaN(panel([0.01]).sharpe()[0]));
-  assert.ok(Array.from(panel([0.01, 0.02]).rollingSharpe(0, 1).sharpe).every(Number.isNaN));
+  assert.ok(Array.from(panel([0.01, 0.02]).rollingSharpe(0, 1).values).every(Number.isNaN));
 });
 
 test('integer arguments reject truncation, wrapping and non-finite values', () => {

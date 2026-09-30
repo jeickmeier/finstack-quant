@@ -253,7 +253,7 @@ fn performance_facade_exercises_broad_api_surface() {
     assert!(rolling_sharpe.values.iter().all(|value| value.is_finite()));
 
     let ref_date = *perf.active_dates().last().expect("last active date");
-    let lookbacks = perf.lookback_returns(ref_date, FiscalConfig::us_federal());
+    let lookbacks = perf.lookback_returns(ref_date, Some(FiscalConfig::us_federal()));
     assert_finite_metric("month-to-date lookback", &lookbacks.mtd, ticker_count);
     assert_finite_metric("quarter-to-date lookback", &lookbacks.qtd, ticker_count);
     assert_finite_metric("year-to-date lookback", &lookbacks.ytd, ticker_count);
@@ -344,7 +344,7 @@ fn performance_lookback_returns_clamps_pre_start_reference_date() {
     .expect("performance");
 
     let ref_date = Date::from_calendar_date(2025, Month::May, 15).expect("ref date");
-    let lookbacks = perf.lookback_returns(ref_date, FiscalConfig::us_federal());
+    let lookbacks = perf.lookback_returns(ref_date, Some(FiscalConfig::us_federal()));
     assert_eq!(lookbacks.mtd, vec![0.0]);
     assert_eq!(lookbacks.qtd, vec![0.0]);
     assert_eq!(lookbacks.ytd, vec![0.0]);
@@ -383,7 +383,7 @@ fn performance_smoke_asserts_fiscal_lookback_and_zero_variance_invariants() {
     .expect("rising performance");
     let config = FiscalConfig::new(1, 15).expect("valid fiscal config");
     let ref_date = *rising_perf.active_dates().last().expect("last active date");
-    let lookbacks = rising_perf.lookback_returns(ref_date, config);
+    let lookbacks = rising_perf.lookback_returns(ref_date, Some(config));
     assert!(lookbacks.fytd[0] > 0.0);
 }
 

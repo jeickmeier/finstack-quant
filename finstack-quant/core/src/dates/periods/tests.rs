@@ -408,3 +408,29 @@ fn parse_id_rejects_bad_ranges() {
     assert!(PeriodId::from_str("2025W99").is_err());
     assert!(PeriodId::from_str("2025D500").is_err());
 }
+
+#[test]
+fn fiscal_config_from_parts_fills_the_omitted_half() {
+    assert_eq!(FiscalConfig::from_parts(None, None).expect("none"), None);
+    assert_eq!(
+        FiscalConfig::from_parts(Some(10), None).expect("month only"),
+        Some(FiscalConfig::us_federal())
+    );
+    assert_eq!(
+        FiscalConfig::from_parts(None, Some(6)).expect("day only"),
+        Some(FiscalConfig::new(1, 6).expect("jan 6"))
+    );
+    assert_eq!(
+        FiscalConfig::from_parts(Some(4), Some(6)).expect("both"),
+        Some(FiscalConfig::uk())
+    );
+    assert!(FiscalConfig::from_parts(Some(13), None).is_err());
+    assert!(FiscalConfig::from_parts(None, Some(0)).is_err());
+    assert_eq!(FiscalConfig::default(), FiscalConfig::calendar_year());
+}
+
+#[test]
+fn period_kind_annualization_factor_is_const() {
+    const DAILY: f64 = PeriodKind::Daily.annualization_factor();
+    assert_eq!(DAILY, 252.0);
+}

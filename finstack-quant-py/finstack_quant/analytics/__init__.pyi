@@ -1453,8 +1453,10 @@ class DatedSeries:
     """
     Date-indexed numeric series returned by the rolling-window analytics.
 
-    Rolling-window methods return this shared carrier with a metric-specific
-    DataFrame column name.
+    Rolling-window methods return this shared carrier. It wraps Rust
+    ``DatedSeries``, whose ``value_column`` (a Rust ``RollingMetric``) names
+    the metric; WASM rolling methods return the same ``{values, dates,
+    value_column}`` object.
 
     Examples
     --------
@@ -1486,7 +1488,9 @@ class DatedSeries:
         Raises
         ------
         ValueError
-            If ``json`` is malformed or does not satisfy the serialized schema.
+            If ``json`` is malformed or does not satisfy the serialized schema,
+            including a ``value_column`` other than ``"volatility"``,
+            ``"sortino"``, ``"sharpe"`` or ``"return"``.
 
         Examples
         --------
@@ -1552,12 +1556,14 @@ class DatedSeries:
     @property
     def value_column(self) -> str:
         """
-        Column name used by :meth:`to_dataframe`.
+        Metric name of the series, also the column name used by
+        :meth:`to_dataframe`.
 
         Returns
         -------
         str
-            Metric-specific column name (e.g. ``sharpe``, ``volatility``).
+            Rust ``RollingMetric`` name: ``"volatility"``, ``"sortino"``,
+            ``"sharpe"`` or ``"return"``.
 
         Notes
         -----
@@ -1632,7 +1638,7 @@ class Performance:
         self,
         prices: pd.DataFrame,
         benchmark_ticker: str | None = None,
-        frequency: str = "daily",
+        frequency: str | None = None,
     ) -> None:
         """
         Build from a pandas DataFrame of prices.
@@ -1649,7 +1655,7 @@ class Performance:
             ``"monthly"``, ``"quarterly"``, ``"semi_annual"``, or ``"annual"``,
             or a pandas offset alias (``D``/``B``, ``W``, ``M``, ``Q``,
             ``A``/``Y``). Sets the annualization factor (252, 52, 12, 4, 2, 1).
-            Default ``"daily"``.
+            ``None`` uses the Rust default ``DEFAULT_FREQUENCY`` (daily).
 
         Raises
         ------
@@ -1669,7 +1675,7 @@ class Performance:
         prices: list[list[float]],
         ticker_names: list[str],
         benchmark_ticker: str | None = None,
-        frequency: str = "daily",
+        frequency: str | None = None,
     ) -> Performance:
         """
         Construct from raw arrays (dates, prices matrix, ticker names).
@@ -1719,7 +1725,7 @@ class Performance:
     def from_returns(
         returns: pd.DataFrame | pd.Series,
         benchmark_ticker: str | None = None,
-        frequency: str = "daily",
+        frequency: str | None = None,
     ) -> Performance:
         """
         Build from a pandas DataFrame (or Series) of simple returns.
@@ -1769,7 +1775,7 @@ class Performance:
         returns: list[list[float]],
         ticker_names: list[str],
         benchmark_ticker: str | None = None,
-        frequency: str = "daily",
+        frequency: str | None = None,
     ) -> Performance:
         """
         Construct from raw return arrays (dates, returns matrix, ticker names).
@@ -3163,7 +3169,7 @@ class Performance:
         self,
         ticker_idx: int | str,
         factor_returns: list[list[float]],
-        return_kind: str = "excess",
+        return_kind: str | None = None,
         risk_free_rate: float = 0.0,
     ) -> MultiFactorResult:
         """
@@ -3182,8 +3188,9 @@ class Performance:
         factor_returns : list[list[float]]
             Already-excess factor return matrix; ``factor_returns[i]`` is the
             return series for factor ``i``.
-        return_kind : str, default ``"excess"``
-            ``"excess"`` or ``"total"``.
+        return_kind : str, optional
+            ``"excess"`` or ``"total"``; ``None`` uses the Rust default
+            ``ReturnKind::Excess``.
         risk_free_rate : float, default 0.0
             Annualized decimal risk-free rate used when ``return_kind`` is
             ``"total"``.
@@ -3223,9 +3230,12 @@ class Performance:
         ref_date : object
             Reference date (``datetime.date``, ``pd.Timestamp``, or ISO string).
         fiscal_year_start_month : int, optional
-            Fiscal year start month in ``1..=12``.
+            Fiscal year start month in ``1..=12``. When only the day is given
+            the month is January; with both omitted the fiscal year is the
+            calendar year (Rust ``FiscalConfig::from_parts``).
         fiscal_year_start_day : int, optional
-            Fiscal year start day in ``1..=31``.
+            Fiscal year start day in ``1..=31``. When only the month is given
+            the day is the 1st.
 
         Returns
         -------
@@ -3243,7 +3253,7 @@ class Performance:
     def period_stats(
         self,
         ticker_idx: int | str,
-        aggregation_frequency: str = "monthly",
+        aggregation_frequency: str | None = None,
         fiscal_year_start_month: int | None = None,
         fiscal_year_start_day: int | None = None,
     ) -> PeriodStats:
@@ -3255,14 +3265,17 @@ class Performance:
         ticker_idx : int or str
             Zero-based ticker column index, or a ticker name resolved through
             Rust ``Performance::ticker_index``.
-        aggregation_frequency : str, default "monthly"
+        aggregation_frequency : str, optional
             Aggregation frequency (``"daily"``, ``"weekly"``, ``"monthly"``,
             ``"quarterly"``, ``"semi_annual"``, ``"annual"`` or a pandas
-            offset alias).
+            offset alias); ``None`` uses the Rust default
+            ``DEFAULT_PERIODIC_FREQUENCY`` (monthly).
         fiscal_year_start_month : int, optional
-            Fiscal year start month in ``1..=12``.
+            Fiscal year start month in ``1..=12``. When only the day is given
+            the month is January (Rust ``FiscalConfig::from_parts``).
         fiscal_year_start_day : int, optional
-            Fiscal year start day in ``1..=31``.
+            Fiscal year start day in ``1..=31``. When only the month is given
+            the day is the 1st.
 
         Returns
         -------
@@ -3278,18 +3291,19 @@ class Performance:
 
     def periodic_returns(
         self,
-        frequency: str = "monthly",
+        frequency: str | None = None,
     ) -> list[list[tuple[datetime.date, float]]]:
         """
         Calendar-bucketed compounded returns for all tickers.
 
         Parameters
         ----------
-        frequency : str, default "monthly"
+        frequency : str, optional
             Calendar-bucketing frequency: one of ``"daily"``, ``"weekly"``,
             ``"monthly"``, ``"quarterly"``, ``"semi_annual"``, or
             ``"annual"`` (pandas offset aliases ``D``/``B``, ``W``, ``M``,
-            ``Q``, ``A``/``Y`` are accepted too).
+            ``Q``, ``A``/``Y`` are accepted too); ``None`` uses the Rust
+            default ``DEFAULT_PERIODIC_FREQUENCY`` (monthly).
 
         Returns
         -------
@@ -3420,17 +3434,18 @@ class Performance:
         """
         ...
 
-    def to_periodic_returns_dataframe(self, frequency: str = "monthly") -> pd.DataFrame:
+    def to_periodic_returns_dataframe(self, frequency: str | None = None) -> pd.DataFrame:
         """
         Calendar-bucketed compounded returns for all tickers.
 
         Parameters
         ----------
-        frequency : str, default "monthly"
+        frequency : str, optional
             Bucketing frequency: one of ``"daily"``, ``"weekly"``,
             ``"monthly"``, ``"quarterly"``, ``"semi_annual"``, ``"annual"``
             or a pandas offset alias (``D``/``B``, ``W``, ``M``, ``Q``,
-            ``A``/``Y``).
+            ``A``/``Y``); ``None`` uses the Rust default
+            ``DEFAULT_PERIODIC_FREQUENCY`` (monthly).
 
         Returns
         -------
@@ -3532,9 +3547,12 @@ class Performance:
         ref_date : object
             Reference date.
         fiscal_year_start_month : int, optional
-            Fiscal year start month in ``1..=12``.
+            Fiscal year start month in ``1..=12``. When only the day is given
+            the month is January; with both omitted the fiscal year is the
+            calendar year (Rust ``FiscalConfig::from_parts``).
         fiscal_year_start_day : int, optional
-            Fiscal year start day in ``1..=31``.
+            Fiscal year start day in ``1..=31``. When only the month is given
+            the day is the 1st.
 
         Returns
         -------

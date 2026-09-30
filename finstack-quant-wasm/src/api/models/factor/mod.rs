@@ -703,7 +703,12 @@ pub fn evaluate_risk_budget(
     let result =
         evaluate_risk_budget_arrays(ids, &actual_var, &target_var_pct, portfolio_var, threshold)
             .map_err(to_js_err)?;
-    crate::utils::to_js_value(&result)
+    let js = crate::utils::to_js_value(&result)?;
+    let positions = js_sys::Reflect::get(&js, &JsValue::from("positions"))?;
+    crate::utils::restore_non_finite_rows::<
+        finstack_quant_models::factor::risk::PositionBudgetEntry,
+    >(&positions)?;
+    Ok(js)
 }
 
 #[cfg(test)]

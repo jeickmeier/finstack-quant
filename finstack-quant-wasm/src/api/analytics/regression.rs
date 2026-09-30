@@ -21,11 +21,11 @@ use crate::utils::to_js_err;
 /// `portfolio.factorBrinsonAttribution`, which requires factor returns
 /// satisfying that same completeness condition.
 /// @param exposures - Row-major factor exposure matrix, `n_assets x n_factors`: asset i's exposure to factor j is `exposures[i * n_factors + j]`.
-/// @param nFactors - Number of factor columns in `exposures`; must be a positive integer no greater than `4294967295`.
+/// @param nFactors - Number of factor columns in `exposures`; a non-negative whole number no greater than `4294967295` (Rust rejects `0` as invalid input).
 /// @param returns - Realized asset returns, length `n_assets` (defines `n_assets`).
 /// @param weights - Holding weights whose weighted return `w'r` must be fully reproduced by `w'Xf` (e.g. benchmark weights for a benchmark-return attribution).
 /// @returns Constrained factor returns `f`, one per factor, satisfying `w'Xf = w'r` to numerical precision.
-/// @throws Error - If `nFactors` is non-finite, fractional, zero, negative, or exceeds the WebAssembly `usize` range; if vector dimensions are inconsistent (including an overflowing `n_assets * n_factors`); if any vector value is non-finite; if the design matrix is rank-deficient; if coefficient rescaling or the constraint correction produces a non-finite value; or if the correction direction is degenerate and OLS does not already satisfy the constraint.
+/// @throws Error - A `TypeError` (kind `invalid_type`) if `nFactors` is not a finite, non-negative whole number within the WebAssembly `usize` range. A validation error from Rust if `nFactors` is zero or `returns` is empty; if vector dimensions are inconsistent (including an overflowing `n_assets * n_factors`); if any vector value is non-finite; if the design matrix is rank-deficient; if coefficient rescaling or the constraint correction produces a non-finite value; or if the correction direction is degenerate and OLS does not already satisfy the constraint.
 #[wasm_bindgen(js_name = constrainedLeastSquares)]
 pub fn constrained_least_squares(
     exposures: JsValue,

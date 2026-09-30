@@ -133,7 +133,7 @@ fn analytics_dts_matches_runtime_hotspots() {
     let drawdown_duration_docs = preceding_jsdoc(&dts, "  maxDrawdownDuration(): number[];");
     let periodic_returns_docs = preceding_jsdoc(
         &dts,
-        "  periodicReturns(frequency?: string): PeriodicReturnPoint[][];",
+        "  periodicReturns(frequency?: string): PeriodicReturn[][];",
     );
 
     assert!(dts.contains("declare class Performance {"));
@@ -150,10 +150,10 @@ fn analytics_dts_matches_runtime_hotspots() {
         &dts,
         "activeDatesForTicker(tickerIdx: number): string[];",
     ));
-    assert!(dts.contains("export interface PeriodicReturnPoint {"));
+    assert!(dts.contains("export interface PeriodicReturn {"));
     assert!(contains_ignoring_ws(
         &dts,
-        "periodicReturns(frequency?: string): PeriodicReturnPoint[][];",
+        "periodicReturns(frequency?: string): PeriodicReturn[][];",
     ));
     assert!(periodic_returns_docs.contains("The outer array is ticker-major"));
     for token in [
@@ -218,6 +218,13 @@ fn analytics_dts_matches_runtime_hotspots() {
         &dts,
         "rollingReturns(tickerIdx: number, window: number): DatedSeries;",
     ));
+    // Rolling series keep the Rust `DatedSeries` field names.
+    assert!(contains_ignoring_ws(&dts, "values: Float64Array;"));
+    assert!(contains_ignoring_ws(
+        &dts,
+        "value_column: \"volatility\" | \"sortino\" | \"sharpe\" | \"return\";",
+    ));
+    assert!(!dts.contains("return?: Float64Array;"));
     assert!(contains_ignoring_ws(
         &dts,
         "cagr(dayCount?: string, calendarId?: string): Float64Array;",
@@ -249,7 +256,7 @@ fn periodic_returns_has_one_exact_frequency_param_description() {
     let dts = index_dts();
     let docs = preceding_jsdoc(
         &dts,
-        "  periodicReturns(frequency?: string): PeriodicReturnPoint[][];",
+        "  periodicReturns(frequency?: string): PeriodicReturn[][];",
     );
 
     assert_eq!(docs.matches("@param frequency").count(), 1);

@@ -71,7 +71,7 @@ impl Performance {
         let panel = self.periodic_returns(frequency);
         let dates: Vec<Date> = panel
             .iter()
-            .flat_map(|series| series.iter().map(|(d, _)| *d))
+            .flat_map(|series| series.iter().map(|point| point.date))
             .collect::<BTreeSet<_>>()
             .into_iter()
             .collect();
@@ -79,9 +79,9 @@ impl Performance {
             .into_iter()
             .map(|series| {
                 let mut padded = vec![f64::NAN; dates.len()];
-                for (d, v) in series {
-                    if let Ok(pos) = dates.binary_search(&d) {
-                        padded[pos] = v;
+                for point in series {
+                    if let Ok(pos) = dates.binary_search(&point.date) {
+                        padded[pos] = point.value;
                     }
                 }
                 padded

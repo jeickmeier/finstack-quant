@@ -27,8 +27,12 @@
 //!
 //! Result and config types ([`PeriodStats`], [`DrawdownEpisode`],
 //! [`BetaResult`], [`GreeksResult`], [`RollingGreeks`], [`MultiFactorResult`],
-//! [`ReturnKind`], [`DatedSeries`], [`LookbackReturns`]) are re-exported here because
-//! `Performance` returns them.
+//! [`ReturnKind`], [`DatedSeries`], [`RollingMetric`], [`PeriodicReturn`],
+//! [`LookbackReturns`]) are re-exported here because `Performance` returns them.
+//!
+//! The `DEFAULT_*` constants ([`DEFAULT_CONFIDENCE`], [`DEFAULT_ROLLING_WINDOW`],
+//! [`DEFAULT_PERIODS_PER_YEAR`], ...) are the values the Python and WebAssembly
+//! bindings substitute for omitted arguments.
 //!
 //! Freestanding public exceptions are intentionally narrow:
 //! - [`scalar`] exposes [`sharpe`], [`sortino`], [`volatility`] and
@@ -82,6 +86,7 @@ pub(crate) type Result<T> = finstack_quant_core::Result<T>;
 pub(crate) mod aggregation;
 pub(crate) mod benchmark;
 pub mod correlation;
+pub(crate) mod defaults;
 pub(crate) mod drawdown;
 pub(crate) mod lookback;
 pub(crate) mod performance;
@@ -90,12 +95,40 @@ pub(crate) mod returns;
 pub(crate) mod risk_metrics;
 pub mod scalar;
 
-pub use aggregation::PeriodStats;
+pub use aggregation::{PeriodStats, PeriodicReturn};
 pub use benchmark::{beta, BetaResult, GreeksResult, MultiFactorResult, ReturnKind, RollingGreeks};
+pub use defaults::{
+    DEFAULT_ANNUALIZE, DEFAULT_CONFIDENCE, DEFAULT_DRAWDOWN_COUNT, DEFAULT_FREQUENCY, DEFAULT_MAR,
+    DEFAULT_PERIODIC_FREQUENCY, DEFAULT_PERIODS_PER_YEAR, DEFAULT_RISK_FREE_RATE,
+    DEFAULT_ROLLING_WINDOW,
+};
 pub use drawdown::DrawdownEpisode;
 pub use performance::{LookbackReturns, Performance};
-pub use risk_metrics::{CagrDayCount, DatedSeries};
+pub use risk_metrics::{CagrDayCount, DatedSeries, RollingMetric};
 pub use scalar::{max_drawdown, sharpe, sortino, volatility};
+
+#[cfg(test)]
+pub(crate) mod test_support {
+    use finstack_quant_core::wire::NonFiniteFields;
+
+    /// Assert that `T::NON_FINITE_FIELDS` names exactly the keys that
+    /// serialize as sentinel strings. Callers pass a value whose `f64` fields
+    /// are all `NaN`: fields routed through `core::wire::non_finite_f64` come
+    /// out as strings, plain `f64` fields as `null`.
+    pub(crate) fn assert_non_finite_fields<T: serde::Serialize + NonFiniteFields>(value: &T) {
+        let json = serde_json::to_value(value).expect("serialize");
+        let object = json.as_object().expect("struct serializes as an object");
+        let mut actual: Vec<&str> = object
+            .iter()
+            .filter(|(_, v)| v.is_string())
+            .map(|(k, _)| k.as_str())
+            .collect();
+        actual.sort_unstable();
+        let mut expected = T::NON_FINITE_FIELDS.to_vec();
+        expected.sort_unstable();
+        assert_eq!(actual, expected);
+    }
+}
 
 /// Compiles the crate `README.md` Rust samples as doctests.
 ///

@@ -4,6 +4,7 @@
 //! position (or group of positions). The budgeting engine compares actual
 //! component VaR against targets and computes utilization ratios.
 
+use finstack_quant_core::wire::NonFiniteFields;
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 
@@ -82,6 +83,10 @@ pub struct PositionBudgetEntry {
     /// VaR minus the target level. Negative when under budget, and always
     /// negative for diversifiers.
     pub excess: f64,
+}
+
+impl NonFiniteFields for PositionBudgetEntry {
+    const NON_FINITE_FIELDS: &'static [&'static str] = &["utilization"];
 }
 
 impl RiskBudget {
@@ -289,6 +294,27 @@ mod tests {
     use super::*;
 
     type TestResult = finstack_quant_core::Result<()>;
+
+    #[test]
+    fn position_budget_entry_non_finite_fields_match_serde_sentinels() {
+        let entry = PositionBudgetEntry {
+            position_id: "P".to_string(),
+            actual_component_var: f64::NAN,
+            target_component_var: f64::NAN,
+            utilization: f64::NAN,
+            excess: f64::NAN,
+        };
+        let json = serde_json::to_value(&entry).expect("serialize");
+        let mut sentinels: Vec<&str> = json
+            .as_object()
+            .expect("object")
+            .iter()
+            .filter(|(key, value)| value.is_string() && key.as_str() != "position_id")
+            .map(|(key, _)| key.as_str())
+            .collect();
+        sentinels.sort_unstable();
+        assert_eq!(sentinels, PositionBudgetEntry::NON_FINITE_FIELDS);
+    }
 
     fn budget(targets: IndexMap<String, f64>, utilization_threshold: f64) -> RiskBudget {
         RiskBudget {

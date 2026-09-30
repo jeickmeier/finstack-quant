@@ -3,7 +3,7 @@
 
 use super::{LookbackReturns, Performance};
 use crate::aggregation::{
-    group_by_period, group_by_period_dated, period_stats_from_grouped, PeriodStats,
+    group_by_period, group_by_period_dated, period_stats_from_grouped, PeriodStats, PeriodicReturn,
 };
 use crate::correlation::{
     nearest_correlation_matrix, validate_correlation_matrix, NearestCorrelationOpts,
@@ -237,13 +237,19 @@ impl Performance {
     /// # Arguments
     ///
     /// * `ref_date` - Inclusive end of each lookback window.
-    /// * `fiscal_config` - Fiscal year start month and day for FYTD.
+    /// * `fiscal_config` - Fiscal year start month and day for FYTD; `None`
+    ///   uses [`FiscalConfig::default`], the calendar year (January 1).
     ///
     /// # Returns
     ///
     /// Per-ticker compounded simple returns for MTD, QTD, YTD, and FYTD.
     /// All four vectors contain one entry per ticker.
-    pub fn lookback_returns(&self, ref_date: Date, fiscal_config: FiscalConfig) -> LookbackReturns {
+    pub fn lookback_returns(
+        &self,
+        ref_date: Date,
+        fiscal_config: Option<FiscalConfig>,
+    ) -> LookbackReturns {
+        let fiscal_config = fiscal_config.unwrap_or_default();
         let compute = |selector: fn(&[Date], Date) -> core::ops::Range<usize>| -> Vec<f64> {
             self.map_tickers(|i| {
                 let range = selector(self.active_dates_for_ticker_unchecked(i), ref_date);
@@ -274,6 +280,14 @@ impl Performance {
 
     /// Period-aggregated statistics for a specific ticker.
     ///
+    /// # Arguments
+    ///
+    /// * `ticker_idx` - Zero-based column index of the ticker.
+    /// * `aggregation_frequency` - Calendar bucket the per-period returns are
+    ///   compounded into before the statistics are taken.
+    /// * `fiscal_config` - Fiscal year start used to bucket fiscal periods;
+    ///   `None` uses calendar periods.
+    ///
     /// # Errors
     ///
     /// Returns [`crate::error::InputError::InvalidReturnSeries`] when
@@ -296,8 +310,8 @@ impl Performance {
 
     /// Calendar-bucketed compounded returns per ticker.
     ///
-    /// Returns one `Vec<(Date, f64)>` per ticker — each entry is
-    /// `(period_end_date, compounded_return)` for one calendar bucket of `frequency`.
+    /// Returns one `Vec<PeriodicReturn>` per ticker — each entry is the
+    /// period-end date and compounded return of one calendar bucket of `frequency`.
     /// Buckets compound via the shared kernel, so they reconcile exactly with
     /// [`Performance::cumulative_returns`]. Returns are simple decimal fractions
     /// (`0.01` means 1%), ticker series follow [`Performance::ticker_names`] order,
@@ -310,9 +324,9 @@ impl Performance {
     ///
     /// # Returns
     ///
-    /// A ticker-major panel of chronological `(period_end_date,
-    /// compounded_return)` points over the active analysis window.
-    pub fn periodic_returns(&self, frequency: PeriodKind) -> Vec<Vec<(Date, f64)>> {
+    /// A ticker-major panel of chronological [`PeriodicReturn`] points over
+    /// the active analysis window.
+    pub fn periodic_returns(&self, frequency: PeriodKind) -> Vec<Vec<PeriodicReturn>> {
         self.map_tickers(|i| {
             group_by_period_dated(
                 self.active_dates_for_ticker_unchecked(i),
@@ -428,16 +442,26 @@ mod periodic_returns_tests {
     }
 
     #[test]
+    fn lookback_returns_default_fiscal_year_is_calendar_year() {
+        let perf = sample_two_month_daily_performance();
+        let ref_date = *perf.dates().last().unwrap();
+        let omitted = perf.lookback_returns(ref_date, None);
+        let explicit = perf.lookback_returns(ref_date, Some(FiscalConfig::calendar_year()));
+        assert_eq!(omitted.fytd, explicit.fytd);
+        assert_eq!(omitted.ytd, explicit.fytd);
+    }
+
+    #[test]
     fn periodic_returns_monthly_has_one_bucket_per_month() {
         let perf = sample_two_month_daily_performance();
         let periodic = perf.periodic_returns(PeriodKind::Monthly);
         assert_eq!(periodic.len(), perf.ticker_names().len());
         assert_eq!(periodic[0].len(), 2);
-        assert_eq!(periodic[0][0].0.month(), Month::January);
-        assert_eq!(periodic[0][1].0.month(), Month::February);
+        assert_eq!(periodic[0][0].date.month(), Month::January);
+        assert_eq!(periodic[0][1].date.month(), Month::February);
         let cum = perf.cumulative_returns();
         let total = *cum[0].last().unwrap();
-        let chained = (1.0 + periodic[0][0].1) * (1.0 + periodic[0][1].1) - 1.0;
+        let chained = (1.0 + periodic[0][0].value) * (1.0 + periodic[0][1].value) - 1.0;
         assert!((chained - total).abs() < 1e-12);
     }
 }

@@ -8,6 +8,7 @@ pub mod input;
 
 pub use date::{date_to_iso, parse_iso_date, parse_iso_dates};
 
+use finstack_quant_core::wire::{non_finite_f64, NonFiniteFields};
 use wasm_bindgen::JsValue;
 
 /// Anything the bindings can turn into a structured JS error.
@@ -191,6 +192,71 @@ pub fn to_js_value<T: serde::Serialize>(value: &T) -> Result<JsValue, JsValue> {
     value
         .serialize(&serde_wasm_bindgen::Serializer::json_compatible())
         .map_err(to_js_err)
+}
+
+/// Serialize a result whose Rust type names its non-finite fields, returning
+/// those fields as JavaScript numbers.
+///
+/// The fields listed by [`NonFiniteFields`] serialize through
+/// `core::wire::non_finite_f64`, which writes `±∞`/`NaN` as sentinel strings
+/// so JSON can round-trip them. JavaScript numbers hold those values natively,
+/// so the sentinels are decoded back into numbers here.
+///
+/// # Errors
+///
+/// Returns a structured `JsValue` error if serialization or property access
+/// fails.
+pub(crate) fn to_js_value_numeric<T: serde::Serialize + NonFiniteFields>(
+    value: &T,
+) -> Result<JsValue, JsValue> {
+    let js = to_js_value(value)?;
+    restore_non_finite::<T>(&js)?;
+    Ok(js)
+}
+
+/// Serialize a slice of results as a JavaScript array, returning each row's
+/// non-finite fields as numbers (see [`to_js_value_numeric`]).
+///
+/// # Errors
+///
+/// Returns a structured `JsValue` error if serialization or property access
+/// fails.
+pub(crate) fn to_js_rows_numeric<T: serde::Serialize + NonFiniteFields>(
+    rows: &[T],
+) -> Result<JsValue, JsValue> {
+    let js = to_js_value(&rows)?;
+    restore_non_finite_rows::<T>(&js)?;
+    Ok(js)
+}
+
+/// Decode the sentinel strings in each element of an already serialized
+/// array of `T` rows (for a result that nests `T` rows under one key).
+///
+/// # Errors
+///
+/// Returns the `Reflect` failure if a property cannot be read or written.
+pub(crate) fn restore_non_finite_rows<T: NonFiniteFields>(rows: &JsValue) -> Result<(), JsValue> {
+    let rows = js_sys::Array::from(rows);
+    for row in rows.iter() {
+        restore_non_finite::<T>(&row)?;
+    }
+    Ok(())
+}
+
+/// Replace each `T::NON_FINITE_FIELDS` sentinel string on `object` with the
+/// number it encodes, using the Rust-owned sentinel vocabulary.
+fn restore_non_finite<T: NonFiniteFields>(object: &JsValue) -> Result<(), JsValue> {
+    for &field in T::NON_FINITE_FIELDS {
+        let key = JsValue::from_str(field);
+        let value = js_sys::Reflect::get(object, &key)?;
+        if let Some(number) = value
+            .as_string()
+            .and_then(|text| non_finite_f64::parse_sentinel(&text))
+        {
+            js_sys::Reflect::set(object, &key, &JsValue::from_f64(number))?;
+        }
+    }
+    Ok(())
 }
 
 /// Serialize a value to a JSON-compatible `JsValue` while preserving Rust

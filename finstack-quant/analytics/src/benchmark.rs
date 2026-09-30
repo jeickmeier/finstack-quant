@@ -12,6 +12,7 @@ use crate::dates::Date;
 use crate::math::stats::{OnlineCovariance, OnlineStats};
 use crate::regression::normalized_svd_least_squares;
 use finstack_quant_core::math::{neumaier_sum, NeumaierAccumulator};
+use finstack_quant_core::wire::NonFiniteFields;
 use nalgebra::DMatrix;
 
 // Recompute the four sliding-window sums (sr, sb, srb, sb²) every 64 steps to
@@ -266,6 +267,10 @@ pub struct BetaResult {
     pub ci_upper: f64,
 }
 
+impl NonFiniteFields for BetaResult {
+    const NON_FINITE_FIELDS: &'static [&'static str] = &["beta", "std_err", "ci_lower", "ci_upper"];
+}
+
 // Two-sided 95% critical value: Student's t with `n−2` degrees of freedom.
 // Use exact tabulated values for small samples, then conservative step-down
 // anchors at df = 40, 60, and 120 before the asymptotic normal limit.
@@ -481,6 +486,11 @@ pub struct GreeksResult {
     /// Adjusted R-squared of the regression, or [`f64::NAN`] when undefined.
     #[serde(with = "finstack_quant_core::wire::non_finite_f64")]
     pub adjusted_r_squared: f64,
+}
+
+impl NonFiniteFields for GreeksResult {
+    const NON_FINITE_FIELDS: &'static [&'static str] =
+        &["alpha", "beta", "r_squared", "adjusted_r_squared"];
 }
 
 /// Single-factor greeks for portfolio vs benchmark.
@@ -850,11 +860,14 @@ pub(crate) fn batting_average(returns: &[f64], benchmark: &[f64]) -> f64 {
 ///
 /// Factor series are always treated as already-excess (Fama–French style).
 /// Only the dependent series is adjusted when [`ReturnKind::Total`] is used.
-#[derive(Debug, Clone, Copy, PartialEq, serde::Serialize, serde::Deserialize)]
+/// The default, used by the bindings when the kind is omitted, is
+/// [`ReturnKind::Excess`].
+#[derive(Debug, Clone, Copy, Default, PartialEq, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ReturnKind {
     /// `returns` are already excess returns. Alpha is the annualized OLS
     /// intercept of excess `y` on the supplied (already-excess) factors.
+    #[default]
     Excess,
     /// `returns` are total returns. The geometrically decompounded period
     /// risk-free rate is subtracted from `y` only, then OLS is run.
@@ -925,6 +938,10 @@ pub struct MultiFactorResult {
     pub adjusted_r_squared: f64,
     /// Annualized residual volatility.
     pub residual_vol: f64,
+}
+
+impl NonFiniteFields for MultiFactorResult {
+    const NON_FINITE_FIELDS: &'static [&'static str] = &["r_squared", "adjusted_r_squared"];
 }
 
 fn geometric_capture<F>(returns: &[f64], benchmark: &[f64], ann_factor: f64, include: F) -> f64
@@ -1164,6 +1181,38 @@ pub(crate) fn multi_factor_greeks(
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn non_finite_field_lists_match_serde_sentinels() {
+        use crate::test_support::assert_non_finite_fields;
+        let beta = BetaResult {
+            beta: f64::NAN,
+            std_err: f64::NAN,
+            ci_lower: f64::NAN,
+            ci_upper: f64::NAN,
+        };
+        assert_non_finite_fields(&beta);
+        let greeks = GreeksResult {
+            alpha: f64::NAN,
+            beta: f64::NAN,
+            r_squared: f64::NAN,
+            adjusted_r_squared: f64::NAN,
+        };
+        assert_non_finite_fields(&greeks);
+        let multi = MultiFactorResult {
+            alpha: f64::NAN,
+            betas: vec![f64::NAN],
+            r_squared: f64::NAN,
+            adjusted_r_squared: f64::NAN,
+            residual_vol: f64::NAN,
+        };
+        assert_non_finite_fields(&multi);
+    }
+
+    #[test]
+    fn return_kind_defaults_to_excess() {
+        assert_eq!(ReturnKind::default(), ReturnKind::Excess);
+    }
+
     use super::*;
 
     use crate::dates::{Duration, Month};

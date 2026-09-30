@@ -402,9 +402,13 @@ fn rolling_returns_match_dated_series_shape() {
         .unwrap()
         .dyn_into()
         .unwrap();
-    let values = obj_typed_vec(&raw, "return");
+    let values = obj_typed_vec(&raw, "values");
     assert_eq!(values.len(), date_array.length() as usize);
     assert!(!values.is_empty());
+    let label = Reflect::get(&raw, &JsValue::from_str("value_column"))
+        .unwrap()
+        .as_string();
+    assert_eq!(label.as_deref(), Some("return"));
 }
 
 #[wasm_bindgen_test]

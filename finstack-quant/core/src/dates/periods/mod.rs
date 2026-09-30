@@ -103,7 +103,7 @@ impl PeriodKind {
     /// - Weekly: 52
     /// - Semi-Annual: 2
     /// - Annual: 1
-    pub fn periods_per_year(self) -> u16 {
+    pub const fn periods_per_year(self) -> u16 {
         match self {
             PeriodKind::Daily => 252,
             PeriodKind::Quarterly => 4,
@@ -118,7 +118,7 @@ impl PeriodKind {
     ///
     /// Used to scale per-period statistics to annual equivalents.
     /// For all variants this equals `periods_per_year()` cast to `f64`.
-    pub fn annualization_factor(self) -> f64 {
+    pub const fn annualization_factor(self) -> f64 {
         self.periods_per_year() as f64
     }
 
@@ -562,12 +562,24 @@ pub struct FiscalConfig {
     pub start_day: u8,
 }
 
+/// The calendar year (January 1), the fiscal year used when none is given.
+impl Default for FiscalConfig {
+    fn default() -> Self {
+        Self::calendar_year()
+    }
+}
+
 impl FiscalConfig {
     /// Create a new fiscal configuration.
     ///
     /// This validates the independent month and day ranges. It does not reject
     /// a day such as February 31 until that configuration is applied to a
     /// concrete fiscal year, because leap-year validity is year-dependent.
+    ///
+    /// # Arguments
+    ///
+    /// * `start_month` - Month the fiscal year starts in (1 = January … 12).
+    /// * `start_day` - Day of that month the fiscal year starts on (1-31).
     ///
     /// # Errors
     ///
@@ -588,6 +600,39 @@ impl FiscalConfig {
             start_month,
             start_day,
         })
+    }
+
+    /// Resolve an optionally specified fiscal-year start.
+    ///
+    /// Hosts expose the start as two optional arguments; this is the one place
+    /// that decides what an omitted half means.
+    ///
+    /// # Arguments
+    ///
+    /// * `start_month` - Fiscal-year start month (1-12). When only
+    ///   `start_day` is supplied, the month defaults to January.
+    /// * `start_day` - Fiscal-year start day of month (1-31). When only
+    ///   `start_month` is supplied, the day defaults to the 1st.
+    ///
+    /// # Returns
+    ///
+    /// `None` when both parts are omitted, so the caller's own default applies
+    /// (for example [`FiscalConfig::default`], the calendar year). Otherwise
+    /// the validated configuration: a month of 10 alone means October 1, and a
+    /// day of 6 alone means January 6.
+    ///
+    /// # Errors
+    ///
+    /// Returns `Error::Validation` under the same range rules as
+    /// [`FiscalConfig::new`].
+    pub fn from_parts(
+        start_month: Option<u8>,
+        start_day: Option<u8>,
+    ) -> crate::Result<Option<Self>> {
+        if start_month.is_none() && start_day.is_none() {
+            return Ok(None);
+        }
+        Self::new(start_month.unwrap_or(1), start_day.unwrap_or(1)).map(Some)
     }
 
     /// Standard calendar year (January 1).

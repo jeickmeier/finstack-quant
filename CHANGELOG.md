@@ -2,6 +2,18 @@
 
 ## [Unreleased]
 
+### WASM binding audit: analytics (2026-09-30)
+
+#### Changed (BREAKING)
+
+- WASM rolling metrics (`rollingVolatility`, `rollingSortino`, `rollingSharpe`, `rollingReturns`) return `{ values, dates, value_column }` instead of `{ dates, <metric> }`. The label comes from the new Rust `DatedSeries.value_column: RollingMetric`.
+  - Python `DatedSeries` wraps the Rust type, and `from_json` rejects an unknown `value_column`.
+  - `DatedSeries.values` serializes non-finite points as `"nan"` / `"inf"` sentinels (new `core::wire::non_finite_f64_seq`), so a series with undefined windows now round-trips through JSON and pickle.
+- `Performance::periodic_returns` returns `Vec<Vec<PeriodicReturn>>` (`{ date, value }`). WASM returns those objects, and the TS type `PeriodicReturnPoint` is renamed `PeriodicReturn`.
+- `Performance::lookback_returns` takes `Option<FiscalConfig>`. The new `FiscalConfig::from_parts` and `FiscalConfig: Default` replace the binding-side fiscal parsing.
+- Analytics defaults are Rust constants (`DEFAULT_PERIODS_PER_YEAR`, `DEFAULT_RISK_FREE_RATE`, `DEFAULT_MAR`, `DEFAULT_FREQUENCY`, `DEFAULT_PERIODIC_FREQUENCY`, `DEFAULT_ROLLING_WINDOW`, `DEFAULT_CONFIDENCE`, `DEFAULT_DRAWDOWN_COUNT`, `DEFAULT_ANNUALIZE`) and `ReturnKind: Default`. Both hosts use them. Python `frequency`, `aggregation_frequency` and `return_kind` default to `None`. No default value changed.
+- Result types with non-finite fields list them through the new `core::wire::NonFiniteFields` trait. WASM restores those fields to numeric `NaN` / `±Infinity`, so `evaluateRiskBudget` `utilization` is a number rather than the string `"inf"`.
+
 ### WASM binding audit: scenarios (2026-09-30)
 
 #### Changed (BREAKING)

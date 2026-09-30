@@ -2747,32 +2747,26 @@ export interface PeriodStats {
 }
 
 /**
- * Dated rolling result returned by per-ticker rolling analytics.
+ * Dated rolling result returned by per-ticker rolling analytics: the serde
+ * form of Rust `DatedSeries`, with `values` as a typed array.
  *
- * Exactly one metric-named key (`sharpe`, `sortino`, `volatility`, or
- * `return`) is present, matching the method that produced the series.
+ * Identical keys to Python `DatedSeries.to_json()`.
  */
 export interface DatedSeries {
   /**
-   * ISO-8601 dates aligned with the metric series, in chronological order.
+   * Rolling metric values, one per completed window.
+   */
+  values: Float64Array;
+  /**
+   * ISO-8601 window-end dates aligned 1:1 with `values`, in chronological order.
    */
   dates: string[];
   /**
-   * Rolling Sharpe ratio when produced by `rollingSharpe`.
+   * Rust `RollingMetric` name of the series: `"volatility"` (`rollingVolatility`),
+   * `"sortino"` (`rollingSortino`), `"sharpe"` (`rollingSharpe`) or `"return"`
+   * (`rollingReturns`).
    */
-  sharpe?: Float64Array;
-  /**
-   * Rolling Sortino ratio when produced by `rollingSortino`.
-   */
-  sortino?: Float64Array;
-  /**
-   * Rolling volatility when produced by `rollingVolatility`.
-   */
-  volatility?: Float64Array;
-  /**
-   * Rolling compounded return when produced by `rollingReturns`.
-   */
-  return?: Float64Array;
+  value_column: "volatility" | "sortino" | "sharpe" | "return";
 }
 
 /**
@@ -2893,9 +2887,10 @@ export interface LookbackReturns {
 }
 
 /**
- * One calendar-bucketed return emitted by `Performance.periodicReturns`.
+ * One calendar-bucketed return emitted by `Performance.periodicReturns`: the
+ * serde form of Rust `PeriodicReturn`.
  */
-export interface PeriodicReturnPoint {
+export interface PeriodicReturn {
   /**
    * ISO-8601 date of the final observation in the calendar bucket.
    */
@@ -3062,9 +3057,11 @@ declare class Performance {
   /**
    * Compound annual growth rate per asset.
    *
-   * `dayCount` omitted or `"act365_25"` uses Act/365.25. Other values are
-   * core DayCount names such as `"act_365f"` or `"bus_252"`. `bus_252`
-   * requires `calendarId`.
+   * `dayCount` omitted or `"act365_25"` uses Act/365.25 (the Rust
+   * `CagrDayCount` default). Other values are core DayCount names such as
+   * `"act_365f"` or `"bus_252"`. `bus_252` requires `calendarId`. Labels
+   * only: to reuse a `core.DayCount` handle, pass `dayCount.toString()`
+   * (Python additionally accepts the `DayCount` object itself).
    * @param dayCount - Optional day-count: `"act365_25"` or a core name such as `"act_365f"`; defaults to Act/365.25.
    * @param calendarId - Optional holiday-calendar id, or `+`-joined ids for a union calendar (`"nyse+gblo"`); required for `bus_252`.
    * @returns Per-ticker values as a Float64Array in `tickerNames()` order.
@@ -3337,7 +3334,7 @@ declare class Performance {
    * Calendar-bucketed compounded returns for every ticker.
    *
    * The outer array is ticker-major in `tickerNames()` order. Each inner
-   * array contains chronological period-end points. Chaining one ticker's
+   * array contains chronological Rust `PeriodicReturn` points. Chaining one ticker's
    * decimal `value` fields reconciles with its final `cumulativeReturns()`
    * value.
    *
@@ -3352,10 +3349,10 @@ declare class Performance {
    * console.log(point.date, point.value); // "2024-01-02", 0.0302
    * ```
    * @param frequency - Optional calendar frequency token: `"daily"`, `"weekly"`, `"monthly"`, `"quarterly"`, `"semi_annual"`, or `"annual"` (pandas offset aliases `D`/`B`, `W`, `M`, `Q`, `A`/`Y` are accepted too); defaults to `"monthly"`.
-   * @returns Ticker-major nested arrays of chronological period-end points with simple decimal returns.
-   * @throws Error - Rejects an unsupported frequency or a failure to create a point property on the JavaScript result object.
+   * @returns Ticker-major nested arrays of chronological Rust `PeriodicReturn` `{ date, value }` points with simple decimal returns.
+   * @throws Error - Rejects an unsupported frequency or a panel that cannot be serialized to JavaScript.
    */
-  periodicReturns(frequency?: string): PeriodicReturnPoint[][];
+  periodicReturns(frequency?: string): PeriodicReturn[][];
   /**
    * Drawdown series per asset.
    * @returns One Float64Array per ticker in `tickerNames()` order.
@@ -3426,7 +3423,7 @@ declare class Performance {
    * Rolling volatility series for one asset over a window.
    * @param tickerIdx - Finite non-negative integer column index in tickerNames order; fractional or out-of-range values are rejected.
    * @param window - Finite positive integer observation count; defaults to 63 periods. Invalid numeric values are rejected.
-   * @returns `{ dates, volatility }` series for the selected ticker.
+   * @returns `{ values, dates, value_column }` series for the selected ticker; `value_column` is `"volatility"`.
    * @throws Error - Rejects when `ticker_idx` is outside the loaded ticker columns or the JavaScript result object's properties cannot be created.
    */
   rollingVolatility(tickerIdx: number, window?: number): DatedSeries;
@@ -3435,7 +3432,7 @@ declare class Performance {
    * @param tickerIdx - Finite non-negative integer column index in tickerNames order; fractional or out-of-range values are rejected.
    * @param window - Finite positive integer observation count; defaults to 63 periods. Invalid numeric values are rejected.
    * @param mar - Per-period minimum acceptable return as a decimal; defaults to 0.0.
-   * @returns `{ dates, sortino }` series for the selected ticker.
+   * @returns `{ values, dates, value_column }` series for the selected ticker; `value_column` is `"sortino"`.
    * @throws Error - Rejects when `ticker_idx` is outside the loaded ticker columns or the JavaScript result object's properties cannot be created.
    */
   rollingSortino(tickerIdx: number, window?: number, mar?: number): DatedSeries;
@@ -3444,7 +3441,7 @@ declare class Performance {
    * @param tickerIdx - Finite non-negative integer column index in tickerNames order; fractional or out-of-range values are rejected.
    * @param window - Finite positive integer observation count; defaults to 63 periods. Invalid numeric values are rejected.
    * @param riskFreeRate - Annualized decimal risk-free rate; defaults to 0.0.
-   * @returns `{ dates, sharpe }` series for the selected ticker.
+   * @returns `{ values, dates, value_column }` series for the selected ticker; `value_column` is `"sharpe"`.
    * @throws Error - Rejects when `ticker_idx` is outside the loaded ticker columns or the JavaScript result object's properties cannot be created.
    */
   rollingSharpe(tickerIdx: number, window?: number, riskFreeRate?: number): DatedSeries;
@@ -3452,7 +3449,7 @@ declare class Performance {
    * Rolling compounded return series for one asset over a window.
    * @param tickerIdx - Finite non-negative integer column index in tickerNames order; fractional or out-of-range values are rejected.
    * @param window - Finite positive integer observation count. Zero, fractional, non-finite, and out-of-range values are rejected.
-   * @returns `{ dates, return }` series for the selected ticker.
+   * @returns `{ values, dates, value_column }` series for the selected ticker; `value_column` is `"return"`.
    * @throws Error - Rejects when `ticker_idx` is outside the loaded ticker columns or the JavaScript result object's properties cannot be created. An overlong `window` returns an empty series; a zero window is rejected.
    */
   rollingReturns(tickerIdx: number, window: number): DatedSeries;
@@ -3490,8 +3487,8 @@ declare class Performance {
    * through `refDate`. Holidays are not skipped. The first included
    * simple return still spans the prior close.
    * @param refDate - ISO-8601 date on which MTD, QTD, YTD, and FYTD windows end.
-   * @param fiscalYearStartMonth - Optional fiscal-year start month from 1 through 12; defaults to January.
-   * @param fiscalYearStartDay - Optional fiscal-year start day; defaults to the first day of the month.
+   * @param fiscalYearStartMonth - Optional fiscal-year start month from 1 through 12; defaults to January. With both parts omitted the fiscal year is the calendar year.
+   * @param fiscalYearStartDay - Optional fiscal-year start day; defaults to the first day of the month (Rust `FiscalConfig::from_parts`).
    * @param refDate - ISO-8601 date on which MTD, QTD, YTD, and FYTD windows end.
    * @param fiscalYearStartMonth - Optional fiscal-year start month from 1 through 12; defaults to January.
    * @param fiscalYearStartDay - Optional fiscal-year start day; defaults to the first day.
@@ -3507,8 +3504,8 @@ declare class Performance {
    * Aggregated period statistics for one asset at the given frequency.
    * @param tickerIdx - Finite non-negative integer column index in tickerNames order; fractional or out-of-range values are rejected.
    * @param aggregationFrequency - Optional aggregation frequency token; defaults to monthly.
-   * @param fiscalYearStartMonth - Optional fiscal-year start month from 1 through 12.
-   * @param fiscalYearStartDay - Optional fiscal-year start day within the selected month.
+   * @param fiscalYearStartMonth - Optional fiscal-year start month from 1 through 12; when only the day is given the month is January.
+   * @param fiscalYearStartDay - Optional fiscal-year start day within the selected month; when only the month is given the day is the 1st.
    * @returns Period statistics object for the selected ticker at the requested frequency.
    * @throws Error - Rejects an unsupported `aggregation_frequency`, a fiscal month outside `1..=12`, a fiscal day outside `1..=31`, an out-of-range `ticker_idx`, or period statistics that cannot be serialized to JavaScript.
    */
@@ -3559,11 +3556,11 @@ export interface AnalyticsNamespace {
    * returns consumed by `portfolio.factorBrinsonAttribution`, which
    * requires factor returns satisfying that same completeness condition.
    * @param exposures - Row-major factor exposure matrix, `n_assets x n_factors`: asset i's exposure to factor j is `exposures[i * n_factors + j]`.
-   * @param nFactors - Number of factor columns in `exposures`; must be a positive integer no greater than `4294967295`.
+   * @param nFactors - Number of factor columns in `exposures`; a non-negative whole number no greater than `4294967295` (Rust rejects `0` as invalid input).
    * @param returns - Realized asset returns, length `n_assets` (defines `n_assets`).
    * @param weights - Holding weights whose weighted return `w'r` must be fully reproduced by `w'Xf` (e.g. benchmark weights for a benchmark-return attribution).
    * @returns Constrained factor returns `f`, one per factor, satisfying `w'Xf = w'r` to numerical precision.
-   * @throws Error - If `nFactors` is non-finite, fractional, zero, negative, or exceeds the WebAssembly `usize` range; if vector dimensions are inconsistent (including an overflowing `n_assets * n_factors`); if any vector value is non-finite; if the design matrix is rank-deficient; if coefficient rescaling or the constraint correction produces a non-finite value; or if the correction direction is degenerate and OLS does not already satisfy the constraint.
+   * @throws Error - A `TypeError` (kind `invalid_type`) if `nFactors` is not a finite, non-negative whole number within the WebAssembly `usize` range. A validation error from Rust if `nFactors` is zero or `returns` is empty; if vector dimensions are inconsistent (including an overflowing `n_assets * n_factors`); if any vector value is non-finite; if the design matrix is rank-deficient; if coefficient rescaling or the constraint correction produces a non-finite value; or if the correction direction is degenerate and OLS does not already satisfy the constraint.
    */
   constrainedLeastSquares(
     exposures: NumericArray,

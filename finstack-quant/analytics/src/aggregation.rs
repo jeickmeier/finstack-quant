@@ -1,13 +1,41 @@
 //! Period aggregation: group returns by period and compute period-level stats.
 //!
-//! Crate-internal except for [`PeriodStats`] (re-exported at the crate root).
+//! Crate-internal except for [`PeriodStats`] and [`PeriodicReturn`]
+//! (re-exported at the crate root).
 //! Uses `dates::periods::PeriodId` as grouping keys and `DateExt` for
 //! date-to-period mapping.
 
 use crate::dates::{Date, DateExt, FiscalConfig, PeriodId, PeriodKind};
+use finstack_quant_core::wire::NonFiniteFields;
 
 use super::returns::comp_total;
 use crate::math::summation::NeumaierAccumulator;
+
+/// One calendar bucket of a periodic-return series.
+///
+/// Returned per ticker by [`crate::Performance::periodic_returns`].
+///
+/// # Examples
+///
+/// ```rust
+/// use finstack_quant_analytics::PeriodicReturn;
+/// use finstack_quant_core::dates::{Date, Month};
+///
+/// let point = PeriodicReturn {
+///     date: Date::from_calendar_date(2025, Month::January, 31)?,
+///     value: 0.012,
+/// };
+/// assert_eq!(serde_json::to_string(&point)?, r#"{"date":"2025-01-31","value":0.012}"#);
+/// # Ok::<(), Box<dyn std::error::Error>>(())
+/// ```
+#[derive(Debug, Clone, Copy, PartialEq, serde::Serialize, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct PeriodicReturn {
+    /// Date of the last observation in the bucket (the period end).
+    pub date: Date,
+    /// Compounded simple return over the bucket as a decimal (`0.01` is 1%).
+    pub value: f64,
+}
 
 /// Period-level aggregate statistics.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -48,6 +76,15 @@ pub struct PeriodStats {
     /// do not affect this payoff approximation; `win_rate` uses all periods.
     #[serde(with = "finstack_quant_core::wire::non_finite_f64")]
     pub kelly_criterion: f64,
+}
+
+impl NonFiniteFields for PeriodStats {
+    const NON_FINITE_FIELDS: &'static [&'static str] = &[
+        "payoff_ratio",
+        "profit_factor",
+        "cpc_ratio",
+        "kelly_criterion",
+    ];
 }
 
 impl PeriodStats {
@@ -124,10 +161,10 @@ pub(crate) fn group_by_period_dated(
     dates: &[Date],
     returns: &[f64],
     frequency: PeriodKind,
-) -> Vec<(Date, f64)> {
+) -> Vec<PeriodicReturn> {
     group_period_buckets(dates, returns, frequency, None)
         .into_iter()
-        .map(|(_, last_date, compounded)| (last_date, compounded))
+        .map(|(_, date, value)| PeriodicReturn { date, value })
         .collect()
 }
 
@@ -321,11 +358,11 @@ mod periodic_dated_tests {
         let out = group_by_period_dated(&dates, &rets, PeriodKind::Monthly);
 
         assert_eq!(out.len(), 2);
-        assert_eq!(out[0].0, d(2021, 1, 20));
-        assert_eq!(out[1].0, d(2021, 2, 25));
-        assert!((out[0].1 - (1.01 * 1.02 - 1.0)).abs() < 1e-12);
-        assert!((out[1].1 - (0.99 * 1.03 - 1.0)).abs() < 1e-12);
-        let total = (1.0 + out[0].1) * (1.0 + out[1].1) - 1.0;
+        assert_eq!(out[0].date, d(2021, 1, 20));
+        assert_eq!(out[1].date, d(2021, 2, 25));
+        assert!((out[0].value - (1.01 * 1.02 - 1.0)).abs() < 1e-12);
+        assert!((out[1].value - (0.99 * 1.03 - 1.0)).abs() < 1e-12);
+        let total = (1.0 + out[0].value) * (1.0 + out[1].value) - 1.0;
         let expected = 1.01 * 1.02 * 0.99 * 1.03 - 1.0;
         assert!((total - expected).abs() < 1e-12);
     }
@@ -339,6 +376,25 @@ mod periodic_dated_tests {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn period_stats_non_finite_fields_match_serde_sentinels() {
+        let stats = PeriodStats {
+            best: f64::NAN,
+            worst: f64::NAN,
+            consecutive_wins: 0,
+            consecutive_losses: 0,
+            win_rate: f64::NAN,
+            avg_return: f64::NAN,
+            avg_win: f64::NAN,
+            avg_loss: f64::NAN,
+            payoff_ratio: f64::NAN,
+            profit_factor: f64::NAN,
+            cpc_ratio: f64::NAN,
+            kelly_criterion: f64::NAN,
+        };
+        crate::test_support::assert_non_finite_fields(&stats);
+    }
+
     use super::*;
     use crate::dates::Month;
 

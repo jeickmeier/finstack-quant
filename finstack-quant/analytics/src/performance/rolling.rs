@@ -4,7 +4,7 @@ use super::Performance;
 use crate::math::summation::NeumaierAccumulator;
 use crate::returns::MIN_GROWTH_FACTOR;
 use crate::risk_metrics::{
-    rolling_sharpe, rolling_sortino, rolling_volatility, DatedSeries,
+    rolling_sharpe, rolling_sortino, rolling_volatility, DatedSeries, RollingMetric,
     ROLLING_KERNEL_RECOMPUTE_INTERVAL,
 };
 
@@ -48,7 +48,7 @@ impl Performance {
         let dates = self.active_dates_for_ticker_unchecked(ticker_idx);
         let n = returns.len().min(dates.len());
         if window > n {
-            return Ok(DatedSeries::default());
+            return Ok(DatedSeries::empty(RollingMetric::Return));
         }
         let count = n - window + 1;
         let mut values = Vec::with_capacity(count);
@@ -94,6 +94,7 @@ impl Performance {
         Ok(DatedSeries {
             values,
             dates: out_dates,
+            value_column: RollingMetric::Return,
         })
     }
 
