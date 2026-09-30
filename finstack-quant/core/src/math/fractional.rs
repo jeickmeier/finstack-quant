@@ -38,6 +38,7 @@ use crate::{Error, Result};
 /// - H = 0.5 — standard Brownian motion
 /// - H > 0.5 — smooth (persistent increments)
 #[derive(Debug, Clone, Copy, PartialEq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct HurstExponent {
     /// The Hurst parameter value.
     h: f64,

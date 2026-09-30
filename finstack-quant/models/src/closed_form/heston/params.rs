@@ -30,6 +30,7 @@ pub mod heston_defaults {
 pub(super) const HESTON_TAIL_DIAGNOSTIC_THRESHOLD: f64 = 1e-4;
 
 #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 /// Market inputs for closed-form Heston pricing.
 ///
 /// The stochastic parameters are stored once in the canonical models-layer

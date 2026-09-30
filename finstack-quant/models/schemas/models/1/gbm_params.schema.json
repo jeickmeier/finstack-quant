@@ -1,0 +1,29 @@
+{
+  "$id": "https://finstack_quant.dev/schemas/models/1/gbm_params.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Geometric Brownian Motion parameters.",
+  "properties": {
+    "q": {
+      "description": "Dividend/foreign rate (annual)",
+      "format": "double",
+      "type": "number"
+    },
+    "r": {
+      "description": "Risk-free rate (annual)",
+      "format": "double",
+      "type": "number"
+    },
+    "sigma": {
+      "description": "Volatility (annual)",
+      "format": "double",
+      "type": "number"
+    }
+  },
+  "required": [
+    "r",
+    "q",
+    "sigma"
+  ],
+  "title": "GbmParams",
+  "type": "object"
+}

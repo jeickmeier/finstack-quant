@@ -1,0 +1,87 @@
+{
+  "$id": "https://finstack_quant.dev/schemas/models/1/correlation_structure.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Correlation structure specification.",
+  "oneOf": [
+    {
+      "additionalProperties": false,
+      "properties": {
+        "asset_correlation": {
+          "format": "double",
+          "type": "number"
+        },
+        "prepay_default_correlation": {
+          "format": "double",
+          "type": "number"
+        },
+        "structure": {
+          "const": "flat",
+          "type": "string"
+        }
+      },
+      "required": [
+        "structure",
+        "asset_correlation",
+        "prepay_default_correlation"
+      ],
+      "type": "object"
+    },
+    {
+      "additionalProperties": false,
+      "properties": {
+        "inter_sector": {
+          "format": "double",
+          "type": "number"
+        },
+        "intra_sector": {
+          "format": "double",
+          "type": "number"
+        },
+        "prepay_default": {
+          "format": "double",
+          "type": "number"
+        },
+        "structure": {
+          "const": "sectored",
+          "type": "string"
+        }
+      },
+      "required": [
+        "structure",
+        "intra_sector",
+        "inter_sector",
+        "prepay_default"
+      ],
+      "type": "object"
+    },
+    {
+      "additionalProperties": false,
+      "properties": {
+        "correlations": {
+          "items": {
+            "format": "double",
+            "type": "number"
+          },
+          "type": "array"
+        },
+        "labels": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "structure": {
+          "const": "matrix",
+          "type": "string"
+        }
+      },
+      "required": [
+        "structure",
+        "correlations",
+        "labels"
+      ],
+      "type": "object"
+    }
+  ],
+  "title": "CorrelationStructure"
+}

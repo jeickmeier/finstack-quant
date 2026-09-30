@@ -1,0 +1,65 @@
+{
+  "$id": "https://finstack_quant.dev/schemas/models/1/ohlson_o_score_input.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Input for the Ohlson O-Score logistic model (1980).",
+  "properties": {
+    "current_liabilities_to_current_assets": {
+      "description": "Current Liabilities / Current Assets.",
+      "format": "double",
+      "type": "number"
+    },
+    "funds_from_operations_to_total_liabilities": {
+      "description": "Funds from Operations / Total Liabilities.",
+      "format": "double",
+      "type": "number"
+    },
+    "liabilities_exceed_assets": {
+      "description": "1 if Total Liabilities > Total Assets, else 0.",
+      "format": "double",
+      "type": "number"
+    },
+    "log_total_assets_adjusted": {
+      "description": "Ohlson's SIZE variable: `ln(Total Assets / GNP price-level index)`.\n\nThe published coefficient `-0.407` is calibrated to this specific\nscale using the US GNP deflator with Ohlson's 1970s base period\n(Ohlson 1980, Table 4). The deflator normalises for inflation so\nfirms are compared on a constant-dollar basis.\n\n# Unit sensitivity (IMPORTANT)\n\nBecause the coefficient is calibrated to Ohlson's specific scale,\nsubstituting a different unit shifts the score by a constant and\ntherefore shifts every implied PD and every zone boundary. For\nexample, `ln(total_assets_millions)` differs from Ohlson's SIZE\nby `+ ln(10^6 / GNP_deflator_1970s)`, which multiplied by\n`-0.407` shifts the O-score by roughly `-2.8` - i.e. every firm\nlooks ~60%+ \"safer\" than it should.\n\nRecommended inputs, in order of fidelity:\n1. `ln(total_assets_nominal_USD / GNP_deflator)` using a deflator\n   with an explicit base period close to 1968-70. This reproduces\n   Ohlson's original scale.\n2. `ln(total_assets_deflated_to_Ohlson_base_USD)` if you have\n   pre-deflated real dollars.\n3. Any other rescaling, together with a re-estimated intercept and\n   re-calibrated zone thresholds on your own sample.\n\nDo **not** feed raw `ln(total_assets_millions)` or\n`ln(total_assets_billions)` unless you have re-estimated the model\n- the out-of-the-box thresholds will mis-rank.",
+      "format": "double",
+      "type": "number"
+    },
+    "negative_net_income_two_years": {
+      "description": "1 if net income was negative for the last two years, else 0.",
+      "format": "double",
+      "type": "number"
+    },
+    "net_income_change": {
+      "description": "(NI_t - NI_{t-1}) / (|NI_t| + |NI_{t-1}|) -- change in net income.",
+      "format": "double",
+      "type": "number"
+    },
+    "net_income_to_total_assets": {
+      "description": "Net Income / Total Assets (ROA).",
+      "format": "double",
+      "type": "number"
+    },
+    "total_liabilities_to_total_assets": {
+      "description": "Total Liabilities / Total Assets.",
+      "format": "double",
+      "type": "number"
+    },
+    "working_capital_to_total_assets": {
+      "description": "Working Capital / Total Assets.",
+      "format": "double",
+      "type": "number"
+    }
+  },
+  "required": [
+    "log_total_assets_adjusted",
+    "total_liabilities_to_total_assets",
+    "working_capital_to_total_assets",
+    "current_liabilities_to_current_assets",
+    "liabilities_exceed_assets",
+    "net_income_to_total_assets",
+    "funds_from_operations_to_total_liabilities",
+    "negative_net_income_two_years",
+    "net_income_change"
+  ],
+  "title": "OhlsonOScoreInput",
+  "type": "object"
+}

@@ -1,0 +1,703 @@
+{
+  "$defs": {
+    "EclBucket": {
+      "description": "ECL result for a single time bucket.",
+      "properties": {
+        "discount_factor": {
+          "description": "Discount factor at the bucket midpoint, or at recovery for Stage 3.",
+          "format": "double",
+          "type": "number"
+        },
+        "ead": {
+          "description": "EAD used for this bucket.",
+          "format": "double",
+          "type": "number"
+        },
+        "ecl": {
+          "description": "ECL contribution from this bucket.",
+          "format": "double",
+          "type": "number"
+        },
+        "lgd": {
+          "description": "LGD used for this bucket.",
+          "format": "double",
+          "type": "number"
+        },
+        "marginal_pd": {
+          "description": "Unconditional default probability for the bucket,\n`cumPD(t_end) - cumPD(t_start)`. This is the quantity that\nmultiplies `LGD * EAD * DF` for performing exposures. Stage 3\nsets it to one and measures EAD less discounted recoveries.",
+          "format": "double",
+          "type": "number"
+        },
+        "t_end": {
+          "description": "End of the time bucket (years).",
+          "format": "double",
+          "type": "number"
+        },
+        "t_start": {
+          "description": "Start of the time bucket (years).",
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "required": [
+        "t_start",
+        "t_end",
+        "marginal_pd",
+        "lgd",
+        "ead",
+        "discount_factor",
+        "ecl"
+      ],
+      "type": "object"
+    },
+    "EclResult": {
+      "description": "ECL result for a single exposure under a single scenario.",
+      "properties": {
+        "buckets": {
+          "description": "Per-bucket breakdown.",
+          "items": {
+            "$ref": "#/$defs/EclBucket"
+          },
+          "type": "array"
+        },
+        "ecl": {
+          "description": "Total ECL for this exposure under this scenario.",
+          "format": "double",
+          "type": "number"
+        },
+        "exposure_id": {
+          "description": "Exposure identifier.",
+          "type": "string"
+        },
+        "horizon": {
+          "description": "ECL horizon in years.",
+          "format": "double",
+          "type": "number"
+        },
+        "meta": {
+          "$ref": "#/$defs/ResultsMeta",
+          "default": {
+            "fx_policy_applied": null,
+            "numeric_mode": "f64",
+            "rounding": {
+              "ingest_scale_by_currency": {},
+              "mode": "bankers",
+              "output_scale_by_currency": {},
+              "tolerances": {
+                "generic_epsilon": 1e-10,
+                "rate_epsilon": 1e-12
+              },
+              "version": 1
+            },
+            "version": "0.9.0"
+          },
+          "description": "Audit stamp: numeric mode, rounding context, and FX policy in force."
+        },
+        "stage": {
+          "$ref": "#/$defs/Stage",
+          "description": "Assigned IFRS 9 stage."
+        }
+      },
+      "required": [
+        "exposure_id",
+        "stage",
+        "ecl",
+        "horizon",
+        "buckets"
+      ],
+      "type": "object"
+    },
+    "ExposureEclResult": {
+      "description": "Combined staging + ECL result for one exposure.",
+      "properties": {
+        "ead": {
+          "default": 0.0,
+          "description": "Reporting-date EAD of the exposure (copied from [`Exposure::ead`]).\nUsed by portfolio aggregation; defaults to 0.0 when deserializing\nresults produced before this field existed.",
+          "format": "double",
+          "type": "number"
+        },
+        "ecl_result": {
+          "$ref": "#/$defs/WeightedEclResult",
+          "description": "Probability-weighted ECL result."
+        },
+        "meta": {
+          "$ref": "#/$defs/ResultsMeta",
+          "default": {
+            "fx_policy_applied": null,
+            "numeric_mode": "f64",
+            "rounding": {
+              "ingest_scale_by_currency": {},
+              "mode": "bankers",
+              "output_scale_by_currency": {},
+              "tolerances": {
+                "generic_epsilon": 1e-10,
+                "rate_epsilon": 1e-12
+              },
+              "version": 1
+            },
+            "version": "0.9.0"
+          },
+          "description": "Audit stamp: numeric mode, rounding context, and FX policy in force."
+        },
+        "stage_result": {
+          "$ref": "#/$defs/StageResult",
+          "description": "Stage classification result with audit trail."
+        }
+      },
+      "required": [
+        "stage_result",
+        "ecl_result"
+      ],
+      "type": "object"
+    },
+    "PositiveF64Wire": {
+      "description": "Finite JSON number that is strictly greater than zero.\n\nThis type is used by serde field adapters so runtime deserialization and\ngenerated schemas enforce the same positive-number contract.",
+      "exclusiveMinimum": 0.0,
+      "format": "double",
+      "type": "number"
+    },
+    "ResultsMeta": {
+      "description": "Metadata bundle that accompanies valuation outputs.\n\nThe metadata is intentionally small so it can be attached to reports and\ndownstream data stores for reproducibility and audit trails.\n\n# Examples\n```rust\nuse finstack_quant_core::config::{results_meta, FinstackConfig, NUMERIC_MODE_F64};\n\nlet meta = results_meta(&FinstackConfig::default());\nassert_eq!(meta.numeric_mode, NUMERIC_MODE_F64);\nassert!(meta.timestamp.is_none()); // deterministic by default\n```",
+      "properties": {
+        "fx_policy_applied": {
+          "default": null,
+          "description": "Optional FX policy applied by the computing layer (human-readable key).",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "numeric_mode": {
+          "description": "Numeric engine mode used to produce the results.\n\nAlways [`NUMERIC_MODE_F64`] today; a plain string so result\nenvelopes stay wire-compatible across host languages.",
+          "type": "string"
+        },
+        "parallel": {
+          "description": "Whether the producing computation ran in parallel.\n\nSerial results omit the field entirely so existing payloads and golden\nfiles stay byte-identical.",
+          "type": "boolean"
+        },
+        "rounding": {
+          "$ref": "#/$defs/RoundingContext",
+          "description": "Rounding context snapshot applied to IO boundaries."
+        },
+        "timestamp": {
+          "description": "Timestamp when result was computed (ISO 8601 format).\nUseful for audit trails and reproducibility.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "version": {
+          "description": "Finstack Quant library version used to produce the result.",
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "numeric_mode",
+        "rounding"
+      ],
+      "type": "object"
+    },
+    "RoundingContext": {
+      "description": "Snapshot of active rounding settings used for result stamping.\n\nInstances are typically produced via [`rounding_context_from`] and persisted\nalongside valuation results.",
+      "properties": {
+        "ingest_scale_by_currency": {
+          "additionalProperties": {
+            "format": "uint32",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "description": "Ingest scale map snapshot by currency code.",
+          "type": "object"
+        },
+        "mode": {
+          "$ref": "#/$defs/RoundingMode",
+          "description": "Active rounding mode."
+        },
+        "output_scale_by_currency": {
+          "additionalProperties": {
+            "format": "uint32",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "description": "Output scale map snapshot by currency code.",
+          "type": "object"
+        },
+        "tolerances": {
+          "$ref": "#/$defs/ToleranceConfig",
+          "default": {
+            "generic_epsilon": 1e-10,
+            "rate_epsilon": 1e-12
+          },
+          "description": "Tolerance settings snapshot for floating-point comparisons."
+        },
+        "version": {
+          "description": "Schema version for forward compatibility.",
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "mode",
+        "ingest_scale_by_currency",
+        "output_scale_by_currency",
+        "version"
+      ],
+      "type": "object"
+    },
+    "RoundingMode": {
+      "description": "Rounding modes supported by the library.\n\nThe variants mirror the most common conventions found in pricing engines.\n\n# Examples\n```rust\nuse finstack_quant_core::config::{FinstackConfig, RoundingMode};\n\nlet mut cfg = FinstackConfig::default();\ncfg.rounding.mode = RoundingMode::TowardZero;\nassert!(matches!(cfg.rounding.mode, RoundingMode::TowardZero));\n```",
+      "oneOf": [
+        {
+          "const": "bankers",
+          "description": "Banker's rounding (ties to even).",
+          "type": "string"
+        },
+        {
+          "const": "away_from_zero",
+          "description": "Round halves away from zero.",
+          "type": "string"
+        },
+        {
+          "const": "toward_zero",
+          "description": "Round toward zero (truncate).",
+          "type": "string"
+        },
+        {
+          "const": "floor",
+          "description": "Round toward negative infinity.",
+          "type": "string"
+        },
+        {
+          "const": "ceil",
+          "description": "Round toward positive infinity.",
+          "type": "string"
+        }
+      ]
+    },
+    "Stage": {
+      "description": "IFRS 9 impairment stage for a credit exposure.\n\nUnder IFRS 9, financial instruments are classified into three stages that\ndetermine the ECL measurement horizon:\n\n- **Stage 1**: 12-month ECL (no significant increase in credit risk)\n- **Stage 2**: Lifetime ECL (significant increase in credit risk detected)\n- **Stage 3**: Lifetime ECL (credit-impaired, objective evidence of default)\n\n# References\n\nIFRS 9 Financial Instruments, Section 5.5 -- Impairment. `docs/REFERENCES.md#ifrs-9-impairment`",
+      "oneOf": [
+        {
+          "const": "stage1",
+          "description": "Performing -- 12-month ECL. No significant increase in credit risk\nsince initial recognition.",
+          "type": "string"
+        },
+        {
+          "const": "stage2",
+          "description": "Underperforming -- lifetime ECL. Significant increase in credit risk\n(SICR) detected but not yet credit-impaired.",
+          "type": "string"
+        },
+        {
+          "const": "stage3",
+          "description": "Non-performing -- lifetime ECL. Credit-impaired (objective evidence of\ndefault: DPD >= 90, restructuring, etc.).",
+          "type": "string"
+        }
+      ]
+    },
+    "StageResult": {
+      "description": "Result of stage classification with audit trail.",
+      "properties": {
+        "cured": {
+          "description": "Whether the exposure was cured from a higher stage.",
+          "type": "boolean"
+        },
+        "stage": {
+          "$ref": "#/$defs/Stage",
+          "description": "Assigned stage."
+        },
+        "triggers": {
+          "description": "Which trigger(s) caused the classification.",
+          "items": {
+            "$ref": "#/$defs/StagingTrigger"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "stage",
+        "triggers",
+        "cured"
+      ],
+      "type": "object"
+    },
+    "StagingTrigger": {
+      "description": "Reason for stage assignment (audit trail).\n\nEach variant captures the specific values that triggered the classification,\nenabling regulatory reporting and model governance review.",
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "description": "DPD exceeded Stage 3 threshold.",
+          "properties": {
+            "dpd_stage3": {
+              "additionalProperties": false,
+              "properties": {
+                "dpd": {
+                  "description": "Actual days past due.",
+                  "format": "uint32",
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "threshold": {
+                  "description": "Configured threshold.",
+                  "format": "uint32",
+                  "minimum": 0,
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "dpd",
+                "threshold"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "dpd_stage3"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Objective evidence of default (IFRS 9 B5.5.37 \"unlikely to pay\").",
+          "properties": {
+            "stage3_qualitative": {
+              "additionalProperties": false,
+              "properties": {
+                "flag": {
+                  "description": "Name of the default-evidence flag (e.g. `bankruptcy`,\n`distressed_modification`, `cross_default`, or a user\nsupplied key from `other_default_evidence`).",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "flag"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "stage3_qualitative"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Absolute PD increase exceeded threshold.",
+          "properties": {
+            "pd_delta_absolute": {
+              "additionalProperties": false,
+              "properties": {
+                "delta": {
+                  "description": "Actual PD delta (current minus origination).",
+                  "format": "double",
+                  "type": "number"
+                },
+                "threshold": {
+                  "description": "Configured threshold.",
+                  "format": "double",
+                  "type": "number"
+                }
+              },
+              "required": [
+                "delta",
+                "threshold"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "pd_delta_absolute"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Relative PD increase exceeded threshold.",
+          "properties": {
+            "pd_delta_relative": {
+              "additionalProperties": false,
+              "properties": {
+                "ratio": {
+                  "description": "Actual ratio (current PD / origination PD).",
+                  "format": "double",
+                  "type": "number"
+                },
+                "threshold": {
+                  "description": "Configured threshold.",
+                  "format": "double",
+                  "type": "number"
+                }
+              },
+              "required": [
+                "ratio",
+                "threshold"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "pd_delta_relative"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Rating downgraded by N or more notches (IFRS 9 B5.5.17(f): external\ncredit rating downgrade as a SICR indicator).\n\nNotches are counted as `position(current) - position(origination)`\non the configured rating scale (see\n[`StagingConfig::rating_scale_labels`]); a value of `notches >=\nthreshold` fires this trigger.",
+          "properties": {
+            "rating_downgrade": {
+              "additionalProperties": false,
+              "properties": {
+                "notches": {
+                  "description": "Actual downgrade notches.",
+                  "format": "uint32",
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "threshold": {
+                  "description": "Configured threshold.",
+                  "format": "uint32",
+                  "minimum": 0,
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "notches",
+                "threshold"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "rating_downgrade"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "DPD exceeded Stage 2 backstop.",
+          "properties": {
+            "dpd_stage2": {
+              "additionalProperties": false,
+              "properties": {
+                "dpd": {
+                  "description": "Actual days past due.",
+                  "format": "uint32",
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "threshold": {
+                  "description": "Configured threshold.",
+                  "format": "uint32",
+                  "minimum": 0,
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "dpd",
+                "threshold"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "dpd_stage2"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Qualitative flag active.",
+          "properties": {
+            "qualitative": {
+              "additionalProperties": false,
+              "properties": {
+                "flag": {
+                  "description": "Name of the active flag.",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "flag"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "qualitative"
+          ],
+          "type": "object"
+        },
+        {
+          "const": "no_trigger",
+          "description": "No triggers active: Stage 1 default.",
+          "type": "string"
+        }
+      ]
+    },
+    "ToleranceConfig": {
+      "additionalProperties": false,
+      "description": "Numerical tolerance configuration for floating-point comparisons.\n\nProvides configurable epsilon values for zero-checks in rate calculations\nand generic floating-point comparisons. These defaults are chosen to balance\nnumerical stability with practical precision requirements.\n\n# Examples\n```rust\nuse finstack_quant_core::config::ToleranceConfig;\n\nlet mut tol = ToleranceConfig::default();\nassert_eq!(tol.rate_epsilon, 1e-12);\n\n// Customize for stricter rate comparisons\ntol.rate_epsilon = 1e-14;\n```",
+      "properties": {
+        "generic_epsilon": {
+          "$ref": "#/$defs/PositiveF64Wire",
+          "default": 1e-10,
+          "description": "Epsilon for generic floating-point comparisons (default: 1e-10).\n\nUsed for general numerical comparisons where higher tolerance is acceptable."
+        },
+        "rate_epsilon": {
+          "$ref": "#/$defs/PositiveF64Wire",
+          "default": 1e-12,
+          "description": "Epsilon for rate comparisons (default: 1e-12).\n\nUsed when comparing interest rates, yields, and other small ratios."
+        }
+      },
+      "type": "object"
+    },
+    "WeightedEclResult": {
+      "description": "Probability-weighted ECL result across scenarios.",
+      "properties": {
+        "ecl": {
+          "description": "Probability-weighted ECL.",
+          "format": "double",
+          "type": "number"
+        },
+        "exposure_id": {
+          "description": "Exposure identifier.",
+          "type": "string"
+        },
+        "meta": {
+          "$ref": "#/$defs/ResultsMeta",
+          "default": {
+            "fx_policy_applied": null,
+            "numeric_mode": "f64",
+            "rounding": {
+              "ingest_scale_by_currency": {},
+              "mode": "bankers",
+              "output_scale_by_currency": {},
+              "tolerances": {
+                "generic_epsilon": 1e-10,
+                "rate_epsilon": 1e-12
+              },
+              "version": 1
+            },
+            "version": "0.9.0"
+          },
+          "description": "Audit stamp: numeric mode, rounding context, and FX policy in force."
+        },
+        "scenario_breakdown": {
+          "description": "Per-scenario breakdown: (scenario_id, weight, result).",
+          "items": {
+            "maxItems": 3,
+            "minItems": 3,
+            "prefixItems": [
+              {
+                "type": "string"
+              },
+              {
+                "format": "double",
+                "type": "number"
+              },
+              {
+                "$ref": "#/$defs/EclResult"
+              }
+            ],
+            "type": "array"
+          },
+          "type": "array"
+        },
+        "stage": {
+          "$ref": "#/$defs/Stage",
+          "description": "Assigned IFRS 9 stage."
+        }
+      },
+      "required": [
+        "exposure_id",
+        "stage",
+        "ecl",
+        "scenario_breakdown"
+      ],
+      "type": "object"
+    }
+  },
+  "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/portfolio_ecl_result.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Portfolio-level ECL result with stage migration and segment breakdown.",
+  "properties": {
+    "count_by_stage": {
+      "additionalProperties": {
+        "format": "uint",
+        "minimum": 0,
+        "type": "integer"
+      },
+      "description": "Exposure count by stage.",
+      "type": "object"
+    },
+    "ead_by_stage": {
+      "additionalProperties": {
+        "format": "double",
+        "type": "number"
+      },
+      "description": "EAD by stage (total outstanding balance per stage).",
+      "type": "object"
+    },
+    "ecl_by_segment": {
+      "additionalProperties": {
+        "format": "double",
+        "type": "number"
+      },
+      "description": "ECL by segment (product, geography, rating, etc.).",
+      "type": "object"
+    },
+    "ecl_by_stage": {
+      "additionalProperties": {
+        "format": "double",
+        "type": "number"
+      },
+      "description": "ECL by stage.",
+      "type": "object"
+    },
+    "exposure_results": {
+      "description": "Per-exposure results.",
+      "items": {
+        "$ref": "#/$defs/ExposureEclResult"
+      },
+      "type": "array"
+    },
+    "migration_matrix": {
+      "additionalProperties": {
+        "additionalProperties": {
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "type": "object"
+      },
+      "description": "Stage migration matrix: previous_stage -> current_stage -> count.\nOnly populated for exposures that have a `previous_stage`.",
+      "type": "object"
+    },
+    "total_ecl": {
+      "description": "Total ECL across all exposures.",
+      "format": "double",
+      "type": "number"
+    },
+    "unmatched_exposure_ids": {
+      "default": [],
+      "description": "Exposure ids in `exposure_results` that could not be matched against\nthe exposure slice passed to\n[`PortfolioEclResult::from_results_with_exposures`]. Unmatched\nresults still contribute their ECL and EAD to the stage totals, but\ncarry no segment or migration data.",
+      "items": {
+        "type": "string"
+      },
+      "type": "array"
+    }
+  },
+  "required": [
+    "total_ecl",
+    "ecl_by_stage",
+    "count_by_stage",
+    "ead_by_stage",
+    "ecl_by_segment",
+    "migration_matrix",
+    "exposure_results"
+  ],
+  "title": "PortfolioEclResult",
+  "type": "object"
+}

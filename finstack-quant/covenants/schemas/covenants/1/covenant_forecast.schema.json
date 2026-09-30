@@ -1,0 +1,138 @@
+{
+  "$defs": {
+    "BoundKind": {
+      "description": "Direction of inequality for numeric covenants.",
+      "oneOf": [
+        {
+          "const": "at_most",
+          "description": "Covenant passes when the metric is less than or equal to the threshold.",
+          "type": "string"
+        },
+        {
+          "const": "at_least",
+          "description": "Covenant passes when the metric is greater than or equal to the threshold.",
+          "type": "string"
+        }
+      ]
+    },
+    "DateWire": {
+      "description": "ISO 8601 calendar date encoded as a `YYYY-MM-DD` JSON string.",
+      "format": "date",
+      "type": "string"
+    }
+  },
+  "$id": "https://finstack_quant.dev/schemas/covenants/1/covenant_forecast.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Forecast output with headroom analytics.",
+  "properties": {
+    "breach_probability": {
+      "description": "Marginal breach probability at each test date; not a first-passage probability.",
+      "items": {
+        "format": "double",
+        "type": "number"
+      },
+      "type": "array"
+    },
+    "breach_probability_stderr": {
+      "default": [],
+      "description": "Standard error of the breach probability estimate.\n\nAnalytic stochastic probabilities have zero estimator error.",
+      "items": {
+        "format": "double",
+        "type": "number"
+      },
+      "type": "array"
+    },
+    "comparator": {
+      "$ref": "#/$defs/BoundKind",
+      "description": "Comparison direction for the covenant threshold test."
+    },
+    "covenant_description": {
+      "description": "Human-readable covenant description.",
+      "type": "string"
+    },
+    "covenant_id": {
+      "description": "Stable covenant instance identifier.",
+      "type": "string"
+    },
+    "first_breach_date": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/DateWire"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "Date of first projected breach (if any)"
+    },
+    "headroom": {
+      "description": "Headroom (distance from breach) at each test date.\n\n`None` means the covenant is inactive for the period or the headroom is\nnot meaningful under the applicable covenant convention.",
+      "items": {
+        "format": "double",
+        "type": [
+          "number",
+          "null"
+        ]
+      },
+      "type": "array"
+    },
+    "min_headroom_date": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/DateWire"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "Date with minimum finite headroom."
+    },
+    "min_headroom_value": {
+      "description": "Minimum finite headroom value across all active test dates.",
+      "format": "double",
+      "type": [
+        "number",
+        "null"
+      ]
+    },
+    "projected_values": {
+      "description": "Projected metric values at each test date.\n\n`None` means the covenant is inactive or its earnings denominator makes\nthe ratio indeterminate. Non-finite caller observations are rejected.",
+      "items": {
+        "format": "double",
+        "type": [
+          "number",
+          "null"
+        ]
+      },
+      "type": "array"
+    },
+    "test_dates": {
+      "description": "Future test dates for covenant evaluation",
+      "items": {
+        "$ref": "#/$defs/DateWire"
+      },
+      "type": "array"
+    },
+    "thresholds": {
+      "description": "Covenant thresholds at each test date",
+      "items": {
+        "format": "double",
+        "type": "number"
+      },
+      "type": "array"
+    }
+  },
+  "required": [
+    "covenant_id",
+    "covenant_description",
+    "comparator",
+    "test_dates",
+    "projected_values",
+    "thresholds",
+    "headroom",
+    "breach_probability"
+  ],
+  "title": "CovenantForecast",
+  "type": "object"
+}

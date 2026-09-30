@@ -1,0 +1,30 @@
+{
+  "$id": "https://finstack_quant.dev/schemas/models/1/forward_greeks.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Undiscounted forward Greeks of a European option on a forward.",
+  "properties": {
+    "delta": {
+      "description": "Sensitivity of the undiscounted premium to the forward (`dV/dF`).",
+      "format": "double",
+      "type": "number"
+    },
+    "gamma": {
+      "description": "Second derivative of the undiscounted premium to the forward (`d2V/dF2`).",
+      "format": "double",
+      "type": "number"
+    },
+    "vega": {
+      "description": "Sensitivity of the undiscounted premium to a unit (1.0) change in vol.",
+      "format": "double",
+      "type": "number"
+    }
+  },
+  "required": [
+    "delta",
+    "gamma",
+    "vega"
+  ],
+  "title": "ForwardGreeks",
+  "type": "object"
+}

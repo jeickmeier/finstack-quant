@@ -1,0 +1,87 @@
+{
+  "$defs": {
+    "CreditAssessmentPoint": {
+      "description": "One period's structured credit metrics. Each metric is `None` when it\ncannot be computed for that period (e.g. an incomplete TTM window).",
+      "properties": {
+        "free_cash_flow": {
+          "description": "Free cash flow at this period.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "interest_coverage": {
+          "description": "TTM EBITDA / TTM interest expense.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "leverage_ratio": {
+          "description": "Total debt / TTM EBITDA.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "period": {
+          "description": "Period identifier rendered as a string (e.g. `\"2025Q4\"`).",
+          "type": "string"
+        }
+      },
+      "required": [
+        "period"
+      ],
+      "type": "object"
+    }
+  },
+  "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/credit_assessment.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Structured credit assessment: leverage, interest coverage, and free cash flow at a `period` plus a per-period series for trend display.",
+  "properties": {
+    "free_cash_flow": {
+      "description": "Free cash flow at `period`.",
+      "format": "double",
+      "type": [
+        "number",
+        "null"
+      ]
+    },
+    "interest_coverage": {
+      "description": "Interest coverage at `period`.",
+      "format": "double",
+      "type": [
+        "number",
+        "null"
+      ]
+    },
+    "leverage_ratio": {
+      "description": "Leverage ratio at `period`.",
+      "format": "double",
+      "type": [
+        "number",
+        "null"
+      ]
+    },
+    "period": {
+      "description": "Assessment period rendered as a string (e.g. `\"2025Q4\"`).",
+      "type": "string"
+    },
+    "series": {
+      "description": "Per-period series (ascending) for trend display.",
+      "items": {
+        "$ref": "#/$defs/CreditAssessmentPoint"
+      },
+      "type": "array"
+    }
+  },
+  "required": [
+    "period",
+    "series"
+  ],
+  "title": "CreditAssessment",
+  "type": "object"
+}

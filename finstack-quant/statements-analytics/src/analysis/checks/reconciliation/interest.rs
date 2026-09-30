@@ -17,6 +17,7 @@ use finstack_quant_statements::Result;
 /// debt-balance / rate pairs are provided, verifies that the implied rate on
 /// average debt is within a reasonable band.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct InterestExpenseReconciliation {
     /// Interest expense node (income statement).
     pub interest_expense_node: NodeId,

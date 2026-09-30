@@ -33,16 +33,20 @@ use super::{error::MigrationError, scale::RatingScale};
 /// - Gupton, G. M., Finger, C. C., & Bhatia, M. (1997). *CreditMetrics —
 ///   Technical Document*. J.P. Morgan. `docs/REFERENCES.md#creditmetrics-1997`
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(try_from = "TransitionMatrixWire")]
 pub struct TransitionMatrix {
+    #[cfg_attr(feature = "json-schema", schemars(with = "(Vec<f64>, usize, usize)"))]
     pub(crate) data: DMatrix<f64>,
     pub(crate) horizon: f64,
     pub(crate) scale: RatingScale,
 }
 
 #[derive(Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 struct TransitionMatrixWire {
+    #[cfg_attr(feature = "json-schema", schemars(with = "(Vec<f64>, usize, usize)"))]
     data: DMatrix<f64>,
     horizon: f64,
     scale: RatingScale,

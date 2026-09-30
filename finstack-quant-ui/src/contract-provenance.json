@@ -1326,7 +1326,7 @@
   ],
   "scenarioAuthority": {
     "source": "finstack-quant/valuations/src/instruments/fixed_income/structured_credit/metrics/scenario.rs",
-    "sha256": "d9f6eec979c7db8ca6f17e22c5af269a08da066d076e9bb96f9616c74256b3d3"
+    "sha256": "347df20bd49ca4fd63e3c563dd040ad8150d0b05924c031ed6dcfbfc1afac913"
   },
   "deferred": {
     "machine-readable-units": "Generic values stay raw; do not infer units from names or decimal refs.",

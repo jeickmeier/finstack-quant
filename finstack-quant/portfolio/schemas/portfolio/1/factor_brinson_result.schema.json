@@ -1,0 +1,124 @@
+{
+  "$defs": {
+    "AssetSpecificContribution": {
+      "additionalProperties": false,
+      "description": "One asset's contribution to the specific (selection) effect.",
+      "properties": {
+        "active_weight": {
+          "description": "Active weight `h_p,i − h_b,i`.",
+          "format": "double",
+          "type": "number"
+        },
+        "asset": {
+          "description": "Asset identifier (mirrors [`FactorBrinsonInput::asset_ids`]).",
+          "type": "string"
+        },
+        "contribution": {
+          "description": "Contribution `(h_p,i − h_b,i) * ε_b,i`.",
+          "format": "double",
+          "type": "number"
+        },
+        "specific_return": {
+          "description": "Specific return implied by the supplied factor returns,\n`ε_b,i = r_i − (X f_b)_i`.",
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "required": [
+        "asset",
+        "specific_return",
+        "active_weight",
+        "contribution"
+      ],
+      "type": "object"
+    },
+    "FactorBrinsonContribution": {
+      "additionalProperties": false,
+      "description": "One factor's contribution to the factor (allocation) effect.",
+      "properties": {
+        "active_loading": {
+          "description": "Active factor loading `w_k = Σ_i X_ik (h_p,i − h_b,i)`.",
+          "format": "double",
+          "type": "number"
+        },
+        "contribution": {
+          "description": "Contribution `w_k * f_k` (undemeaned; see module docs).",
+          "format": "double",
+          "type": "number"
+        },
+        "factor": {
+          "description": "Factor name (mirrors [`FactorBrinsonInput::factor_names`]).",
+          "type": "string"
+        },
+        "factor_return": {
+          "description": "Benchmark factor return `f_k` supplied by the caller.",
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "required": [
+        "factor",
+        "active_loading",
+        "factor_return",
+        "contribution"
+      ],
+      "type": "object"
+    }
+  },
+  "$id": "https://finstack_quant.dev/schemas/portfolio/1/factor_brinson_result.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Factor-Brinson unified attribution result.",
+  "properties": {
+    "active_return": {
+      "description": "Active return, `portfolio_return − benchmark_return`.",
+      "format": "double",
+      "type": "number"
+    },
+    "allocation": {
+      "description": "Factor (allocation) contribution, `FC = w'f_b` where\n`w = X'(h_p − h_b)`.",
+      "format": "double",
+      "type": "number"
+    },
+    "asset_contributions": {
+      "description": "Per-asset breakdown of `selection`, in `asset_ids` order.",
+      "items": {
+        "$ref": "#/$defs/AssetSpecificContribution"
+      },
+      "type": "array"
+    },
+    "benchmark_return": {
+      "description": "Benchmark total return, `h_b'r`.",
+      "format": "double",
+      "type": "number"
+    },
+    "factor_contributions": {
+      "description": "Per-factor breakdown of `allocation`, in `factor_names` order.",
+      "items": {
+        "$ref": "#/$defs/FactorBrinsonContribution"
+      },
+      "type": "array"
+    },
+    "portfolio_return": {
+      "description": "Portfolio total return, `h_p'r`.",
+      "format": "double",
+      "type": "number"
+    },
+    "selection": {
+      "description": "Specific (selection) contribution, `SC = (h_p − h_b)'ε_b`.",
+      "format": "double",
+      "type": "number"
+    }
+  },
+  "required": [
+    "portfolio_return",
+    "benchmark_return",
+    "active_return",
+    "allocation",
+    "selection",
+    "factor_contributions",
+    "asset_contributions"
+  ],
+  "title": "FactorBrinsonResult",
+  "type": "object"
+}

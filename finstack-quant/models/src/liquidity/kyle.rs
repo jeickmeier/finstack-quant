@@ -27,6 +27,7 @@ use super::impact::{ExecutionTrajectory, ImpactEstimate, TradeParams};
 /// Lambda can be estimated from the Amihud ratio or regressed from
 /// trade-and-quote data.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct KyleLambdaModel {
     /// Price impact per unit of order flow.
     lambda: f64,

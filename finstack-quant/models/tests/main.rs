@@ -27,6 +27,9 @@ mod lookback_commodity_regressions;
 mod market_data_diff_tests;
 #[path = "model_audit_regressions.rs"]
 mod model_audit_regressions;
+#[cfg(feature = "json-schema")]
+#[path = "model_schema_contract.rs"]
+mod model_schema_contract;
 #[path = "portfolio_loss.rs"]
 mod portfolio_loss;
 #[path = "production_audit.rs"]

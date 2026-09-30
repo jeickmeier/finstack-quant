@@ -1,0 +1,65 @@
+{
+  "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/provision_waterfall.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Provision movement waterfall between two reporting dates.",
+  "properties": {
+    "closing": {
+      "description": "Closing ECL balance.",
+      "format": "double",
+      "type": "number"
+    },
+    "cured_to_stage1": {
+      "description": "Cured back to Stage 1 (net ECL release) — both Stage 2 → 1 and\nStage 3 → 1.",
+      "format": "double",
+      "type": "number"
+    },
+    "cured_to_stage2": {
+      "description": "Partial cure Stage 3 → Stage 2 (net ECL change, typically a\nrelease as Stage 3 lifetime ECL is de-recognised, partly offset\nby Stage 2 lifetime ECL).",
+      "format": "double",
+      "type": "number"
+    },
+    "derecognitions": {
+      "description": "Derecognitions (maturities, repayments, sales).",
+      "format": "double",
+      "type": "number"
+    },
+    "new_originations": {
+      "description": "New originations (new exposures added this period).",
+      "format": "double",
+      "type": "number"
+    },
+    "opening": {
+      "description": "Opening ECL balance (previous period closing).",
+      "format": "double",
+      "type": "number"
+    },
+    "remeasurement": {
+      "description": "Model/parameter changes (remeasurement, i.e., the residual).",
+      "format": "double",
+      "type": "number"
+    },
+    "transfers_to_stage2": {
+      "description": "Transfers to Stage 2 (net ECL change from stage upgrades).",
+      "format": "double",
+      "type": "number"
+    },
+    "transfers_to_stage3": {
+      "description": "Transfers to Stage 3 (net ECL change from stage downgrades).",
+      "format": "double",
+      "type": "number"
+    }
+  },
+  "required": [
+    "opening",
+    "new_originations",
+    "transfers_to_stage2",
+    "transfers_to_stage3",
+    "cured_to_stage1",
+    "cured_to_stage2",
+    "derecognitions",
+    "remeasurement",
+    "closing"
+  ],
+  "title": "ProvisionWaterfall",
+  "type": "object"
+}

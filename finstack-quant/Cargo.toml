@@ -12,7 +12,7 @@ autotests = false
 
 [dependencies]
 finstack_quant_core = { package = "finstack-quant-core", path = "core", version = "0.9.0", default-features = false }
-finstack_quant_analytics = { package = "finstack-quant-analytics", path = "analytics", version = "0.9.0" }
+finstack_quant_analytics = { package = "finstack-quant-analytics", path = "analytics", version = "0.9.0", default-features = false }
 finstack_quant_attribution = { package = "finstack-quant-attribution", path = "attribution", version = "0.9.0", default-features = false }
 finstack_quant_calibration = { package = "finstack-quant-calibration", path = "calibration", version = "0.9.0", default-features = false }
 finstack_quant_cashflows = { package = "finstack-quant-cashflows", path = "cashflows", version = "0.9.0", default-features = false }
@@ -20,7 +20,7 @@ finstack_quant_covenants = { package = "finstack-quant-covenants", path = "coven
 finstack_quant_features = { package = "finstack-quant-features", path = "features", version = "0.9.0", default-features = false }
 finstack_quant_margin = { package = "finstack-quant-margin", path = "margin", version = "0.9.0", default-features = false }
 finstack_quant_statements = { package = "finstack-quant-statements", path = "statements", version = "0.9.0", default-features = false }
-finstack_quant_statements_analytics = { package = "finstack-quant-statements-analytics", path = "statements-analytics", version = "0.9.0" }
+finstack_quant_statements_analytics = { package = "finstack-quant-statements-analytics", path = "statements-analytics", version = "0.9.0", default-features = false }
 finstack_quant_valuations = { package = "finstack-quant-valuations", path = "valuations", version = "0.9.0", default-features = false }
 finstack_quant_portfolio = { package = "finstack-quant-portfolio", path = "portfolio", version = "0.9.0", default-features = false }
 finstack_quant_scenarios = { package = "finstack-quant-scenarios", path = "scenarios", version = "0.9.0", default-features = false }
@@ -32,6 +32,7 @@ jsonschema = { version = "0.28", default-features = false, optional = true }
 default = ["json-schema", "jsonschema-validate"]
 json-schema = [
     "finstack_quant_core/json-schema",
+    "finstack_quant_analytics/json-schema",
     "finstack_quant_attribution/json-schema",
     "finstack_quant_calibration/json-schema",
     "finstack_quant_cashflows/json-schema",
@@ -39,6 +40,7 @@ json-schema = [
     "finstack_quant_features/json-schema",
     "finstack_quant_margin/json-schema",
     "finstack_quant_statements/json-schema",
+    "finstack_quant_statements_analytics/json-schema",
     "finstack_quant_valuations/json-schema",
     "finstack_quant_portfolio/json-schema",
     "finstack_quant_scenarios/json-schema",

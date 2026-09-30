@@ -1,0 +1,146 @@
+{
+  "$defs": {
+    "ParameterSpec": {
+      "description": "Parameter to vary in sensitivity analysis.",
+      "properties": {
+        "base_value": {
+          "description": "Base value",
+          "format": "double",
+          "type": "number"
+        },
+        "node_id": {
+          "description": "Node identifier",
+          "type": "string"
+        },
+        "period_id": {
+          "$ref": "#/$defs/PeriodId",
+          "description": "Period to vary"
+        },
+        "perturbations": {
+          "description": "Perturbations to apply (e.g., [-10%, 0%, +10%])",
+          "items": {
+            "format": "double",
+            "type": "number"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "node_id",
+        "period_id",
+        "base_value",
+        "perturbations"
+      ],
+      "type": "object"
+    },
+    "PeriodId": {
+      "description": "Identifier for a Gregorian period like `2025Q1` or a fiscal period like\n`FY2025W53`.",
+      "type": "string"
+    },
+    "SensitivityConfig": {
+      "additionalProperties": false,
+      "description": "Sensitivity analysis configuration.",
+      "properties": {
+        "mode": {
+          "$ref": "#/$defs/SensitivityMode",
+          "description": "Analysis mode"
+        },
+        "parameters": {
+          "description": "Parameters to vary",
+          "items": {
+            "$ref": "#/$defs/ParameterSpec"
+          },
+          "type": "array"
+        },
+        "target_metrics": {
+          "description": "Target metrics to track",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "mode",
+        "parameters",
+        "target_metrics"
+      ],
+      "type": "object"
+    },
+    "SensitivityMode": {
+      "description": "Sensitivity analysis mode.",
+      "oneOf": [
+        {
+          "const": "diagonal",
+          "description": "One-at-a-time parameter variations",
+          "type": "string"
+        },
+        {
+          "const": "full_grid",
+          "description": "Full factorial grid",
+          "type": "string"
+        },
+        {
+          "const": "tornado",
+          "description": "Ranked by impact magnitude",
+          "type": "string"
+        }
+      ]
+    },
+    "SensitivityScenario": {
+      "description": "Result of a single sensitivity scenario.",
+      "properties": {
+        "parameter_values": {
+          "additionalProperties": {
+            "format": "double",
+            "type": "number"
+          },
+          "description": "Parameter values for this scenario keyed as `node_id@period_id`.",
+          "type": "object"
+        },
+        "results": {
+          "$ref": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json",
+          "description": "Full evaluation results"
+        }
+      },
+      "required": [
+        "parameter_values",
+        "results"
+      ],
+      "type": "object"
+    }
+  },
+  "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/sensitivity_result.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Results of sensitivity analysis.",
+  "properties": {
+    "baseline": {
+      "anyOf": [
+        {
+          "$ref": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "Unperturbed baseline evaluation of the model (populated by tornado\nruns). Used by tornado chart generation as the reference metric\nwhen a parameter's base value is not part of the perturbation grid."
+    },
+    "config": {
+      "$ref": "#/$defs/SensitivityConfig",
+      "description": "Configuration used"
+    },
+    "scenarios": {
+      "description": "All scenario results",
+      "items": {
+        "$ref": "#/$defs/SensitivityScenario"
+      },
+      "type": "array"
+    }
+  },
+  "required": [
+    "config",
+    "scenarios"
+  ],
+  "title": "SensitivityResult",
+  "type": "object"
+}

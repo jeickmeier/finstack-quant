@@ -1,0 +1,36 @@
+{
+  "$defs": {
+    "NodeId": {
+      "description": "Type-safe identifier for a node in a financial model.\n\nSerializes as a plain string and is interoperable with `&str` via\n[`Borrow`] and [`AsRef`].",
+      "type": "string"
+    }
+  },
+  "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/fcf_sign_check.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Tracks consecutive periods of negative free cash flow and flags at configurable thresholds.",
+  "properties": {
+    "consecutive_negative_error": {
+      "description": "Number of consecutive negative periods before an error.",
+      "format": "uint",
+      "minimum": 0,
+      "type": "integer"
+    },
+    "consecutive_negative_warning": {
+      "description": "Number of consecutive negative periods before a warning.",
+      "format": "uint",
+      "minimum": 0,
+      "type": "integer"
+    },
+    "fcf_node": {
+      "$ref": "#/$defs/NodeId",
+      "description": "Free cash flow node."
+    }
+  },
+  "required": [
+    "fcf_node",
+    "consecutive_negative_warning",
+    "consecutive_negative_error"
+  ],
+  "title": "FcfSignCheck",
+  "type": "object"
+}

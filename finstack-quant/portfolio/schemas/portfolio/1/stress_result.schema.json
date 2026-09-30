@@ -1,0 +1,281 @@
+{
+  "$defs": {
+    "FactorContribution": {
+      "description": "Contribution of a single factor to portfolio risk.\n\nSee [`RiskDecomposition`] for the sign convention applied to each field.",
+      "properties": {
+        "absolute_risk": {
+          "description": "Absolute contribution of the factor to the chosen risk measure.\nSign follows the measure's convention.",
+          "format": "double",
+          "type": "number"
+        },
+        "factor_id": {
+          "$ref": "#/$defs/FactorId",
+          "description": "Identifier of the factor being reported."
+        },
+        "marginal_risk": {
+          "description": "Marginal sensitivity of portfolio risk to the factor. Same sign\nconvention as `absolute_risk`.",
+          "format": "double",
+          "type": "number"
+        },
+        "relative_risk": {
+          "description": "Contribution expressed as a share of total portfolio risk. Dimensionless,\nnon-negative for standard long-risk portfolios (signs of numerator and\ndenominator cancel).",
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "required": [
+        "factor_id",
+        "absolute_risk",
+        "relative_risk",
+        "marginal_risk"
+      ],
+      "type": "object"
+    },
+    "FactorId": {
+      "description": "Unique identifier for a risk factor.",
+      "type": "string"
+    },
+    "PositionFactorContribution": {
+      "description": "Contribution of a single position to a specific factor bucket.",
+      "properties": {
+        "factor_id": {
+          "$ref": "#/$defs/FactorId",
+          "description": "Identifier of the contributing factor."
+        },
+        "position_id": {
+          "description": "Portfolio position identifier.",
+          "type": "string"
+        },
+        "risk_contribution": {
+          "description": "Risk attributed to this position-factor pair.",
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "required": [
+        "position_id",
+        "factor_id",
+        "risk_contribution"
+      ],
+      "type": "object"
+    },
+    "PositionId": {
+      "description": "Position identifier.",
+      "type": "string"
+    },
+    "PositionResidualContribution": {
+      "description": "Annualized residual variance contributed by a single position.\n\n`residual_variance` is reported in variance units (not vol) so that\nper-position residuals add linearly into a portfolio-level total. Callers\nthat want per-position residual *vol* should take the square root of this\nfield after summing the relevant subset.",
+      "properties": {
+        "position_id": {
+          "description": "Portfolio position identifier.",
+          "type": "string"
+        },
+        "residual_variance": {
+          "description": "Annualized variance contributed by this position's idiosyncratic risk.\nAlways non-negative.",
+          "format": "double",
+          "type": "number"
+        },
+        "source": {
+          "$ref": "#/$defs/ResidualContributionSource",
+          "description": "Where the residual variance came from."
+        }
+      },
+      "required": [
+        "position_id",
+        "residual_variance",
+        "source"
+      ],
+      "type": "object"
+    },
+    "ResidualContributionSource": {
+      "description": "Source of a per-position residual variance contribution.\n\nDistinguishes residuals derived from a credit factor model (where the\nidiosyncratic adder is calibrated per issuer) from generic / unattributed\nresidual sources used by other decomposers.",
+      "oneOf": [
+        {
+          "description": "Residual variance sourced from a `CreditFactorModel`'s idiosyncratic\nvol forecast for the named issuer.",
+          "properties": {
+            "issuer_id": {
+              "description": "Issuer whose idiosyncratic vol drives this residual contribution.",
+              "type": "string"
+            },
+            "kind": {
+              "const": "from_credit_model",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "issuer_id"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Residual variance from any other source (e.g. unattributed simulation\nnoise or a decomposer that does not track the issuer).",
+          "properties": {
+            "kind": {
+              "const": "other",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "RiskDecomposition": {
+      "additionalProperties": false,
+      "description": "Portfolio-level decomposition of total risk across common factors and residuals.\n\n# Sign convention\n\nThe sign of [`RiskDecomposition::total_risk`], [`FactorContribution::absolute_risk`],\n[`FactorContribution::marginal_risk`], and [`RiskDecomposition::residual_risk`]\ndepends on the selected [`RiskMeasure`]:\n\n* [`RiskMeasure::Variance`] and [`RiskMeasure::Volatility`] — non-negative.\n* [`RiskMeasure::VaR`] and [`RiskMeasure::ExpectedShortfall`] — **non-positive**\n  (losses reported as negative numbers; see [`RiskMeasure`] for details).\n\n[`FactorContribution::relative_risk`] is always a dimensionless share and\nstays non-negative for a long-risk portfolio because numerator and denominator\ncarry the same sign.",
+      "properties": {
+        "factor_contributions": {
+          "description": "Aggregate factor-level contributions to portfolio risk.",
+          "items": {
+            "$ref": "#/$defs/FactorContribution"
+          },
+          "type": "array"
+        },
+        "measure": {
+          "$ref": "#/$defs/RiskMeasure",
+          "description": "Risk measure used to aggregate and report the decomposition."
+        },
+        "position_factor_contributions": {
+          "description": "Per-position, per-factor contributions that roll up into the portfolio view.",
+          "items": {
+            "$ref": "#/$defs/PositionFactorContribution"
+          },
+          "type": "array"
+        },
+        "position_residual_contributions": {
+          "description": "Per-position residual (idiosyncratic) variance contributions.\n\nPopulated only by credit-aware position decomposers that have access to\nper-issuer idiosyncratic vol estimates. Empty when the decomposer has no\nposition-level residual allocation.",
+          "items": {
+            "$ref": "#/$defs/PositionResidualContribution"
+          },
+          "type": "array"
+        },
+        "residual_risk": {
+          "description": "Unattributed or idiosyncratic risk left after factor aggregation.\nSame sign convention as `total_risk`.",
+          "format": "double",
+          "type": "number"
+        },
+        "total_risk": {
+          "description": "Total portfolio risk under the selected `measure`. Sign follows the\nmeasure's convention (see struct-level docs).",
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "required": [
+        "total_risk",
+        "measure",
+        "factor_contributions",
+        "residual_risk",
+        "position_factor_contributions",
+        "position_residual_contributions"
+      ],
+      "type": "object"
+    },
+    "RiskMeasure": {
+      "description": "Risk measure used when aggregating factor exposures.",
+      "oneOf": [
+        {
+          "const": "variance",
+          "description": "Aggregate exposures using factor covariance and portfolio variance.",
+          "type": "string"
+        },
+        {
+          "const": "volatility",
+          "description": "Aggregate exposures using portfolio volatility.",
+          "type": "string"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Aggregate exposures using Value at Risk at a fixed one-sided loss confidence level.\n\nThis assumes the downstream aggregation engine is interpreting the factor\nmodel as a parametric, one-period loss distribution rather than a full\nhistorical or Monte Carlo simulation.\n\n# Sign convention\n\nVaR is reported as a **negative** number on the P&L axis: for a long-risk\nportfolio, `total_risk` at 99% is approximately `-sigma * z_{0.99}`.\nFactor contributions carry the same sign as the total. Downstream\naggregators and visualizations rely on this convention.",
+          "properties": {
+            "var": {
+              "properties": {
+                "confidence": {
+                  "description": "Confidence level in the open interval `(0.5, 1)`.",
+                  "exclusiveMaximum": 1.0,
+                  "exclusiveMinimum": 0.5,
+                  "format": "double",
+                  "type": "number"
+                }
+              },
+              "required": [
+                "confidence"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "var"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Aggregate exposures using expected shortfall at a fixed one-sided loss confidence level.\n\nAs with [`Self::VaR`], this is intended for parametric factor-model\naggregation rather than full-path simulation, and ES is reported as a\n**negative** number using the P&L sign convention.",
+          "properties": {
+            "expected_shortfall": {
+              "properties": {
+                "confidence": {
+                  "description": "Confidence level in the open interval `(0.5, 1)`.",
+                  "exclusiveMaximum": 1.0,
+                  "exclusiveMinimum": 0.5,
+                  "format": "double",
+                  "type": "number"
+                }
+              },
+              "required": [
+                "confidence"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "expected_shortfall"
+          ],
+          "type": "object"
+        }
+      ]
+    }
+  },
+  "$id": "https://finstack_quant.dev/schemas/portfolio/1/stress_result.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Result of a factor-stress scenario.",
+  "properties": {
+    "position_pnl": {
+      "description": "Per-position P&L contributions.",
+      "items": {
+        "maxItems": 2,
+        "minItems": 2,
+        "prefixItems": [
+          {
+            "$ref": "#/$defs/PositionId"
+          },
+          {
+            "format": "double",
+            "type": "number"
+          }
+        ],
+        "type": "array"
+      },
+      "type": "array"
+    },
+    "stressed_decomposition": {
+      "$ref": "#/$defs/RiskDecomposition",
+      "description": "Risk decomposition recomputed under the stressed market."
+    },
+    "total_pnl": {
+      "description": "Total portfolio P&L under the stressed market.",
+      "format": "double",
+      "type": "number"
+    }
+  },
+  "required": [
+    "total_pnl",
+    "position_pnl",
+    "stressed_decomposition"
+  ],
+  "title": "StressResult",
+  "type": "object"
+}

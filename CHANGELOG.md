@@ -2,6 +2,28 @@
 
 ## [Unreleased]
 
+### WASM binding audit: JSON Schemas for every boundary type (2026-09-30)
+
+#### Changed (BREAKING)
+
+- Rust renames, forced by schema name collisions:
+  - `portfolio::FactorContribution` (factor Brinson) → `FactorBrinsonContribution`
+  - `scenarios::Severity` (template severity) → `TemplateSeverity`
+  - `models::credit::lgd::CollateralType` → `WorkoutCollateralType`
+
+#### Added
+
+- JSON Schemas, and therefore generated TypeScript, for every public serde boundary type in analytics, covenants, margin, models, portfolio and statements-analytics, plus gaps in core, scenarios, statements and valuations. Each type with a custom serde wire has a schema round-trip test.
+  - analytics and statements-analytics gain a `json-schema` feature, on by default.
+  - New schema generator binaries exist for analytics, covenants and statements-analytics, and models publishes a `models` schema family.
+  - The TS package gains the `analytics`, `covenants` and `statements_analytics` namespaces.
+- `core::wire::NonFiniteF64Wire` describes the `non_finite_f64` wire in schemas, and `finstack_quant_core::schema_artifact!` declares artifacts.
+- The valuations results `CompositeRebalanceResult`, `EnhancedMonteCarloResult`, `OasResult`, `ScenarioTable` and `TrancheMetrics` are published, as is `instrument_json.schema.json`.
+
+#### Fixed
+
+- The schema `$ref` externalizer now handles self-referential types such as `InstrumentJson`.
+
 ### WASM binding audit: TypeScript types generated from JSON Schema (2026-09-30)
 
 #### Changed (BREAKING)

@@ -1,0 +1,118 @@
+{
+  "$defs": {
+    "AllocationScheme": {
+      "description": "Strategy allocation scheme.",
+      "oneOf": [
+        {
+          "const": "equal",
+          "description": "Equal weights across all strategies.",
+          "type": "string"
+        },
+        {
+          "const": "fixed",
+          "description": "Caller-supplied fixed weights.",
+          "type": "string"
+        },
+        {
+          "const": "inverse_volatility",
+          "description": "Inverse sample-volatility weights from strategy returns.",
+          "type": "string"
+        },
+        {
+          "const": "risk_budget",
+          "description": "Long-only target risk contribution weights from covariance and budgets.",
+          "type": "string"
+        }
+      ]
+    },
+    "StrategyAllocationInput": {
+      "additionalProperties": false,
+      "description": "Per-strategy allocation input row.",
+      "properties": {
+        "fixed_weight": {
+          "description": "Fixed weight for `fixed` scheme.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "id": {
+          "description": "Stable strategy identifier.",
+          "type": "string"
+        },
+        "returns": {
+          "default": [],
+          "description": "Historical returns for `inverse_volatility`.",
+          "items": {
+            "format": "double",
+            "type": "number"
+          },
+          "type": "array"
+        },
+        "risk_budget": {
+          "description": "Target risk budget fraction for `risk_budget`.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "type": "object"
+    }
+  },
+  "$id": "https://finstack_quant.dev/schemas/portfolio/1/weight_allocation_spec.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "JSON specification for strategy-level allocation.",
+  "properties": {
+    "covariance": {
+      "description": "Optional covariance matrix for `risk_budget`, row-major as nested lists.",
+      "items": {
+        "items": {
+          "format": "double",
+          "type": "number"
+        },
+        "type": "array"
+      },
+      "type": [
+        "array",
+        "null"
+      ]
+    },
+    "money_decimal_places": {
+      "default": 10,
+      "description": "Number of decimal places for capital rounding.",
+      "format": "uint32",
+      "minimum": 0,
+      "type": "integer"
+    },
+    "scheme": {
+      "$ref": "#/$defs/AllocationScheme",
+      "description": "Allocation scheme to apply."
+    },
+    "strategies": {
+      "description": "Strategy input rows.",
+      "items": {
+        "$ref": "#/$defs/StrategyAllocationInput"
+      },
+      "type": "array"
+    },
+    "total_capital": {
+      "description": "Total capital to allocate across strategies.",
+      "format": "double",
+      "type": "number"
+    }
+  },
+  "required": [
+    "scheme",
+    "total_capital",
+    "strategies"
+  ],
+  "title": "WeightAllocationSpec",
+  "type": "object"
+}

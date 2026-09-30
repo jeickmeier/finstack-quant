@@ -69,6 +69,7 @@ use serde_json::json;
 ///
 /// Multi-comparison workflows can be built by running multiple analyzers.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct VarianceConfig {
     /// Human-readable name for the baseline (e.g. `"management_case"`).
@@ -105,6 +106,7 @@ impl VarianceConfig {
 ///
 /// Represents variance for a single `(metric, period)` pair.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct VarianceRow {
     /// Period identifier (e.g. `"2025Q1"`).
     pub period: PeriodId,
@@ -143,6 +145,7 @@ pub struct VarianceRow {
 
 /// Full variance report between a baseline and comparison.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct VarianceReport {
     /// Label for the baseline scenario (e.g. `"management_case"`).
     pub baseline_label: String,
@@ -156,6 +159,7 @@ pub struct VarianceReport {
 
 /// Single driver contribution entry in a bridge chart.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct BridgeStep {
     /// Driver node identifier (e.g. `"revenue"`).
     pub driver: String,
@@ -167,6 +171,7 @@ pub struct BridgeStep {
 
 /// Bridge chart for a single target metric and period.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct BridgeChart {
     /// Target metric identifier (e.g. `"ebitda"`).
     pub target_metric: String,

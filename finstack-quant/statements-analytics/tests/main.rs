@@ -17,6 +17,9 @@ mod analysis_monte_carlo;
 mod analysis_orchestrator;
 #[path = "analysis_scenario_set.rs"]
 mod analysis_scenario_set;
+#[cfg(feature = "json-schema")]
+#[path = "analysis_schema_contract.rs"]
+mod analysis_schema_contract;
 #[path = "checks_all.rs"]
 mod checks_all;
 #[path = "extensions_all.rs"]

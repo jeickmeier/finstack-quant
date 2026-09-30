@@ -1,0 +1,110 @@
+{
+  "$defs": {
+    "PeriodId": {
+      "description": "Identifier for a Gregorian period like `2025Q1` or a fiscal period like\n`FY2025W53`.",
+      "type": "string"
+    },
+    "VarianceReport": {
+      "description": "Full variance report between a baseline and comparison.",
+      "properties": {
+        "baseline_label": {
+          "description": "Label for the baseline scenario (e.g. `\"management_case\"`).",
+          "type": "string"
+        },
+        "comparison_label": {
+          "description": "Label for the comparison scenario (e.g. `\"bank_case\"`).",
+          "type": "string"
+        },
+        "rows": {
+          "description": "Per-metric, per-period variance rows.",
+          "items": {
+            "$ref": "#/$defs/VarianceRow"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "baseline_label",
+        "comparison_label",
+        "rows"
+      ],
+      "type": "object"
+    },
+    "VarianceRow": {
+      "description": "One row of variance output.\n\nRepresents variance for a single `(metric, period)` pair.",
+      "properties": {
+        "abs_var": {
+          "description": "Absolute variance: `comparison - baseline`.",
+          "format": "double",
+          "type": "number"
+        },
+        "baseline": {
+          "description": "Baseline value.",
+          "format": "double",
+          "type": "number"
+        },
+        "comparison": {
+          "description": "Comparison value.",
+          "format": "double",
+          "type": "number"
+        },
+        "driver_contribution": {
+          "additionalProperties": {
+            "format": "double",
+            "type": "number"
+          },
+          "description": "Optional driver breakdown: `driver → contribution` in the same units\nas the underlying metric.\n\nThis is populated by bridge decomposition helpers and can be rendered\nas a \"bridge\" column in reports.",
+          "type": "object"
+        },
+        "metric": {
+          "description": "Metric / node identifier (e.g. `\"revenue\"`).",
+          "type": "string"
+        },
+        "pct_var": {
+          "description": "Percentage variance (fraction): `abs_var / baseline`.\n\nWhen the baseline is effectively zero this is `None` (Options\nserialize as JSON `null`) rather than a spurious `0.0`, which\npreviously hid meaningful absolute deltas whenever the\ndenominator was small. Reporting layers should interpret a\n`None` as \"undefined / not meaningful\" and fall back to the\nabsolute variance.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "period": {
+          "$ref": "#/$defs/PeriodId",
+          "description": "Period identifier (e.g. `\"2025Q1\"`)."
+        }
+      },
+      "required": [
+        "period",
+        "metric",
+        "baseline",
+        "comparison",
+        "abs_var"
+      ],
+      "type": "object"
+    }
+  },
+  "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/scenario_diff.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Variance-style diff between two evaluated scenarios.",
+  "properties": {
+    "baseline": {
+      "description": "Baseline scenario name.",
+      "type": "string"
+    },
+    "comparison": {
+      "description": "Comparison scenario name.",
+      "type": "string"
+    },
+    "variance": {
+      "$ref": "#/$defs/VarianceReport",
+      "description": "Underlying variance report."
+    }
+  },
+  "required": [
+    "baseline",
+    "comparison",
+    "variance"
+  ],
+  "title": "ScenarioDiff",
+  "type": "object"
+}

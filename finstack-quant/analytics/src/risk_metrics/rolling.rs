@@ -52,6 +52,7 @@ fn recompute_sum_sum_ds(window: &[f64], mar: f64) -> (f64, f64) {
 /// Serialized as its lowercase name (`"volatility"`, `"sortino"`,
 /// `"sharpe"`, `"return"`), which hosts also use as the value-column label.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(rename_all = "snake_case")]
 pub enum RollingMetric {
     /// Annualized sample volatility (`Performance::rolling_volatility`).
@@ -94,14 +95,23 @@ impl std::fmt::Display for RollingMetric {
 /// share field names, serde shape, and helper methods; `value_column` names
 /// the metric that produced the values.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct DatedSeries {
     /// Computed metric values, one per completed rolling window. An undefined
     /// window (e.g. a zero-volatility Sharpe) is `NaN`; JSON carries it as the
     /// `"nan"` sentinel so the series round-trips.
     #[serde(with = "finstack_quant_core::wire::non_finite_f64_seq")]
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "Vec<finstack_quant_core::wire::NonFiniteF64Wire>")
+    )]
     pub values: Vec<f64>,
     /// Window-end dates aligned 1:1 with `values`.
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "Vec<finstack_quant_core::wire::DateWire>")
+    )]
     pub dates: Vec<Date>,
     /// Metric carried by `values`; hosts use its name as the value-column label.
     pub value_column: RollingMetric,

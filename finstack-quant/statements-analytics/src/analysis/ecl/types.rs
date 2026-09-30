@@ -37,6 +37,7 @@ fn default_revolver_ccf() -> f64 {
 ///
 /// IFRS 9 Financial Instruments, Section 5.5 -- Impairment. `docs/REFERENCES.md#ifrs-9-impairment`
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(rename_all = "snake_case")]
 pub enum Stage {
     /// Performing -- 12-month ECL. No significant increase in credit risk
@@ -70,6 +71,7 @@ impl std::fmt::Display for Stage {
 /// `other_default_evidence`) represent objective evidence of default
 /// and should trigger Stage 3 independently of the 90-DPD backstop.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct QualitativeFlags {
     /// On internal watchlist.
     pub watchlist: bool,
@@ -168,6 +170,7 @@ pub const MAX_REMAINING_MATURITY_YEARS: f64 = 100.0;
 /// amounts are in the exposure's base currency (currency conversion is the
 /// caller's responsibility).
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct Exposure {
     /// Unique identifier for the exposure (instrument ID, facility ID, etc.).
@@ -446,6 +449,7 @@ pub trait PdTermStructure: Send + Sync {
 /// increasing times, monotone PDs in `[0, 1]`) and unknown fields are
 /// rejected.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(try_from = "RawPdCurveData")]
 pub struct RawPdCurve {
     /// Rating label this curve applies to.
@@ -457,6 +461,7 @@ pub struct RawPdCurve {
 /// Serde shadow type that routes `RawPdCurve` deserialization through
 /// [`RawPdCurve::new`] so JSON inputs cannot bypass the curve invariants.
 #[derive(Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 struct RawPdCurveData {
     rating: String,
@@ -568,6 +573,7 @@ impl PdTermStructure for RawPdCurve {
 /// origination and current rating curves. A rating absent from the map
 /// is a missing curve: staging skips PD-delta; ECL lookup still errors.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct RatingPdMap {
     /// Cumulative PD curves keyed by the rating label

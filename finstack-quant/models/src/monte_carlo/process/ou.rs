@@ -40,6 +40,7 @@ use tracing::warn;
 
 /// Validated Hull-White one-factor process parameters.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(try_from = "RawHullWhite1FParams")]
 pub struct HullWhite1FParams {
     /// Canonical mean reversion and volatility schedule.
@@ -52,6 +53,7 @@ pub struct HullWhite1FParams {
 }
 
 #[derive(serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 struct RawHullWhite1FParams {
     #[serde(flatten)]
     model: HullWhiteParams,

@@ -738,7 +738,9 @@ version = "0.9.0"
 dependencies = [
  "criterion",
  "finstack-quant-core",
+ "jsonschema",
  "nalgebra",
+ "schemars",
  "serde",
  "serde_json",
  "tracing",
@@ -853,6 +855,7 @@ version = "0.9.0"
 dependencies = [
  "finstack-quant-core",
  "indexmap",
+ "jsonschema",
  "schemars",
  "serde",
  "serde_json",
@@ -1032,7 +1035,9 @@ dependencies = [
  "finstack-quant-statements",
  "finstack-quant-valuations",
  "indexmap",
+ "jsonschema",
  "rayon",
+ "schemars",
  "serde",
  "serde_json",
  "time",

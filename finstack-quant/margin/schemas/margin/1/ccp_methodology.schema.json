@@ -1,0 +1,74 @@
+{
+  "$id": "https://finstack_quant.dev/schemas/margin/1/ccp_methodology.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "CCP methodology type.",
+  "oneOf": [
+    {
+      "const": "lch_swap_clear",
+      "description": "LCH SwapClear (VaR-based for IRS)",
+      "type": "string"
+    },
+    {
+      "const": "lch_cds_clear",
+      "description": "LCH CDSClear",
+      "type": "string"
+    },
+    {
+      "const": "cme",
+      "description": "CME Clearing (SPAN-based)",
+      "type": "string"
+    },
+    {
+      "const": "ice_clear_credit",
+      "description": "ICE Clear Credit (for CDS/CDX)",
+      "type": "string"
+    },
+    {
+      "const": "ice_clear_us",
+      "description": "ICE Clear US",
+      "type": "string"
+    },
+    {
+      "const": "jscc",
+      "description": "JSCC (Japan)",
+      "type": "string"
+    },
+    {
+      "const": "eurex",
+      "description": "Eurex",
+      "type": "string"
+    },
+    {
+      "additionalProperties": false,
+      "description": "Generic VaR-based",
+      "properties": {
+        "generic_var": {
+          "additionalProperties": false,
+          "properties": {
+            "confidence": {
+              "description": "Confidence level (e.g., 0.99 for 99%)",
+              "format": "double",
+              "type": "number"
+            },
+            "lookback_days": {
+              "description": "Lookback period in days",
+              "format": "uint32",
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "confidence",
+            "lookback_days"
+          ],
+          "type": "object"
+        }
+      },
+      "required": [
+        "generic_var"
+      ],
+      "type": "object"
+    }
+  ],
+  "title": "CcpMethodology"
+}

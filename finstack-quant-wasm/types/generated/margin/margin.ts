@@ -1,6 +1,33 @@
 // Generated from the finstack-quant-margin JSON schemas by scripts/generate-contract-types.mjs. Do not edit.
 
 /**
+ * Built-in [`ScheduleAssetClass`] spellings.
+ */
+export type BuiltInScheduleAssetClass = "interest_rate" | "credit" | "equity" | "commodity" | "fx" | "other";
+/**
+ * CCP methodology type.
+ */
+export type CcpMethodology =
+  | "lch_swap_clear"
+  | "lch_cds_clear"
+  | "cme"
+  | "ice_clear_credit"
+  | "ice_clear_us"
+  | "jscc"
+  | "eurex"
+  | {
+      generic_var: {
+        /**
+         * Confidence level (e.g., 0.99 for 99%)
+         */
+        confidence: number;
+        /**
+         * Lookback period in days
+         */
+        lookback_days: number;
+      };
+    };
+/**
  * Clearing status for OTC derivatives.
  *
  * Determines whether a trade is cleared through a CCP or remains bilateral
@@ -37,6 +64,14 @@ export type CollateralAssetClass =
   | "equity"
   | "gold"
   | "mutual_funds";
+/**
+ * FRTB correlation scenario for capital charge aggregation.
+ *
+ * The final SBA capital charge is max(low, medium, high).
+ * Low and high scenarios scale prescribed correlations per BCBS d457,
+ * floored/capped by the scenario-specific Basel formulas.
+ */
+export type CorrelationScenario = "low" | "medium" | "high";
 /**
  * ISO 4217 currency enumeration
  */
@@ -266,6 +301,69 @@ export type DecimalWire = string;
  */
 export type MarginTenor = "daily" | "weekly" | "monthly" | "on_demand";
 /**
+ * ISO 8601 calendar date encoded as a `YYYY-MM-DD` JSON string.
+ */
+export type DateWire = string;
+/**
+ * DRC asset type.
+ */
+export type DrcAssetType = "corporate" | "sovereign" | "local_government" | "securitization" | "equity";
+/**
+ * DRC sector classification.
+ */
+export type DrcSector = "sovereign" | "corporate" | "local_government";
+/**
+ * DRC seniority for LGD assignment.
+ */
+export type DrcSeniority = "covered_bond" | "senior_unsecured" | "subordinated" | "equity" | "securitization";
+/**
+ * Rounding modes supported by the library.
+ *
+ * The variants mirror the most common conventions found in pricing engines.
+ *
+ * # Examples
+ * ```rust
+ * use finstack_quant_core::config::{FinstackConfig, RoundingMode};
+ *
+ * let mut cfg = FinstackConfig::default();
+ * cfg.rounding.mode = RoundingMode::TowardZero;
+ * assert!(matches!(cfg.rounding.mode, RoundingMode::TowardZero));
+ * ```
+ */
+export type RoundingMode = "bankers" | "away_from_zero" | "toward_zero" | "floor" | "ceil";
+/**
+ * Finite JSON number that is strictly greater than zero.
+ *
+ * This type is used by serde field adapters so runtime deserialization and
+ * generated schemas enforce the same positive-number contract.
+ */
+export type PositiveF64Wire = number;
+/**
+ * FRTB risk classes per BCBS d457.
+ */
+export type FrtbRiskClass = "girr" | "csr_non_sec" | "csr_sec_ctp" | "csr_sec_non_ctp" | "equity" | "commodity" | "fx";
+/**
+ * Deterministic decay applied to today's SIMM IM to approximate `E[IM(t)]`.
+ */
+export type ImDecayProfile =
+  | "constant"
+  | {
+      linear_to_maturity: {
+        /**
+         * Portfolio maturity `T` in years (must be positive and finite).
+         */
+        maturity_years: number;
+      };
+    }
+  | {
+      sqrt_time: {
+        /**
+         * Portfolio maturity `T` in years (must be positive and finite).
+         */
+        maturity_years: number;
+      };
+    };
+/**
  * Type of margin call.
  *
  * Classifies the nature of a margin call for proper processing
@@ -350,6 +448,83 @@ export type SimmCreditSector =
  * Typed value of the required margin schema marker.
  */
 export type MarginSchema = "finstack_quant.margin/1";
+/**
+ * Identifies a margin netting set.
+ *
+ * Instruments in the same netting set can offset each other for margin
+ * calculation purposes. The netting set is typically defined by the
+ * CSA agreement (bilateral) or by CCP membership (cleared) — these two
+ * shapes are mutually exclusive, so the type encodes them as enum
+ * variants rather than as a struct with two `Option<String>` fields
+ * that could in principle both be set or both be unset.
+ */
+export type NettingSetId =
+  | {
+      /**
+       * Counterparty identifier
+       */
+      counterparty_id: string;
+      /**
+       * CSA identifier
+       */
+      csa_id: string;
+      kind: "bilateral";
+    }
+  | {
+      /**
+       * CCP identifier (also used as the counterparty id)
+       */
+      ccp_id: string;
+      kind: "cleared";
+    };
+/**
+ * Repo margin type.
+ *
+ * Different margin mechanisms offer varying levels of protection
+ * and operational complexity.
+ */
+export type RepoMarginType = "none" | "mark_to_market" | "net_exposure" | "triparty";
+/**
+ * SA-CCR asset class for add-on computation.
+ *
+ * Each derivative trade is assigned to exactly one asset class.
+ * The add-on formula and supervisory parameters differ by class.
+ */
+export type SaCcrAssetClass = "interest_rate" | "foreign_exchange" | "credit" | "equity" | "commodity";
+/**
+ * SA-CCR option type for delta computation.
+ */
+export type SaCcrOptionType = "call_long" | "call_short" | "put_long" | "put_short";
+/**
+ * Supervisory classification required for credit, equity and commodity trades.
+ * Parameters are prescribed by CRE52.72; this is independent of hedging-set identity.
+ */
+export type SaCcrSupervisoryCategory =
+  | "credit_aa"
+  | "credit_a"
+  | "credit_bbb"
+  | "credit_bb"
+  | "credit_b"
+  | "credit_ccc"
+  | "credit_index_ig"
+  | "credit_index_hy"
+  | "equity_single_name"
+  | "equity_index"
+  | "commodity_electricity"
+  | "commodity_other";
+/**
+ * Asset class for schedule-based IM calculation.
+ */
+export type ScheduleAssetClass = BuiltInScheduleAssetClass | string;
+/**
+ * Risk classes for SIMM categorization.
+ */
+export type SimmRiskClass =
+  "interest_rate" | "credit_qualifying" | "credit_non_qualifying" | "equity" | "commodity" | "fx";
+/**
+ * SIMM version identifier.
+ */
+export type SimmVersion = "v2_6";
 
 /**
  * Single collateral eligibility entry.
@@ -721,6 +896,549 @@ export interface VmParameters {
   threshold: Money;
 }
 /**
+ * A position subject to the Default Risk Charge.
+ *
+ * Per MAR22.9, gross JTD for a position is:
+ *
+ * ```text
+ * long:  gross = max(LGD * notional + P&L, 0)
+ * short: gross = min(LGD * notional + P&L, 0)
+ * ```
+ *
+ * where the `P&L` term captures any mark-to-market adjustment already
+ * reflected in the trading-book valuation (e.g. an underwater long bond
+ * has a small negative `P&L` that reduces the exposed JTD). `jtd_amount`
+ * represents the signed *notional* (positive = long, negative = short);
+ * [`drc_charge`](super::drc::drc_charge) multiplies by [`DrcSeniority`]
+ * LGD and then applies the `pnl_adjustment` and the sign-preserving floor.
+ */
+export interface DrcPosition {
+  /**
+   * Asset sub-type: corporate, sovereign, local government, or equity.
+   * Securitizations are rejected because they require a separate DRC model.
+   */
+  asset_type: DrcAssetType;
+  /**
+   * Issuer identifier.
+   */
+  issuer: string;
+  /**
+   * Signed JTD *notional* (positive = long, negative = short). Does
+   * **not** include the LGD multiplier — [`super::drc::drc_charge`] applies LGD.
+   */
+  jtd_amount: number;
+  /**
+   * Residual contractual maturity in years; scaled into [0.25, 1.0] for JTD.
+   * Cash equities use the elected three-month or greater-than-one-year horizon.
+   */
+  maturity_years: number;
+  /**
+   * Mark-to-market / P&L adjustment from MAR22.9. Default 0. Add a
+   * negative value for a long position with unrealised loss so the
+   * gross JTD is correctly floored at zero when the mark-down already
+   * exceeds `LGD * notional`.
+   */
+  pnl_adjustment?: number;
+  /**
+   * Credit rating bucket (1-based per FRTB specification).
+   */
+  rating_bucket: number;
+  /**
+   * Sector for DRC bucket assignment.
+   */
+  sector: DrcSector;
+  /**
+   * Seniority for LGD determination.
+   */
+  seniority: DrcSeniority;
+  [k: string]: unknown;
+}
+/**
+ * SA-CCR Exposure at Default result.
+ */
+export interface EadResult {
+  /**
+   * Aggregate add-on before multiplier.
+   */
+  add_on_aggregate: number;
+  /**
+   * Add-on by asset class.
+   */
+  add_on_by_asset_class: {
+    [k: string]: number;
+  };
+  /**
+   * Alpha multiplier (1.4 per regulation).
+   */
+  alpha: number;
+  /**
+   * Exposure at Default: `alpha * (RC + PFE)`, capped for margined sets
+   * at the same netting set calculated without a margin agreement.
+   */
+  ead: number;
+  /**
+   * Maturity factor applied.
+   */
+  maturity_factor: number;
+  /**
+   * Policy metadata stamped by the computing layer: numeric mode, active
+   * rounding context, any applied FX policy, and the parallel-execution
+   * flag.
+   */
+  meta?: ResultsMeta;
+  /**
+   * PFE multiplier (accounts for over-collateralization).
+   */
+  multiplier: number;
+  /**
+   * Potential future exposure component.
+   */
+  pfe: number;
+  /**
+   * Replacement cost component.
+   */
+  rc: number;
+  [k: string]: unknown;
+}
+/**
+ * Metadata bundle that accompanies valuation outputs.
+ *
+ * The metadata is intentionally small so it can be attached to reports and
+ * downstream data stores for reproducibility and audit trails.
+ *
+ * # Examples
+ * ```rust
+ * use finstack_quant_core::config::{results_meta, FinstackConfig, NUMERIC_MODE_F64};
+ *
+ * let meta = results_meta(&FinstackConfig::default());
+ * assert_eq!(meta.numeric_mode, NUMERIC_MODE_F64);
+ * assert!(meta.timestamp.is_none()); // deterministic by default
+ * ```
+ */
+export interface ResultsMeta {
+  /**
+   * Optional FX policy applied by the computing layer (human-readable key).
+   */
+  fx_policy_applied?: string | null;
+  /**
+   * Numeric engine mode used to produce the results.
+   *
+   * Always [`NUMERIC_MODE_F64`] today; a plain string so result
+   * envelopes stay wire-compatible across host languages.
+   */
+  numeric_mode: string;
+  /**
+   * Whether the producing computation ran in parallel.
+   *
+   * Serial results omit the field entirely so existing payloads and golden
+   * files stay byte-identical.
+   */
+  parallel?: boolean;
+  /**
+   * Rounding context snapshot applied to IO boundaries.
+   */
+  rounding: RoundingContext;
+  /**
+   * Timestamp when result was computed (ISO 8601 format).
+   * Useful for audit trails and reproducibility.
+   */
+  timestamp?: string | null;
+  /**
+   * Finstack Quant library version used to produce the result.
+   */
+  version?: string | null;
+  [k: string]: unknown;
+}
+/**
+ * Snapshot of active rounding settings used for result stamping.
+ *
+ * Instances are typically produced via [`rounding_context_from`] and persisted
+ * alongside valuation results.
+ */
+export interface RoundingContext {
+  /**
+   * Ingest scale map snapshot by currency code.
+   */
+  ingest_scale_by_currency: {
+    [k: string]: number;
+  };
+  /**
+   * Active rounding mode.
+   */
+  mode: RoundingMode;
+  /**
+   * Output scale map snapshot by currency code.
+   */
+  output_scale_by_currency: {
+    [k: string]: number;
+  };
+  /**
+   * Tolerance settings snapshot for floating-point comparisons.
+   */
+  tolerances?: ToleranceConfig;
+  /**
+   * Schema version for forward compatibility.
+   */
+  version: number;
+  [k: string]: unknown;
+}
+/**
+ * Numerical tolerance configuration for floating-point comparisons.
+ *
+ * Provides configurable epsilon values for zero-checks in rate calculations
+ * and generic floating-point comparisons. These defaults are chosen to balance
+ * numerical stability with practical precision requirements.
+ *
+ * # Examples
+ * ```rust
+ * use finstack_quant_core::config::ToleranceConfig;
+ *
+ * let mut tol = ToleranceConfig::default();
+ * assert_eq!(tol.rate_epsilon, 1e-12);
+ *
+ * // Customize for stricter rate comparisons
+ * tol.rate_epsilon = 1e-14;
+ * ```
+ */
+export interface ToleranceConfig {
+  /**
+   * Epsilon for generic floating-point comparisons (default: 1e-10).
+   *
+   * Used for general numerical comparisons where higher tolerance is acceptable.
+   */
+  generic_epsilon?: PositiveF64Wire;
+  /**
+   * Epsilon for rate comparisons (default: 1e-12).
+   *
+   * Used when comparing interest rates, yields, and other small ratios.
+   */
+  rate_epsilon?: PositiveF64Wire;
+}
+/**
+ * Excess collateral result.
+ */
+export interface ExcessCollateral {
+  /**
+   * Collateral value
+   */
+  collateral_value: Money;
+  /**
+   * Excess amount (positive) or shortfall (negative)
+   */
+  excess: Money;
+  /**
+   * Required value
+   */
+  required_value: Money;
+  [k: string]: unknown;
+}
+/**
+ * Diagnostics from exposure simulation capturing data quality metrics.
+ *
+ * Populated by the exposure computation engine to let callers distinguish
+ * genuine zero exposure from missing data.
+ */
+export interface ExposureDiagnostics {
+  /**
+   * Number of time grid points where market data could not be rolled forward.
+   */
+  market_roll_failures: number;
+  /**
+   * Total time grid points evaluated.
+   */
+  total_time_points: number;
+  /**
+   * Total number of individual instrument valuation failures across all time points.
+   */
+  valuation_failures: number;
+}
+/**
+ * Exposure profile computed at each time grid point.
+ */
+export interface ExposureProfile {
+  /**
+   * Simulation quality diagnostics (populated by the exposure engine).
+   */
+  diagnostics?: ExposureDiagnostics | null;
+  /**
+   * Expected Negative Exposure at each time point: max(-V(t), 0).
+   */
+  ene: number[];
+  /**
+   * Expected Positive Exposure at each time point: max(V(t), 0).
+   */
+  epe: number[];
+  /**
+   * Portfolio mark-to-market value at each time point (may be negative).
+   */
+  mtm_values: number[];
+  /**
+   * Nonnegative time points in years from valuation date. An explicit zero
+   * node supplies opening exposure; before the first node exposure is held
+   * flat at that node, consistently across CVA, DVA, FVA and MVA.
+   */
+  times: number[];
+}
+/**
+ * Complete FRTB SBA capital charge result.
+ */
+export interface FrtbSbaResult {
+  /**
+   * Which correlation scenario produced the binding charge for each component.
+   */
+  binding_scenario: CorrelationScenario;
+  /**
+   * Curvature risk charge by risk class.
+   */
+  curvature_by_risk_class: {
+    [k: string]: number;
+  };
+  /**
+   * Delta risk charge by risk class.
+   */
+  delta_by_risk_class: {
+    [k: string]: number;
+  };
+  /**
+   * Default Risk Charge (credit + equity).
+   */
+  drc: number;
+  /**
+   * Policy metadata stamped by the computing layer: numeric mode, active
+   * rounding context, any applied FX policy, and the parallel-execution
+   * flag.
+   */
+  meta?: ResultsMeta;
+  /**
+   * Residual Risk Add-On.
+   */
+  rrao: number;
+  /**
+   * Delta+Vega+Curvature charge under each scenario (for transparency).
+   */
+  scenario_charges: {
+    [k: string]: number;
+  };
+  /**
+   * Total capital charge (sum of all components).
+   */
+  total: number;
+  /**
+   * Vega risk charge by risk class.
+   */
+  vega_by_risk_class: {
+    [k: string]: number;
+  };
+  [k: string]: unknown;
+}
+/**
+ * FRTB sensitivity inputs organized by risk class.
+ */
+export interface FrtbSensitivities {
+  base_currency: Currency;
+  commodity_curvature: [unknown, unknown, unknown, unknown][];
+  commodity_delta: [unknown, unknown, unknown, unknown, unknown][];
+  commodity_vega: [unknown, unknown, unknown, unknown][];
+  csr_nonsec_curvature: [unknown, unknown, unknown, unknown][];
+  csr_nonsec_delta: [unknown, unknown, unknown, unknown, unknown][];
+  csr_nonsec_vega: [unknown, unknown, unknown, unknown][];
+  csr_sec_ctp_curvature: [unknown, unknown, unknown, unknown][];
+  csr_sec_ctp_delta: [unknown, unknown, unknown, unknown, unknown][];
+  csr_sec_ctp_vega: [unknown, unknown, unknown, unknown][];
+  csr_sec_nonctp_curvature: [unknown, unknown, unknown, unknown][];
+  csr_sec_nonctp_delta: [unknown, unknown, unknown, unknown, unknown][];
+  csr_sec_nonctp_vega: [unknown, unknown, unknown, unknown][];
+  drc_positions: DrcPosition[];
+  equity_curvature: [unknown, unknown, unknown, unknown][];
+  equity_delta: [unknown, unknown, unknown][];
+  equity_repo_delta: [unknown, unknown, unknown][];
+  equity_vega: [unknown, unknown, unknown, unknown][];
+  fx_curvature: [unknown, unknown, unknown, unknown][];
+  fx_delta: [unknown, unknown, unknown][];
+  fx_vega: [unknown, unknown, unknown, unknown][];
+  girr_curvature: [unknown, unknown, unknown][];
+  girr_delta: [unknown, unknown, unknown][];
+  girr_inflation_delta: [unknown, unknown][];
+  girr_vega: [unknown, unknown, unknown, unknown][];
+  girr_xccy_basis_delta: [unknown, unknown][];
+  rrao_exotic_notionals: RraoPosition[];
+}
+/**
+ * A position subject to the Residual Risk Add-On.
+ *
+ * RRAO applies to exotic instruments whose risks are not adequately
+ * captured by the delta/vega/curvature framework -- instruments with
+ * gap risk, correlation risk, or behavioral risk.
+ */
+export interface RraoPosition {
+  /**
+   * Instrument identifier.
+   */
+  instrument_id: string;
+  /**
+   * Whether the instrument bears exotic underlying risk (1.0% weight)
+   * or other residual risk (0.1% weight).
+   */
+  is_exotic: boolean;
+  /**
+   * Gross notional amount.
+   */
+  notional: number;
+  [k: string]: unknown;
+}
+/**
+ * Funding cost/benefit configuration for FVA and MVA calculation.
+ */
+export interface FundingConfig {
+  /**
+   * Funding benefit spread in basis points (benefit on negative exposure).
+   *
+   * If `None`, symmetric funding is assumed: `funding_benefit = funding_spread`.
+   * In practice, the benefit spread may be lower than the cost spread
+   * due to asymmetric funding conditions.
+   */
+  funding_benefit_bp?: number | null;
+  /**
+   * Funding spread in basis points (cost on positive exposure).
+   *
+   * This is the spread over the risk-free rate that the institution
+   * pays to fund positive (out-of-the-money to counterparty) exposure.
+   * Typical values: 20–100 bp depending on the institution's credit quality.
+   */
+  funding_spread_bp: number;
+  /**
+   * Expected initial-margin profile `E[IM(t)]` that drives MVA.
+   *
+   * When `Some`, [`crate::xva::cva::compute_bilateral_xva`] prices the
+   * lifetime funding cost of posting this IM and reports it as
+   * [`XvaResult::mva`]. When `None`, MVA is not computed and
+   * [`XvaResult::mva`] is `None`.
+   *
+   * Build the profile with
+   * [`crate::xva::mva::im_profile_from_simm`] (deterministic SIMM decay), or
+   * supply the path-consistent mean IM from your own simulation.
+   */
+  im_profile?: ImProfile | null;
+  /**
+   * Spread in basis points applied to posted initial margin (MVA).
+   *
+   * If `None`, MVA uses `funding_spread_bp` — the desk's unsecured
+   * funding spread, which is the standard assumption (Green 2015, ch. 10).
+   * Override when IM is funded at a different (typically term or partially
+   * secured) level than uncollateralized derivative exposure.
+   */
+  margin_funding_spread_bp?: number | null;
+}
+/**
+ * Expected initial-margin profile `E[IM(t)]` on a time grid.
+ *
+ * Values are in the aggregation currency chosen when the profile was built
+ * (e.g. the `currency` argument of [`im_profile_from_simm`]).
+ */
+export interface ImProfile {
+  /**
+   * Expected IM at each time point (non-negative, finite).
+   */
+  im_values: number[];
+  /**
+   * Time points in years from the valuation date (strictly increasing, positive).
+   */
+  times: number[];
+}
+/**
+ * Haircut sensitivity (Haircut01) result.
+ */
+export interface Haircut01 {
+  /**
+   * Collateral value
+   */
+  collateral_value: Money;
+  /**
+   * Current haircut (decimal)
+   */
+  current_haircut: number;
+  /**
+   * PV change for +1bp haircut
+   */
+  pv_change: Money;
+  [k: string]: unknown;
+}
+/**
+ * One-way IM collateral account after applying the CSA's allocated threshold.
+ */
+export interface ImCollateralResult {
+  /**
+   * Existing nonnegative collateral balance in this one-way IM account.
+   */
+  current_collateral: Money;
+  /**
+   * Gross model IM after MPOR adjustment, before contractual thresholds.
+   */
+  gross_initial_margin: Money;
+  /**
+   * Target collateral balance, max(gross IM minus allocated CSA threshold, 0).
+   */
+  required_collateral: Money;
+  /**
+   * True requires separate custody with no reuse to satisfy VM obligations.
+   */
+  segregated: boolean;
+  /**
+   * Signed transfer: positive posts additional IM, negative returns excess.
+   * Absolute transfers strictly below MTA are zero; equality triggers transfer.
+   */
+  transfer: Money;
+}
+/**
+ * Initial margin calculation result.
+ */
+export interface ImResult {
+  /**
+   * Calculated initial margin amount
+   */
+  amount: Money;
+  /**
+   * Whether the amount is an approximation rather than
+   * an exact computation under the named methodology.
+   *
+   * Approximations need not be conservative. Historical SIMM sets this flag
+   * because its input dimensions and some aggregation stages are simplified.
+   * Also set by the clearing-house and internal-model calculators when
+   * they fall back to `|exposure_base| x conservative_rate` because no
+   * [`ExternalImSource`](crate::calculators::im::ExternalImSource) supplied
+   * a real margin amount. Portfolio-level consumers should surface this
+   * flag: an approximated IM is suitable for indicative funding/capacity
+   * analysis, not for reconciling actual CCP margin calls.
+   */
+  approximation: boolean;
+  /**
+   * Calculation date
+   */
+  as_of: string;
+  /**
+   * Breakdown by risk class (if available)
+   *
+   * Keys are methodology-specific component labels. SIMM publishes
+   * `IR_Delta`, `IR_Vega`, `Credit_Qualifying_Delta`,
+   * `Credit_Qualifying_Vega`, `Credit_NonQualifying_Delta`,
+   * `Credit_NonQualifying_Vega`, `Equity_Delta`, `Equity_Vega`, `FX_Delta`,
+   * `FX_Vega`, `Commodity_Delta`, `Commodity_Vega` and `Curvature`; the
+   * schedule calculator publishes the normalised asset class (for example
+   * `interest_rate`). Values are IM amounts for that component.
+   */
+  breakdown: {
+    [k: string]: Money;
+  };
+  /**
+   * Methodology used for calculation
+   */
+  methodology: ImMethodology;
+  /**
+   * Margin Period of Risk in business days used in calculation
+   */
+  mpor_days: number;
+}
+/**
  * Margin call event.
  *
  * Represents a single margin call with all relevant details for
@@ -829,4 +1547,592 @@ export interface OtcMarginSpec {
    * Variation margin exchange frequency
    */
   vm_frequency: MarginTenor;
+}
+/**
+ * Margin funding cost result.
+ */
+export interface MarginFundingCost {
+  /**
+   * Net funding cost (annualized)
+   */
+  annual_cost: Money;
+  /**
+   * Collateral return rate (e.g., Fed Funds)
+   */
+  collateral_rate: number;
+  /**
+   * Funding rate (annualized)
+   */
+  funding_rate: number;
+  /**
+   * Posted margin amount
+   */
+  margin_posted: Money;
+  [k: string]: unknown;
+}
+/**
+ * Margin utilization result.
+ */
+export interface MarginUtilization {
+  posted: Money;
+  required: Money;
+}
+/**
+ * Result of an MVA computation.
+ */
+export interface MvaResult {
+  /**
+   * Time-weighted average IM over the profile horizon:
+   * `(1/T) ∫₀ᵀ IM(t) dt` under the same trapezoid convention as `mva`.
+   */
+  average_im: number;
+  /**
+   * Echo of the IM profile used: `(time, IM(t))` pairs.
+   */
+  im_profile: [unknown, unknown][];
+  /**
+   * MVA (positive = lifetime funding cost of posting IM).
+   */
+  mva: number;
+}
+/**
+ * GMRA 2011 compliant repo margin specification.
+ */
+export interface RepoMarginSpec {
+  /**
+   * Tenor of margin valuation and calls.
+   */
+  call_frequency: MarginTenor;
+  /**
+   * Eligible collateral for substitution (if allowed).
+   */
+  eligible_substitutes?: EligibleCollateralSchedule | null;
+  /**
+   * Percentage deviation that triggers a margin call.
+   *
+   * E.g., 0.01 = 1% deviation from margin ratio triggers a call.
+   * If the current ratio falls below `margin_ratio * (1 - threshold)`,
+   * a margin call is generated.
+   */
+  margin_call_threshold: number;
+  /**
+   * Margin interest rate (if applicable).
+   *
+   * Typically tied to overnight rates (Fed Funds, SONIA, ESTR).
+   */
+  margin_interest_rate?: number | null;
+  /**
+   * Margin ratio (e.g., 1.02 = 102% collateralization required).
+   *
+   * GMRA typically expresses this as the ratio of Market Value
+   * of Securities to Purchase Price.
+   */
+  margin_ratio: number;
+  /**
+   * Type of margin mechanism.
+   */
+  margin_type: RepoMarginType;
+  /**
+   * Whether margin interest is paid on cash margin transfers.
+   *
+   * Under GMRA, the parties may agree to pay interest on
+   * cash margin transfers.
+   */
+  pays_margin_interest: boolean;
+  /**
+   * Settlement lag for margin transfers (business days).
+   *
+   * GMRA standard is typically same-day (0) or next-day (1).
+   */
+  settlement_lag: number;
+  /**
+   * Whether collateral substitution is permitted.
+   *
+   * GMRA Paragraph 8 governs substitution rights.
+   */
+  substitution_allowed: boolean;
+}
+/**
+ * Netting set configuration for SA-CCR.
+ */
+export interface SaCcrNettingSetConfig {
+  /**
+   * Valuation date used for forward-start and remaining-maturity calculations.
+   */
+  as_of: DateWire;
+  /**
+   * Net current collateral held (positive = bank holds collateral).
+   */
+  collateral: number;
+  /**
+   * Whether the netting set is subject to a margin agreement.
+   */
+  is_margined: boolean;
+  /**
+   * Margin period of risk in business days (default: 10 for bilateral).
+   */
+  mpor_days: number;
+  /**
+   * Minimum transfer amount (MTA).
+   */
+  mta: number;
+  /**
+   * Netting set identifier.
+   */
+  netting_set_id: NettingSetId;
+  /**
+   * Net independent collateral amount (NICA).
+   */
+  nica: number;
+  /**
+   * Threshold amount (TH) under the margin agreement.
+   */
+  threshold: number;
+}
+/**
+ * A single derivative trade for SA-CCR EAD computation.
+ */
+export interface SaCcrTrade {
+  /**
+   * Asset class assignment.
+   */
+  asset_class: SaCcrAssetClass;
+  /**
+   * Long (+1.0) or short (-1.0) direction.
+   */
+  direction: number;
+  /**
+   * Underlying end date used for supervisory duration; linear trade maturity.
+   */
+  end_date: DateWire;
+  /**
+   * Hedging set identifier within the asset class.
+   * Trades with the same hedging set can partially offset.
+   */
+  hedging_set: string;
+  /**
+   * Whether this trade is an option.
+   */
+  is_option: boolean;
+  /**
+   * Current mark-to-market value.
+   */
+  mtm: number;
+  /**
+   * Notional in reporting currency before supervisory duration for IR/credit.
+   * FX, equity and commodity notionals must already use CRE52 adjusted notionals.
+   */
+  notional: number;
+  /**
+   * Option expiry for maturity-factor calculation, distinct from the
+   * underlying start/end dates used for supervisory duration.
+   */
+  option_maturity_date?: DateWire | null;
+  /**
+   * Option exercise type if applicable.
+   */
+  option_type?: SaCcrOptionType | null;
+  /**
+   * Underlying start date used for IR/credit supervisory duration.
+   */
+  start_date: DateWire;
+  /**
+   * Explicit supervisory category; required outside IR and FX.
+   */
+  supervisory_category?: SaCcrSupervisoryCategory | null;
+  /**
+   * Supervisory delta adjustment.
+   * For linear trades: +1 (long) or -1 (short).
+   * For options: delta from Black-Scholes or equivalent.
+   */
+  supervisory_delta: number;
+  /**
+   * Unique trade identifier.
+   */
+  trade_id: string;
+  /**
+   * Underlier reference (e.g., currency pair, issuer, equity name, commodity).
+   */
+  underlier: string;
+}
+/**
+ * One volatility-weighted vega input before SIMM curvature scaling.
+ *
+ * The amount is `sigma * dPV/dsigma` in the sensitivity container's base
+ * currency, before HVR, vega risk weights or concentration. For equity, FX
+ * and commodity, `sigma` is the paragraph 10(b) prescribed volatility proxy;
+ * for rates and credit it is the matching quoted ATM volatility. Preserve
+ * separate expiries until `SF(t) = 0.5 * min(1, 14/t_days)` has been applied.
+ */
+export interface SimmCurvatureSensitivity {
+  /**
+   * Currency code for IR, credit sector for qualifying credit, numeric
+   * commodity bucket, `fx` for FX, or `residual` for equity/non-qualifying credit.
+   */
+  bucket: string;
+  /**
+   * Option-expiry tenor from [`SIMM_TENORS`]. Two weeks means 14 calendar
+   * days; months use 365/12 days and years use 365 days.
+   */
+  expiry_tenor: string;
+  /**
+   * IR subcurve name, credit issuer, equity underlier, commodity name,
+   * or an FX currency pair such as `EUR/USD`; must be nonempty.
+   */
+  factor: string;
+  /**
+   * SIMM risk class selecting the prescribed bucket and correlation rules.
+   */
+  risk_class: SimmRiskClass;
+  /**
+   * IR or credit risk-factor tenor. Required for IR and credit; absent for
+   * equity, commodity and FX. This is distinct from the option expiry.
+   */
+  risk_tenor?: string | null;
+  /**
+   * Signed base-currency `sigma * dPV/dsigma` before SF, HVR, VRW or concentration.
+   */
+  volatility_weighted_vega: number;
+}
+/**
+ * SIMM sensitivity inputs organized by risk class.
+ */
+export interface SimmSensitivities {
+  /**
+   * Base currency for the sensitivities.
+   *
+   * This is the currency context in which the sensitivity set was produced.
+   * It does not force the output currency of the eventual margin result.
+   */
+  base_currency: Currency;
+  /**
+   * Commodity delta P&L per 1% relative price increase by bucket.
+   *
+   * Bucket labels should match the SIMM commodity bucket naming expected by
+   * the calculator's registry-backed lookup table.
+   */
+  commodity_delta: {
+    [k: string]: number;
+  };
+  /**
+   * Commodity vega by bucket.
+   *
+   * Bucket labels follow the same SIMM commodity bucket naming as
+   * [`commodity_delta`](Self::commodity_delta); the single commodity vega
+   * risk weight replaces the per-bucket delta weights.
+   */
+  commodity_vega: {
+    [k: string]: number;
+  };
+  /**
+   * Credit non-qualifying delta by (issuer/index, tenor bucket).
+   *
+   * For securitizations and exposures explicitly classified as non-qualifying.
+   */
+  credit_non_qualifying_delta: {
+    [k: string]: number;
+  };
+  /**
+   * Credit non-qualifying vega by `(issuer/index, tenor bucket)`.
+   *
+   * Pooled like [`credit_non_qualifying_delta`](Self::credit_non_qualifying_delta)
+   * and weighted by the credit-non-qualifying vega risk weight.
+   */
+  credit_non_qualifying_vega: {
+    [k: string]: number;
+  };
+  /**
+   * Credit qualifying delta by `(sector, issuer/index, tenor bucket)`.
+   *
+   * Sector assignment is mandatory so the calculator can apply ISDA SIMM
+   * intra- and inter-bucket aggregation without a scalar approximation.
+   */
+  credit_qualifying_delta: {
+    [k: string]: number;
+  };
+  /**
+   * Credit qualifying vega by `(sector, issuer/index, tenor bucket)`.
+   *
+   * Bucketed exactly like [`credit_qualifying_delta`](Self::credit_qualifying_delta)
+   * so ISDA SIMM applies the same intra- and inter-bucket aggregation to the
+   * vega risk class, weighted by the single credit-qualifying vega risk
+   * weight rather than the per-bucket delta weights.
+   */
+  credit_qualifying_vega: {
+    [k: string]: number;
+  };
+  /**
+   * Expiry-resolved signed `sigma * dPV/dsigma` inputs before SF, HVR,
+   * vega risk weights or concentration. Entries are retained separately
+   * until expiry scaling, so opposite vegas at different expiries do not
+   * incorrectly cancel curvature.
+   */
+  curvature: SimmCurvatureSensitivity[];
+  /**
+   * Equity delta by underlier.
+   *
+   * Values are signed currency P&L per 1% relative equity-price increase.
+   */
+  equity_delta: {
+    [k: string]: number;
+  };
+  /**
+   * Equity vega by underlier.
+   */
+  equity_vega: {
+    [k: string]: number;
+  };
+  /**
+   * FX delta by currency.
+   *
+   * Values are signed currency P&L per 1% relative FX-price increase,
+   * before risk weighting or concentration. USD is the calculation currency.
+   */
+  fx_delta: {
+    [k: string]: number;
+  };
+  /**
+   * FX vega by currency pair.
+   */
+  fx_vega: {
+    [k: string]: number;
+  };
+  /**
+   * Interest rate delta by (currency, tenor bucket).
+   *
+   * Tenor buckets follow SIMM specification: 2W, 1M, 3M, 6M, 1Y, 2Y, 3Y, 5Y, 10Y, 15Y, 20Y, 30Y
+   */
+  ir_delta: {
+    [k: string]: number;
+  };
+  /**
+   * Interest rate vega by `(currency, tenor bucket)`.
+   *
+   * Values are sigma times dPV/dsigma in currency before VRW or concentration.
+   * This legacy two-dimensional vega input collapses underlying-maturity detail;
+   * curvature has the separate full expiry-resolved input.
+   */
+  ir_vega: {
+    [k: string]: number;
+  };
+  [k: string]: unknown;
+}
+/**
+ * JSON-friendly representation of `SimmSensitivities`.
+ */
+export interface SimmSensitivitiesJson {
+  /**
+   * Base currency for the sensitivities.
+   */
+  base_currency: Currency;
+  /**
+   * Commodity delta buckets as `(bucket, amount)`.
+   */
+  commodity_delta?: [unknown, unknown][];
+  /**
+   * Commodity vega buckets as `(bucket, amount)`.
+   */
+  commodity_vega?: [unknown, unknown][];
+  /**
+   * Credit non-qualifying delta buckets as `(name, tenor, amount)`.
+   */
+  credit_non_qualifying_delta?: [unknown, unknown, unknown][];
+  /**
+   * Credit non-qualifying vega buckets as `(name, tenor, amount)`.
+   */
+  credit_non_qualifying_vega?: [unknown, unknown, unknown][];
+  /**
+   * Credit qualifying deltas as `(sector, name, tenor, amount)`.
+   */
+  credit_qualifying_delta?: [unknown, unknown, unknown, unknown][];
+  /**
+   * Credit qualifying vegas as `(sector, name, tenor, amount)`.
+   */
+  credit_qualifying_vega?: [unknown, unknown, unknown, unknown][];
+  /**
+   * Expiry-resolved volatility-weighted vega inputs before curvature scaling.
+   */
+  curvature?: SimmCurvatureSensitivity[];
+  /**
+   * Equity delta buckets as `(underlier, amount)`.
+   */
+  equity_delta?: [unknown, unknown][];
+  /**
+   * Equity vega buckets as `(underlier, amount)`.
+   */
+  equity_vega?: [unknown, unknown][];
+  /**
+   * FX delta buckets as `(currency, amount)`.
+   */
+  fx_delta?: [unknown, unknown][];
+  /**
+   * FX vega buckets as `(ccy1, ccy2, amount)`.
+   */
+  fx_vega?: [unknown, unknown, unknown][];
+  /**
+   * Interest-rate delta buckets as `(currency, tenor, amount)`.
+   */
+  ir_delta?: [unknown, unknown, unknown][];
+  /**
+   * Interest-rate vega buckets as `(currency, tenor, amount)`.
+   */
+  ir_vega?: [unknown, unknown, unknown][];
+}
+/**
+ * Variation margin calculation result.
+ */
+export interface VmResult {
+  /**
+   * Amount to collect from the counterparty, including returned collateral
+   */
+  collect_amount: Money;
+  /**
+   * Calculation date
+   */
+  date: string;
+  /**
+   * Gross mark-to-market exposure
+   */
+  gross_exposure: Money;
+  /**
+   * Net exposure after applying threshold and independent amount
+   */
+  net_exposure: Money;
+  /**
+   * Amount to post to the counterparty, including returned collateral
+   */
+  post_amount: Money;
+  /**
+   * Settlement date for the margin transfer
+   */
+  settlement_date: string;
+}
+/**
+ * Result of XVA calculations.
+ */
+export interface XvaResult {
+  /**
+   * Unilateral CVA (positive = cost to the desk).
+   *
+   * Represents the expected loss due to counterparty default,
+   * discounted to present value.
+   */
+  cva: number;
+  /**
+   * DVA (Debit Valuation Adjustment): own-default benefit.
+   *
+   * Positive DVA represents the expected gain to the desk from
+   * the institution's own default on negative-exposure positions.
+   *
+   * `None` when DVA is not computed (unilateral CVA only).
+   */
+  dva?: number | null;
+  /**
+   * Time-weighted average of Effective EPE (regulatory scalar metric).
+   *
+   * Computed as:
+   * ```text
+   * Effective_EPE_avg = (1 / min(1, M)) × Σₖ Effective_EPE(tₖ) × Δtₖ
+   * ```
+   *
+   * where `M` is the portfolio maturity and `Δtₖ = tₖ - tₖ₋₁`.
+   * This is the key input for EAD under SA-CCR.
+   *
+   * # References
+   *
+   * - BCBS 279 (2014). "The standardised approach for measuring
+   *   counterparty credit risk exposures." `docs/REFERENCES.md#bcbs-279-saccr`
+   */
+  effective_epe: number;
+  /**
+   * Effective EPE profile: `(time, Effective_EPE(t))`.
+   *
+   * Non-decreasing version of EPE, per Basel III SA-CCR:
+   * `Effective_EPE(t_k) = max(Effective_EPE(t_{k-1}), EPE(t_k))`
+   *
+   * # References
+   *
+   * - BCBS 279 (2014). "The standardised approach for measuring
+   *   counterparty credit risk exposures." `docs/REFERENCES.md#bcbs-279-saccr`
+   */
+  effective_epe_profile: [unknown, unknown][];
+  /**
+   * Expected Negative Exposure profile: `(time, ENE(t))`.
+   *
+   * ENE(t) = E[max(-V(t), 0)] — the average negative mark-to-market
+   * at each time point (own-default exposure).
+   */
+  ene_profile: [unknown, unknown][];
+  /**
+   * Expected Positive Exposure profile: `(time, EPE(t))`.
+   *
+   * EPE(t) = E[max(V(t), 0)] — the average positive mark-to-market
+   * at each time point.
+   */
+  epe_profile: [unknown, unknown][];
+  /**
+   * FVA (Funding Valuation Adjustment): net funding cost/benefit.
+   *
+   * Positive FVA represents a net funding cost; negative FVA
+   * represents a net funding benefit. Captures the cost of
+   * funding uncollateralized derivative positions.
+   *
+   * `None` when FVA is not computed.
+   */
+  fva?: number | null;
+  /**
+   * Maximum PFE across the profile (`max_t PFE(t)`).
+   *
+   * In the deterministic engine this equals `max_t EPE(t)` by
+   * construction (see [`Self::pfe_profile`]). Used for coarse credit
+   * limit monitoring where a Monte Carlo tail quantile is not
+   * available.
+   */
+  max_pfe: number;
+  /**
+   * Policy metadata stamped by the computing layer: numeric mode, active
+   * rounding context, any applied FX policy, and the parallel-execution
+   * flag.
+   */
+  meta?: ResultsMeta;
+  /**
+   * MVA (Margin Valuation Adjustment): funding cost of posted initial margin.
+   *
+   * Positive MVA represents the lifetime cost of funding the initial
+   * margin the desk posts against the netting set. Uses the same sign
+   * convention as CVA and FVA.
+   *
+   * `None` when MVA is not computed — that is, when no
+   * [`FundingConfig::im_profile`] was supplied.
+   *
+   * # References
+   *
+   * - Green, A. (2015). *XVA*. Wiley. Chapter 10. `docs/REFERENCES.md#green-xva`
+   */
+  mva?: number | null;
+  /**
+   * Potential Future Exposure profile: `(time, PFE(t))`.
+   *
+   * **IMPORTANT** — the deterministic CVA engine has a single path,
+   * so the distribution of exposures collapses to a point mass at
+   * `max(V(t), 0)`. In that degenerate case every quantile (and the
+   * mean) equals `EPE(t)`, and this field holds the EPE path, not a
+   * tail quantile. The name is retained so downstream systems keep
+   * their column bindings; supply a profile from a Monte Carlo exposure
+   * simulation when a true 97.5%-quantile PFE is required for limit
+   * monitoring.
+   */
+  pfe_profile: [unknown, unknown][];
+  /**
+   * All-in valuation adjustment: `CVA − DVA + FVA + MVA`.
+   *
+   * Uncomputed components contribute zero. This is the quantity subtracted
+   * from the risk-free value of the netting set.
+   *
+   * # References
+   *
+   * - Gregory, J. (2020). *The xVA Challenge*, 4th ed. Wiley. Chapter 14. `docs/REFERENCES.md#gregory-xva-challenge`
+   * - Green, A. (2015). *XVA*. Wiley. Chapters 9-10. `docs/REFERENCES.md#green-xva`
+   */
+  total_xva: number;
 }

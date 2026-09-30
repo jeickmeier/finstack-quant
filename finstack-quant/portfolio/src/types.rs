@@ -221,6 +221,7 @@ impl From<f64> for AttributeValue {
 /// `false`.  For [`AttributeValue::Number`] attributes, all six operators
 /// apply.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(rename_all = "snake_case")]
 pub enum ComparisonOp {
     /// Equal.
@@ -287,6 +288,7 @@ impl fmt::Display for ComparisonOp {
 /// Reusable building block for [`crate::optimization::PositionFilter::ByAttribute`]
 /// and [`crate::optimization::PerPositionMetric::AttributeIndicator`].
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct AttributeTest {
     /// Attribute key to test.

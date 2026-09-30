@@ -1,0 +1,62 @@
+{
+  "$defs": {
+    "NodeId": {
+      "description": "Type-safe identifier for a node in a financial model.\n\nSerializes as a plain string and is interoperable with `&str` via\n[`Borrow`] and [`AsRef`].",
+      "type": "string"
+    },
+    "PeriodScope": {
+      "description": "Scope that determines which periods a check applies to.",
+      "oneOf": [
+        {
+          "const": "all_periods",
+          "description": "Run the check on every period.",
+          "type": "string"
+        },
+        {
+          "const": "actuals_only",
+          "description": "Run only on actual (historical) periods.",
+          "type": "string"
+        },
+        {
+          "const": "forecast_only",
+          "description": "Run only on forecast periods.",
+          "type": "string"
+        }
+      ]
+    }
+  },
+  "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/growth_rate_consistency.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Flags line items whose period-over-period growth exceeds configurable upper / lower bounds.",
+  "properties": {
+    "max_decline_pct": {
+      "description": "Maximum negative growth rate as a decimal (e.g. −0.30 = −30 %).",
+      "format": "double",
+      "type": "number"
+    },
+    "max_period_growth_pct": {
+      "description": "Maximum positive growth rate as a decimal (e.g. 0.50 = 50 %).",
+      "format": "double",
+      "type": "number"
+    },
+    "nodes": {
+      "description": "Nodes to monitor for growth-rate plausibility.",
+      "items": {
+        "$ref": "#/$defs/NodeId"
+      },
+      "type": "array"
+    },
+    "scope": {
+      "$ref": "#/$defs/PeriodScope",
+      "description": "Which periods to check."
+    }
+  },
+  "required": [
+    "nodes",
+    "max_period_growth_pct",
+    "max_decline_pct",
+    "scope"
+  ],
+  "title": "GrowthRateConsistency",
+  "type": "object"
+}

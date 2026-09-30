@@ -24,7 +24,7 @@ use std::sync::Arc;
 
 const SCENARIO_BATCH_MAX_ACTIVE_STATES: usize = 8;
 
-/// Serialize-only scenario-and-revalue view returned by binding surfaces.
+/// Scenario-and-revalue view returned by binding surfaces.
 ///
 /// This pre-1.0 API intentionally has no alias under its former
 /// persistence-implying name:
@@ -32,7 +32,8 @@ const SCENARIO_BATCH_MAX_ACTIVE_STATES: usize = 8;
 /// ```compile_fail
 /// use finstack_quant_portfolio::scenarios::ScenarioRevalueEnvelope;
 /// ```
-#[derive(Debug, Clone, serde::Serialize)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct ScenarioRevalueView {
     /// Stressed portfolio valuation.
     pub valuation: crate::valuation::PortfolioValuation,
@@ -314,7 +315,7 @@ pub fn apply_and_revalue(
     Ok((valuation, report))
 }
 
-/// Apply a scenario and return the serialize-only JSON view shape.
+/// Apply a scenario and return the JSON view shape.
 ///
 /// # Errors
 ///
@@ -364,6 +365,7 @@ pub fn apply_and_revalue_view(
 /// stressed valuation come first, in stressed-valuation order, followed by any
 /// position that only exists in the base valuation, in base-valuation order.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct ScenarioPnl {
     /// Total scenario P&L in the portfolio base currency
     /// (`stressed.total_base_currency - base.total_base_currency`).
@@ -373,7 +375,7 @@ pub struct ScenarioPnl {
     pub by_position: IndexMap<PositionId, Money>,
 }
 
-/// Serialize-only scenario-P&L view returned by binding surfaces.
+/// Scenario-P&L view returned by binding surfaces.
 ///
 /// Mirrors [`ScenarioRevalueView`] so callers keep scenario provenance
 /// (which operations were applied, which were skipped) alongside the P&L.
@@ -384,7 +386,8 @@ pub struct ScenarioPnl {
 /// ```compile_fail
 /// use finstack_quant_portfolio::scenarios::ScenarioPnlEnvelope;
 /// ```
-#[derive(Debug, Clone, serde::Serialize)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct ScenarioPnlView {
     /// Scenario-attributable profit and loss.
     pub pnl: ScenarioPnl,
@@ -394,6 +397,7 @@ pub struct ScenarioPnlView {
 
 /// One ordered result from [`scenario_pnl_batch`].
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct ScenarioPnlBatchItem {
     /// Identifier copied from the input scenario.
     pub scenario_id: String,
@@ -646,7 +650,7 @@ pub fn scenario_pnl_batch(
     Ok(results)
 }
 
-/// Compute scenario P&L and return the serialize-only JSON view shape.
+/// Compute scenario P&L and return the JSON view shape.
 ///
 /// # Arguments
 ///

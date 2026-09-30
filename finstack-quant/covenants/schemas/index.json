@@ -1,0 +1,68 @@
+{
+  "artifacts": [
+    {
+      "$id": "https://finstack_quant.dev/schemas/covenants/1/consequence_application.schema.json",
+      "bytes": 868,
+      "kind": "component",
+      "path": "schemas/covenants/1/consequence_application.schema.json",
+      "summary": "Result of applying a covenant consequence.",
+      "title": "ConsequenceApplication",
+      "type_name": "ConsequenceApplication"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/covenants/1/covenant_engine.schema.json",
+      "bytes": 26958,
+      "kind": "input",
+      "path": "schemas/covenants/1/covenant_engine.schema.json",
+      "summary": "Covenant engine for evaluation and consequence application.",
+      "title": "CovenantEngine",
+      "type_name": "CovenantEngine"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/covenants/1/covenant_forecast.schema.json",
+      "bytes": 3854,
+      "kind": "output",
+      "path": "schemas/covenants/1/covenant_forecast.schema.json",
+      "summary": "Forecast output with headroom analytics.",
+      "title": "CovenantForecast",
+      "type_name": "CovenantForecast"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/covenants/1/covenant_forecast_config.schema.json",
+      "bytes": 3766,
+      "kind": "input",
+      "path": "schemas/covenants/1/covenant_forecast_config.schema.json",
+      "summary": "Covenant forecast configuration.",
+      "title": "CovenantForecastConfig",
+      "type_name": "CovenantForecastConfig"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/covenants/1/covenant_report.schema.json",
+      "bytes": 8136,
+      "kind": "output",
+      "path": "schemas/covenants/1/covenant_report.schema.json",
+      "summary": "Covenant check result.",
+      "title": "CovenantReport",
+      "type_name": "CovenantReport"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/covenants/1/future_breach.schema.json",
+      "bytes": 1561,
+      "kind": "output",
+      "path": "schemas/covenants/1/future_breach.schema.json",
+      "summary": "A projected covenant breach.",
+      "title": "FutureBreach",
+      "type_name": "FutureBreach"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/covenants/1/hash_map_metric_source.schema.json",
+      "bytes": 496,
+      "kind": "input",
+      "path": "schemas/covenants/1/hash_map_metric_source.schema.json",
+      "summary": "Map-backed metric source for tests, bindings, and simple callers.",
+      "title": "HashMapMetricSource",
+      "type_name": "HashMapMetricSource"
+    }
+  ],
+  "schema_index_version": 1
+}

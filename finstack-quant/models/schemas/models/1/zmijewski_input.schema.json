@@ -1,0 +1,29 @@
+{
+  "$id": "https://finstack_quant.dev/schemas/models/1/zmijewski_input.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Input for the Zmijewski (1984) probit bankruptcy prediction model.",
+  "properties": {
+    "current_assets_to_current_liabilities": {
+      "description": "Current Assets / Current Liabilities (current ratio / liquidity).",
+      "format": "double",
+      "type": "number"
+    },
+    "net_income_to_total_assets": {
+      "description": "Net Income / Total Assets (ROA).",
+      "format": "double",
+      "type": "number"
+    },
+    "total_liabilities_to_total_assets": {
+      "description": "Total Liabilities / Total Assets (leverage / financial leverage ratio).",
+      "format": "double",
+      "type": "number"
+    }
+  },
+  "required": [
+    "net_income_to_total_assets",
+    "total_liabilities_to_total_assets",
+    "current_assets_to_current_liabilities"
+  ],
+  "title": "ZmijewskiInput",
+  "type": "object"
+}

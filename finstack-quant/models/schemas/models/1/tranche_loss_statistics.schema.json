@@ -1,0 +1,77 @@
+{
+  "$id": "https://finstack_quant.dev/schemas/models/1/tranche_loss_statistics.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Loss statistics for one attachment/detachment tranche over a simulated pool loss distribution.",
+  "properties": {
+    "attachment": {
+      "description": "Tranche attachment point as a fraction of pool notional, in `[0, 1)`.",
+      "format": "double",
+      "type": "number"
+    },
+    "detachment": {
+      "description": "Tranche detachment point as a fraction of pool notional, in `(0, 1]`.",
+      "format": "double",
+      "type": "number"
+    },
+    "expected_loss_amount": {
+      "description": "Mean tranche loss in pool-notional units.",
+      "format": "double",
+      "type": "number"
+    },
+    "expected_loss_fraction": {
+      "description": "Mean tranche loss as a fraction of tranche notional, in `[0, 1]`.",
+      "format": "double",
+      "type": "number"
+    },
+    "expected_shortfall_amount": {
+      "description": "Probability-weighted mean tranche loss amount in the worst confidence tail.",
+      "format": "double",
+      "type": "number"
+    },
+    "expected_shortfall_fraction": {
+      "description": "Probability-weighted mean tranche loss fraction in the worst confidence tail.",
+      "format": "double",
+      "type": "number"
+    },
+    "prob_attachment_breached": {
+      "description": "Share of paths whose pool loss fraction strictly exceeds `attachment`.",
+      "format": "double",
+      "type": "number"
+    },
+    "prob_full_writedown": {
+      "description": "Share of paths whose pool loss fraction reaches or exceeds `detachment`.",
+      "format": "double",
+      "type": "number"
+    },
+    "tranche_notional": {
+      "description": "Tranche notional `(detachment - attachment) * pool_notional`.",
+      "format": "double",
+      "type": "number"
+    },
+    "var_amount": {
+      "description": "Nearest-rank tranche loss amount at the distribution's confidence.",
+      "format": "double",
+      "type": "number"
+    },
+    "var_fraction": {
+      "description": "Nearest-rank tranche loss fraction at the distribution's confidence.",
+      "format": "double",
+      "type": "number"
+    }
+  },
+  "required": [
+    "attachment",
+    "detachment",
+    "tranche_notional",
+    "expected_loss_fraction",
+    "expected_loss_amount",
+    "var_fraction",
+    "var_amount",
+    "expected_shortfall_fraction",
+    "expected_shortfall_amount",
+    "prob_attachment_breached",
+    "prob_full_writedown"
+  ],
+  "title": "TrancheLossStatistics",
+  "type": "object"
+}

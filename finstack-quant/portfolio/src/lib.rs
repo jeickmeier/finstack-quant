@@ -227,7 +227,7 @@ pub use excess_return::{
     DurationCellTable, ExcessReturnPosition, ExcessReturnResult, ReferenceReturn,
 };
 pub use factor_brinson::{
-    factor_brinson_attribution, FactorBrinsonInput, FactorBrinsonResult, FactorContribution,
+    factor_brinson_attribution, FactorBrinsonContribution, FactorBrinsonInput, FactorBrinsonResult,
 };
 pub use factor_model::{
     allocate_weights, allocate_weights_json, validate_allocation_json, WeightAllocationResult,

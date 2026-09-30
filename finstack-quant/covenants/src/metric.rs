@@ -13,6 +13,7 @@ use std::sync::Arc;
 /// `dscr`, but this crate intentionally has no compile-time dependency on
 /// `finstack-quant-statements`.
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[repr(transparent)]
 #[serde(transparent)]
 pub struct CovenantMetricId(Arc<str>);
@@ -78,6 +79,7 @@ pub trait CovenantMetricSource: Send + Sync {
 
 /// Map-backed metric source for tests, bindings, and simple callers.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct HashMapMetricSource {
     metrics: HashMap<CovenantMetricId, f64>,
 }

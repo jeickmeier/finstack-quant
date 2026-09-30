@@ -1,0 +1,29 @@
+{
+  "$id": "https://finstack_quant.dev/schemas/models/1/black_scholes_cf.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Black-Scholes characteristic function.",
+  "properties": {
+    "q": {
+      "description": "Dividend yield.",
+      "format": "double",
+      "type": "number"
+    },
+    "r": {
+      "description": "Risk-free rate.",
+      "format": "double",
+      "type": "number"
+    },
+    "sigma": {
+      "description": "Volatility (annualized).",
+      "format": "double",
+      "type": "number"
+    }
+  },
+  "required": [
+    "r",
+    "q",
+    "sigma"
+  ],
+  "title": "BlackScholesCf",
+  "type": "object"
+}

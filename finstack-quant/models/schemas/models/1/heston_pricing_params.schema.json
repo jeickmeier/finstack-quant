@@ -1,0 +1,53 @@
+{
+  "$id": "https://finstack_quant.dev/schemas/models/1/heston_pricing_params.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Market inputs for closed-form Heston pricing.",
+  "properties": {
+    "kappa": {
+      "description": "Mean reversion speed.",
+      "format": "double",
+      "type": "number"
+    },
+    "q": {
+      "description": "Continuously compounded dividend or foreign yield as an annual decimal.",
+      "format": "double",
+      "type": "number"
+    },
+    "r": {
+      "description": "Continuously compounded risk-free rate as an annual decimal.",
+      "format": "double",
+      "type": "number"
+    },
+    "rho": {
+      "description": "Spot-variance correlation.",
+      "format": "double",
+      "type": "number"
+    },
+    "sigma_v": {
+      "description": "Vol-of-vol.",
+      "format": "double",
+      "type": "number"
+    },
+    "theta": {
+      "description": "Long-run variance.",
+      "format": "double",
+      "type": "number"
+    },
+    "v0": {
+      "description": "Initial variance.",
+      "format": "double",
+      "type": "number"
+    }
+  },
+  "required": [
+    "r",
+    "q",
+    "v0",
+    "kappa",
+    "theta",
+    "sigma_v",
+    "rho"
+  ],
+  "title": "HestonPricingParams",
+  "type": "object"
+}

@@ -27,6 +27,13 @@ SCHEMA_INDEX_RELATIVE_PATH = Path("schemas/index.json")
 
 GENERATORS = (
     Generator(Path("finstack-quant/core"), "finstack-quant-core", "gen_core_schemas"),
+    Generator(Path("finstack-quant/analytics"), "finstack-quant-analytics", "gen_analytics_schemas"),
+    Generator(
+        Path("finstack-quant/statements-analytics"),
+        "finstack-quant-statements-analytics",
+        "gen_statements_analytics_schemas",
+    ),
+    Generator(Path("finstack-quant/covenants"), "finstack-quant-covenants", "gen_covenants_schemas"),
     Generator(Path("finstack-quant/attribution"), "finstack-quant-attribution", "gen_attribution_schemas"),
     Generator(
         Path("finstack-quant/calibration"),

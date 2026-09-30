@@ -1,0 +1,278 @@
+{
+  "$defs": {
+    "AttributionFactor": {
+      "description": "Factor types for P&L attribution.\n\nGroups `MarketContext` inputs by their economic role:\n- **RatesCurves**: discount_curves + forward_curves\n- **CreditCurves**: hazard_curves\n- **InflationCurves**: inflation_curves + published inflation_indices\n- **Correlations**: base_correlation_curves\n- **Fx**: FxMatrix\n- **Volatility**: surfaces and declared scalar volatility quotes\n- **MarketScalars**: other prices, non-fixing series and dividends",
+      "oneOf": [
+        {
+          "const": "carry",
+          "description": "Time decay and accruals (Theta).",
+          "type": "string"
+        },
+        {
+          "const": "rates_curves",
+          "description": "Interest rate curves (discount & forward).",
+          "type": "string"
+        },
+        {
+          "const": "credit_curves",
+          "description": "Credit hazard curves (spread risk).",
+          "type": "string"
+        },
+        {
+          "const": "inflation_curves",
+          "description": "Inflation curves and published CPI index changes.",
+          "type": "string"
+        },
+        {
+          "const": "correlations",
+          "description": "Base correlation curves (structured credit).",
+          "type": "string"
+        },
+        {
+          "const": "fx",
+          "description": "FX rate changes.",
+          "type": "string"
+        },
+        {
+          "const": "volatility",
+          "description": "Implied volatility changes.",
+          "type": "string"
+        },
+        {
+          "const": "market_scalars",
+          "description": "Market scalars (dividends and equity/commodity prices).",
+          "type": "string"
+        },
+        {
+          "const": "model_parameters",
+          "description": "Model-specific parameters (prepayment, default, recovery, conversion).",
+          "type": "string"
+        }
+      ]
+    },
+    "AttributionMethod": {
+      "description": "Attribution methodology for decomposing P&L.\n\nFour methodologies are supported:\n- **Parallel**: Independent factor isolation (may not sum due to cross-effects)\n- **Waterfall**: Sequential application (guarantees sum = total, order matters)\n- **MetricsBased**: Linear approximation using existing metrics (fast but approximate)\n- **Taylor**: Sensitivity-based Taylor expansion (first/second order via bump-and-reprice)",
+      "oneOf": [
+        {
+          "const": "parallel",
+          "description": "Independent factor isolation (may not sum due to cross-effects).\n\nEach factor is isolated independently by restoring T₀ values for that\nfactor while keeping T₁ values for all others. Residual captures\ncross-effects and non-linearities.",
+          "type": "string"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Sequential waterfall attribution (guarantees sum = total, order matters).\n\nFactors are applied one-by-one in the specified order. Each factor's\nP&L is computed with all previous factors at T₁ and remaining at T₀.\nResidual is minimal by construction.",
+          "properties": {
+            "waterfall": {
+              "items": {
+                "$ref": "#/$defs/AttributionFactor"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "waterfall"
+          ],
+          "type": "object"
+        },
+        {
+          "const": "metrics_based",
+          "description": "Use existing metrics (Theta, DV01, CS01) for approximation.\n\nLinear approximation using pre-computed sensitivities. Fast but less\naccurate for large market moves due to convexity effects.",
+          "type": "string"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Sensitivity-based Taylor expansion (first/second order).\n\nComputes sensitivities at T₀ via bump-and-reprice, then multiplies by\nobserved market moves to decompose P&L. Optionally includes second-order\ngamma/convexity terms.",
+          "properties": {
+            "taylor": {
+              "$ref": "#/$defs/TaylorAttributionConfig"
+            }
+          },
+          "required": [
+            "taylor"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "MetricId": {
+      "description": "Strongly-typed metric identifier.\n\nProvides compile-time validation, autocomplete support, and safe refactoring\nwhen metric names change. Covers bond, IRS, deposit, and risk metrics.\n\nSee unit tests and `examples/` for usage.",
+      "type": "string"
+    },
+    "PortfolioValuationOptions": {
+      "description": "Options controlling portfolio valuation behaviour.\n\nThe default is a risk run: [`strict_risk`](Self::strict_risk) is `true`\nand [`metrics`](Self::metrics) is [`RequestedMetrics::Standard`]. A\nfailed requested risk metric aborts the valuation. Set `strict_risk` to\n`false` only when a PV-preserving best-effort fallback is intentional.",
+      "properties": {
+        "metrics": {
+          "$ref": "#/$defs/RequestedMetrics",
+          "default": {
+            "mode": "standard"
+          },
+          "description": "Which metric set to request. See [`RequestedMetrics`]."
+        },
+        "strict_risk": {
+          "default": true,
+          "description": "When `true` (default), any failure to compute the risk metrics\nrequested of a position causes the entire portfolio valuation to fail.\n\nWhen `false`, the engine falls back to PV-only valuation for that\nposition if metrics fail, preserving aggregate PV but leaving those\nrisk metrics missing (see [`PortfolioValuation::degraded_positions`]).\n\nThis governs computation failures only. A metric the position's\ninstrument type has no calculator for is never requested of it in the\nfirst place (see [`RequestedMetrics`]) and so fails neither mode; it is\nreported on [`PositionValue::inapplicable_metrics`].",
+          "type": "boolean"
+        }
+      },
+      "type": "object"
+    },
+    "ReplayErrorPolicy": {
+      "description": "What to do when a single snapshot fails to revalue.",
+      "oneOf": [
+        {
+          "const": "strict",
+          "description": "Fail the entire replay on the first valuation error. This is the\nhistorical behaviour and the right default for hedge-fund risk\nreporting where a missing snapshot must surface, not be silently\nskipped. Default.",
+          "type": "string"
+        },
+        {
+          "const": "best_effort",
+          "description": "Skip snapshots that fail to revalue and continue. Failed dates are\nreported on `ReplayResult::skipped_dates` so callers can surface them\nto ops without losing the rest of the timeline. Use this when\nrunning ad-hoc backfills where a single bad day shouldn't discard\nweeks of computed steps.",
+          "type": "string"
+        }
+      ]
+    },
+    "ReplayMode": {
+      "description": "What to compute at each replay step.",
+      "oneOf": [
+        {
+          "const": "pv_only",
+          "description": "Just portfolio PV at each date.",
+          "type": "string"
+        },
+        {
+          "const": "pv_and_pnl",
+          "description": "PV + daily/cumulative mark-to-market P&L.",
+          "type": "string"
+        },
+        {
+          "const": "full_attribution",
+          "description": "PV + P&L + per-position factor decomposition.",
+          "type": "string"
+        }
+      ]
+    },
+    "RequestedMetrics": {
+      "description": "Which metric set to offer every position in the portfolio.\n\n# A portfolio metric list is a menu\n\nWhichever variant is used, the resulting list is a **menu**, not a request\nmade of each position individually. It is chosen once for a book whose\npositions have different instrument types, and there is no way to say\n\"`delta` for the options, `cs01` for the credit\" — so a mixed book is only\nvaluable at all if each position takes the part of the list that applies to\nit. Each position is therefore asked for exactly the entries its own\ninstrument type has a calculator for.\n\nNarrowing is confined to structural inapplicability, and it is reported,\nnot silent:\n\n- The entries skipped for a position are listed on\n  [`PositionValue::inapplicable_metrics`].\n- An identifier the standard metric registry does not know is still\n  rejected when the request is parsed, by [`Self::try_from_metric_names`],\n  so a typo fails loudly instead of narrowing away everywhere.\n- A composite position is asked for the additive entries at least one of\n  its legs supports (see `Instrument::applicable_metrics`).\n- A metric an instrument type *does* support but fails to compute is\n  governed by\n  [`PortfolioValuationOptions::strict_risk`](PortfolioValuationOptions::strict_risk),\n  which is unchanged: the valuation aborts, or the position degrades to\n  PV-only and is listed on [`PortfolioValuation::degraded_positions`].\n\nSingle-instrument pricing keeps the opposite contract: it rejects any\nrequested metric its instrument type has no calculator for, because there\nthe caller chose the list against that one instrument.",
+      "oneOf": [
+        {
+          "description": "Standard portfolio metric set only: PV plus `dv01`.\n\nKept intentionally small so a plain book values with nothing narrowed\naway; pricer-specific metrics (`theta`, `cs01`, Greeks, bucketed\nladders) are offered explicitly through\n[`RequestedMetrics::StandardPlus`] or [`RequestedMetrics::Only`].",
+          "properties": {
+            "mode": {
+              "const": "standard",
+              "type": "string"
+            }
+          },
+          "required": [
+            "mode"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Standard menu plus the listed extra metrics (de-duplicated).",
+          "properties": {
+            "metrics": {
+              "items": {
+                "$ref": "#/$defs/MetricId"
+              },
+              "type": "array"
+            },
+            "mode": {
+              "const": "standard_plus",
+              "type": "string"
+            }
+          },
+          "required": [
+            "mode",
+            "metrics"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Only the listed metrics; the standard menu is not included.",
+          "properties": {
+            "metrics": {
+              "items": {
+                "$ref": "#/$defs/MetricId"
+              },
+              "type": "array"
+            },
+            "mode": {
+              "const": "only",
+              "type": "string"
+            }
+          },
+          "required": [
+            "mode",
+            "metrics"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "TaylorAttributionConfig": {
+      "additionalProperties": false,
+      "description": "Configuration for Taylor-based P&L attribution.",
+      "properties": {
+        "credit_spread_bump_bp": {
+          "default": 1.0,
+          "description": "Credit spread bump size for CS01 computation (basis points).",
+          "format": "double",
+          "type": "number"
+        },
+        "include_gamma": {
+          "default": false,
+          "description": "Include second-order (gamma/convexity) terms.",
+          "type": "boolean"
+        },
+        "rate_bump_bp": {
+          "default": 1.0,
+          "description": "Rate bump size for DV01 computation (basis points).",
+          "format": "double",
+          "type": "number"
+        },
+        "vol_bump": {
+          "default": 0.01,
+          "description": "Vol bump size for vega computation (absolute vol points, e.g. 0.01 = 1%).",
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "type": "object"
+    }
+  },
+  "$id": "https://finstack_quant.dev/schemas/portfolio/1/replay_config.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Configuration for a replay run.",
+  "properties": {
+    "attribution_method": {
+      "$ref": "#/$defs/AttributionMethod",
+      "default": "parallel",
+      "description": "Attribution method (only used in `FullAttribution` mode)."
+    },
+    "mode": {
+      "$ref": "#/$defs/ReplayMode",
+      "description": "What to compute at each step."
+    },
+    "on_error": {
+      "$ref": "#/$defs/ReplayErrorPolicy",
+      "default": "strict",
+      "description": "Strict-vs-best-effort handling of per-snapshot failures."
+    },
+    "valuation_options": {
+      "$ref": "#/$defs/PortfolioValuationOptions",
+      "default": {
+        "metrics": {
+          "mode": "standard"
+        },
+        "strict_risk": true
+      },
+      "description": "Valuation options compiled into each replay evaluation profile."
+    }
+  },
+  "required": [
+    "mode"
+  ],
+  "title": "ReplayConfig",
+  "type": "object"
+}

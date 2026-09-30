@@ -52,6 +52,7 @@ const MAX_FACTORS: usize = 3;
 /// tenor schedule, displacements, piecewise-constant factor loadings, and
 /// initial forward rates.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct LmmParams {
     /// Number of forward rates (N).
     pub num_forwards: usize,

@@ -1,0 +1,34 @@
+{
+  "$id": "https://finstack_quant.dev/schemas/portfolio/1/grid_position.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "One position (or pre-aggregated bucket) in a duration-cell x sector grid, for one period and one side (portfolio or benchmark).",
+  "properties": {
+    "cell": {
+      "description": "Duration-cell label. Cell labels may come from\n[`crate::excess_return::duration_cell_label`], but any string key is\naccepted — this module has no dependency on how cells were built.",
+      "type": "string"
+    },
+    "sector": {
+      "description": "Sector bucket label within the cell.",
+      "type": "string"
+    },
+    "total_return": {
+      "description": "Realized total return for the period (decimal).",
+      "format": "double",
+      "type": "number"
+    },
+    "weight": {
+      "description": "Weight as a fraction of the whole side at period start (decimal).",
+      "format": "double",
+      "type": "number"
+    }
+  },
+  "required": [
+    "cell",
+    "sector",
+    "weight",
+    "total_return"
+  ],
+  "title": "GridPosition",
+  "type": "object"
+}

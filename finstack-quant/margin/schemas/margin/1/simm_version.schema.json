@@ -1,0 +1,13 @@
+{
+  "$id": "https://finstack_quant.dev/schemas/margin/1/simm_version.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "SIMM version identifier.",
+  "oneOf": [
+    {
+      "const": "v2_6",
+      "description": "SIMM v2.6 (2023)",
+      "type": "string"
+    }
+  ],
+  "title": "SimmVersion"
+}

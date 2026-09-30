@@ -1,0 +1,131 @@
+{
+  "$defs": {
+    "ExplanationStep": {
+      "description": "Step in a calculation breakdown.",
+      "properties": {
+        "component": {
+          "description": "Component identifier (e.g., \"revenue\")",
+          "type": "string"
+        },
+        "operation": {
+          "description": "Operation applied (e.g., \"+\", \"-\", \"*\", \"/\")",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "value": {
+          "$ref": "#/$defs/NonFiniteF64Wire",
+          "description": "Value of the component; non-finite values serialize as `\"nan\"`,\n`\"inf\"` or `\"-inf\"`."
+        }
+      },
+      "required": [
+        "component",
+        "value"
+      ],
+      "type": "object"
+    },
+    "NodeType": {
+      "description": "Node computation type.\n\nDetermines how a node's value is computed:\n- **Value**: Only explicit values (actuals, assumptions)\n- **Calculated**: Only formula-derived\n- **Mixed**: Value OR Forecast OR Formula (precedence: Value > Forecast > Formula)",
+      "oneOf": [
+        {
+          "const": "value",
+          "description": "Only explicit values",
+          "type": "string"
+        },
+        {
+          "const": "calculated",
+          "description": "Only formula-derived",
+          "type": "string"
+        },
+        {
+          "const": "mixed",
+          "description": "Value OR Forecast OR Formula (precedence: Value > Forecast > Formula)",
+          "type": "string"
+        }
+      ]
+    },
+    "NonFiniteF64Wire": {
+      "anyOf": [
+        {
+          "description": "A finite value, written as a JSON number.",
+          "format": "double",
+          "type": "number"
+        },
+        {
+          "$ref": "#/$defs/NonFiniteSentinel",
+          "description": "A non-finite value, written as its sentinel string."
+        }
+      ],
+      "description": "An `f64` in the [`non_finite_f64`] wire form: a JSON number when finite,\notherwise one of the strings `\"inf\"`, `\"-inf\"` or `\"nan\"`.\n\nContract types store plain `f64` fields with\n`#[serde(with = \"finstack_quant_core::wire::non_finite_f64\")]` and name this\ntype in `#[schemars(with = ...)]`, so the generated schema describes the\nsentinel strings the serializer actually writes."
+    },
+    "NonFiniteSentinel": {
+      "description": "Sentinel string the [`non_finite_f64`] adapter writes for a non-finite `f64`.",
+      "oneOf": [
+        {
+          "const": "inf",
+          "description": "`+∞`, written as `\"inf\"`.",
+          "type": "string"
+        },
+        {
+          "const": "-inf",
+          "description": "`-∞`, written as `\"-inf\"`.",
+          "type": "string"
+        },
+        {
+          "const": "nan",
+          "description": "`NaN`, written as `\"nan\"`.",
+          "type": "string"
+        }
+      ]
+    },
+    "PeriodId": {
+      "description": "Identifier for a Gregorian period like `2025Q1` or a fiscal period like\n`FY2025W53`.",
+      "type": "string"
+    }
+  },
+  "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/explanation.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Detailed explanation of a node's calculation.",
+  "properties": {
+    "breakdown": {
+      "description": "Breakdown of calculation components",
+      "items": {
+        "$ref": "#/$defs/ExplanationStep"
+      },
+      "type": "array"
+    },
+    "final_value": {
+      "$ref": "#/$defs/NonFiniteF64Wire",
+      "description": "Final calculated value; non-finite values serialize as `\"nan\"`,\n`\"inf\"` or `\"-inf\"`."
+    },
+    "formula_text": {
+      "description": "Formula text (if calculated)",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "node_id": {
+      "description": "Node identifier",
+      "type": "string"
+    },
+    "node_type": {
+      "$ref": "#/$defs/NodeType",
+      "description": "Type of node (Value, Calculated, etc.)"
+    },
+    "period_id": {
+      "$ref": "#/$defs/PeriodId",
+      "description": "Period being explained"
+    }
+  },
+  "required": [
+    "node_id",
+    "period_id",
+    "final_value",
+    "node_type",
+    "breakdown"
+  ],
+  "title": "Explanation",
+  "type": "object"
+}

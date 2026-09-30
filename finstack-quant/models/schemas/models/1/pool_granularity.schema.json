@@ -1,0 +1,18 @@
+{
+  "$id": "https://finstack_quant.dev/schemas/models/1/pool_granularity.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "AssetPool-granularity policy for the structured-credit default engine.",
+  "oneOf": [
+    {
+      "const": "per_name",
+      "description": "Simulate each name's default independently conditional on the\nsystematic factor (finite-pool copula). Captures name-level lumpiness;\nthe correct default for concentrated pools. This is the default.",
+      "type": "string"
+    },
+    {
+      "const": "large_homogeneous",
+      "description": "Apply the closed-form LHP conditional default probability uniformly to\nevery name. This is the `N → ∞` limit of [`Self::PerName`] — an\nacceptable, faster approximation only for genuinely granular pools.",
+      "type": "string"
+    }
+  ],
+  "title": "PoolGranularity"
+}

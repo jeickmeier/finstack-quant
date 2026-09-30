@@ -326,6 +326,7 @@ fn interest_coverage_at(results: &StatementResult, at: &PeriodId) -> Option<f64>
 /// One period's structured credit metrics. Each metric is `None` when it
 /// cannot be computed for that period (e.g. an incomplete TTM window).
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct CreditAssessmentPoint {
     /// Period identifier rendered as a string (e.g. `"2025Q4"`).
     pub period: String,
@@ -354,6 +355,7 @@ pub struct CreditAssessmentPoint {
 /// assert_eq!(assessment.period, "2025Q4");
 /// ```
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct CreditAssessment {
     /// Assessment period rendered as a string (e.g. `"2025Q4"`).
     pub period: String,

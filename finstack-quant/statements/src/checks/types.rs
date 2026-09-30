@@ -28,6 +28,7 @@ use crate::types::NodeId;
 ///   "reduction". Used by `total_cash_flow` in `CashReconciliation` and
 ///   `net_income` in `RetainedEarningsReconciliation`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(rename_all = "snake_case")]
 pub enum SignConventionPolicy {
     /// The value must be a non-negative magnitude (the reconciliation's
@@ -130,6 +131,7 @@ pub enum CheckCategory {
 
 /// Scope that determines which periods a check applies to.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(rename_all = "snake_case")]
 pub enum PeriodScope {
     /// Run the check on every period.

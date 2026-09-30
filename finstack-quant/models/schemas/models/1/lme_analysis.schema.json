@@ -1,0 +1,122 @@
+{
+  "$defs": {
+    "LeverageImpact": {
+      "description": "Gross-leverage impact of a liability management exercise.\n\nLeverage is gross debt over EBITDA, so a value of `8.0` reads as 8.0x.\nOnly debt retired at par reduces leverage; consent fees and collateral\ntransfers leave gross debt unchanged.",
+      "properties": {
+        "leverage_reduction": {
+          "description": "Turns of leverage removed: `pre_leverage - post_leverage`.",
+          "format": "double",
+          "type": "number"
+        },
+        "post_leverage": {
+          "description": "Gross debt over EBITDA after the exercise, as a multiple.",
+          "format": "double",
+          "type": "number"
+        },
+        "post_total_debt": {
+          "description": "Gross debt of the target instrument after the exercise.",
+          "format": "double",
+          "type": "number"
+        },
+        "pre_leverage": {
+          "description": "Gross debt over EBITDA before the exercise, as a multiple.",
+          "format": "double",
+          "type": "number"
+        },
+        "pre_total_debt": {
+          "description": "Gross debt of the target instrument before the exercise.",
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "required": [
+        "pre_total_debt",
+        "post_total_debt",
+        "pre_leverage",
+        "post_leverage",
+        "leverage_reduction"
+      ],
+      "type": "object"
+    },
+    "LmeType": {
+      "description": "Structure of a liability management exercise.\n\nEach variant reinterprets the `repurchase_price_pct` argument of\n[`analyze_lme`]; see that function's documentation for the per-variant\nmeaning and admissible range.",
+      "oneOf": [
+        {
+          "const": "open_market_repurchase",
+          "description": "Open-market repurchase of debt below par.",
+          "type": "string"
+        },
+        {
+          "const": "tender_offer",
+          "description": "Public tender offer for debt at a stated price.",
+          "type": "string"
+        },
+        {
+          "const": "amend_and_extend",
+          "description": "Maturity extension in exchange for a consent fee; no par is retired.",
+          "type": "string"
+        },
+        {
+          "const": "dropdown",
+          "description": "Transfer of collateral to an unrestricted subsidiary; no par is\nretired and remaining holders are structurally diluted.",
+          "type": "string"
+        }
+      ]
+    }
+  },
+  "$id": "https://finstack_quant.dev/schemas/models/1/lme_analysis.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Issuer-side economics of a liability management exercise.",
+  "properties": {
+    "cost": {
+      "description": "Cash paid by the issuer, in the caller's monetary unit.",
+      "format": "double",
+      "type": "number"
+    },
+    "discount_capture": {
+      "description": "Par retired less cash paid — the discount captured by the issuer.",
+      "format": "double",
+      "type": "number"
+    },
+    "discount_capture_pct": {
+      "description": "Discount captured as a fraction of par retired; zero when no par is\nretired.",
+      "format": "double",
+      "type": "number"
+    },
+    "leverage_impact": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/LeverageImpact"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "Gross-leverage impact, present only when a positive EBITDA is supplied."
+    },
+    "lme_type": {
+      "$ref": "#/$defs/LmeType",
+      "description": "Structure of the exercise, echoed back in canonical form."
+    },
+    "notional_reduction": {
+      "description": "Face amount retired; zero for structures that do not extinguish debt.",
+      "format": "double",
+      "type": "number"
+    },
+    "remaining_holder_impact_pct": {
+      "description": "Fraction of value diverted away from non-participating holders; nonzero\nonly for a [`LmeType::Dropdown`].",
+      "format": "double",
+      "type": "number"
+    }
+  },
+  "required": [
+    "lme_type",
+    "cost",
+    "notional_reduction",
+    "discount_capture",
+    "discount_capture_pct",
+    "remaining_holder_impact_pct"
+  ],
+  "title": "LmeAnalysis",
+  "type": "object"
+}

@@ -46,8 +46,10 @@ use super::{
 ///   Rating Drift with Continuous Observations." *Journal of Banking & Finance*,
 ///   26(2-3), 423-444. `docs/REFERENCES.md#lando-skodeberg-2002`
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(try_from = "GeneratorMatrixWire")]
 pub struct GeneratorMatrix {
+    #[cfg_attr(feature = "json-schema", schemars(with = "(Vec<f64>, usize, usize)"))]
     pub(crate) data: DMatrix<f64>,
     pub(crate) scale: RatingScale,
     /// Total negative off-diagonal mass clamped to zero by Kreinin-Sidenius
@@ -67,8 +69,10 @@ pub struct GeneratorMatrix {
 }
 
 #[derive(Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 struct GeneratorMatrixWire {
+    #[cfg_attr(feature = "json-schema", schemars(with = "(Vec<f64>, usize, usize)"))]
     data: DMatrix<f64>,
     scale: RatingScale,
     #[serde(default)]

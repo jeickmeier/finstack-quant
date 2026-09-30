@@ -82,13 +82,19 @@ pub fn externalize_schema_definitions(
         let mut local_stack = vec![definition.name.to_string()];
         let local_validation = validation_view(local, &local_defs, &mut local_stack)?;
 
-        let external = (definition.generator)()?;
-        let external_defs = external
+        // A recursive root refers to itself as `#`; file it under its local
+        // name so both sides compare the same cycle edges.
+        let mut external = (definition.generator)()?;
+        let root_ref = format!("#/$defs/{}", definition.name);
+        rename_root_refs(&mut external, &root_ref);
+        let mut external_defs = external
             .get("$defs")
             .and_then(Value::as_object)
             .cloned()
             .unwrap_or_default();
-        let external_validation = validation_view(&external, &external_defs, &mut Vec::new())?;
+        external_defs.insert(definition.name.to_string(), external.clone());
+        let mut external_stack = vec![definition.name.to_string()];
+        let external_validation = validation_view(&external, &external_defs, &mut external_stack)?;
         if local_validation != external_validation {
             return Err(Error::Validation(format!(
                 "local $defs/{} is not assertion-equivalent to {}",
@@ -101,6 +107,26 @@ pub fn externalize_schema_definitions(
     externalize_refs(schema, &external_refs);
     prune_unreachable_defs(schema);
     Ok(())
+}
+
+/// Rewrite every whole-document `$ref: "#"` to `root_ref`.
+fn rename_root_refs(value: &mut Value, root_ref: &str) {
+    match value {
+        Value::Object(map) => {
+            if map.get("$ref").and_then(Value::as_str) == Some("#") {
+                map.insert("$ref".to_string(), Value::String(root_ref.to_string()));
+            }
+            for child in map.values_mut() {
+                rename_root_refs(child, root_ref);
+            }
+        }
+        Value::Array(items) => {
+            for item in items {
+                rename_root_refs(item, root_ref);
+            }
+        }
+        _ => {}
+    }
 }
 
 pub(super) fn validation_view(

@@ -1,0 +1,65 @@
+{
+  "$id": "https://finstack_quant.dev/schemas/models/1/yield_forecast.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "h-step ahead yield curve forecast with confidence bands.",
+  "properties": {
+    "factors": {
+      "description": "Factor point forecast [beta1, beta2, beta3].",
+      "items": {
+        "format": "double",
+        "type": "number"
+      },
+      "maxItems": 3,
+      "minItems": 3,
+      "type": "array"
+    },
+    "horizon": {
+      "description": "Forecast horizon in periods.",
+      "format": "uint",
+      "minimum": 0,
+      "type": "integer"
+    },
+    "lower_95": {
+      "description": "95% confidence band lower bound per tenor (length N).",
+      "items": {
+        "format": "double",
+        "type": "number"
+      },
+      "type": "array"
+    },
+    "tenors": {
+      "description": "Tenor grid (length N).",
+      "items": {
+        "format": "double",
+        "type": "number"
+      },
+      "type": "array"
+    },
+    "upper_95": {
+      "description": "95% confidence band upper bound per tenor (length N).",
+      "items": {
+        "format": "double",
+        "type": "number"
+      },
+      "type": "array"
+    },
+    "yields": {
+      "description": "Point forecast: zero rates at each tenor (length N).",
+      "items": {
+        "format": "double",
+        "type": "number"
+      },
+      "type": "array"
+    }
+  },
+  "required": [
+    "horizon",
+    "yields",
+    "tenors",
+    "factors",
+    "lower_95",
+    "upper_95"
+  ],
+  "title": "YieldForecast",
+  "type": "object"
+}

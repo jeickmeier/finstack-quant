@@ -1,0 +1,90 @@
+{
+  "$defs": {
+    "ExchangeType": {
+      "description": "Structure of a distressed exchange offer.\n\nThe variant records how the new instrument ranks against the existing claim\nand is reported back on [`ExchangeOfferAnalysis`] for audit purposes; it\ndoes not change the arithmetic.",
+      "oneOf": [
+        {
+          "const": "par_for_par",
+          "description": "New instrument issued at the same face amount as the old claim.",
+          "type": "string"
+        },
+        {
+          "const": "discount",
+          "description": "New instrument issued at a face amount below the old claim.",
+          "type": "string"
+        },
+        {
+          "const": "uptier",
+          "description": "Participating creditors are lifted above the existing capital structure.",
+          "type": "string"
+        },
+        {
+          "const": "downtier",
+          "description": "Participating creditors are subordinated relative to their old claim.",
+          "type": "string"
+        }
+      ]
+    }
+  },
+  "$id": "https://finstack_quant.dev/schemas/models/1/exchange_offer_analysis.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Hold-versus-tender economics of a distressed exchange offer.",
+  "properties": {
+    "breakeven_recovery": {
+      "description": "Hold-out recovery, as a fraction of the existing claim's present value,\nat which tendering and holding out break even. Capped at `1.0`.",
+      "format": "double",
+      "type": "number"
+    },
+    "consent_fee": {
+      "description": "Cash consent or early-tender fee.",
+      "format": "double",
+      "type": "number"
+    },
+    "delta_npv": {
+      "description": "Tender consideration less the hold-out present value.",
+      "format": "double",
+      "type": "number"
+    },
+    "equity_sweetener_value": {
+      "description": "Estimated value of attached equity or warrants.",
+      "format": "double",
+      "type": "number"
+    },
+    "exchange_type": {
+      "$ref": "#/$defs/ExchangeType",
+      "description": "Structure of the offer, echoed back in canonical form."
+    },
+    "new_npv": {
+      "description": "Present value of the new instrument received on tendering.",
+      "format": "double",
+      "type": "number"
+    },
+    "old_npv": {
+      "description": "Present value of the existing claim if the holder does not tender.",
+      "format": "double",
+      "type": "number"
+    },
+    "tender_recommended": {
+      "description": "Whether the tender consideration clears the\n[`TENDER_RECOMMENDATION_HURDLE`] cushion over the hold-out value.",
+      "type": "boolean"
+    },
+    "tender_total": {
+      "description": "Total tender consideration: new instrument plus fee plus sweetener.",
+      "format": "double",
+      "type": "number"
+    }
+  },
+  "required": [
+    "exchange_type",
+    "old_npv",
+    "new_npv",
+    "consent_fee",
+    "equity_sweetener_value",
+    "tender_total",
+    "delta_npv",
+    "breakeven_recovery",
+    "tender_recommended"
+  ],
+  "title": "ExchangeOfferAnalysis",
+  "type": "object"
+}

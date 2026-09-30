@@ -1,0 +1,29 @@
+{
+  "$id": "https://finstack_quant.dev/schemas/portfolio/1/fi_reconciliation_report.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Report from reconciling the five effect totals against the active return, mirroring `crate::attribution` reconciliation conventions.",
+  "properties": {
+    "is_reconciled": {
+      "description": "Whether the residual is within tolerance.",
+      "type": "boolean"
+    },
+    "tolerance": {
+      "description": "Tolerance used for the check.",
+      "format": "double",
+      "type": "number"
+    },
+    "total_residual": {
+      "description": "`active_return − (allocation + carry + treasury + spread + selection)`.",
+      "format": "double",
+      "type": "number"
+    }
+  },
+  "required": [
+    "total_residual",
+    "is_reconciled",
+    "tolerance"
+  ],
+  "title": "FiReconciliationReport",
+  "type": "object"
+}

@@ -1,0 +1,43 @@
+{
+  "$id": "https://finstack_quant.dev/schemas/models/1/simulated_paths.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Results from Monte Carlo path simulation.",
+  "properties": {
+    "asset_values": {
+      "description": "Asset values in row-major order: `path_idx * (num_steps + 1) + time_idx`.",
+      "items": {
+        "format": "double",
+        "type": "number"
+      },
+      "type": "array"
+    },
+    "num_paths": {
+      "description": "Number of paths simulated.",
+      "format": "uint",
+      "minimum": 0,
+      "type": "integer"
+    },
+    "num_steps": {
+      "description": "Number of time steps.",
+      "format": "uint",
+      "minimum": 0,
+      "type": "integer"
+    },
+    "times": {
+      "description": "Time grid from 0 to T.",
+      "items": {
+        "format": "double",
+        "type": "number"
+      },
+      "type": "array"
+    }
+  },
+  "required": [
+    "times",
+    "asset_values",
+    "num_paths",
+    "num_steps"
+  ],
+  "title": "SimulatedPaths",
+  "type": "object"
+}

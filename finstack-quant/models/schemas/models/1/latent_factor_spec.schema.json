@@ -1,0 +1,105 @@
+{
+  "$id": "https://finstack_quant.dev/schemas/models/1/latent_factor_spec.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Factor model specification for configuration and serialization.",
+  "oneOf": [
+    {
+      "additionalProperties": false,
+      "description": "Single factor model (common market factor).",
+      "properties": {
+        "mean_reversion": {
+          "description": "Mean reversion speed (0 = random walk)",
+          "format": "double",
+          "type": "number"
+        },
+        "type": {
+          "const": "single_factor",
+          "type": "string"
+        },
+        "volatility": {
+          "description": "Factor volatility (std dev of innovations)",
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "required": [
+        "type",
+        "volatility",
+        "mean_reversion"
+      ],
+      "type": "object"
+    },
+    {
+      "additionalProperties": false,
+      "description": "Two-factor model for prepayment and credit.",
+      "properties": {
+        "correlation": {
+          "description": "Correlation between prepayment and credit factors",
+          "format": "double",
+          "type": "number"
+        },
+        "credit_vol": {
+          "description": "Credit factor volatility",
+          "format": "double",
+          "type": "number"
+        },
+        "prepay_vol": {
+          "description": "Prepayment factor volatility",
+          "format": "double",
+          "type": "number"
+        },
+        "type": {
+          "const": "two_factor",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type",
+        "prepay_vol",
+        "credit_vol",
+        "correlation"
+      ],
+      "type": "object"
+    },
+    {
+      "additionalProperties": false,
+      "description": "Multi-factor model with custom correlation matrix.",
+      "properties": {
+        "correlations": {
+          "description": "Correlation matrix (flattened row-major)",
+          "items": {
+            "format": "double",
+            "type": "number"
+          },
+          "type": "array"
+        },
+        "num_factors": {
+          "description": "Number of factors",
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "type": {
+          "const": "multi_factor",
+          "type": "string"
+        },
+        "volatilities": {
+          "description": "Factor volatilities",
+          "items": {
+            "format": "double",
+            "type": "number"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "type",
+        "num_factors",
+        "volatilities",
+        "correlations"
+      ],
+      "type": "object"
+    }
+  ],
+  "title": "LatentFactorSpec"
+}

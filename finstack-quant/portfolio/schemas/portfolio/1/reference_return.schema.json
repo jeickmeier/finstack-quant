@@ -1,0 +1,24 @@
+{
+  "$id": "https://finstack_quant.dev/schemas/portfolio/1/reference_return.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "One reference (e.g.",
+  "properties": {
+    "duration": {
+      "description": "Duration in years at period start. Must be finite and non-negative.",
+      "format": "double",
+      "type": "number"
+    },
+    "total_return": {
+      "description": "Realized total return for the period (decimal, e.g. `0.01` = 1%).\nMust be finite.",
+      "format": "double",
+      "type": "number"
+    }
+  },
+  "required": [
+    "duration",
+    "total_return"
+  ],
+  "title": "ReferenceReturn",
+  "type": "object"
+}

@@ -1,0 +1,120 @@
+{
+  "$defs": {
+    "AllocationDiagnostics": {
+      "additionalProperties": false,
+      "description": "Portfolio-level allocation diagnostics.",
+      "properties": {
+        "leverage": {
+          "description": "Gross leverage, equal to sum of absolute weights.",
+          "format": "double",
+          "type": "number"
+        },
+        "weights_sum": {
+          "description": "Sum of allocation weights.",
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "required": [
+        "weights_sum",
+        "leverage"
+      ],
+      "type": "object"
+    },
+    "AllocationScheme": {
+      "description": "Strategy allocation scheme.",
+      "oneOf": [
+        {
+          "const": "equal",
+          "description": "Equal weights across all strategies.",
+          "type": "string"
+        },
+        {
+          "const": "fixed",
+          "description": "Caller-supplied fixed weights.",
+          "type": "string"
+        },
+        {
+          "const": "inverse_volatility",
+          "description": "Inverse sample-volatility weights from strategy returns.",
+          "type": "string"
+        },
+        {
+          "const": "risk_budget",
+          "description": "Long-only target risk contribution weights from covariance and budgets.",
+          "type": "string"
+        }
+      ]
+    },
+    "StrategyAllocation": {
+      "additionalProperties": false,
+      "description": "Per-strategy allocation output row.",
+      "properties": {
+        "capital": {
+          "description": "Rounded capital allocation.",
+          "format": "double",
+          "type": "number"
+        },
+        "id": {
+          "description": "Strategy identifier.",
+          "type": "string"
+        },
+        "risk_contribution": {
+          "description": "Risk contribution fraction, when covariance diagnostics are available.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "volatility": {
+          "description": "Sample volatility used by inverse-volatility allocation, when applicable.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "weight": {
+          "description": "Fully invested allocation weight.",
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "required": [
+        "id",
+        "weight",
+        "capital"
+      ],
+      "type": "object"
+    }
+  },
+  "$id": "https://finstack_quant.dev/schemas/portfolio/1/weight_allocation_result.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Strategy allocation result.",
+  "properties": {
+    "allocations": {
+      "description": "Per-strategy allocation rows.",
+      "items": {
+        "$ref": "#/$defs/StrategyAllocation"
+      },
+      "type": "array"
+    },
+    "diagnostics": {
+      "$ref": "#/$defs/AllocationDiagnostics",
+      "description": "Portfolio-level diagnostics."
+    },
+    "scheme": {
+      "$ref": "#/$defs/AllocationScheme",
+      "description": "Allocation scheme applied."
+    }
+  },
+  "required": [
+    "scheme",
+    "allocations",
+    "diagnostics"
+  ],
+  "title": "WeightAllocationResult",
+  "type": "object"
+}

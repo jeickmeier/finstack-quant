@@ -30,6 +30,7 @@ const STRICT_ENDPOINT_BATCH_SIZE: usize = 8;
 
 /// What to compute at each replay step.
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(rename_all = "snake_case")]
 pub enum ReplayMode {
     /// Just portfolio PV at each date.
@@ -42,6 +43,7 @@ pub enum ReplayMode {
 
 /// What to do when a single snapshot fails to revalue.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(rename_all = "snake_case")]
 pub enum ReplayErrorPolicy {
     /// Fail the entire replay on the first valuation error. This is the
@@ -60,6 +62,7 @@ pub enum ReplayErrorPolicy {
 
 /// Configuration for a replay run.
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct ReplayConfig {
     /// What to compute at each step.
@@ -175,8 +178,13 @@ impl ReplayTimeline {
 
 /// Output for a single replay step.
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct ReplayStep {
     /// Valuation date.
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "finstack_quant_core::wire::DateWire")
+    )]
     pub date: Date,
     /// Full portfolio valuation at this date.
     pub valuation: PortfolioValuation,
@@ -191,13 +199,23 @@ pub struct ReplayStep {
 
 /// Aggregate statistics across the full replay.
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct ReplaySummary {
     /// First date in the timeline.
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "finstack_quant_core::wire::DateWire")
+    )]
     pub start_date: Date,
     /// Last date in the timeline.
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "finstack_quant_core::wire::DateWire")
+    )]
     pub end_date: Date,
     /// Number of steps (including step 0).
     #[serde(with = "finstack_quant_core::wire::count")]
+    #[cfg_attr(feature = "json-schema", schemars(with = "u32"))]
     pub num_steps: usize,
     /// Portfolio value at step 0.
     pub start_value: Money,
@@ -217,21 +235,38 @@ pub struct ReplaySummary {
     /// is not meaningful.
     pub max_mtm_drawdown_pct: f64,
     /// Date of the peak before the maximum (dollar-selected) drawdown.
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "finstack_quant_core::wire::DateWire")
+    )]
     pub max_mtm_drawdown_peak_date: Date,
     /// Date of the trough of the maximum (dollar-selected) drawdown.
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "finstack_quant_core::wire::DateWire")
+    )]
     pub max_mtm_drawdown_trough_date: Date,
     /// Date of the peak before the maximum percentage-selected drawdown.
     /// `None` when no positive peak ever produced a decline.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "Option<finstack_quant_core::wire::DateWire>")
+    )]
     pub max_mtm_drawdown_pct_peak_date: Option<Date>,
     /// Date of the trough of the maximum percentage-selected drawdown.
     /// `None` when no positive peak ever produced a decline.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "Option<finstack_quant_core::wire::DateWire>")
+    )]
     pub max_mtm_drawdown_pct_trough_date: Option<Date>,
 }
 
 /// Full output of a replay run.
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct ReplayResult {
     /// Per-step output.
     pub steps: Vec<ReplayStep>,
@@ -241,6 +276,10 @@ pub struct ReplayResult {
     /// run was configured for [`ReplayErrorPolicy::BestEffort`]. Empty in
     /// strict mode (the run would have aborted instead).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "Vec<(finstack_quant_core::wire::DateWire, String)>")
+    )]
     pub skipped_dates: Vec<(Date, String)>,
 }
 

@@ -1,0 +1,48 @@
+{
+  "$id": "https://finstack_quant.dev/schemas/models/1/bs_greeks.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Black–Scholes/Garman–Kohlhagen Greeks (per unit, not scaled by contract size).",
+  "properties": {
+    "delta": {
+      "description": "Delta sensitivity per unit.",
+      "format": "double",
+      "type": "number"
+    },
+    "gamma": {
+      "description": "Gamma sensitivity per unit.",
+      "format": "double",
+      "type": "number"
+    },
+    "rho_q": {
+      "description": "Rho to the foreign/dividend yield per 1%.",
+      "format": "double",
+      "type": "number"
+    },
+    "rho_r": {
+      "description": "Rho to the domestic/risk-free rate per 1%.",
+      "format": "double",
+      "type": "number"
+    },
+    "theta": {
+      "description": "Theta per day (scaled by provided day-count basis).",
+      "format": "double",
+      "type": "number"
+    },
+    "vega": {
+      "description": "Vega per 1% volatility move.",
+      "format": "double",
+      "type": "number"
+    }
+  },
+  "required": [
+    "delta",
+    "gamma",
+    "vega",
+    "theta",
+    "rho_r",
+    "rho_q"
+  ],
+  "title": "BsGreeks",
+  "type": "object"
+}

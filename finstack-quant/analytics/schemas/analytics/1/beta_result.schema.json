@@ -1,0 +1,67 @@
+{
+  "$defs": {
+    "NonFiniteF64Wire": {
+      "anyOf": [
+        {
+          "description": "A finite value, written as a JSON number.",
+          "format": "double",
+          "type": "number"
+        },
+        {
+          "$ref": "#/$defs/NonFiniteSentinel",
+          "description": "A non-finite value, written as its sentinel string."
+        }
+      ],
+      "description": "An `f64` in the [`non_finite_f64`] wire form: a JSON number when finite,\notherwise one of the strings `\"inf\"`, `\"-inf\"` or `\"nan\"`.\n\nContract types store plain `f64` fields with\n`#[serde(with = \"finstack_quant_core::wire::non_finite_f64\")]` and name this\ntype in `#[schemars(with = ...)]`, so the generated schema describes the\nsentinel strings the serializer actually writes."
+    },
+    "NonFiniteSentinel": {
+      "description": "Sentinel string the [`non_finite_f64`] adapter writes for a non-finite `f64`.",
+      "oneOf": [
+        {
+          "const": "inf",
+          "description": "`+∞`, written as `\"inf\"`.",
+          "type": "string"
+        },
+        {
+          "const": "-inf",
+          "description": "`-∞`, written as `\"-inf\"`.",
+          "type": "string"
+        },
+        {
+          "const": "nan",
+          "description": "`NaN`, written as `\"nan\"`.",
+          "type": "string"
+        }
+      ]
+    }
+  },
+  "$id": "https://finstack_quant.dev/schemas/analytics/1/beta_result.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "OLS beta result with standard error and 95% confidence interval.",
+  "properties": {
+    "beta": {
+      "$ref": "#/$defs/NonFiniteF64Wire",
+      "description": "Estimated beta coefficient, or [`f64::NAN`] when it is not estimable\ntogether with the confidence interval."
+    },
+    "ci_lower": {
+      "$ref": "#/$defs/NonFiniteF64Wire",
+      "description": "Lower bound of the 95% confidence interval, or [`f64::NAN`] when\nundefined."
+    },
+    "ci_upper": {
+      "$ref": "#/$defs/NonFiniteF64Wire",
+      "description": "Upper bound of the 95% confidence interval, or [`f64::NAN`] when\nundefined."
+    },
+    "std_err": {
+      "$ref": "#/$defs/NonFiniteF64Wire",
+      "description": "Standard error of the beta estimate, or [`f64::NAN`] when undefined."
+    }
+  },
+  "required": [
+    "beta",
+    "std_err",
+    "ci_lower",
+    "ci_upper"
+  ],
+  "title": "BetaResult",
+  "type": "object"
+}

@@ -1,0 +1,35 @@
+{
+  "$id": "https://finstack_quant.dev/schemas/portfolio/1/excess_return_position.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "One position's beginning-of-period duration, weight and realized total return, the input to `excess_returns`.",
+  "properties": {
+    "duration": {
+      "description": "Beginning-of-period duration in years, used to look up the\nduration-matched cell in the [`DurationCellTable`]. Must be finite,\nnon-negative, and fall inside one of the table's cells; durations in a\nvalid gap are rejected like any other unmatched duration.",
+      "format": "double",
+      "type": "number"
+    },
+    "id": {
+      "description": "Position identifier, used to name the position in any validation\nerror and echoed onto the matching [`PositionExcess::id`].",
+      "type": "string"
+    },
+    "total_return": {
+      "description": "Realized period total return (decimal, e.g. `0.0225` = 2.25%). Must\nbe finite.",
+      "format": "double",
+      "type": "number"
+    },
+    "weight": {
+      "description": "Portfolio weight (decimal, e.g. `0.2` = 20%). Across all positions\npassed to [`excess_returns`] these must sum to `1.0` within\n`WEIGHT_TOLERANCE`. Must be finite.",
+      "format": "double",
+      "type": "number"
+    }
+  },
+  "required": [
+    "id",
+    "weight",
+    "duration",
+    "total_return"
+  ],
+  "title": "ExcessReturnPosition",
+  "type": "object"
+}

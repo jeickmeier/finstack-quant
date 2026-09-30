@@ -1,0 +1,165 @@
+{
+  "$defs": {
+    "MetricExtractor": {
+      "description": "Identifies which metric to extract from CompanyMetrics.",
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "description": "A named field (e.g., \"leverage\", \"oas_bp\", \"ebitda_margin\").",
+          "properties": {
+            "named": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "named"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "A valuation multiple.",
+          "properties": {
+            "multiple": {
+              "$ref": "#/$defs/Multiple"
+            }
+          },
+          "required": [
+            "multiple"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "A custom metric key from the `custom` map.",
+          "properties": {
+            "custom": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "custom"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "Multiple": {
+      "description": "Valuation multiple.\n\nEnterprise value multiples use EV as the numerator. Equity multiples\nuse market capitalization or share price. Credit multiples use spread\nor yield as the numerator and a fundamental metric as denominator.",
+      "oneOf": [
+        {
+          "const": "ev_ebitda",
+          "description": "EV / EBITDA",
+          "type": "string"
+        },
+        {
+          "const": "ev_revenue",
+          "description": "EV / Revenue",
+          "type": "string"
+        },
+        {
+          "const": "ev_ebit",
+          "description": "EV / EBIT",
+          "type": "string"
+        },
+        {
+          "const": "ev_fcf",
+          "description": "EV / Free Cash Flow (unlevered)",
+          "type": "string"
+        },
+        {
+          "const": "pe",
+          "description": "Price / Earnings",
+          "type": "string"
+        },
+        {
+          "const": "pb",
+          "description": "Price / Book Value",
+          "type": "string"
+        },
+        {
+          "const": "ptbv",
+          "description": "Price / Tangible Book Value",
+          "type": "string"
+        },
+        {
+          "const": "p_fcf",
+          "description": "Price / Free Cash Flow (levered)",
+          "type": "string"
+        },
+        {
+          "const": "dividend_yield",
+          "description": "Dividend Yield (dividend / price, expressed as a ratio)",
+          "type": "string"
+        },
+        {
+          "const": "spread_per_turn",
+          "description": "Spread per turn of leverage (OAS / (Debt / EBITDA))",
+          "type": "string"
+        },
+        {
+          "const": "yield_per_coverage",
+          "description": "Yield / Interest Coverage",
+          "type": "string"
+        }
+      ]
+    },
+    "ScoreDirection": {
+      "description": "Rich/cheap sign convention for a scoring dimension's Y metric.\n\nDetermines how a higher-than-peers Y value maps onto the composite\nscore (positive = cheap). Spread- and yield-like metrics are cheap\nwhen high ([`HigherIsCheap`](Self::HigherIsCheap)); valuation\nmultiples (P/E, EV/EBITDA) are rich when high\n([`HigherIsRich`](Self::HigherIsRich)).\n\nThe direction is applied consistently to both the regression-residual\npath and the univariate z-score path. The default,\n`HigherIsCheap`, matches the historical regression-path convention\n(positive residual = actual spread above fitted fair spread = cheap).",
+      "oneOf": [
+        {
+          "const": "higher_is_cheap",
+          "description": "Higher Y than peers means the subject is cheap (spread-like metrics).",
+          "type": "string"
+        },
+        {
+          "const": "higher_is_rich",
+          "description": "Higher Y than peers means the subject is rich (multiple-like metrics).",
+          "type": "string"
+        }
+      ]
+    }
+  },
+  "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/scoring_dimension.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Configuration for a single rich/cheap scoring dimension.",
+  "properties": {
+    "direction": {
+      "$ref": "#/$defs/ScoreDirection",
+      "default": "higher_is_cheap",
+      "description": "Rich/cheap sign convention for the Y metric (default:\n[`ScoreDirection::HigherIsCheap`], i.e. spread-like)."
+    },
+    "label": {
+      "description": "Human-readable label (e.g., \"Spread vs Leverage\").",
+      "type": "string"
+    },
+    "weight": {
+      "description": "Weight of this dimension in the composite score (0.0 to 1.0).",
+      "format": "double",
+      "type": "number"
+    },
+    "x_extractor": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/MetricExtractor"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "Optional explanatory metric for single-factor regression.\nOmit it to score the dependent metric against its peer distribution."
+    },
+    "y_extractor": {
+      "$ref": "#/$defs/MetricExtractor",
+      "description": "How to extract the Y variable (dependent) from CompanyMetrics."
+    }
+  },
+  "required": [
+    "label",
+    "y_extractor",
+    "weight"
+  ],
+  "title": "ScoringDimension",
+  "type": "object"
+}

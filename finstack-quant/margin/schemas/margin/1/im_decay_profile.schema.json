@@ -1,0 +1,61 @@
+{
+  "$id": "https://finstack_quant.dev/schemas/margin/1/im_decay_profile.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Deterministic decay applied to today's SIMM IM to approximate `E[IM(t)]`.",
+  "oneOf": [
+    {
+      "const": "constant",
+      "description": "IM stays at today's level for the whole horizon.",
+      "type": "string"
+    },
+    {
+      "additionalProperties": false,
+      "description": "IM decays linearly to zero at `maturity_years`.",
+      "properties": {
+        "linear_to_maturity": {
+          "additionalProperties": false,
+          "properties": {
+            "maturity_years": {
+              "description": "Portfolio maturity `T` in years (must be positive and finite).",
+              "format": "double",
+              "type": "number"
+            }
+          },
+          "required": [
+            "maturity_years"
+          ],
+          "type": "object"
+        }
+      },
+      "required": [
+        "linear_to_maturity"
+      ],
+      "type": "object"
+    },
+    {
+      "additionalProperties": false,
+      "description": "IM decays like the square root of remaining time to `maturity_years`.",
+      "properties": {
+        "sqrt_time": {
+          "additionalProperties": false,
+          "properties": {
+            "maturity_years": {
+              "description": "Portfolio maturity `T` in years (must be positive and finite).",
+              "format": "double",
+              "type": "number"
+            }
+          },
+          "required": [
+            "maturity_years"
+          ],
+          "type": "object"
+        }
+      },
+      "required": [
+        "sqrt_time"
+      ],
+      "type": "object"
+    }
+  ],
+  "title": "ImDecayProfile"
+}

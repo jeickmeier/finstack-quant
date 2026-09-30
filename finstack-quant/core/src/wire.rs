@@ -833,6 +833,41 @@ mod tests {
     }
 
     #[test]
+    fn non_finite_wire_schema_lists_exactly_the_serialized_sentinels() {
+        let schema = serde_json::to_value(schemars::schema_for!(NonFiniteF64Wire)).expect("schema");
+        let sentinel = &schema["$defs"]["NonFiniteSentinel"];
+        let mut spellings: Vec<String> = sentinel["oneOf"]
+            .as_array()
+            .map(|variants| {
+                variants
+                    .iter()
+                    .map(|variant| variant["const"].as_str().expect("const").to_string())
+                    .collect()
+            })
+            .or_else(|| {
+                sentinel["enum"].as_array().map(|values| {
+                    values
+                        .iter()
+                        .map(|value| value.as_str().expect("string").to_string())
+                        .collect()
+                })
+            })
+            .expect("sentinel spellings");
+        spellings.sort();
+        assert_eq!(spellings, ["-inf", "inf", "nan"]);
+        for value in [f64::INFINITY, f64::NEG_INFINITY, f64::NAN] {
+            let wire = serde_json::to_value(NonFiniteF64Wire::from(value)).expect("serialize");
+            let adapter = serde_json::to_value(NonFiniteHolder { value }).expect("serialize");
+            assert_eq!(adapter["value"], wire, "adapter and wire type agree");
+            assert!(spellings.iter().any(|spelling| wire == json!(spelling)));
+        }
+        assert_eq!(
+            serde_json::to_value(NonFiniteF64Wire::from(1.5)).expect("serialize"),
+            json!(1.5)
+        );
+    }
+
+    #[test]
     fn decimal_wire_is_string_only() {
         let decimal: DecimalWire = serde_json::from_value(json!("-1.25e+2")).expect("decimal");
         assert_eq!(decimal.0, Decimal::new(-125, 0));
@@ -1025,6 +1060,51 @@ pub mod non_finite_f64 {
             "-inf" | "-infinity" => Some(f64::NEG_INFINITY),
             "nan" => Some(f64::NAN),
             _ => None,
+        }
+    }
+}
+
+/// An `f64` in the [`non_finite_f64`] wire form: a JSON number when finite,
+/// otherwise one of the strings `"inf"`, `"-inf"` or `"nan"`.
+///
+/// Contract types store plain `f64` fields with
+/// `#[serde(with = "finstack_quant_core::wire::non_finite_f64")]` and name this
+/// type in `#[schemars(with = ...)]`, so the generated schema describes the
+/// sentinel strings the serializer actually writes.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(untagged)]
+pub enum NonFiniteF64Wire {
+    /// A finite value, written as a JSON number.
+    Finite(f64),
+    /// A non-finite value, written as its sentinel string.
+    NonFinite(NonFiniteSentinel),
+}
+
+/// Sentinel string the [`non_finite_f64`] adapter writes for a non-finite `f64`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(rename_all = "snake_case")]
+pub enum NonFiniteSentinel {
+    /// `+∞`, written as `"inf"`.
+    Inf,
+    /// `-∞`, written as `"-inf"`.
+    #[serde(rename = "-inf")]
+    NegInf,
+    /// `NaN`, written as `"nan"`.
+    Nan,
+}
+
+impl From<f64> for NonFiniteF64Wire {
+    fn from(value: f64) -> Self {
+        if value.is_nan() {
+            Self::NonFinite(NonFiniteSentinel::Nan)
+        } else if value == f64::INFINITY {
+            Self::NonFinite(NonFiniteSentinel::Inf)
+        } else if value == f64::NEG_INFINITY {
+            Self::NonFinite(NonFiniteSentinel::NegInf)
+        } else {
+            Self::Finite(value)
         }
     }
 }

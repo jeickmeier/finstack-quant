@@ -1,0 +1,44 @@
+{
+  "$defs": {
+    "DateWire": {
+      "description": "ISO 8601 calendar date encoded as a `YYYY-MM-DD` JSON string.",
+      "format": "date",
+      "type": "string"
+    }
+  },
+  "$id": "https://finstack_quant.dev/schemas/analytics/1/rolling_greeks.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Rolling greeks output.",
+  "properties": {
+    "alphas": {
+      "description": "Rolling alpha values.",
+      "items": {
+        "format": "double",
+        "type": "number"
+      },
+      "type": "array"
+    },
+    "betas": {
+      "description": "Rolling beta values.",
+      "items": {
+        "format": "double",
+        "type": "number"
+      },
+      "type": "array"
+    },
+    "dates": {
+      "description": "End dates for each rolling window.",
+      "items": {
+        "$ref": "#/$defs/DateWire"
+      },
+      "type": "array"
+    }
+  },
+  "required": [
+    "dates",
+    "alphas",
+    "betas"
+  ],
+  "title": "RollingGreeks",
+  "type": "object"
+}

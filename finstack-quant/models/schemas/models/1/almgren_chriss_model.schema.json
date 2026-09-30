@@ -1,0 +1,29 @@
+{
+  "$id": "https://finstack_quant.dev/schemas/models/1/almgren_chriss_model.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Almgren-Chriss (2001) market impact model.",
+  "properties": {
+    "delta": {
+      "description": "Power-law exponent for temporary impact (delta).\nTypically 0.5-0.6 for equities.",
+      "format": "double",
+      "type": "number"
+    },
+    "eta": {
+      "description": "Temporary impact coefficient (eta).",
+      "format": "double",
+      "type": "number"
+    },
+    "gamma": {
+      "description": "Permanent impact coefficient (gamma).",
+      "format": "double",
+      "type": "number"
+    }
+  },
+  "required": [
+    "gamma",
+    "eta",
+    "delta"
+  ],
+  "title": "AlmgrenChrissModel",
+  "type": "object"
+}

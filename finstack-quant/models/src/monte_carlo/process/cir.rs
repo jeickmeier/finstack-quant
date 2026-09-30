@@ -28,6 +28,7 @@ use super::super::traits::{PathState, StateKey, StochasticProcess};
 
 /// CIR process parameters.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct CirParams {
     /// Mean reversion speed (κ)
     pub kappa: f64,

@@ -1,0 +1,113 @@
+{
+  "$defs": {
+    "DateWire": {
+      "description": "ISO 8601 calendar date encoded as a `YYYY-MM-DD` JSON string.",
+      "format": "date",
+      "type": "string"
+    },
+    "NettingSetId": {
+      "description": "Identifies a margin netting set.\n\nInstruments in the same netting set can offset each other for margin\ncalculation purposes. The netting set is typically defined by the\nCSA agreement (bilateral) or by CCP membership (cleared) — these two\nshapes are mutually exclusive, so the type encodes them as enum\nvariants rather than as a struct with two `Option<String>` fields\nthat could in principle both be set or both be unset.",
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "description": "A bilateral netting set scoped by counterparty + CSA.",
+          "properties": {
+            "counterparty_id": {
+              "description": "Counterparty identifier",
+              "type": "string"
+            },
+            "csa_id": {
+              "description": "CSA identifier",
+              "type": "string"
+            },
+            "kind": {
+              "const": "bilateral",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "counterparty_id",
+            "csa_id"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "A cleared netting set scoped by CCP membership.",
+          "properties": {
+            "ccp_id": {
+              "description": "CCP identifier (also used as the counterparty id)",
+              "type": "string"
+            },
+            "kind": {
+              "const": "cleared",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "ccp_id"
+          ],
+          "type": "object"
+        }
+      ]
+    }
+  },
+  "$id": "https://finstack_quant.dev/schemas/margin/1/sa_ccr_netting_set_config.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Netting set configuration for SA-CCR.",
+  "properties": {
+    "as_of": {
+      "$ref": "#/$defs/DateWire",
+      "description": "Valuation date used for forward-start and remaining-maturity calculations."
+    },
+    "collateral": {
+      "description": "Net current collateral held (positive = bank holds collateral).",
+      "format": "double",
+      "type": "number"
+    },
+    "is_margined": {
+      "description": "Whether the netting set is subject to a margin agreement.",
+      "type": "boolean"
+    },
+    "mpor_days": {
+      "description": "Margin period of risk in business days (default: 10 for bilateral).",
+      "format": "uint32",
+      "minimum": 0,
+      "type": "integer"
+    },
+    "mta": {
+      "description": "Minimum transfer amount (MTA).",
+      "format": "double",
+      "type": "number"
+    },
+    "netting_set_id": {
+      "$ref": "#/$defs/NettingSetId",
+      "description": "Netting set identifier."
+    },
+    "nica": {
+      "description": "Net independent collateral amount (NICA).",
+      "format": "double",
+      "type": "number"
+    },
+    "threshold": {
+      "description": "Threshold amount (TH) under the margin agreement.",
+      "format": "double",
+      "type": "number"
+    }
+  },
+  "required": [
+    "as_of",
+    "netting_set_id",
+    "is_margined",
+    "collateral",
+    "threshold",
+    "mta",
+    "nica",
+    "mpor_days"
+  ],
+  "title": "SaCcrNettingSetConfig",
+  "type": "object"
+}

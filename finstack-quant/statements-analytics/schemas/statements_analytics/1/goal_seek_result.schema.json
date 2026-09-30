@@ -1,0 +1,29 @@
+{
+  "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/goal_seek_result.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Outcome of a `goal_seek` solve.",
+  "properties": {
+    "model": {
+      "anyOf": [
+        {
+          "$ref": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "Copy of the input model with `solved_value` written into the driver\nnode at the driver period, re-validated; `None` when `update_model`\nwas `false`."
+    },
+    "solved_value": {
+      "description": "Driver value, in the driver node's own units (the currency amount for\na monetary node), that brings the target node to the target value\nwithin tolerance.",
+      "format": "double",
+      "type": "number"
+    }
+  },
+  "required": [
+    "solved_value"
+  ],
+  "title": "GoalSeekResult",
+  "type": "object"
+}

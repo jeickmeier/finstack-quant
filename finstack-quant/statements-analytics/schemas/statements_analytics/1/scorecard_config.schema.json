@@ -1,0 +1,91 @@
+{
+  "$defs": {
+    "ScorecardMetric": {
+      "additionalProperties": false,
+      "description": "Definition of a scorecard metric.",
+      "properties": {
+        "description": {
+          "description": "Description",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "formula": {
+          "description": "Formula to calculate the metric (DSL syntax)",
+          "type": "string"
+        },
+        "name": {
+          "description": "Metric name",
+          "type": "string"
+        },
+        "thresholds": {
+          "additionalProperties": {
+            "maxItems": 2,
+            "minItems": 2,
+            "prefixItems": [
+              {
+                "format": "double",
+                "type": "number"
+              },
+              {
+                "format": "double",
+                "type": "number"
+              }
+            ],
+            "type": "array"
+          },
+          "default": {},
+          "description": "Rating thresholds: rating → [min, max]",
+          "type": "object"
+        },
+        "weight": {
+          "default": 1.0,
+          "description": "Weight in overall score (0.0 to 1.0)",
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "required": [
+        "name",
+        "formula"
+      ],
+      "type": "object"
+    }
+  },
+  "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/scorecard_config.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Configuration for credit scorecard analysis.",
+  "properties": {
+    "metrics": {
+      "default": [],
+      "description": "List of metrics to evaluate",
+      "items": {
+        "$ref": "#/$defs/ScorecardMetric"
+      },
+      "type": "array"
+    },
+    "min_rating": {
+      "description": "Minimum acceptable rating (optional)",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "period": {
+      "description": "Period to rate, as a parseable `PeriodId` string (e.g. `\"2025Q4\"`).\n\nWhen `None`, the scorecard rates the last *actual* period in the model\nif any exists, otherwise the last model period. Metric formulas see\nonly periods up to (and including) the rated period as history.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "rating_scale": {
+      "default": "S&P",
+      "description": "Rating scale to use (e.g., \"S&P\", \"Moody's\", \"Fitch\")",
+      "type": "string"
+    }
+  },
+  "title": "ScorecardConfig",
+  "type": "object"
+}

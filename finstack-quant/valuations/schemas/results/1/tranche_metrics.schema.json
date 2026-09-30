@@ -1,0 +1,120 @@
+{
+  "$id": "https://finstack_quant.dev/schemas/results/1/tranche_metrics.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Per-tranche risk and spread metrics from the tranche's own projected cashflows.",
+  "properties": {
+    "convexity": {
+      "description": "Effective convexity (years²) from the same ±1 bp re-projection.",
+      "format": "double",
+      "type": "number"
+    },
+    "cs01": {
+      "description": "Credit-spread DV01 — currency change for a +1 bp z-spread shock. Negative\nfor a long tranche (wider spreads reduce PV).",
+      "format": "double",
+      "type": "number"
+    },
+    "currency": {
+      "$ref": "https://finstack_quant.dev/schemas/common/1/currency.schema.json",
+      "description": "ISO-4217 code of the currency `pv` and `cs01` are denominated in."
+    },
+    "dm_bp": {
+      "description": "Discount margin to maturity at `target_price_pct` (basis points): the\nconstant spread over the deal discount curve that reprices the\nfloater's projected cashflows; `None` for fixed-rate tranches.",
+      "format": "double",
+      "type": [
+        "number",
+        "null"
+      ]
+    },
+    "dm_to_call_bp": {
+      "description": "Discount margin to the assumed call (basis points); floating-rate\ntranches only.",
+      "format": "double",
+      "type": [
+        "number",
+        "null"
+      ]
+    },
+    "factor": {
+      "description": "Pool factor of the note: `current_balance / original_balance`, so a\nprice on original face is `price_pct * factor`.",
+      "format": "double",
+      "type": "number"
+    },
+    "modified_duration": {
+      "description": "Effective (rate) duration (years): the tranche is re-projected with\nevery rate curve in the market (discount and forward) bumped ±1 bp in\nparallel and the dirty settlement values differenced, so a floater's\ncoupon resets move with the curve and its duration is short, while a\nfixed-coupon note's equals its modified duration.",
+      "format": "double",
+      "type": "number"
+    },
+    "price_pct": {
+      "description": "Model clean settlement price as a percentage of the tranche's CURRENT\nbalance (the factor-adjusted secondary-market quote basis).",
+      "format": "double",
+      "type": "number"
+    },
+    "pv": {
+      "description": "Present value of the tranche (currency units).",
+      "format": "double",
+      "type": "number"
+    },
+    "spread_convexity": {
+      "description": "Spread convexity (years²): second-order z-spread sensitivity of the\nprojected cashflows at the solved z-spread, on the same kernel as\n`spread_duration`.",
+      "format": "double",
+      "type": "number"
+    },
+    "spread_duration": {
+      "description": "Spread duration (years): `-CS01 / (dirty settlement target · 1bp)`.",
+      "format": "double",
+      "type": "number"
+    },
+    "target_price_pct": {
+      "description": "Price the z-spread/CS01 were solved against (% of current balance) —\nthe supplied market price, or the model price when none was given.",
+      "format": "double",
+      "type": "number"
+    },
+    "tranche_id": {
+      "description": "Identifier of the tranche.",
+      "type": "string"
+    },
+    "wal": {
+      "description": "Weighted-average life (years).",
+      "format": "double",
+      "type": "number"
+    },
+    "wal_to_call": {
+      "description": "Weighted-average life to the deal's assumed call (years); `None`\nwithout a `call_assumption` covering this tranche.",
+      "format": "double",
+      "type": [
+        "number",
+        "null"
+      ]
+    },
+    "z_spread_bp": {
+      "description": "Z-spread to `target_price_pct` (basis points): the constant spread over the\ndiscount curve equating the tranche's PV to that price. Zero when solved\nagainst the tranche's own model price (no spread to its curve-discounted value).",
+      "format": "double",
+      "type": "number"
+    },
+    "z_spread_to_call_bp": {
+      "description": "Z-spread to the assumed call at `target_price_pct` (basis points).",
+      "format": "double",
+      "type": [
+        "number",
+        "null"
+      ]
+    }
+  },
+  "required": [
+    "tranche_id",
+    "currency",
+    "pv",
+    "price_pct",
+    "factor",
+    "wal",
+    "z_spread_bp",
+    "cs01",
+    "spread_duration",
+    "spread_convexity",
+    "modified_duration",
+    "convexity",
+    "target_price_pct"
+  ],
+  "title": "TrancheMetrics",
+  "type": "object"
+}

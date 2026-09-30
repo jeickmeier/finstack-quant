@@ -1,0 +1,81 @@
+{
+  "$defs": {
+    "NonFiniteF64Wire": {
+      "anyOf": [
+        {
+          "description": "A finite value, written as a JSON number.",
+          "format": "double",
+          "type": "number"
+        },
+        {
+          "$ref": "#/$defs/NonFiniteSentinel",
+          "description": "A non-finite value, written as its sentinel string."
+        }
+      ],
+      "description": "An `f64` in the [`non_finite_f64`] wire form: a JSON number when finite,\notherwise one of the strings `\"inf\"`, `\"-inf\"` or `\"nan\"`.\n\nContract types store plain `f64` fields with\n`#[serde(with = \"finstack_quant_core::wire::non_finite_f64\")]` and name this\ntype in `#[schemars(with = ...)]`, so the generated schema describes the\nsentinel strings the serializer actually writes."
+    },
+    "NonFiniteSentinel": {
+      "description": "Sentinel string the [`non_finite_f64`] adapter writes for a non-finite `f64`.",
+      "oneOf": [
+        {
+          "const": "inf",
+          "description": "`+∞`, written as `\"inf\"`.",
+          "type": "string"
+        },
+        {
+          "const": "-inf",
+          "description": "`-∞`, written as `\"-inf\"`.",
+          "type": "string"
+        },
+        {
+          "const": "nan",
+          "description": "`NaN`, written as `\"nan\"`.",
+          "type": "string"
+        }
+      ]
+    }
+  },
+  "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/forecast_metrics.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Forecast accuracy metrics.",
+  "properties": {
+    "mae": {
+      "$ref": "#/$defs/NonFiniteF64Wire",
+      "description": "Mean Absolute Error: average of |actual - forecast|\n\nInterpretation: Average magnitude of errors in the same units as the data.\nLower is better. Not sensitive to outliers."
+    },
+    "mape": {
+      "$ref": "#/$defs/NonFiniteF64Wire",
+      "description": "Mean Absolute Percentage Error: average of |actual - forecast| / |actual| × 100\n\nInterpretation: Average error as a percentage. Scale-independent.\nBe cautious when actual values are near zero (can produce extreme values).\nThe implementation treats `|actual| < ZERO_TOLERANCE` as a zero-weight\nterm and excludes that sample from both the numerator and the count;\n[`ForecastMetrics::mape_effective_n`] records how many samples were\nused so callers can tell a low MAPE from a MAPE that was computed on\nvery few points. Very small non-zero actuals can still dominate the\nmetric. If `mape_effective_n == 0`, `mape` is `NaN`; prefer\n[`ForecastMetrics::smape`] in that case.\nLower is better."
+    },
+    "mape_effective_n": {
+      "description": "Number of samples that actually contributed to MAPE (i.e. had\n`|actual| >= ZERO_TOLERANCE`). Always `<= n`.",
+      "format": "uint",
+      "minimum": 0,
+      "type": "integer"
+    },
+    "n": {
+      "description": "Number of data points used in the calculation",
+      "format": "uint",
+      "minimum": 0,
+      "type": "integer"
+    },
+    "rmse": {
+      "$ref": "#/$defs/NonFiniteF64Wire",
+      "description": "Root Mean Squared Error: sqrt(average((actual - forecast)²))\n\nInterpretation: Penalizes larger errors more heavily than MAE.\nSame units as the data. Always >= MAE.\nLower is better."
+    },
+    "smape": {
+      "$ref": "#/$defs/NonFiniteF64Wire",
+      "description": "Symmetric Mean Absolute Percentage Error:\n`mean( |a - f| / ((|a| + |f|) / 2) ) × 100`.\n\nAlways well-defined when at least one of `|a|` or `|f|` is positive,\nand always bounded in `[0, 200]`. Preferred over MAPE when the actual\nseries contains zeros or near-zeros. Terms where both `a` and `f`\nare within `ZERO_TOLERANCE` of zero are skipped."
+    }
+  },
+  "required": [
+    "mae",
+    "mape",
+    "mape_effective_n",
+    "smape",
+    "rmse",
+    "n"
+  ],
+  "title": "ForecastMetrics",
+  "type": "object"
+}

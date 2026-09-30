@@ -81,4 +81,11 @@ pub const ARTIFACTS: &[finstack_quant_core::schema::SchemaArtifact] = &[
     .with_kind(finstack_quant_core::schema::SchemaKind::Input)
     .with_summary("Ordered shock and roll operations over market, statement and valuation targets.")
     .with_examples(scenario_examples),
+    finstack_quant_core::schema::SchemaArtifact::new::<crate::TemplateMetadata>(
+        "schemas/scenarios/1/template_metadata.schema.json",
+        "https://finstack_quant.dev/schemas/scenarios/1/template_metadata.schema.json",
+        "TemplateMetadata",
+        "Descriptive metadata of a built-in scenario template.",
+    )
+    .with_kind(finstack_quant_core::schema::SchemaKind::Output),
 ];

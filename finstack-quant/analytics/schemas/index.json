@@ -1,0 +1,113 @@
+{
+  "artifacts": [
+    {
+      "$id": "https://finstack_quant.dev/schemas/analytics/1/beta_result.schema.json",
+      "bytes": 2406,
+      "kind": "output",
+      "path": "schemas/analytics/1/beta_result.schema.json",
+      "summary": "OLS beta result with standard error and 95% confidence interval.",
+      "title": "BetaResult",
+      "type_name": "BetaResult"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/analytics/1/cagr_day_count.schema.json",
+      "bytes": 18940,
+      "kind": "component",
+      "path": "schemas/analytics/1/cagr_day_count.schema.json",
+      "summary": "Day-count convention for CAGR annualization over explicit calendar dates.",
+      "title": "CagrDayCount",
+      "type_name": "CagrDayCount"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/analytics/1/dated_series.schema.json",
+      "bytes": 3529,
+      "kind": "component",
+      "path": "schemas/analytics/1/dated_series.schema.json",
+      "summary": "A dated time-series column: scalar values aligned with window-end dates.",
+      "title": "DatedSeries",
+      "type_name": "DatedSeries"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/analytics/1/drawdown_episode.schema.json",
+      "bytes": 2130,
+      "kind": "component",
+      "path": "schemas/analytics/1/drawdown_episode.schema.json",
+      "summary": "Drawdown episode with start, valley, optional recovery, and max drawdown.",
+      "title": "DrawdownEpisode",
+      "type_name": "DrawdownEpisode"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/analytics/1/greeks_result.schema.json",
+      "bytes": 2401,
+      "kind": "output",
+      "path": "schemas/analytics/1/greeks_result.schema.json",
+      "summary": "Greeks (alpha, beta, R-squared, adjusted R-squared) from a single-factor regression.",
+      "title": "GreeksResult",
+      "type_name": "GreeksResult"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/analytics/1/lookback_returns.schema.json",
+      "bytes": 1318,
+      "kind": "component",
+      "path": "schemas/analytics/1/lookback_returns.schema.json",
+      "summary": "Lookback returns for each period horizon.",
+      "title": "LookbackReturns",
+      "type_name": "LookbackReturns"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/analytics/1/multi_factor_result.schema.json",
+      "bytes": 2647,
+      "kind": "output",
+      "path": "schemas/analytics/1/multi_factor_result.schema.json",
+      "summary": "Result of a multi-factor regression.",
+      "title": "MultiFactorResult",
+      "type_name": "MultiFactorResult"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/analytics/1/performance.schema.json",
+      "bytes": 3633,
+      "kind": "input",
+      "path": "schemas/analytics/1/performance.schema.json",
+      "summary": "Central performance analytics engine.",
+      "title": "Performance",
+      "type_name": "Performance"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/analytics/1/period_stats.schema.json",
+      "bytes": 3963,
+      "kind": "output",
+      "path": "schemas/analytics/1/period_stats.schema.json",
+      "summary": "Period-level aggregate statistics.",
+      "title": "PeriodStats",
+      "type_name": "PeriodStats"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/analytics/1/periodic_return.schema.json",
+      "bytes": 848,
+      "kind": "component",
+      "path": "schemas/analytics/1/periodic_return.schema.json",
+      "summary": "One calendar bucket of a periodic-return series.",
+      "title": "PeriodicReturn",
+      "type_name": "PeriodicReturn"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/analytics/1/return_kind.schema.json",
+      "bytes": 1258,
+      "kind": "component",
+      "path": "schemas/analytics/1/return_kind.schema.json",
+      "summary": "How the dependent return series is interpreted in a multi-factor regression.",
+      "title": "ReturnKind",
+      "type_name": "ReturnKind"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/analytics/1/rolling_greeks.schema.json",
+      "bytes": 1000,
+      "kind": "component",
+      "path": "schemas/analytics/1/rolling_greeks.schema.json",
+      "summary": "Rolling greeks output.",
+      "title": "RollingGreeks",
+      "type_name": "RollingGreeks"
+    }
+  ],
+  "schema_index_version": 1
+}

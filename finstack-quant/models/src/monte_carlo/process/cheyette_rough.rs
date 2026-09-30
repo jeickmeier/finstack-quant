@@ -96,6 +96,7 @@ use finstack_quant_core::math::fractional::HurstExponent;
 /// typically reconstructed from market data rather than round-tripped through
 /// plain-text serialization.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct CheyetteRoughVolParams {
     /// Mean reversion of the short rate (κ > 0).
     pub kappa: f64,

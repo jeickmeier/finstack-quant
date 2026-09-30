@@ -1,0 +1,18 @@
+{
+  "$id": "https://finstack_quant.dev/schemas/models/1/averaging_method.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Asian averaging method.",
+  "oneOf": [
+    {
+      "const": "arithmetic",
+      "description": "Arithmetic average: (1/n) Σ S_i",
+      "type": "string"
+    },
+    {
+      "const": "geometric",
+      "description": "Geometric average: (Π S_i)^(1/n)",
+      "type": "string"
+    }
+  ],
+  "title": "AveragingMethod"
+}

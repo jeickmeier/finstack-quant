@@ -57,6 +57,7 @@ pub const ONE_PERCENT: f64 = 100.0;
 /// FX options (with foreign rate), as it includes both `rho_r` (domestic) and
 /// `rho_q` (foreign/dividend) sensitivities.
 #[derive(Debug, Clone, Copy, Default, PartialEq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct BsGreeks {
     /// Delta sensitivity per unit.

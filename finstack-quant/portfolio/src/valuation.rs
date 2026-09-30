@@ -202,6 +202,7 @@ impl PortfolioValuation {
 /// requested metric its instrument type has no calculator for, because there
 /// the caller chose the list against that one instrument.
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(tag = "mode", content = "metrics", rename_all = "snake_case")]
 pub enum RequestedMetrics {
     /// Standard portfolio metric set only: PV plus `dv01`.
@@ -267,6 +268,7 @@ impl RequestedMetrics {
 /// failed requested risk metric aborts the valuation. Set `strict_risk` to
 /// `false` only when a PV-preserving best-effort fallback is intentional.
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(default)]
 pub struct PortfolioValuationOptions {
     /// When `true` (default), any failure to compute the risk metrics

@@ -1,0 +1,64 @@
+{
+  "$id": "https://finstack_quant.dev/schemas/portfolio/1/factor_brinson_input.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Inputs to `factor_brinson_attribution`: per-asset returns, a factor exposure matrix, and portfolio/benchmark weights.",
+  "properties": {
+    "asset_ids": {
+      "description": "Asset identifiers, length `n_assets`.",
+      "items": {
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "asset_returns": {
+      "description": "Realized asset returns (decimal, e.g. `0.02` = 2%), length `n_assets`.",
+      "items": {
+        "format": "double",
+        "type": "number"
+      },
+      "type": "array"
+    },
+    "benchmark_weights": {
+      "description": "Benchmark weight per asset, length `n_assets`. Must sum to `1.0`.",
+      "items": {
+        "format": "double",
+        "type": "number"
+      },
+      "type": "array"
+    },
+    "exposures": {
+      "description": "Row-major factor exposure matrix, `n_assets x n_factors`: asset `i`'s\nexposure to factor `j` is `exposures[i * n_factors + j]`.",
+      "items": {
+        "format": "double",
+        "type": "number"
+      },
+      "type": "array"
+    },
+    "factor_names": {
+      "description": "Factor names, length `n_factors` (defines `n_factors`).",
+      "items": {
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "portfolio_weights": {
+      "description": "Portfolio weight per asset, length `n_assets`. Must sum to `1.0`.",
+      "items": {
+        "format": "double",
+        "type": "number"
+      },
+      "type": "array"
+    }
+  },
+  "required": [
+    "asset_ids",
+    "asset_returns",
+    "exposures",
+    "factor_names",
+    "portfolio_weights",
+    "benchmark_weights"
+  ],
+  "title": "FactorBrinsonInput",
+  "type": "object"
+}

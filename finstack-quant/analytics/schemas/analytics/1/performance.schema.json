@@ -1,0 +1,127 @@
+{
+  "$defs": {
+    "DateWire": {
+      "description": "ISO 8601 calendar date encoded as a `YYYY-MM-DD` JSON string.",
+      "format": "date",
+      "type": "string"
+    },
+    "PeriodKind": {
+      "description": "Period frequency type.\n\nDefines the frequency of periodic schedules (cashflow rolls, return-series\nresampling, statement reporting). Each variant carries an implied\n\"periods-per-year\" used by [`PeriodKind::periods_per_year`] and by\ndownstream annualization helpers in `finstack-quant-analytics`.\n\n`Daily` follows the trading-day convention (252 per year), not the\ncalendar-day convention (365 per year). Use `Weekly` if you need\ncalendar-week granularity.\n\nParses the snake_case wire values via [`std::str::FromStr`]\n(for example, `\"quarterly\"` or `\"semi_annual\"`). The parser also accepts\nthe `\"semiannual\"` spelling and the pandas offset aliases `D`/`B`\n(daily), `W` (weekly), `M`/`ME` (monthly), `Q`/`QE` (quarterly) and\n`A`/`Y`/`YE` (annual); serde (de)serialization stays strict snake_case.",
+      "oneOf": [
+        {
+          "const": "daily",
+          "description": "Daily periods (252 trading days per year by convention)",
+          "type": "string"
+        },
+        {
+          "const": "quarterly",
+          "description": "Quarterly periods (4 per year)",
+          "type": "string"
+        },
+        {
+          "const": "monthly",
+          "description": "Monthly periods (12 per year)",
+          "type": "string"
+        },
+        {
+          "const": "weekly",
+          "description": "Weekly periods (ISO 8601 week-year, typically 52 or 53 per year)",
+          "type": "string"
+        },
+        {
+          "const": "semi_annual",
+          "description": "Semi-annual periods (2 per year)",
+          "type": "string"
+        },
+        {
+          "const": "annual",
+          "description": "Annual periods (1 per year)",
+          "type": "string"
+        }
+      ]
+    },
+    "TickerSpan": {
+      "properties": {
+        "end": {
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "start": {
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "start",
+        "end"
+      ],
+      "type": "object"
+    }
+  },
+  "$id": "https://finstack_quant.dev/schemas/analytics/1/performance.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Central performance analytics engine.",
+  "properties": {
+    "benchmark_idx": {
+      "format": "uint",
+      "minimum": 0,
+      "type": "integer"
+    },
+    "end_idx": {
+      "format": "uint",
+      "minimum": 0,
+      "type": "integer"
+    },
+    "frequency": {
+      "$ref": "#/$defs/PeriodKind"
+    },
+    "price_dates": {
+      "items": {
+        "$ref": "#/$defs/DateWire"
+      },
+      "type": "array"
+    },
+    "return_spans": {
+      "items": {
+        "$ref": "#/$defs/TickerSpan"
+      },
+      "type": "array"
+    },
+    "returns": {
+      "items": {
+        "items": {
+          "format": "double",
+          "type": "number"
+        },
+        "type": "array"
+      },
+      "type": "array"
+    },
+    "start_idx": {
+      "format": "uint",
+      "minimum": 0,
+      "type": "integer"
+    },
+    "ticker_names": {
+      "items": {
+        "type": "string"
+      },
+      "type": "array"
+    }
+  },
+  "required": [
+    "price_dates",
+    "returns",
+    "return_spans",
+    "ticker_names",
+    "benchmark_idx",
+    "frequency",
+    "start_idx",
+    "end_idx"
+  ],
+  "title": "Performance",
+  "type": "object"
+}

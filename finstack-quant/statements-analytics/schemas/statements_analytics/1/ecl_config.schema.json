@@ -1,0 +1,273 @@
+{
+  "$defs": {
+    "DownturnLgd": {
+      "additionalProperties": false,
+      "description": "Downturn LGD adjuster.\n\nWraps a base LGD estimate and applies a downturn adjustment method\nto produce a stressed LGD for capital calculations.",
+      "properties": {
+        "method": {
+          "$ref": "#/$defs/DownturnMethod",
+          "description": "Downturn adjustment method."
+        }
+      },
+      "required": [
+        "method"
+      ],
+      "type": "object"
+    },
+    "DownturnMethod": {
+      "description": "Method for computing downturn LGD from base (through-the-cycle) LGD.",
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "description": "Proprietary stressed-LGD approximation (mean plus a multiple of the\nBernoulli standard deviation).\n\n```text\nLGD_downturn = LGD_base + sensitivity * sqrt(asset_correlation)\n             * Phi_inv(stress_quantile) * sqrt(LGD_base * (1 - LGD_base))\n  ```\n\n`sqrt(LGD_base * (1 - LGD_base))` is the standard deviation of a\nBernoulli loss indicator with mean `LGD_base`. The adjustment captures\nthe systematic component heuristically: in downturns, recoveries fall\nbecause the same macro factor driving defaults also depresses asset\nvalues.\n\nThis is *not* the Frye-Jacobs (2012) model (whose LGD function is\n`cLGD = Φ(Φ⁻¹(cDR) − k) / cDR`); Frye & Jacobs (2012) is related\nliterature only. See the module-level Methodology Note.",
+          "properties": {
+            "stressed_approximation": {
+              "additionalProperties": false,
+              "properties": {
+                "asset_correlation": {
+                  "description": "Asset correlation (rho). Typical: 0.10-0.24 per Basel.",
+                  "format": "double",
+                  "type": "number"
+                },
+                "lgd_sensitivity": {
+                  "description": "LGD sensitivity to systematic factor. Typical: 0.3-0.5.",
+                  "format": "double",
+                  "type": "number"
+                },
+                "stress_quantile": {
+                  "description": "Stress quantile for downturn scenario. Typical: 0.999 (99.9th percentile).",
+                  "format": "double",
+                  "type": "number"
+                }
+              },
+              "required": [
+                "asset_correlation",
+                "lgd_sensitivity",
+                "stress_quantile"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "stressed_approximation"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Regulatory floor: LGD_downturn = max(LGD_base + add_on, floor).\n\nBasel III mandates that downturn LGD cannot fall below certain floors.\nThe add-on is a flat increment over the base LGD.",
+          "properties": {
+            "regulatory_floor": {
+              "additionalProperties": false,
+              "properties": {
+                "add_on": {
+                  "description": "Flat add-on over base LGD. Typical: 0.05-0.10 (5-10pp).",
+                  "format": "double",
+                  "type": "number"
+                },
+                "floor": {
+                  "description": "Absolute LGD floor. Typical: 0.10 for secured, 0.25 for unsecured.",
+                  "format": "double",
+                  "type": "number"
+                }
+              },
+              "required": [
+                "add_on",
+                "floor"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "regulatory_floor"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "LgdType": {
+      "description": "LGD methodology selection.\n\nSelects how the base LGD carried on an [`Exposure`] (or a scenario\n[`MacroScenario::lgd_override`]) is converted into the effective LGD used\nin the ECL calculation. Each non-default variant requires a companion\n[`EclConfig`] field; [`EclConfig::validate`] enforces that the field is\npresent for the selected variant and absent otherwise (a \"set but unused\"\nknob is rejected symmetrically with a \"used but unset\" one), so a\nmisconfigured methodology cannot be silently stamped into results.\n\n# Variants and formulas\n\n- [`LgdType::PointInTime`]: `LGD_eff = base`, where `base` is\n  [`Exposure::lgd`] or the scenario [`MacroScenario::lgd_override`] when\n  present. No companion field.\n- [`LgdType::ThroughTheCycle`]: `LGD_eff = EclConfig::ttc_lgd`, a\n  cycle-average LGD that pins the effective LGD regardless of `base`.\n  Because the pin would silently discard a scenario `lgd_override`,\n  combining `ThroughTheCycle` with any scenario override is a validation\n  error (see [`compute_ecl_weighted`]).\n- [`LgdType::Downturn`]: `LGD_eff = EclConfig::downturn_lgd.adjust(base)`,\n  applied via [`DownturnLgd::adjust`] on top of `base` (so a scenario\n  `lgd_override` sets the base and the downturn stress is layered on top\n  of it):\n  - Stressed (`DownturnMethod::StressedApproximation`):\n    `LGD_eff = clamp(base + s·√ρ·Φ⁻¹(q)·√(base·(1−base)), 0, 1)`, core's\n    documented mean-plus-Bernoulli-stdev approximation (see\n    `core/src/credit/lgd/downturn.rs` Methodology Note; Frye & Jacobs\n    (2012) is related literature only, not the formula implemented here).\n  - Regulatory floor (`DownturnMethod::RegulatoryFloor`):\n    `LGD_eff = clamp(max(base + add_on, floor), 0, 1)`.\n\n# References\n\n- Basel Framework CRE36.85-36.90 -- downturn LGD requirement and\n  regulatory floors.\n- Frye, J. & Jacobs, M. (2012). \"Credit Loss and Systematic Loss Given\n  Default.\" *Journal of Credit Risk*, 8(1), 109-140 (related literature\n  only; see [`DownturnLgd`] for the exact formula implemented).",
+      "oneOf": [
+        {
+          "const": "point_in_time",
+          "description": "Point-in-time LGD from the exposure (or scenario override). No\ncompanion field required.",
+          "type": "string"
+        },
+        {
+          "const": "through_the_cycle",
+          "description": "Through-the-cycle average LGD. Requires [`EclConfig::ttc_lgd`].",
+          "type": "string"
+        },
+        {
+          "const": "downturn",
+          "description": "Downturn LGD (stressed scenario). Requires\n[`EclConfig::downturn_lgd`].",
+          "type": "string"
+        }
+      ]
+    },
+    "MacroScenario": {
+      "additionalProperties": false,
+      "description": "A forward-looking macro scenario with a probability weight.\n\nUsed for probability-weighted ECL calculation per IFRS 9 B5.5.42.",
+      "properties": {
+        "id": {
+          "description": "Scenario identifier (e.g., \"base\", \"upside\", \"downside\").",
+          "type": "string"
+        },
+        "lgd_override": {
+          "description": "Optional LGD override for this scenario (downturn LGD).",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "weight": {
+          "description": "Probability weight in \\[0, 1\\]. All scenario weights must sum to 1.0.",
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "required": [
+        "id",
+        "weight"
+      ],
+      "type": "object"
+    },
+    "StagingConfig": {
+      "additionalProperties": false,
+      "description": "Configuration for IFRS 9 stage classification.\n\nControls the quantitative and qualitative thresholds used in the staging\nwaterfall, plus curing rules for step-down from higher stages.",
+      "properties": {
+        "cure_periods_stage2_to_1": {
+          "description": "Curing configuration: minimum consecutive performing periods\nrequired to move from Stage 2 back to Stage 1. Default: 3.\n\nThe default is a pragmatic 3-period observation window; EBA\nGL on default uses a 3-month probation for Stage 2 → 1 (see\nEBA/GL/2016/07 §32).",
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "cure_periods_stage3_to_2": {
+          "description": "Curing configuration: minimum consecutive performing periods\nrequired to move from Stage 3 to Stage 2. Default: 12.\n\nThe default matches the EBA GL on default probation window of\n12 months for cure out of default (EBA/GL/2016/07 §71–§72). If\nyour internal policy uses a shorter probation, override this\nfield explicitly.",
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "dpd_stage2_threshold": {
+          "description": "DPD threshold for Stage 2 backstop (IFRS 9 B5.5.19 rebuttable\npresumption). Default: 30.",
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "dpd_stage3_threshold": {
+          "description": "DPD threshold for Stage 3 (absolute backstop). Default: 90.",
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "pd_delta_absolute": {
+          "description": "Absolute PD increase threshold for SICR (e.g., 0.01 = 1 pp).\nIf the lifetime PD has increased by more than this amount since\norigination, the exposure is classified as Stage 2.",
+          "format": "double",
+          "type": "number"
+        },
+        "pd_delta_relative": {
+          "description": "Relative PD increase threshold for SICR (e.g., 2.0 = PD doubled).\nApplied as: current_pd / origination_pd > threshold.",
+          "format": "double",
+          "type": "number"
+        },
+        "qualitative_triggers_enabled": {
+          "description": "Whether any qualitative SICR flag triggers Stage 2.",
+          "type": "boolean"
+        },
+        "rating_downgrade_notches": {
+          "description": "Rating downgrade notches that trigger Stage 2 (IFRS 9 B5.5.17(f):\nexternal credit rating downgrade as a SICR indicator).\n\n[`classify_stage`] fires [`StagingTrigger::RatingDowngrade`] when\n`position(current) - position(origination) >= rating_downgrade_notches`\non the configured scale (see [`Self::rating_scale_labels`]). Example:\n3 means a 3-notch downgrade from origination triggers SICR. A `0`\nthreshold disables the trigger entirely.",
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "rating_scale_labels": {
+          "default": null,
+          "description": "Ordered rating-scale labels (best -> worst) used to count downgrade\nnotches for the `rating_downgrade_notches` trigger. When `None`, the\ncore 10-state S&P/Fitch scale (AAA, AA, A, BBB, BB, B, CCC, CC, C, D)\nis used. Ratings not present on the scale never fire the trigger.",
+          "items": {
+            "type": "string"
+          },
+          "type": [
+            "array",
+            "null"
+          ]
+        },
+        "stage3_qualitative_triggers_enabled": {
+          "description": "Whether objective default-evidence flags (bankruptcy,\ndistressed modification, cross-default,\n`other_default_evidence`) trigger Stage 3 classification,\nindependently of the 90 DPD backstop. Defaults to `true`.\n\nDisable only when such triggers are controlled by an upstream\ncredit-event engine that already mapped them into DPD or\nprevious-stage state.",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "pd_delta_absolute",
+        "pd_delta_relative",
+        "rating_downgrade_notches",
+        "dpd_stage2_threshold",
+        "dpd_stage3_threshold",
+        "qualitative_triggers_enabled",
+        "stage3_qualitative_triggers_enabled",
+        "cure_periods_stage2_to_1",
+        "cure_periods_stage3_to_2"
+      ],
+      "type": "object"
+    }
+  },
+  "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/ecl_config.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Configuration for ECL calculation.",
+  "properties": {
+    "bucket_width_years": {
+      "description": "Time bucket width in years for the PD-LGD-EAD integration.\nMust be finite and at least 0.0001 years, limiting a 100-year\nexposure to one million buckets. Default: quarterly (0.25).",
+      "format": "double",
+      "type": "number"
+    },
+    "downturn_lgd": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/DownturnLgd"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "Downturn LGD adjuster applied when `lgd_type == `[`LgdType::Downturn`]."
+    },
+    "lgd_type": {
+      "$ref": "#/$defs/LgdType",
+      "description": "LGD methodology label; see [`LgdType`] for the formulas each variant\napplies and the companion field it requires."
+    },
+    "scenarios": {
+      "description": "Macro scenario specifications with probability weights.\nWeights must sum to 1.0 and each weight must lie in \\[0, 1\\].\n\nWhen non-empty, [`compute_ecl_weighted`] and [`EclEngine`] require\nthe same ids and weights (tolerance 1e-6, same order) as the\n`pd_sources` argument. The `pd_sources` weights remain the priced\nweights and are still validated independently.",
+      "items": {
+        "$ref": "#/$defs/MacroScenario"
+      },
+      "type": "array"
+    },
+    "stage3_time_to_recovery_years": {
+      "default": 1.0,
+      "description": "Assumed time (in years) from the reporting date to recovery\nrealisation for Stage 3 (credit-impaired) exposures. Used to\ndiscount expected recoveries `(1 - LGD) x EAD` at the EIR.\nThe allowance is current EAD less those discounted recoveries.\nDefault: 1.0 year, a common practical recovery-lag assumption.",
+      "format": "double",
+      "type": "number"
+    },
+    "staging": {
+      "$ref": "#/$defs/StagingConfig",
+      "description": "Staging configuration for IFRS 9."
+    },
+    "ttc_lgd": {
+      "description": "Cycle-average LGD used when `lgd_type == `[`LgdType::ThroughTheCycle`].",
+      "format": "double",
+      "type": [
+        "number",
+        "null"
+      ]
+    }
+  },
+  "required": [
+    "bucket_width_years",
+    "scenarios",
+    "staging",
+    "lgd_type"
+  ],
+  "title": "EclConfig",
+  "type": "object"
+}

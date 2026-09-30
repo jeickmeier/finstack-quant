@@ -1,0 +1,63 @@
+{
+  "$defs": {
+    "DateWire": {
+      "description": "ISO 8601 calendar date encoded as a `YYYY-MM-DD` JSON string.",
+      "format": "date",
+      "type": "string"
+    }
+  },
+  "$id": "https://finstack_quant.dev/schemas/models/1/yield_panel.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "A panel of yield observations: rows = dates, columns = tenors.",
+  "properties": {
+    "dates": {
+      "description": "Observation dates (optional, for labeling). Length T if provided.",
+      "items": {
+        "$ref": "#/$defs/DateWire"
+      },
+      "type": [
+        "array",
+        "null"
+      ]
+    },
+    "tenors": {
+      "description": "Tenor grid in years, length N. Must be sorted ascending, all > 0.",
+      "items": {
+        "format": "double",
+        "type": "number"
+      },
+      "type": "array"
+    },
+    "yields": {
+      "description": "Yield matrix: T rows (dates) x N columns (tenors).\nEntry (t, i) is the zero rate at observation t for tenor i.",
+      "maxItems": 3,
+      "minItems": 3,
+      "prefixItems": [
+        {
+          "items": {
+            "format": "double",
+            "type": "number"
+          },
+          "type": "array"
+        },
+        {
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        {
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        }
+      ],
+      "type": "array"
+    }
+  },
+  "required": [
+    "yields",
+    "tenors"
+  ],
+  "title": "YieldPanel",
+  "type": "object"
+}

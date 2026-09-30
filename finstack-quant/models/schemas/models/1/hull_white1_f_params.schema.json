@@ -1,0 +1,62 @@
+{
+  "$defs": {
+    "PiecewiseConstantCurve": {
+      "description": "A finite, left-continuous piecewise-constant curve.",
+      "properties": {
+        "times": {
+          "items": {
+            "format": "double",
+            "type": "number"
+          },
+          "type": "array"
+        },
+        "values": {
+          "items": {
+            "format": "double",
+            "type": "number"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "times",
+        "values"
+      ],
+      "type": "object"
+    }
+  },
+  "$id": "https://finstack_quant.dev/schemas/models/1/hull_white1_f_params.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Validated Hull-White one-factor process parameters.",
+  "properties": {
+    "kappa": {
+      "format": "double",
+      "type": "number"
+    },
+    "theta_curve": {
+      "items": {
+        "format": "double",
+        "type": "number"
+      },
+      "type": "array"
+    },
+    "theta_times": {
+      "items": {
+        "format": "double",
+        "type": "number"
+      },
+      "type": "array"
+    },
+    "volatility": {
+      "$ref": "#/$defs/PiecewiseConstantCurve"
+    }
+  },
+  "required": [
+    "kappa",
+    "volatility",
+    "theta_curve",
+    "theta_times"
+  ],
+  "title": "HullWhite1FParams",
+  "type": "object"
+}

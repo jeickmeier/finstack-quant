@@ -876,6 +876,21 @@ pub fn artifacts() -> Vec<SchemaArtifact> {
             "Parsed financial tenor.",
         )
         .with_examples(tenor_examples),
+        SchemaArtifact::new::<crate::instruments::InstrumentJson>(
+            "schemas/common/1/instrument_json.schema.json",
+            concat!(
+                "https://finstack_quant.dev/schemas/common/1/",
+                "instrument_json.schema.json"
+            ),
+            "InstrumentJson",
+            "Tagged `{type, spec}` payload for one instrument, without the envelope marker.",
+        )
+        .with_packager(package_valuations_schema)
+        .with_kind(SchemaKind::Component)
+        .with_summary(
+            "The instrument union embedded by portfolio positions and candidates; the same \
+             branches as the instrument envelope's `instrument` field.",
+        ),
         SchemaArtifact::new::<InstrumentEnvelope>(
             "schemas/instruments/1/instrument.schema.json",
             concat!(
@@ -910,6 +925,48 @@ pub fn artifacts() -> Vec<SchemaArtifact> {
         .with_kind(SchemaKind::Output)
         .with_summary("PV plus requested measures, with rounding and FX policy stamps.")
         .with_examples(valuation_result_examples),
+        SchemaArtifact::new::<crate::instruments::CompositeRebalanceResult>(
+            "schemas/results/1/composite_rebalance_result.schema.json",
+            "https://finstack_quant.dev/schemas/results/1/composite_rebalance_result.schema.json",
+            "CompositeRebalanceResult",
+            "Result of resolving a new composite holdings state.",
+        )
+        .with_packager(package_valuations_schema)
+        .with_kind(SchemaKind::Output),
+        SchemaArtifact::new::<
+            crate::instruments::fixed_income::revolving_credit::EnhancedMonteCarloResult,
+        >(
+            "schemas/results/1/enhanced_monte_carlo_result.schema.json",
+            "https://finstack_quant.dev/schemas/results/1/enhanced_monte_carlo_result.schema.json",
+            "EnhancedMonteCarloResult",
+            "Revolving-credit Monte Carlo value with per-path details.",
+        )
+        .with_packager(package_valuations_schema)
+        .with_kind(SchemaKind::Output),
+        SchemaArtifact::new::<crate::instruments::fixed_income::structured_credit::OasResult>(
+            "schemas/results/1/oas_result.schema.json",
+            "https://finstack_quant.dev/schemas/results/1/oas_result.schema.json",
+            "OasResult",
+            "Structured-credit option-adjusted spread and its solver diagnostics.",
+        )
+        .with_packager(package_valuations_schema)
+        .with_kind(SchemaKind::Output),
+        SchemaArtifact::new::<crate::instruments::fixed_income::structured_credit::ScenarioTable>(
+            "schemas/results/1/scenario_table.schema.json",
+            "https://finstack_quant.dev/schemas/results/1/scenario_table.schema.json",
+            "ScenarioTable",
+            "Structured-credit scenario grid results for one tranche.",
+        )
+        .with_packager(package_valuations_schema)
+        .with_kind(SchemaKind::Output),
+        SchemaArtifact::new::<crate::instruments::fixed_income::structured_credit::TrancheMetrics>(
+            "schemas/results/1/tranche_metrics.schema.json",
+            "https://finstack_quant.dev/schemas/results/1/tranche_metrics.schema.json",
+            "TrancheMetrics",
+            "Per-tranche risk and spread metrics from the tranche's own projected cashflows.",
+        )
+        .with_packager(package_valuations_schema)
+        .with_kind(SchemaKind::Output),
     ];
 
     artifacts.extend(

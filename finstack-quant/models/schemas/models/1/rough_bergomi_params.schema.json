@@ -1,0 +1,56 @@
+{
+  "$defs": {
+    "HurstExponent": {
+      "description": "Validated Hurst exponent H ∈ (0, 1).\n\nThe Hurst exponent determines the roughness of fractional Brownian motion:\n\n- H < 0.5 — rough (anti-persistent increments)\n- H = 0.5 — standard Brownian motion\n- H > 0.5 — smooth (persistent increments)",
+      "properties": {
+        "h": {
+          "description": "The Hurst parameter value.",
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "required": [
+        "h"
+      ],
+      "type": "object"
+    }
+  },
+  "$id": "https://finstack_quant.dev/schemas/models/1/rough_bergomi_params.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "rBergomi model parameters.",
+  "properties": {
+    "eta": {
+      "description": "Vol-of-vol scaling (η > 0).",
+      "format": "double",
+      "type": "number"
+    },
+    "hurst": {
+      "$ref": "#/$defs/HurstExponent",
+      "description": "Hurst exponent H ∈ (0, 0.5), typically 0.07–0.12 for equity indices."
+    },
+    "q": {
+      "description": "Dividend yield (annual, continuously compounded).",
+      "format": "double",
+      "type": "number"
+    },
+    "r": {
+      "description": "Risk-free rate (annual, continuously compounded).",
+      "format": "double",
+      "type": "number"
+    },
+    "rho": {
+      "description": "Spot-vol correlation ρ ∈ [-1, 1].",
+      "format": "double",
+      "type": "number"
+    }
+  },
+  "required": [
+    "r",
+    "q",
+    "hurst",
+    "eta",
+    "rho"
+  ],
+  "title": "RoughBergomiParams",
+  "type": "object"
+}

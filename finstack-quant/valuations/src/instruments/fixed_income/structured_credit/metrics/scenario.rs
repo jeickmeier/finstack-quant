@@ -18,6 +18,7 @@ use super::calculate_tranche_wal;
 
 /// Grid of behavioral scenarios to evaluate.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct ScenarioGrid {
     /// Annual CPR values (decimal) to sweep.
@@ -35,6 +36,7 @@ pub struct ScenarioGrid {
 
 /// One evaluated cell of the scenario table.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct ScenarioCell {
     /// Annual CPR (decimal) for this cell.
@@ -56,6 +58,7 @@ pub struct ScenarioCell {
 
 /// Scenario table for a single tranche.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct ScenarioTable {
     /// Identifier of the tranche evaluated.

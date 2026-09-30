@@ -1,0 +1,123 @@
+{
+  "$defs": {
+    "AssetClass": {
+      "description": "Asset class categories affected by a stress template.\n\nThese values describe the primary risk buckets touched by a historical\nscenario so registries can expose coarse filtering and search.",
+      "oneOf": [
+        {
+          "const": "rates",
+          "description": "Interest rates and fixed income.",
+          "type": "string"
+        },
+        {
+          "const": "credit",
+          "description": "Credit spreads and default risk.",
+          "type": "string"
+        },
+        {
+          "const": "equity",
+          "description": "Equity prices and dividends.",
+          "type": "string"
+        },
+        {
+          "const": "fx",
+          "description": "Foreign exchange rates.",
+          "type": "string"
+        },
+        {
+          "const": "volatility",
+          "description": "Implied and realized volatility.",
+          "type": "string"
+        },
+        {
+          "const": "commodity",
+          "description": "Commodity prices.",
+          "type": "string"
+        }
+      ]
+    },
+    "DateWire": {
+      "description": "ISO 8601 calendar date encoded as a `YYYY-MM-DD` JSON string.",
+      "format": "date",
+      "type": "string"
+    },
+    "TemplateSeverity": {
+      "description": "Severity classification for stress scenarios.\n\nThis label is intended for discovery and filtering rather than for pricing\nlogic. Registries and UIs can use it to group historical events by the\nmagnitude of the modeled dislocation.",
+      "oneOf": [
+        {
+          "const": "mild",
+          "description": "Mild stress with limited market dislocation.",
+          "type": "string"
+        },
+        {
+          "const": "moderate",
+          "description": "Moderate stress with broader but contained market impact.",
+          "type": "string"
+        },
+        {
+          "const": "severe",
+          "description": "Severe systemic stress with large cross-asset dislocations.",
+          "type": "string"
+        }
+      ]
+    }
+  },
+  "$id": "https://finstack_quant.dev/schemas/scenarios/1/template_metadata.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Descriptive metadata of a built-in scenario template.",
+  "properties": {
+    "asset_classes": {
+      "description": "Asset classes materially affected by the scenario.",
+      "items": {
+        "$ref": "#/$defs/AssetClass"
+      },
+      "type": "array"
+    },
+    "components": {
+      "description": "IDs of composable sub-component templates.\n\nEmpty when the template is atomic rather than a composite built from\nmultiple reusable scenario fragments.",
+      "items": {
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "description": {
+      "description": "Description of the historical event and modeled effects.",
+      "type": "string"
+    },
+    "event_date": {
+      "$ref": "#/$defs/DateWire",
+      "description": "Primary date associated with the historical event.\n\nThis is typically the date of the market dislocation rather than the\nvaluation date used when the template is later executed."
+    },
+    "id": {
+      "description": "Stable identifier for the template.",
+      "type": "string"
+    },
+    "name": {
+      "description": "Human-readable template name.",
+      "type": "string"
+    },
+    "severity": {
+      "$ref": "#/$defs/TemplateSeverity",
+      "description": "Severity classification for the template."
+    },
+    "tags": {
+      "description": "Freeform tags used for filtering and discovery.",
+      "items": {
+        "type": "string"
+      },
+      "type": "array"
+    }
+  },
+  "required": [
+    "id",
+    "name",
+    "description",
+    "event_date",
+    "asset_classes",
+    "tags",
+    "severity",
+    "components"
+  ],
+  "title": "TemplateMetadata",
+  "type": "object"
+}

@@ -13,7 +13,14 @@ use serde::{Deserialize, Serialize};
 /// test date is the last entry with date <= test_date. If no entry applies,
 /// [`ThresholdSchedule::threshold_for`] returns `None`.
 #[derive(Debug, Clone, PartialEq, Serialize)]
-pub struct ThresholdSchedule(Vec<(Date, f64)>);
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+pub struct ThresholdSchedule(
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "Vec<(finstack_quant_core::wire::DateWire, f64)>")
+    )]
+    Vec<(Date, f64)>,
+);
 
 impl<'de> Deserialize<'de> for ThresholdSchedule {
     fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>

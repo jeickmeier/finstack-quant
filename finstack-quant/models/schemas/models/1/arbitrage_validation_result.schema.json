@@ -1,0 +1,92 @@
+{
+  "$defs": {
+    "ButterflyViolation": {
+      "description": "A butterfly spread violation at a specific strike.",
+      "properties": {
+        "butterfly_value": {
+          "description": "Butterfly spread value (negative indicates violation)",
+          "format": "double",
+          "type": "number"
+        },
+        "severity_pct": {
+          "description": "Severity as percentage of mid-strike price",
+          "format": "double",
+          "type": "number"
+        },
+        "strike": {
+          "description": "Strike at which the violation occurs",
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "required": [
+        "strike",
+        "butterfly_value",
+        "severity_pct"
+      ],
+      "type": "object"
+    },
+    "MonotonicityViolation": {
+      "description": "A monotonicity violation between two strikes.",
+      "properties": {
+        "price_high": {
+          "description": "Call price at higher strike (should be lower)",
+          "format": "double",
+          "type": "number"
+        },
+        "price_low": {
+          "description": "Call price at lower strike",
+          "format": "double",
+          "type": "number"
+        },
+        "strike_high": {
+          "description": "Higher strike",
+          "format": "double",
+          "type": "number"
+        },
+        "strike_low": {
+          "description": "Lower strike",
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "required": [
+        "strike_low",
+        "strike_high",
+        "price_low",
+        "price_high"
+      ],
+      "type": "object"
+    }
+  },
+  "$id": "https://finstack_quant.dev/schemas/models/1/arbitrage_validation_result.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Result of arbitrage validation, containing any violations found.",
+  "properties": {
+    "arbitrage_free": {
+      "description": "`true` when both violation lists are empty.",
+      "type": "boolean"
+    },
+    "butterfly_violations": {
+      "description": "Strikes where butterfly spread is negative (convexity violation)",
+      "items": {
+        "$ref": "#/$defs/ButterflyViolation"
+      },
+      "type": "array"
+    },
+    "monotonicity_violations": {
+      "description": "Pairs of strikes where call prices increase (monotonicity violation)",
+      "items": {
+        "$ref": "#/$defs/MonotonicityViolation"
+      },
+      "type": "array"
+    }
+  },
+  "required": [
+    "arbitrage_free",
+    "butterfly_violations",
+    "monotonicity_violations"
+  ],
+  "title": "ArbitrageValidationResult",
+  "type": "object"
+}

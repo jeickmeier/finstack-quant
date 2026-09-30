@@ -79,6 +79,7 @@ impl GbmPathConfig {
 
 /// Compact captured GBM paths for plotting and diagnostics.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct GbmPathSummary {
     /// Number of independent estimators requested.
     pub num_paths: usize,

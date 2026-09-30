@@ -21,6 +21,7 @@ use indexmap::IndexMap;
 /// remain in the evaluated model currency, while coverage/leverage metrics are
 /// plain scalar ratios.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct CorporateAnalysis {
     /// Full statement evaluation (all nodes, all periods)
     pub statement: StatementResult,

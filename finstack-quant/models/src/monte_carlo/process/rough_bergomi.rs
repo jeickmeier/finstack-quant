@@ -98,6 +98,7 @@ use finstack_quant_core::math::fractional::HurstExponent;
 /// through plain-text serialization. On deserialization it defaults to a
 /// flat curve at 4% (20% vol).
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct RoughBergomiParams {
     /// Risk-free rate (annual, continuously compounded).
     pub r: f64,

@@ -746,6 +746,9 @@ run = [
   set -eu
   cargo build \
     -p finstack-quant-core --bin gen_core_schemas \
+    -p finstack-quant-analytics --bin gen_analytics_schemas \
+    -p finstack-quant-statements-analytics --bin gen_statements_analytics_schemas \
+    -p finstack-quant-covenants --bin gen_covenants_schemas \
     -p finstack-quant-attribution --bin gen_attribution_schemas \
     -p finstack-quant-calibration --bin gen_calibration_schemas \
     -p finstack-quant-cashflows --bin gen_cashflow_schemas \
@@ -758,6 +761,9 @@ run = [
   target_dir="${CARGO_TARGET_DIR:-target}"
   for bin in \
     gen_core_schemas \
+    gen_analytics_schemas \
+    gen_statements_analytics_schemas \
+    gen_covenants_schemas \
     gen_attribution_schemas \
     gen_calibration_schemas \
     gen_cashflow_schemas \
@@ -774,14 +780,19 @@ run = [
   "uv run --no-sync python scripts/check_schema_generation.py",
   """
   cargo nextest run --no-fail-fast -E '\
+    (binary_id(finstack-quant-analytics::analytics) & test(/schema_contract::/)) | \
+    (binary_id(finstack-quant-covenants::covenants) & test(/schema_contract::/)) | \
     (binary_id(finstack-quant-cashflows::cashflows) & test(/schema_roundtrip::/)) | \
     (binary_id(finstack-quant-portfolio::portfolio) & test(/materialization_schema/)) | \
+    (binary_id(finstack-quant-portfolio::portfolio) & test(/portfolio_schema_contract::/)) | \
     (binary_id(finstack-quant-margin::margin) & test(/schema_parity/)) | \
     (binary_id(finstack-quant-attribution::attribution) & test(/attribution::schema_contract::/)) | \
     (binary_id(finstack-quant-calibration::calibration) & test(/schema_parity/)) | \
     (binary_id(finstack-quant-statements::statements) & test(/schema_contract/)) | \
+    (binary_id(finstack-quant-statements-analytics::statements_analytics) & test(/analysis_schema_contract::/)) | \
     (binary_id(finstack-quant-scenarios::scenarios) & test(/schema_contract/)) | \
     (binary_id(finstack-quant-models::models) & test(/factor_schema_contract/)) | \
+    (binary_id(finstack-quant-models::models) & test(/model_schema_contract::/)) | \
     (binary_id(finstack-quant-valuations::valuations) & test(/schema_parity/)) | \
     (package(finstack-quant-valuations) & kind(lib) & test(/test_instrument_schema_union_parity/)) | \
     (binary_id(finstack-quant-valuations::valuations) & test(/schema_audit/))'
@@ -794,6 +805,9 @@ run = '''
 set -eu
 cargo build \
   -p finstack-quant-core --bin gen_core_schemas \
+  -p finstack-quant-analytics --bin gen_analytics_schemas \
+  -p finstack-quant-statements-analytics --bin gen_statements_analytics_schemas \
+  -p finstack-quant-covenants --bin gen_covenants_schemas \
   -p finstack-quant-attribution --bin gen_attribution_schemas \
   -p finstack-quant-calibration --bin gen_calibration_schemas \
   -p finstack-quant-cashflows --bin gen_cashflow_schemas \
@@ -806,6 +820,9 @@ cargo build \
 target_dir="${CARGO_TARGET_DIR:-target}"
 for bin in \
   gen_core_schemas \
+  gen_analytics_schemas \
+  gen_statements_analytics_schemas \
+  gen_covenants_schemas \
   gen_attribution_schemas \
   gen_calibration_schemas \
   gen_cashflow_schemas \

@@ -23,7 +23,8 @@ pub use downturn::{DownturnLgd, DownturnMethod};
 pub use ead::{CreditConversionFactor, EadCalculator};
 pub use seniority::{BetaRecovery, SeniorityCalibration, SeniorityClass, SeniorityRecovery};
 pub use workout::{
-    CollateralPiece, CollateralType, WorkoutCosts, WorkoutLgd, WorkoutLgdBuilder, WorkoutLgdResult,
+    CollateralPiece, WorkoutCollateralType, WorkoutCosts, WorkoutLgd, WorkoutLgdBuilder,
+    WorkoutLgdResult,
 };
 
 /// Return historical recovery distribution parameters for a seniority class.
@@ -136,7 +137,7 @@ pub fn workout_lgd(
     let pieces = collateral
         .into_iter()
         .map(|(type_name, value, haircut)| {
-            let collateral_type = type_name.parse::<CollateralType>()?;
+            let collateral_type = type_name.parse::<WorkoutCollateralType>()?;
             CollateralPiece::new(collateral_type, value, haircut)
         })
         .collect::<finstack_quant_core::Result<Vec<_>>>()?;

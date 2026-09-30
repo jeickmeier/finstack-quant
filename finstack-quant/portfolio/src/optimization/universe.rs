@@ -9,6 +9,7 @@ use std::sync::Arc;
 
 /// Filters for selecting which positions are included in a rule.
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(rename_all = "snake_case", deny_unknown_fields)]
 pub enum PositionFilter {
     /// All positions in the portfolio.
@@ -65,6 +66,8 @@ impl PositionFilter {
 /// This represents an instrument not currently held but available for trading.
 /// The optimizer can allocate weight to candidates (up to `max_weight`).
 #[derive(Clone)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[cfg_attr(feature = "json-schema", schemars(with = "CandidatePositionSpec"))]
 pub struct CandidatePosition {
     /// Unique identifier for this candidate (becomes `PositionId` if traded).
     pub id: PositionId,
@@ -179,6 +182,8 @@ impl CandidatePosition {
 /// Wire form of [`CandidatePosition`]: the instrument travels as its
 /// canonical tagged JSON payload instead of a trait object.
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[cfg_attr(feature = "json-schema", schemars(rename = "CandidatePosition"))]
 #[serde(deny_unknown_fields)]
 struct CandidatePositionSpec {
     id: PositionId,
@@ -251,6 +256,7 @@ impl<'de> Deserialize<'de> for CandidatePosition {
 /// Serializes with serde; candidate instruments travel as their canonical
 /// tagged JSON payload (see [`CandidatePosition`]).
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(default, deny_unknown_fields)]
 pub struct TradeUniverse {
     /// Filter for existing positions that can be traded.

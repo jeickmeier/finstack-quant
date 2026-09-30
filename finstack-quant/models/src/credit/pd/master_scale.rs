@@ -27,12 +27,14 @@ use super::error::PdCalibrationError;
 /// assert_eq!(result.grade, "BBB");
 /// ```
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(try_from = "MasterScaleWire")]
 pub struct MasterScale {
     grades: Vec<MasterScaleGrade>,
 }
 
 #[derive(Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 struct MasterScaleWire {
     grades: Vec<MasterScaleGrade>,
@@ -48,6 +50,7 @@ impl TryFrom<MasterScaleWire> for MasterScale {
 
 /// A single grade in a master scale.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct MasterScaleGrade {
     /// Grade label (e.g., "AAA", "Aaa", "1", etc.).
     pub label: String,
@@ -64,6 +67,7 @@ pub struct MasterScaleGrade {
 
 /// Result of mapping a PD to a master scale grade.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct MasterScaleResult {
     /// The assigned rating grade label.
     pub grade: String,

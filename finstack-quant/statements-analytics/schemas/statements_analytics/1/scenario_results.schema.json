@@ -1,0 +1,10 @@
+{
+  "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/scenario_results.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": {
+    "$ref": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json"
+  },
+  "description": "Evaluated results for all scenarios in a `ScenarioSet`.",
+  "title": "ScenarioResults",
+  "type": "object"
+}

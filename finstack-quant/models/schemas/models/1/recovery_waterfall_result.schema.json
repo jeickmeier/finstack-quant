@@ -1,0 +1,99 @@
+{
+  "$defs": {
+    "RecoveryAllocation": {
+      "description": "Recovery allocated to one claim.",
+      "properties": {
+        "collateral_recovery": {
+          "description": "Recovery funded by net pledged collateral.",
+          "format": "double",
+          "type": "number"
+        },
+        "deficiency": {
+          "description": "Unrecovered allowed claim amount.",
+          "format": "double",
+          "type": "number"
+        },
+        "general_recovery": {
+          "description": "Recovery funded by the residual general estate.",
+          "format": "double",
+          "type": "number"
+        },
+        "id": {
+          "description": "Stable claim identifier.",
+          "type": "string"
+        },
+        "priority": {
+          "description": "Absolute-priority rank.",
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "recovery_rate": {
+          "description": "Total recovery divided by the allowed claim; zero for a zero claim.",
+          "format": "double",
+          "type": "number"
+        },
+        "seniority": {
+          "description": "Caller-defined seniority label.",
+          "type": "string"
+        },
+        "total_claim": {
+          "description": "Total allowed claim amount.",
+          "format": "double",
+          "type": "number"
+        },
+        "total_recovery": {
+          "description": "Total recovery from collateral and the general estate.",
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "required": [
+        "id",
+        "seniority",
+        "priority",
+        "total_claim",
+        "collateral_recovery",
+        "general_recovery",
+        "total_recovery",
+        "recovery_rate",
+        "deficiency"
+      ],
+      "type": "object"
+    }
+  },
+  "$id": "https://finstack_quant.dev/schemas/models/1/recovery_waterfall_result.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Result of allocating a distributable estate across claims.",
+  "properties": {
+    "allocations": {
+      "description": "Per-claim allocations ordered by priority, then original input order.",
+      "items": {
+        "$ref": "#/$defs/RecoveryAllocation"
+      },
+      "type": "array"
+    },
+    "apr_satisfied": {
+      "description": "Whether the residual estate was allocated in absolute-priority order.",
+      "type": "boolean"
+    },
+    "total_distributed": {
+      "description": "Total value distributed to claims.",
+      "format": "double",
+      "type": "number"
+    },
+    "undistributed_estate": {
+      "description": "Estate value remaining after all allowed claims are satisfied.",
+      "format": "double",
+      "type": "number"
+    }
+  },
+  "required": [
+    "total_distributed",
+    "undistributed_estate",
+    "apr_satisfied",
+    "allocations"
+  ],
+  "title": "RecoveryWaterfallResult",
+  "type": "object"
+}

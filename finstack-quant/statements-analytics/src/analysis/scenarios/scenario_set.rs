@@ -59,6 +59,7 @@ use serde_json::json;
 /// }
 /// ```
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct ScenarioDefinition {
     /// Optional parent scenario to inherit overrides from.
@@ -93,6 +94,7 @@ pub struct ScenarioDefinition {
 /// surface. Overrides preserve scalar/monetary units while broadcasting across
 /// forecast periods.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct ScenarioSet {
     /// Map of scenario name → definition.
@@ -101,6 +103,7 @@ pub struct ScenarioSet {
 
 /// Evaluated results for all scenarios in a [`ScenarioSet`].
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(transparent)]
 pub struct ScenarioResults {
     /// Map of scenario name → evaluated [`StatementResult`] for that scenario.
@@ -112,6 +115,7 @@ pub struct ScenarioResults {
 /// This is a thin wrapper around [`VarianceReport`] that keeps track of the
 /// baseline and comparison scenario names.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct ScenarioDiff {
     /// Baseline scenario name.
     pub baseline: String,

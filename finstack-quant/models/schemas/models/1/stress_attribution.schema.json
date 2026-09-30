@@ -1,0 +1,111 @@
+{
+  "$defs": {
+    "StressPositionEntry": {
+      "description": "Single position's contribution to tail stress.",
+      "properties": {
+        "avg_tail_pnl": {
+          "description": "Average P&L contribution in tail scenarios.",
+          "format": "double",
+          "type": "number"
+        },
+        "pct_of_tail_loss": {
+          "description": "Fraction of total portfolio tail loss attributable to this position.",
+          "format": "double",
+          "type": "number"
+        },
+        "position_id": {
+          "description": "Position identifier.",
+          "type": "string"
+        },
+        "worst_scenario_pnl": {
+          "description": "Worst single-scenario P&L for this position.",
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "required": [
+        "position_id",
+        "avg_tail_pnl",
+        "pct_of_tail_loss",
+        "worst_scenario_pnl"
+      ],
+      "type": "object"
+    },
+    "TailScenarioBreakdown": {
+      "description": "Breakdown of a single tail scenario.",
+      "properties": {
+        "portfolio_pnl": {
+          "description": "Total portfolio P&L for this scenario.",
+          "format": "double",
+          "type": "number"
+        },
+        "position_pnls": {
+          "description": "Per-position P&L contributions, index-aligned to\n[`StressAttribution::position_ids`]. Entry `i` is the P&L for\n`StressAttribution::position_ids[i]`.",
+          "items": {
+            "format": "double",
+            "type": "number"
+          },
+          "type": "array"
+        },
+        "scenario_index": {
+          "description": "Scenario index in the original history.",
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "scenario_index",
+        "portfolio_pnl",
+        "position_pnls"
+      ],
+      "type": "object"
+    }
+  },
+  "$id": "https://finstack_quant.dev/schemas/models/1/stress_attribution.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Per-position attribution of portfolio losses in tail scenarios.",
+  "properties": {
+    "n_tail_scenarios": {
+      "description": "Number of tail scenarios analyzed.",
+      "format": "uint",
+      "minimum": 0,
+      "type": "integer"
+    },
+    "position_contributions": {
+      "description": "Per-position average contribution to tail losses.\n\nSorted by absolute contribution (largest risk driver first).",
+      "items": {
+        "$ref": "#/$defs/StressPositionEntry"
+      },
+      "type": "array"
+    },
+    "position_ids": {
+      "description": "Canonical position ordering shared by every [`tail_scenarios`] entry.\n\n`tail_scenarios[k].position_pnls[i]` is the P&L for `position_ids[i]`.\nStoring the id list once here (rather than re-attaching it to every tail\nscenario) avoids duplicating it `n_tail_scenarios` times.\n\n[`tail_scenarios`]: Self::tail_scenarios",
+      "items": {
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "tail_scenarios": {
+      "description": "Individual tail scenario breakdowns.\n\nContains `n_tail_scenarios` entries, each with per-position P&L\nindex-aligned to [`position_ids`](Self::position_ids).\nSorted by portfolio loss (worst first).",
+      "items": {
+        "$ref": "#/$defs/TailScenarioBreakdown"
+      },
+      "type": "array"
+    },
+    "var_threshold": {
+      "description": "Portfolio VaR threshold (scenarios with P&L at or below this are\n\"tail events\"). Loss convention: reported as a negative number.",
+      "format": "double",
+      "type": "number"
+    }
+  },
+  "required": [
+    "var_threshold",
+    "n_tail_scenarios",
+    "position_ids",
+    "position_contributions",
+    "tail_scenarios"
+  ],
+  "title": "StressAttribution",
+  "type": "object"
+}

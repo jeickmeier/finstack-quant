@@ -12,7 +12,7 @@ autotests = false
 
 [dependencies]
 finstack-quant-core = { path = "../core", version = "0.9.0", default-features = false }
-finstack-quant-analytics = { path = "../analytics", version = "0.9.0" }
+finstack-quant-analytics = { path = "../analytics", version = "0.9.0", default-features = false }
 finstack-quant-cashflows = { path = "../cashflows", version = "0.9.0", default-features = false }
 indexmap = { workspace = true, features = ["serde"] }
 smallvec = { version = "1.15", default-features = false, features = ["serde"] }
@@ -38,6 +38,7 @@ default = ["json-schema"]
 json-schema = [
     "dep:schemars",
     "finstack-quant-core/json-schema",
+    "finstack-quant-analytics/json-schema",
     "finstack-quant-cashflows/json-schema",
 ]
 

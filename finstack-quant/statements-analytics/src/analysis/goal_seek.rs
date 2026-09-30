@@ -57,6 +57,7 @@ use std::cell::RefCell;
 /// or null>}`; `model` is always present and is `null` unless the solve was
 /// asked to return the updated model.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct GoalSeekResult {
     /// Driver value, in the driver node's own units (the currency amount for

@@ -1,0 +1,42 @@
+{
+  "$id": "https://finstack_quant.dev/schemas/models/1/volatility_convention.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Volatility quoting convention.",
+  "oneOf": [
+    {
+      "const": "normal",
+      "description": "Normal absolute volatility in decimal rate units per square-root year",
+      "type": "string"
+    },
+    {
+      "const": "lognormal",
+      "description": "Lognormal (Black) relative volatility as a decimal per square-root year",
+      "type": "string"
+    },
+    {
+      "additionalProperties": false,
+      "description": "Shifted lognormal for negative rates",
+      "properties": {
+        "shifted_lognormal": {
+          "additionalProperties": false,
+          "properties": {
+            "shift": {
+              "description": "Additive displacement in the same decimal rate or price units as forward and strike",
+              "format": "double",
+              "type": "number"
+            }
+          },
+          "required": [
+            "shift"
+          ],
+          "type": "object"
+        }
+      },
+      "required": [
+        "shifted_lognormal"
+      ],
+      "type": "object"
+    }
+  ],
+  "title": "VolatilityConvention"
+}

@@ -20,6 +20,7 @@ use serde::{Deserialize, Serialize};
 /// The default is [`SpreadVolatilityKind::Relative`] to match the original
 /// Bangia convention.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(rename_all = "snake_case")]
 pub enum SpreadVolatilityKind {
     /// Standard deviation of the relative (fractional) bid-ask spread
@@ -48,6 +49,8 @@ pub enum SpreadVolatilityKind {
 ///
 /// - Bid-ask spread conventions: `docs/REFERENCES.md#hasbrouck-2007`
 #[derive(Clone, Debug, PartialEq, Serialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[cfg_attr(feature = "json-schema", schemars(deny_unknown_fields))]
 pub struct LiquidityProfile {
     /// Instrument identifier (must match `Position::instrument_id`).
     pub instrument_id: String,
@@ -251,6 +254,7 @@ impl LiquidityProfile {
 ///
 /// - AIFMD liquidity bucketing: `docs/REFERENCES.md#aifmd-liquidity-management`
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(rename_all = "snake_case")]
 pub enum LiquidityTier {
     /// Tier 1: < 1 day to liquidate (highly liquid).
@@ -308,6 +312,7 @@ impl LiquidityTier {
 /// [`crate::liquidity::TradeParams::risk_aversion`], and the VaR confidence
 /// is an explicit argument to [`crate::liquidity::lvar_bangia_scalar`].
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct LiquidityConfig {
     /// Days-to-liquidate thresholds for tier boundaries.

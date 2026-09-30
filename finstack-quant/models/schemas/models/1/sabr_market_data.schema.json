@@ -1,0 +1,55 @@
+{
+  "$id": "https://finstack_quant.dev/schemas/models/1/sabr_market_data.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Market data for SABR calibration.",
+  "properties": {
+    "beta": {
+      "description": "Fixed beta parameter",
+      "format": "double",
+      "type": "number"
+    },
+    "forward": {
+      "description": "Forward price",
+      "format": "double",
+      "type": "number"
+    },
+    "market_vols": {
+      "description": "Market implied volatilities",
+      "items": {
+        "format": "double",
+        "type": "number"
+      },
+      "type": "array"
+    },
+    "shift": {
+      "description": "Optional shift for handling negative rates in lognormal SABR (beta ≈ 1.0)\nDefault: 0.02 (200 basis points) if None and rates are negative",
+      "format": "double",
+      "type": [
+        "number",
+        "null"
+      ]
+    },
+    "strikes": {
+      "description": "Strike prices",
+      "items": {
+        "format": "double",
+        "type": "number"
+      },
+      "type": "array"
+    },
+    "time_to_expiry": {
+      "description": "Time to expiry",
+      "format": "double",
+      "type": "number"
+    }
+  },
+  "required": [
+    "forward",
+    "time_to_expiry",
+    "strikes",
+    "market_vols",
+    "beta"
+  ],
+  "title": "SabrMarketData",
+  "type": "object"
+}

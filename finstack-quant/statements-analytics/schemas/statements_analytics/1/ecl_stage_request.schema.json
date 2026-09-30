@@ -1,0 +1,70 @@
+{
+  "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/ecl_stage_request.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Inputs for the simplified IFRS 9 stage-classification workflow.",
+  "properties": {
+    "current_pd": {
+      "description": "Current lifetime probability of default as a decimal probability.",
+      "format": "double",
+      "type": "number"
+    },
+    "days_past_due": {
+      "default": null,
+      "description": "Current days past due; `None` applies the performing-exposure default\nof zero days.",
+      "format": "uint32",
+      "minimum": 0,
+      "type": [
+        "integer",
+        "null"
+      ]
+    },
+    "dpd_stage2_trigger": {
+      "default": null,
+      "description": "Whether to apply the canonical Stage 2 days-past-due backstop; `None`\nenables the backstop.",
+      "type": [
+        "boolean",
+        "null"
+      ]
+    },
+    "dpd_stage3_trigger": {
+      "default": null,
+      "description": "Whether to apply the canonical Stage 3 days-past-due backstop; `None`\nenables the backstop.",
+      "type": [
+        "boolean",
+        "null"
+      ]
+    },
+    "exposure_id": {
+      "description": "Stable identifier used to label the classified exposure.",
+      "type": "string"
+    },
+    "origination_pd": {
+      "description": "Lifetime probability of default at initial recognition as a decimal\nprobability.",
+      "format": "double",
+      "type": "number"
+    },
+    "pd_delta_absolute": {
+      "default": null,
+      "description": "Optional absolute lifetime-PD increase that triggers Stage 2; `None`\nuses the default IFRS 9 staging-policy threshold.",
+      "format": "double",
+      "type": [
+        "number",
+        "null"
+      ]
+    },
+    "remaining_maturity_years": {
+      "description": "Remaining contractual or behavioural maturity in years, used as the\nlifetime-PD comparison horizon subject to the canonical SICR cap.",
+      "format": "double",
+      "type": "number"
+    }
+  },
+  "required": [
+    "exposure_id",
+    "remaining_maturity_years",
+    "current_pd",
+    "origination_pd"
+  ],
+  "title": "EclStageRequest",
+  "type": "object"
+}

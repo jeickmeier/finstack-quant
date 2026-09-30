@@ -11,6 +11,7 @@ use thiserror::Error;
 /// and `implied_pd` contains a probability only when the model has a native
 /// probability transform or an explicit calibration was requested.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct ScoringResult {
     /// The raw score value (Z, Z', Z'', O, or Zmijewski Y).
     pub score: f64,
@@ -33,6 +34,7 @@ pub struct ScoringResult {
 /// - `Grey`: ambiguous / requires further analysis.
 /// - `Distress`: high bankruptcy probability.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(rename_all = "snake_case")]
 pub enum ScoringZone {
     /// Safe zone (low bankruptcy probability).

@@ -1,6 +1,13 @@
 // Generated from the finstack-quant-scenarios JSON schemas by scripts/generate-contract-types.mjs. Do not edit.
 
 /**
+ * Asset class categories affected by a stress template.
+ *
+ * These values describe the primary risk buckets touched by a historical
+ * scenario so registries can expose coarse filtering and search.
+ */
+export type AssetClass = "rates" | "credit" | "equity" | "fx" | "volatility" | "commodity";
+/**
  * Compounding convention for interest rates.
  *
  * Used to specify how interest rates should be quoted or converted.
@@ -211,6 +218,10 @@ export type Currency =
  * ```
  */
 export type CurveKind = "discount" | "forward" | "par_cds" | "inflation" | "commodity";
+/**
+ * ISO 8601 calendar date encoded as a `YYYY-MM-DD` JSON string.
+ */
+export type DateWire = string;
 /**
  * Supported day-count conventions with industry-standard definitions.
  *
@@ -848,6 +859,14 @@ export type ResolutionMode = "most_specific_wins" | "cumulative";
  * Exact schema marker accepted by [`ScenarioEnvelope`].
  */
 export type ScenarioSchema = "finstack_quant.scenario/1";
+/**
+ * Severity classification for stress scenarios.
+ *
+ * This label is intended for discovery and filtering rather than for pricing
+ * logic. Registries and UIs can use it to group historical events by the
+ * magnitude of the modeled dislocation.
+ */
+export type TemplateSeverity = "mild" | "moderate" | "severe";
 
 /**
  * A target specifying a hierarchy path with optional tag filtering.
@@ -1014,4 +1033,47 @@ export interface ScenarioSpec {
    * Default: [`ResolutionMode::MostSpecificWins`].
    */
   resolution_mode?: ResolutionMode;
+}
+/**
+ * Descriptive metadata of a built-in scenario template.
+ */
+export interface TemplateMetadata {
+  /**
+   * Asset classes materially affected by the scenario.
+   */
+  asset_classes: AssetClass[];
+  /**
+   * IDs of composable sub-component templates.
+   *
+   * Empty when the template is atomic rather than a composite built from
+   * multiple reusable scenario fragments.
+   */
+  components: string[];
+  /**
+   * Description of the historical event and modeled effects.
+   */
+  description: string;
+  /**
+   * Primary date associated with the historical event.
+   *
+   * This is typically the date of the market dislocation rather than the
+   * valuation date used when the template is later executed.
+   */
+  event_date: DateWire;
+  /**
+   * Stable identifier for the template.
+   */
+  id: string;
+  /**
+   * Human-readable template name.
+   */
+  name: string;
+  /**
+   * Severity classification for the template.
+   */
+  severity: TemplateSeverity;
+  /**
+   * Freeform tags used for filtering and discovery.
+   */
+  tags: string[];
 }

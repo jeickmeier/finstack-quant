@@ -1,0 +1,29 @@
+{
+  "$id": "https://finstack_quant.dev/schemas/models/1/cir_params.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "CIR process parameters.",
+  "properties": {
+    "kappa": {
+      "description": "Mean reversion speed (κ)",
+      "format": "double",
+      "type": "number"
+    },
+    "sigma": {
+      "description": "Volatility of volatility (σ)",
+      "format": "double",
+      "type": "number"
+    },
+    "theta": {
+      "description": "Long-term mean (θ)",
+      "format": "double",
+      "type": "number"
+    }
+  },
+  "required": [
+    "kappa",
+    "theta",
+    "sigma"
+  ],
+  "title": "CirParams",
+  "type": "object"
+}

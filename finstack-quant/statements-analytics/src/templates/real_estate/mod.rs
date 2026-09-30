@@ -207,6 +207,7 @@ fn default_occupancy() -> f64 {
 ///
 /// The lease `growth_rate` then applies from this step forward until the next step.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct RentStepSpec {
     /// Period (inclusive) when this rent level becomes effective.
@@ -217,6 +218,7 @@ pub struct RentStepSpec {
 
 /// Free rent (concession) window that zeros out rent for `periods` starting at `start`.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct FreeRentWindowSpec {
     /// Period (inclusive) when free rent starts.
@@ -229,6 +231,7 @@ pub struct FreeRentWindowSpec {
 ///
 /// This is modeled in an **expected value** sense via `probability`.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct RenewalSpec {
     /// Downtime (no rent) after the initial term ends.
@@ -313,6 +316,7 @@ impl RenewalSpec {
 /// - `PerPeriod`: `growth_rate` is applied every model period. Must be set
 ///   explicitly; omitted / defaulted values are never per-period.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(rename_all = "snake_case")]
 pub enum LeaseGrowthConvention {
     /// Growth rate compounds every model period.
@@ -331,6 +335,7 @@ pub enum LeaseGrowthConvention {
 /// Renewal probability is interpreted in expected-value terms, so vacancy and
 /// effective-rent outputs include the weighting implicitly.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct LeaseSpec {
     /// Base id used to derive node ids:
@@ -452,6 +457,7 @@ impl LeaseSpec {
 /// `vacancy_loss_physical` and `renewal_prob_loss` in addition to these
 /// configurable aggregate outputs.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct RentRollOutputNodes {
     /// Total contractual rent (PGI) from all leases.
@@ -790,6 +796,7 @@ pub fn add_rent_roll(
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "snake_case")]
 #[derive(Default)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub enum ManagementFeeBase {
     /// Fee is applied to EGI.
     #[default]
@@ -802,6 +809,7 @@ pub enum ManagementFeeBase {
 ///
 /// `rate` is a decimal fraction, so `0.03` means `3%`.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct ManagementFeeSpec {
     /// Management fee rate as a decimal fraction (e.g., 0.03 for 3%).
@@ -826,6 +834,7 @@ impl Default for ManagementFeeSpec {
 /// [`add_property_operating_statement`]. Per-lease detail nodes from the rent
 /// roll remain derived from the individual lease ids.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct PropertyTemplateNodes {
     /// Rent roll output nodes (PGI/free rent/vacancy/effective rent).

@@ -13,6 +13,7 @@ use serde::{Deserialize, Serialize};
 /// confidence interval in [`finstack_quant_core::money::Money`] after choosing a
 /// currency.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct Estimate {
     /// Mean of the discounted path values.

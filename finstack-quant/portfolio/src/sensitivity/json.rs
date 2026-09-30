@@ -40,6 +40,7 @@ pub const DEFAULT_PNL_SCENARIO_POINTS: usize = 5;
 /// # Ok::<(), Box<dyn std::error::Error>>(())
 /// ```
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct SensitivityMatrixJson {
     /// Reporting currency of every monetary sensitivity.

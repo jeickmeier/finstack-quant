@@ -1,0 +1,71 @@
+{
+  "$defs": {
+    "NodeId": {
+      "description": "Type-safe identifier for a node in a financial model.\n\nSerializes as a plain string and is interoperable with `&str` via\n[`Borrow`] and [`AsRef`].",
+      "type": "string"
+    },
+    "SignConventionPolicy": {
+      "description": "Declared sign convention for a flow / magnitude input to a reconciliation\ncheck.\n\nEach reconciliation declares its input expectation so callers can\nvalidate data at construction time rather than at P&L\nreconciliation. Previously each reconciliation embedded its sign\nassumptions implicitly (e.g. `CapexReconciliation` expected\n`capex_cf` to be a positive magnitude while INVARIANTS.md §3\ndocumented the CFS convention as negative), which produced silent\ncross-check failures on any model that used the other convention.\n\n# Variants\n\n* [`Self::MagnitudePositive`] — the value is a non-negative magnitude;\n  direction (inflow vs outflow) is encoded in the reconciliation's\n  formula via `+` / `-` operators. Used by capex, depreciation,\n  dividends, and disposal magnitudes across the cross-statement\n  reconciliations.\n* [`Self::InflowPositive`] — the value is a signed flow where positive\n  means \"inflow\" / \"addition\" and negative means \"outflow\" /\n  \"reduction\". Used by `total_cash_flow` in `CashReconciliation` and\n  `net_income` in `RetainedEarningsReconciliation`.",
+      "oneOf": [
+        {
+          "const": "magnitude_positive",
+          "description": "The value must be a non-negative magnitude (the reconciliation's\nformula adds or subtracts it explicitly). This is the default for\nhistorical reasons — every reconciliation in the current code\nassumes magnitudes are positive.",
+          "type": "string"
+        },
+        {
+          "const": "inflow_positive",
+          "description": "The value is signed: positive = inflow / addition, negative =\noutflow / reduction.",
+          "type": "string"
+        }
+      ]
+    }
+  },
+  "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/depreciation_reconciliation.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Verifies PP&E(t) = PP&E(t−1) + Capex(t) − D&A(t) − Disposals(t).",
+  "properties": {
+    "capex_node": {
+      "$ref": "#/$defs/NodeId",
+      "description": "Capital expenditures node (cash flow statement / investing)."
+    },
+    "depreciation_expense_node": {
+      "$ref": "#/$defs/NodeId",
+      "description": "D&A expense node (income statement)."
+    },
+    "disposals_node": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/NodeId"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "Optional asset disposals node."
+    },
+    "ppe_node": {
+      "$ref": "#/$defs/NodeId",
+      "description": "PP&E balance node (balance sheet)."
+    },
+    "sign_convention": {
+      "$ref": "#/$defs/SignConventionPolicy",
+      "default": "magnitude_positive",
+      "description": "Sign convention applied to `capex_node`,\n`depreciation_expense_node`, and `disposals_node`. Defaults to\n[`SignConventionPolicy::MagnitudePositive`]."
+    },
+    "tolerance": {
+      "description": "Tolerance override; falls back to\n[`finstack_quant_statements::checks::CheckConfig::default_tolerance`].",
+      "format": "double",
+      "type": [
+        "number",
+        "null"
+      ]
+    }
+  },
+  "required": [
+    "depreciation_expense_node",
+    "ppe_node",
+    "capex_node"
+  ],
+  "title": "DepreciationReconciliation",
+  "type": "object"
+}

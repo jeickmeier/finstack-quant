@@ -31,12 +31,14 @@ fn collect_schema_files(directory: &Path, paths: &mut Vec<PathBuf>) {
     }
 }
 
-fn external_schema_resources() -> Vec<(String, jsonschema::Resource)> {
+/// Every published schema a portfolio artifact may reference by `$id`.
+pub(crate) fn external_schema_resources() -> Vec<(String, jsonschema::Resource)> {
     let manifest_dir = Path::new(env!("CARGO_MANIFEST_DIR"));
     let roots = [
         manifest_dir.join("../cashflows/schemas/cashflow/1"),
         manifest_dir.join("../valuations/schemas/common/1"),
         manifest_dir.join("../valuations/schemas/instruments/1"),
+        manifest_dir.join("../valuations/schemas/results/1"),
     ];
     let mut paths = Vec::new();
     for root in roots {

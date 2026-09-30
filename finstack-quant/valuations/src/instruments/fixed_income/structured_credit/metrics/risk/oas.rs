@@ -47,6 +47,7 @@ const OAS_INSTRUMENT_STREAM_OFFSET: u64 = 1 << 40;
 
 /// Configuration for the structured-credit OAS calculation.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct OasConfig {
     /// Number of Monte-Carlo scenarios (forced to 1 when neither dimension is
@@ -90,6 +91,7 @@ impl Default for OasConfig {
 
 /// Result of an OAS calculation.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct OasResult {
     /// Option-adjusted spread (decimal; `0.01` = 100 bp).
     pub oas: f64,

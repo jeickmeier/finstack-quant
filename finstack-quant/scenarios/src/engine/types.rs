@@ -82,6 +82,7 @@ pub(crate) struct HazardApplyEnv<'a> {
 /// identifier is a resolved market identifier rather than an unresolved
 /// hierarchy path or a best-effort reconstruction of the original spec.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
 pub enum ScenarioMarketTarget {
     /// A discount, forward, credit, inflation, or commodity curve.
@@ -126,12 +127,14 @@ pub enum ScenarioMarketTarget {
 /// instruments that actually changed, while `all_dirty` provides a
 /// conservative escape hatch for changes that cannot be represented precisely.
 #[derive(Debug, Clone, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct ScenarioChangeManifest {
     /// Concrete market-data targets changed by applied effects.
     pub market_targets: Vec<ScenarioMarketTarget>,
     /// Zero-based indices of portfolio instruments mutated in place.
     #[serde(with = "finstack_quant_core::wire::counts")]
+    #[cfg_attr(feature = "json-schema", schemars(with = "Vec<u32>"))]
     pub changed_instrument_indices: Vec<usize>,
     /// Whether the execution context's effective valuation date changed.
     pub as_of_changed: bool,
@@ -181,11 +184,20 @@ impl ScenarioChangeManifest {
 /// assert_eq!(report.days, 31);
 /// ```
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct RollForwardReport {
     /// Original as-of date.
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "finstack_quant_core::wire::DateWire")
+    )]
     pub old_date: finstack_quant_core::dates::Date,
 
     /// New as-of date after roll.
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "finstack_quant_core::wire::DateWire")
+    )]
     pub new_date: finstack_quant_core::dates::Date,
 
     /// Calendar days between `old_date` and `new_date`.
@@ -196,6 +208,7 @@ pub struct RollForwardReport {
     /// `old_date` is still calendar days. Downstream ACT/365F annualization
     /// depends on this.
     #[serde(with = "finstack_quant_core::wire::signed_count")]
+    #[cfg_attr(feature = "json-schema", schemars(with = "i32"))]
     pub days: i64,
 
     /// Per-instrument carry accrual (if instruments provided), grouped by currency.
@@ -231,6 +244,7 @@ pub struct RollForwardReport {
 /// assert_eq!(report.expanded_operations, 3);
 /// ```
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct ApplicationReport {
     /// Number of effects successfully applied to the execution context.
@@ -240,10 +254,12 @@ pub struct ApplicationReport {
     /// is therefore not an operation-coverage ratio; inspect `changes` and
     /// `warnings` to determine which targets changed or were skipped.
     #[serde(with = "finstack_quant_core::wire::count")]
+    #[cfg_attr(feature = "json-schema", schemars(with = "u32"))]
     pub operations_applied: usize,
     /// Number of user-provided `OperationSpec` entries in the scenario
     /// (before hierarchy expansion and deduplication).
     #[serde(with = "finstack_quant_core::wire::count")]
+    #[cfg_attr(feature = "json-schema", schemars(with = "u32"))]
     pub user_operations: usize,
     /// Number of direct (non-hierarchy) operations produced after hierarchy
     /// expansion and resolution-mode deduplication. No-match expansion and
@@ -251,6 +267,7 @@ pub struct ApplicationReport {
     /// `operations_applied` counts effects rather than operations, the two
     /// counters are not directly comparable.
     #[serde(with = "finstack_quant_core::wire::count")]
+    #[cfg_attr(feature = "json-schema", schemars(with = "u32"))]
     pub expanded_operations: usize,
 
     /// Authoritative metadata describing the state changed by applied effects.

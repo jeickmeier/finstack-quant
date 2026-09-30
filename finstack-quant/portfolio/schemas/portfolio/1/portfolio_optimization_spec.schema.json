@@ -1,0 +1,1783 @@
+{
+  "$defs": {
+    "AttributeTest": {
+      "additionalProperties": false,
+      "description": "Predicate that tests a single position attribute against a value.\n\nReusable building block for [`crate::optimization::PositionFilter::ByAttribute`]\nand [`crate::optimization::PerPositionMetric::AttributeIndicator`].",
+      "properties": {
+        "key": {
+          "description": "Attribute key to test.",
+          "type": "string"
+        },
+        "op": {
+          "$ref": "#/$defs/ComparisonOp",
+          "description": "Comparison operator."
+        },
+        "value": {
+          "$ref": "#/$defs/AttributeValue",
+          "description": "Value to compare against."
+        }
+      },
+      "required": [
+        "key",
+        "op",
+        "value"
+      ],
+      "type": "object"
+    },
+    "AttributeValue": {
+      "anyOf": [
+        {
+          "description": "Categorical / string attribute (e.g., rating = \"CCC\", sector = \"Energy\").",
+          "type": "string"
+        },
+        {
+          "description": "Numeric attribute (e.g., credit_score = 650.0, esg_score = 72.5).",
+          "format": "double",
+          "type": "number"
+        }
+      ],
+      "description": "Value stored in a position or candidate attribute.\n\nPositions carry key/value attributes for grouping, filtering, and\noptimization constraints.  Text values represent categorical data\n(rating, sector), while numeric values represent continuous data\n(credit score, ESG score) usable in metric expressions."
+    },
+    "Book": {
+      "additionalProperties": false,
+      "description": "A book represents a folder-like organizational unit within a portfolio.\n\nBooks can contain positions and/or child books, forming a hierarchical tree.\nThis allows multi-level aggregation (e.g., Americas > Credit > Investment Grade).\n\n# Design\n\n- Flat position list is default; books are optional\n- Parent-child relationships tracked via `parent_id` field\n- Positions reference books via optional `book_id` field\n- Positions without `book_id` are not in any book\n- Book hierarchies are expected to be acyclic trees or forests; aggregation\n  helpers reject cycles and excessively deep nesting instead of recursing\n  indefinitely\n- [`Book::child_book_ids`] drives rollup in [`crate::grouping::aggregate_by_book`];\n  [`crate::portfolio::Portfolio::validate`] checks parent/child consistency\n  between child lists and [`Book::parent_id`]",
+      "properties": {
+        "child_book_ids": {
+          "description": "Child book IDs (for hierarchical organization)",
+          "items": {
+            "$ref": "#/$defs/BookId"
+          },
+          "type": "array"
+        },
+        "id": {
+          "$ref": "#/$defs/BookId",
+          "description": "Unique identifier for this book"
+        },
+        "meta": {
+          "additionalProperties": true,
+          "description": "Additional metadata",
+          "type": "object"
+        },
+        "name": {
+          "description": "Human-readable name",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "parent_id": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/BookId"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Parent book identifier (None for root books)"
+        },
+        "position_ids": {
+          "description": "Position IDs directly assigned to this book (non-recursive)",
+          "items": {
+            "$ref": "#/$defs/PositionId"
+          },
+          "type": "array"
+        },
+        "tags": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Book-level tags for grouping and filtering",
+          "type": "object"
+        }
+      },
+      "required": [
+        "id",
+        "position_ids",
+        "child_book_ids"
+      ],
+      "type": "object"
+    },
+    "BookId": {
+      "description": "Book identifier.",
+      "type": "string"
+    },
+    "CandidatePosition": {
+      "additionalProperties": false,
+      "description": "A candidate instrument that could be added to the portfolio.\n\nThis represents an instrument not currently held but available for trading.\nThe optimizer can allocate weight to candidates (up to `max_weight`).",
+      "properties": {
+        "attributes": {
+          "additionalProperties": {
+            "$ref": "#/$defs/AttributeValue"
+          },
+          "type": "object"
+        },
+        "entity_id": {
+          "$ref": "#/$defs/EntityId"
+        },
+        "id": {
+          "$ref": "#/$defs/PositionId"
+        },
+        "instrument_spec": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/instrument_json.schema.json"
+        },
+        "max_weight": {
+          "format": "double",
+          "type": "number"
+        },
+        "min_weight": {
+          "format": "double",
+          "type": "number"
+        },
+        "unit": {
+          "$ref": "#/$defs/PositionUnit"
+        }
+      },
+      "required": [
+        "id",
+        "entity_id",
+        "instrument_spec",
+        "unit",
+        "max_weight",
+        "min_weight"
+      ],
+      "type": "object"
+    },
+    "ComparisonOp": {
+      "description": "Comparison operator for attribute-based filtering.\n\nFor [`AttributeValue::Text`] attributes, only [`ComparisonOp::Eq`] and\n[`ComparisonOp::Ne`] are meaningful; ordering comparisons on text return\n`false`.  For [`AttributeValue::Number`] attributes, all six operators\napply.",
+      "oneOf": [
+        {
+          "const": "eq",
+          "description": "Equal.",
+          "type": "string"
+        },
+        {
+          "const": "ne",
+          "description": "Not equal.",
+          "type": "string"
+        },
+        {
+          "const": "lt",
+          "description": "Less than (numeric only).",
+          "type": "string"
+        },
+        {
+          "const": "le",
+          "description": "Less than or equal (numeric only).",
+          "type": "string"
+        },
+        {
+          "const": "gt",
+          "description": "Greater than (numeric only).",
+          "type": "string"
+        },
+        {
+          "const": "ge",
+          "description": "Greater than or equal (numeric only).",
+          "type": "string"
+        }
+      ]
+    },
+    "Constraint": {
+      "description": "Declarative constraint specification.",
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "description": "General metric bound, e.g. duration `<= 4.0`.",
+          "properties": {
+            "metric_bound": {
+              "additionalProperties": false,
+              "properties": {
+                "label": {
+                  "description": "Human‑readable label for debugging/diagnostics.",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "metric": {
+                  "$ref": "#/$defs/MetricExpr",
+                  "description": "Metric expression on the left‑hand side."
+                },
+                "op": {
+                  "$ref": "#/$defs/Inequality",
+                  "description": "Operator (<=, >=, ==)."
+                },
+                "rhs": {
+                  "description": "Right‑hand side constant.",
+                  "format": "double",
+                  "type": "number"
+                }
+              },
+              "required": [
+                "metric",
+                "op",
+                "rhs"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "metric_bound"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Weight bounds for all positions matching the filter.",
+          "properties": {
+            "weight_bounds": {
+              "additionalProperties": false,
+              "properties": {
+                "filter": {
+                  "$ref": "#/$defs/PositionFilter",
+                  "description": "Filter to select positions for this constraint."
+                },
+                "label": {
+                  "description": "Human‑readable label for debugging/diagnostics.",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "max": {
+                  "description": "Inclusive maximum weight.",
+                  "format": "double",
+                  "type": "number"
+                },
+                "min": {
+                  "description": "Inclusive minimum weight.",
+                  "format": "double",
+                  "type": "number"
+                }
+              },
+              "required": [
+                "filter",
+                "min",
+                "max"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "weight_bounds"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Maximum turnover constraint: `Σ |w_new - w_current| <= max_turnover`.",
+          "properties": {
+            "max_turnover": {
+              "additionalProperties": false,
+              "properties": {
+                "label": {
+                  "description": "Human‑readable label for debugging/diagnostics.",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "max_turnover": {
+                  "description": "Maximum allowed turnover (sum of absolute weight changes).",
+                  "format": "double",
+                  "type": "number"
+                }
+              },
+              "required": [
+                "max_turnover"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "max_turnover"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Budget/normalization constraint: usually `∑ w_i == 1.0`.",
+          "properties": {
+            "budget": {
+              "additionalProperties": false,
+              "properties": {
+                "rhs": {
+                  "description": "Right‑hand side constant (typically 1.0 for normalization).",
+                  "format": "double",
+                  "type": "number"
+                }
+              },
+              "required": [
+                "rhs"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "budget"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "Currency": {
+      "description": "ISO 4217 currency enumeration",
+      "oneOf": [
+        {
+          "const": "AED",
+          "description": "UAE Dirham (784)",
+          "type": "string"
+        },
+        {
+          "const": "AFN",
+          "description": "Afghani (971)",
+          "type": "string"
+        },
+        {
+          "const": "ALL",
+          "description": "Lek (8)",
+          "type": "string"
+        },
+        {
+          "const": "AMD",
+          "description": "Armenian Dram (51)",
+          "type": "string"
+        },
+        {
+          "const": "ANG",
+          "description": "Netherlands Antillean Guilder (532)",
+          "type": "string"
+        },
+        {
+          "const": "AOA",
+          "description": "Kwanza (973)",
+          "type": "string"
+        },
+        {
+          "const": "ARS",
+          "description": "Argentine Peso (32)",
+          "type": "string"
+        },
+        {
+          "const": "AUD",
+          "description": "Australian Dollar (36)",
+          "type": "string"
+        },
+        {
+          "const": "AWG",
+          "description": "Aruban Florin (533)",
+          "type": "string"
+        },
+        {
+          "const": "AZN",
+          "description": "Azerbaijan Manat (944)",
+          "type": "string"
+        },
+        {
+          "const": "BAM",
+          "description": "Convertible Mark (977)",
+          "type": "string"
+        },
+        {
+          "const": "BBD",
+          "description": "Barbados Dollar (52)",
+          "type": "string"
+        },
+        {
+          "const": "BDT",
+          "description": "Taka (50)",
+          "type": "string"
+        },
+        {
+          "const": "BGN",
+          "description": "Bulgarian Lev (975)",
+          "type": "string"
+        },
+        {
+          "const": "BHD",
+          "description": "Bahraini Dinar (48)",
+          "type": "string"
+        },
+        {
+          "const": "BIF",
+          "description": "Burundi Franc (108)",
+          "type": "string"
+        },
+        {
+          "const": "BMD",
+          "description": "Bermudian Dollar (60)",
+          "type": "string"
+        },
+        {
+          "const": "BND",
+          "description": "Brunei Dollar (96)",
+          "type": "string"
+        },
+        {
+          "const": "BOB",
+          "description": "Boliviano (68)",
+          "type": "string"
+        },
+        {
+          "const": "BRL",
+          "description": "Brazilian Real (986)",
+          "type": "string"
+        },
+        {
+          "const": "BSD",
+          "description": "Bahamian Dollar (44)",
+          "type": "string"
+        },
+        {
+          "const": "BTN",
+          "description": "Ngultrum (64)",
+          "type": "string"
+        },
+        {
+          "const": "BWP",
+          "description": "Pula (72)",
+          "type": "string"
+        },
+        {
+          "const": "BYN",
+          "description": "Belarusian Ruble (933)",
+          "type": "string"
+        },
+        {
+          "const": "BZD",
+          "description": "Belize Dollar (84)",
+          "type": "string"
+        },
+        {
+          "const": "CAD",
+          "description": "Canadian Dollar (124)",
+          "type": "string"
+        },
+        {
+          "const": "CDF",
+          "description": "Congolese Franc (976)",
+          "type": "string"
+        },
+        {
+          "const": "CHF",
+          "description": "Swiss Franc (756)",
+          "type": "string"
+        },
+        {
+          "const": "CLF",
+          "description": "Unidad de Fomento (990)",
+          "type": "string"
+        },
+        {
+          "const": "CLP",
+          "description": "Chilean Peso (152)",
+          "type": "string"
+        },
+        {
+          "const": "CNY",
+          "description": "Yuan Renminbi (156)",
+          "type": "string"
+        },
+        {
+          "const": "COP",
+          "description": "Colombian Peso (170)",
+          "type": "string"
+        },
+        {
+          "const": "CRC",
+          "description": "Costa Rican Colon (188)",
+          "type": "string"
+        },
+        {
+          "const": "CUC",
+          "description": "Peso Convertible (931)",
+          "type": "string"
+        },
+        {
+          "const": "CUP",
+          "description": "Cuban Peso (192)",
+          "type": "string"
+        },
+        {
+          "const": "CVE",
+          "description": "Cabo Verde Escudo (132)",
+          "type": "string"
+        },
+        {
+          "const": "CZK",
+          "description": "Czech Koruna (203)",
+          "type": "string"
+        },
+        {
+          "const": "DJF",
+          "description": "Djibouti Franc (262)",
+          "type": "string"
+        },
+        {
+          "const": "DKK",
+          "description": "Danish Krone (208)",
+          "type": "string"
+        },
+        {
+          "const": "DOP",
+          "description": "Dominican Peso (214)",
+          "type": "string"
+        },
+        {
+          "const": "DZD",
+          "description": "Algerian Dinar (12)",
+          "type": "string"
+        },
+        {
+          "const": "EGP",
+          "description": "Egyptian Pound (818)",
+          "type": "string"
+        },
+        {
+          "const": "ERN",
+          "description": "Nakfa (232)",
+          "type": "string"
+        },
+        {
+          "const": "ETB",
+          "description": "Ethiopian Birr (230)",
+          "type": "string"
+        },
+        {
+          "const": "EUR",
+          "description": "Euro (978)",
+          "type": "string"
+        },
+        {
+          "const": "FJD",
+          "description": "Fiji Dollar (242)",
+          "type": "string"
+        },
+        {
+          "const": "FKP",
+          "description": "Falkland Islands Pound (238)",
+          "type": "string"
+        },
+        {
+          "const": "GBP",
+          "description": "Pound Sterling (826)",
+          "type": "string"
+        },
+        {
+          "const": "GEL",
+          "description": "Lari (981)",
+          "type": "string"
+        },
+        {
+          "const": "GHS",
+          "description": "Ghana Cedi (936)",
+          "type": "string"
+        },
+        {
+          "const": "GIP",
+          "description": "Gibraltar Pound (292)",
+          "type": "string"
+        },
+        {
+          "const": "GMD",
+          "description": "Dalasi (270)",
+          "type": "string"
+        },
+        {
+          "const": "GNF",
+          "description": "Guinean Franc (324)",
+          "type": "string"
+        },
+        {
+          "const": "GTQ",
+          "description": "Quetzal (320)",
+          "type": "string"
+        },
+        {
+          "const": "GYD",
+          "description": "Guyana Dollar (328)",
+          "type": "string"
+        },
+        {
+          "const": "HKD",
+          "description": "Hong Kong Dollar (344)",
+          "type": "string"
+        },
+        {
+          "const": "HNL",
+          "description": "Lempira (340)",
+          "type": "string"
+        },
+        {
+          "const": "HRK",
+          "description": "Kuna (191)",
+          "type": "string"
+        },
+        {
+          "const": "HTG",
+          "description": "Gourde (332)",
+          "type": "string"
+        },
+        {
+          "const": "HUF",
+          "description": "Forint (348)",
+          "type": "string"
+        },
+        {
+          "const": "IDR",
+          "description": "Rupiah (360)",
+          "type": "string"
+        },
+        {
+          "const": "ILS",
+          "description": "New Israeli Sheqel (376)",
+          "type": "string"
+        },
+        {
+          "const": "INR",
+          "description": "Indian Rupee (356)",
+          "type": "string"
+        },
+        {
+          "const": "IQD",
+          "description": "Iraqi Dinar (368)",
+          "type": "string"
+        },
+        {
+          "const": "IRR",
+          "description": "Iranian Rial (364)",
+          "type": "string"
+        },
+        {
+          "const": "ISK",
+          "description": "Iceland Krona (352)",
+          "type": "string"
+        },
+        {
+          "const": "JMD",
+          "description": "Jamaican Dollar (388)",
+          "type": "string"
+        },
+        {
+          "const": "JOD",
+          "description": "Jordanian Dinar (400)",
+          "type": "string"
+        },
+        {
+          "const": "JPY",
+          "description": "Yen (392)",
+          "type": "string"
+        },
+        {
+          "const": "KES",
+          "description": "Kenyan Shilling (404)",
+          "type": "string"
+        },
+        {
+          "const": "KGS",
+          "description": "Som (417)",
+          "type": "string"
+        },
+        {
+          "const": "KHR",
+          "description": "Riel (116)",
+          "type": "string"
+        },
+        {
+          "const": "KMF",
+          "description": "Comorian Franc (174)",
+          "type": "string"
+        },
+        {
+          "const": "KPW",
+          "description": "North Korean Won (408)",
+          "type": "string"
+        },
+        {
+          "const": "KRW",
+          "description": "Won (410)",
+          "type": "string"
+        },
+        {
+          "const": "KWD",
+          "description": "Kuwaiti Dinar (414)",
+          "type": "string"
+        },
+        {
+          "const": "KYD",
+          "description": "Cayman Islands Dollar (136)",
+          "type": "string"
+        },
+        {
+          "const": "KZT",
+          "description": "Tenge (398)",
+          "type": "string"
+        },
+        {
+          "const": "LAK",
+          "description": "Lao Kip (418)",
+          "type": "string"
+        },
+        {
+          "const": "LBP",
+          "description": "Lebanese Pound (422)",
+          "type": "string"
+        },
+        {
+          "const": "LKR",
+          "description": "Sri Lanka Rupee (144)",
+          "type": "string"
+        },
+        {
+          "const": "LRD",
+          "description": "Liberian Dollar (430)",
+          "type": "string"
+        },
+        {
+          "const": "LSL",
+          "description": "Loti (426)",
+          "type": "string"
+        },
+        {
+          "const": "LYD",
+          "description": "Libyan Dinar (434)",
+          "type": "string"
+        },
+        {
+          "const": "MAD",
+          "description": "Moroccan Dirham (504)",
+          "type": "string"
+        },
+        {
+          "const": "MDL",
+          "description": "Moldovan Leu (498)",
+          "type": "string"
+        },
+        {
+          "const": "MGA",
+          "description": "Malagasy Ariary (969)",
+          "type": "string"
+        },
+        {
+          "const": "MKD",
+          "description": "Denar (807)",
+          "type": "string"
+        },
+        {
+          "const": "MMK",
+          "description": "Kyat (104)",
+          "type": "string"
+        },
+        {
+          "const": "MNT",
+          "description": "Tugrik (496)",
+          "type": "string"
+        },
+        {
+          "const": "MOP",
+          "description": "Pataca (446)",
+          "type": "string"
+        },
+        {
+          "const": "MRU",
+          "description": "Ouguiya (929)",
+          "type": "string"
+        },
+        {
+          "const": "MUR",
+          "description": "Mauritius Rupee (480)",
+          "type": "string"
+        },
+        {
+          "const": "MVR",
+          "description": "Rufiyaa (462)",
+          "type": "string"
+        },
+        {
+          "const": "MWK",
+          "description": "Malawi Kwacha (454)",
+          "type": "string"
+        },
+        {
+          "const": "MXN",
+          "description": "Mexican Peso (484)",
+          "type": "string"
+        },
+        {
+          "const": "MYR",
+          "description": "Malaysian Ringgit (458)",
+          "type": "string"
+        },
+        {
+          "const": "MZN",
+          "description": "Mozambique Metical (943)",
+          "type": "string"
+        },
+        {
+          "const": "NAD",
+          "description": "Namibia Dollar (516)",
+          "type": "string"
+        },
+        {
+          "const": "NGN",
+          "description": "Naira (566)",
+          "type": "string"
+        },
+        {
+          "const": "NIO",
+          "description": "Cordoba Oro (558)",
+          "type": "string"
+        },
+        {
+          "const": "NOK",
+          "description": "Norwegian Krone (578)",
+          "type": "string"
+        },
+        {
+          "const": "NPR",
+          "description": "Nepalese Rupee (524)",
+          "type": "string"
+        },
+        {
+          "const": "NZD",
+          "description": "New Zealand Dollar (554)",
+          "type": "string"
+        },
+        {
+          "const": "OMR",
+          "description": "Rial Omani (512)",
+          "type": "string"
+        },
+        {
+          "const": "PAB",
+          "description": "Balboa (590)",
+          "type": "string"
+        },
+        {
+          "const": "PEN",
+          "description": "Sol (604)",
+          "type": "string"
+        },
+        {
+          "const": "PGK",
+          "description": "Kina (598)",
+          "type": "string"
+        },
+        {
+          "const": "PHP",
+          "description": "Philippine Peso (608)",
+          "type": "string"
+        },
+        {
+          "const": "PKR",
+          "description": "Pakistan Rupee (586)",
+          "type": "string"
+        },
+        {
+          "const": "PLN",
+          "description": "Zloty (985)",
+          "type": "string"
+        },
+        {
+          "const": "PYG",
+          "description": "Guarani (600)",
+          "type": "string"
+        },
+        {
+          "const": "QAR",
+          "description": "Qatari Rial (634)",
+          "type": "string"
+        },
+        {
+          "const": "RON",
+          "description": "Romanian Leu (946)",
+          "type": "string"
+        },
+        {
+          "const": "RSD",
+          "description": "Serbian Dinar (941)",
+          "type": "string"
+        },
+        {
+          "const": "RUB",
+          "description": "Russian Ruble (643)",
+          "type": "string"
+        },
+        {
+          "const": "RWF",
+          "description": "Rwanda Franc (646)",
+          "type": "string"
+        },
+        {
+          "const": "SAR",
+          "description": "Saudi Riyal (682)",
+          "type": "string"
+        },
+        {
+          "const": "SBD",
+          "description": "Solomon Islands Dollar (90)",
+          "type": "string"
+        },
+        {
+          "const": "SCR",
+          "description": "Seychelles Rupee (690)",
+          "type": "string"
+        },
+        {
+          "const": "SDG",
+          "description": "Sudanese Pound (938)",
+          "type": "string"
+        },
+        {
+          "const": "SEK",
+          "description": "Swedish Krona (752)",
+          "type": "string"
+        },
+        {
+          "const": "SGD",
+          "description": "Singapore Dollar (702)",
+          "type": "string"
+        },
+        {
+          "const": "SHP",
+          "description": "Saint Helena Pound (654)",
+          "type": "string"
+        },
+        {
+          "const": "SLE",
+          "description": "Leone (925)",
+          "type": "string"
+        },
+        {
+          "const": "SLL",
+          "description": "Leone (694)",
+          "type": "string"
+        },
+        {
+          "const": "SOS",
+          "description": "Somali Shilling (706)",
+          "type": "string"
+        },
+        {
+          "const": "SRD",
+          "description": "Surinam Dollar (968)",
+          "type": "string"
+        },
+        {
+          "const": "SSP",
+          "description": "South Sudanese Pound (728)",
+          "type": "string"
+        },
+        {
+          "const": "STN",
+          "description": "Dobra (930)",
+          "type": "string"
+        },
+        {
+          "const": "SYP",
+          "description": "Syrian Pound (760)",
+          "type": "string"
+        },
+        {
+          "const": "SZL",
+          "description": "Lilangeni (748)",
+          "type": "string"
+        },
+        {
+          "const": "THB",
+          "description": "Baht (764)",
+          "type": "string"
+        },
+        {
+          "const": "TJS",
+          "description": "Somoni (972)",
+          "type": "string"
+        },
+        {
+          "const": "TMT",
+          "description": "Turkmenistan New Manat (934)",
+          "type": "string"
+        },
+        {
+          "const": "TND",
+          "description": "Tunisian Dinar (788)",
+          "type": "string"
+        },
+        {
+          "const": "TOP",
+          "description": "Pa'anga (776)",
+          "type": "string"
+        },
+        {
+          "const": "TRY",
+          "description": "Turkish Lira (949)",
+          "type": "string"
+        },
+        {
+          "const": "TTD",
+          "description": "Trinidad and Tobago Dollar (780)",
+          "type": "string"
+        },
+        {
+          "const": "TWD",
+          "description": "New Taiwan Dollar (901)",
+          "type": "string"
+        },
+        {
+          "const": "TZS",
+          "description": "Tanzanian Shilling (834)",
+          "type": "string"
+        },
+        {
+          "const": "UAH",
+          "description": "Hryvnia (980)",
+          "type": "string"
+        },
+        {
+          "const": "UGX",
+          "description": "Uganda Shilling (800)",
+          "type": "string"
+        },
+        {
+          "const": "USD",
+          "description": "US Dollar (840)",
+          "type": "string"
+        },
+        {
+          "const": "UYU",
+          "description": "Peso Uruguayo (858)",
+          "type": "string"
+        },
+        {
+          "const": "UZS",
+          "description": "Uzbekistan Sum (860)",
+          "type": "string"
+        },
+        {
+          "const": "VED",
+          "description": "Bolívar Soberano (926)",
+          "type": "string"
+        },
+        {
+          "const": "VES",
+          "description": "Bolívar Soberano (928)",
+          "type": "string"
+        },
+        {
+          "const": "VND",
+          "description": "Dong (704)",
+          "type": "string"
+        },
+        {
+          "const": "VUV",
+          "description": "Vatu (548)",
+          "type": "string"
+        },
+        {
+          "const": "WST",
+          "description": "Tala (882)",
+          "type": "string"
+        },
+        {
+          "const": "XAF",
+          "description": "CFA Franc BEAC (950)",
+          "type": "string"
+        },
+        {
+          "const": "XCD",
+          "description": "East Caribbean Dollar (951)",
+          "type": "string"
+        },
+        {
+          "const": "XOF",
+          "description": "CFA Franc BCEAO (952)",
+          "type": "string"
+        },
+        {
+          "const": "XPF",
+          "description": "CFP Franc (953)",
+          "type": "string"
+        },
+        {
+          "const": "YER",
+          "description": "Yemeni Rial (886)",
+          "type": "string"
+        },
+        {
+          "const": "ZAR",
+          "description": "Rand (710)",
+          "type": "string"
+        },
+        {
+          "const": "ZMW",
+          "description": "Zambian Kwacha (967)",
+          "type": "string"
+        },
+        {
+          "const": "ZWL",
+          "description": "Zimbabwe Dollar (932)",
+          "type": "string"
+        }
+      ]
+    },
+    "DateWire": {
+      "description": "ISO 8601 calendar date encoded as a `YYYY-MM-DD` JSON string.",
+      "format": "date",
+      "type": "string"
+    },
+    "Entity": {
+      "additionalProperties": false,
+      "description": "An entity that can hold positions.\n\nEntities represent companies, funds, or other legal entities that\nown instruments. For standalone instruments (derivatives, FX), use\nthe dummy entity.",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/EntityId",
+          "description": "Unique identifier for the entity"
+        },
+        "meta": {
+          "additionalProperties": true,
+          "description": "Additional metadata",
+          "type": "object"
+        },
+        "name": {
+          "description": "Human-readable name",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "tags": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Entity-level tags for grouping and filtering",
+          "type": "object"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "type": "object"
+    },
+    "EntityId": {
+      "description": "Entity identifier (company, fund, etc.)",
+      "type": "string"
+    },
+    "Inequality": {
+      "description": "Inequality/equality operator.",
+      "oneOf": [
+        {
+          "const": "le",
+          "description": "Less‑than or equal: `lhs <= rhs`.",
+          "type": "string"
+        },
+        {
+          "const": "ge",
+          "description": "Greater‑than or equal: `lhs >= rhs`.",
+          "type": "string"
+        },
+        {
+          "const": "eq",
+          "description": "Equality: `lhs == rhs`.",
+          "type": "string"
+        }
+      ]
+    },
+    "MetricExpr": {
+      "description": "Portfolio‑level scalar metric expressed in terms of position metrics + weights.\n\nThese expressions are intentionally restricted to linear or linearized forms\nso they can be represented by the LP-based optimizer.",
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "description": "`sum_i w_i * m_i`, where `m_i` comes from a `PerPositionMetric`.",
+          "properties": {
+            "weighted_sum": {
+              "additionalProperties": false,
+              "properties": {
+                "filter": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/$defs/PositionFilter"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Optional filter restricting which positions contribute."
+                },
+                "metric": {
+                  "$ref": "#/$defs/PerPositionMetric",
+                  "description": "Per‑position metric to aggregate."
+                }
+              },
+              "required": [
+                "metric"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "weighted_sum"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Value‑weighted average: `sum_i w_i * m_i`, with implicit `sum_i w_i == 1`.\nThis is appropriate for duration or yield when weights are `ValueWeight`.",
+          "properties": {
+            "value_weighted_average": {
+              "additionalProperties": false,
+              "properties": {
+                "filter": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/$defs/PositionFilter"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Optional filter restricting which positions contribute."
+                },
+                "metric": {
+                  "$ref": "#/$defs/PerPositionMetric",
+                  "description": "Per‑position metric to average."
+                }
+              },
+              "required": [
+                "metric"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "value_weighted_average"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "MetricId": {
+      "description": "Strongly-typed metric identifier.\n\nProvides compile-time validation, autocomplete support, and safe refactoring\nwhen metric names change. Covers bond, IRS, deposit, and risk metrics.\n\nSee unit tests and `examples/` for usage.",
+      "type": "string"
+    },
+    "MissingMetricPolicy": {
+      "description": "How to handle missing metrics for a position.",
+      "oneOf": [
+        {
+          "const": "zero",
+          "description": "Treat missing as 0.0 (default, appropriate for duration‑like metrics).",
+          "type": "string"
+        },
+        {
+          "const": "exclude",
+          "description": "Freeze the position at its current weight and drop it from metric\ncoefficient vectors (`WeightedSum` and `ValueWeightedAverage` alike).\n\nMissing metrics are not treated as zero in the objective or in\nconstraint rows: the coefficient is `0` and the name is omitted from\na `ValueWeightedAverage` denominator, matching “excluded from\nconstraint evaluation”.",
+          "type": "string"
+        },
+        {
+          "const": "strict",
+          "description": "Fail with error if any required metric is missing.",
+          "type": "string"
+        }
+      ]
+    },
+    "Objective": {
+      "description": "Optimization direction and target.",
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "description": "Maximize a portfolio‑level metric.",
+          "properties": {
+            "maximize": {
+              "$ref": "#/$defs/MetricExpr"
+            }
+          },
+          "required": [
+            "maximize"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Minimize a portfolio‑level metric.",
+          "properties": {
+            "minimize": {
+              "$ref": "#/$defs/MetricExpr"
+            }
+          },
+          "required": [
+            "minimize"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "PerPositionMetric": {
+      "description": "Where a per‑position scalar metric comes from.",
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "description": "Directly from `ValuationResult::measures` using a standard `MetricId`.\n\nExamples:\n- `Metric(MetricId::DurationMod)` for modified duration\n- `Metric(MetricId::Ytm)` for yield to maturity\n- `Metric(MetricId::Dv01)` for DV01",
+          "properties": {
+            "metric": {
+              "$ref": "#/$defs/MetricId"
+            }
+          },
+          "required": [
+            "metric"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "From `ValuationResult::measures` using a string key (for custom or\nbucketed metrics stored by name).",
+          "properties": {
+            "custom_key": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "custom_key"
+          ],
+          "type": "object"
+        },
+        {
+          "const": "pv_base",
+          "description": "Use the base currency PV of the position (after scaling).",
+          "type": "string"
+        },
+        {
+          "const": "pv_native",
+          "description": "Use the native‑currency PV of the position (after scaling).\n\nValues are returned in each position's own currency and are therefore\n**not commensurable** across a mixed-currency portfolio. The LP\ncoefficient builder rejects `PvNative` inside aggregated objectives\n([`MetricExpr::WeightedSum`] or [`MetricExpr::ValueWeightedAverage`]) —\nuse [`PerPositionMetric::PvBase`] in those contexts so all positions\nare summed in a single numeraire.",
+          "type": "string"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Numeric attribute value from position attributes.",
+          "properties": {
+            "attribute": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "attribute"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "1.0 if the attribute test passes, 0.0 otherwise.",
+          "properties": {
+            "attribute_indicator": {
+              "$ref": "#/$defs/AttributeTest"
+            }
+          },
+          "required": [
+            "attribute_indicator"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Constant scalar for all positions.",
+          "properties": {
+            "constant": {
+              "format": "double",
+              "type": "number"
+            }
+          },
+          "required": [
+            "constant"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "PortfolioSpec": {
+      "description": "Serializable portfolio specification.\n\nThis struct allows portfolios to be serialized and deserialized by storing\npositions as `PositionSpec` rather than `Position` (which contains non-serializable\n`Arc<dyn Instrument>`).",
+      "properties": {
+        "as_of": {
+          "$ref": "#/$defs/DateWire",
+          "description": "Valuation date"
+        },
+        "base_currency": {
+          "$ref": "#/$defs/Currency",
+          "description": "Base currency for aggregation"
+        },
+        "books": {
+          "additionalProperties": {
+            "$ref": "#/$defs/Book"
+          },
+          "description": "Optional hierarchical book organization",
+          "type": "object"
+        },
+        "entities": {
+          "additionalProperties": {
+            "$ref": "#/$defs/Entity"
+          },
+          "description": "Entities that own positions",
+          "type": "object"
+        },
+        "id": {
+          "description": "Portfolio identifier",
+          "type": "string"
+        },
+        "meta": {
+          "additionalProperties": true,
+          "description": "Additional metadata",
+          "type": "object"
+        },
+        "name": {
+          "description": "Human-readable name",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "positions": {
+          "description": "Positions as serializable specs",
+          "items": {
+            "$ref": "#/$defs/PositionSpec"
+          },
+          "type": "array"
+        },
+        "tags": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Portfolio-level tags",
+          "type": "object"
+        }
+      },
+      "required": [
+        "id",
+        "base_currency",
+        "as_of",
+        "entities",
+        "positions"
+      ],
+      "type": "object"
+    },
+    "PositionFilter": {
+      "description": "Filters for selecting which positions are included in a rule.",
+      "oneOf": [
+        {
+          "const": "all",
+          "description": "All positions in the portfolio.",
+          "type": "string"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Filter by entity ID.",
+          "properties": {
+            "by_entity_id": {
+              "$ref": "#/$defs/EntityId"
+            }
+          },
+          "required": [
+            "by_entity_id"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Filter by attribute test (text equality, numeric comparison, etc.).",
+          "properties": {
+            "by_attribute": {
+              "$ref": "#/$defs/AttributeTest"
+            }
+          },
+          "required": [
+            "by_attribute"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Filter by multiple position IDs.",
+          "properties": {
+            "by_position_ids": {
+              "items": {
+                "$ref": "#/$defs/PositionId"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "by_position_ids"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Exclude positions matching the inner filter.",
+          "properties": {
+            "not": {
+              "$ref": "#/$defs/PositionFilter"
+            }
+          },
+          "required": [
+            "not"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Conjunction: positions matching ALL inner filters.",
+          "properties": {
+            "and": {
+              "items": {
+                "$ref": "#/$defs/PositionFilter"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "and"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Disjunction: positions matching ANY inner filter.",
+          "properties": {
+            "or": {
+              "items": {
+                "$ref": "#/$defs/PositionFilter"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "or"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "PositionId": {
+      "description": "Position identifier.",
+      "type": "string"
+    },
+    "PositionSpec": {
+      "description": "Serializable position specification (without `Arc<dyn Instrument>`).\n\nThis struct allows positions to be serialized and deserialized by storing\nthe instrument definition as JSON rather than a trait object.",
+      "properties": {
+        "attributes": {
+          "additionalProperties": {
+            "$ref": "#/$defs/AttributeValue"
+          },
+          "description": "Position-level attributes for grouping, filtering, and constraints",
+          "type": "object"
+        },
+        "book_id": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/BookId"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Optional book identifier"
+        },
+        "entity_id": {
+          "$ref": "#/$defs/EntityId",
+          "description": "Entity identifier"
+        },
+        "instrument_id": {
+          "description": "Instrument identifier (for reference/lookup)",
+          "type": "string"
+        },
+        "instrument_spec": {
+          "anyOf": [
+            {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/instrument_json.schema.json"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Instrument definition for full serialization (optional)\n\nIf `None`, the position can still be serialized but cannot be\nreconstructed without an external instrument registry."
+        },
+        "meta": {
+          "additionalProperties": true,
+          "description": "Additional metadata",
+          "type": "object"
+        },
+        "position_id": {
+          "$ref": "#/$defs/PositionId",
+          "description": "Position identifier"
+        },
+        "quantity": {
+          "description": "Signed quantity. For [`PositionUnit::Notional`], a lot multiplier.",
+          "format": "double",
+          "type": "number"
+        },
+        "unit": {
+          "$ref": "#/$defs/PositionUnit",
+          "description": "Unit of measurement"
+        }
+      },
+      "required": [
+        "position_id",
+        "entity_id",
+        "instrument_id",
+        "quantity",
+        "unit"
+      ],
+      "type": "object"
+    },
+    "PositionUnit": {
+      "description": "Unit of position measurement.\n\nThe unit describes how the `quantity` on a [`Position`] should be interpreted.\nCallers should treat it as part of the valuation contract, not display-only\nmetadata.\n\n# Scaling contract\n\nPosition value is ``scale_factor(unit) * instrument.value()``. The instrument\nis already built with its deal notional (or face, or one share). Each variant\ndefines the scale factor explicitly:\n\n| Variant       | Scale factor              | Quantity interpretation              |\n|---------------|---------------------------|--------------------------------------|\n| `Units`       | `quantity`                | Number of instrument units/shares    |\n| `Notional(_)` | `quantity`                | Lot multiplier (`1` = one deal)      |\n| `FaceValue`   | `quantity`                | Held face-value multiplier           |\n| `Percentage`  | `quantity / 100`          | Percentage points of the instrument  |\n\n## `Notional` semantics\n\n`Notional(ccy)` means the instrument stores the deal notional and\n`quantity` is a lot multiplier: `1` is one deal, `2` is two deals.\nPosition PV is ``quantity × instrument.value()``. Do not build the\ninstrument with unit notional of 1 and put the dollar notional in\n`quantity`.\n\nOptional `Notional(Some(ccy))` only validates currency against the\ninstrument's native PV currency. It does not change the scale factor.\nA warning is emitted when it disagrees with the instrument's valuation\ncurrency.",
+      "oneOf": [
+        {
+          "const": "units",
+          "description": "Number of units/shares (for equities, baskets). Scale factor = `quantity`.",
+          "type": "string"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Lot multiplier for a notional-quoted instrument, optionally tagged\nwith a currency (for derivatives, FX).\n\nScale factor = `quantity`. The instrument already carries deal\nnotional; `1` is one deal and `2` is two deals. The optional\n[`Currency`] is a validation tag and does not alter scaling.",
+          "properties": {
+            "notional": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/Currency"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "required": [
+            "notional"
+          ],
+          "type": "object"
+        },
+        {
+          "const": "face_value",
+          "description": "Face value of debt instruments (for bonds, loans). Scale factor = `quantity`.",
+          "type": "string"
+        },
+        {
+          "const": "percentage",
+          "description": "Percentage of ownership where the value represents percentage points.\n\nFor example, 50.0 means 50%, not 0.50. The scaling logic always divides\nby 100 to convert to a decimal multiplier.",
+          "type": "string"
+        }
+      ]
+    },
+    "TradeUniverse": {
+      "additionalProperties": false,
+      "description": "Defines which instruments the optimizer can trade.\n\nThe trade universe consists of:\n\n1. **Tradeable positions**: existing portfolio positions that can be adjusted\n2. **Held positions**: existing positions locked at current weight\n3. **Candidate positions**: new instruments that could be added\n\nSerializes with serde; candidate instruments travel as their canonical\ntagged JSON payload (see [`CandidatePosition`]).",
+      "properties": {
+        "allow_short_candidates": {
+          "default": false,
+          "description": "Whether candidates can receive negative weights (short selling).\nDefault: false (long‑only for new positions).",
+          "type": "boolean"
+        },
+        "candidates": {
+          "default": [],
+          "description": "Candidate instruments not currently in the portfolio.\nThese start with weight 0 and can be added by the optimizer.",
+          "items": {
+            "$ref": "#/$defs/CandidatePosition"
+          },
+          "type": "array"
+        },
+        "held_filter": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PositionFilter"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Filter for existing positions that are held constant.\nPositions matching this filter keep their current weight.\nTakes precedence over `tradeable_filter` if both match."
+        },
+        "tradeable_filter": {
+          "$ref": "#/$defs/PositionFilter",
+          "default": "all",
+          "description": "Filter for existing positions that can be traded.\nPositions matching this filter have their weights optimized.\nDefault: all positions are tradeable."
+        }
+      },
+      "type": "object"
+    },
+    "WeightingScheme": {
+      "description": "How optimization weights are defined.\n\n# Conventions\n\n`ValueWeight` and `NotionalWeight` are normalized portfolio shares, whereas\n`UnitScaling` is a direct multiplier on current quantity for existing\npositions.",
+      "oneOf": [
+        {
+          "const": "value_weight",
+          "description": "`w_i` is share of gross portfolio base-currency PV.\n\nWeights are computed against `gross_pv_base = Σ |pv_i|`, so for a\nlong-only portfolio `∑ w_i = 1`. When shorts are permitted the sum can\ndiffer from `1` because shorts enter the denominator as absolute value\nwhile contributing negatively to `w_i`.\n\nQuantity reconstruction converts the target PV share back to\n`Position::quantity` via `pv_per_unit`, which is base-currency PV per\n1.0 of [`crate::position::Position::scale_factor`] (a `Percentage`\nholding of `50` uses scale `0.5`, not raw `50`). Each candidate must\nhave non-zero `pv_per_unit`. Zero-PV candidates are rejected at\ndecision-space construction time under this scheme because their\nimplied quantity would be undefined.",
+          "type": "string"
+        },
+        {
+          "const": "notional_weight",
+          "description": "`w_i` is share of signed deal notional; still normalized so `∑ w_i = 1`\non a long-only book (shorts enter the denominator as absolute value).\n\nPer-position notional is the absolute deal notional converted to portfolio\nbase currency at the valuation date, multiplied by `scale_factor()`.\nInstruments that do not expose `notional()` fail under this scheme —\nthere is no silent fallback to `scale_factor()` as a dollar proxy.\nQuantity reconstruction divides the target notional share by the\ninstrument deal notional and writes the result back in\n`Position::quantity` units (lots, shares, or percentage points).",
+          "type": "string"
+        },
+        {
+          "const": "unit_scaling",
+          "description": "`w_i` scales the current quantity (e.g. units or face value).\n\nUnlike `ValueWeight` and `NotionalWeight`, this is not a PV share.\nFor existing positions, `w_i = 1.0` means \"keep the current quantity\",\n`w_i = 0.5` means \"halve it\", and `w_i = 0.0` means \"close it\".\nExisting multipliers are nonnegative by default; an explicit budget\nor weight bound controls increases above one. Turnover is measured as\nthe sum of absolute changes in these multipliers.\nFor new candidates, `w_i` is interpreted directly as the target quantity\nbecause there is no live quantity to scale.",
+          "type": "string"
+        }
+      ]
+    }
+  },
+  "$id": "https://finstack_quant.dev/schemas/portfolio/1/portfolio_optimization_spec.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "JSON-serializable specification for a portfolio optimization problem.",
+  "properties": {
+    "constraints": {
+      "default": [],
+      "description": "Constraints on the optimized portfolio. An explicit budget replaces the\ndefault sum-of-weights budget of one; duplicate explicit budgets are rejected.",
+      "items": {
+        "$ref": "#/$defs/Constraint"
+      },
+      "type": "array"
+    },
+    "label": {
+      "default": null,
+      "description": "Optional label for auditability.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "missing_metric_policy": {
+      "$ref": "#/$defs/MissingMetricPolicy",
+      "default": "zero",
+      "description": "Policy for handling positions missing required metrics."
+    },
+    "objective": {
+      "$ref": "#/$defs/Objective",
+      "description": "Optimization objective."
+    },
+    "portfolio": {
+      "$ref": "#/$defs/PortfolioSpec",
+      "description": "Portfolio specification (same format as `value_portfolio`)."
+    },
+    "trade_universe": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/TradeUniverse"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "Optional trade universe (tradeable/held filters and candidate\nadditions). `None` means every existing position is tradeable and no\ncandidates are considered."
+    },
+    "weighting": {
+      "$ref": "#/$defs/WeightingScheme",
+      "default": "value_weight",
+      "description": "How weights are defined."
+    }
+  },
+  "required": [
+    "portfolio",
+    "objective"
+  ],
+  "title": "PortfolioOptimizationSpec",
+  "type": "object"
+}

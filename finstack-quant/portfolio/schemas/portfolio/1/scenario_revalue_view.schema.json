@@ -1,0 +1,2396 @@
+{
+  "$defs": {
+    "ApplicationReport": {
+      "additionalProperties": false,
+      "description": "Report describing what happened during [`super::ScenarioEngine::apply`].\n\n# Examples\n```rust\nuse finstack_quant_scenarios::engine::ApplicationReport;\n\nlet report = ApplicationReport {\n    operations_applied: 3,\n    user_operations: 1,\n    expanded_operations: 3,\n    changes: Default::default(),\n    warnings: vec![],\n    meta: None,\n    time_roll: None,\n};\n\nassert_eq!(report.operations_applied, 3);\nassert_eq!(report.user_operations, 1);\nassert_eq!(report.expanded_operations, 3);\n```",
+      "properties": {
+        "changes": {
+          "$ref": "#/$defs/ScenarioChangeManifest",
+          "description": "Authoritative metadata describing the state changed by applied effects."
+        },
+        "expanded_operations": {
+          "description": "Number of direct (non-hierarchy) operations produced after hierarchy\nexpansion and resolution-mode deduplication. No-match expansion and\ndeduplication can make this smaller than `user_operations`. Because\n`operations_applied` counts effects rather than operations, the two\ncounters are not directly comparable.",
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "meta": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ResultsMeta"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Audit stamp describing the numeric mode, rounding context, and FX\npolicy under which the scenario was applied."
+        },
+        "operations_applied": {
+          "description": "Number of effects successfully applied to the execution context.\n\nOne user-level operation can produce zero, one, or many effects after\nhierarchy expansion and target resolution. This low-level effect count\nis therefore not an operation-coverage ratio; inspect `changes` and\n`warnings` to determine which targets changed or were skipped.",
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "time_roll": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/RollForwardReport"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Roll-forward report from the Phase 0 `TimeRollForward` operation,\nwhen the scenario contained one. Carries the per-instrument carry\ndecomposition and the new valuation date; instruments whose valuation\nfailed during the roll are also surfaced as\n[`Warning::TimeRollInstrumentFailed`] entries in `warnings`."
+        },
+        "user_operations": {
+          "description": "Number of user-provided `OperationSpec` entries in the scenario\n(before hierarchy expansion and deduplication).",
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "warnings": {
+          "description": "Structured warnings generated during application (non-fatal).",
+          "items": {
+            "$ref": "#/$defs/Warning"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "operations_applied",
+        "user_operations",
+        "expanded_operations",
+        "changes",
+        "warnings"
+      ],
+      "type": "object"
+    },
+    "Currency": {
+      "description": "ISO 4217 currency enumeration",
+      "oneOf": [
+        {
+          "const": "AED",
+          "description": "UAE Dirham (784)",
+          "type": "string"
+        },
+        {
+          "const": "AFN",
+          "description": "Afghani (971)",
+          "type": "string"
+        },
+        {
+          "const": "ALL",
+          "description": "Lek (8)",
+          "type": "string"
+        },
+        {
+          "const": "AMD",
+          "description": "Armenian Dram (51)",
+          "type": "string"
+        },
+        {
+          "const": "ANG",
+          "description": "Netherlands Antillean Guilder (532)",
+          "type": "string"
+        },
+        {
+          "const": "AOA",
+          "description": "Kwanza (973)",
+          "type": "string"
+        },
+        {
+          "const": "ARS",
+          "description": "Argentine Peso (32)",
+          "type": "string"
+        },
+        {
+          "const": "AUD",
+          "description": "Australian Dollar (36)",
+          "type": "string"
+        },
+        {
+          "const": "AWG",
+          "description": "Aruban Florin (533)",
+          "type": "string"
+        },
+        {
+          "const": "AZN",
+          "description": "Azerbaijan Manat (944)",
+          "type": "string"
+        },
+        {
+          "const": "BAM",
+          "description": "Convertible Mark (977)",
+          "type": "string"
+        },
+        {
+          "const": "BBD",
+          "description": "Barbados Dollar (52)",
+          "type": "string"
+        },
+        {
+          "const": "BDT",
+          "description": "Taka (50)",
+          "type": "string"
+        },
+        {
+          "const": "BGN",
+          "description": "Bulgarian Lev (975)",
+          "type": "string"
+        },
+        {
+          "const": "BHD",
+          "description": "Bahraini Dinar (48)",
+          "type": "string"
+        },
+        {
+          "const": "BIF",
+          "description": "Burundi Franc (108)",
+          "type": "string"
+        },
+        {
+          "const": "BMD",
+          "description": "Bermudian Dollar (60)",
+          "type": "string"
+        },
+        {
+          "const": "BND",
+          "description": "Brunei Dollar (96)",
+          "type": "string"
+        },
+        {
+          "const": "BOB",
+          "description": "Boliviano (68)",
+          "type": "string"
+        },
+        {
+          "const": "BRL",
+          "description": "Brazilian Real (986)",
+          "type": "string"
+        },
+        {
+          "const": "BSD",
+          "description": "Bahamian Dollar (44)",
+          "type": "string"
+        },
+        {
+          "const": "BTN",
+          "description": "Ngultrum (64)",
+          "type": "string"
+        },
+        {
+          "const": "BWP",
+          "description": "Pula (72)",
+          "type": "string"
+        },
+        {
+          "const": "BYN",
+          "description": "Belarusian Ruble (933)",
+          "type": "string"
+        },
+        {
+          "const": "BZD",
+          "description": "Belize Dollar (84)",
+          "type": "string"
+        },
+        {
+          "const": "CAD",
+          "description": "Canadian Dollar (124)",
+          "type": "string"
+        },
+        {
+          "const": "CDF",
+          "description": "Congolese Franc (976)",
+          "type": "string"
+        },
+        {
+          "const": "CHF",
+          "description": "Swiss Franc (756)",
+          "type": "string"
+        },
+        {
+          "const": "CLF",
+          "description": "Unidad de Fomento (990)",
+          "type": "string"
+        },
+        {
+          "const": "CLP",
+          "description": "Chilean Peso (152)",
+          "type": "string"
+        },
+        {
+          "const": "CNY",
+          "description": "Yuan Renminbi (156)",
+          "type": "string"
+        },
+        {
+          "const": "COP",
+          "description": "Colombian Peso (170)",
+          "type": "string"
+        },
+        {
+          "const": "CRC",
+          "description": "Costa Rican Colon (188)",
+          "type": "string"
+        },
+        {
+          "const": "CUC",
+          "description": "Peso Convertible (931)",
+          "type": "string"
+        },
+        {
+          "const": "CUP",
+          "description": "Cuban Peso (192)",
+          "type": "string"
+        },
+        {
+          "const": "CVE",
+          "description": "Cabo Verde Escudo (132)",
+          "type": "string"
+        },
+        {
+          "const": "CZK",
+          "description": "Czech Koruna (203)",
+          "type": "string"
+        },
+        {
+          "const": "DJF",
+          "description": "Djibouti Franc (262)",
+          "type": "string"
+        },
+        {
+          "const": "DKK",
+          "description": "Danish Krone (208)",
+          "type": "string"
+        },
+        {
+          "const": "DOP",
+          "description": "Dominican Peso (214)",
+          "type": "string"
+        },
+        {
+          "const": "DZD",
+          "description": "Algerian Dinar (12)",
+          "type": "string"
+        },
+        {
+          "const": "EGP",
+          "description": "Egyptian Pound (818)",
+          "type": "string"
+        },
+        {
+          "const": "ERN",
+          "description": "Nakfa (232)",
+          "type": "string"
+        },
+        {
+          "const": "ETB",
+          "description": "Ethiopian Birr (230)",
+          "type": "string"
+        },
+        {
+          "const": "EUR",
+          "description": "Euro (978)",
+          "type": "string"
+        },
+        {
+          "const": "FJD",
+          "description": "Fiji Dollar (242)",
+          "type": "string"
+        },
+        {
+          "const": "FKP",
+          "description": "Falkland Islands Pound (238)",
+          "type": "string"
+        },
+        {
+          "const": "GBP",
+          "description": "Pound Sterling (826)",
+          "type": "string"
+        },
+        {
+          "const": "GEL",
+          "description": "Lari (981)",
+          "type": "string"
+        },
+        {
+          "const": "GHS",
+          "description": "Ghana Cedi (936)",
+          "type": "string"
+        },
+        {
+          "const": "GIP",
+          "description": "Gibraltar Pound (292)",
+          "type": "string"
+        },
+        {
+          "const": "GMD",
+          "description": "Dalasi (270)",
+          "type": "string"
+        },
+        {
+          "const": "GNF",
+          "description": "Guinean Franc (324)",
+          "type": "string"
+        },
+        {
+          "const": "GTQ",
+          "description": "Quetzal (320)",
+          "type": "string"
+        },
+        {
+          "const": "GYD",
+          "description": "Guyana Dollar (328)",
+          "type": "string"
+        },
+        {
+          "const": "HKD",
+          "description": "Hong Kong Dollar (344)",
+          "type": "string"
+        },
+        {
+          "const": "HNL",
+          "description": "Lempira (340)",
+          "type": "string"
+        },
+        {
+          "const": "HRK",
+          "description": "Kuna (191)",
+          "type": "string"
+        },
+        {
+          "const": "HTG",
+          "description": "Gourde (332)",
+          "type": "string"
+        },
+        {
+          "const": "HUF",
+          "description": "Forint (348)",
+          "type": "string"
+        },
+        {
+          "const": "IDR",
+          "description": "Rupiah (360)",
+          "type": "string"
+        },
+        {
+          "const": "ILS",
+          "description": "New Israeli Sheqel (376)",
+          "type": "string"
+        },
+        {
+          "const": "INR",
+          "description": "Indian Rupee (356)",
+          "type": "string"
+        },
+        {
+          "const": "IQD",
+          "description": "Iraqi Dinar (368)",
+          "type": "string"
+        },
+        {
+          "const": "IRR",
+          "description": "Iranian Rial (364)",
+          "type": "string"
+        },
+        {
+          "const": "ISK",
+          "description": "Iceland Krona (352)",
+          "type": "string"
+        },
+        {
+          "const": "JMD",
+          "description": "Jamaican Dollar (388)",
+          "type": "string"
+        },
+        {
+          "const": "JOD",
+          "description": "Jordanian Dinar (400)",
+          "type": "string"
+        },
+        {
+          "const": "JPY",
+          "description": "Yen (392)",
+          "type": "string"
+        },
+        {
+          "const": "KES",
+          "description": "Kenyan Shilling (404)",
+          "type": "string"
+        },
+        {
+          "const": "KGS",
+          "description": "Som (417)",
+          "type": "string"
+        },
+        {
+          "const": "KHR",
+          "description": "Riel (116)",
+          "type": "string"
+        },
+        {
+          "const": "KMF",
+          "description": "Comorian Franc (174)",
+          "type": "string"
+        },
+        {
+          "const": "KPW",
+          "description": "North Korean Won (408)",
+          "type": "string"
+        },
+        {
+          "const": "KRW",
+          "description": "Won (410)",
+          "type": "string"
+        },
+        {
+          "const": "KWD",
+          "description": "Kuwaiti Dinar (414)",
+          "type": "string"
+        },
+        {
+          "const": "KYD",
+          "description": "Cayman Islands Dollar (136)",
+          "type": "string"
+        },
+        {
+          "const": "KZT",
+          "description": "Tenge (398)",
+          "type": "string"
+        },
+        {
+          "const": "LAK",
+          "description": "Lao Kip (418)",
+          "type": "string"
+        },
+        {
+          "const": "LBP",
+          "description": "Lebanese Pound (422)",
+          "type": "string"
+        },
+        {
+          "const": "LKR",
+          "description": "Sri Lanka Rupee (144)",
+          "type": "string"
+        },
+        {
+          "const": "LRD",
+          "description": "Liberian Dollar (430)",
+          "type": "string"
+        },
+        {
+          "const": "LSL",
+          "description": "Loti (426)",
+          "type": "string"
+        },
+        {
+          "const": "LYD",
+          "description": "Libyan Dinar (434)",
+          "type": "string"
+        },
+        {
+          "const": "MAD",
+          "description": "Moroccan Dirham (504)",
+          "type": "string"
+        },
+        {
+          "const": "MDL",
+          "description": "Moldovan Leu (498)",
+          "type": "string"
+        },
+        {
+          "const": "MGA",
+          "description": "Malagasy Ariary (969)",
+          "type": "string"
+        },
+        {
+          "const": "MKD",
+          "description": "Denar (807)",
+          "type": "string"
+        },
+        {
+          "const": "MMK",
+          "description": "Kyat (104)",
+          "type": "string"
+        },
+        {
+          "const": "MNT",
+          "description": "Tugrik (496)",
+          "type": "string"
+        },
+        {
+          "const": "MOP",
+          "description": "Pataca (446)",
+          "type": "string"
+        },
+        {
+          "const": "MRU",
+          "description": "Ouguiya (929)",
+          "type": "string"
+        },
+        {
+          "const": "MUR",
+          "description": "Mauritius Rupee (480)",
+          "type": "string"
+        },
+        {
+          "const": "MVR",
+          "description": "Rufiyaa (462)",
+          "type": "string"
+        },
+        {
+          "const": "MWK",
+          "description": "Malawi Kwacha (454)",
+          "type": "string"
+        },
+        {
+          "const": "MXN",
+          "description": "Mexican Peso (484)",
+          "type": "string"
+        },
+        {
+          "const": "MYR",
+          "description": "Malaysian Ringgit (458)",
+          "type": "string"
+        },
+        {
+          "const": "MZN",
+          "description": "Mozambique Metical (943)",
+          "type": "string"
+        },
+        {
+          "const": "NAD",
+          "description": "Namibia Dollar (516)",
+          "type": "string"
+        },
+        {
+          "const": "NGN",
+          "description": "Naira (566)",
+          "type": "string"
+        },
+        {
+          "const": "NIO",
+          "description": "Cordoba Oro (558)",
+          "type": "string"
+        },
+        {
+          "const": "NOK",
+          "description": "Norwegian Krone (578)",
+          "type": "string"
+        },
+        {
+          "const": "NPR",
+          "description": "Nepalese Rupee (524)",
+          "type": "string"
+        },
+        {
+          "const": "NZD",
+          "description": "New Zealand Dollar (554)",
+          "type": "string"
+        },
+        {
+          "const": "OMR",
+          "description": "Rial Omani (512)",
+          "type": "string"
+        },
+        {
+          "const": "PAB",
+          "description": "Balboa (590)",
+          "type": "string"
+        },
+        {
+          "const": "PEN",
+          "description": "Sol (604)",
+          "type": "string"
+        },
+        {
+          "const": "PGK",
+          "description": "Kina (598)",
+          "type": "string"
+        },
+        {
+          "const": "PHP",
+          "description": "Philippine Peso (608)",
+          "type": "string"
+        },
+        {
+          "const": "PKR",
+          "description": "Pakistan Rupee (586)",
+          "type": "string"
+        },
+        {
+          "const": "PLN",
+          "description": "Zloty (985)",
+          "type": "string"
+        },
+        {
+          "const": "PYG",
+          "description": "Guarani (600)",
+          "type": "string"
+        },
+        {
+          "const": "QAR",
+          "description": "Qatari Rial (634)",
+          "type": "string"
+        },
+        {
+          "const": "RON",
+          "description": "Romanian Leu (946)",
+          "type": "string"
+        },
+        {
+          "const": "RSD",
+          "description": "Serbian Dinar (941)",
+          "type": "string"
+        },
+        {
+          "const": "RUB",
+          "description": "Russian Ruble (643)",
+          "type": "string"
+        },
+        {
+          "const": "RWF",
+          "description": "Rwanda Franc (646)",
+          "type": "string"
+        },
+        {
+          "const": "SAR",
+          "description": "Saudi Riyal (682)",
+          "type": "string"
+        },
+        {
+          "const": "SBD",
+          "description": "Solomon Islands Dollar (90)",
+          "type": "string"
+        },
+        {
+          "const": "SCR",
+          "description": "Seychelles Rupee (690)",
+          "type": "string"
+        },
+        {
+          "const": "SDG",
+          "description": "Sudanese Pound (938)",
+          "type": "string"
+        },
+        {
+          "const": "SEK",
+          "description": "Swedish Krona (752)",
+          "type": "string"
+        },
+        {
+          "const": "SGD",
+          "description": "Singapore Dollar (702)",
+          "type": "string"
+        },
+        {
+          "const": "SHP",
+          "description": "Saint Helena Pound (654)",
+          "type": "string"
+        },
+        {
+          "const": "SLE",
+          "description": "Leone (925)",
+          "type": "string"
+        },
+        {
+          "const": "SLL",
+          "description": "Leone (694)",
+          "type": "string"
+        },
+        {
+          "const": "SOS",
+          "description": "Somali Shilling (706)",
+          "type": "string"
+        },
+        {
+          "const": "SRD",
+          "description": "Surinam Dollar (968)",
+          "type": "string"
+        },
+        {
+          "const": "SSP",
+          "description": "South Sudanese Pound (728)",
+          "type": "string"
+        },
+        {
+          "const": "STN",
+          "description": "Dobra (930)",
+          "type": "string"
+        },
+        {
+          "const": "SYP",
+          "description": "Syrian Pound (760)",
+          "type": "string"
+        },
+        {
+          "const": "SZL",
+          "description": "Lilangeni (748)",
+          "type": "string"
+        },
+        {
+          "const": "THB",
+          "description": "Baht (764)",
+          "type": "string"
+        },
+        {
+          "const": "TJS",
+          "description": "Somoni (972)",
+          "type": "string"
+        },
+        {
+          "const": "TMT",
+          "description": "Turkmenistan New Manat (934)",
+          "type": "string"
+        },
+        {
+          "const": "TND",
+          "description": "Tunisian Dinar (788)",
+          "type": "string"
+        },
+        {
+          "const": "TOP",
+          "description": "Pa'anga (776)",
+          "type": "string"
+        },
+        {
+          "const": "TRY",
+          "description": "Turkish Lira (949)",
+          "type": "string"
+        },
+        {
+          "const": "TTD",
+          "description": "Trinidad and Tobago Dollar (780)",
+          "type": "string"
+        },
+        {
+          "const": "TWD",
+          "description": "New Taiwan Dollar (901)",
+          "type": "string"
+        },
+        {
+          "const": "TZS",
+          "description": "Tanzanian Shilling (834)",
+          "type": "string"
+        },
+        {
+          "const": "UAH",
+          "description": "Hryvnia (980)",
+          "type": "string"
+        },
+        {
+          "const": "UGX",
+          "description": "Uganda Shilling (800)",
+          "type": "string"
+        },
+        {
+          "const": "USD",
+          "description": "US Dollar (840)",
+          "type": "string"
+        },
+        {
+          "const": "UYU",
+          "description": "Peso Uruguayo (858)",
+          "type": "string"
+        },
+        {
+          "const": "UZS",
+          "description": "Uzbekistan Sum (860)",
+          "type": "string"
+        },
+        {
+          "const": "VED",
+          "description": "Bolívar Soberano (926)",
+          "type": "string"
+        },
+        {
+          "const": "VES",
+          "description": "Bolívar Soberano (928)",
+          "type": "string"
+        },
+        {
+          "const": "VND",
+          "description": "Dong (704)",
+          "type": "string"
+        },
+        {
+          "const": "VUV",
+          "description": "Vatu (548)",
+          "type": "string"
+        },
+        {
+          "const": "WST",
+          "description": "Tala (882)",
+          "type": "string"
+        },
+        {
+          "const": "XAF",
+          "description": "CFA Franc BEAC (950)",
+          "type": "string"
+        },
+        {
+          "const": "XCD",
+          "description": "East Caribbean Dollar (951)",
+          "type": "string"
+        },
+        {
+          "const": "XOF",
+          "description": "CFA Franc BCEAO (952)",
+          "type": "string"
+        },
+        {
+          "const": "XPF",
+          "description": "CFP Franc (953)",
+          "type": "string"
+        },
+        {
+          "const": "YER",
+          "description": "Yemeni Rial (886)",
+          "type": "string"
+        },
+        {
+          "const": "ZAR",
+          "description": "Rand (710)",
+          "type": "string"
+        },
+        {
+          "const": "ZMW",
+          "description": "Zambian Kwacha (967)",
+          "type": "string"
+        },
+        {
+          "const": "ZWL",
+          "description": "Zimbabwe Dollar (932)",
+          "type": "string"
+        }
+      ]
+    },
+    "CurveKind": {
+      "description": "Identifies which family of curve an operation targets.\n\nThese variants map to the market data collections exposed by\n`finstack_quant_core::market_data::context::MarketContext`.\nThey also determine which quoting and interpolation conventions apply when\ndownstream helpers extract rates or apply node shocks.\n\n# Examples\n```rust\nuse finstack_quant_scenarios::CurveKind;\n\nlet kind = CurveKind::Discount;\nassert_eq!(format!(\"{:?}\", kind), \"Discount\");\n```",
+      "oneOf": [
+        {
+          "const": "discount",
+          "description": "Discount factor curve.",
+          "type": "string"
+        },
+        {
+          "const": "forward",
+          "description": "Forward rate curve.",
+          "type": "string"
+        },
+        {
+          "const": "par_cds",
+          "description": "Credit Par CDS curve (bumping spreads)",
+          "type": "string"
+        },
+        {
+          "const": "inflation",
+          "description": "Inflation index curve.",
+          "type": "string"
+        },
+        {
+          "const": "commodity",
+          "description": "Commodity forward [`PriceCurve`](finstack_quant_core::market_data::term_structures::PriceCurve).\n\n`bp` on parallel/node ops is percent of the price-curve forward\n(`5.0` = +5%), not a rate basis-point shock. Looking up a\n[`DiscountCurve`](finstack_quant_core::market_data::term_structures::DiscountCurve)\nunder this id is an error.",
+          "type": "string"
+        }
+      ]
+    },
+    "DateWire": {
+      "description": "ISO 8601 calendar date encoded as a `YYYY-MM-DD` JSON string.",
+      "format": "date",
+      "type": "string"
+    },
+    "DecimalWire": {
+      "description": "Exact decimal encoded only as a JSON string.",
+      "pattern": "^-?\\d+(\\.\\d+)?([eE][+-]?\\d+)?$",
+      "type": "string"
+    },
+    "EntityId": {
+      "description": "Entity identifier (company, fund, etc.)",
+      "type": "string"
+    },
+    "FxConversionPolicy": {
+      "description": "Standard FX conversion strategies used to hint FX providers.\n\nThe policy tells a provider *how* the rate will be applied so it can decide\nbetween spot, forward, or averaged sources.",
+      "oneOf": [
+        {
+          "const": "cashflow_date",
+          "description": "Use spot/forward on the cashflow date.",
+          "type": "string"
+        },
+        {
+          "const": "period_end",
+          "description": "Use period end date.",
+          "type": "string"
+        },
+        {
+          "const": "period_average",
+          "description": "Use an average over the period.",
+          "type": "string"
+        }
+      ]
+    },
+    "Id": {
+      "description": "A phantom-typed identifier that prevents mixing different kinds of IDs.\n\nThis type wraps a string identifier with a phantom type parameter to ensure\ntype safety at compile time. Different `Id<T>` types with different `T`\ncannot be compared or mixed accidentally, preventing entire classes of bugs.\n\n# Type Parameters\n\n* `T` - Phantom type tag that distinguishes this ID from IDs with different tags\n\n# Invariants\n\n- Storage uses `Arc<str>` for efficient cloning\n- The phantom marker has zero size and runtime cost\n- Two `Id<T>` values are equal if their string values are equal\n- IDs with different type tags (`Id<A>` vs `Id<B>`) cannot be compared\n\n# Examples\n\n```rust\nuse finstack_quant_core::types::{CurveId, InstrumentId};\n\n// Create IDs with different type tags\nlet curve = CurveId::from(\"USD-SOFR\");\nlet bond = InstrumentId::from(\"ISIN:US912828XG60\");\n\n// Can compare IDs of the same type\nassert_eq!(curve, CurveId::from(\"USD-SOFR\"));\nassert_ne!(curve, CurveId::from(\"EUR-ESTR\"));\n\n// Cannot compare IDs of different types (compile error):\n// let _ = curve == bond;  // Error: mismatched types\n```\n\n# Thread Safety\n\n`Id<T>` is `Send + Sync` as it wraps an `Arc<str>`. Multiple threads can\nsafely share and clone IDs with minimal synchronization overhead.",
+      "type": "string"
+    },
+    "InstrumentType": {
+      "description": "Strongly-typed instrument classification for pricer dispatch.\n\nEach variant represents a distinct instrument type with its own pricing\nlogic and risk characteristics. Used by the pricing registry to route\ninstruments to appropriate pricer implementations.",
+      "oneOf": [
+        {
+          "const": "bond",
+          "description": "Fixed or floating-rate bond (plain vanilla, callable, amortizing).",
+          "type": "string"
+        },
+        {
+          "const": "credit_default_swap",
+          "description": "Credit Default Swap (single-name credit protection).",
+          "type": "string"
+        },
+        {
+          "const": "cds_index",
+          "description": "CDS Index (portfolio credit protection, e.g., CDX, iTraxx).",
+          "type": "string"
+        },
+        {
+          "const": "cds_tranche",
+          "description": "CDS Tranche (mezzanine credit exposure via synthetic CDO).",
+          "type": "string"
+        },
+        {
+          "const": "cds_option",
+          "description": "Option on Credit Default Swap.",
+          "type": "string"
+        },
+        {
+          "const": "interest_rate_swap",
+          "description": "Interest Rate Swap (fixed-for-floating exchange).",
+          "type": "string"
+        },
+        {
+          "const": "cap_floor",
+          "description": "Interest rate cap or floor (portfolio of caplets/floorlets).",
+          "type": "string"
+        },
+        {
+          "const": "swaption",
+          "description": "Option on interest rate swap (European exercise).",
+          "type": "string"
+        },
+        {
+          "const": "bermudan_swaption",
+          "description": "Bermudan swaption (multiple exercise dates).",
+          "type": "string"
+        },
+        {
+          "const": "basis_swap",
+          "description": "Basis swap (floating-for-floating with spread).",
+          "type": "string"
+        },
+        {
+          "const": "basket",
+          "description": "Multi-asset basket (worst-of, best-of, or weighted).",
+          "type": "string"
+        },
+        {
+          "const": "convertible_bond",
+          "description": "Convertible bond (bond with embedded equity option).",
+          "type": "string"
+        },
+        {
+          "const": "deposit",
+          "description": "Money market deposit (single-period).",
+          "type": "string"
+        },
+        {
+          "const": "equity_option",
+          "description": "Vanilla equity option (call or put on single stock or index).",
+          "type": "string"
+        },
+        {
+          "const": "fx_option",
+          "description": "FX option (Garman-Kohlhagen model).",
+          "type": "string"
+        },
+        {
+          "const": "fx_spot",
+          "description": "FX spot position (currency pair).",
+          "type": "string"
+        },
+        {
+          "const": "fx_swap",
+          "description": "FX forward or FX swap.",
+          "type": "string"
+        },
+        {
+          "const": "xccy_swap",
+          "description": "Cross-currency swap (multi-currency floating legs).",
+          "type": "string"
+        },
+        {
+          "const": "inflation_linked_bond",
+          "description": "Inflation-linked bond (TIPS, index-linked gilts).",
+          "type": "string"
+        },
+        {
+          "const": "inflation_swap",
+          "description": "Zero-coupon inflation swap.",
+          "type": "string"
+        },
+        {
+          "const": "yoy_inflation_swap",
+          "description": "Year-on-year inflation swap.",
+          "type": "string"
+        },
+        {
+          "const": "inflation_cap_floor",
+          "description": "Inflation cap/floor (YoY inflation options).",
+          "type": "string"
+        },
+        {
+          "const": "interest_rate_future",
+          "description": "Interest rate futures contract.",
+          "type": "string"
+        },
+        {
+          "const": "variance_swap",
+          "description": "Variance swap (volatility exposure).",
+          "type": "string"
+        },
+        {
+          "const": "fx_variance_swap",
+          "description": "FX variance swap (volatility exposure on FX).",
+          "type": "string"
+        },
+        {
+          "const": "equity",
+          "description": "Equity spot position (shares in single stock or fund).",
+          "type": "string"
+        },
+        {
+          "const": "repo",
+          "description": "Repurchase agreement (repo or reverse repo).",
+          "type": "string"
+        },
+        {
+          "const": "forward_rate_agreement",
+          "description": "Forward Rate Agreement (forward-starting interest rate contract).",
+          "type": "string"
+        },
+        {
+          "const": "structured_credit",
+          "description": "Structured credit (ABS, RMBS, CMBS, CLO with tranches and waterfall).",
+          "type": "string"
+        },
+        {
+          "const": "private_markets_fund",
+          "description": "Private markets fund (PE/credit fund with waterfall).",
+          "type": "string"
+        },
+        {
+          "const": "revolving_credit",
+          "description": "Revolving credit facility with drawdown/repayment.",
+          "type": "string"
+        },
+        {
+          "const": "asian_option",
+          "description": "Asian option (payoff based on average price).",
+          "type": "string"
+        },
+        {
+          "const": "barrier_option",
+          "description": "Barrier option (knock-in or knock-out on barrier cross).",
+          "type": "string"
+        },
+        {
+          "const": "lookback_option",
+          "description": "Lookback option (payoff based on path extremum).",
+          "type": "string"
+        },
+        {
+          "const": "quanto_option",
+          "description": "Quanto option (cross-currency option with quanto adjustment).",
+          "type": "string"
+        },
+        {
+          "const": "autocallable",
+          "description": "Autocallable structured note (early redemption feature).",
+          "type": "string"
+        },
+        {
+          "const": "cms_option",
+          "description": "CMS option (constant maturity swap option).",
+          "type": "string"
+        },
+        {
+          "const": "cms_swap",
+          "description": "CMS swap (constant maturity swap).",
+          "type": "string"
+        },
+        {
+          "const": "cliquet_option",
+          "description": "Cliquet option (ratchet option with periodic resets).",
+          "type": "string"
+        },
+        {
+          "const": "range_accrual",
+          "description": "Range accrual note (coupon accrues when rate in range).",
+          "type": "string"
+        },
+        {
+          "const": "fx_barrier_option",
+          "description": "FX barrier option (FX option with knock-in/out barrier).",
+          "type": "string"
+        },
+        {
+          "const": "term_loan",
+          "description": "Term loan (optionally Delayed Draw Term Loan)",
+          "type": "string"
+        },
+        {
+          "const": "discounted_cash_flow",
+          "description": "Discounted Cash Flow (corporate valuation)",
+          "type": "string"
+        },
+        {
+          "const": "real_estate_asset",
+          "description": "Real estate asset valuation (DCF or direct cap).",
+          "type": "string"
+        },
+        {
+          "const": "levered_real_estate_equity",
+          "description": "Levered real estate equity (asset minus financing).",
+          "type": "string"
+        },
+        {
+          "const": "trs_equity",
+          "description": "Equity Total Return Swap.",
+          "type": "string"
+        },
+        {
+          "const": "trs_fixed_income_index",
+          "description": "Fixed Income Index Total Return Swap.",
+          "type": "string"
+        },
+        {
+          "const": "bond_future",
+          "description": "Bond future (futures on a deliverable bond basket with CTD mechanics).",
+          "type": "string"
+        },
+        {
+          "const": "commodity_forward",
+          "description": "Commodity forward or futures contract.",
+          "type": "string"
+        },
+        {
+          "const": "commodity_swap",
+          "description": "Commodity swap (fixed-for-floating commodity price exchange).",
+          "type": "string"
+        },
+        {
+          "const": "commodity_option",
+          "description": "Commodity option (option on commodity forward or spot).",
+          "type": "string"
+        },
+        {
+          "const": "commodity_asian_option",
+          "description": "Commodity Asian option (option on arithmetic/geometric average of commodity prices).",
+          "type": "string"
+        },
+        {
+          "const": "commodity_swaption",
+          "description": "Commodity swaption (option on a fixed-for-floating commodity swap).",
+          "type": "string"
+        },
+        {
+          "const": "commodity_spread_option",
+          "description": "Commodity spread option (option on the spread between two commodities).",
+          "type": "string"
+        },
+        {
+          "const": "volatility_index_future",
+          "description": "Volatility index future (VIX, VXN, VSTOXX).",
+          "type": "string"
+        },
+        {
+          "const": "fx_forward",
+          "description": "FX forward (outright forward, single exchange at maturity).",
+          "type": "string"
+        },
+        {
+          "const": "ndf",
+          "description": "Non-deliverable forward (NDF) for restricted currencies.",
+          "type": "string"
+        },
+        {
+          "const": "agency_mbs_passthrough",
+          "description": "Agency MBS passthrough (FNMA, FHLMC, GNMA pools).",
+          "type": "string"
+        },
+        {
+          "const": "agency_tba",
+          "description": "Agency TBA (To-Be-Announced) forward.",
+          "type": "string"
+        },
+        {
+          "const": "dollar_roll",
+          "description": "Dollar roll (TBA financing trade).",
+          "type": "string"
+        },
+        {
+          "const": "agency_cmo",
+          "description": "Agency CMO (Collateralized Mortgage Obligation).",
+          "type": "string"
+        },
+        {
+          "const": "fx_digital_option",
+          "description": "FX digital (binary) option (cash-or-nothing / asset-or-nothing).",
+          "type": "string"
+        },
+        {
+          "const": "fx_touch_option",
+          "description": "FX touch option (one-touch / no-touch American binary).",
+          "type": "string"
+        },
+        {
+          "const": "tarn",
+          "description": "Target Redemption Note (path-dependent coupon with knockout).",
+          "type": "string"
+        },
+        {
+          "const": "cms_spread_option",
+          "description": "CMS Spread Option (option on spread between two CMS rates).",
+          "type": "string"
+        },
+        {
+          "const": "callable_range_accrual",
+          "description": "Callable Range Accrual (range accrual with Bermudan call).",
+          "type": "string"
+        },
+        {
+          "const": "snowball",
+          "description": "Snowball / Inverse Floater structured note.",
+          "type": "string"
+        },
+        {
+          "const": "composite",
+          "description": "Generic resolved basket of signed underlying instrument quantities.",
+          "type": "string"
+        },
+        {
+          "const": "commodity_future",
+          "description": "Linear listed future on a single or average observed price.",
+          "type": "string"
+        },
+        {
+          "const": "fx_future",
+          "description": "Exchange-listed future on a deliverable currency pair.",
+          "type": "string"
+        },
+        {
+          "const": "equity_future",
+          "description": "Exchange-listed equity or equity-index future, including fixed-currency quantos.",
+          "type": "string"
+        },
+        {
+          "const": "equity_total_return_future",
+          "description": "Listed equity total-return future quoted as an annualized financing spread.",
+          "type": "string"
+        },
+        {
+          "const": "interest_rate_future_option",
+          "description": "Listed or bilateral option on an interest-rate futures price.",
+          "type": "string"
+        },
+        {
+          "const": "equity_future_option",
+          "description": "Exchange-listed option on an equity or equity-index futures contract.",
+          "type": "string"
+        },
+        {
+          "const": "fx_future_option",
+          "description": "Exchange-listed option on an FX futures contract.",
+          "type": "string"
+        },
+        {
+          "const": "commodity_future_option",
+          "description": "Exchange-listed option on a commodity futures contract.",
+          "type": "string"
+        },
+        {
+          "const": "volatility_index_future_option",
+          "description": "Exchange-listed option on a volatility-index futures contract.",
+          "type": "string"
+        },
+        {
+          "const": "asset_backed_facility",
+          "description": "Asset-backed facility (warehouse line against a collateral pool).",
+          "type": "string"
+        }
+      ]
+    },
+    "MetricId": {
+      "description": "Strongly-typed metric identifier.\n\nProvides compile-time validation, autocomplete support, and safe refactoring\nwhen metric names change. Covers bond, IRS, deposit, and risk metrics.\n\nSee unit tests and `examples/` for usage.",
+      "type": "string"
+    },
+    "Money": {
+      "additionalProperties": false,
+      "description": "Currency-tagged monetary amount with safe arithmetic.\n\nValues retain decimal precision independently of ISO 4217 display precision.\n\nWhen you need configurable rounding during ingestion, use\n[`Money::new_with_config`].\n\n# Examples\n```rust\nuse finstack_quant_core::money::Money;\nuse finstack_quant_core::currency::Currency;\n\nlet notional = Money::from((1_000_000_i64, Currency::EUR));\nassert_eq!(notional.currency(), Currency::EUR);\nassert_eq!(notional.amount(), 1_000_000.0);\n```",
+      "properties": {
+        "amount": {
+          "$ref": "#/$defs/DecimalWire",
+          "description": "Monetary amount, carried on the wire as an exact decimal string rather\nthan a JSON number so no precision is lost in transit. Construction with\nconfiguration applies the selected ingest scale; raw construction does not."
+        },
+        "currency": {
+          "$ref": "#/$defs/Currency",
+          "description": "ISO 4217 currency of `amount`. Arithmetic between two `Money` values\nrequires this to match; there is no implicit conversion."
+        }
+      },
+      "required": [
+        "amount",
+        "currency"
+      ],
+      "type": "object"
+    },
+    "PortfolioValuation": {
+      "description": "Complete portfolio valuation results.\n\nProvides per-position valuations, totals by entity, and the grand total.",
+      "properties": {
+        "as_of": {
+          "$ref": "#/$defs/DateWire",
+          "description": "Valuation date carried through from the portfolio."
+        },
+        "by_entity": {
+          "additionalProperties": {
+            "$ref": "#/$defs/Money"
+          },
+          "description": "Aggregated values by entity",
+          "type": "object"
+        },
+        "degraded_positions": {
+          "description": "Positions whose valuation fell back to PV-only because requested risk\nmetrics could not be computed.",
+          "items": {
+            "$ref": "#/$defs/PositionId"
+          },
+          "type": "array"
+        },
+        "fx_collapse_policy": {
+          "$ref": "#/$defs/FxConversionPolicy",
+          "default": "cashflow_date",
+          "description": "FX policy applied when collapsing position values to the base currency.\n\nBase-currency rollups use an explicit spot-equivalent conversion at\n[`as_of`](Self::as_of) through the market FX matrix; this records the\napplied [`FxConversionPolicy`] so the result envelope satisfies the\npolicy-visibility invariant (the FX strategy is stamped, not implied)."
+        },
+        "position_values": {
+          "additionalProperties": {
+            "$ref": "#/$defs/PositionValue"
+          },
+          "description": "Values for each position",
+          "type": "object"
+        },
+        "total_base_currency": {
+          "$ref": "#/$defs/Money",
+          "description": "Total portfolio value in base currency"
+        }
+      },
+      "required": [
+        "as_of",
+        "position_values",
+        "total_base_currency",
+        "by_entity"
+      ],
+      "type": "object"
+    },
+    "PositionId": {
+      "description": "Position identifier.",
+      "type": "string"
+    },
+    "PositionValue": {
+      "description": "Result of valuing a single position.\n\nHolds both native-currency and base-currency valuations along with\nthe underlying [`ValuationResult`].",
+      "properties": {
+        "entity_id": {
+          "$ref": "#/$defs/EntityId",
+          "description": "Entity that owns this position"
+        },
+        "inapplicable_metrics": {
+          "description": "Metrics on the portfolio menu that this position's instrument type has\nno calculator for, and which were therefore never requested of it.\n\nA portfolio metric list is a menu offered to a heterogeneous book (see\n[`RequestedMetrics`]), so this records the per-position narrowing that\nmakes such a list usable. It is not a failure report: unlike\n[`PortfolioValuation::degraded_positions`] and\n[`PortfolioMetrics::skipped_metrics`](crate::metrics::PortfolioMetrics::skipped_metrics),\nnothing here could have been computed and was not. An entry means the\nmodel gives this instrument type no such exposure, so the position\ncontributes nothing to that metric's portfolio total by construction.\n\nListed in menu order. Empty for a position that supports the whole menu.",
+          "items": {
+            "$ref": "#/$defs/MetricId"
+          },
+          "type": "array"
+        },
+        "metric_scale": {
+          "description": "Linear scaling factor to apply to summable risk measures.\n\nThis mirrors the economic position size and sign used for PV scaling,\nbut is kept separate so non-summable metrics such as YTM remain\nunscaled at the position drill-down level.",
+          "format": "double",
+          "type": "number"
+        },
+        "position_id": {
+          "$ref": "#/$defs/PositionId",
+          "description": "Position identifier"
+        },
+        "risk_error": {
+          "description": "Original metrics failure message when the valuation fell back to PV-only.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "risk_metrics_complete": {
+          "description": "Whether every risk metric requested *of this position* was computed\nsuccessfully.\n\nThe requested set is the portfolio metric menu narrowed to what this\nposition's instrument type supports, so structural narrowing does not\nclear this flag; the narrowed-away entries are listed on\n[`inapplicable_metrics`](Self::inapplicable_metrics). `false` means a\nsupported metric failed to compute and the position fell back to\nPV-only.",
+          "type": "boolean"
+        },
+        "valuation_result": {
+          "anyOf": [
+            {
+              "$ref": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Full valuation result with metrics (including computed risk measures)."
+        },
+        "value_base": {
+          "$ref": "#/$defs/Money",
+          "description": "Value converted to portfolio base currency"
+        },
+        "value_native": {
+          "$ref": "#/$defs/Money",
+          "description": "Value in the instrument's native currency"
+        }
+      },
+      "required": [
+        "position_id",
+        "entity_id",
+        "value_native",
+        "value_base",
+        "metric_scale",
+        "risk_metrics_complete"
+      ],
+      "type": "object"
+    },
+    "PositiveF64Wire": {
+      "description": "Finite JSON number that is strictly greater than zero.\n\nThis type is used by serde field adapters so runtime deserialization and\ngenerated schemas enforce the same positive-number contract.",
+      "exclusiveMinimum": 0.0,
+      "format": "double",
+      "type": "number"
+    },
+    "ResultsMeta": {
+      "description": "Metadata bundle that accompanies valuation outputs.\n\nThe metadata is intentionally small so it can be attached to reports and\ndownstream data stores for reproducibility and audit trails.\n\n# Examples\n```rust\nuse finstack_quant_core::config::{results_meta, FinstackConfig, NUMERIC_MODE_F64};\n\nlet meta = results_meta(&FinstackConfig::default());\nassert_eq!(meta.numeric_mode, NUMERIC_MODE_F64);\nassert!(meta.timestamp.is_none()); // deterministic by default\n```",
+      "properties": {
+        "fx_policy_applied": {
+          "default": null,
+          "description": "Optional FX policy applied by the computing layer (human-readable key).",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "numeric_mode": {
+          "description": "Numeric engine mode used to produce the results.\n\nAlways [`NUMERIC_MODE_F64`] today; a plain string so result\nenvelopes stay wire-compatible across host languages.",
+          "type": "string"
+        },
+        "parallel": {
+          "description": "Whether the producing computation ran in parallel.\n\nSerial results omit the field entirely so existing payloads and golden\nfiles stay byte-identical.",
+          "type": "boolean"
+        },
+        "rounding": {
+          "$ref": "#/$defs/RoundingContext",
+          "description": "Rounding context snapshot applied to IO boundaries."
+        },
+        "timestamp": {
+          "description": "Timestamp when result was computed (ISO 8601 format).\nUseful for audit trails and reproducibility.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "version": {
+          "description": "Finstack Quant library version used to produce the result.",
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "numeric_mode",
+        "rounding"
+      ],
+      "type": "object"
+    },
+    "RollForwardReport": {
+      "description": "Report from time roll-forward operation.\n\n# Examples\n```rust\nuse finstack_quant_scenarios::RollForwardReport;\nuse indexmap::IndexMap;\nuse time::macros::date;\n\nlet report = RollForwardReport {\n    old_date: date!(2025 - 01 - 01),\n    new_date: date!(2025 - 02 - 01),\n    days: 31,\n    instrument_carry: vec![],\n    total_carry: IndexMap::new(),\n    failed_instruments: vec![],\n};\nassert_eq!(report.days, 31);\n```",
+      "properties": {
+        "days": {
+          "description": "Calendar days between `old_date` and `new_date`.\n\nAlways a calendar-day span, including under\n[`TimeRollMode::BusinessDays`](crate::spec::TimeRollMode::BusinessDays):\nthe target date is business-day adjusted, but the span back to\n`old_date` is still calendar days. Downstream ACT/365F annualization\ndepends on this.",
+          "format": "int32",
+          "type": "integer"
+        },
+        "failed_instruments": {
+          "description": "Instruments whose carry calculation failed but did not abort the roll.",
+          "items": {
+            "maxItems": 2,
+            "minItems": 2,
+            "prefixItems": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "string"
+              }
+            ],
+            "type": "array"
+          },
+          "type": "array"
+        },
+        "instrument_carry": {
+          "description": "Per-instrument carry accrual (if instruments provided), grouped by currency.",
+          "items": {
+            "maxItems": 2,
+            "minItems": 2,
+            "prefixItems": [
+              {
+                "type": "string"
+              },
+              {
+                "additionalProperties": {
+                  "$ref": "#/$defs/Money"
+                },
+                "type": "object"
+              }
+            ],
+            "type": "array"
+          },
+          "type": "array"
+        },
+        "new_date": {
+          "$ref": "#/$defs/DateWire",
+          "description": "New as-of date after roll."
+        },
+        "old_date": {
+          "$ref": "#/$defs/DateWire",
+          "description": "Original as-of date."
+        },
+        "total_carry": {
+          "additionalProperties": {
+            "$ref": "#/$defs/Money"
+          },
+          "description": "Total P&L from carry, grouped by currency.",
+          "type": "object"
+        }
+      },
+      "required": [
+        "old_date",
+        "new_date",
+        "days",
+        "instrument_carry",
+        "total_carry",
+        "failed_instruments"
+      ],
+      "type": "object"
+    },
+    "RoundingContext": {
+      "description": "Snapshot of active rounding settings used for result stamping.\n\nInstances are typically produced via [`rounding_context_from`] and persisted\nalongside valuation results.",
+      "properties": {
+        "ingest_scale_by_currency": {
+          "additionalProperties": {
+            "format": "uint32",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "description": "Ingest scale map snapshot by currency code.",
+          "type": "object"
+        },
+        "mode": {
+          "$ref": "#/$defs/RoundingMode",
+          "description": "Active rounding mode."
+        },
+        "output_scale_by_currency": {
+          "additionalProperties": {
+            "format": "uint32",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "description": "Output scale map snapshot by currency code.",
+          "type": "object"
+        },
+        "tolerances": {
+          "$ref": "#/$defs/ToleranceConfig",
+          "default": {
+            "generic_epsilon": 1e-10,
+            "rate_epsilon": 1e-12
+          },
+          "description": "Tolerance settings snapshot for floating-point comparisons."
+        },
+        "version": {
+          "description": "Schema version for forward compatibility.",
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "mode",
+        "ingest_scale_by_currency",
+        "output_scale_by_currency",
+        "version"
+      ],
+      "type": "object"
+    },
+    "RoundingMode": {
+      "description": "Rounding modes supported by the library.\n\nThe variants mirror the most common conventions found in pricing engines.\n\n# Examples\n```rust\nuse finstack_quant_core::config::{FinstackConfig, RoundingMode};\n\nlet mut cfg = FinstackConfig::default();\ncfg.rounding.mode = RoundingMode::TowardZero;\nassert!(matches!(cfg.rounding.mode, RoundingMode::TowardZero));\n```",
+      "oneOf": [
+        {
+          "const": "bankers",
+          "description": "Banker's rounding (ties to even).",
+          "type": "string"
+        },
+        {
+          "const": "away_from_zero",
+          "description": "Round halves away from zero.",
+          "type": "string"
+        },
+        {
+          "const": "toward_zero",
+          "description": "Round toward zero (truncate).",
+          "type": "string"
+        },
+        {
+          "const": "floor",
+          "description": "Round toward negative infinity.",
+          "type": "string"
+        },
+        {
+          "const": "ceil",
+          "description": "Round toward positive infinity.",
+          "type": "string"
+        }
+      ]
+    },
+    "ScenarioChangeManifest": {
+      "additionalProperties": false,
+      "description": "Authoritative change manifest produced while applying a scenario.\n\nReaders use the manifest to invalidate only the market factors and\ninstruments that actually changed, while `all_dirty` provides a\nconservative escape hatch for changes that cannot be represented precisely.",
+      "properties": {
+        "all_dirty": {
+          "description": "Whether callers must conservatively treat every dependency as dirty.\n\nThis is set for effective time rolls because date-sensitive values can\nchange even when no explicit market or instrument target was mutated.",
+          "type": "boolean"
+        },
+        "as_of_changed": {
+          "description": "Whether the execution context's effective valuation date changed.",
+          "type": "boolean"
+        },
+        "changed_instrument_indices": {
+          "description": "Zero-based indices of portfolio instruments mutated in place.",
+          "items": {
+            "format": "uint32",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "type": "array"
+        },
+        "market_targets": {
+          "description": "Concrete market-data targets changed by applied effects.",
+          "items": {
+            "$ref": "#/$defs/ScenarioMarketTarget"
+          },
+          "type": "array"
+        },
+        "portfolio_shape_changed": {
+          "description": "Whether instruments were inserted, removed, or reordered.\n\nScenario operations do not change portfolio shape, so this stays `false`.",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "market_targets",
+        "changed_instrument_indices",
+        "as_of_changed",
+        "portfolio_shape_changed",
+        "all_dirty"
+      ],
+      "type": "object"
+    },
+    "ScenarioMarketTarget": {
+      "description": "A concrete market-data target changed while applying a scenario.\n\nTargets are recorded from hierarchy-expanded operations together with the\neffects that were actually accepted by the engine. Consequently, every\nidentifier is a resolved market identifier rather than an unresolved\nhierarchy path or a best-effort reconstruction of the original spec.",
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "description": "A discount, forward, credit, inflation, or commodity curve.",
+          "properties": {
+            "curve_id": {
+              "$ref": "#/$defs/Id",
+              "description": "Concrete identifier changed in that collection."
+            },
+            "curve_kind": {
+              "$ref": "#/$defs/CurveKind",
+              "description": "Curve family used to select the market-data collection."
+            },
+            "kind": {
+              "const": "curve",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "curve_kind",
+            "curve_id"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "A volatility-index curve.",
+          "properties": {
+            "curve_id": {
+              "$ref": "#/$defs/Id",
+              "description": "Concrete volatility-index curve identifier."
+            },
+            "kind": {
+              "const": "volatility_index",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "curve_id"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "A base-correlation surface.",
+          "properties": {
+            "kind": {
+              "const": "base_correlation",
+              "type": "string"
+            },
+            "surface_id": {
+              "$ref": "#/$defs/Id",
+              "description": "Concrete base-correlation surface identifier."
+            }
+          },
+          "required": [
+            "kind",
+            "surface_id"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "A volatility surface.",
+          "properties": {
+            "kind": {
+              "const": "vol_surface",
+              "type": "string"
+            },
+            "vol_surface_id": {
+              "$ref": "#/$defs/Id",
+              "description": "Concrete volatility-surface identifier."
+            }
+          },
+          "required": [
+            "kind",
+            "vol_surface_id"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "An equity or other scalar price entry.",
+          "properties": {
+            "kind": {
+              "const": "equity_price",
+              "type": "string"
+            },
+            "spot_id": {
+              "$ref": "#/$defs/Id",
+              "description": "Concrete `MarketContext::get_price` scalar identifier."
+            }
+          },
+          "required": [
+            "kind",
+            "spot_id"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "A directed FX pair.",
+          "properties": {
+            "base": {
+              "$ref": "#/$defs/Currency",
+              "description": "Base currency strengthened or weakened by the operation."
+            },
+            "kind": {
+              "const": "fx",
+              "type": "string"
+            },
+            "quote": {
+              "$ref": "#/$defs/Currency",
+              "description": "Quote currency used for the shocked rate."
+            }
+          },
+          "required": [
+            "kind",
+            "base",
+            "quote"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "ToleranceConfig": {
+      "additionalProperties": false,
+      "description": "Numerical tolerance configuration for floating-point comparisons.\n\nProvides configurable epsilon values for zero-checks in rate calculations\nand generic floating-point comparisons. These defaults are chosen to balance\nnumerical stability with practical precision requirements.\n\n# Examples\n```rust\nuse finstack_quant_core::config::ToleranceConfig;\n\nlet mut tol = ToleranceConfig::default();\nassert_eq!(tol.rate_epsilon, 1e-12);\n\n// Customize for stricter rate comparisons\ntol.rate_epsilon = 1e-14;\n```",
+      "properties": {
+        "generic_epsilon": {
+          "$ref": "#/$defs/PositiveF64Wire",
+          "default": 1e-10,
+          "description": "Epsilon for generic floating-point comparisons (default: 1e-10).\n\nUsed for general numerical comparisons where higher tolerance is acceptable."
+        },
+        "rate_epsilon": {
+          "$ref": "#/$defs/PositiveF64Wire",
+          "default": 1e-12,
+          "description": "Epsilon for rate comparisons (default: 1e-12).\n\nUsed when comparing interest rates, yields, and other small ratios."
+        }
+      },
+      "type": "object"
+    },
+    "Warning": {
+      "description": "A single warning emitted by an adapter, the engine, or a downstream helper.\n\nNew variants will be added over time; pattern matches on `Warning` should\nalways include a wildcard arm.",
+      "oneOf": [
+        {
+          "description": "Par-spread shocks used the approximation delta hazard = delta spread / (1 - recovery).",
+          "properties": {
+            "curve_id": {
+              "description": "Hazard curve affected by the approximate spread shock.",
+              "type": "string"
+            },
+            "kind": {
+              "const": "hazard_spread_first_order",
+              "type": "string"
+            },
+            "recovery_rate": {
+              "description": "Decimal recovery fraction used in the loss-given-default conversion.",
+              "format": "double",
+              "type": "number"
+            }
+          },
+          "required": [
+            "kind",
+            "curve_id",
+            "recovery_rate"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "A discount curve was resolved heuristically (currency-prefix or single-\ncurve fallback) instead of via an explicit `discount_curve_id`.",
+          "properties": {
+            "chosen_discount": {
+              "description": "The discount curve selected by the heuristic.",
+              "type": "string"
+            },
+            "for_curve": {
+              "description": "Curve identifier the heuristic was applied to.",
+              "type": "string"
+            },
+            "kind": {
+              "const": "discount_curve_heuristic",
+              "type": "string"
+            },
+            "reason": {
+              "description": "Reason text describing the heuristic path.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "for_curve",
+            "chosen_discount",
+            "reason"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "A commodity price-curve shock was outside the typical percent-of-forward\nstress range (approximately `[-80, +200]` percent).",
+          "properties": {
+            "curve_id": {
+              "description": "Curve identifier.",
+              "type": "string"
+            },
+            "detail": {
+              "description": "Detail describing whether the trigger was a parallel or node shock\nand which knot(s) were extreme.",
+              "type": "string"
+            },
+            "kind": {
+              "const": "commodity_shock_outside_range",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "curve_id",
+            "detail"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Equity identifier was missing from the market context; no bump applied.",
+          "properties": {
+            "id": {
+              "description": "Equity price identifier.",
+              "type": "string"
+            },
+            "kind": {
+              "const": "equity_not_found",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "id"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Rate binding produced no statement update because the target node has\nno explicit forecast values.",
+          "properties": {
+            "curve_id": {
+              "description": "Curve identifier from which the rate would have been extracted.",
+              "type": "string"
+            },
+            "kind": {
+              "const": "rate_binding_no_forecast_values",
+              "type": "string"
+            },
+            "node_id": {
+              "description": "Statement node identifier.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "node_id",
+            "curve_id"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Rate binding evaluation failed.",
+          "properties": {
+            "curve_id": {
+              "description": "Curve identifier.",
+              "type": "string"
+            },
+            "kind": {
+              "const": "rate_binding_failed",
+              "type": "string"
+            },
+            "node_id": {
+              "description": "Statement node identifier.",
+              "type": "string"
+            },
+            "reason": {
+              "description": "Underlying error message.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "node_id",
+            "curve_id",
+            "reason"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Statement node had no forecast values to modify.",
+          "properties": {
+            "kind": {
+              "const": "statement_node_no_values",
+              "type": "string"
+            },
+            "node_id": {
+              "description": "Statement node identifier.",
+              "type": "string"
+            },
+            "op": {
+              "description": "Operation that was attempted (e.g. `\"forecast_percent\"`).",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "node_id",
+            "op"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Statement operation failed.",
+          "properties": {
+            "kind": {
+              "const": "statement_op_failed",
+              "type": "string"
+            },
+            "node_id": {
+              "description": "Statement node identifier.",
+              "type": "string"
+            },
+            "op": {
+              "description": "Operation name.",
+              "type": "string"
+            },
+            "reason": {
+              "description": "Underlying error message.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "node_id",
+            "op",
+            "reason"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Model evaluator emitted a warning during re-evaluation.",
+          "properties": {
+            "detail": {
+              "description": "Free-text detail from the evaluator (already includes context).",
+              "type": "string"
+            },
+            "kind": {
+              "const": "model_evaluation",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "detail"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Model re-evaluation failed.",
+          "properties": {
+            "kind": {
+              "const": "model_reevaluation_failed",
+              "type": "string"
+            },
+            "reason": {
+              "description": "Underlying error message.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "reason"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "FX shock left a non-pivot direct quote inconsistent with the pivot-\ntriangulated cross.",
+          "properties": {
+            "detail": {
+              "description": "Free-text detail naming the inconsistent pair and computed values.",
+              "type": "string"
+            },
+            "kind": {
+              "const": "fx_triangulation_inconsistent",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "detail"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Instrument shock fell back to attribute metadata because no pricing\noverride was exposed by the instrument's pricer.",
+          "properties": {
+            "inst_type": {
+              "$ref": "#/$defs/InstrumentType",
+              "description": "Canonical instrument type that could not apply the shock directly."
+            },
+            "kind": {
+              "const": "instrument_shock_fallback",
+              "type": "string"
+            },
+            "label": {
+              "description": "Instrument label (id / name / unidentified).",
+              "type": "string"
+            },
+            "shock_kind": {
+              "description": "Whether the shock is a price (`\"price\"`) or spread (`\"spread\"`).",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "shock_kind",
+            "inst_type",
+            "label"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Instrument shock found no instruments matching the filter.",
+          "properties": {
+            "filter_desc": {
+              "description": "Free-text description of the filter (e.g. `IndexMap` debug form).",
+              "type": "string"
+            },
+            "kind": {
+              "const": "instrument_shock_no_match",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "filter_desc"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Correlation shock found no `StructuredCredit` instruments with a\ncorrelation structure.",
+          "properties": {
+            "kind": {
+              "const": "correlation_shock_no_match",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Correlation bump clamped one or more correlation parameters.",
+          "properties": {
+            "detail": {
+              "description": "Detail string describing what was clamped.",
+              "type": "string"
+            },
+            "instrument_id": {
+              "description": "Instrument identifier.",
+              "type": "string"
+            },
+            "kind": {
+              "const": "correlation_clamped",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "instrument_id",
+            "detail"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "A shock targeting a curve node by tenor had to extrapolate beyond the\ncurve's pillar range.",
+          "properties": {
+            "curve_id": {
+              "description": "Curve identifier.",
+              "type": "string"
+            },
+            "detail": {
+              "description": "Free-text describing the tenor and the gap.",
+              "type": "string"
+            },
+            "kind": {
+              "const": "tenor_extrapolated",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "curve_id",
+            "detail"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "An interpolated node bump split its shock across two pillars of a\npar-CDS curve that is rebuilt by solve-to-par recalibration. On that\npath the 1/Σw² delivery correction is only first-order — the weighted\ntargets are snapped to the nearest calibration quotes before\nre-solving, so the realized shock at the requested tenor may differ\nfrom the requested size. Direct-shift curves (discount, inflation,\nforward, commodity) calibrate onto the native interpolant and do not\nemit this warning. Use `TenorMatchMode::Exact` at pillar tenors for\npillar-accurate par-CDS bucket risk.",
+          "properties": {
+            "curve_id": {
+              "description": "Curve identifier.",
+              "type": "string"
+            },
+            "detail": {
+              "description": "Free-text describing the tenor and adjacent pillars.",
+              "type": "string"
+            },
+            "kind": {
+              "const": "interpolated_node_bump_first_order",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "curve_id",
+            "detail"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Bucket-correlation shock matched no detachment buckets.",
+          "properties": {
+            "kind": {
+              "const": "base_corr_bucket_no_match",
+              "type": "string"
+            },
+            "surface_id": {
+              "description": "Surface identifier.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "surface_id"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Vol-surface arbitrage warning detected post-shock.",
+          "properties": {
+            "detail": {
+              "description": "Free-text from `ArbitrageViolation` Display.",
+              "type": "string"
+            },
+            "kind": {
+              "const": "vol_surface_arbitrage",
+              "type": "string"
+            },
+            "vol_surface_id": {
+              "description": "Volatility-surface identifier.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "vol_surface_id",
+            "detail"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Vol-surface negative bucket shock that may produce non-positive vols.",
+          "properties": {
+            "bucket": {
+              "description": "Whether this was a parallel (`false`) or bucket (`true`) shock.",
+              "type": "boolean"
+            },
+            "kind": {
+              "const": "vol_surface_large_negative_shock",
+              "type": "string"
+            },
+            "pct": {
+              "description": "Percent shock value.",
+              "format": "double",
+              "type": "number"
+            },
+            "vol_surface_id": {
+              "description": "Volatility-surface identifier.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "vol_surface_id",
+            "pct",
+            "bucket"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "A hierarchy-targeted operation expanded to zero curves. This is almost\nalways a configuration mistake — the target path exists but has no\ncurves attached to it, or the tag filter excluded everything.",
+          "properties": {
+            "kind": {
+              "const": "hierarchy_no_match",
+              "type": "string"
+            },
+            "op_kind": {
+              "description": "Operation kind name (e.g., `\"HierarchyCurveParallelBp\"`).",
+              "type": "string"
+            },
+            "target_path": {
+              "description": "Hierarchy path the operation targeted, joined with `/`.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "target_path",
+            "op_kind"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "A hierarchy-resolved identifier was skipped because it does not exist\nin the market collection targeted by the operation kind (e.g. a\n`HierarchyCurveParallelBp { curve_kind: Discount }` matched an id that\nis an equity price or vol surface, not a discount curve). The remaining\nresolved identifiers are still applied.",
+          "properties": {
+            "curve_id": {
+              "description": "The resolved identifier that was skipped.",
+              "type": "string"
+            },
+            "kind": {
+              "const": "hierarchy_resolved_id_skipped",
+              "type": "string"
+            },
+            "op_kind": {
+              "description": "Operation kind name (e.g., `\"HierarchyCurveParallelBp\"`).",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "curve_id",
+            "op_kind"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "An instrument's valuation failed while computing carry during a\n`TimeRollForward` operation. The instrument is excluded from the\nroll-forward carry aggregation but the roll itself proceeds.",
+          "properties": {
+            "instrument_id": {
+              "description": "Instrument identifier.",
+              "type": "string"
+            },
+            "kind": {
+              "const": "time_roll_instrument_failed",
+              "type": "string"
+            },
+            "reason": {
+              "description": "Underlying valuation error message.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "instrument_id",
+            "reason"
+          ],
+          "type": "object"
+        }
+      ]
+    }
+  },
+  "$id": "https://finstack_quant.dev/schemas/portfolio/1/scenario_revalue_view.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Scenario-and-revalue view returned by binding surfaces.",
+  "properties": {
+    "report": {
+      "$ref": "#/$defs/ApplicationReport",
+      "description": "Scenario application report."
+    },
+    "valuation": {
+      "$ref": "#/$defs/PortfolioValuation",
+      "description": "Stressed portfolio valuation."
+    }
+  },
+  "required": [
+    "valuation",
+    "report"
+  ],
+  "title": "ScenarioRevalueView",
+  "type": "object"
+}

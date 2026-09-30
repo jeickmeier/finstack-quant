@@ -15,6 +15,7 @@ use finstack_quant_valuations::instruments::Instrument;
 
 /// P&L profile for one factor across a scenario grid.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct FactorPnlProfile {
     /// Reporting currency of all per-position P&L amounts.
     pub base_currency: Currency,

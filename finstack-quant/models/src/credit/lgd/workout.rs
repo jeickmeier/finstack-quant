@@ -52,7 +52,7 @@ fn validate_finite(value: f64) -> Result<()> {
 #[derive(Debug, Clone, Copy, PartialEq, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(rename_all = "snake_case")]
-pub enum CollateralType {
+pub enum WorkoutCollateralType {
     /// Cash and cash equivalents. Typical haircut: 0-5%.
     Cash,
     /// Government securities. Typical haircut: 2-10%.
@@ -71,7 +71,7 @@ pub enum CollateralType {
     Other,
 }
 
-impl std::str::FromStr for CollateralType {
+impl std::str::FromStr for WorkoutCollateralType {
     type Err = finstack_quant_core::Error;
 
     fn from_str(s: &str) -> Result<Self> {
@@ -96,7 +96,7 @@ impl std::str::FromStr for CollateralType {
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct CollateralPiece {
     /// Collateral asset class.
-    pub collateral_type: CollateralType,
+    pub collateral_type: WorkoutCollateralType,
     /// Book value (pre-haircut) of the collateral.
     pub book_value: f64,
     /// Liquidation haircut in \[0, 1\]. Applied as: liquidation_value = book_value * (1 - haircut).
@@ -109,7 +109,11 @@ impl CollateralPiece {
     /// # Errors
     ///
     /// Returns an error if inputs are non-finite, `book_value < 0`, or `haircut` is not in \[0, 1\].
-    pub fn new(collateral_type: CollateralType, book_value: f64, haircut: f64) -> Result<Self> {
+    pub fn new(
+        collateral_type: WorkoutCollateralType,
+        book_value: f64,
+        haircut: f64,
+    ) -> Result<Self> {
         validate_finite(book_value)?;
         validate_finite(haircut)?;
         if book_value < 0.0 {
@@ -419,16 +423,16 @@ mod tests {
 
     #[test]
     fn collateral_piece_liquidation_value() {
-        let piece =
-            CollateralPiece::new(CollateralType::RealEstate, 80.0, 0.30).expect("valid collateral");
+        let piece = CollateralPiece::new(WorkoutCollateralType::RealEstate, 80.0, 0.30)
+            .expect("valid collateral");
         assert!((piece.liquidation_value() - 56.0).abs() < 1e-12);
     }
 
     #[test]
     fn collateral_type_from_str_rejects_noncanonical_spellings() {
         assert_eq!(
-            CollateralType::from_str("cash").expect("cash"),
-            CollateralType::Cash
+            WorkoutCollateralType::from_str("cash").expect("cash"),
+            WorkoutCollateralType::Cash
         );
 
         for rejected in [
@@ -439,7 +443,7 @@ mod tests {
             "RealEstate",
             "crypto",
         ] {
-            let error = CollateralType::from_str(rejected)
+            let error = WorkoutCollateralType::from_str(rejected)
                 .expect_err("noncanonical collateral type should be rejected");
             assert!(error.to_string().contains("unknown collateral type"));
         }
@@ -448,11 +452,11 @@ mod tests {
     #[test]
     fn collateral_piece_validation() {
         // Negative book value
-        assert!(CollateralPiece::new(CollateralType::Cash, -1.0, 0.0).is_err());
+        assert!(CollateralPiece::new(WorkoutCollateralType::Cash, -1.0, 0.0).is_err());
         // Haircut out of range
-        assert!(CollateralPiece::new(CollateralType::Cash, 100.0, -0.1).is_err());
-        assert!(CollateralPiece::new(CollateralType::Cash, 100.0, 1.1).is_err());
-        assert!(CollateralPiece::new(CollateralType::Cash, f64::NAN, 0.0).is_err());
+        assert!(CollateralPiece::new(WorkoutCollateralType::Cash, 100.0, -0.1).is_err());
+        assert!(CollateralPiece::new(WorkoutCollateralType::Cash, 100.0, 1.1).is_err());
+        assert!(CollateralPiece::new(WorkoutCollateralType::Cash, f64::NAN, 0.0).is_err());
     }
 
     #[test]
@@ -475,8 +479,8 @@ mod tests {
     #[test]
     fn workout_lgd_single_collateral() {
         // Single collateral: RE $80M, 30% haircut, EAD $100M, 2yr workout at 5%, 8% total costs
-        let piece =
-            CollateralPiece::new(CollateralType::RealEstate, 80.0, 0.30).expect("valid collateral");
+        let piece = CollateralPiece::new(WorkoutCollateralType::RealEstate, 80.0, 0.30)
+            .expect("valid collateral");
         let costs = WorkoutCosts::new(0.05, 0.03).expect("valid costs");
 
         let model = WorkoutLgd::builder()
@@ -528,8 +532,8 @@ mod tests {
     #[test]
     fn workout_lgd_collateral_exceeds_ead() {
         // Collateral liquidation value > EAD: recovery capped at EAD
-        let piece =
-            CollateralPiece::new(CollateralType::Cash, 200.0, 0.0).expect("valid collateral");
+        let piece = CollateralPiece::new(WorkoutCollateralType::Cash, 200.0, 0.0)
+            .expect("valid collateral");
 
         let model = WorkoutLgd::builder()
             .collateral(piece)
@@ -574,8 +578,9 @@ mod tests {
 
     #[test]
     fn workout_lgd_multiple_collateral() {
-        let p1 = CollateralPiece::new(CollateralType::Cash, 20.0, 0.0).expect("valid");
-        let p2 = CollateralPiece::new(CollateralType::RealEstate, 60.0, 0.25).expect("valid");
+        let p1 = CollateralPiece::new(WorkoutCollateralType::Cash, 20.0, 0.0).expect("valid");
+        let p2 =
+            CollateralPiece::new(WorkoutCollateralType::RealEstate, 60.0, 0.25).expect("valid");
 
         let model = WorkoutLgd::builder()
             .collateral(p1)
@@ -606,7 +611,8 @@ mod tests {
 
     #[test]
     fn workout_lgd_recovery_rate_complement() {
-        let piece = CollateralPiece::new(CollateralType::Equipment, 50.0, 0.40).expect("valid");
+        let piece =
+            CollateralPiece::new(WorkoutCollateralType::Equipment, 50.0, 0.40).expect("valid");
         let model = WorkoutLgd::builder()
             .collateral(piece)
             .build()
@@ -619,7 +625,8 @@ mod tests {
 
     #[test]
     fn workout_lgd_serialization_roundtrip() {
-        let piece = CollateralPiece::new(CollateralType::RealEstate, 80.0, 0.30).expect("valid");
+        let piece =
+            CollateralPiece::new(WorkoutCollateralType::RealEstate, 80.0, 0.30).expect("valid");
         let model = WorkoutLgd::builder()
             .collateral(piece)
             .build()

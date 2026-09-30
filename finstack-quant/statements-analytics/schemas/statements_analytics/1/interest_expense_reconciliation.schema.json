@@ -1,0 +1,66 @@
+{
+  "$defs": {
+    "NodeId": {
+      "description": "Type-safe identifier for a node in a financial model.\n\nSerializes as a plain string and is interoperable with `&str` via\n[`Borrow`] and [`AsRef`].",
+      "type": "string"
+    }
+  },
+  "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/interest_expense_reconciliation.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Reconciles interest expense against debt balances or the capital-structure interest schedule.",
+  "properties": {
+    "cs_interest_node": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/NodeId"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "Optional capital-structure interest node for direct comparison."
+    },
+    "debt_balance_nodes": {
+      "description": "Debt-balance / rate pairs: `(balance_node, optional_rate_node)`.",
+      "items": {
+        "maxItems": 2,
+        "minItems": 2,
+        "prefixItems": [
+          {
+            "$ref": "#/$defs/NodeId"
+          },
+          {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/NodeId"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        ],
+        "type": "array"
+      },
+      "type": "array"
+    },
+    "interest_expense_node": {
+      "$ref": "#/$defs/NodeId",
+      "description": "Interest expense node (income statement)."
+    },
+    "tolerance_pct": {
+      "description": "Tolerance expressed as a fraction (default 0.05 = 5 %).",
+      "format": "double",
+      "type": [
+        "number",
+        "null"
+      ]
+    }
+  },
+  "required": [
+    "interest_expense_node",
+    "debt_balance_nodes"
+  ],
+  "title": "InterestExpenseReconciliation",
+  "type": "object"
+}

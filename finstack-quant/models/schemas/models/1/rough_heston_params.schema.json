@@ -1,0 +1,74 @@
+{
+  "$defs": {
+    "HurstExponent": {
+      "description": "Validated Hurst exponent H ∈ (0, 1).\n\nThe Hurst exponent determines the roughness of fractional Brownian motion:\n\n- H < 0.5 — rough (anti-persistent increments)\n- H = 0.5 — standard Brownian motion\n- H > 0.5 — smooth (persistent increments)",
+      "properties": {
+        "h": {
+          "description": "The Hurst parameter value.",
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "required": [
+        "h"
+      ],
+      "type": "object"
+    }
+  },
+  "$id": "https://finstack_quant.dev/schemas/models/1/rough_heston_params.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Rough Heston model parameters.",
+  "properties": {
+    "hurst": {
+      "$ref": "#/$defs/HurstExponent",
+      "description": "Hurst exponent H ∈ (0, 0.5) — controls the roughness of the variance."
+    },
+    "kappa": {
+      "description": "Mean reversion speed (κ > 0).",
+      "format": "double",
+      "type": "number"
+    },
+    "q": {
+      "description": "Dividend yield (annual, continuously compounded).",
+      "format": "double",
+      "type": "number"
+    },
+    "r": {
+      "description": "Risk-free rate (annual, continuously compounded).",
+      "format": "double",
+      "type": "number"
+    },
+    "rho": {
+      "description": "Spot–variance correlation ρ ∈ \\[−1, 1\\].",
+      "format": "double",
+      "type": "number"
+    },
+    "sigma_v": {
+      "description": "Volatility of variance — vol-of-vol (σᵥ > 0).",
+      "format": "double",
+      "type": "number"
+    },
+    "theta": {
+      "description": "Long-run variance level (θ > 0).",
+      "format": "double",
+      "type": "number"
+    },
+    "v0": {
+      "description": "Initial variance (v₀ > 0).",
+      "format": "double",
+      "type": "number"
+    }
+  },
+  "required": [
+    "r",
+    "q",
+    "hurst",
+    "kappa",
+    "theta",
+    "sigma_v",
+    "rho",
+    "v0"
+  ],
+  "title": "RoughHestonParams",
+  "type": "object"
+}

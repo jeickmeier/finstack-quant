@@ -50,6 +50,7 @@ use super::types::{Exposure, PdTermStructure, Stage};
 ///
 /// Used for probability-weighted ECL calculation per IFRS 9 B5.5.42.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct MacroScenario {
     /// Scenario identifier (e.g., "base", "upside", "downside").
@@ -104,6 +105,7 @@ pub struct MacroScenario {
 ///   Default." *Journal of Credit Risk*, 8(1), 109-140 (related literature
 ///   only; see [`DownturnLgd`] for the exact formula implemented).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(rename_all = "snake_case")]
 pub enum LgdType {
     /// Point-in-time LGD from the exposure (or scenario override). No
@@ -123,6 +125,7 @@ pub enum LgdType {
 /// Controls time bucket granularity, scenario specifications, staging
 /// parameters, and LGD methodology.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct EclConfig {
     /// Time bucket width in years for the PD-LGD-EAD integration.
@@ -472,6 +475,7 @@ impl Default for EclConfigBuilder {
 
 /// ECL result for a single time bucket.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct EclBucket {
     /// Start of the time bucket (years).
     pub t_start: f64,
@@ -494,6 +498,7 @@ pub struct EclBucket {
 
 /// ECL result for a single exposure under a single scenario.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct EclResult {
     /// Exposure identifier.
     pub exposure_id: String,
@@ -512,6 +517,7 @@ pub struct EclResult {
 
 /// Probability-weighted ECL result across scenarios.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct WeightedEclResult {
     /// Exposure identifier.
     pub exposure_id: String,
@@ -528,6 +534,7 @@ pub struct WeightedEclResult {
 
 /// Combined staging + ECL result for one exposure.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct ExposureEclResult {
     /// Stage classification result with audit trail.
     pub stage_result: StageResult,

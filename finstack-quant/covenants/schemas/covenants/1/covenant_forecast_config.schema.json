@@ -1,0 +1,90 @@
+{
+  "$defs": {
+    "CovenantScope": {
+      "description": "Whether a covenant is tested periodically or only upon an action.",
+      "oneOf": [
+        {
+          "const": "maintenance",
+          "description": "Tested on a schedule (e.g., quarterly leverage tests).",
+          "type": "string"
+        },
+        {
+          "const": "incurrence",
+          "description": "Tested only upon specific actions (e.g., incurrence of debt).",
+          "type": "string"
+        }
+      ]
+    },
+    "DateWire": {
+      "description": "ISO 8601 calendar date encoded as a `YYYY-MM-DD` JSON string.",
+      "format": "date",
+      "type": "string"
+    }
+  },
+  "$id": "https://finstack_quant.dev/schemas/covenants/1/covenant_forecast_config.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Covenant forecast configuration.",
+  "properties": {
+    "antithetic": {
+      "default": false,
+      "description": "Enables antithetic variate pairing in Monte Carlo mode.\n\nEach simulated unit draws `Z` and reuses `-Z` as a paired path,\nhalving the number of independent RNG draws and reducing estimator\nvariance for payoffs that are monotone in `Z` (Glasserman 2003,\n*Monte Carlo Methods in Financial Engineering*, §4.1). Only\nmeaningful when `num_paths > 0`; `antithetic == true` with\n`num_paths == 0` is rejected during validation as an inert flag.",
+      "type": "boolean"
+    },
+    "breach_probability_threshold": {
+      "default": 0.05,
+      "description": "Minimum stochastic breach probability to include in batch breach output.",
+      "format": "double",
+      "type": "number"
+    },
+    "num_paths": {
+      "description": "Selects the stochastic sub-mode: closed-form analytic vs. Monte Carlo.\n\n`0` (the default) uses the closed-form analytic lognormal\nprobabilities via [`norm_cdf`]. A value greater than `0` switches to\npath-consistent Monte Carlo simulation with that many paths; with\n`antithetic` enabled, paths are simulated in `(Z, -Z)` pairs and this\ncount is rounded up to a whole number of pairs. Ignored when\n`stochastic` is `false`.",
+      "format": "uint",
+      "minimum": 0,
+      "type": "integer"
+    },
+    "random_seed": {
+      "description": "RNG seed for Monte Carlo mode (`num_paths > 0`).\n\n`None` uses the crate-internal `DEFAULT_MC_SEED` (`0`). Ignored in analytic mode\n(`num_paths == 0`) and when `stochastic` is `false`.",
+      "format": "uint64",
+      "minimum": 0,
+      "type": [
+        "integer",
+        "null"
+      ]
+    },
+    "reference_date": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/DateWire"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "Reference date for time-scaling lognormal shocks. When set, shocks scale with\n`sqrt(T)` where T is the year-fraction from this date to the test date.\nWhen `None`, the engine uses the end date of the period immediately\npreceding the first forecast period, so the first simulated point still\nhas a non-zero forecast horizon."
+    },
+    "scope": {
+      "$ref": "#/$defs/CovenantScope",
+      "description": "Scope selected by batch forecasts: maintenance by default. Incurrence\nforecasts are hypothetical capacity checks, not actual breach events."
+    },
+    "stochastic": {
+      "description": "Whether to use stochastic (as opposed to deterministic) breach probabilities.",
+      "type": "boolean"
+    },
+    "volatility": {
+      "description": "Volatility for stochastic scenarios (annualized).",
+      "format": "double",
+      "type": [
+        "number",
+        "null"
+      ]
+    }
+  },
+  "required": [
+    "scope",
+    "stochastic",
+    "num_paths"
+  ],
+  "title": "CovenantForecastConfig",
+  "type": "object"
+}

@@ -1,0 +1,60 @@
+{
+  "$id": "https://finstack_quant.dev/schemas/models/1/recovery_spec.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Recovery model specification for configuration and serialization.",
+  "oneOf": [
+    {
+      "additionalProperties": false,
+      "description": "Constant recovery rate (current default behavior).",
+      "properties": {
+        "rate": {
+          "description": "Recovery rate ∈ [0, 1]",
+          "format": "double",
+          "type": "number"
+        },
+        "type": {
+          "const": "constant",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type",
+        "rate"
+      ],
+      "type": "object"
+    },
+    {
+      "additionalProperties": false,
+      "description": "Recovery correlated with market factor (Andersen-Sidenius model).\n\nUses the same bounded latent-factor shock as [`CorrelatedRecovery`]:\nthe affine shock `correlation * volatility * Z` is passed through a\nsmooth logistic transform so recovery stays inside the configured bounds.",
+      "properties": {
+        "factor_correlation": {
+          "description": "Correlation with the systematic factor. Under the canonical\nlow-factor-stress convention this is typically POSITIVE: recovery\nfalls when the factor falls, so defaults (high in stress) and\nrecoveries co-move negatively.",
+          "format": "double",
+          "type": "number"
+        },
+        "mean_recovery": {
+          "description": "Mean recovery rate",
+          "format": "double",
+          "type": "number"
+        },
+        "recovery_volatility": {
+          "description": "Recovery volatility (standard deviation)",
+          "format": "double",
+          "type": "number"
+        },
+        "type": {
+          "const": "market_correlated",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type",
+        "mean_recovery",
+        "recovery_volatility",
+        "factor_correlation"
+      ],
+      "type": "object"
+    }
+  ],
+  "title": "RecoverySpec"
+}

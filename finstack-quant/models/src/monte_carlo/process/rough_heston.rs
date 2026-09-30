@@ -82,6 +82,7 @@ use finstack_quant_core::math::fractional::HurstExponent;
 /// `theta`, `sigma_v`, and `v0`.  The Hurst exponent is validated by
 /// [`HurstExponent`]; a warning is logged when `H ≥ 0.5` (non-rough regime).
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct RoughHestonParams {
     /// Risk-free rate (annual, continuously compounded).
     pub r: f64,

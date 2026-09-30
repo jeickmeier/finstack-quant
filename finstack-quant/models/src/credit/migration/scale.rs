@@ -24,6 +24,7 @@ use finstack_quant_core::HashMap;
 /// assert_eq!(scale.default_state(), Some(9)); // D
 /// ```
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(try_from = "RatingScaleWire")]
 pub struct RatingScale {
     labels: Vec<String>,
@@ -32,6 +33,7 @@ pub struct RatingScale {
 }
 
 #[derive(Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 struct RatingScaleWire {
     labels: Vec<String>,

@@ -1,0 +1,131 @@
+{
+  "$defs": {
+    "LiquidityProfile": {
+      "additionalProperties": false,
+      "description": "Market microstructure data for a single instrument.\n\nUsers supply this data from their market data systems; the module does not\nfetch it.\n\n# Units\n\n- Prices (`mid`, `bid`, `ask`) are in the instrument's native currency.\n- `avg_daily_volume` is in shares/contracts per day.\n- `avg_trade_size` is in shares/contracts per trade.\n- `spread_volatility` is the standard deviation of the relative spread\n  (spread / mid) over the observation window.\n\n# References\n\n- Bid-ask spread conventions: `docs/REFERENCES.md#hasbrouck-2007`",
+      "properties": {
+        "ask": {
+          "description": "Best ask price.",
+          "format": "double",
+          "type": "number"
+        },
+        "avg_daily_volume": {
+          "description": "Average daily trading volume in shares/contracts.",
+          "format": "double",
+          "type": "number"
+        },
+        "avg_trade_size": {
+          "description": "Average trade size in shares/contracts.",
+          "format": "double",
+          "type": "number"
+        },
+        "bid": {
+          "description": "Best bid price.",
+          "format": "double",
+          "type": "number"
+        },
+        "instrument_id": {
+          "description": "Instrument identifier (must match `Position::instrument_id`).",
+          "type": "string"
+        },
+        "mid": {
+          "description": "Mid-price (average of bid and ask).",
+          "format": "double",
+          "type": "number"
+        },
+        "observation_days": {
+          "description": "Observation window in trading days for volume/spread statistics.\n\nDefaults to 20 (one calendar month). Used to qualify the\nstatistical reliability of ADV and spread estimates.",
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "spread_volatility": {
+          "description": "Standard deviation of the bid-ask spread.\n\nUsed in the Bangia et al. (1999) LVaR formula. Set to 0.0 if\nspread volatility data is unavailable (degrades to exogenous LVaR).\n\nThe interpretation (relative vs. absolute) is controlled by\n[`Self::spread_volatility_kind`], which defaults to\n[`SpreadVolatilityKind::Relative`] (the original Bangia convention).",
+          "format": "double",
+          "type": "number"
+        },
+        "spread_volatility_kind": {
+          "$ref": "#/$defs/SpreadVolatilityKind",
+          "description": "Interpretation of [`Self::spread_volatility`]: relative or absolute."
+        }
+      },
+      "required": [
+        "instrument_id",
+        "mid",
+        "bid",
+        "ask",
+        "avg_daily_volume",
+        "avg_trade_size",
+        "spread_volatility",
+        "spread_volatility_kind",
+        "observation_days"
+      ],
+      "type": "object"
+    },
+    "SpreadVolatilityKind": {
+      "description": "How [`LiquidityProfile::spread_volatility`] should be interpreted.\n\nBangia et al. (1999) phrase the LVaR add-on in terms of the volatility of the\n**relative** (proportional) spread. Some data providers quote spread\nvolatility in absolute price units instead. This enum selects the convention;\nthe LVaR calculator normalizes absolute spread volatilities to relative\nbefore combining with `z_alpha` and position value.\n\nThe default is [`SpreadVolatilityKind::Relative`] to match the original\nBangia convention.",
+      "oneOf": [
+        {
+          "const": "relative",
+          "description": "Standard deviation of the relative (fractional) bid-ask spread\n(`spread / mid`). This matches Bangia et al. (1999).",
+          "type": "string"
+        },
+        {
+          "const": "absolute",
+          "description": "Standard deviation of the absolute bid-ask spread in price units\n(`ask - bid`). The LVaR calculator divides by `mid` before use.",
+          "type": "string"
+        }
+      ]
+    }
+  },
+  "$id": "https://finstack_quant.dev/schemas/models/1/trade_params.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Input parameters for a market impact calculation.",
+  "properties": {
+    "daily_volatility": {
+      "description": "Daily return volatility of the instrument.",
+      "format": "double",
+      "type": "number"
+    },
+    "horizon_days": {
+      "description": "Execution horizon in trading days.",
+      "format": "double",
+      "type": "number"
+    },
+    "profile": {
+      "$ref": "#/$defs/LiquidityProfile",
+      "description": "Liquidity profile for the instrument."
+    },
+    "quantity": {
+      "description": "Total quantity to execute (positive = buy, negative = sell).",
+      "format": "double",
+      "type": "number"
+    },
+    "reference_price": {
+      "default": null,
+      "description": "Reference price used to convert the return-space volatility\n`daily_volatility` into a currency-space risk term (execution risk,\nvariance, etc.).\n\n`None` means fall back to `profile.mid`, which matches the\nhistorical default. Set explicitly when the arrival price or\ndecision-time price differs materially from the profile mid (e.g.\nwhen the profile was calibrated from a snapshot stale relative to\nthe order).",
+      "format": "double",
+      "type": [
+        "number",
+        "null"
+      ]
+    },
+    "risk_aversion": {
+      "description": "Risk aversion parameter for trajectory optimization; `None` falls\nback to the model's internal default (currently `1e-6` in the\nAlmgren-Chriss trajectory solver).",
+      "format": "double",
+      "type": [
+        "number",
+        "null"
+      ]
+    }
+  },
+  "required": [
+    "quantity",
+    "horizon_days",
+    "daily_volatility",
+    "profile"
+  ],
+  "title": "TradeParams",
+  "type": "object"
+}

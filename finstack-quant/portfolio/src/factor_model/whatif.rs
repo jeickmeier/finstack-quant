@@ -17,6 +17,7 @@ use finstack_quant_models::factor::FactorId;
 
 /// Base/after delta for a single factor contribution.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct FactorContributionDelta {
     /// Factor identifier whose contribution changed.
     pub factor_id: FactorId,
@@ -28,6 +29,7 @@ pub struct FactorContributionDelta {
 
 /// Result of a position what-if scenario.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct WhatIfResult {
     /// Baseline decomposition used as the comparison point.
     pub before: RiskDecomposition,
@@ -43,6 +45,7 @@ pub struct WhatIfResult {
 /// decomposition on the shocked market. Call [`FactorModel::factor_stress`]
 /// when the stressed decomposition is required.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct StressPnl {
     /// Total portfolio P&L under the stressed market.
     pub total_pnl: f64,
@@ -52,6 +55,7 @@ pub struct StressPnl {
 
 /// Result of a factor-stress scenario.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct StressResult {
     /// Total portfolio P&L under the stressed market.
     pub total_pnl: f64,
@@ -68,6 +72,7 @@ pub struct StressResult {
 /// "new_quantity": ...}`.
 /// This is the wire shape every host binding accepts for what-if requests.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
 pub enum PositionChange {
     /// Remove an existing position by identifier.

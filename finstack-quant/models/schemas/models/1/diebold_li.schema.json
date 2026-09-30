@@ -1,0 +1,212 @@
+{
+  "$defs": {
+    "DateWire": {
+      "description": "ISO 8601 calendar date encoded as a `YYYY-MM-DD` JSON string.",
+      "format": "date",
+      "type": "string"
+    },
+    "FactorTimeSeries": {
+      "description": "Time series of extracted Nelson-Siegel factors.",
+      "properties": {
+        "dates": {
+          "description": "Observation dates copied from the source [`YieldPanel`] (length T)\nwhen the panel carried them; `None` for unlabeled panels.",
+          "items": {
+            "$ref": "#/$defs/DateWire"
+          },
+          "type": [
+            "array",
+            "null"
+          ]
+        },
+        "factors": {
+          "description": "Factor matrix: T rows x 3 columns [beta1, beta2, beta3].\nbeta1 = level, beta2 = slope, beta3 = curvature.",
+          "maxItems": 3,
+          "minItems": 3,
+          "prefixItems": [
+            {
+              "items": {
+                "format": "double",
+                "type": "number"
+              },
+              "type": "array"
+            },
+            {
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            }
+          ],
+          "type": "array"
+        },
+        "r_squared": {
+          "description": "R-squared per tenor (length N).",
+          "items": {
+            "format": "double",
+            "type": "number"
+          },
+          "type": "array"
+        },
+        "r_squared_avg": {
+          "description": "Overall cross-sectional R-squared (average across tenors).",
+          "format": "double",
+          "type": "number"
+        },
+        "residuals": {
+          "description": "Residuals from OLS factor extraction: T x N.",
+          "maxItems": 3,
+          "minItems": 3,
+          "prefixItems": [
+            {
+              "items": {
+                "format": "double",
+                "type": "number"
+              },
+              "type": "array"
+            },
+            {
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            }
+          ],
+          "type": "array"
+        }
+      },
+      "required": [
+        "factors",
+        "residuals",
+        "r_squared",
+        "r_squared_avg"
+      ],
+      "type": "object"
+    }
+  },
+  "$id": "https://finstack_quant.dev/schemas/models/1/diebold_li.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Diebold-Li (2006) dynamic Nelson-Siegel model.",
+  "properties": {
+    "factors": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/FactorTimeSeries"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "Extracted factor time series."
+    },
+    "lambda": {
+      "description": "Decay parameter lambda.",
+      "format": "double",
+      "type": "number"
+    },
+    "mu": {
+      "description": "VAR(1) intercept vector mu.",
+      "maxItems": 3,
+      "minItems": 3,
+      "prefixItems": [
+        {
+          "items": {
+            "format": "double",
+            "type": "number"
+          },
+          "type": "array"
+        },
+        {
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "type": [
+        "array",
+        "null"
+      ]
+    },
+    "phi": {
+      "description": "VAR(1) coefficient matrix Phi.",
+      "maxItems": 3,
+      "minItems": 3,
+      "prefixItems": [
+        {
+          "items": {
+            "format": "double",
+            "type": "number"
+          },
+          "type": "array"
+        },
+        {
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        {
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        }
+      ],
+      "type": [
+        "array",
+        "null"
+      ]
+    },
+    "q_cov": {
+      "description": "VAR(1) residual covariance Q.",
+      "maxItems": 3,
+      "minItems": 3,
+      "prefixItems": [
+        {
+          "items": {
+            "format": "double",
+            "type": "number"
+          },
+          "type": "array"
+        },
+        {
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        {
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        }
+      ],
+      "type": [
+        "array",
+        "null"
+      ]
+    },
+    "tenors": {
+      "description": "Tenor grid from the input panel.",
+      "items": {
+        "format": "double",
+        "type": "number"
+      },
+      "type": "array"
+    }
+  },
+  "required": [
+    "lambda",
+    "tenors"
+  ],
+  "title": "DieboldLi",
+  "type": "object"
+}

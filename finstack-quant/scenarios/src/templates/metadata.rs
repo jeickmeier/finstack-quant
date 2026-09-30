@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(rename_all = "snake_case")]
-pub enum Severity {
+pub enum TemplateSeverity {
     /// Mild stress with limited market dislocation.
     Mild,
     /// Moderate stress with broader but contained market impact.
@@ -73,7 +73,7 @@ pub struct TemplateMetadata {
     /// Freeform tags used for filtering and discovery.
     pub tags: Vec<String>,
     /// Severity classification for the template.
-    pub severity: Severity,
+    pub severity: TemplateSeverity,
     /// IDs of composable sub-component templates.
     ///
     /// Empty when the template is atomic rather than a composite built from
@@ -98,12 +98,12 @@ mod tests {
             event_date: date!(2008 - 09 - 15),
             asset_classes: vec![AssetClass::Rates, AssetClass::Credit],
             tags: vec!["systemic".into(), "credit".into()],
-            severity: Severity::Severe,
+            severity: TemplateSeverity::Severe,
             components: vec!["gfc_2008_rates".into(), "gfc_2008_credit".into()],
         };
 
         assert_eq!(meta.id, "gfc_2008");
-        assert_eq!(meta.severity, Severity::Severe);
+        assert_eq!(meta.severity, TemplateSeverity::Severe);
         assert_eq!(meta.asset_classes.len(), 2);
     }
 
@@ -116,7 +116,7 @@ mod tests {
             event_date: date!(2020 - 03 - 16),
             asset_classes: vec![AssetClass::Equity],
             tags: vec!["test".into()],
-            severity: Severity::Mild,
+            severity: TemplateSeverity::Mild,
             components: vec![],
         };
 
@@ -137,7 +137,7 @@ mod tests {
             event_date: date!(2020 - 03 - 16),
             asset_classes: vec![AssetClass::Equity, AssetClass::FX],
             tags: vec!["systemic".into()],
-            severity: Severity::Mild,
+            severity: TemplateSeverity::Mild,
             components: vec!["equity".into()],
         };
 
@@ -170,8 +170,8 @@ mod tests {
 
     #[test]
     fn test_severity_ordering() {
-        assert!(Severity::Mild < Severity::Moderate);
-        assert!(Severity::Moderate < Severity::Severe);
+        assert!(TemplateSeverity::Mild < TemplateSeverity::Moderate);
+        assert!(TemplateSeverity::Moderate < TemplateSeverity::Severe);
     }
 
     #[test]

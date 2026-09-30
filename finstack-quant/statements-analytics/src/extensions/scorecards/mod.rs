@@ -108,6 +108,7 @@ pub struct CreditScorecardExtension {
 
 /// Configuration for credit scorecard analysis.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct ScorecardConfig {
     /// Rating scale to use (e.g., "S&P", "Moody's", "Fitch")
@@ -133,6 +134,7 @@ pub struct ScorecardConfig {
 
 /// Definition of a scorecard metric.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct ScorecardMetric {
     /// Metric name
@@ -164,6 +166,7 @@ fn default_weight() -> f64 {
 
 /// Status of a scorecard run.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(rename_all = "snake_case")]
 pub enum ScorecardStatus {
     /// Scorecard executed successfully
@@ -174,6 +177,7 @@ pub enum ScorecardStatus {
 
 /// Report produced by [`CreditScorecardExtension::execute`].
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct ScorecardReport {
     /// Overall execution status
     pub status: ScorecardStatus,

@@ -1,10 +1,13 @@
+export * as analytics from "./analytics/index.js";
 export * as attribution from "./attribution/index.js";
 export * as calibration from "./calibration/index.js";
 export * as cashflows from "./cashflows/index.js";
 export * as core from "./core/index.js";
+export * as covenants from "./covenants/index.js";
 export * as margin from "./margin/index.js";
 export * as models from "./models/index.js";
 export * as portfolio from "./portfolio/index.js";
 export * as scenarios from "./scenarios/index.js";
 export * as statements from "./statements/index.js";
+export * as statements_analytics from "./statements_analytics/index.js";
 export * as valuations from "./valuations/index.js";

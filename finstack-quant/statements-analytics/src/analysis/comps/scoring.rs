@@ -25,6 +25,7 @@ use std::str::FromStr;
 /// `HigherIsCheap`, matches the historical regression-path convention
 /// (positive residual = actual spread above fitted fair spread = cheap).
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(rename_all = "snake_case")]
 pub enum ScoreDirection {
     /// Higher Y than peers means the subject is cheap (spread-like metrics).
@@ -50,6 +51,7 @@ impl FromStr for ScoreDirection {
 
 /// Configuration for a single rich/cheap scoring dimension.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct ScoringDimension {
     /// Human-readable label (e.g., "Spread vs Leverage").
@@ -69,6 +71,7 @@ pub struct ScoringDimension {
 
 /// Identifies which metric to extract from CompanyMetrics.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(rename_all = "snake_case", deny_unknown_fields)]
 pub enum MetricExtractor {
     /// A named field (e.g., "leverage", "oas_bp", "ebitda_margin").
@@ -95,6 +98,7 @@ impl FromStr for MetricExtractor {
 
 /// Decomposed score for a single dimension.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct DimensionScore {
     /// Label of the dimension.
     pub label: String,
@@ -117,6 +121,7 @@ pub struct DimensionScore {
 
 /// Composite relative value result.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct RelativeValueResult {
     /// Company being scored.
     pub company_id: CompanyId,

@@ -1,0 +1,39 @@
+{
+  "$defs": {
+    "NodeId": {
+      "description": "Type-safe identifier for a node in a financial model.\n\nSerializes as a plain string and is interoperable with `&str` via\n[`Borrow`] and [`AsRef`].",
+      "type": "string"
+    }
+  },
+  "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/coverage_floor_check.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Flags periods where a coverage ratio (e.g.",
+  "properties": {
+    "denominator_node": {
+      "$ref": "#/$defs/NodeId",
+      "description": "Denominator node (e.g. interest expense, total debt service)."
+    },
+    "min_error": {
+      "description": "Minimum ratio before an error is issued.",
+      "format": "double",
+      "type": "number"
+    },
+    "min_warning": {
+      "description": "Minimum ratio before a warning is issued.",
+      "format": "double",
+      "type": "number"
+    },
+    "numerator_node": {
+      "$ref": "#/$defs/NodeId",
+      "description": "Numerator node (e.g. EBITDA, cash flow available for debt service)."
+    }
+  },
+  "required": [
+    "numerator_node",
+    "denominator_node",
+    "min_warning",
+    "min_error"
+  ],
+  "title": "CoverageFloorCheck",
+  "type": "object"
+}

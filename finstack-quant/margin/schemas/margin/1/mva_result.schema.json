@@ -1,0 +1,44 @@
+{
+  "$id": "https://finstack_quant.dev/schemas/margin/1/mva_result.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Result of an MVA computation.",
+  "properties": {
+    "average_im": {
+      "description": "Time-weighted average IM over the profile horizon:\n`(1/T) ∫₀ᵀ IM(t) dt` under the same trapezoid convention as `mva`.",
+      "format": "double",
+      "type": "number"
+    },
+    "im_profile": {
+      "description": "Echo of the IM profile used: `(time, IM(t))` pairs.",
+      "items": {
+        "maxItems": 2,
+        "minItems": 2,
+        "prefixItems": [
+          {
+            "format": "double",
+            "type": "number"
+          },
+          {
+            "format": "double",
+            "type": "number"
+          }
+        ],
+        "type": "array"
+      },
+      "type": "array"
+    },
+    "mva": {
+      "description": "MVA (positive = lifetime funding cost of posting IM).",
+      "format": "double",
+      "type": "number"
+    }
+  },
+  "required": [
+    "mva",
+    "average_im",
+    "im_profile"
+  ],
+  "title": "MvaResult",
+  "type": "object"
+}

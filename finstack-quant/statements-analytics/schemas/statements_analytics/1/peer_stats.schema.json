@@ -1,0 +1,66 @@
+{
+  "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/peer_stats.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Descriptive statistics for a peer set metric.",
+  "properties": {
+    "count": {
+      "description": "Number of observations.",
+      "format": "uint",
+      "minimum": 0,
+      "type": "integer"
+    },
+    "iqr": {
+      "description": "Interquartile range (`q3 - q1`).",
+      "format": "double",
+      "type": "number"
+    },
+    "max": {
+      "description": "Maximum value.",
+      "format": "double",
+      "type": "number"
+    },
+    "mean": {
+      "description": "Arithmetic mean.",
+      "format": "double",
+      "type": "number"
+    },
+    "median": {
+      "description": "Median (50th percentile).",
+      "format": "double",
+      "type": "number"
+    },
+    "min": {
+      "description": "Minimum value.",
+      "format": "double",
+      "type": "number"
+    },
+    "q1": {
+      "description": "25th percentile.",
+      "format": "double",
+      "type": "number"
+    },
+    "q3": {
+      "description": "75th percentile.",
+      "format": "double",
+      "type": "number"
+    },
+    "std_dev": {
+      "description": "Sample standard deviation.",
+      "format": "double",
+      "type": "number"
+    }
+  },
+  "required": [
+    "count",
+    "mean",
+    "median",
+    "std_dev",
+    "min",
+    "max",
+    "q1",
+    "q3",
+    "iqr"
+  ],
+  "title": "PeerStats",
+  "type": "object"
+}

@@ -37,13 +37,19 @@ fn rows_to_dmatrix(rows: &[Vec<f64>], label: &str) -> finstack_quant_core::Resul
 ///
 /// Yields are continuously compounded zero rates.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct YieldPanel {
     /// Yield matrix: T rows (dates) x N columns (tenors).
     /// Entry (t, i) is the zero rate at observation t for tenor i.
+    #[cfg_attr(feature = "json-schema", schemars(with = "(Vec<f64>, usize, usize)"))]
     pub yields: DMatrix<f64>,
     /// Tenor grid in years, length N. Must be sorted ascending, all > 0.
     pub tenors: Vec<f64>,
     /// Observation dates (optional, for labeling). Length T if provided.
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "Option<Vec<finstack_quant_core::wire::DateWire>>")
+    )]
     pub dates: Option<Vec<finstack_quant_core::dates::Date>>,
 }
 
@@ -205,14 +211,21 @@ impl YieldPanel {
 
 /// Time series of extracted Nelson-Siegel factors.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct FactorTimeSeries {
     /// Observation dates copied from the source [`YieldPanel`] (length T)
     /// when the panel carried them; `None` for unlabeled panels.
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "Option<Vec<finstack_quant_core::wire::DateWire>>")
+    )]
     pub dates: Option<Vec<finstack_quant_core::dates::Date>>,
     /// Factor matrix: T rows x 3 columns [beta1, beta2, beta3].
     /// beta1 = level, beta2 = slope, beta3 = curvature.
+    #[cfg_attr(feature = "json-schema", schemars(with = "(Vec<f64>, usize, usize)"))]
     pub factors: DMatrix<f64>,
     /// Residuals from OLS factor extraction: T x N.
+    #[cfg_attr(feature = "json-schema", schemars(with = "(Vec<f64>, usize, usize)"))]
     pub residuals: DMatrix<f64>,
     /// R-squared per tenor (length N).
     pub r_squared: Vec<f64>,
@@ -255,6 +268,7 @@ impl FactorTimeSeries {
 
 /// h-step ahead yield curve forecast with confidence bands.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct YieldForecast {
     /// Forecast horizon in periods.
     pub horizon: usize,

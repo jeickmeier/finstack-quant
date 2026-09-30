@@ -1,0 +1,143 @@
+{
+  "$defs": {
+    "Stage": {
+      "description": "IFRS 9 impairment stage for a credit exposure.\n\nUnder IFRS 9, financial instruments are classified into three stages that\ndetermine the ECL measurement horizon:\n\n- **Stage 1**: 12-month ECL (no significant increase in credit risk)\n- **Stage 2**: Lifetime ECL (significant increase in credit risk detected)\n- **Stage 3**: Lifetime ECL (credit-impaired, objective evidence of default)\n\n# References\n\nIFRS 9 Financial Instruments, Section 5.5 -- Impairment. `docs/REFERENCES.md#ifrs-9-impairment`",
+      "oneOf": [
+        {
+          "const": "stage1",
+          "description": "Performing -- 12-month ECL. No significant increase in credit risk\nsince initial recognition.",
+          "type": "string"
+        },
+        {
+          "const": "stage2",
+          "description": "Underperforming -- lifetime ECL. Significant increase in credit risk\n(SICR) detected but not yet credit-impaired.",
+          "type": "string"
+        },
+        {
+          "const": "stage3",
+          "description": "Non-performing -- lifetime ECL. Credit-impaired (objective evidence of\ndefault: DPD >= 90, restructuring, etc.).",
+          "type": "string"
+        }
+      ]
+    }
+  },
+  "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/ecl_request.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Inputs for probability-weighted ECL from cumulative-PD schedules.",
+  "properties": {
+    "bucket_width_years": {
+      "default": null,
+      "description": "Optional ECL integration-bucket width in years; `None` uses the\ncanonical IFRS 9 policy default.",
+      "format": "double",
+      "type": [
+        "number",
+        "null"
+      ]
+    },
+    "ead": {
+      "description": "Exposure at default in the exposure's base currency.",
+      "format": "double",
+      "type": "number"
+    },
+    "ead_schedule": {
+      "default": null,
+      "description": "Optional exposure-at-default profile represented as\n`(time_years, ead)` knots.",
+      "items": {
+        "maxItems": 2,
+        "minItems": 2,
+        "prefixItems": [
+          {
+            "format": "double",
+            "type": "number"
+          },
+          {
+            "format": "double",
+            "type": "number"
+          }
+        ],
+        "type": "array"
+      },
+      "type": [
+        "array",
+        "null"
+      ]
+    },
+    "eir": {
+      "description": "Annual effective interest rate as a decimal used for discounting.",
+      "format": "double",
+      "type": "number"
+    },
+    "exposure_id": {
+      "description": "Stable identifier copied into the calculation result.",
+      "type": "string"
+    },
+    "lgd": {
+      "description": "Loss given default as a decimal probability in `[0, 1]`.",
+      "format": "double",
+      "type": "number"
+    },
+    "remaining_maturity_years": {
+      "description": "Remaining contractual or behavioural maturity in years.",
+      "format": "double",
+      "type": "number"
+    },
+    "scenarios": {
+      "description": "Probability-weighted scenarios represented as `(weight, schedule)`;\neach schedule contains `(time_years, cumulative_pd)` knots.",
+      "items": {
+        "maxItems": 2,
+        "minItems": 2,
+        "prefixItems": [
+          {
+            "format": "double",
+            "type": "number"
+          },
+          {
+            "items": {
+              "maxItems": 2,
+              "minItems": 2,
+              "prefixItems": [
+                {
+                  "format": "double",
+                  "type": "number"
+                },
+                {
+                  "format": "double",
+                  "type": "number"
+                }
+              ],
+              "type": "array"
+            },
+            "type": "array"
+          }
+        ],
+        "type": "array"
+      },
+      "type": "array"
+    },
+    "stage": {
+      "$ref": "#/$defs/Stage",
+      "description": "Assigned IFRS 9 stage controlling the 12-month or lifetime horizon."
+    },
+    "stage3_time_to_recovery_years": {
+      "default": null,
+      "description": "Optional Stage 3 expected-recovery horizon in years; `None` uses the\ncanonical IFRS 9 ECL default.",
+      "format": "double",
+      "type": [
+        "number",
+        "null"
+      ]
+    }
+  },
+  "required": [
+    "exposure_id",
+    "ead",
+    "lgd",
+    "eir",
+    "remaining_maturity_years",
+    "stage",
+    "scenarios"
+  ],
+  "title": "EclRequest",
+  "type": "object"
+}

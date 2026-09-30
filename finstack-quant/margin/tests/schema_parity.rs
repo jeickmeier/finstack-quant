@@ -506,3 +506,70 @@ fn margin_schema_and_serde_reject_negative_maturity_years_and_late_notification_
         ],
     );
 }
+
+/// Render one registered margin artifact by its Rust type name.
+fn registered_schema(type_name: &str) -> Value {
+    finstack_quant_margin::schema::ARTIFACTS
+        .iter()
+        .find(|artifact| artifact.type_name() == type_name)
+        .unwrap_or_else(|| panic!("{type_name} is not registered"))
+        .generate()
+        .expect("schema renders")
+}
+
+/// Serialize, validate against the registered schema, read back and require
+/// the second serialization to match the first.
+fn assert_wire_matches_registered_schema<T: Serialize + DeserializeOwned>(
+    type_name: &str,
+    value: &T,
+) -> Value {
+    let wire = serde_json::to_value(value).expect("serialize");
+    validate_fixture(&registered_schema(type_name), &wire)
+        .unwrap_or_else(|errors| panic!("{type_name}: {errors:?}\n{wire}"));
+    let back: T = serde_json::from_value(wire.clone()).expect("deserialize");
+    assert_eq!(serde_json::to_value(&back).expect("reserialize"), wire);
+    wire
+}
+
+#[test]
+fn schedule_asset_class_schema_matches_its_string_wire() {
+    use finstack_quant_margin::ScheduleAssetClass;
+
+    for class in [
+        ScheduleAssetClass::InterestRate,
+        ScheduleAssetClass::Fx,
+        ScheduleAssetClass::Custom("cash_equity".to_string()),
+    ] {
+        assert_wire_matches_registered_schema("ScheduleAssetClass", &class);
+    }
+    let schema = registered_schema("ScheduleAssetClass");
+    assert!(validate_fixture(&schema, &json!("custom_")).is_err());
+    assert!(validate_fixture(&schema, &json!({ "Custom": "x" })).is_err());
+}
+
+#[test]
+fn frtb_sensitivities_schema_matches_its_sorted_tuple_wire() {
+    use finstack_quant_margin::regulatory::frtb::FrtbSensitivities;
+
+    let mut sensitivities = FrtbSensitivities::new(Currency::USD);
+    sensitivities.add_girr_delta(Currency::USD, "5Y", 1_250.0);
+    sensitivities.add_csr_nonsec_delta("ACME", 3, "5Y", "bond", -400.0);
+    sensitivities.add_equity_delta("SPX", 11, 900.0);
+    sensitivities.add_fx_delta(Currency::EUR, Currency::USD, 50.0);
+    sensitivities.add_girr_curvature(Currency::USD, 10.0, -12.0);
+    let wire = assert_wire_matches_registered_schema("FrtbSensitivities", &sensitivities);
+    assert_eq!(wire["girr_delta"], json!([["USD", "5Y", 1250.0]]));
+}
+
+#[test]
+fn margin_utilization_schema_matches_its_amount_only_wire() {
+    use finstack_quant_margin::metrics::MarginUtilization;
+
+    let utilization = MarginUtilization::new(
+        Money::new(1_200_000.0, Currency::USD).expect("valid money"),
+        Money::new(1_000_000.0, Currency::USD).expect("valid money"),
+    )
+    .expect("valid utilization");
+    let wire = assert_wire_matches_registered_schema("MarginUtilization", &utilization);
+    assert!(wire.get("ratio").is_none(), "ratio is derived on decode");
+}

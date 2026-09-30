@@ -1,0 +1,92 @@
+{
+  "$defs": {
+    "AccountType": {
+      "description": "Type of balance sheet account.",
+      "oneOf": [
+        {
+          "const": "asset",
+          "description": "Asset account",
+          "type": "string"
+        },
+        {
+          "const": "liability",
+          "description": "Liability account",
+          "type": "string"
+        },
+        {
+          "const": "equity",
+          "description": "Equity account",
+          "type": "string"
+        }
+      ]
+    },
+    "CorkscrewAccount": {
+      "additionalProperties": false,
+      "description": "Configuration for a single corkscrew account.",
+      "properties": {
+        "account_type": {
+          "$ref": "#/$defs/AccountType",
+          "description": "Account type (asset, liability, equity)"
+        },
+        "beginning_balance_node": {
+          "description": "Optional: Node ID for beginning balance override",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "changes": {
+          "default": [],
+          "description": "Node IDs representing increases (or signed net changes) to the balance.\n\nEach change node is **added** to the prior (or beginning) balance.\nPrefer [`Self::decreases`] for positive outflows so roll-forward\ndecrease nodes do not need to be negated.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "decreases": {
+          "description": "Node IDs representing positive decreases (repayments, outflows,\ndisposals) subtracted from the balance.\n\nIdentity: `expected = prev + Σ changes − Σ decreases`, or\n`beginning + Σ changes − Σ decreases` when\n[`Self::beginning_balance_node`] is set. Empty by default so existing\nconfigs that store reductions as negative `changes` still parse.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "node_id": {
+          "description": "Node ID for the balance account",
+          "type": "string"
+        }
+      },
+      "required": [
+        "node_id",
+        "account_type"
+      ],
+      "type": "object"
+    }
+  },
+  "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/corkscrew_config.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Configuration for corkscrew analysis.",
+  "properties": {
+    "accounts": {
+      "default": [],
+      "description": "List of balance sheet accounts to validate",
+      "items": {
+        "$ref": "#/$defs/CorkscrewAccount"
+      },
+      "type": "array"
+    },
+    "fail_on_error": {
+      "default": false,
+      "description": "Whether to fail on inconsistencies (default: false)",
+      "type": "boolean"
+    },
+    "tolerance": {
+      "default": 0.01,
+      "description": "Tolerance for rounding differences (default: 0.01)",
+      "format": "double",
+      "type": "number"
+    }
+  },
+  "title": "CorkscrewConfig",
+  "type": "object"
+}

@@ -4,6 +4,7 @@ use super::PositionRiskDecomposition;
 
 /// Serializable Expected Shortfall contribution row.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct PositionEsContributionView {
     /// Position identifier.
     pub position_id: String,
@@ -17,6 +18,7 @@ pub struct PositionEsContributionView {
 
 /// Serializable Expected Shortfall decomposition view.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct ParametricEsDecompositionView {
     /// Total portfolio VaR.
     pub portfolio_var: f64,

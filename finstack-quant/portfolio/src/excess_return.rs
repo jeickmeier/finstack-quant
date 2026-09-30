@@ -50,6 +50,7 @@ const WEIGHT_TOLERANCE: f64 = 1e-6;
 /// width would silently pick an arbitrary granularity for the duration grid,
 /// so callers must state it explicitly.
 #[derive(Clone, Copy, Debug, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct CellConfig {
     /// Width of each duration cell, in years. Must be finite and positive.
@@ -59,6 +60,7 @@ pub struct CellConfig {
 /// One reference (e.g. Treasury) instrument's duration and period total
 /// return, used as an input to [`cell_returns_from_reference`].
 #[derive(Clone, Copy, Debug, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct ReferenceReturn {
     /// Duration in years at period start. Must be finite and non-negative.
@@ -76,6 +78,7 @@ pub struct ReferenceReturn {
 /// unknown fields like the other inbound types in this crate, so a
 /// misspelled or stale key fails closed instead of being silently dropped.
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct CellReturn {
     /// Human-readable cell label, e.g. `"5.0-5.5"` (see
@@ -107,6 +110,7 @@ pub struct CellReturn {
 
 /// A full duration-cell base-return curve built from a reference universe.
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct DurationCellTable {
     /// Label identifying the reference universe this curve was built from
@@ -634,6 +638,7 @@ fn fill_gaps(base_return: &mut [f64], observed: &[bool]) {
 /// One position's beginning-of-period duration, weight and realized total
 /// return, the input to [`excess_returns`].
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct ExcessReturnPosition {
     /// Position identifier, used to name the position in any validation
@@ -659,6 +664,7 @@ pub struct ExcessReturnPosition {
 /// [`ExcessReturnResult`] (which embeds a `Vec` of these) from JSON, so it
 /// denies unknown fields like the other inbound types in this module.
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct PositionExcess {
     /// Position identifier (mirrors [`ExcessReturnPosition::id`]).
@@ -675,6 +681,7 @@ pub struct PositionExcess {
 /// Per-position and portfolio-level duration-matched credit excess return
 /// result, produced by [`excess_returns`].
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct ExcessReturnResult {
     /// Label of the base curve the excess returns were measured against

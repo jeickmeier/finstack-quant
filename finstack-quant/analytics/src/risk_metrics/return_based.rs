@@ -25,6 +25,7 @@ pub(crate) fn invalid_annualization_factor(annualize: bool, ann_factor: f64) -> 
 /// `Bus252` requires a holiday calendar on the facade; missing calendar is
 /// an error.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(rename_all = "snake_case")]
 pub enum CagrDayCount {
     /// Actual calendar days divided by 365.25 (default).

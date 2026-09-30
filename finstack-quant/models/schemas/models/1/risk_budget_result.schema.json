@@ -1,0 +1,102 @@
+{
+  "$defs": {
+    "NonFiniteF64Wire": {
+      "anyOf": [
+        {
+          "description": "A finite value, written as a JSON number.",
+          "format": "double",
+          "type": "number"
+        },
+        {
+          "$ref": "#/$defs/NonFiniteSentinel",
+          "description": "A non-finite value, written as its sentinel string."
+        }
+      ],
+      "description": "An `f64` in the [`non_finite_f64`] wire form: a JSON number when finite,\notherwise one of the strings `\"inf\"`, `\"-inf\"` or `\"nan\"`.\n\nContract types store plain `f64` fields with\n`#[serde(with = \"finstack_quant_core::wire::non_finite_f64\")]` and name this\ntype in `#[schemars(with = ...)]`, so the generated schema describes the\nsentinel strings the serializer actually writes."
+    },
+    "NonFiniteSentinel": {
+      "description": "Sentinel string the [`non_finite_f64`] adapter writes for a non-finite `f64`.",
+      "oneOf": [
+        {
+          "const": "inf",
+          "description": "`+∞`, written as `\"inf\"`.",
+          "type": "string"
+        },
+        {
+          "const": "-inf",
+          "description": "`-∞`, written as `\"-inf\"`.",
+          "type": "string"
+        },
+        {
+          "const": "nan",
+          "description": "`NaN`, written as `\"nan\"`.",
+          "type": "string"
+        }
+      ]
+    },
+    "PositionBudgetEntry": {
+      "description": "Budget comparison for a single position.",
+      "properties": {
+        "actual_component_var": {
+          "description": "Actual component VaR from the decomposition, signed as reported by\nthe engine (loss convention: negative for risk consumers when the\nportfolio VaR is negative).",
+          "format": "double",
+          "type": "number"
+        },
+        "excess": {
+          "description": "Over/under-budget amount on the consuming side: consuming component\nVaR minus the target level. Negative when under budget, and always\nnegative for diversifiers.",
+          "format": "double",
+          "type": "number"
+        },
+        "position_id": {
+          "description": "Position identifier.",
+          "type": "string"
+        },
+        "target_component_var": {
+          "description": "Target component VaR level: target fraction times |portfolio VaR|.",
+          "format": "double",
+          "type": "number"
+        },
+        "utilization": {
+          "$ref": "#/$defs/NonFiniteF64Wire",
+          "description": "Utilization ratio: consuming-side component VaR over the target level.\n\nThe component is measured on the consuming side (positive when it has\nthe same sign as portfolio VaR). Values > 1.0 indicate the position\nuses more risk than budgeted; values in (0, 1) indicate unused\nbudget; **negative values indicate a diversifier** whose component\nVaR offsets portfolio risk — a diversifier can never breach.\n`±inf` marks a non-zero component against a zero target."
+        }
+      },
+      "required": [
+        "position_id",
+        "actual_component_var",
+        "target_component_var",
+        "utilization",
+        "excess"
+      ],
+      "type": "object"
+    }
+  },
+  "$id": "https://finstack_quant.dev/schemas/models/1/risk_budget_result.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Result of comparing actual risk decomposition against a risk budget.",
+  "properties": {
+    "has_breach": {
+      "description": "Whether any position exceeds its utilization threshold.",
+      "type": "boolean"
+    },
+    "positions": {
+      "description": "Per-position budget comparison.",
+      "items": {
+        "$ref": "#/$defs/PositionBudgetEntry"
+      },
+      "type": "array"
+    },
+    "total_overbudget": {
+      "description": "Total over-budget amount: sum of positive consuming-side exceedances.",
+      "format": "double",
+      "type": "number"
+    }
+  },
+  "required": [
+    "positions",
+    "total_overbudget",
+    "has_breach"
+  ],
+  "title": "RiskBudgetResult",
+  "type": "object"
+}

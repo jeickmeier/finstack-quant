@@ -111,6 +111,7 @@ const COMPLETENESS_TOLERANCE: f64 = 1e-7;
 /// Weights may be negative (short positions); each side's weights must sum
 /// to `1.0` within `WEIGHT_TOLERANCE`.
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct FactorBrinsonInput {
     /// Asset identifiers, length `n_assets`.
@@ -130,8 +131,9 @@ pub struct FactorBrinsonInput {
 
 /// One factor's contribution to the factor (allocation) effect.
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
-pub struct FactorContribution {
+pub struct FactorBrinsonContribution {
     /// Factor name (mirrors [`FactorBrinsonInput::factor_names`]).
     pub factor: String,
     /// Active factor loading `w_k = Σ_i X_ik (h_p,i − h_b,i)`.
@@ -144,6 +146,7 @@ pub struct FactorContribution {
 
 /// One asset's contribution to the specific (selection) effect.
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct AssetSpecificContribution {
     /// Asset identifier (mirrors [`FactorBrinsonInput::asset_ids`]).
@@ -159,6 +162,7 @@ pub struct AssetSpecificContribution {
 
 /// Factor-Brinson unified attribution result.
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct FactorBrinsonResult {
     /// Portfolio total return, `h_p'r`.
@@ -173,7 +177,7 @@ pub struct FactorBrinsonResult {
     /// Specific (selection) contribution, `SC = (h_p − h_b)'ε_b`.
     pub selection: f64,
     /// Per-factor breakdown of `allocation`, in `factor_names` order.
-    pub factor_contributions: Vec<FactorContribution>,
+    pub factor_contributions: Vec<FactorBrinsonContribution>,
     /// Per-asset breakdown of `selection`, in `asset_ids` order.
     pub asset_contributions: Vec<AssetSpecificContribution>,
 }
@@ -399,7 +403,7 @@ pub fn factor_brinson_attribution(
     let selection = acc_sc.total();
 
     let factor_contributions = (0..n_factors)
-        .map(|j| FactorContribution {
+        .map(|j| FactorBrinsonContribution {
             factor: input.factor_names[j].clone(),
             active_loading: w[j],
             factor_return: factor_returns[j],

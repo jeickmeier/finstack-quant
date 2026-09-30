@@ -25,6 +25,7 @@ use super::registry::{embedded_registry, RatingFactorTableParts};
 /// assert_eq!(table.get_factor(CreditRating::B).expect("B factor"), 2720.0);
 /// ```
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct RatingFactorTable {
     factors: BTreeMap<CreditRating, f64>,
     agency: String,

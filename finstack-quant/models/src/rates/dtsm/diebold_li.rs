@@ -50,6 +50,7 @@ const DEFAULT_LAMBDA: f64 = 0.7308;
 ///
 /// See module-level documentation for model details.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(try_from = "RawDieboldLi")]
 pub struct DieboldLi {
     /// Decay parameter lambda (fixed, not estimated).
@@ -57,10 +58,22 @@ pub struct DieboldLi {
     /// Extracted factor time series (populated after `extract_factors`).
     factors: Option<FactorTimeSeries>,
     /// VAR(1) intercept vector mu (3x1), populated after `fit_var`.
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "Option<(Vec<f64>, usize, ())>")
+    )]
     mu: Option<DVector<f64>>,
     /// VAR(1) coefficient matrix Phi (3x3), populated after `fit_var`.
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "Option<(Vec<f64>, usize, usize)>")
+    )]
     phi: Option<DMatrix<f64>>,
     /// VAR(1) residual covariance Q (3x3), populated after `fit_var`.
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "Option<(Vec<f64>, usize, usize)>")
+    )]
     q_cov: Option<DMatrix<f64>>,
     /// Tenor grid from the input panel.
     tenors: Vec<f64>,
@@ -71,6 +84,7 @@ pub struct DieboldLi {
 /// Mirrors the serialized field layout exactly; conversion re-applies the
 /// builder's lambda validation and rejects unknown fields.
 #[derive(Debug, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 struct RawDieboldLi {
     /// Decay parameter lambda.
@@ -78,10 +92,22 @@ struct RawDieboldLi {
     /// Extracted factor time series.
     factors: Option<FactorTimeSeries>,
     /// VAR(1) intercept vector mu.
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "Option<(Vec<f64>, usize, ())>")
+    )]
     mu: Option<DVector<f64>>,
     /// VAR(1) coefficient matrix Phi.
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "Option<(Vec<f64>, usize, usize)>")
+    )]
     phi: Option<DMatrix<f64>>,
     /// VAR(1) residual covariance Q.
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "Option<(Vec<f64>, usize, usize)>")
+    )]
     q_cov: Option<DMatrix<f64>>,
     /// Tenor grid from the input panel.
     tenors: Vec<f64>,

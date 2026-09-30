@@ -15,6 +15,7 @@ const SCENARIO_RATING: &str = "scenario";
 /// exposure used when callers supply current and origination lifetime PDs
 /// directly.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct EclStageRequest {
     /// Stable identifier used to label the classified exposure.
@@ -240,6 +241,7 @@ pub fn compute_ecl_for_exposure(
 /// schedules are anchored at `(0, 0)`, and the supplied maturity determines the
 /// 12-month or lifetime horizon according to [`Stage`].
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct EclRequest {
     /// Stable identifier copied into the calculation result.

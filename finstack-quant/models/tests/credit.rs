@@ -1,7 +1,7 @@
 //! Cross-module credit workflow integration tests.
 
 use finstack_quant_models::credit::lgd::{
-    CollateralPiece, CollateralType, DownturnLgd, EadCalculator, WorkoutCosts, WorkoutLgd,
+    CollateralPiece, DownturnLgd, EadCalculator, WorkoutCollateralType, WorkoutCosts, WorkoutLgd,
 };
 use finstack_quant_models::credit::migration::{
     projection, GeneratorMatrix, MigrationSimulator, RatingScale, TransitionMatrix,
@@ -52,7 +52,7 @@ fn credit_workflow_maps_migration_and_loss_modules_together() {
 
     let ead = EadCalculator::revolver(60.0, 40.0).unwrap().ead();
     let workout = WorkoutLgd::builder()
-        .collateral(CollateralPiece::new(CollateralType::RealEstate, 75.0, 0.30).unwrap())
+        .collateral(CollateralPiece::new(WorkoutCollateralType::RealEstate, 75.0, 0.30).unwrap())
         .workout_years(2.0)
         .discount_rate(0.06)
         .costs(WorkoutCosts::new(0.04, 0.03).unwrap())

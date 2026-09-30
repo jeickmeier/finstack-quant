@@ -14,6 +14,7 @@ use std::collections::BTreeMap;
 #[derive(
     Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize,
 )]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(rename_all = "snake_case")]
 #[non_exhaustive]
 pub enum FrtbRiskClass {
@@ -68,6 +69,7 @@ impl std::fmt::Display for FrtbRiskClass {
 #[derive(
     Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize,
 )]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(rename_all = "snake_case")]
 pub enum CorrelationScenario {
     /// `rho_low = max(2 * rho_medium - 1, 0.75 * rho_medium)`
@@ -125,6 +127,7 @@ mod correlation_scenario_tests {
 
 /// DRC sector classification.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(rename_all = "snake_case")]
 #[non_exhaustive]
 pub enum DrcSector {
@@ -138,6 +141,7 @@ pub enum DrcSector {
 
 /// DRC seniority for LGD assignment.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(rename_all = "snake_case")]
 #[non_exhaustive]
 pub enum DrcSeniority {
@@ -155,6 +159,7 @@ pub enum DrcSeniority {
 
 /// DRC asset type.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(rename_all = "snake_case")]
 #[non_exhaustive]
 pub enum DrcAssetType {
@@ -186,6 +191,7 @@ pub enum DrcAssetType {
 /// [`drc_charge`](super::drc::drc_charge) multiplies by [`DrcSeniority`]
 /// LGD and then applies the `pnl_adjustment` and the sign-preserving floor.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct DrcPosition {
     /// Residual contractual maturity in years; scaled into [0.25, 1.0] for JTD.
     /// Cash equities use the elected three-month or greater-than-one-year horizon.
@@ -218,6 +224,7 @@ pub struct DrcPosition {
 /// captured by the delta/vega/curvature framework -- instruments with
 /// gap risk, correlation risk, or behavioral risk.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct RraoPosition {
     /// Instrument identifier.
     pub instrument_id: String,
@@ -236,6 +243,11 @@ pub struct RraoPosition {
 /// - Curvature shock direction (up/down) per risk factor
 /// - Bucket assignment metadata required for FRTB aggregation
 #[derive(Debug, Clone, PartialEq)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[cfg_attr(
+    feature = "json-schema",
+    schemars(with = "super::wire::FrtbSensitivitiesWire")
+)]
 pub struct FrtbSensitivities {
     /// Base/reporting currency.
     pub base_currency: Currency,
@@ -1031,6 +1043,7 @@ impl FrtbSensitivities {
 
 /// Complete FRTB SBA capital charge result.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct FrtbSbaResult {
     /// Total capital charge (sum of all components).
     pub total: f64,

@@ -14,6 +14,7 @@ use finstack_quant_statements::Result;
 ///
 /// Periods with zero or negative pretax income are skipped.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct EffectiveTaxRateCheck {
     /// Tax expense node.
     pub tax_expense_node: NodeId,

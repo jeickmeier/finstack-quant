@@ -1,0 +1,256 @@
+{
+  "$defs": {
+    "Attributes": {
+      "additionalProperties": false,
+      "description": "User-defined tags and key-value metadata for instrument classification.",
+      "properties": {
+        "meta": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Structured metadata associated with the instrument.",
+          "type": "object"
+        },
+        "tags": {
+          "description": "User-defined tags for categorization.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array",
+          "uniqueItems": true
+        }
+      },
+      "type": "object"
+    },
+    "CompanyId": {
+      "description": "Opaque company identifier within a peer set.",
+      "type": "string"
+    },
+    "CompanyMetrics": {
+      "description": "Metrics for a single company in a peer set.\n\nAll monetary values should be in the same currency before constructing\na `PeerSet`. Currency normalization is the caller's responsibility.\nRatios are plain scalars (e.g., `6.5` means 6.5x leverage).",
+      "properties": {
+        "attributes": {
+          "$ref": "#/$defs/Attributes",
+          "default": {},
+          "description": "Optional instrument-level attributes (sector, geography, rating).\nUsed by `PeerFilter` for inclusion/exclusion decisions."
+        },
+        "book_value": {
+          "description": "Book value of equity.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "custom": {
+          "additionalProperties": {
+            "format": "double",
+            "type": "number"
+          },
+          "default": {},
+          "description": "Arbitrary additional metrics keyed by name.\nUsed for custom multiples or regression factors.",
+          "type": "object"
+        },
+        "dividends_per_share": {
+          "description": "Dividends per share (annualized).",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "ebit": {
+          "description": "EBIT.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "ebitda": {
+          "description": "EBITDA (period basis determined by the PeerSet context).",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "ebitda_margin": {
+          "description": "EBITDA margin (decimal, e.g., 0.25 = 25%).",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "enterprise_value": {
+          "description": "Enterprise value.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "id": {
+          "$ref": "#/$defs/CompanyId",
+          "description": "Company identifier."
+        },
+        "interest_coverage": {
+          "description": "EBITDA / Interest Expense.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "leverage": {
+          "description": "Total debt / EBITDA.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "lfcf": {
+          "description": "Levered free cash flow.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "market_cap": {
+          "description": "Equity market capitalization.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "net_income": {
+          "description": "Net income / earnings.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "oas_bp": {
+          "description": "Option-adjusted spread in basis points.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "revenue": {
+          "description": "Revenue.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "revenue_growth": {
+          "description": "Revenue growth rate (decimal, e.g., 0.05 = 5%).",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "share_price": {
+          "description": "Share price.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "tangible_book_value": {
+          "description": "Tangible book value.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "ufcf": {
+          "description": "Unlevered free cash flow.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "yield_pct": {
+          "description": "Yield to worst / yield to maturity.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "type": "object"
+    },
+    "PeriodBasis": {
+      "description": "Time basis for computing a valuation multiple.",
+      "oneOf": [
+        {
+          "const": "ltm",
+          "description": "Last twelve months (trailing).",
+          "type": "string"
+        },
+        {
+          "const": "ntm",
+          "description": "Next twelve months (forward consensus or forecast).",
+          "type": "string"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Custom period identified by a label (e.g., \"FY2025E\").",
+          "properties": {
+            "custom": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "custom"
+          ],
+          "type": "object"
+        }
+      ]
+    }
+  },
+  "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/peer_set.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "A set of comparable companies with their metrics.",
+  "properties": {
+    "peers": {
+      "description": "Peer companies in the comparison set.",
+      "items": {
+        "$ref": "#/$defs/CompanyMetrics"
+      },
+      "type": "array"
+    },
+    "period_basis": {
+      "$ref": "#/$defs/PeriodBasis",
+      "description": "Period basis for all metrics in this set."
+    },
+    "subject": {
+      "$ref": "#/$defs/CompanyMetrics",
+      "description": "The subject company being evaluated."
+    }
+  },
+  "required": [
+    "subject",
+    "peers",
+    "period_basis"
+  ],
+  "title": "PeerSet",
+  "type": "object"
+}

@@ -1,0 +1,78 @@
+{
+  "$defs": {
+    "NonFiniteF64Wire": {
+      "anyOf": [
+        {
+          "description": "A finite value, written as a JSON number.",
+          "format": "double",
+          "type": "number"
+        },
+        {
+          "$ref": "#/$defs/NonFiniteSentinel",
+          "description": "A non-finite value, written as its sentinel string."
+        }
+      ],
+      "description": "An `f64` in the [`non_finite_f64`] wire form: a JSON number when finite,\notherwise one of the strings `\"inf\"`, `\"-inf\"` or `\"nan\"`.\n\nContract types store plain `f64` fields with\n`#[serde(with = \"finstack_quant_core::wire::non_finite_f64\")]` and name this\ntype in `#[schemars(with = ...)]`, so the generated schema describes the\nsentinel strings the serializer actually writes."
+    },
+    "NonFiniteSentinel": {
+      "description": "Sentinel string the [`non_finite_f64`] adapter writes for a non-finite `f64`.",
+      "oneOf": [
+        {
+          "const": "inf",
+          "description": "`+∞`, written as `\"inf\"`.",
+          "type": "string"
+        },
+        {
+          "const": "-inf",
+          "description": "`-∞`, written as `\"-inf\"`.",
+          "type": "string"
+        },
+        {
+          "const": "nan",
+          "description": "`NaN`, written as `\"nan\"`.",
+          "type": "string"
+        }
+      ]
+    }
+  },
+  "$id": "https://finstack_quant.dev/schemas/analytics/1/multi_factor_result.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Result of a multi-factor regression.",
+  "properties": {
+    "adjusted_r_squared": {
+      "$ref": "#/$defs/NonFiniteF64Wire",
+      "description": "Adjusted R-squared; NaN when R-squared or residual degrees of freedom are undefined.\n\n```text\nadj_R² = 1 − (1 − R²) × (n − 1) / (n − k − 1)\n```"
+    },
+    "alpha": {
+      "description": "Annualized OLS intercept of the (possibly rf-adjusted) dependent series.",
+      "format": "double",
+      "type": "number"
+    },
+    "betas": {
+      "description": "Regression coefficients, one per factor.",
+      "items": {
+        "format": "double",
+        "type": "number"
+      },
+      "type": "array"
+    },
+    "r_squared": {
+      "$ref": "#/$defs/NonFiniteF64Wire",
+      "description": "Fraction of variance explained; NaN for a constant dependent series."
+    },
+    "residual_vol": {
+      "description": "Annualized residual volatility.",
+      "format": "double",
+      "type": "number"
+    }
+  },
+  "required": [
+    "alpha",
+    "betas",
+    "r_squared",
+    "adjusted_r_squared",
+    "residual_vol"
+  ],
+  "title": "MultiFactorResult",
+  "type": "object"
+}

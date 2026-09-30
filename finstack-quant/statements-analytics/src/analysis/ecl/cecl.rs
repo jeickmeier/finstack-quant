@@ -32,6 +32,7 @@ use super::types::{Exposure, PdTermStructure};
 
 /// How the PD curve reverts from forecast to historical after the R&S period.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(rename_all = "snake_case")]
 pub enum ReversionMethod {
     /// Immediate: PD jumps to historical at the R&S boundary.
@@ -52,6 +53,7 @@ pub enum ReversionMethod {
 /// was removed before it was ever implemented — no cohort data model exists
 /// to support it honestly.)
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(rename_all = "snake_case")]
 pub enum CeclMethodology {
     /// PD-LGD-EAD approach (same formula as IFRS 9, always lifetime).
@@ -78,6 +80,7 @@ pub enum CeclMethodology {
 
 /// Configuration for CECL (US GAAP ASC 326) calculation.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct CeclConfig {
     /// Time bucket width in years (same as IFRS 9). Default: 0.25.
@@ -217,6 +220,7 @@ impl CeclConfig {
 
 /// CECL result for a single exposure.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct CeclResult {
     /// Exposure identifier.
     pub exposure_id: String,

@@ -1,0 +1,148 @@
+{
+  "$defs": {
+    "BrinsonPeriodResult": {
+      "description": "Single-period Brinson-Fachler result.",
+      "properties": {
+        "benchmark_return": {
+          "description": "Benchmark total return for the period, `Σ_i w_b,i · r_b,i`.",
+          "format": "double",
+          "type": "number"
+        },
+        "portfolio_return": {
+          "description": "Portfolio total return for the period, `Σ_i w_p,i · r_p,i`.",
+          "format": "double",
+          "type": "number"
+        },
+        "sectors": {
+          "description": "Per-sector effects, in the order supplied.",
+          "items": {
+            "$ref": "#/$defs/SectorEffect"
+          },
+          "type": "array"
+        },
+        "total_allocation": {
+          "description": "Sum of allocation effects across sectors.",
+          "format": "double",
+          "type": "number"
+        },
+        "total_excess_return": {
+          "description": "Active return, `portfolio_return − benchmark_return`.\nEquals `total_allocation + total_selection + total_interaction`.",
+          "format": "double",
+          "type": "number"
+        },
+        "total_interaction": {
+          "description": "Sum of interaction effects across sectors.",
+          "format": "double",
+          "type": "number"
+        },
+        "total_selection": {
+          "description": "Sum of selection effects across sectors.",
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "required": [
+        "sectors",
+        "total_allocation",
+        "total_selection",
+        "total_interaction",
+        "portfolio_return",
+        "benchmark_return",
+        "total_excess_return"
+      ],
+      "type": "object"
+    },
+    "SectorEffect": {
+      "description": "Per-sector attribution effects (Brinson-Fachler three-way split).",
+      "properties": {
+        "allocation": {
+          "description": "Allocation effect `(w_p − w_b) · (r_b,i − r_b)`.",
+          "format": "double",
+          "type": "number"
+        },
+        "interaction": {
+          "description": "Interaction effect `(w_p − w_b) · (r_p,i − r_b,i)`.",
+          "format": "double",
+          "type": "number"
+        },
+        "sector": {
+          "description": "Sector identifier (mirrors [`SectorPeriod::sector`]).",
+          "type": "string"
+        },
+        "selection": {
+          "description": "Selection effect `w_b · (r_p,i − r_b,i)`.",
+          "format": "double",
+          "type": "number"
+        },
+        "total": {
+          "description": "Sum of the three effects — equal to the sector's contribution to\nactive return.",
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "required": [
+        "sector",
+        "allocation",
+        "selection",
+        "interaction",
+        "total"
+      ],
+      "type": "object"
+    }
+  },
+  "$id": "https://finstack_quant.dev/schemas/portfolio/1/carino_linked_attribution.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Compounded portfolio vs.",
+  "properties": {
+    "benchmark_return_compounded": {
+      "description": "Geometrically compounded benchmark return.",
+      "format": "double",
+      "type": "number"
+    },
+    "linked_allocation": {
+      "description": "Sum of per-sector linked allocation effects.",
+      "format": "double",
+      "type": "number"
+    },
+    "linked_interaction": {
+      "description": "Sum of per-sector linked interaction effects.",
+      "format": "double",
+      "type": "number"
+    },
+    "linked_sectors": {
+      "description": "Per-sector Carino-smoothed effects summed across periods.\n`sum(linked_allocation + linked_selection + linked_interaction)`\nreconstructs the active compounded return exactly.",
+      "items": {
+        "$ref": "#/$defs/SectorEffect"
+      },
+      "type": "array"
+    },
+    "linked_selection": {
+      "description": "Sum of per-sector linked selection effects.",
+      "format": "double",
+      "type": "number"
+    },
+    "periods": {
+      "description": "Per-period decompositions in chronological order.",
+      "items": {
+        "$ref": "#/$defs/BrinsonPeriodResult"
+      },
+      "type": "array"
+    },
+    "portfolio_return_compounded": {
+      "description": "Geometrically compounded portfolio return,\n`∏_t (1 + r_p,t) − 1`.",
+      "format": "double",
+      "type": "number"
+    }
+  },
+  "required": [
+    "periods",
+    "portfolio_return_compounded",
+    "benchmark_return_compounded",
+    "linked_sectors",
+    "linked_allocation",
+    "linked_selection",
+    "linked_interaction"
+  ],
+  "title": "CarinoLinkedAttribution",
+  "type": "object"
+}

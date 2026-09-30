@@ -85,6 +85,7 @@ pub use finstack_quant_attribution::{
 /// while `by_position` remains in each instrument's native currency so callers
 /// can inspect raw instrument attribution before FX translation.
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct PortfolioAttribution {
     /// Total portfolio P&L in base currency.
@@ -194,6 +195,7 @@ pub struct PortfolioAttribution {
 ///
 /// Verifies that the sum of all factor P&L buckets plus FX translation equals `total_pnl`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct ReconciliationReport {
     /// Total residual: `total_pnl - (sum of factor buckets + fx_translation_pnl)`.
     pub total_residual: f64,

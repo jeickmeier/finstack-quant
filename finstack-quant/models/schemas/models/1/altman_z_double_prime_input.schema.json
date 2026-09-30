@@ -1,0 +1,35 @@
+{
+  "$id": "https://finstack_quant.dev/schemas/models/1/altman_z_double_prime_input.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Input ratios for the Altman Z''-Score (non-manufacturing firms).",
+  "properties": {
+    "book_equity_to_total_liabilities": {
+      "description": "X4: Book Value of Equity / Book Value of Total Liabilities.",
+      "format": "double",
+      "type": "number"
+    },
+    "ebit_to_total_assets": {
+      "description": "X3: EBIT / Total Assets.",
+      "format": "double",
+      "type": "number"
+    },
+    "retained_earnings_to_total_assets": {
+      "description": "X2: Retained Earnings / Total Assets.",
+      "format": "double",
+      "type": "number"
+    },
+    "working_capital_to_total_assets": {
+      "description": "X1: Working Capital / Total Assets.",
+      "format": "double",
+      "type": "number"
+    }
+  },
+  "required": [
+    "working_capital_to_total_assets",
+    "retained_earnings_to_total_assets",
+    "ebit_to_total_assets",
+    "book_equity_to_total_liabilities"
+  ],
+  "title": "AltmanZDoublePrimeInput",
+  "type": "object"
+}

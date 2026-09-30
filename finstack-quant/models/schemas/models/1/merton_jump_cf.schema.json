@@ -1,0 +1,47 @@
+{
+  "$id": "https://finstack_quant.dev/schemas/models/1/merton_jump_cf.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Merton (1976) jump-diffusion characteristic function.",
+  "properties": {
+    "lambda": {
+      "description": "Jump intensity (expected number of jumps per year).",
+      "format": "double",
+      "type": "number"
+    },
+    "mu_j": {
+      "description": "Mean of log-jump size.",
+      "format": "double",
+      "type": "number"
+    },
+    "q": {
+      "description": "Dividend yield.",
+      "format": "double",
+      "type": "number"
+    },
+    "r": {
+      "description": "Risk-free rate.",
+      "format": "double",
+      "type": "number"
+    },
+    "sigma": {
+      "description": "Diffusion volatility.",
+      "format": "double",
+      "type": "number"
+    },
+    "sigma_j": {
+      "description": "Standard deviation of log-jump size.",
+      "format": "double",
+      "type": "number"
+    }
+  },
+  "required": [
+    "r",
+    "q",
+    "sigma",
+    "lambda",
+    "mu_j",
+    "sigma_j"
+  ],
+  "title": "MertonJumpCf",
+  "type": "object"
+}

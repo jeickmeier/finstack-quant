@@ -1,0 +1,62 @@
+{
+  "$defs": {
+    "DateWire": {
+      "description": "ISO 8601 calendar date encoded as a `YYYY-MM-DD` JSON string.",
+      "format": "date",
+      "type": "string"
+    }
+  },
+  "$id": "https://finstack_quant.dev/schemas/analytics/1/drawdown_episode.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Drawdown episode with start, valley, optional recovery, and max drawdown.",
+  "properties": {
+    "duration_days": {
+      "description": "Calendar days from start to end (or last observation).",
+      "format": "int64",
+      "type": "integer"
+    },
+    "end": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/DateWire"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "Date when wealth recovered to the prior peak (None if still in drawdown)."
+    },
+    "max_drawdown": {
+      "description": "Maximum drawdown depth (negative fraction, e.g. −0.25 for a 25% loss).",
+      "format": "double",
+      "type": "number"
+    },
+    "near_recovery_threshold": {
+      "description": "Near-recovery threshold: the drawdown level at which 99% of the\npeak-to-trough loss has been recovered (i.e. `max_drawdown * 0.01`,\na value slightly below zero). Useful for identifying \"almost recovered\"\ndrawdowns where the series is within 1% of the prior peak.",
+      "format": "double",
+      "type": "number"
+    },
+    "start": {
+      "$ref": "#/$defs/DateWire",
+      "description": "Date when the drawdown began (peak date)."
+    },
+    "truncated_at_start": {
+      "default": false,
+      "description": "`true` when the series began already in drawdown (no observed prior\npeak), so `start` is the first observation rather than a true peak.\nSurvival / duration analytics should treat such episodes as\nleft-censored.",
+      "type": "boolean"
+    },
+    "valley": {
+      "$ref": "#/$defs/DateWire",
+      "description": "Date of the maximum drawdown depth."
+    }
+  },
+  "required": [
+    "start",
+    "valley",
+    "duration_days",
+    "max_drawdown",
+    "near_recovery_threshold"
+  ],
+  "title": "DrawdownEpisode",
+  "type": "object"
+}

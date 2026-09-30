@@ -1,0 +1,30 @@
+{
+  "$defs": {
+    "DateWire": {
+      "description": "ISO 8601 calendar date encoded as a `YYYY-MM-DD` JSON string.",
+      "format": "date",
+      "type": "string"
+    }
+  },
+  "$id": "https://finstack_quant.dev/schemas/analytics/1/periodic_return.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "One calendar bucket of a periodic-return series.",
+  "properties": {
+    "date": {
+      "$ref": "#/$defs/DateWire",
+      "description": "Date of the last observation in the bucket (the period end)."
+    },
+    "value": {
+      "description": "Compounded simple return over the bucket as a decimal (`0.01` is 1%).",
+      "format": "double",
+      "type": "number"
+    }
+  },
+  "required": [
+    "date",
+    "value"
+  ],
+  "title": "PeriodicReturn",
+  "type": "object"
+}

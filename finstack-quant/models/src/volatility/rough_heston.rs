@@ -269,6 +269,7 @@ impl FractionalRiccatiSolver {
 /// assert!(call > 0.0 && call < 100.0);
 /// ```
 #[derive(Debug, Clone, Copy, PartialEq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(try_from = "RawRoughHestonFourierParams")]
 pub struct RoughHestonFourierParams {
     /// Initial variance (v₀ > 0).
@@ -297,6 +298,7 @@ pub struct RoughHestonFourierParams {
 /// unchanged; conversion runs [`RoughHestonFourierParams::new`] validation
 /// and rejects unknown fields.
 #[derive(Debug, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 struct RawRoughHestonFourierParams {
     /// Initial variance.

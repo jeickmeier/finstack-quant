@@ -25,6 +25,8 @@ use std::borrow::Cow;
 
 /// Asset class for schedule-based IM calculation.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[cfg_attr(feature = "json-schema", schemars(with = "ScheduleAssetClassWire"))]
 pub enum ScheduleAssetClass {
     /// Interest rate derivatives
     InterestRate,
@@ -74,6 +76,40 @@ impl<'de> serde::Deserialize<'de> for ScheduleAssetClass {
         let s = <String as serde::Deserialize>::deserialize(deserializer)?;
         s.parse().map_err(serde::de::Error::custom)
     }
+}
+
+/// Schema of the [`ScheduleAssetClass`] wire string: a built-in class name or
+/// `custom_<name>`. Describes the hand-written serde impls; never serialized.
+#[cfg(feature = "json-schema")]
+#[derive(schemars::JsonSchema)]
+#[schemars(untagged, rename = "ScheduleAssetClass")]
+#[allow(dead_code)]
+enum ScheduleAssetClassWire {
+    /// One of the built-in asset classes.
+    BuiltIn(BuiltInScheduleAssetClass),
+    /// A user-defined class, `custom_` followed by lowercase ASCII letters,
+    /// digits or underscores.
+    Custom(#[schemars(regex(pattern = r"^custom_[a-z0-9_]+$"))] String),
+}
+
+/// Built-in [`ScheduleAssetClass`] spellings.
+#[cfg(feature = "json-schema")]
+#[derive(schemars::JsonSchema)]
+#[schemars(rename_all = "snake_case")]
+#[allow(dead_code)]
+enum BuiltInScheduleAssetClass {
+    /// `interest_rate`.
+    InterestRate,
+    /// `credit`.
+    Credit,
+    /// `equity`.
+    Equity,
+    /// `commodity`.
+    Commodity,
+    /// `fx`.
+    Fx,
+    /// `other`.
+    Other,
 }
 
 impl std::fmt::Display for ScheduleAssetClass {

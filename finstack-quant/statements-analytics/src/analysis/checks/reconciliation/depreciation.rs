@@ -21,6 +21,7 @@ use finstack_quant_statements::Result;
 /// default. The formula subtracts D&A and disposals explicitly, so any
 /// negative magnitude would double-sign the reconciliation.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct DepreciationReconciliation {
     /// D&A expense node (income statement).
     pub depreciation_expense_node: NodeId,

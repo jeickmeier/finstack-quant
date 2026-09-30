@@ -11,6 +11,7 @@ use std::str::FromStr;
 
 /// Opaque company identifier within a peer set.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct CompanyId(pub String);
 
 impl CompanyId {
@@ -33,6 +34,7 @@ impl fmt::Display for CompanyId {
 
 /// Time basis for computing a valuation multiple.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(rename_all = "snake_case")]
 pub enum PeriodBasis {
     /// Last twelve months (trailing).
@@ -49,6 +51,7 @@ pub enum PeriodBasis {
 /// use market capitalization or share price. Credit multiples use spread
 /// or yield as the numerator and a fundamental metric as denominator.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(rename_all = "snake_case")]
 pub enum Multiple {
     /// EV / EBITDA
@@ -151,6 +154,7 @@ impl FromStr for Multiple {
 /// a `PeerSet`. Currency normalization is the caller's responsibility.
 /// Ratios are plain scalars (e.g., `6.5` means 6.5x leverage).
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct CompanyMetrics {
     /// Company identifier.
     pub id: CompanyId,

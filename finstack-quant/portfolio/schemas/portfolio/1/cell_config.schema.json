@@ -1,0 +1,18 @@
+{
+  "$id": "https://finstack_quant.dev/schemas/portfolio/1/cell_config.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Configuration for `cell_returns_from_reference`.",
+  "properties": {
+    "width": {
+      "description": "Width of each duration cell, in years. Must be finite and positive.",
+      "format": "double",
+      "type": "number"
+    }
+  },
+  "required": [
+    "width"
+  ],
+  "title": "CellConfig",
+  "type": "object"
+}

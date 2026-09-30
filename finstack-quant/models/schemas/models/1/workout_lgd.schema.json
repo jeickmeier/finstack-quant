@@ -1,0 +1,128 @@
+{
+  "$defs": {
+    "CollateralPiece": {
+      "description": "A single piece of collateral in the recovery waterfall.",
+      "properties": {
+        "book_value": {
+          "description": "Book value (pre-haircut) of the collateral.",
+          "format": "double",
+          "type": "number"
+        },
+        "collateral_type": {
+          "$ref": "#/$defs/WorkoutCollateralType",
+          "description": "Collateral asset class."
+        },
+        "haircut": {
+          "description": "Liquidation haircut in \\[0, 1\\]. Applied as: liquidation_value = book_value * (1 - haircut).",
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "required": [
+        "collateral_type",
+        "book_value",
+        "haircut"
+      ],
+      "type": "object"
+    },
+    "WorkoutCollateralType": {
+      "description": "Collateral asset class with associated liquidation haircut.\n\nHaircuts represent the discount from book value realized in a\nforced-sale / workout scenario. Values are in \\[0, 1\\] where 0 means\nfull recovery of book value and 1 means total loss.",
+      "oneOf": [
+        {
+          "const": "cash",
+          "description": "Cash and cash equivalents. Typical haircut: 0-5%.",
+          "type": "string"
+        },
+        {
+          "const": "securities",
+          "description": "Government securities. Typical haircut: 2-10%.",
+          "type": "string"
+        },
+        {
+          "const": "receivables",
+          "description": "Accounts receivable. Typical haircut: 20-40%.",
+          "type": "string"
+        },
+        {
+          "const": "inventory",
+          "description": "Inventory (raw materials, finished goods). Typical haircut: 30-60%.",
+          "type": "string"
+        },
+        {
+          "const": "equipment",
+          "description": "Equipment and machinery. Typical haircut: 30-50%.",
+          "type": "string"
+        },
+        {
+          "const": "real_estate",
+          "description": "Commercial real estate. Typical haircut: 20-40%.",
+          "type": "string"
+        },
+        {
+          "const": "intellectual_property",
+          "description": "Intellectual property (patents, trademarks). Typical haircut: 50-90%.",
+          "type": "string"
+        },
+        {
+          "const": "other",
+          "description": "Other / custom collateral.",
+          "type": "string"
+        }
+      ]
+    },
+    "WorkoutCosts": {
+      "description": "Workout and resolution costs.\n\nThese reduce the net recovery available to creditors.",
+      "properties": {
+        "direct_cost_rate": {
+          "description": "Direct costs as fraction of EAD (legal fees, administrative). Typical: 3-8%.",
+          "format": "double",
+          "type": "number"
+        },
+        "indirect_cost_rate": {
+          "description": "Indirect costs as fraction of EAD (opportunity cost, management distraction). Typical: 2-5%.",
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "required": [
+        "direct_cost_rate",
+        "indirect_cost_rate"
+      ],
+      "type": "object"
+    }
+  },
+  "$id": "https://finstack_quant.dev/schemas/models/1/workout_lgd.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Workout-based LGD model using a collateral-first recovery waterfall.",
+  "properties": {
+    "collateral": {
+      "description": "Ordered collateral waterfall (highest priority first).",
+      "items": {
+        "$ref": "#/$defs/CollateralPiece"
+      },
+      "type": "array"
+    },
+    "costs": {
+      "$ref": "#/$defs/WorkoutCosts",
+      "description": "Direct and indirect resolution costs."
+    },
+    "discount_rate": {
+      "description": "Discount rate for time-value-of-money during workout.",
+      "format": "double",
+      "type": "number"
+    },
+    "workout_years": {
+      "description": "Expected workout duration in years. Typical: 1-5 years.",
+      "format": "double",
+      "type": "number"
+    }
+  },
+  "required": [
+    "collateral",
+    "workout_years",
+    "discount_rate",
+    "costs"
+  ],
+  "title": "WorkoutLgd",
+  "type": "object"
+}

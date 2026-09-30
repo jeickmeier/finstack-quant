@@ -1,0 +1,18 @@
+{
+  "$id": "https://finstack_quant.dev/schemas/portfolio/1/fi_attribution_config.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Configuration for `campisi_attribution`.",
+  "properties": {
+    "period_years": {
+      "description": "Length of the attribution period in years (e.g. `0.25` for a\nquarter). Scales `yield_annual` into the period carry.",
+      "format": "double",
+      "type": "number"
+    }
+  },
+  "required": [
+    "period_years"
+  ],
+  "title": "FiAttributionConfig",
+  "type": "object"
+}

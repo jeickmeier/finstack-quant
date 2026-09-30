@@ -17,6 +17,7 @@ use finstack_quant_statements::Result;
 ///
 /// Skips the first period because no prior balance is available.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct WorkingCapitalConsistency {
     /// Working-capital change node from the cash flow statement.
     pub wc_change_cf_node: NodeId,

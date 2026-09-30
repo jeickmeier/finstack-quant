@@ -104,6 +104,8 @@ pub mod analysis;
 /// Concrete extension implementations (corkscrew, credit scorecard).
 pub mod extensions;
 
+#[cfg(feature = "json-schema")]
+pub mod schema;
 /// Templates for common financial model structures.
 pub mod templates;
 

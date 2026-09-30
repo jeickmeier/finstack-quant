@@ -1,0 +1,455 @@
+{
+  "artifacts": [
+    {
+      "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/bridge_chart.schema.json",
+      "bytes": 2562,
+      "kind": "component",
+      "path": "schemas/statements_analytics/1/bridge_chart.schema.json",
+      "summary": "Bridge chart for a single target metric and period.",
+      "title": "BridgeChart",
+      "type_name": "BridgeChart"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/capex_reconciliation.schema.json",
+      "bytes": 3503,
+      "kind": "component",
+      "path": "schemas/statements_analytics/1/capex_reconciliation.schema.json",
+      "summary": "Verifies that cash-flow-statement capex equals the sum of PP&E additions and intangible additions.",
+      "title": "CapexReconciliation",
+      "type_name": "CapexReconciliation"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/cecl_config.schema.json",
+      "bytes": 6601,
+      "kind": "input",
+      "path": "schemas/statements_analytics/1/cecl_config.schema.json",
+      "summary": "Configuration for CECL (US GAAP ASC 326) calculation.",
+      "title": "CeclConfig",
+      "type_name": "CeclConfig"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/cecl_result.schema.json",
+      "bytes": 2424,
+      "kind": "output",
+      "path": "schemas/statements_analytics/1/cecl_result.schema.json",
+      "summary": "CECL result for a single exposure.",
+      "title": "CeclResult",
+      "type_name": "CeclResult"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/corkscrew_config.schema.json",
+      "bytes": 3001,
+      "kind": "input",
+      "path": "schemas/statements_analytics/1/corkscrew_config.schema.json",
+      "summary": "Configuration for corkscrew analysis.",
+      "title": "CorkscrewConfig",
+      "type_name": "CorkscrewConfig"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/corkscrew_report.schema.json",
+      "bytes": 1455,
+      "kind": "output",
+      "path": "schemas/statements_analytics/1/corkscrew_report.schema.json",
+      "summary": "Report produced by `CorkscrewExtension::execute`.",
+      "title": "CorkscrewReport",
+      "type_name": "CorkscrewReport"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/corporate_analysis.schema.json",
+      "bytes": 28940,
+      "kind": "output",
+      "path": "schemas/statements_analytics/1/corporate_analysis.schema.json",
+      "summary": "Unified analysis result combining statement, equity, and credit perspectives.",
+      "title": "CorporateAnalysis",
+      "type_name": "CorporateAnalysis"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/coverage_floor_check.schema.json",
+      "bytes": 1231,
+      "kind": "component",
+      "path": "schemas/statements_analytics/1/coverage_floor_check.schema.json",
+      "summary": "Flags periods where a coverage ratio (e.g.",
+      "title": "CoverageFloorCheck",
+      "type_name": "CoverageFloorCheck"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/credit_assessment.schema.json",
+      "bytes": 2334,
+      "kind": "component",
+      "path": "schemas/statements_analytics/1/credit_assessment.schema.json",
+      "summary": "Structured credit assessment: leverage, interest coverage, and free cash flow at a `period` plus a per-period series for trend display.",
+      "title": "CreditAssessment",
+      "type_name": "CreditAssessment"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/dcf_options.schema.json",
+      "bytes": 10242,
+      "kind": "input",
+      "path": "schemas/statements_analytics/1/dcf_options.schema.json",
+      "summary": "Optional configuration for DCF valuation beyond the core WACC/terminal parameters.",
+      "title": "DcfOptions",
+      "type_name": "DcfOptions"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/dcf_sensitivity_result.schema.json",
+      "bytes": 23439,
+      "kind": "output",
+      "path": "schemas/statements_analytics/1/dcf_sensitivity_result.schema.json",
+      "summary": "Enterprise-value tornado for the headline DCF assumptions.",
+      "title": "DcfSensitivityResult",
+      "type_name": "DcfSensitivityResult"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/dependency_tree.schema.json",
+      "bytes": 742,
+      "kind": "component",
+      "path": "schemas/statements_analytics/1/dependency_tree.schema.json",
+      "summary": "Hierarchical dependency tree structure.",
+      "title": "DependencyTree",
+      "type_name": "DependencyTree"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/depreciation_reconciliation.schema.json",
+      "bytes": 3542,
+      "kind": "component",
+      "path": "schemas/statements_analytics/1/depreciation_reconciliation.schema.json",
+      "summary": "Verifies PP&E(t) = PP&E(t−1) + Capex(t) − D&A(t) − Disposals(t).",
+      "title": "DepreciationReconciliation",
+      "type_name": "DepreciationReconciliation"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/dividend_reconciliation.schema.json",
+      "bytes": 3187,
+      "kind": "component",
+      "path": "schemas/statements_analytics/1/dividend_reconciliation.schema.json",
+      "summary": "Verifies that dividends on the cash flow statement equal the dividends charged against equity.",
+      "title": "DividendReconciliation",
+      "type_name": "DividendReconciliation"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/ecl_config.schema.json",
+      "bytes": 14106,
+      "kind": "input",
+      "path": "schemas/statements_analytics/1/ecl_config.schema.json",
+      "summary": "Configuration for ECL calculation.",
+      "title": "EclConfig",
+      "type_name": "EclConfig"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/ecl_request.schema.json",
+      "bytes": 4525,
+      "kind": "input",
+      "path": "schemas/statements_analytics/1/ecl_request.schema.json",
+      "summary": "Inputs for probability-weighted ECL from cumulative-PD schedules.",
+      "title": "EclRequest",
+      "type_name": "EclRequest"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/ecl_stage_request.schema.json",
+      "bytes": 2213,
+      "kind": "input",
+      "path": "schemas/statements_analytics/1/ecl_stage_request.schema.json",
+      "summary": "Inputs for the simplified IFRS 9 stage-classification workflow.",
+      "title": "EclStageRequest",
+      "type_name": "EclStageRequest"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/effective_tax_rate_check.schema.json",
+      "bytes": 1295,
+      "kind": "component",
+      "path": "schemas/statements_analytics/1/effective_tax_rate_check.schema.json",
+      "summary": "Verifies that the effective tax rate (tax expense / pretax income) falls within an expected range.",
+      "title": "EffectiveTaxRateCheck",
+      "type_name": "EffectiveTaxRateCheck"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/explanation.schema.json",
+      "bytes": 4185,
+      "kind": "component",
+      "path": "schemas/statements_analytics/1/explanation.schema.json",
+      "summary": "Detailed explanation of a node's calculation.",
+      "title": "Explanation",
+      "type_name": "Explanation"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/exposure.schema.json",
+      "bytes": 8280,
+      "kind": "component",
+      "path": "schemas/statements_analytics/1/exposure.schema.json",
+      "summary": "A single credit exposure for ECL computation.",
+      "title": "Exposure",
+      "type_name": "Exposure"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/fcf_sign_check.schema.json",
+      "bytes": 1171,
+      "kind": "component",
+      "path": "schemas/statements_analytics/1/fcf_sign_check.schema.json",
+      "summary": "Tracks consecutive periods of negative free cash flow and flags at configurable thresholds.",
+      "title": "FcfSignCheck",
+      "type_name": "FcfSignCheck"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/forecast_metrics.schema.json",
+      "bytes": 3865,
+      "kind": "component",
+      "path": "schemas/statements_analytics/1/forecast_metrics.schema.json",
+      "summary": "Forecast accuracy metrics.",
+      "title": "ForecastMetrics",
+      "type_name": "ForecastMetrics"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/goal_seek_result.schema.json",
+      "bytes": 1006,
+      "kind": "output",
+      "path": "schemas/statements_analytics/1/goal_seek_result.schema.json",
+      "summary": "Outcome of a `goal_seek` solve.",
+      "title": "GoalSeekResult",
+      "type_name": "GoalSeekResult"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/growth_rate_consistency.schema.json",
+      "bytes": 1888,
+      "kind": "component",
+      "path": "schemas/statements_analytics/1/growth_rate_consistency.schema.json",
+      "summary": "Flags line items whose period-over-period growth exceeds configurable upper / lower bounds.",
+      "title": "GrowthRateConsistency",
+      "type_name": "GrowthRateConsistency"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/interest_expense_reconciliation.schema.json",
+      "bytes": 1803,
+      "kind": "component",
+      "path": "schemas/statements_analytics/1/interest_expense_reconciliation.schema.json",
+      "summary": "Reconciles interest expense against debt balances or the capital-structure interest schedule.",
+      "title": "InterestExpenseReconciliation",
+      "type_name": "InterestExpenseReconciliation"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/lbo_config.schema.json",
+      "bytes": 14450,
+      "kind": "input",
+      "path": "schemas/statements_analytics/1/lbo_config.schema.json",
+      "summary": "Transaction assumptions for an LBO evaluation.",
+      "title": "LboConfig",
+      "type_name": "LboConfig"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/lbo_result.schema.json",
+      "bytes": 30677,
+      "kind": "output",
+      "path": "schemas/statements_analytics/1/lbo_result.schema.json",
+      "summary": "Outputs of an LBO evaluation.",
+      "title": "LboResult",
+      "type_name": "LboResult"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/lease_spec.schema.json",
+      "bytes": 6604,
+      "kind": "input",
+      "path": "schemas/statements_analytics/1/lease_spec.schema.json",
+      "summary": "Richer lease spec for rent roll generation: - rent steps (explicit bumps) - arbitrary free-rent windows - optional renewal with downtime + probability",
+      "title": "LeaseSpec",
+      "type_name": "LeaseSpec"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/leverage_range_check.schema.json",
+      "bytes": 1597,
+      "kind": "component",
+      "path": "schemas/statements_analytics/1/leverage_range_check.schema.json",
+      "summary": "Flags periods where Debt / TTM EBITDA falls outside configurable warning and error ranges.",
+      "title": "LeverageRangeCheck",
+      "type_name": "LeverageRangeCheck"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/liquidity_runway_check.schema.json",
+      "bytes": 1266,
+      "kind": "component",
+      "path": "schemas/statements_analytics/1/liquidity_runway_check.schema.json",
+      "summary": "Estimates the liquidity runway in months and flags periods that fall below configurable warning and error thresholds.",
+      "title": "LiquidityRunwayCheck",
+      "type_name": "LiquidityRunwayCheck"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/management_fee_spec.schema.json",
+      "bytes": 1087,
+      "kind": "input",
+      "path": "schemas/statements_analytics/1/management_fee_spec.schema.json",
+      "summary": "Management fee specification.",
+      "title": "ManagementFeeSpec",
+      "type_name": "ManagementFeeSpec"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/peer_filter.schema.json",
+      "bytes": 2062,
+      "kind": "component",
+      "path": "schemas/statements_analytics/1/peer_filter.schema.json",
+      "summary": "Criteria for filtering companies into a peer set.",
+      "title": "PeerFilter",
+      "type_name": "PeerFilter"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/peer_set.schema.json",
+      "bytes": 6881,
+      "kind": "component",
+      "path": "schemas/statements_analytics/1/peer_set.schema.json",
+      "summary": "A set of comparable companies with their metrics.",
+      "title": "PeerSet",
+      "type_name": "PeerSet"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/peer_stats.schema.json",
+      "bytes": 1471,
+      "kind": "output",
+      "path": "schemas/statements_analytics/1/peer_stats.schema.json",
+      "summary": "Descriptive statistics for a peer set metric.",
+      "title": "PeerStats",
+      "type_name": "PeerStats"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/portfolio_ecl_result.schema.json",
+      "bytes": 23861,
+      "kind": "output",
+      "path": "schemas/statements_analytics/1/portfolio_ecl_result.schema.json",
+      "summary": "Portfolio-level ECL result with stage migration and segment breakdown.",
+      "title": "PortfolioEclResult",
+      "type_name": "PortfolioEclResult"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/property_template_nodes.schema.json",
+      "bytes": 2892,
+      "kind": "output",
+      "path": "schemas/statements_analytics/1/property_template_nodes.schema.json",
+      "summary": "Standard node ids for a full property operating statement template.",
+      "title": "PropertyTemplateNodes",
+      "type_name": "PropertyTemplateNodes"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/provision_waterfall.schema.json",
+      "bytes": 2057,
+      "kind": "component",
+      "path": "schemas/statements_analytics/1/provision_waterfall.schema.json",
+      "summary": "Provision movement waterfall between two reporting dates.",
+      "title": "ProvisionWaterfall",
+      "type_name": "ProvisionWaterfall"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/rating_pd_map.schema.json",
+      "bytes": 2120,
+      "kind": "component",
+      "path": "schemas/statements_analytics/1/rating_pd_map.schema.json",
+      "summary": "Rating-keyed map of cumulative PD curves.",
+      "title": "RatingPdMap",
+      "type_name": "RatingPdMap"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/regression_result.schema.json",
+      "bytes": 1221,
+      "kind": "output",
+      "path": "schemas/statements_analytics/1/regression_result.schema.json",
+      "summary": "OLS regression result for fair-value estimation.",
+      "title": "RegressionResult",
+      "type_name": "RegressionResult"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/relative_value_result.schema.json",
+      "bytes": 3129,
+      "kind": "output",
+      "path": "schemas/statements_analytics/1/relative_value_result.schema.json",
+      "summary": "Composite relative value result.",
+      "title": "RelativeValueResult",
+      "type_name": "RelativeValueResult"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/scenario_diff.schema.json",
+      "bytes": 3608,
+      "kind": "component",
+      "path": "schemas/statements_analytics/1/scenario_diff.schema.json",
+      "summary": "Variance-style diff between two evaluated scenarios.",
+      "title": "ScenarioDiff",
+      "type_name": "ScenarioDiff"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/scenario_results.schema.json",
+      "bytes": 413,
+      "kind": "component",
+      "path": "schemas/statements_analytics/1/scenario_results.schema.json",
+      "summary": "Evaluated results for all scenarios in a `ScenarioSet`.",
+      "title": "ScenarioResults",
+      "type_name": "ScenarioResults"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/scenario_set.schema.json",
+      "bytes": 23733,
+      "kind": "component",
+      "path": "schemas/statements_analytics/1/scenario_set.schema.json",
+      "summary": "Registry of named scenarios built on top of a base model.",
+      "title": "ScenarioSet",
+      "type_name": "ScenarioSet"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/scorecard_config.schema.json",
+      "bytes": 2557,
+      "kind": "input",
+      "path": "schemas/statements_analytics/1/scorecard_config.schema.json",
+      "summary": "Configuration for credit scorecard analysis.",
+      "title": "ScorecardConfig",
+      "type_name": "ScorecardConfig"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/scorecard_report.schema.json",
+      "bytes": 1541,
+      "kind": "output",
+      "path": "schemas/statements_analytics/1/scorecard_report.schema.json",
+      "summary": "Report produced by `CreditScorecardExtension::execute`.",
+      "title": "ScorecardReport",
+      "type_name": "ScorecardReport"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/scoring_dimension.schema.json",
+      "bytes": 5389,
+      "kind": "component",
+      "path": "schemas/statements_analytics/1/scoring_dimension.schema.json",
+      "summary": "Configuration for a single rich/cheap scoring dimension.",
+      "title": "ScoringDimension",
+      "type_name": "ScoringDimension"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/sensitivity_result.schema.json",
+      "bytes": 4025,
+      "kind": "output",
+      "path": "schemas/statements_analytics/1/sensitivity_result.schema.json",
+      "summary": "Results of sensitivity analysis.",
+      "title": "SensitivityResult",
+      "type_name": "SensitivityResult"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/trend_check.schema.json",
+      "bytes": 2246,
+      "kind": "component",
+      "path": "schemas/statements_analytics/1/trend_check.schema.json",
+      "summary": "Flags a metric that has been deteriorating for `lookback_periods` consecutive periods.",
+      "title": "TrendCheck",
+      "type_name": "TrendCheck"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/variance_config.schema.json",
+      "bytes": 1271,
+      "kind": "input",
+      "path": "schemas/statements_analytics/1/variance_config.schema.json",
+      "summary": "Configuration for variance analysis between two `StatementResult`.",
+      "title": "VarianceConfig",
+      "type_name": "VarianceConfig"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/working_capital_consistency.schema.json",
+      "bytes": 1528,
+      "kind": "component",
+      "path": "schemas/statements_analytics/1/working_capital_consistency.schema.json",
+      "summary": "Verifies that the change in working capital on the cash flow statement equals the negative delta of net working capital on the balance sheet.",
+      "title": "WorkingCapitalConsistency",
+      "type_name": "WorkingCapitalConsistency"
+    }
+  ],
+  "schema_index_version": 1
+}

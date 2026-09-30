@@ -1,0 +1,117 @@
+{
+  "$defs": {
+    "NonFiniteF64Wire": {
+      "anyOf": [
+        {
+          "description": "A finite value, written as a JSON number.",
+          "format": "double",
+          "type": "number"
+        },
+        {
+          "$ref": "#/$defs/NonFiniteSentinel",
+          "description": "A non-finite value, written as its sentinel string."
+        }
+      ],
+      "description": "An `f64` in the [`non_finite_f64`] wire form: a JSON number when finite,\notherwise one of the strings `\"inf\"`, `\"-inf\"` or `\"nan\"`.\n\nContract types store plain `f64` fields with\n`#[serde(with = \"finstack_quant_core::wire::non_finite_f64\")]` and name this\ntype in `#[schemars(with = ...)]`, so the generated schema describes the\nsentinel strings the serializer actually writes."
+    },
+    "NonFiniteSentinel": {
+      "description": "Sentinel string the [`non_finite_f64`] adapter writes for a non-finite `f64`.",
+      "oneOf": [
+        {
+          "const": "inf",
+          "description": "`+∞`, written as `\"inf\"`.",
+          "type": "string"
+        },
+        {
+          "const": "-inf",
+          "description": "`-∞`, written as `\"-inf\"`.",
+          "type": "string"
+        },
+        {
+          "const": "nan",
+          "description": "`NaN`, written as `\"nan\"`.",
+          "type": "string"
+        }
+      ]
+    }
+  },
+  "$id": "https://finstack_quant.dev/schemas/analytics/1/period_stats.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Period-level aggregate statistics.",
+  "properties": {
+    "avg_loss": {
+      "description": "Mean of negative-return periods.",
+      "format": "double",
+      "type": "number"
+    },
+    "avg_return": {
+      "description": "Mean return across all periods.",
+      "format": "double",
+      "type": "number"
+    },
+    "avg_win": {
+      "description": "Mean of positive-return periods.",
+      "format": "double",
+      "type": "number"
+    },
+    "best": {
+      "description": "Best single-period return.",
+      "format": "double",
+      "type": "number"
+    },
+    "consecutive_losses": {
+      "description": "Longest streak of negative-return periods.",
+      "format": "uint",
+      "minimum": 0,
+      "type": "integer"
+    },
+    "consecutive_wins": {
+      "description": "Longest streak of positive-return periods.",
+      "format": "uint",
+      "minimum": 0,
+      "type": "integer"
+    },
+    "cpc_ratio": {
+      "$ref": "#/$defs/NonFiniteF64Wire",
+      "description": "CPC index: `profit_factor × win_rate × payoff_ratio`.\n\nNot to be confused with the Common Sense Ratio\n(`profit_factor × tail_ratio`), which is a different metric."
+    },
+    "kelly_criterion": {
+      "$ref": "#/$defs/NonFiniteF64Wire",
+      "description": "Binary Kelly fraction: `p_win − p_loss / payoff_ratio`, with both\nprobabilities conditional on nonzero returns. Zero-return periods\ndo not affect this payoff approximation; `win_rate` uses all periods."
+    },
+    "payoff_ratio": {
+      "$ref": "#/$defs/NonFiniteF64Wire",
+      "description": "`avg_win / |avg_loss|`. `0.0` when there are no wins; `+∞` when wins\nexist but there are no losses."
+    },
+    "profit_factor": {
+      "$ref": "#/$defs/NonFiniteF64Wire",
+      "description": "Sum of wins / sum of |losses| (gross profit / gross loss).\n`0.0` when there are no wins; `+∞` when wins exist but there are no\nlosses."
+    },
+    "win_rate": {
+      "description": "Fraction of periods with positive returns.",
+      "format": "double",
+      "type": "number"
+    },
+    "worst": {
+      "description": "Worst single-period return.",
+      "format": "double",
+      "type": "number"
+    }
+  },
+  "required": [
+    "best",
+    "worst",
+    "consecutive_wins",
+    "consecutive_losses",
+    "win_rate",
+    "avg_return",
+    "avg_win",
+    "avg_loss",
+    "payoff_ratio",
+    "profit_factor",
+    "cpc_ratio",
+    "kelly_criterion"
+  ],
+  "title": "PeriodStats",
+  "type": "object"
+}

@@ -1,0 +1,42 @@
+{
+  "$id": "https://finstack_quant.dev/schemas/results/1/oas_result.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Structured-credit option-adjusted spread and its solver diagnostics.",
+  "properties": {
+    "market_price": {
+      "description": "Target clean settlement price (% of current balance).",
+      "format": "double",
+      "type": "number"
+    },
+    "model_price": {
+      "description": "Model clean settlement price (% of the tranche's CURRENT balance, the\nfactor-adjusted quote basis) at the solved OAS.",
+      "format": "double",
+      "type": "number"
+    },
+    "num_paths": {
+      "description": "Number of scenarios used.",
+      "format": "uint",
+      "minimum": 0,
+      "type": "integer"
+    },
+    "oas": {
+      "description": "Option-adjusted spread (decimal; `0.01` = 100 bp).",
+      "format": "double",
+      "type": "number"
+    },
+    "price_std_error": {
+      "description": "Monte-Carlo standard error of the mean price (% of current balance).",
+      "format": "double",
+      "type": "number"
+    }
+  },
+  "required": [
+    "oas",
+    "model_price",
+    "market_price",
+    "num_paths",
+    "price_std_error"
+  ],
+  "title": "OasResult",
+  "type": "object"
+}

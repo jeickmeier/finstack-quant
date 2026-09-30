@@ -30,12 +30,17 @@ use finstack_quant_statements::error::{Error, Result};
 /// # }
 /// ```
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct ForecastMetrics {
     /// Mean Absolute Error: average of |actual - forecast|
     ///
     /// Interpretation: Average magnitude of errors in the same units as the data.
     /// Lower is better. Not sensitive to outliers.
     #[serde(with = "finstack_quant_core::wire::non_finite_f64")]
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "finstack_quant_core::wire::NonFiniteF64Wire")
+    )]
     pub mae: f64,
 
     /// Mean Absolute Percentage Error: average of |actual - forecast| / |actual| × 100
@@ -51,6 +56,10 @@ pub struct ForecastMetrics {
     /// [`ForecastMetrics::smape`] in that case.
     /// Lower is better.
     #[serde(with = "finstack_quant_core::wire::non_finite_f64")]
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "finstack_quant_core::wire::NonFiniteF64Wire")
+    )]
     pub mape: f64,
 
     /// Number of samples that actually contributed to MAPE (i.e. had
@@ -65,6 +74,10 @@ pub struct ForecastMetrics {
     /// series contains zeros or near-zeros. Terms where both `a` and `f`
     /// are within `ZERO_TOLERANCE` of zero are skipped.
     #[serde(with = "finstack_quant_core::wire::non_finite_f64")]
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "finstack_quant_core::wire::NonFiniteF64Wire")
+    )]
     pub smape: f64,
 
     /// Root Mean Squared Error: sqrt(average((actual - forecast)²))
@@ -73,6 +86,10 @@ pub struct ForecastMetrics {
     /// Same units as the data. Always >= MAE.
     /// Lower is better.
     #[serde(with = "finstack_quant_core::wire::non_finite_f64")]
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "finstack_quant_core::wire::NonFiniteF64Wire")
+    )]
     pub rmse: f64,
 
     /// Number of data points used in the calculation

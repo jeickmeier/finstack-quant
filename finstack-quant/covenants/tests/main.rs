@@ -9,5 +9,8 @@ mod audit_regressions;
 mod engine_conventions;
 #[path = "integration.rs"]
 mod integration;
+#[cfg(feature = "json-schema")]
+#[path = "schema_contract.rs"]
+mod schema_contract;
 #[path = "serialization.rs"]
 mod serialization;

@@ -1,0 +1,30 @@
+{
+  "$id": "https://finstack_quant.dev/schemas/portfolio/1/linked_return.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Result of geometrically linking sub-period returns.",
+  "properties": {
+    "annualised": {
+      "description": "Annualised return assuming the supplied `horizon_years` covers\nthe full sequence of periods.",
+      "format": "double",
+      "type": "number"
+    },
+    "cumulative": {
+      "description": "Cumulative return over the full horizon: `Π(1 + r_i) − 1`.",
+      "format": "double",
+      "type": "number"
+    },
+    "num_periods": {
+      "description": "Number of sub-periods linked.",
+      "format": "uint",
+      "minimum": 0,
+      "type": "integer"
+    }
+  },
+  "required": [
+    "cumulative",
+    "annualised",
+    "num_periods"
+  ],
+  "title": "LinkedReturn",
+  "type": "object"
+}

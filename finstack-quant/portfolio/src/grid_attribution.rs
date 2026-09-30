@@ -232,6 +232,7 @@ fn scaled_l1_tolerance(values: &[f64]) -> (f64, f64, f64) {
 /// `WEIGHT_TOLERANCE`) across all positions on that side. Returns are
 /// decimals (`0.02` = 2 %).
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct GridPosition {
     /// Duration-cell label. Cell labels may come from
@@ -248,6 +249,7 @@ pub struct GridPosition {
 
 /// Per-cell curve (duration-cell positioning) effect.
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct GridCellEffect {
     /// Duration-cell label.
@@ -265,6 +267,7 @@ pub struct GridCellEffect {
 
 /// Per-(cell, sector) within-cell sector-allocation effect.
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct GridSectorEffect {
     /// Duration-cell label.
@@ -277,6 +280,7 @@ pub struct GridSectorEffect {
 
 /// Per-(cell, sector) security-selection effect.
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct GridSelectionEffect {
     /// Duration-cell label.
@@ -295,6 +299,7 @@ pub struct GridSelectionEffect {
 /// module, so a misspelled or stale key fails closed instead of being
 /// silently dropped.
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct GridAttributionResult {
     /// Portfolio total return `r^P = Σ_t x_t^P r_t^P`.
@@ -646,6 +651,7 @@ pub fn grid_attribution(
 /// only require validating consistent cell/sector ordering across periods,
 /// mirroring [`crate::brinson::carino_link`].
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct GridCarinoLinkedResult {
     /// Per-period single-period grid attribution results, in chronological
     /// order.

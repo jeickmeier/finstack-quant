@@ -1,0 +1,24 @@
+{
+  "$id": "https://finstack_quant.dev/schemas/models/1/cos_config.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "COS method configuration.",
+  "properties": {
+    "num_terms": {
+      "description": "Number of cosine terms in `1..=`[`CosConfig::MAX_TERMS`] (default: 128).\nMore terms = higher accuracy for non-smooth or heavy-tailed densities.",
+      "format": "uint",
+      "minimum": 0,
+      "type": "integer"
+    },
+    "truncation_l": {
+      "description": "Finite positive truncation range multiplier L (default: 10.0).\nIntegration domain is [c1 - L*sqrt(c2 + sqrt(|c4|)), c1 + L*sqrt(c2 + sqrt(|c4|))].",
+      "format": "double",
+      "type": "number"
+    }
+  },
+  "required": [
+    "num_terms",
+    "truncation_l"
+  ],
+  "title": "CosConfig",
+  "type": "object"
+}

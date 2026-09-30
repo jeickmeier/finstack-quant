@@ -16,6 +16,7 @@ use serde::{Deserialize, Serialize};
 /// rejected, so a misspelled optional key fails instead of silently
 /// disabling its check.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct ThreeStatementMapping {
     /// Total-assets nodes (balance sheet).
@@ -133,6 +134,7 @@ impl ThreeStatementMapping {
 /// coverage, cash-flow, and trend checks. Unknown JSON keys are rejected, so
 /// a misspelled optional key fails instead of silently disabling its check.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct CreditMapping {
     /// Total debt node.

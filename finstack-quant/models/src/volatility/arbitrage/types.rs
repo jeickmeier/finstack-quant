@@ -8,6 +8,7 @@ use std::collections::BTreeMap;
 
 /// A point on the volatility surface where an arbitrage condition is violated.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct ViolationLocation {
     /// Strike or log-moneyness at which the violation occurs.
     pub strike: f64,
@@ -21,6 +22,7 @@ pub struct ViolationLocation {
 #[derive(
     Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize,
 )]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(rename_all = "snake_case")]
 pub enum ArbitrageType {
     /// Call prices not convex in strike: C(K-d) - 2C(K) + C(K+d) < 0.
@@ -53,6 +55,7 @@ pub enum ArbitrageType {
 #[derive(
     Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize,
 )]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(rename_all = "snake_case")]
 pub enum ArbitrageSeverity {
     /// Violation is within numerical noise (< tolerance).
@@ -82,6 +85,7 @@ impl std::fmt::Display for ArbitrageSeverity {
 
 /// A single arbitrage violation detected on a volatility surface.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct ArbitrageViolation {
     /// What type of arbitrage condition was violated.
     pub violation_type: ArbitrageType,
@@ -104,6 +108,7 @@ pub struct ArbitrageViolation {
 
 /// Aggregated arbitrage report for a volatility surface.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct ArbitrageReport {
     /// Identifier of the volatility surface that was checked.
     pub vol_surface_id: String,

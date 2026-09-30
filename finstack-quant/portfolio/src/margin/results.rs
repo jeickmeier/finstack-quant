@@ -10,6 +10,11 @@ use crate::types::PositionId;
 
 /// Margin results for a single netting set.
 #[derive(Debug, Clone)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[cfg_attr(
+    feature = "json-schema",
+    schemars(with = "super::wire::NettingSetMarginWire")
+)]
 pub struct NettingSetMargin {
     /// Netting set identifier
     pub netting_set_id: NettingSetId,
@@ -98,6 +103,11 @@ impl NettingSetMargin {
 
 /// Portfolio-wide margin calculation results.
 #[derive(Debug, Clone)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[cfg_attr(
+    feature = "json-schema",
+    schemars(with = "super::wire::PortfolioMarginResultWire")
+)]
 pub struct PortfolioMarginResult {
     /// Calculation date
     pub as_of: Date,

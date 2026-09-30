@@ -8,8 +8,8 @@
 //! - Exposure-at-default for term loans and revolvers.
 
 use finstack_quant_models::credit::lgd::{
-    self, BetaRecovery, CollateralPiece, CollateralType, CreditConversionFactor, DownturnLgd,
-    EadCalculator, WorkoutCosts, WorkoutLgd, WorkoutLgdBuilder, WorkoutLgdResult,
+    self, BetaRecovery, CollateralPiece, CreditConversionFactor, DownturnLgd, EadCalculator,
+    WorkoutCollateralType, WorkoutCosts, WorkoutLgd, WorkoutLgdBuilder, WorkoutLgdResult,
 };
 use pyo3::prelude::*;
 use pyo3::types::{PyList, PyModule};
@@ -19,12 +19,12 @@ use crate::bindings::pandas_utils::{
 };
 use crate::errors::{core_to_py, serde_json_to_py, value_error};
 
-/// Accepted `CollateralType` strings, in canonical order.
+/// Accepted `WorkoutCollateralType` strings, in canonical order.
 const COLLATERAL_TYPES: &str =
     "cash, securities, receivables, inventory, equipment, real_estate, intellectual_property, other";
 
-fn parse_collateral_type(value: &str) -> PyResult<CollateralType> {
-    value.parse::<CollateralType>().map_err(core_to_py)
+fn parse_collateral_type(value: &str) -> PyResult<WorkoutCollateralType> {
+    value.parse::<WorkoutCollateralType>().map_err(core_to_py)
 }
 
 /// Beta-distributed recovery rate parameterised by mean and standard deviation.

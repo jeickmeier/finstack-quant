@@ -1,0 +1,117 @@
+{
+  "$defs": {
+    "LeverageHazardMap": {
+      "description": "Map from leverage to hazard rate.",
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "description": "`lambda(t) = lambda_0 * (L(t) / L_0)^beta`",
+          "properties": {
+            "power_law": {
+              "properties": {
+                "exponent": {
+                  "description": "Power-law exponent (`beta`).",
+                  "format": "double",
+                  "type": "number"
+                }
+              },
+              "required": [
+                "exponent"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "power_law"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "`lambda(t) = lambda_0 * exp(beta * (L(t) - L_0))`",
+          "properties": {
+            "exponential": {
+              "properties": {
+                "sensitivity": {
+                  "description": "Exponential sensitivity (`beta`).",
+                  "format": "double",
+                  "type": "number"
+                }
+              },
+              "required": [
+                "sensitivity"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "exponential"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Tabular: linear interpolation from empirical calibration.",
+          "properties": {
+            "tabular": {
+              "properties": {
+                "hazard_points": {
+                  "description": "Corresponding hazard rates at each breakpoint.",
+                  "items": {
+                    "format": "double",
+                    "type": "number"
+                  },
+                  "type": "array"
+                },
+                "leverage_points": {
+                  "description": "Leverage breakpoints (must be sorted ascending).",
+                  "items": {
+                    "format": "double",
+                    "type": "number"
+                  },
+                  "type": "array"
+                }
+              },
+              "required": [
+                "leverage_points",
+                "hazard_points"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "tabular"
+          ],
+          "type": "object"
+        }
+      ]
+    }
+  },
+  "$id": "https://finstack_quant.dev/schemas/models/1/endogenous_hazard_spec.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Specification for endogenous (leverage-dependent) hazard rate.",
+  "properties": {
+    "base_hazard_rate": {
+      "description": "Base (reference) hazard rate `lambda_0`.",
+      "format": "double",
+      "type": "number"
+    },
+    "base_leverage": {
+      "description": "Base (reference) leverage level `L_0`.",
+      "format": "double",
+      "type": "number"
+    },
+    "leverage_hazard_map": {
+      "$ref": "#/$defs/LeverageHazardMap",
+      "description": "Mapping function from leverage to hazard rate."
+    }
+  },
+  "required": [
+    "base_hazard_rate",
+    "base_leverage",
+    "leverage_hazard_map"
+  ],
+  "title": "EndogenousHazardSpec",
+  "type": "object"
+}

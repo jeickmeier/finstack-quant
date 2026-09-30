@@ -55,6 +55,7 @@ pub fn capfloor_hw1f_sigma_schedule_key(curve_id: &str) -> String {
 /// assert!(!params.is_uncalibrated_default());
 /// ```
 #[derive(Debug, Clone, Copy, PartialEq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(try_from = "RawHullWhiteCalibrationParams")]
 pub struct HullWhiteCalibrationParams {
     /// Mean-reversion speed κ in inverse years; strictly positive and finite.
@@ -65,6 +66,7 @@ pub struct HullWhiteCalibrationParams {
 }
 
 #[derive(serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 struct RawHullWhiteCalibrationParams {
     kappa: f64,
     sigma: f64,
@@ -129,6 +131,7 @@ impl HullWhiteCalibrationParams {
 
 /// Hull-White parameters with piecewise-constant short-rate volatility.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(try_from = "RawHullWhiteParams")]
 pub struct HullWhiteParams {
     /// Mean-reversion speed κ in inverse years; strictly positive and finite.
@@ -139,6 +142,7 @@ pub struct HullWhiteParams {
 }
 
 #[derive(serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 struct RawHullWhiteParams {
     kappa: f64,
     volatility: PiecewiseConstantCurve,

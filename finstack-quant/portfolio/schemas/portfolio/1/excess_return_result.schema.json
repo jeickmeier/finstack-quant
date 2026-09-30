@@ -1,0 +1,76 @@
+{
+  "$defs": {
+    "PositionExcess": {
+      "additionalProperties": false,
+      "description": "One position's duration-matched credit excess return.\n\nThis type is *input-reachable*: the Python/WASM bindings deserialize\n[`ExcessReturnResult`] (which embeds a `Vec` of these) from JSON, so it\ndenies unknown fields like the other inbound types in this module.",
+      "properties": {
+        "base_return": {
+          "description": "The matched cell's base return.",
+          "format": "double",
+          "type": "number"
+        },
+        "cell": {
+          "description": "Label of the duration cell the position was matched to (mirrors\n[`CellReturn::label`]).",
+          "type": "string"
+        },
+        "excess_return": {
+          "description": "`total_return − base_return` for this position.",
+          "format": "double",
+          "type": "number"
+        },
+        "id": {
+          "description": "Position identifier (mirrors [`ExcessReturnPosition::id`]).",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "cell",
+        "base_return",
+        "excess_return"
+      ],
+      "type": "object"
+    }
+  },
+  "$id": "https://finstack_quant.dev/schemas/portfolio/1/excess_return_result.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Per-position and portfolio-level duration-matched credit excess return result, produced by `excess_returns`.",
+  "properties": {
+    "base_label": {
+      "description": "Label of the base curve the excess returns were measured against\n(mirrors [`DurationCellTable::base_label`]).",
+      "type": "string"
+    },
+    "portfolio_base_return": {
+      "description": "Weight-weighted portfolio base return `Σ w_i · base_return_i`.",
+      "format": "double",
+      "type": "number"
+    },
+    "portfolio_excess_return": {
+      "description": "Weight-weighted portfolio excess return `Σ w_i · excess_return_i`,\naccumulated independently from `portfolio_total_return` and\n`portfolio_base_return` — not computed as their difference. The\nidentity `portfolio_excess_return == portfolio_total_return −\nportfolio_base_return` holds algebraically for any correct\nimplementation of [`excess_returns`], but computing\n`portfolio_excess_return` *as* that difference would subtract two\nlarge, nearly-equal weighted sums whenever positions' total and base\nreturns share a large common component — exactly the shape of\ncatastrophic cancellation. Accumulating the already-small\nper-position excesses directly avoids that precision loss; see\n[`excess_returns`]'s\n`portfolio_excess_return_avoids_catastrophic_cancellation` test,\nwhich constructs such a case and shows the two computations\nmeasurably diverge (~3e-9 absolute, against sums of order 1e8).",
+      "format": "double",
+      "type": "number"
+    },
+    "portfolio_total_return": {
+      "description": "Weight-weighted portfolio total return `Σ w_i · total_return_i`.",
+      "format": "double",
+      "type": "number"
+    },
+    "positions": {
+      "description": "Per-position results, in input order.",
+      "items": {
+        "$ref": "#/$defs/PositionExcess"
+      },
+      "type": "array"
+    }
+  },
+  "required": [
+    "base_label",
+    "positions",
+    "portfolio_total_return",
+    "portfolio_base_return",
+    "portfolio_excess_return"
+  ],
+  "title": "ExcessReturnResult",
+  "type": "object"
+}

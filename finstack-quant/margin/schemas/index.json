@@ -1,6 +1,114 @@
 {
   "artifacts": [
     {
+      "$id": "https://finstack_quant.dev/schemas/margin/1/ccp_methodology.schema.json",
+      "bytes": 1795,
+      "kind": "component",
+      "path": "schemas/margin/1/ccp_methodology.schema.json",
+      "summary": "CCP methodology type.",
+      "title": "CcpMethodology",
+      "type_name": "CcpMethodology"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/margin/1/ead_result.schema.json",
+      "bytes": 8515,
+      "kind": "output",
+      "path": "schemas/margin/1/ead_result.schema.json",
+      "summary": "SA-CCR Exposure at Default result.",
+      "title": "EadResult",
+      "type_name": "EadResult"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/margin/1/excess_collateral.schema.json",
+      "bytes": 21404,
+      "kind": "output",
+      "path": "schemas/margin/1/excess_collateral.schema.json",
+      "summary": "Excess collateral result.",
+      "title": "ExcessCollateral",
+      "type_name": "ExcessCollateral"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/margin/1/exposure_profile.schema.json",
+      "bytes": 2758,
+      "kind": "input",
+      "path": "schemas/margin/1/exposure_profile.schema.json",
+      "summary": "Exposure profile computed at each time grid point.",
+      "title": "ExposureProfile",
+      "type_name": "ExposureProfile"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/margin/1/frtb_risk_class.schema.json",
+      "bytes": 1090,
+      "kind": "component",
+      "path": "schemas/margin/1/frtb_risk_class.schema.json",
+      "summary": "FRTB risk classes per BCBS d457.",
+      "title": "FrtbRiskClass",
+      "type_name": "FrtbRiskClass"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/margin/1/frtb_sba_result.schema.json",
+      "bytes": 9534,
+      "kind": "output",
+      "path": "schemas/margin/1/frtb_sba_result.schema.json",
+      "summary": "Complete FRTB SBA capital charge result.",
+      "title": "FrtbSbaResult",
+      "type_name": "FrtbSbaResult"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/margin/1/frtb_sensitivities.schema.json",
+      "bytes": 38108,
+      "kind": "input",
+      "path": "schemas/margin/1/frtb_sensitivities.schema.json",
+      "summary": "FRTB sensitivity inputs organized by risk class.",
+      "title": "FrtbSensitivities",
+      "type_name": "FrtbSensitivities"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/margin/1/funding_config.schema.json",
+      "bytes": 3173,
+      "kind": "input",
+      "path": "schemas/margin/1/funding_config.schema.json",
+      "summary": "Funding cost/benefit configuration for FVA and MVA calculation.",
+      "title": "FundingConfig",
+      "type_name": "FundingConfig"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/margin/1/haircut01.schema.json",
+      "bytes": 21419,
+      "kind": "output",
+      "path": "schemas/margin/1/haircut01.schema.json",
+      "summary": "Haircut sensitivity (Haircut01) result.",
+      "title": "Haircut01",
+      "type_name": "Haircut01"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/margin/1/im_collateral_result.schema.json",
+      "bytes": 22074,
+      "kind": "output",
+      "path": "schemas/margin/1/im_collateral_result.schema.json",
+      "summary": "One-way IM collateral account after applying the CSA's allocated threshold.",
+      "title": "ImCollateralResult",
+      "type_name": "ImCollateralResult"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/margin/1/im_decay_profile.schema.json",
+      "bytes": 1739,
+      "kind": "input",
+      "path": "schemas/margin/1/im_decay_profile.schema.json",
+      "summary": "Deterministic decay applied to today's SIMM IM to approximate `E[IM(t)]`.",
+      "title": "ImDecayProfile",
+      "type_name": "ImDecayProfile"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/margin/1/im_result.schema.json",
+      "bytes": 25050,
+      "kind": "output",
+      "path": "schemas/margin/1/im_result.schema.json",
+      "summary": "Initial margin calculation result.",
+      "title": "ImResult",
+      "type_name": "ImResult"
+    },
+    {
       "$id": "https://finstack_quant.dev/schemas/margin/1/margin.schema.json",
       "bytes": 54888,
       "kind": "input",
@@ -8,6 +116,114 @@
       "summary": "One of three closed root shapes: an OTC margin spec, a CSA spec, or a margin call.",
       "title": "Finstack Quant Margin Specification",
       "type_name": "MarginEnvelope"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/margin/1/margin_funding_cost.schema.json",
+      "bytes": 21593,
+      "kind": "output",
+      "path": "schemas/margin/1/margin_funding_cost.schema.json",
+      "summary": "Margin funding cost result.",
+      "title": "MarginFundingCost",
+      "type_name": "MarginFundingCost"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/margin/1/margin_utilization.schema.json",
+      "bytes": 21188,
+      "kind": "output",
+      "path": "schemas/margin/1/margin_utilization.schema.json",
+      "summary": "Margin utilization result.",
+      "title": "MarginUtilization",
+      "type_name": "MarginUtilization"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/margin/1/mva_result.schema.json",
+      "bytes": 1159,
+      "kind": "output",
+      "path": "schemas/margin/1/mva_result.schema.json",
+      "summary": "Result of an MVA computation.",
+      "title": "MvaResult",
+      "type_name": "MvaResult"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/margin/1/repo_margin_spec.schema.json",
+      "bytes": 10640,
+      "kind": "input",
+      "path": "schemas/margin/1/repo_margin_spec.schema.json",
+      "summary": "GMRA 2011 compliant repo margin specification.",
+      "title": "RepoMarginSpec",
+      "type_name": "RepoMarginSpec"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/margin/1/sa_ccr_netting_set_config.schema.json",
+      "bytes": 3533,
+      "kind": "input",
+      "path": "schemas/margin/1/sa_ccr_netting_set_config.schema.json",
+      "summary": "Netting set configuration for SA-CCR.",
+      "title": "SaCcrNettingSetConfig",
+      "type_name": "SaCcrNettingSetConfig"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/margin/1/sa_ccr_trade.schema.json",
+      "bytes": 6664,
+      "kind": "input",
+      "path": "schemas/margin/1/sa_ccr_trade.schema.json",
+      "summary": "A single derivative trade for SA-CCR EAD computation.",
+      "title": "SaCcrTrade",
+      "type_name": "SaCcrTrade"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/margin/1/schedule_asset_class.schema.json",
+      "bytes": 1435,
+      "kind": "component",
+      "path": "schemas/margin/1/schedule_asset_class.schema.json",
+      "summary": "Asset class for schedule-based IM calculation.",
+      "title": "ScheduleAssetClass",
+      "type_name": "ScheduleAssetClass"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/margin/1/simm_sensitivities.schema.json",
+      "bytes": 30267,
+      "kind": "input",
+      "path": "schemas/margin/1/simm_sensitivities.schema.json",
+      "summary": "SIMM sensitivity inputs organized by risk class.",
+      "title": "SimmSensitivities",
+      "type_name": "SimmSensitivities"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/margin/1/simm_sensitivities_json.schema.json",
+      "bytes": 31290,
+      "kind": "input",
+      "path": "schemas/margin/1/simm_sensitivities_json.schema.json",
+      "summary": "JSON-friendly representation of `SimmSensitivities`.",
+      "title": "SimmSensitivitiesJson",
+      "type_name": "SimmSensitivitiesJson"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/margin/1/simm_version.schema.json",
+      "bytes": 333,
+      "kind": "component",
+      "path": "schemas/margin/1/simm_version.schema.json",
+      "summary": "SIMM version identifier.",
+      "title": "SimmVersion",
+      "type_name": "SimmVersion"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/margin/1/vm_result.schema.json",
+      "bytes": 21927,
+      "kind": "output",
+      "path": "schemas/margin/1/vm_result.schema.json",
+      "summary": "Variation margin calculation result.",
+      "title": "VmResult",
+      "type_name": "VmResult"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/margin/1/xva_result.schema.json",
+      "bytes": 12923,
+      "kind": "output",
+      "path": "schemas/margin/1/xva_result.schema.json",
+      "summary": "Result of XVA calculations.",
+      "title": "XvaResult",
+      "type_name": "XvaResult"
     }
   ],
   "schema_index_version": 1

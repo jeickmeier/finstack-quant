@@ -1,0 +1,17 @@
+{
+  "$id": "https://finstack_quant.dev/schemas/models/1/kyle_lambda_model.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Kyle (1985) price impact model.",
+  "properties": {
+    "lambda": {
+      "description": "Price impact per unit of order flow.",
+      "format": "double",
+      "type": "number"
+    }
+  },
+  "required": [
+    "lambda"
+  ],
+  "title": "KyleLambdaModel",
+  "type": "object"
+}

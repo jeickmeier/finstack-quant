@@ -1,0 +1,1522 @@
+{
+  "$defs": {
+    "Currency": {
+      "description": "ISO 4217 currency enumeration",
+      "oneOf": [
+        {
+          "const": "AED",
+          "description": "UAE Dirham (784)",
+          "type": "string"
+        },
+        {
+          "const": "AFN",
+          "description": "Afghani (971)",
+          "type": "string"
+        },
+        {
+          "const": "ALL",
+          "description": "Lek (8)",
+          "type": "string"
+        },
+        {
+          "const": "AMD",
+          "description": "Armenian Dram (51)",
+          "type": "string"
+        },
+        {
+          "const": "ANG",
+          "description": "Netherlands Antillean Guilder (532)",
+          "type": "string"
+        },
+        {
+          "const": "AOA",
+          "description": "Kwanza (973)",
+          "type": "string"
+        },
+        {
+          "const": "ARS",
+          "description": "Argentine Peso (32)",
+          "type": "string"
+        },
+        {
+          "const": "AUD",
+          "description": "Australian Dollar (36)",
+          "type": "string"
+        },
+        {
+          "const": "AWG",
+          "description": "Aruban Florin (533)",
+          "type": "string"
+        },
+        {
+          "const": "AZN",
+          "description": "Azerbaijan Manat (944)",
+          "type": "string"
+        },
+        {
+          "const": "BAM",
+          "description": "Convertible Mark (977)",
+          "type": "string"
+        },
+        {
+          "const": "BBD",
+          "description": "Barbados Dollar (52)",
+          "type": "string"
+        },
+        {
+          "const": "BDT",
+          "description": "Taka (50)",
+          "type": "string"
+        },
+        {
+          "const": "BGN",
+          "description": "Bulgarian Lev (975)",
+          "type": "string"
+        },
+        {
+          "const": "BHD",
+          "description": "Bahraini Dinar (48)",
+          "type": "string"
+        },
+        {
+          "const": "BIF",
+          "description": "Burundi Franc (108)",
+          "type": "string"
+        },
+        {
+          "const": "BMD",
+          "description": "Bermudian Dollar (60)",
+          "type": "string"
+        },
+        {
+          "const": "BND",
+          "description": "Brunei Dollar (96)",
+          "type": "string"
+        },
+        {
+          "const": "BOB",
+          "description": "Boliviano (68)",
+          "type": "string"
+        },
+        {
+          "const": "BRL",
+          "description": "Brazilian Real (986)",
+          "type": "string"
+        },
+        {
+          "const": "BSD",
+          "description": "Bahamian Dollar (44)",
+          "type": "string"
+        },
+        {
+          "const": "BTN",
+          "description": "Ngultrum (64)",
+          "type": "string"
+        },
+        {
+          "const": "BWP",
+          "description": "Pula (72)",
+          "type": "string"
+        },
+        {
+          "const": "BYN",
+          "description": "Belarusian Ruble (933)",
+          "type": "string"
+        },
+        {
+          "const": "BZD",
+          "description": "Belize Dollar (84)",
+          "type": "string"
+        },
+        {
+          "const": "CAD",
+          "description": "Canadian Dollar (124)",
+          "type": "string"
+        },
+        {
+          "const": "CDF",
+          "description": "Congolese Franc (976)",
+          "type": "string"
+        },
+        {
+          "const": "CHF",
+          "description": "Swiss Franc (756)",
+          "type": "string"
+        },
+        {
+          "const": "CLF",
+          "description": "Unidad de Fomento (990)",
+          "type": "string"
+        },
+        {
+          "const": "CLP",
+          "description": "Chilean Peso (152)",
+          "type": "string"
+        },
+        {
+          "const": "CNY",
+          "description": "Yuan Renminbi (156)",
+          "type": "string"
+        },
+        {
+          "const": "COP",
+          "description": "Colombian Peso (170)",
+          "type": "string"
+        },
+        {
+          "const": "CRC",
+          "description": "Costa Rican Colon (188)",
+          "type": "string"
+        },
+        {
+          "const": "CUC",
+          "description": "Peso Convertible (931)",
+          "type": "string"
+        },
+        {
+          "const": "CUP",
+          "description": "Cuban Peso (192)",
+          "type": "string"
+        },
+        {
+          "const": "CVE",
+          "description": "Cabo Verde Escudo (132)",
+          "type": "string"
+        },
+        {
+          "const": "CZK",
+          "description": "Czech Koruna (203)",
+          "type": "string"
+        },
+        {
+          "const": "DJF",
+          "description": "Djibouti Franc (262)",
+          "type": "string"
+        },
+        {
+          "const": "DKK",
+          "description": "Danish Krone (208)",
+          "type": "string"
+        },
+        {
+          "const": "DOP",
+          "description": "Dominican Peso (214)",
+          "type": "string"
+        },
+        {
+          "const": "DZD",
+          "description": "Algerian Dinar (12)",
+          "type": "string"
+        },
+        {
+          "const": "EGP",
+          "description": "Egyptian Pound (818)",
+          "type": "string"
+        },
+        {
+          "const": "ERN",
+          "description": "Nakfa (232)",
+          "type": "string"
+        },
+        {
+          "const": "ETB",
+          "description": "Ethiopian Birr (230)",
+          "type": "string"
+        },
+        {
+          "const": "EUR",
+          "description": "Euro (978)",
+          "type": "string"
+        },
+        {
+          "const": "FJD",
+          "description": "Fiji Dollar (242)",
+          "type": "string"
+        },
+        {
+          "const": "FKP",
+          "description": "Falkland Islands Pound (238)",
+          "type": "string"
+        },
+        {
+          "const": "GBP",
+          "description": "Pound Sterling (826)",
+          "type": "string"
+        },
+        {
+          "const": "GEL",
+          "description": "Lari (981)",
+          "type": "string"
+        },
+        {
+          "const": "GHS",
+          "description": "Ghana Cedi (936)",
+          "type": "string"
+        },
+        {
+          "const": "GIP",
+          "description": "Gibraltar Pound (292)",
+          "type": "string"
+        },
+        {
+          "const": "GMD",
+          "description": "Dalasi (270)",
+          "type": "string"
+        },
+        {
+          "const": "GNF",
+          "description": "Guinean Franc (324)",
+          "type": "string"
+        },
+        {
+          "const": "GTQ",
+          "description": "Quetzal (320)",
+          "type": "string"
+        },
+        {
+          "const": "GYD",
+          "description": "Guyana Dollar (328)",
+          "type": "string"
+        },
+        {
+          "const": "HKD",
+          "description": "Hong Kong Dollar (344)",
+          "type": "string"
+        },
+        {
+          "const": "HNL",
+          "description": "Lempira (340)",
+          "type": "string"
+        },
+        {
+          "const": "HRK",
+          "description": "Kuna (191)",
+          "type": "string"
+        },
+        {
+          "const": "HTG",
+          "description": "Gourde (332)",
+          "type": "string"
+        },
+        {
+          "const": "HUF",
+          "description": "Forint (348)",
+          "type": "string"
+        },
+        {
+          "const": "IDR",
+          "description": "Rupiah (360)",
+          "type": "string"
+        },
+        {
+          "const": "ILS",
+          "description": "New Israeli Sheqel (376)",
+          "type": "string"
+        },
+        {
+          "const": "INR",
+          "description": "Indian Rupee (356)",
+          "type": "string"
+        },
+        {
+          "const": "IQD",
+          "description": "Iraqi Dinar (368)",
+          "type": "string"
+        },
+        {
+          "const": "IRR",
+          "description": "Iranian Rial (364)",
+          "type": "string"
+        },
+        {
+          "const": "ISK",
+          "description": "Iceland Krona (352)",
+          "type": "string"
+        },
+        {
+          "const": "JMD",
+          "description": "Jamaican Dollar (388)",
+          "type": "string"
+        },
+        {
+          "const": "JOD",
+          "description": "Jordanian Dinar (400)",
+          "type": "string"
+        },
+        {
+          "const": "JPY",
+          "description": "Yen (392)",
+          "type": "string"
+        },
+        {
+          "const": "KES",
+          "description": "Kenyan Shilling (404)",
+          "type": "string"
+        },
+        {
+          "const": "KGS",
+          "description": "Som (417)",
+          "type": "string"
+        },
+        {
+          "const": "KHR",
+          "description": "Riel (116)",
+          "type": "string"
+        },
+        {
+          "const": "KMF",
+          "description": "Comorian Franc (174)",
+          "type": "string"
+        },
+        {
+          "const": "KPW",
+          "description": "North Korean Won (408)",
+          "type": "string"
+        },
+        {
+          "const": "KRW",
+          "description": "Won (410)",
+          "type": "string"
+        },
+        {
+          "const": "KWD",
+          "description": "Kuwaiti Dinar (414)",
+          "type": "string"
+        },
+        {
+          "const": "KYD",
+          "description": "Cayman Islands Dollar (136)",
+          "type": "string"
+        },
+        {
+          "const": "KZT",
+          "description": "Tenge (398)",
+          "type": "string"
+        },
+        {
+          "const": "LAK",
+          "description": "Lao Kip (418)",
+          "type": "string"
+        },
+        {
+          "const": "LBP",
+          "description": "Lebanese Pound (422)",
+          "type": "string"
+        },
+        {
+          "const": "LKR",
+          "description": "Sri Lanka Rupee (144)",
+          "type": "string"
+        },
+        {
+          "const": "LRD",
+          "description": "Liberian Dollar (430)",
+          "type": "string"
+        },
+        {
+          "const": "LSL",
+          "description": "Loti (426)",
+          "type": "string"
+        },
+        {
+          "const": "LYD",
+          "description": "Libyan Dinar (434)",
+          "type": "string"
+        },
+        {
+          "const": "MAD",
+          "description": "Moroccan Dirham (504)",
+          "type": "string"
+        },
+        {
+          "const": "MDL",
+          "description": "Moldovan Leu (498)",
+          "type": "string"
+        },
+        {
+          "const": "MGA",
+          "description": "Malagasy Ariary (969)",
+          "type": "string"
+        },
+        {
+          "const": "MKD",
+          "description": "Denar (807)",
+          "type": "string"
+        },
+        {
+          "const": "MMK",
+          "description": "Kyat (104)",
+          "type": "string"
+        },
+        {
+          "const": "MNT",
+          "description": "Tugrik (496)",
+          "type": "string"
+        },
+        {
+          "const": "MOP",
+          "description": "Pataca (446)",
+          "type": "string"
+        },
+        {
+          "const": "MRU",
+          "description": "Ouguiya (929)",
+          "type": "string"
+        },
+        {
+          "const": "MUR",
+          "description": "Mauritius Rupee (480)",
+          "type": "string"
+        },
+        {
+          "const": "MVR",
+          "description": "Rufiyaa (462)",
+          "type": "string"
+        },
+        {
+          "const": "MWK",
+          "description": "Malawi Kwacha (454)",
+          "type": "string"
+        },
+        {
+          "const": "MXN",
+          "description": "Mexican Peso (484)",
+          "type": "string"
+        },
+        {
+          "const": "MYR",
+          "description": "Malaysian Ringgit (458)",
+          "type": "string"
+        },
+        {
+          "const": "MZN",
+          "description": "Mozambique Metical (943)",
+          "type": "string"
+        },
+        {
+          "const": "NAD",
+          "description": "Namibia Dollar (516)",
+          "type": "string"
+        },
+        {
+          "const": "NGN",
+          "description": "Naira (566)",
+          "type": "string"
+        },
+        {
+          "const": "NIO",
+          "description": "Cordoba Oro (558)",
+          "type": "string"
+        },
+        {
+          "const": "NOK",
+          "description": "Norwegian Krone (578)",
+          "type": "string"
+        },
+        {
+          "const": "NPR",
+          "description": "Nepalese Rupee (524)",
+          "type": "string"
+        },
+        {
+          "const": "NZD",
+          "description": "New Zealand Dollar (554)",
+          "type": "string"
+        },
+        {
+          "const": "OMR",
+          "description": "Rial Omani (512)",
+          "type": "string"
+        },
+        {
+          "const": "PAB",
+          "description": "Balboa (590)",
+          "type": "string"
+        },
+        {
+          "const": "PEN",
+          "description": "Sol (604)",
+          "type": "string"
+        },
+        {
+          "const": "PGK",
+          "description": "Kina (598)",
+          "type": "string"
+        },
+        {
+          "const": "PHP",
+          "description": "Philippine Peso (608)",
+          "type": "string"
+        },
+        {
+          "const": "PKR",
+          "description": "Pakistan Rupee (586)",
+          "type": "string"
+        },
+        {
+          "const": "PLN",
+          "description": "Zloty (985)",
+          "type": "string"
+        },
+        {
+          "const": "PYG",
+          "description": "Guarani (600)",
+          "type": "string"
+        },
+        {
+          "const": "QAR",
+          "description": "Qatari Rial (634)",
+          "type": "string"
+        },
+        {
+          "const": "RON",
+          "description": "Romanian Leu (946)",
+          "type": "string"
+        },
+        {
+          "const": "RSD",
+          "description": "Serbian Dinar (941)",
+          "type": "string"
+        },
+        {
+          "const": "RUB",
+          "description": "Russian Ruble (643)",
+          "type": "string"
+        },
+        {
+          "const": "RWF",
+          "description": "Rwanda Franc (646)",
+          "type": "string"
+        },
+        {
+          "const": "SAR",
+          "description": "Saudi Riyal (682)",
+          "type": "string"
+        },
+        {
+          "const": "SBD",
+          "description": "Solomon Islands Dollar (90)",
+          "type": "string"
+        },
+        {
+          "const": "SCR",
+          "description": "Seychelles Rupee (690)",
+          "type": "string"
+        },
+        {
+          "const": "SDG",
+          "description": "Sudanese Pound (938)",
+          "type": "string"
+        },
+        {
+          "const": "SEK",
+          "description": "Swedish Krona (752)",
+          "type": "string"
+        },
+        {
+          "const": "SGD",
+          "description": "Singapore Dollar (702)",
+          "type": "string"
+        },
+        {
+          "const": "SHP",
+          "description": "Saint Helena Pound (654)",
+          "type": "string"
+        },
+        {
+          "const": "SLE",
+          "description": "Leone (925)",
+          "type": "string"
+        },
+        {
+          "const": "SLL",
+          "description": "Leone (694)",
+          "type": "string"
+        },
+        {
+          "const": "SOS",
+          "description": "Somali Shilling (706)",
+          "type": "string"
+        },
+        {
+          "const": "SRD",
+          "description": "Surinam Dollar (968)",
+          "type": "string"
+        },
+        {
+          "const": "SSP",
+          "description": "South Sudanese Pound (728)",
+          "type": "string"
+        },
+        {
+          "const": "STN",
+          "description": "Dobra (930)",
+          "type": "string"
+        },
+        {
+          "const": "SYP",
+          "description": "Syrian Pound (760)",
+          "type": "string"
+        },
+        {
+          "const": "SZL",
+          "description": "Lilangeni (748)",
+          "type": "string"
+        },
+        {
+          "const": "THB",
+          "description": "Baht (764)",
+          "type": "string"
+        },
+        {
+          "const": "TJS",
+          "description": "Somoni (972)",
+          "type": "string"
+        },
+        {
+          "const": "TMT",
+          "description": "Turkmenistan New Manat (934)",
+          "type": "string"
+        },
+        {
+          "const": "TND",
+          "description": "Tunisian Dinar (788)",
+          "type": "string"
+        },
+        {
+          "const": "TOP",
+          "description": "Pa'anga (776)",
+          "type": "string"
+        },
+        {
+          "const": "TRY",
+          "description": "Turkish Lira (949)",
+          "type": "string"
+        },
+        {
+          "const": "TTD",
+          "description": "Trinidad and Tobago Dollar (780)",
+          "type": "string"
+        },
+        {
+          "const": "TWD",
+          "description": "New Taiwan Dollar (901)",
+          "type": "string"
+        },
+        {
+          "const": "TZS",
+          "description": "Tanzanian Shilling (834)",
+          "type": "string"
+        },
+        {
+          "const": "UAH",
+          "description": "Hryvnia (980)",
+          "type": "string"
+        },
+        {
+          "const": "UGX",
+          "description": "Uganda Shilling (800)",
+          "type": "string"
+        },
+        {
+          "const": "USD",
+          "description": "US Dollar (840)",
+          "type": "string"
+        },
+        {
+          "const": "UYU",
+          "description": "Peso Uruguayo (858)",
+          "type": "string"
+        },
+        {
+          "const": "UZS",
+          "description": "Uzbekistan Sum (860)",
+          "type": "string"
+        },
+        {
+          "const": "VED",
+          "description": "Bolívar Soberano (926)",
+          "type": "string"
+        },
+        {
+          "const": "VES",
+          "description": "Bolívar Soberano (928)",
+          "type": "string"
+        },
+        {
+          "const": "VND",
+          "description": "Dong (704)",
+          "type": "string"
+        },
+        {
+          "const": "VUV",
+          "description": "Vatu (548)",
+          "type": "string"
+        },
+        {
+          "const": "WST",
+          "description": "Tala (882)",
+          "type": "string"
+        },
+        {
+          "const": "XAF",
+          "description": "CFA Franc BEAC (950)",
+          "type": "string"
+        },
+        {
+          "const": "XCD",
+          "description": "East Caribbean Dollar (951)",
+          "type": "string"
+        },
+        {
+          "const": "XOF",
+          "description": "CFA Franc BCEAO (952)",
+          "type": "string"
+        },
+        {
+          "const": "XPF",
+          "description": "CFP Franc (953)",
+          "type": "string"
+        },
+        {
+          "const": "YER",
+          "description": "Yemeni Rial (886)",
+          "type": "string"
+        },
+        {
+          "const": "ZAR",
+          "description": "Rand (710)",
+          "type": "string"
+        },
+        {
+          "const": "ZMW",
+          "description": "Zambian Kwacha (967)",
+          "type": "string"
+        },
+        {
+          "const": "ZWL",
+          "description": "Zimbabwe Dollar (932)",
+          "type": "string"
+        }
+      ]
+    },
+    "DateWire": {
+      "description": "ISO 8601 calendar date encoded as a `YYYY-MM-DD` JSON string.",
+      "format": "date",
+      "type": "string"
+    },
+    "DecimalWire": {
+      "description": "Exact decimal encoded only as a JSON string.",
+      "pattern": "^-?\\d+(\\.\\d+)?([eE][+-]?\\d+)?$",
+      "type": "string"
+    },
+    "DegradedPosition": {
+      "properties": {
+        "message": {
+          "type": "string"
+        },
+        "position_id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "position_id",
+        "message"
+      ],
+      "type": "object"
+    },
+    "ImCollateralResult": {
+      "additionalProperties": false,
+      "description": "One-way IM collateral account after applying the CSA's allocated threshold.\n\nIM remains separate from VM. Segregation determines the custody requirement;\nit does not discount gross model risk or allow the account to offset VM.",
+      "properties": {
+        "current_collateral": {
+          "$ref": "#/$defs/Money",
+          "description": "Existing nonnegative collateral balance in this one-way IM account."
+        },
+        "gross_initial_margin": {
+          "$ref": "#/$defs/Money",
+          "description": "Gross model IM after MPOR adjustment, before contractual thresholds."
+        },
+        "required_collateral": {
+          "$ref": "#/$defs/Money",
+          "description": "Target collateral balance, max(gross IM minus allocated CSA threshold, 0)."
+        },
+        "segregated": {
+          "description": "True requires separate custody with no reuse to satisfy VM obligations.",
+          "type": "boolean"
+        },
+        "transfer": {
+          "$ref": "#/$defs/Money",
+          "description": "Signed transfer: positive posts additional IM, negative returns excess.\nAbsolute transfers strictly below MTA are zero; equality triggers transfer."
+        }
+      },
+      "required": [
+        "gross_initial_margin",
+        "required_collateral",
+        "current_collateral",
+        "transfer",
+        "segregated"
+      ],
+      "type": "object"
+    },
+    "ImMethodology": {
+      "description": "Initial margin calculation methodology.\n\nDifferent methodologies are used depending on regulatory requirements,\nproduct type, and whether trades are cleared or bilateral.\n\n# BCBS-IOSCO Standards\n\nFor bilateral (uncleared) OTC derivatives, either SIMM or the regulatory\nschedule approach may be used. SIMM is the industry standard for large\ndealers due to its risk-sensitivity.",
+      "oneOf": [
+        {
+          "const": "haircut",
+          "description": "Haircut-based IM calculation (standard for repos and securities financing)\n\nIM = Collateral_Value × Haircut\n\nHaircuts are determined by asset class, rating, maturity, and FX mismatch.",
+          "type": "string"
+        },
+        {
+          "const": "simm",
+          "description": "ISDA Standard Initial Margin Model (SIMM)\n\nSensitivities-based model calculating IM from delta, vega, and curvature\nrisk across interest rate, credit, equity, commodity, and FX risk classes.\n\nReference: ISDA SIMM Methodology v2.6 (2023)",
+          "type": "string"
+        },
+        {
+          "const": "schedule",
+          "description": "BCBS-IOSCO regulatory schedule approach\n\nGrid-based IM calculation using notional × rate based on asset class and maturity.\nSimpler but typically more conservative than SIMM.\n\nExample rates:\n- Interest Rate: 0-2yr: 1%, 2-5yr: 2%, 5+yr: 4%\n- Credit: 2-5yr: 5%, 5+yr: 10%\n- Equity: 15%\n- FX: 6%",
+          "type": "string"
+        },
+        {
+          "const": "internal_model",
+          "description": "Internal model approved by regulator\n\nBank's proprietary VaR or ES-based model approved by supervisor.\nMust meet regulatory backtesting and validation requirements.",
+          "type": "string"
+        },
+        {
+          "const": "clearing_house",
+          "description": "Clearing house methodology\n\nCCP-specific IM calculation (typically VaR or SPAN-based).\nExamples: LCH SwapClear, CME, ICE Clear Credit",
+          "type": "string"
+        }
+      ]
+    },
+    "Money": {
+      "additionalProperties": false,
+      "description": "Currency-tagged monetary amount with safe arithmetic.\n\nValues retain decimal precision independently of ISO 4217 display precision.\n\nWhen you need configurable rounding during ingestion, use\n[`Money::new_with_config`].\n\n# Examples\n```rust\nuse finstack_quant_core::money::Money;\nuse finstack_quant_core::currency::Currency;\n\nlet notional = Money::from((1_000_000_i64, Currency::EUR));\nassert_eq!(notional.currency(), Currency::EUR);\nassert_eq!(notional.amount(), 1_000_000.0);\n```",
+      "properties": {
+        "amount": {
+          "$ref": "#/$defs/DecimalWire",
+          "description": "Monetary amount, carried on the wire as an exact decimal string rather\nthan a JSON number so no precision is lost in transit. Construction with\nconfiguration applies the selected ingest scale; raw construction does not."
+        },
+        "currency": {
+          "$ref": "#/$defs/Currency",
+          "description": "ISO 4217 currency of `amount`. Arithmetic between two `Money` values\nrequires this to match; there is no implicit conversion."
+        }
+      },
+      "required": [
+        "amount",
+        "currency"
+      ],
+      "type": "object"
+    },
+    "NettingSetId": {
+      "description": "Identifies a margin netting set.\n\nInstruments in the same netting set can offset each other for margin\ncalculation purposes. The netting set is typically defined by the\nCSA agreement (bilateral) or by CCP membership (cleared) — these two\nshapes are mutually exclusive, so the type encodes them as enum\nvariants rather than as a struct with two `Option<String>` fields\nthat could in principle both be set or both be unset.",
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "description": "A bilateral netting set scoped by counterparty + CSA.",
+          "properties": {
+            "counterparty_id": {
+              "description": "Counterparty identifier",
+              "type": "string"
+            },
+            "csa_id": {
+              "description": "CSA identifier",
+              "type": "string"
+            },
+            "kind": {
+              "const": "bilateral",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "counterparty_id",
+            "csa_id"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "A cleared netting set scoped by CCP membership.",
+          "properties": {
+            "ccp_id": {
+              "description": "CCP identifier (also used as the counterparty id)",
+              "type": "string"
+            },
+            "kind": {
+              "const": "cleared",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "ccp_id"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "NettingSetMargin": {
+      "properties": {
+        "as_of": {
+          "$ref": "#/$defs/DateWire"
+        },
+        "csa_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "im_breakdown": {
+          "additionalProperties": {
+            "$ref": "#/$defs/Money"
+          },
+          "type": "object"
+        },
+        "im_methodology": {
+          "$ref": "#/$defs/ImMethodology"
+        },
+        "initial_margin": {
+          "$ref": "#/$defs/Money"
+        },
+        "is_approximate": {
+          "type": "boolean"
+        },
+        "netting_set_id": {
+          "$ref": "#/$defs/NettingSetId"
+        },
+        "position_count": {
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "sensitivities": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SimmSensitivitiesJson"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "total_margin": {
+          "$ref": "#/$defs/Money"
+        },
+        "variation_margin": {
+          "$ref": "#/$defs/Money"
+        }
+      },
+      "required": [
+        "netting_set_id",
+        "as_of",
+        "initial_margin",
+        "variation_margin",
+        "total_margin",
+        "position_count",
+        "im_methodology",
+        "is_approximate",
+        "im_breakdown"
+      ],
+      "type": "object"
+    },
+    "SimmCreditSector": {
+      "description": "SIMM credit sector for bucket assignment.\n\nMaps reference entities to ISDA SIMM credit qualifying buckets.\nSee ISDA SIMM v2.6 Table 2.",
+      "oneOf": [
+        {
+          "const": "sovereign",
+          "description": "Bucket 1: IG sovereigns including central banks.",
+          "type": "string"
+        },
+        {
+          "const": "financial",
+          "description": "Bucket 2: IG financials including government-backed financials.",
+          "type": "string"
+        },
+        {
+          "const": "basic_materials",
+          "description": "Bucket 3: IG basic materials, energy, and industrials.",
+          "type": "string"
+        },
+        {
+          "const": "consumer_goods",
+          "description": "Bucket 4: IG consumer goods and services.",
+          "type": "string"
+        },
+        {
+          "const": "technology_media",
+          "description": "Bucket 5: IG technology, telecommunications.",
+          "type": "string"
+        },
+        {
+          "const": "health_care",
+          "description": "Bucket 6: IG health care, utilities, local government, and government-backed corporates.",
+          "type": "string"
+        },
+        {
+          "const": "high_yield_sovereign",
+          "description": "Bucket 7: HY / non-rated sovereigns including central banks.",
+          "type": "string"
+        },
+        {
+          "const": "high_yield_financial",
+          "description": "Bucket 8: HY / non-rated financials including government-backed financials.",
+          "type": "string"
+        },
+        {
+          "const": "high_yield_basic_materials",
+          "description": "Bucket 9: HY / non-rated basic materials, energy, and industrials.",
+          "type": "string"
+        },
+        {
+          "const": "high_yield_consumer_goods",
+          "description": "Bucket 10: HY / non-rated consumer goods and services.",
+          "type": "string"
+        },
+        {
+          "const": "high_yield_technology_media",
+          "description": "Bucket 11: HY / non-rated technology, telecommunications.",
+          "type": "string"
+        },
+        {
+          "const": "high_yield_health_care",
+          "description": "Bucket 12: HY / non-rated health care, utilities, local government, and government-backed corporates.",
+          "type": "string"
+        },
+        {
+          "const": "residual",
+          "description": "Residual bucket.",
+          "type": "string"
+        }
+      ]
+    },
+    "SimmCurvatureSensitivity": {
+      "additionalProperties": false,
+      "description": "One volatility-weighted vega input before SIMM curvature scaling.\n\nThe amount is `sigma * dPV/dsigma` in the sensitivity container's base\ncurrency, before HVR, vega risk weights or concentration. For equity, FX\nand commodity, `sigma` is the paragraph 10(b) prescribed volatility proxy;\nfor rates and credit it is the matching quoted ATM volatility. Preserve\nseparate expiries until `SF(t) = 0.5 * min(1, 14/t_days)` has been applied.",
+      "properties": {
+        "bucket": {
+          "description": "Currency code for IR, credit sector for qualifying credit, numeric\ncommodity bucket, `fx` for FX, or `residual` for equity/non-qualifying credit.",
+          "type": "string"
+        },
+        "expiry_tenor": {
+          "description": "Option-expiry tenor from [`SIMM_TENORS`]. Two weeks means 14 calendar\ndays; months use 365/12 days and years use 365 days.",
+          "type": "string"
+        },
+        "factor": {
+          "description": "IR subcurve name, credit issuer, equity underlier, commodity name,\nor an FX currency pair such as `EUR/USD`; must be nonempty.",
+          "type": "string"
+        },
+        "risk_class": {
+          "$ref": "#/$defs/SimmRiskClass",
+          "description": "SIMM risk class selecting the prescribed bucket and correlation rules."
+        },
+        "risk_tenor": {
+          "description": "IR or credit risk-factor tenor. Required for IR and credit; absent for\nequity, commodity and FX. This is distinct from the option expiry.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "volatility_weighted_vega": {
+          "description": "Signed base-currency `sigma * dPV/dsigma` before SF, HVR, VRW or concentration.",
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "required": [
+        "risk_class",
+        "bucket",
+        "factor",
+        "expiry_tenor",
+        "volatility_weighted_vega"
+      ],
+      "type": "object"
+    },
+    "SimmRiskClass": {
+      "description": "Risk classes for SIMM categorization.",
+      "oneOf": [
+        {
+          "const": "interest_rate",
+          "description": "Interest rate risk",
+          "type": "string"
+        },
+        {
+          "const": "credit_qualifying",
+          "description": "Credit qualifying (corporate, sovereign, and index credit, including high yield)",
+          "type": "string"
+        },
+        {
+          "const": "credit_non_qualifying",
+          "description": "Credit non-qualifying (securitizations and designated non-qualifying exposures)",
+          "type": "string"
+        },
+        {
+          "const": "equity",
+          "description": "Equity risk",
+          "type": "string"
+        },
+        {
+          "const": "commodity",
+          "description": "Commodity risk",
+          "type": "string"
+        },
+        {
+          "const": "fx",
+          "description": "Foreign exchange risk",
+          "type": "string"
+        }
+      ]
+    },
+    "SimmSensitivitiesJson": {
+      "additionalProperties": false,
+      "description": "JSON-friendly representation of [`SimmSensitivities`].\n\nTuple-keyed maps cannot be represented directly as JSON object keys, so this\nDTO stores each bucket as an array of tuples. It is the canonical JSON shape\nused by language bindings and examples.",
+      "properties": {
+        "base_currency": {
+          "$ref": "#/$defs/Currency",
+          "description": "Base currency for the sensitivities."
+        },
+        "commodity_delta": {
+          "default": [],
+          "description": "Commodity delta buckets as `(bucket, amount)`.",
+          "items": {
+            "maxItems": 2,
+            "minItems": 2,
+            "prefixItems": [
+              {
+                "type": "string"
+              },
+              {
+                "format": "double",
+                "type": "number"
+              }
+            ],
+            "type": "array"
+          },
+          "type": "array"
+        },
+        "commodity_vega": {
+          "default": [],
+          "description": "Commodity vega buckets as `(bucket, amount)`.",
+          "items": {
+            "maxItems": 2,
+            "minItems": 2,
+            "prefixItems": [
+              {
+                "type": "string"
+              },
+              {
+                "format": "double",
+                "type": "number"
+              }
+            ],
+            "type": "array"
+          },
+          "type": "array"
+        },
+        "credit_non_qualifying_delta": {
+          "default": [],
+          "description": "Credit non-qualifying delta buckets as `(name, tenor, amount)`.",
+          "items": {
+            "maxItems": 3,
+            "minItems": 3,
+            "prefixItems": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "format": "double",
+                "type": "number"
+              }
+            ],
+            "type": "array"
+          },
+          "type": "array"
+        },
+        "credit_non_qualifying_vega": {
+          "default": [],
+          "description": "Credit non-qualifying vega buckets as `(name, tenor, amount)`.",
+          "items": {
+            "maxItems": 3,
+            "minItems": 3,
+            "prefixItems": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "format": "double",
+                "type": "number"
+              }
+            ],
+            "type": "array"
+          },
+          "type": "array"
+        },
+        "credit_qualifying_delta": {
+          "default": [],
+          "description": "Credit qualifying deltas as `(sector, name, tenor, amount)`.",
+          "items": {
+            "maxItems": 4,
+            "minItems": 4,
+            "prefixItems": [
+              {
+                "$ref": "#/$defs/SimmCreditSector"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "format": "double",
+                "type": "number"
+              }
+            ],
+            "type": "array"
+          },
+          "type": "array"
+        },
+        "credit_qualifying_vega": {
+          "default": [],
+          "description": "Credit qualifying vegas as `(sector, name, tenor, amount)`.",
+          "items": {
+            "maxItems": 4,
+            "minItems": 4,
+            "prefixItems": [
+              {
+                "$ref": "#/$defs/SimmCreditSector"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "format": "double",
+                "type": "number"
+              }
+            ],
+            "type": "array"
+          },
+          "type": "array"
+        },
+        "curvature": {
+          "default": [],
+          "description": "Expiry-resolved volatility-weighted vega inputs before curvature scaling.",
+          "items": {
+            "$ref": "#/$defs/SimmCurvatureSensitivity"
+          },
+          "type": "array"
+        },
+        "equity_delta": {
+          "default": [],
+          "description": "Equity delta buckets as `(underlier, amount)`.",
+          "items": {
+            "maxItems": 2,
+            "minItems": 2,
+            "prefixItems": [
+              {
+                "type": "string"
+              },
+              {
+                "format": "double",
+                "type": "number"
+              }
+            ],
+            "type": "array"
+          },
+          "type": "array"
+        },
+        "equity_vega": {
+          "default": [],
+          "description": "Equity vega buckets as `(underlier, amount)`.",
+          "items": {
+            "maxItems": 2,
+            "minItems": 2,
+            "prefixItems": [
+              {
+                "type": "string"
+              },
+              {
+                "format": "double",
+                "type": "number"
+              }
+            ],
+            "type": "array"
+          },
+          "type": "array"
+        },
+        "fx_delta": {
+          "default": [],
+          "description": "FX delta buckets as `(currency, amount)`.",
+          "items": {
+            "maxItems": 2,
+            "minItems": 2,
+            "prefixItems": [
+              {
+                "$ref": "#/$defs/Currency"
+              },
+              {
+                "format": "double",
+                "type": "number"
+              }
+            ],
+            "type": "array"
+          },
+          "type": "array"
+        },
+        "fx_vega": {
+          "default": [],
+          "description": "FX vega buckets as `(ccy1, ccy2, amount)`.",
+          "items": {
+            "maxItems": 3,
+            "minItems": 3,
+            "prefixItems": [
+              {
+                "$ref": "#/$defs/Currency"
+              },
+              {
+                "$ref": "#/$defs/Currency"
+              },
+              {
+                "format": "double",
+                "type": "number"
+              }
+            ],
+            "type": "array"
+          },
+          "type": "array"
+        },
+        "ir_delta": {
+          "default": [],
+          "description": "Interest-rate delta buckets as `(currency, tenor, amount)`.",
+          "items": {
+            "maxItems": 3,
+            "minItems": 3,
+            "prefixItems": [
+              {
+                "$ref": "#/$defs/Currency"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "format": "double",
+                "type": "number"
+              }
+            ],
+            "type": "array"
+          },
+          "type": "array"
+        },
+        "ir_vega": {
+          "default": [],
+          "description": "Interest-rate vega buckets as `(currency, tenor, amount)`.",
+          "items": {
+            "maxItems": 3,
+            "minItems": 3,
+            "prefixItems": [
+              {
+                "$ref": "#/$defs/Currency"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "format": "double",
+                "type": "number"
+              }
+            ],
+            "type": "array"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "base_currency"
+      ],
+      "type": "object"
+    }
+  },
+  "$id": "https://finstack_quant.dev/schemas/portfolio/1/portfolio_margin_result.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Portfolio-wide margin calculation results.",
+  "properties": {
+    "as_of": {
+      "$ref": "#/$defs/DateWire"
+    },
+    "base_currency": {
+      "$ref": "#/$defs/Currency"
+    },
+    "by_csa": {
+      "additionalProperties": {
+        "$ref": "#/$defs/ImCollateralResult"
+      },
+      "type": "object"
+    },
+    "degraded_positions": {
+      "items": {
+        "$ref": "#/$defs/DegradedPosition"
+      },
+      "type": "array"
+    },
+    "netting_sets": {
+      "items": {
+        "$ref": "#/$defs/NettingSetMargin"
+      },
+      "type": "array"
+    },
+    "positions_without_margin": {
+      "format": "uint",
+      "minimum": 0,
+      "type": "integer"
+    },
+    "total_im_transfer": {
+      "$ref": "#/$defs/Money"
+    },
+    "total_initial_margin": {
+      "$ref": "#/$defs/Money"
+    },
+    "total_margin": {
+      "$ref": "#/$defs/Money"
+    },
+    "total_positions": {
+      "format": "uint",
+      "minimum": 0,
+      "type": "integer"
+    },
+    "total_required_im_collateral": {
+      "$ref": "#/$defs/Money"
+    },
+    "total_segregated_im": {
+      "$ref": "#/$defs/Money"
+    },
+    "total_variation_margin": {
+      "$ref": "#/$defs/Money"
+    }
+  },
+  "required": [
+    "as_of",
+    "base_currency",
+    "total_initial_margin",
+    "by_csa",
+    "total_required_im_collateral",
+    "total_im_transfer",
+    "total_segregated_im",
+    "total_variation_margin",
+    "total_margin",
+    "netting_sets",
+    "total_positions",
+    "positions_without_margin",
+    "degraded_positions"
+  ],
+  "title": "PortfolioMarginResult",
+  "type": "object"
+}

@@ -1,0 +1,61 @@
+{
+  "$defs": {
+    "NodeId": {
+      "description": "Type-safe identifier for a node in a financial model.\n\nSerializes as a plain string and is interoperable with `&str` via\n[`Borrow`] and [`AsRef`].",
+      "type": "string"
+    }
+  },
+  "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/leverage_range_check.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Flags periods where Debt / TTM EBITDA falls outside configurable warning and error ranges.",
+  "properties": {
+    "debt_node": {
+      "$ref": "#/$defs/NodeId",
+      "description": "Total debt node."
+    },
+    "ebitda_node": {
+      "$ref": "#/$defs/NodeId",
+      "description": "EBITDA node."
+    },
+    "error_range": {
+      "description": "`(min, max)` range that triggers an error when exceeded.",
+      "maxItems": 2,
+      "minItems": 2,
+      "prefixItems": [
+        {
+          "format": "double",
+          "type": "number"
+        },
+        {
+          "format": "double",
+          "type": "number"
+        }
+      ],
+      "type": "array"
+    },
+    "warn_range": {
+      "description": "`(min, max)` range that triggers a warning when exceeded.",
+      "maxItems": 2,
+      "minItems": 2,
+      "prefixItems": [
+        {
+          "format": "double",
+          "type": "number"
+        },
+        {
+          "format": "double",
+          "type": "number"
+        }
+      ],
+      "type": "array"
+    }
+  },
+  "required": [
+    "debt_node",
+    "ebitda_node",
+    "warn_range",
+    "error_range"
+  ],
+  "title": "LeverageRangeCheck",
+  "type": "object"
+}

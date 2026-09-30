@@ -33,6 +33,7 @@ use super::types::YieldPanel;
 /// Produced by [`YieldPca::truncated`]; this is the wire form the language
 /// bindings hand out.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct YieldPcaView {
     /// Row-major loadings `loadings[tenor][k]` for the leading components.
     pub loadings: Vec<Vec<f64>>,
@@ -54,12 +55,15 @@ pub struct YieldPcaView {
 ///
 /// See module-level documentation for details.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct YieldPca {
     /// Eigenvalues in descending order (length min(T-1, N)).
     eigenvalues: Vec<f64>,
     /// Loadings matrix: N tenors x K components (columns are eigenvectors).
+    #[cfg_attr(feature = "json-schema", schemars(with = "(Vec<f64>, usize, usize)"))]
     loadings: DMatrix<f64>,
     /// Scores matrix: (T-1) dates x K components.
+    #[cfg_attr(feature = "json-schema", schemars(with = "(Vec<f64>, usize, usize)"))]
     scores: DMatrix<f64>,
     /// Tenor grid (length N).
     tenors: Vec<f64>,
@@ -68,6 +72,7 @@ pub struct YieldPca {
     /// Cumulative fraction of variance explained.
     cumulative_variance: Vec<f64>,
     /// Mean yield change vector (length N), subtracted before PCA.
+    #[cfg_attr(feature = "json-schema", schemars(with = "(Vec<f64>, usize, ())"))]
     mean_change: DVector<f64>,
 }
 

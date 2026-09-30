@@ -94,6 +94,8 @@ pub mod regression;
 pub(crate) mod returns;
 pub(crate) mod risk_metrics;
 pub mod scalar;
+#[cfg(feature = "json-schema")]
+pub mod schema;
 
 pub use aggregation::{PeriodStats, PeriodicReturn};
 pub use benchmark::{beta, BetaResult, GreeksResult, MultiFactorResult, ReturnKind, RollingGreeks};

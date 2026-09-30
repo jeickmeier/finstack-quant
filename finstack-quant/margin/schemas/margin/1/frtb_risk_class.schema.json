@@ -1,0 +1,43 @@
+{
+  "$id": "https://finstack_quant.dev/schemas/margin/1/frtb_risk_class.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "FRTB risk classes per BCBS d457.",
+  "oneOf": [
+    {
+      "const": "girr",
+      "description": "General Interest Rate Risk",
+      "type": "string"
+    },
+    {
+      "const": "csr_non_sec",
+      "description": "Credit Spread Risk -- non-securitization",
+      "type": "string"
+    },
+    {
+      "const": "csr_sec_ctp",
+      "description": "Credit Spread Risk -- securitization (Correlation Trading Portfolio)",
+      "type": "string"
+    },
+    {
+      "const": "csr_sec_non_ctp",
+      "description": "Credit Spread Risk -- securitization (non-CTP)",
+      "type": "string"
+    },
+    {
+      "const": "equity",
+      "description": "Equity risk",
+      "type": "string"
+    },
+    {
+      "const": "commodity",
+      "description": "Commodity risk",
+      "type": "string"
+    },
+    {
+      "const": "fx",
+      "description": "Foreign exchange risk",
+      "type": "string"
+    }
+  ],
+  "title": "FrtbRiskClass"
+}

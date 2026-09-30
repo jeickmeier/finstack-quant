@@ -22,6 +22,7 @@ use finstack_quant_statements::Result;
 /// high-severity "leverage undefined" finding so the case surfaces
 /// explicitly rather than silently passing.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct LeverageRangeCheck {
     /// Total debt node.
     pub debt_node: NodeId,

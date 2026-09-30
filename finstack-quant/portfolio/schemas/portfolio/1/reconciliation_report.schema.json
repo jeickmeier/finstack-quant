@@ -1,0 +1,28 @@
+{
+  "$id": "https://finstack_quant.dev/schemas/portfolio/1/reconciliation_report.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Report from reconciling position-level P&L attribution against portfolio totals.",
+  "properties": {
+    "is_reconciled": {
+      "description": "Whether the reconciliation passes within tolerance.",
+      "type": "boolean"
+    },
+    "tolerance": {
+      "description": "Tolerance used for the check.",
+      "format": "double",
+      "type": "number"
+    },
+    "total_residual": {
+      "description": "Total residual: `total_pnl - (sum of factor buckets + fx_translation_pnl)`.",
+      "format": "double",
+      "type": "number"
+    }
+  },
+  "required": [
+    "total_residual",
+    "is_reconciled",
+    "tolerance"
+  ],
+  "title": "ReconciliationReport",
+  "type": "object"
+}

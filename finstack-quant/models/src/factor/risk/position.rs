@@ -26,6 +26,7 @@ use tracing::warn;
 
 /// Method used for position-level VaR/ES decomposition.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(rename_all = "snake_case")]
 pub enum DecompositionMethod {
     /// Covariance-based using normal distribution assumption.
@@ -43,6 +44,7 @@ pub enum DecompositionMethod {
 
 /// Configuration for position-level VaR decomposition.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct DecompositionConfig {
     /// Confidence level for VaR and ES (e.g. 0.95, 0.99).
@@ -121,6 +123,7 @@ impl DecompositionConfig {
 /// All monetary fields are in the same units as the portfolio VaR
 /// (typically the portfolio's base currency).
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct PositionVarContribution {
     /// Position identifier.
     pub position_id: String,
@@ -170,6 +173,7 @@ pub struct PositionVarContribution {
 
 /// Expected Shortfall decomposition result for a single portfolio position.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct PositionEsContribution {
     /// Position identifier.
     pub position_id: String,
@@ -220,6 +224,7 @@ pub struct PositionEsContribution {
 /// - Meucci (2005): Risk and Asset Allocation. `docs/REFERENCES.md#meucci-risk-and-asset-allocation`
 /// - Litterman (1996): Hot Spots and Hedges. `docs/REFERENCES.md#litterman-1996-hotspots`
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct PositionRiskDecomposition {
     /// Total portfolio VaR.
     ///
@@ -290,6 +295,7 @@ impl PositionRiskDecomposition {
 /// For each scenario that breaches the VaR threshold, reports which
 /// positions contributed the most to the portfolio loss.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct StressAttribution {
     /// Portfolio VaR threshold (scenarios with P&L at or below this are
     /// "tail events"). Loss convention: reported as a negative number.
@@ -322,6 +328,7 @@ pub struct StressAttribution {
 
 /// Single position's contribution to tail stress.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct StressPositionEntry {
     /// Position identifier.
     pub position_id: String,
@@ -338,6 +345,7 @@ pub struct StressPositionEntry {
 
 /// Breakdown of a single tail scenario.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct TailScenarioBreakdown {
     /// Scenario index in the original history.
     pub scenario_index: usize,

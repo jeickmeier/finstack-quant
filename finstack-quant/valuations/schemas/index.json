@@ -73,6 +73,15 @@
       "type_name": "Id"
     },
     {
+      "$id": "https://finstack_quant.dev/schemas/common/1/instrument_json.schema.json",
+      "bytes": 990583,
+      "kind": "component",
+      "path": "schemas/common/1/instrument_json.schema.json",
+      "summary": "The instrument union embedded by portfolio positions and candidates; the same branches as the instrument envelope's `instrument` field.",
+      "title": "InstrumentJson",
+      "type_name": "InstrumentJson"
+    },
+    {
       "$id": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json",
       "bytes": 62348,
       "kind": "component",
@@ -838,6 +847,24 @@
       "type_name": "SingleInstrumentEnvelope"
     },
     {
+      "$id": "https://finstack_quant.dev/schemas/results/1/composite_rebalance_result.schema.json",
+      "bytes": 998415,
+      "kind": "output",
+      "path": "schemas/results/1/composite_rebalance_result.schema.json",
+      "summary": "Result of resolving a new composite holdings state.",
+      "title": "CompositeRebalanceResult",
+      "type_name": "CompositeRebalanceResult"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/results/1/enhanced_monte_carlo_result.schema.json",
+      "bytes": 49067,
+      "kind": "output",
+      "path": "schemas/results/1/enhanced_monte_carlo_result.schema.json",
+      "summary": "Revolving-credit Monte Carlo value with per-path details.",
+      "title": "EnhancedMonteCarloResult",
+      "type_name": "EnhancedMonteCarloResult"
+    },
+    {
       "$id": "https://finstack_quant.dev/schemas/results/1/instrument_cashflow.schema.json",
       "bytes": 16114,
       "kind": "output",
@@ -845,6 +872,33 @@
       "summary": "Native cashflow rows, reporting-currency PV and reconciliation status.",
       "title": "Instrument Cashflow",
       "type_name": "InstrumentCashflowEnvelope"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/results/1/oas_result.schema.json",
+      "bytes": 1247,
+      "kind": "output",
+      "path": "schemas/results/1/oas_result.schema.json",
+      "summary": "Structured-credit option-adjusted spread and its solver diagnostics.",
+      "title": "OasResult",
+      "type_name": "OasResult"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/results/1/scenario_table.schema.json",
+      "bytes": 2111,
+      "kind": "output",
+      "path": "schemas/results/1/scenario_table.schema.json",
+      "summary": "Structured-credit scenario grid results for one tranche.",
+      "title": "ScenarioTable",
+      "type_name": "ScenarioTable"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/results/1/tranche_metrics.schema.json",
+      "bytes": 4448,
+      "kind": "output",
+      "path": "schemas/results/1/tranche_metrics.schema.json",
+      "summary": "Per-tranche risk and spread metrics from the tranche's own projected cashflows.",
+      "title": "TrancheMetrics",
+      "type_name": "TrancheMetrics"
     },
     {
       "$id": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json",

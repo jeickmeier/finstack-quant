@@ -29,9 +29,14 @@ use crate::math::summation::NeumaierAccumulator;
 /// # Ok::<(), Box<dyn std::error::Error>>(())
 /// ```
 #[derive(Debug, Clone, Copy, PartialEq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct PeriodicReturn {
     /// Date of the last observation in the bucket (the period end).
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "finstack_quant_core::wire::DateWire")
+    )]
     pub date: Date,
     /// Compounded simple return over the bucket as a decimal (`0.01` is 1%).
     pub value: f64,
@@ -39,6 +44,7 @@ pub struct PeriodicReturn {
 
 /// Period-level aggregate statistics.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct PeriodStats {
     /// Best single-period return.
     pub best: f64,
@@ -59,22 +65,38 @@ pub struct PeriodStats {
     /// `avg_win / |avg_loss|`. `0.0` when there are no wins; `+∞` when wins
     /// exist but there are no losses.
     #[serde(with = "finstack_quant_core::wire::non_finite_f64")]
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "finstack_quant_core::wire::NonFiniteF64Wire")
+    )]
     pub payoff_ratio: f64,
     /// Sum of wins / sum of |losses| (gross profit / gross loss).
     /// `0.0` when there are no wins; `+∞` when wins exist but there are no
     /// losses.
     #[serde(with = "finstack_quant_core::wire::non_finite_f64")]
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "finstack_quant_core::wire::NonFiniteF64Wire")
+    )]
     pub profit_factor: f64,
     /// CPC index: `profit_factor × win_rate × payoff_ratio`.
     ///
     /// Not to be confused with the Common Sense Ratio
     /// (`profit_factor × tail_ratio`), which is a different metric.
     #[serde(with = "finstack_quant_core::wire::non_finite_f64")]
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "finstack_quant_core::wire::NonFiniteF64Wire")
+    )]
     pub cpc_ratio: f64,
     /// Binary Kelly fraction: `p_win − p_loss / payoff_ratio`, with both
     /// probabilities conditional on nonzero returns. Zero-return periods
     /// do not affect this payoff approximation; `win_rate` uses all periods.
     #[serde(with = "finstack_quant_core::wire::non_finite_f64")]
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "finstack_quant_core::wire::NonFiniteF64Wire")
+    )]
     pub kelly_criterion: f64,
 }
 

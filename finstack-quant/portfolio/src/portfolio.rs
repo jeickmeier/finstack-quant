@@ -89,6 +89,7 @@ pub struct Portfolio {
 /// positions as `PositionSpec` rather than `Position` (which contains non-serializable
 /// `Arc<dyn Instrument>`).
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct PortfolioSpec {
     /// Portfolio identifier
     pub id: String,
@@ -97,6 +98,10 @@ pub struct PortfolioSpec {
     /// Base currency for aggregation
     pub base_currency: Currency,
     /// Valuation date
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "finstack_quant_core::wire::DateWire")
+    )]
     pub as_of: Date,
     /// Entities that own positions
     pub entities: IndexMap<EntityId, Entity>,

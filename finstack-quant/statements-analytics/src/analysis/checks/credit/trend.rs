@@ -11,6 +11,7 @@ use finstack_quant_statements::Result;
 
 /// Direction in which a metric should ideally move.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(rename_all = "snake_case")]
 pub enum TrendDirection {
     /// Higher values are better (e.g. EBITDA, coverage).
@@ -22,6 +23,7 @@ pub enum TrendDirection {
 /// Flags a metric that has been deteriorating for `lookback_periods`
 /// consecutive periods.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct TrendCheck {
     /// Node to monitor.
     pub node: NodeId,

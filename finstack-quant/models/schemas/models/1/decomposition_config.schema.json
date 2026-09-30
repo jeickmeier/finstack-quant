@@ -1,0 +1,45 @@
+{
+  "$defs": {
+    "DecompositionMethod": {
+      "description": "Method used for position-level VaR/ES decomposition.",
+      "oneOf": [
+        {
+          "const": "parametric",
+          "description": "Covariance-based using normal distribution assumption.\n\nFast (O(n^2) in positions). Exact Euler property.\nRequires a position-level return covariance matrix.",
+          "type": "string"
+        },
+        {
+          "const": "historical",
+          "description": "Full historical simulation with per-position P&L attribution.\n\nSlow (O(n * scenarios)). Approximate Euler property.\nHandles non-normality and non-linear positions.",
+          "type": "string"
+        }
+      ]
+    }
+  },
+  "$id": "https://finstack_quant.dev/schemas/models/1/decomposition_config.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Configuration for position-level VaR decomposition.",
+  "properties": {
+    "compute_incremental": {
+      "description": "Whether to compute incremental VaR (expensive: one full repricing\nper position).",
+      "type": "boolean"
+    },
+    "confidence": {
+      "description": "Confidence level for VaR and ES (e.g. 0.95, 0.99).",
+      "format": "double",
+      "type": "number"
+    },
+    "method": {
+      "$ref": "#/$defs/DecompositionMethod",
+      "description": "Decomposition method."
+    }
+  },
+  "required": [
+    "confidence",
+    "method",
+    "compute_incremental"
+  ],
+  "title": "DecompositionConfig",
+  "type": "object"
+}

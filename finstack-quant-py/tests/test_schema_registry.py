@@ -8,6 +8,7 @@ matters, then get pointer-precise feedback on a near miss.
 from __future__ import annotations
 
 import json
+from pathlib import Path
 from types import ModuleType
 
 import pytest
@@ -22,6 +23,8 @@ from finstack_quant.portfolio import schema as portfolio_schema
 from finstack_quant.scenarios import schema as scenarios_schema
 from finstack_quant.statements import schema as statements_schema
 from finstack_quant.valuations import schema as valuations_schema
+
+ROOT = Path(__file__).resolve().parents[2]
 
 # Every crate that owns a schema registry exposes the same three functions.
 NAMESPACES = [
@@ -128,9 +131,31 @@ def test_every_registry_crate_publishes_the_same_surface() -> None:
         assert {"get", "index", "validate"} <= set(namespace.__all__)
 
 
-def test_indexes_together_cover_the_whole_published_corpus() -> None:
-    paths = {row["path"] for namespace in NAMESPACES for row in json.loads(namespace.index())["artifacts"]}
-    assert len(paths) == 128, "the ten indexes must account for every checked-in artifact"
+# Crate directory (and artifact family, where a crate publishes several) behind
+# each Python namespace. The models crate also publishes a `schemas/models`
+# family that has no Python namespace yet; like the analytics, covenants and
+# statements-analytics registries it is tracked as binding work.
+NAMESPACE_CORPUS = {
+    attribution_schema: ("attribution", "schemas/"),
+    calibration_schema: ("calibration", "schemas/"),
+    cashflows_schema: ("cashflows", "schemas/"),
+    core_schema: ("core", "schemas/"),
+    factor_model_schema: ("models", "schemas/factor_model/"),
+    margin_schema: ("margin", "schemas/"),
+    portfolio_schema: ("portfolio", "schemas/"),
+    scenarios_schema: ("scenarios", "schemas/"),
+    statements_schema: ("statements", "schemas/"),
+    valuations_schema: ("valuations", "schemas/"),
+}
+
+
+@pytest.mark.parametrize("namespace", NAMESPACES)
+def test_index_matches_the_checked_in_crate_index(namespace: ModuleType) -> None:
+    crate, family = NAMESPACE_CORPUS[namespace]
+    checked_in = json.loads((ROOT / "finstack-quant" / crate / "schemas" / "index.json").read_text())
+    expected = {row["path"] for row in checked_in["artifacts"] if row["path"].startswith(family)}
+    served = {row["path"] for row in json.loads(namespace.index())["artifacts"]}
+    assert served == expected, "the namespace must serve exactly the crate's checked-in artifacts"
 
 
 @pytest.mark.parametrize("namespace", NAMESPACES)

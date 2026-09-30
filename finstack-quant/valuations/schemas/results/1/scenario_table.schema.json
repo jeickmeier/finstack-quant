@@ -1,0 +1,72 @@
+{
+  "$defs": {
+    "ScenarioCell": {
+      "additionalProperties": false,
+      "description": "One evaluated cell of the scenario table.",
+      "properties": {
+        "cdr": {
+          "description": "Annual CDR (decimal) for this cell.",
+          "format": "double",
+          "type": "number"
+        },
+        "cpr": {
+          "description": "Annual CPR (decimal) for this cell.",
+          "format": "double",
+          "type": "number"
+        },
+        "price": {
+          "description": "Clean settlement price as a percentage of the tranche's CURRENT\nbalance (the factor-adjusted quote basis): the model dirty value at\nbuyer settlement less accrued, the same figure as\n`TrancheMetrics::price_pct`.",
+          "format": "double",
+          "type": "number"
+        },
+        "severity": {
+          "description": "Loss severity (decimal) for this cell.",
+          "format": "double",
+          "type": "number"
+        },
+        "wal": {
+          "description": "Weighted-average life in years.",
+          "format": "double",
+          "type": "number"
+        },
+        "writedown": {
+          "description": "Total principal writedown in currency units.",
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "required": [
+        "cpr",
+        "cdr",
+        "severity",
+        "price",
+        "wal",
+        "writedown"
+      ],
+      "type": "object"
+    }
+  },
+  "$id": "https://finstack_quant.dev/schemas/results/1/scenario_table.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Structured-credit scenario grid results for one tranche.",
+  "properties": {
+    "cells": {
+      "description": "Evaluated cells, in CPR-major, then CDR, then severity order.",
+      "items": {
+        "$ref": "#/$defs/ScenarioCell"
+      },
+      "type": "array"
+    },
+    "tranche_id": {
+      "description": "Identifier of the tranche evaluated.",
+      "type": "string"
+    }
+  },
+  "required": [
+    "tranche_id",
+    "cells"
+  ],
+  "title": "ScenarioTable",
+  "type": "object"
+}

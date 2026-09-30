@@ -43,6 +43,7 @@ pub(crate) struct RiskBudget {
 /// risk (a diversifier / hedge). Diversifiers can never breach the budget and
 /// never contribute to [`Self::total_overbudget`].
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct RiskBudgetResult {
     /// Per-position budget comparison.
     pub positions: Vec<PositionBudgetEntry>,
@@ -56,6 +57,7 @@ pub struct RiskBudgetResult {
 
 /// Budget comparison for a single position.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct PositionBudgetEntry {
     /// Position identifier.
     pub position_id: String,
@@ -77,6 +79,10 @@ pub struct PositionBudgetEntry {
     /// VaR offsets portfolio risk — a diversifier can never breach.
     /// `±inf` marks a non-zero component against a zero target.
     #[serde(with = "finstack_quant_core::wire::non_finite_f64")]
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "finstack_quant_core::wire::NonFiniteF64Wire")
+    )]
     pub utilization: f64,
 
     /// Over/under-budget amount on the consuming side: consuming component

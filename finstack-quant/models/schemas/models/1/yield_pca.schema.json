@@ -1,0 +1,123 @@
+{
+  "$id": "https://finstack_quant.dev/schemas/models/1/yield_pca.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "PCA decomposition of yield curve changes.",
+  "properties": {
+    "cumulative_variance": {
+      "description": "Cumulative fraction of variance explained.",
+      "items": {
+        "format": "double",
+        "type": "number"
+      },
+      "type": "array"
+    },
+    "eigenvalues": {
+      "description": "Eigenvalues in descending order (length min(T-1, N)).",
+      "items": {
+        "format": "double",
+        "type": "number"
+      },
+      "type": "array"
+    },
+    "loadings": {
+      "description": "Loadings matrix: N tenors x K components (columns are eigenvectors).",
+      "maxItems": 3,
+      "minItems": 3,
+      "prefixItems": [
+        {
+          "items": {
+            "format": "double",
+            "type": "number"
+          },
+          "type": "array"
+        },
+        {
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        {
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        }
+      ],
+      "type": "array"
+    },
+    "mean_change": {
+      "description": "Mean yield change vector (length N), subtracted before PCA.",
+      "maxItems": 3,
+      "minItems": 3,
+      "prefixItems": [
+        {
+          "items": {
+            "format": "double",
+            "type": "number"
+          },
+          "type": "array"
+        },
+        {
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "type": "array"
+    },
+    "scores": {
+      "description": "Scores matrix: (T-1) dates x K components.",
+      "maxItems": 3,
+      "minItems": 3,
+      "prefixItems": [
+        {
+          "items": {
+            "format": "double",
+            "type": "number"
+          },
+          "type": "array"
+        },
+        {
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        {
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        }
+      ],
+      "type": "array"
+    },
+    "tenors": {
+      "description": "Tenor grid (length N).",
+      "items": {
+        "format": "double",
+        "type": "number"
+      },
+      "type": "array"
+    },
+    "variance_explained": {
+      "description": "Fraction of total variance explained by each component.",
+      "items": {
+        "format": "double",
+        "type": "number"
+      },
+      "type": "array"
+    }
+  },
+  "required": [
+    "eigenvalues",
+    "loadings",
+    "scores",
+    "tenors",
+    "variance_explained",
+    "cumulative_variance",
+    "mean_change"
+  ],
+  "title": "YieldPca",
+  "type": "object"
+}

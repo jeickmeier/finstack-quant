@@ -1,0 +1,55 @@
+{
+  "$defs": {
+    "DietzFlow": {
+      "additionalProperties": false,
+      "description": "A single external cashflow within a TWRR sub-period.",
+      "properties": {
+        "amount": {
+          "description": "Signed flow amount from the portfolio's books: positive = contribution\ninto the portfolio; negative = withdrawal. Opposite of\n[`DatedCashflow::amount`].",
+          "format": "double",
+          "type": "number"
+        },
+        "fraction_of_period_remaining": {
+          "description": "Day-weighted fraction of the period from the flow to period end,\n`w = (T − t_flow) / T ∈ [0, 1]`. Flow at period start has `w = 1`;\nflow at period end has `w = 0`.",
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "required": [
+        "amount",
+        "fraction_of_period_remaining"
+      ],
+      "type": "object"
+    }
+  },
+  "$id": "https://finstack_quant.dev/schemas/portfolio/1/twrr_period.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "A single sub-period of a portfolio, with the information needed to compute a Modified-Dietz return.",
+  "properties": {
+    "beginning_market_value": {
+      "description": "PV at period start.",
+      "format": "double",
+      "type": "number"
+    },
+    "cashflows": {
+      "default": [],
+      "description": "External cashflows during the period.\n\nSign convention: **positive** = contribution into the portfolio\n(capital added by the client); **negative** = withdrawal. This\nmatches `ReplaySummary.total_pnl` conventions already in use in\n`portfolio::replay` and is the **opposite** of [`DatedCashflow`] /\n[`mwr_xirr`]. See the module-level Dietz vs XIRR table. Empty (the\nwire default when omitted) for a period with no external flows.",
+      "items": {
+        "$ref": "#/$defs/DietzFlow"
+      },
+      "type": "array"
+    },
+    "ending_market_value": {
+      "description": "PV at period end.",
+      "format": "double",
+      "type": "number"
+    }
+  },
+  "required": [
+    "beginning_market_value",
+    "ending_market_value"
+  ],
+  "title": "TwrrPeriod",
+  "type": "object"
+}

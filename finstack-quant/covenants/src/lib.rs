@@ -72,6 +72,8 @@ pub mod json;
 pub mod metric;
 pub(crate) mod report;
 pub(crate) mod schedule;
+#[cfg(feature = "json-schema")]
+pub mod schema;
 pub mod templates;
 
 pub use engine::{

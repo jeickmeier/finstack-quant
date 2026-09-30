@@ -51,6 +51,7 @@ pub const MAX_SICR_HORIZON_YEARS: f64 = 30.0;
 /// Each variant captures the specific values that triggered the classification,
 /// enabling regulatory reporting and model governance review.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(rename_all = "snake_case", deny_unknown_fields)]
 pub enum StagingTrigger {
     /// DPD exceeded Stage 3 threshold.
@@ -152,6 +153,7 @@ impl core::fmt::Display for StagingTrigger {
 
 /// Result of stage classification with audit trail.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct StageResult {
     /// Assigned stage.
     pub stage: Stage,
@@ -166,6 +168,7 @@ pub struct StageResult {
 /// Controls the quantitative and qualitative thresholds used in the staging
 /// waterfall, plus curing rules for step-down from higher stages.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct StagingConfig {
     /// Absolute PD increase threshold for SICR (e.g., 0.01 = 1 pp).

@@ -202,6 +202,29 @@ fn packaging_compares_recursive_typed_definition_graphs() {
 }
 
 #[test]
+fn packaging_externalizes_a_self_recursive_root_definition() {
+    // `RecursiveProbe` refers to itself; as its own schema root that edge is
+    // `$ref: "#"`, while inside the envelope it is `#/$defs/RecursiveProbe`.
+    let mut schema = serde_json::to_value(schemars::schema_for!(RecursiveEnvelope))
+        .expect("recursive derived schema serializes");
+
+    externalize_schema_definitions(
+        &mut schema,
+        &[ExternalSchemaDefinition::new::<RecursiveProbe>(
+            "RecursiveProbe",
+            "https://example.test/recursive_probe.schema.json",
+        )],
+    )
+    .expect("self-recursive root externalizes");
+
+    assert_eq!(
+        schema["properties"]["probe"]["$ref"],
+        "https://example.test/recursive_probe.schema.json"
+    );
+    assert!(schema.get("$defs").is_none());
+}
+
+#[test]
 fn generated_schema_preserves_derived_assertions() {
     #[allow(dead_code)]
     #[derive(serde::Serialize, serde::Deserialize, schemars::JsonSchema)]

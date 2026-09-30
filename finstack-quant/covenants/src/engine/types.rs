@@ -5,6 +5,7 @@ use serde::{Deserialize, Serialize};
 
 /// Whether a covenant is tested periodically or only upon an action.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(rename_all = "snake_case")]
 pub enum CovenantScope {
     /// Tested on a schedule (e.g., quarterly leverage tests).
@@ -15,6 +16,7 @@ pub enum CovenantScope {
 
 /// Optional activation condition for springing covenants.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct SpringingCondition {
     /// Metric that controls activation (e.g., revolver utilization).
@@ -25,6 +27,7 @@ pub struct SpringingCondition {
 
 /// Financial covenant specification with test frequency and consequences.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct Covenant {
     /// Type of covenant (leverage, coverage, etc.)
@@ -142,6 +145,7 @@ impl Covenant {
 
 /// Type of financial or operational covenant
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(rename_all = "snake_case", deny_unknown_fields)]
 pub enum CovenantType {
     /// Maximum debt-to-EBITDA ratio
@@ -270,6 +274,7 @@ impl std::fmt::Display for CovenantType {
 
 /// Threshold test type (maximum or minimum bound)
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(rename_all = "snake_case", deny_unknown_fields)]
 pub enum ThresholdTest {
     /// Maximum allowed value
@@ -280,6 +285,7 @@ pub enum ThresholdTest {
 
 /// Direction of inequality for numeric covenants.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(rename_all = "snake_case")]
 pub enum BoundKind {
     /// Covenant passes when the metric is less than or equal to the threshold.
@@ -412,6 +418,7 @@ impl CovenantType {
 
 /// Consequence of covenant breach
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(rename_all = "snake_case", deny_unknown_fields)]
 pub enum CovenantConsequence {
     /// Event of default
@@ -436,6 +443,10 @@ pub enum CovenantConsequence {
     /// Accelerate loan maturity date
     AccelerateMaturity {
         /// New accelerated maturity date
+        #[cfg_attr(
+            feature = "json-schema",
+            schemars(with = "finstack_quant_core::wire::DateWire")
+        )]
         new_maturity: Date,
     },
 }
@@ -459,14 +470,23 @@ impl CovenantConsequence {
 
 /// A covenant waiver or amendment granted by lenders.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct CovenantWaiver {
     /// Stable instance identifier of the waived covenant
     /// (from [`Covenant::instance_key`]).
     pub covenant_id: String,
     /// Start date of the waiver period.
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "finstack_quant_core::wire::DateWire")
+    )]
     pub effective_date: Date,
     /// End date of the waiver period (None = permanent amendment).
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "Option<finstack_quant_core::wire::DateWire>")
+    )]
     pub expiry_date: Option<Date>,
     /// Amended threshold (if this is an amendment rather than a full waiver).
     pub amended_threshold: Option<f64>,
@@ -476,6 +496,7 @@ pub struct CovenantWaiver {
 
 /// Covenant evaluation specification.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct CovenantSpec {
     /// The covenant to evaluate
@@ -571,11 +592,20 @@ impl CovenantSpec {
 
 /// Covenant window for scheduled testing.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct CovenantWindow {
     /// Start date of the window
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "finstack_quant_core::wire::DateWire")
+    )]
     pub start: Date,
     /// End date of the window
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "finstack_quant_core::wire::DateWire")
+    )]
     pub end: Date,
     /// Covenants active during this window
     pub covenants: Vec<CovenantSpec>,
@@ -583,6 +613,7 @@ pub struct CovenantWindow {
 
 /// Covenant breach tracking.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct CovenantBreach {
     /// Stable identifier matching [`Covenant::instance_key`].
@@ -591,12 +622,20 @@ pub struct CovenantBreach {
     /// Human-readable description (from `Display`).
     pub covenant_type: String,
     /// Date of the breach
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "finstack_quant_core::wire::DateWire")
+    )]
     pub breach_date: Date,
     /// Actual value that caused the breach
     pub actual_value: Option<f64>,
     /// Required threshold
     pub threshold: Option<f64>,
     /// Cure period end date (if applicable)
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "Option<finstack_quant_core::wire::DateWire>")
+    )]
     pub cure_deadline: Option<Date>,
     /// Whether the breach has been cured
     pub is_cured: bool,
@@ -609,10 +648,15 @@ pub struct CovenantBreach {
 
 /// Result of applying a covenant consequence.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct ConsequenceApplication {
     /// Type of consequence applied
     pub consequence_type: String,
     /// Date when applied
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "finstack_quant_core::wire::DateWire")
+    )]
     pub applied_date: Date,
     /// Details about the application
     pub details: String,

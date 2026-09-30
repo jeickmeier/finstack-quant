@@ -1,0 +1,103 @@
+{
+  "$defs": {
+    "HierarchyDimension": {
+      "description": "A single level in the credit factor hierarchy.\n\nBuilt-in variants (`Rating`, `Region`, `Sector`) have canonical tag keys.\n`Custom(key)` reads `issuer_tags[key]` for arbitrary user-defined dimensions\nsuch as `\"Currency\"` or `\"AssetType\"`.",
+      "oneOf": [
+        {
+          "const": "rating",
+          "description": "Credit rating bucket (e.g. `\"IG\"`, `\"HY\"`, `\"NR\"`).",
+          "type": "string"
+        },
+        {
+          "const": "region",
+          "description": "Geographic region (e.g. `\"EU\"`, `\"NA\"`, `\"APAC\"`).",
+          "type": "string"
+        },
+        {
+          "const": "sector",
+          "description": "Industry sector (e.g. `\"FIN\"`, `\"ENERGY\"`, `\"TECH\"`).",
+          "type": "string"
+        },
+        {
+          "additionalProperties": false,
+          "description": "User-defined dimension reading `issuer_tags[key]`.",
+          "properties": {
+            "custom": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "custom"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "LevelValuesAtDate": {
+      "description": "Per-level bucket values produced by a single decomposition.\n\nThe `values` map is keyed by the dotted bucket path (e.g. `\"IG.EU.FIN\"`),\nmatching the convention used elsewhere in the credit hierarchy artifact.",
+      "properties": {
+        "dimension": {
+          "$ref": "#/$defs/HierarchyDimension",
+          "description": "Dimension identifier for this level, copied from the hierarchy spec."
+        },
+        "level_index": {
+          "description": "Zero-based index of this level inside [`crate::factor::credit::hierarchy::CreditHierarchySpec::levels`].",
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "values": {
+          "additionalProperties": {
+            "format": "double",
+            "type": "number"
+          },
+          "description": "Bucket → mean residual at this level, computed across all issuers\nin the input spread set whose tags placed them in that bucket.",
+          "type": "object"
+        }
+      },
+      "required": [
+        "level_index",
+        "dimension",
+        "values"
+      ],
+      "type": "object"
+    }
+  },
+  "$id": "https://finstack_quant.dev/schemas/models/1/levels_at_date.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Snapshot of all hierarchy-level factor values at a single date, produced from observed issuer spreads.",
+  "properties": {
+    "adder": {
+      "additionalProperties": {
+        "format": "double",
+        "type": "number"
+      },
+      "description": "Per-issuer residual after peeling generic + every level.",
+      "type": "object"
+    },
+    "by_level": {
+      "description": "Per-level bucket values, in hierarchy spec order.",
+      "items": {
+        "$ref": "#/$defs/LevelValuesAtDate"
+      },
+      "type": "array"
+    },
+    "date": {
+      "description": "Date the spreads were observed.",
+      "type": "string"
+    },
+    "generic": {
+      "description": "Generic (PC) factor value at `date`. Equal to the input\n`observed_generic` and propagated unchanged.",
+      "format": "double",
+      "type": "number"
+    }
+  },
+  "required": [
+    "date",
+    "generic",
+    "by_level",
+    "adder"
+  ],
+  "title": "LevelsAtDate",
+  "type": "object"
+}

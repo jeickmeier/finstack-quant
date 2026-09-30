@@ -1,0 +1,92 @@
+{
+  "$defs": {
+    "FiPositionSnapshot": {
+      "additionalProperties": false,
+      "description": "Plain-data snapshot of one position (or pre-aggregated bucket) for one\nattribution period.\n\nWeights are fractions of the whole portfolio (or benchmark) and must sum\nto 1.0 within each side. Returns, yields and spreads are decimals\n(`0.02` = 2 %); durations are in years.",
+      "properties": {
+        "delta_spread": {
+          "description": "Absolute change in the quote-reproducing Z-spread over the period\n(decimal).\n\nMust use the same Z-spread basis as [`Self::spread_duration`] and\n[`Self::spread`].",
+          "format": "double",
+          "type": "number"
+        },
+        "delta_treasury_yield": {
+          "description": "Change in the treasury/benchmark yield relevant to this position's\nduration bucket over the period (decimal).",
+          "format": "double",
+          "type": "number"
+        },
+        "modified_duration": {
+          "description": "Modified duration in years at period start.",
+          "format": "double",
+          "type": "number"
+        },
+        "sector": {
+          "description": "Sector bucket label (industry / quality / any grouping).",
+          "type": "string"
+        },
+        "spread": {
+          "description": "Quote-reproducing Z-spread at period start (decimal).\n\nCarried for provenance and downstream reporting only — the\ndecomposition never divides by it, so any finite value (including zero\nand negative levels) is accepted. See \"Why there is no DTS spread mode\"\nin the module docs.",
+          "format": "double",
+          "type": "number"
+        },
+        "spread_duration": {
+          "description": "Quote-reproducing Z-spread duration in years at period start.\n\nMust use the same Z-spread basis as [`Self::spread`] and\n[`Self::delta_spread`]; OAS, G-spread, and discount-margin durations\nare not compatible inputs.",
+          "format": "double",
+          "type": "number"
+        },
+        "total_return": {
+          "description": "Realized total return for the period (decimal).",
+          "format": "double",
+          "type": "number"
+        },
+        "weight": {
+          "description": "Weight as a fraction of the whole side at period start.",
+          "format": "double",
+          "type": "number"
+        },
+        "yield_annual": {
+          "description": "Annualized yield at period start (decimal; e.g. YTM).",
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "required": [
+        "sector",
+        "weight",
+        "total_return",
+        "yield_annual",
+        "modified_duration",
+        "spread_duration",
+        "spread",
+        "delta_treasury_yield",
+        "delta_spread"
+      ],
+      "type": "object"
+    }
+  },
+  "$id": "https://finstack_quant.dev/schemas/portfolio/1/fi_period_input.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "One attribution period's raw inputs for multi-period linking.",
+  "properties": {
+    "benchmark": {
+      "description": "Benchmark snapshots for the period.",
+      "items": {
+        "$ref": "#/$defs/FiPositionSnapshot"
+      },
+      "type": "array"
+    },
+    "portfolio": {
+      "description": "Portfolio snapshots for the period.",
+      "items": {
+        "$ref": "#/$defs/FiPositionSnapshot"
+      },
+      "type": "array"
+    }
+  },
+  "required": [
+    "portfolio",
+    "benchmark"
+  ],
+  "title": "FiPeriodInput",
+  "type": "object"
+}

@@ -37,6 +37,7 @@ pub(crate) mod state_indices {
 /// These tags are diagnostic metadata only. They do not change pricing logic by
 /// themselves.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(rename_all = "snake_case")]
 pub enum CashflowType {
     /// Principal deployment (draws) or repayment
@@ -73,6 +74,7 @@ pub enum CashflowType {
 /// [`PathDataset::process_params.factor_names`](PathDataset::process_params) or
 /// [`PathDataset::state_var_keys`].
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct PathPoint {
     /// Time step index (0 = initial, N = final)
     pub step: usize,
@@ -80,6 +82,7 @@ pub struct PathPoint {
     pub time: f64,
     /// State variables at this point (spot, variance, rate, etc.)
     /// Indexed by position - see `state_indices` for standard layout
+    #[cfg_attr(feature = "json-schema", schemars(with = "Vec<f64>"))]
     pub state: SmallVec<[f64; 8]>,
     /// Optional payoff snapshot at this point.
     ///
@@ -217,6 +220,7 @@ impl PathPoint {
 /// Contains all captured points for a single simulated path, plus the final
 /// discounted value used in summary statistics.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct SimulatedPath {
     /// Path identifier (0-indexed)
     pub path_id: usize,
@@ -318,6 +322,7 @@ impl SimulatedPath {
 
 /// Records how a captured dataset was selected from the full simulation.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(rename_all = "snake_case", deny_unknown_fields)]
 pub enum PathSamplingMethod {
     /// Every path in the run was captured.
@@ -352,6 +357,7 @@ impl std::fmt::Display for PathSamplingMethod {
 /// [`PathDataset`]. It describes how to interpret captured state vectors rather
 /// than how to price the instrument.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct ProcessParams {
     /// Process type identifier, such as `"GBM"` or `"Heston"`.
     pub process_type: String,
@@ -449,6 +455,7 @@ impl ProcessParams {
 /// The dataset may contain every path or only a deterministic sample of the
 /// full simulation, depending on the value of `sampling_method`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct PathDataset {
     /// Captured paths in deterministic order.
     pub paths: Vec<SimulatedPath>,

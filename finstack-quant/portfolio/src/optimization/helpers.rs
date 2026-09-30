@@ -17,6 +17,7 @@ use serde::{Deserialize, Serialize};
 /// Bindings deserialize this spec, build the `Portfolio` from the embedded
 /// [`PortfolioSpec`], and then run the optimizer.
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct PortfolioOptimizationSpec {
     /// Portfolio specification (same format as `value_portfolio`).
     pub portfolio: PortfolioSpec,

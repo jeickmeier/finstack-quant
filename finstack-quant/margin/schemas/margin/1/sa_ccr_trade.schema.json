@@ -1,0 +1,231 @@
+{
+  "$defs": {
+    "DateWire": {
+      "description": "ISO 8601 calendar date encoded as a `YYYY-MM-DD` JSON string.",
+      "format": "date",
+      "type": "string"
+    },
+    "SaCcrAssetClass": {
+      "description": "SA-CCR asset class for add-on computation.\n\nEach derivative trade is assigned to exactly one asset class.\nThe add-on formula and supervisory parameters differ by class.",
+      "oneOf": [
+        {
+          "const": "interest_rate",
+          "description": "Interest rate derivatives.",
+          "type": "string"
+        },
+        {
+          "const": "foreign_exchange",
+          "description": "Foreign exchange derivatives.",
+          "type": "string"
+        },
+        {
+          "const": "credit",
+          "description": "Credit derivatives.",
+          "type": "string"
+        },
+        {
+          "const": "equity",
+          "description": "Equity derivatives.",
+          "type": "string"
+        },
+        {
+          "const": "commodity",
+          "description": "Commodity derivatives.",
+          "type": "string"
+        }
+      ]
+    },
+    "SaCcrOptionType": {
+      "description": "SA-CCR option type for delta computation.",
+      "oneOf": [
+        {
+          "const": "call_long",
+          "description": "Long call option.",
+          "type": "string"
+        },
+        {
+          "const": "call_short",
+          "description": "Short call option.",
+          "type": "string"
+        },
+        {
+          "const": "put_long",
+          "description": "Long put option.",
+          "type": "string"
+        },
+        {
+          "const": "put_short",
+          "description": "Short put option.",
+          "type": "string"
+        }
+      ]
+    },
+    "SaCcrSupervisoryCategory": {
+      "description": "Supervisory classification required for credit, equity and commodity trades.\nParameters are prescribed by CRE52.72; this is independent of hedging-set identity.",
+      "oneOf": [
+        {
+          "const": "credit_aa",
+          "description": "Single-name credit rated AAA or AA.",
+          "type": "string"
+        },
+        {
+          "const": "credit_a",
+          "description": "Single-name credit rated A.",
+          "type": "string"
+        },
+        {
+          "const": "credit_bbb",
+          "description": "Single-name credit rated BBB.",
+          "type": "string"
+        },
+        {
+          "const": "credit_bb",
+          "description": "Single-name credit rated BB.",
+          "type": "string"
+        },
+        {
+          "const": "credit_b",
+          "description": "Single-name credit rated B.",
+          "type": "string"
+        },
+        {
+          "const": "credit_ccc",
+          "description": "Single-name credit rated CCC or lower.",
+          "type": "string"
+        },
+        {
+          "const": "credit_index_ig",
+          "description": "Investment-grade credit index.",
+          "type": "string"
+        },
+        {
+          "const": "credit_index_hy",
+          "description": "High-yield credit index.",
+          "type": "string"
+        },
+        {
+          "const": "equity_single_name",
+          "description": "Single-name equity.",
+          "type": "string"
+        },
+        {
+          "const": "equity_index",
+          "description": "Equity index.",
+          "type": "string"
+        },
+        {
+          "const": "commodity_electricity",
+          "description": "Electricity commodity.",
+          "type": "string"
+        },
+        {
+          "const": "commodity_other",
+          "description": "Non-electricity commodity.",
+          "type": "string"
+        }
+      ]
+    }
+  },
+  "$id": "https://finstack_quant.dev/schemas/margin/1/sa_ccr_trade.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "A single derivative trade for SA-CCR EAD computation.",
+  "properties": {
+    "asset_class": {
+      "$ref": "#/$defs/SaCcrAssetClass",
+      "description": "Asset class assignment."
+    },
+    "direction": {
+      "description": "Long (+1.0) or short (-1.0) direction.",
+      "format": "double",
+      "type": "number"
+    },
+    "end_date": {
+      "$ref": "#/$defs/DateWire",
+      "description": "Underlying end date used for supervisory duration; linear trade maturity."
+    },
+    "hedging_set": {
+      "description": "Hedging set identifier within the asset class.\nTrades with the same hedging set can partially offset.",
+      "type": "string"
+    },
+    "is_option": {
+      "description": "Whether this trade is an option.",
+      "type": "boolean"
+    },
+    "mtm": {
+      "description": "Current mark-to-market value.",
+      "format": "double",
+      "type": "number"
+    },
+    "notional": {
+      "description": "Notional in reporting currency before supervisory duration for IR/credit.\nFX, equity and commodity notionals must already use CRE52 adjusted notionals.",
+      "format": "double",
+      "type": "number"
+    },
+    "option_maturity_date": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/DateWire"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "Option expiry for maturity-factor calculation, distinct from the\nunderlying start/end dates used for supervisory duration."
+    },
+    "option_type": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/SaCcrOptionType"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "Option exercise type if applicable."
+    },
+    "start_date": {
+      "$ref": "#/$defs/DateWire",
+      "description": "Underlying start date used for IR/credit supervisory duration."
+    },
+    "supervisory_category": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/SaCcrSupervisoryCategory"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "Explicit supervisory category; required outside IR and FX."
+    },
+    "supervisory_delta": {
+      "description": "Supervisory delta adjustment.\nFor linear trades: +1 (long) or -1 (short).\nFor options: delta from Black-Scholes or equivalent.",
+      "format": "double",
+      "type": "number"
+    },
+    "trade_id": {
+      "description": "Unique trade identifier.",
+      "type": "string"
+    },
+    "underlier": {
+      "description": "Underlier reference (e.g., currency pair, issuer, equity name, commodity).",
+      "type": "string"
+    }
+  },
+  "required": [
+    "trade_id",
+    "asset_class",
+    "notional",
+    "start_date",
+    "end_date",
+    "underlier",
+    "hedging_set",
+    "direction",
+    "supervisory_delta",
+    "mtm",
+    "is_option"
+  ],
+  "title": "SaCcrTrade",
+  "type": "object"
+}

@@ -4,8 +4,13 @@ use super::{invalid_return_series, Performance, TickerSpan};
 use crate::dates::{Date, PeriodKind};
 
 #[derive(serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub(super) struct PerformanceState {
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "Vec<finstack_quant_core::wire::DateWire>")
+    )]
     price_dates: Vec<Date>,
     returns: Vec<Vec<f64>>,
     return_spans: Vec<TickerSpan>,

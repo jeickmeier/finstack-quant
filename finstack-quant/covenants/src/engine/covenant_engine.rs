@@ -19,6 +19,7 @@ use std::collections::BTreeSet;
 /// `waivers` default to empty, so `{"specs": [...]}` is a complete engine
 /// document.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct CovenantEngine {
     /// Active covenant specifications

@@ -1,6 +1,177 @@
 {
   "artifacts": [
     {
+      "$id": "https://finstack_quant.dev/schemas/portfolio/1/carino_linked_attribution.schema.json",
+      "bytes": 4680,
+      "kind": "output",
+      "path": "schemas/portfolio/1/carino_linked_attribution.schema.json",
+      "summary": "Compounded portfolio vs.",
+      "title": "CarinoLinkedAttribution",
+      "type_name": "CarinoLinkedAttribution"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/portfolio/1/cashflow_aggregation_options.schema.json",
+      "bytes": 619,
+      "kind": "input",
+      "path": "schemas/portfolio/1/cashflow_aggregation_options.schema.json",
+      "summary": "Options for `aggregate_full_cashflows`.",
+      "title": "CashflowAggregationOptions",
+      "type_name": "CashflowAggregationOptions"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/portfolio/1/cell_config.schema.json",
+      "bytes": 512,
+      "kind": "input",
+      "path": "schemas/portfolio/1/cell_config.schema.json",
+      "summary": "Configuration for `cell_returns_from_reference`.",
+      "title": "CellConfig",
+      "type_name": "CellConfig"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/portfolio/1/dated_cashflow.schema.json",
+      "bytes": 894,
+      "kind": "input",
+      "path": "schemas/portfolio/1/dated_cashflow.schema.json",
+      "summary": "A dated cashflow amount for money-weighted return calculations.",
+      "title": "DatedCashflow",
+      "type_name": "DatedCashflow"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/portfolio/1/duration_cell_table.schema.json",
+      "bytes": 3237,
+      "kind": "output",
+      "path": "schemas/portfolio/1/duration_cell_table.schema.json",
+      "summary": "A full duration-cell base-return curve built from a reference universe.",
+      "title": "DurationCellTable",
+      "type_name": "DurationCellTable"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/portfolio/1/excess_return_position.schema.json",
+      "bytes": 1469,
+      "kind": "input",
+      "path": "schemas/portfolio/1/excess_return_position.schema.json",
+      "summary": "One position's beginning-of-period duration, weight and realized total return, the input to `excess_returns`.",
+      "title": "ExcessReturnPosition",
+      "type_name": "ExcessReturnPosition"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/portfolio/1/excess_return_result.schema.json",
+      "bytes": 3458,
+      "kind": "output",
+      "path": "schemas/portfolio/1/excess_return_result.schema.json",
+      "summary": "Per-position and portfolio-level duration-matched credit excess return result, produced by `excess_returns`.",
+      "title": "ExcessReturnResult",
+      "type_name": "ExcessReturnResult"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/portfolio/1/factor_assignment_report.schema.json",
+      "bytes": 29106,
+      "kind": "output",
+      "path": "schemas/portfolio/1/factor_assignment_report.schema.json",
+      "summary": "Assignment results for a portfolio-level factor mapping pass.",
+      "title": "FactorAssignmentReport",
+      "type_name": "FactorAssignmentReport"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/portfolio/1/factor_brinson_input.schema.json",
+      "bytes": 1846,
+      "kind": "input",
+      "path": "schemas/portfolio/1/factor_brinson_input.schema.json",
+      "summary": "Inputs to `factor_brinson_attribution`: per-asset returns, a factor exposure matrix, and portfolio/benchmark weights.",
+      "title": "FactorBrinsonInput",
+      "type_name": "FactorBrinsonInput"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/portfolio/1/factor_brinson_result.schema.json",
+      "bytes": 3782,
+      "kind": "output",
+      "path": "schemas/portfolio/1/factor_brinson_result.schema.json",
+      "summary": "Factor-Brinson unified attribution result.",
+      "title": "FactorBrinsonResult",
+      "type_name": "FactorBrinsonResult"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/portfolio/1/factor_pnl_profile.schema.json",
+      "bytes": 20749,
+      "kind": "output",
+      "path": "schemas/portfolio/1/factor_pnl_profile.schema.json",
+      "summary": "P&L profile for one factor across a scenario grid.",
+      "title": "FactorPnlProfile",
+      "type_name": "FactorPnlProfile"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/portfolio/1/fi_attribution_config.schema.json",
+      "bytes": 586,
+      "kind": "input",
+      "path": "schemas/portfolio/1/fi_attribution_config.schema.json",
+      "summary": "Configuration for `campisi_attribution`.",
+      "title": "FiAttributionConfig",
+      "type_name": "FiAttributionConfig"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/portfolio/1/fi_carino_linked_result.schema.json",
+      "bytes": 10326,
+      "kind": "output",
+      "path": "schemas/portfolio/1/fi_carino_linked_result.schema.json",
+      "summary": "Multi-period Carino-linked Campisi attribution.",
+      "title": "FiCarinoLinkedResult",
+      "type_name": "FiCarinoLinkedResult"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/portfolio/1/fi_period_input.schema.json",
+      "bytes": 3540,
+      "kind": "input",
+      "path": "schemas/portfolio/1/fi_period_input.schema.json",
+      "summary": "One attribution period's raw inputs for multi-period linking.",
+      "title": "FiPeriodInput",
+      "type_name": "FiPeriodInput"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/portfolio/1/fi_reconciliation_report.schema.json",
+      "bytes": 932,
+      "kind": "output",
+      "path": "schemas/portfolio/1/fi_reconciliation_report.schema.json",
+      "summary": "Report from reconciling the five effect totals against the active return, mirroring `crate::attribution` reconciliation conventions.",
+      "title": "FiReconciliationReport",
+      "type_name": "FiReconciliationReport"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/portfolio/1/grid_carino_linked_result.schema.json",
+      "bytes": 6833,
+      "kind": "output",
+      "path": "schemas/portfolio/1/grid_carino_linked_result.schema.json",
+      "summary": "Multi-period Carino-linked hierarchical grid attribution.",
+      "title": "GridCarinoLinkedResult",
+      "type_name": "GridCarinoLinkedResult"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/portfolio/1/grid_position.schema.json",
+      "bytes": 1152,
+      "kind": "input",
+      "path": "schemas/portfolio/1/grid_position.schema.json",
+      "summary": "One position (or pre-aggregated bucket) in a duration-cell x sector grid, for one period and one side (portfolio or benchmark).",
+      "title": "GridPosition",
+      "type_name": "GridPosition"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/portfolio/1/linked_return.schema.json",
+      "bytes": 871,
+      "kind": "output",
+      "path": "schemas/portfolio/1/linked_return.schema.json",
+      "summary": "Result of geometrically linking sub-period returns.",
+      "title": "LinkedReturn",
+      "type_name": "LinkedReturn"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/portfolio/1/market_factor_key.schema.json",
+      "bytes": 23979,
+      "kind": "component",
+      "path": "schemas/portfolio/1/market_factor_key.schema.json",
+      "summary": "Normalized market factor key for portfolio-level dependency tracking.",
+      "title": "MarketFactorKey",
+      "type_name": "MarketFactorKey"
+    },
+    {
       "$id": "https://finstack_quant.dev/schemas/portfolio/1/materialization_report.schema.json",
       "bytes": 8987,
       "kind": "output",
@@ -8,6 +179,24 @@
       "summary": "Retained diagnostics, bundle counts and phase timings from a portfolio load.",
       "title": "Materialization Report",
       "type_name": "MaterializationReport"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/portfolio/1/portfolio_cashflows.schema.json",
+      "bytes": 51655,
+      "kind": "component",
+      "path": "schemas/portfolio/1/portfolio_cashflows.schema.json",
+      "summary": "Rich portfolio cashflow ladder preserving event classifications.",
+      "title": "PortfolioCashflows",
+      "type_name": "PortfolioCashflows"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/portfolio/1/portfolio_margin_result.schema.json",
+      "bytes": 42705,
+      "kind": "output",
+      "path": "schemas/portfolio/1/portfolio_margin_result.schema.json",
+      "summary": "Portfolio-wide margin calculation results.",
+      "title": "PortfolioMarginResult",
+      "type_name": "PortfolioMarginResult"
     },
     {
       "$id": "https://finstack_quant.dev/schemas/portfolio/1/portfolio_materialization.schema.json",
@@ -26,6 +215,177 @@
       "summary": "Optimizer weights and diagnostics.",
       "title": "Portfolio Optimization Result",
       "type_name": "PortfolioOptimizationResultWire"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/portfolio/1/portfolio_optimization_spec.schema.json",
+      "bytes": 55148,
+      "kind": "input",
+      "path": "schemas/portfolio/1/portfolio_optimization_spec.schema.json",
+      "summary": "JSON-serializable specification for a portfolio optimization problem.",
+      "title": "PortfolioOptimizationSpec",
+      "type_name": "PortfolioOptimizationSpec"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/portfolio/1/portfolio_primitive_exposure_report.schema.json",
+      "bytes": 26747,
+      "kind": "output",
+      "path": "schemas/portfolio/1/portfolio_primitive_exposure_report.schema.json",
+      "summary": "Portfolio primitive decomposition retaining both path and concentration views.",
+      "title": "PortfolioPrimitiveExposureReport",
+      "type_name": "PortfolioPrimitiveExposureReport"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/portfolio/1/portfolio_result.schema.json",
+      "bytes": 41145,
+      "kind": "output",
+      "path": "schemas/portfolio/1/portfolio_result.schema.json",
+      "summary": "Complete results from portfolio evaluation.",
+      "title": "PortfolioResult",
+      "type_name": "PortfolioResult"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/portfolio/1/position_change.schema.json",
+      "bytes": 1510,
+      "kind": "output",
+      "path": "schemas/portfolio/1/position_change.schema.json",
+      "summary": "Position edits supported by `WhatIfEngine::position_what_if`.",
+      "title": "PositionChange",
+      "type_name": "PositionChange"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/portfolio/1/reconciliation_report.schema.json",
+      "bytes": 854,
+      "kind": "output",
+      "path": "schemas/portfolio/1/reconciliation_report.schema.json",
+      "summary": "Report from reconciling position-level P&L attribution against portfolio totals.",
+      "title": "ReconciliationReport",
+      "type_name": "ReconciliationReport"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/portfolio/1/reference_return.schema.json",
+      "bytes": 704,
+      "kind": "input",
+      "path": "schemas/portfolio/1/reference_return.schema.json",
+      "summary": "One reference (e.g.",
+      "title": "ReferenceReturn",
+      "type_name": "ReferenceReturn"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/portfolio/1/replay_config.schema.json",
+      "bytes": 12811,
+      "kind": "input",
+      "path": "schemas/portfolio/1/replay_config.schema.json",
+      "summary": "Configuration for a replay run.",
+      "title": "ReplayConfig",
+      "type_name": "ReplayConfig"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/portfolio/1/replay_result.schema.json",
+      "bytes": 87546,
+      "kind": "output",
+      "path": "schemas/portfolio/1/replay_result.schema.json",
+      "summary": "Full output of a replay run.",
+      "title": "ReplayResult",
+      "type_name": "ReplayResult"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/portfolio/1/scenario_pnl_batch_item.schema.json",
+      "bytes": 74294,
+      "kind": "output",
+      "path": "schemas/portfolio/1/scenario_pnl_batch_item.schema.json",
+      "summary": "One ordered result from `scenario_pnl_batch`.",
+      "title": "ScenarioPnlBatchItem",
+      "type_name": "ScenarioPnlBatchItem"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/portfolio/1/scenario_pnl_view.schema.json",
+      "bytes": 74124,
+      "kind": "output",
+      "path": "schemas/portfolio/1/scenario_pnl_view.schema.json",
+      "summary": "Scenario-P&L view returned by binding surfaces.",
+      "title": "ScenarioPnlView",
+      "type_name": "ScenarioPnlView"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/portfolio/1/scenario_revalue_view.schema.json",
+      "bytes": 79046,
+      "kind": "output",
+      "path": "schemas/portfolio/1/scenario_revalue_view.schema.json",
+      "summary": "Scenario-and-revalue view returned by binding surfaces.",
+      "title": "ScenarioRevalueView",
+      "type_name": "ScenarioRevalueView"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/portfolio/1/sector_period.schema.json",
+      "bytes": 1365,
+      "kind": "input",
+      "path": "schemas/portfolio/1/sector_period.schema.json",
+      "summary": "Per-sector portfolio and benchmark weights and returns for a single attribution period.",
+      "title": "SectorPeriod",
+      "type_name": "SectorPeriod"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/portfolio/1/sensitivity_matrix_json.schema.json",
+      "bytes": 20635,
+      "kind": "output",
+      "path": "schemas/portfolio/1/sensitivity_matrix_json.schema.json",
+      "summary": "Canonical wire form of a factor-sensitivity matrix, shared by both hosts.",
+      "title": "SensitivityMatrixJson",
+      "type_name": "SensitivityMatrixJson"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/portfolio/1/stress_pnl.schema.json",
+      "bytes": 982,
+      "kind": "output",
+      "path": "schemas/portfolio/1/stress_pnl.schema.json",
+      "summary": "P&L-only result of a factor-stress scenario.",
+      "title": "StressPnl",
+      "type_name": "StressPnl"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/portfolio/1/stress_result.schema.json",
+      "bytes": 11002,
+      "kind": "output",
+      "path": "schemas/portfolio/1/stress_result.schema.json",
+      "summary": "Result of a factor-stress scenario.",
+      "title": "StressResult",
+      "type_name": "StressResult"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/portfolio/1/twrr_period.schema.json",
+      "bytes": 2168,
+      "kind": "output",
+      "path": "schemas/portfolio/1/twrr_period.schema.json",
+      "summary": "A single sub-period of a portfolio, with the information needed to compute a Modified-Dietz return.",
+      "title": "TwrrPeriod",
+      "type_name": "TwrrPeriod"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/portfolio/1/weight_allocation_result.schema.json",
+      "bytes": 3292,
+      "kind": "output",
+      "path": "schemas/portfolio/1/weight_allocation_result.schema.json",
+      "summary": "Strategy allocation result.",
+      "title": "WeightAllocationResult",
+      "type_name": "WeightAllocationResult"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/portfolio/1/weight_allocation_spec.schema.json",
+      "bytes": 3126,
+      "kind": "input",
+      "path": "schemas/portfolio/1/weight_allocation_spec.schema.json",
+      "summary": "JSON specification for strategy-level allocation.",
+      "title": "WeightAllocationSpec",
+      "type_name": "WeightAllocationSpec"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/portfolio/1/what_if_result.schema.json",
+      "bytes": 11438,
+      "kind": "output",
+      "path": "schemas/portfolio/1/what_if_result.schema.json",
+      "summary": "Result of a position what-if scenario.",
+      "title": "WhatIfResult",
+      "type_name": "WhatIfResult"
     }
   ],
   "schema_index_version": 1

@@ -1,0 +1,40 @@
+{
+  "$id": "https://finstack_quant.dev/schemas/portfolio/1/sector_period.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Per-sector portfolio and benchmark weights and returns for a single attribution period.",
+  "properties": {
+    "benchmark_return": {
+      "description": "Benchmark return for the sector over the period.\n\nIgnored when [`benchmark_weight`](Self::benchmark_weight) is zero:\n[`brinson_fachler`] substitutes the benchmark total `r_b` (Campisi\noff-benchmark convention).",
+      "format": "double",
+      "type": "number"
+    },
+    "benchmark_weight": {
+      "description": "Benchmark weight in the sector at period start.",
+      "format": "double",
+      "type": "number"
+    },
+    "portfolio_return": {
+      "description": "Portfolio return for the sector over the period.",
+      "format": "double",
+      "type": "number"
+    },
+    "portfolio_weight": {
+      "description": "Portfolio weight in the sector at period start.",
+      "format": "double",
+      "type": "number"
+    },
+    "sector": {
+      "description": "Sector identifier (industry / country / any grouping).",
+      "type": "string"
+    }
+  },
+  "required": [
+    "sector",
+    "portfolio_weight",
+    "benchmark_weight",
+    "portfolio_return",
+    "benchmark_return"
+  ],
+  "title": "SectorPeriod",
+  "type": "object"
+}

@@ -1,0 +1,74 @@
+{
+  "$defs": {
+    "ImProfile": {
+      "additionalProperties": false,
+      "description": "Expected initial-margin profile `E[IM(t)]` on a time grid.\n\nValues are in the aggregation currency chosen when the profile was built\n(e.g. the `currency` argument of [`im_profile_from_simm`]).",
+      "properties": {
+        "im_values": {
+          "description": "Expected IM at each time point (non-negative, finite).",
+          "items": {
+            "format": "double",
+            "type": "number"
+          },
+          "type": "array"
+        },
+        "times": {
+          "description": "Time points in years from the valuation date (strictly increasing, positive).",
+          "items": {
+            "format": "double",
+            "type": "number"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "times",
+        "im_values"
+      ],
+      "type": "object"
+    }
+  },
+  "$id": "https://finstack_quant.dev/schemas/margin/1/funding_config.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Funding cost/benefit configuration for FVA and MVA calculation.",
+  "properties": {
+    "funding_benefit_bp": {
+      "description": "Funding benefit spread in basis points (benefit on negative exposure).\n\nIf `None`, symmetric funding is assumed: `funding_benefit = funding_spread`.\nIn practice, the benefit spread may be lower than the cost spread\ndue to asymmetric funding conditions.",
+      "format": "double",
+      "type": [
+        "number",
+        "null"
+      ]
+    },
+    "funding_spread_bp": {
+      "description": "Funding spread in basis points (cost on positive exposure).\n\nThis is the spread over the risk-free rate that the institution\npays to fund positive (out-of-the-money to counterparty) exposure.\nTypical values: 20–100 bp depending on the institution's credit quality.",
+      "format": "double",
+      "type": "number"
+    },
+    "im_profile": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ImProfile"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "Expected initial-margin profile `E[IM(t)]` that drives MVA.\n\nWhen `Some`, [`crate::xva::cva::compute_bilateral_xva`] prices the\nlifetime funding cost of posting this IM and reports it as\n[`XvaResult::mva`]. When `None`, MVA is not computed and\n[`XvaResult::mva`] is `None`.\n\nBuild the profile with\n[`crate::xva::mva::im_profile_from_simm`] (deterministic SIMM decay), or\nsupply the path-consistent mean IM from your own simulation."
+    },
+    "margin_funding_spread_bp": {
+      "description": "Spread in basis points applied to posted initial margin (MVA).\n\nIf `None`, MVA uses `funding_spread_bp` — the desk's unsecured\nfunding spread, which is the standard assumption (Green 2015, ch. 10).\nOverride when IM is funded at a different (typically term or partially\nsecured) level than uncollateralized derivative exposure.",
+      "format": "double",
+      "type": [
+        "number",
+        "null"
+      ]
+    }
+  },
+  "required": [
+    "funding_spread_bp"
+  ],
+  "title": "FundingConfig",
+  "type": "object"
+}

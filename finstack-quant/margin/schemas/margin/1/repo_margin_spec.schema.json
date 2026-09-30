@@ -1,0 +1,284 @@
+{
+  "$defs": {
+    "CollateralAssetClass": {
+      "description": "Collateral asset classes per BCBS-IOSCO standards.\n\nAsset classes determine baseline haircuts and eligibility criteria.\nThe BCBS-IOSCO framework specifies minimum haircuts by asset class.\n\n# Reference\n\nBCBS-IOSCO \"Margin requirements for non-centrally cleared derivatives\" (2020)\nAnnex A: Standardized haircut schedule `docs/REFERENCES.md#bcbs-iosco-uncleared-margin`",
+      "oneOf": [
+        {
+          "const": "cash",
+          "description": "Cash in eligible currency",
+          "type": "string"
+        },
+        {
+          "const": "government_bonds",
+          "description": "Sovereign government bonds accepted as collateral.",
+          "type": "string"
+        },
+        {
+          "const": "agency_bonds",
+          "description": "Debt issued or guaranteed by eligible agencies.",
+          "type": "string"
+        },
+        {
+          "const": "covered_bonds",
+          "description": "Covered bonds meeting the applicable eligibility criteria.",
+          "type": "string"
+        },
+        {
+          "const": "corporate_bonds",
+          "description": "Investment-grade corporate bonds accepted under the CSA.",
+          "type": "string"
+        },
+        {
+          "const": "equity",
+          "description": "Eligible listed equity collateral.",
+          "type": "string"
+        },
+        {
+          "const": "gold",
+          "description": "Eligible gold collateral.",
+          "type": "string"
+        },
+        {
+          "const": "mutual_funds",
+          "description": "Eligible mutual funds or exchange-traded funds.",
+          "type": "string"
+        }
+      ]
+    },
+    "CollateralEligibility": {
+      "additionalProperties": false,
+      "description": "Single collateral eligibility entry.\n\nDefines eligibility criteria and haircut for a specific type of collateral.",
+      "properties": {
+        "asset_class": {
+          "$ref": "#/$defs/CollateralAssetClass",
+          "description": "Asset class"
+        },
+        "concentration_limit": {
+          "description": "Concentration limit as fraction of total collateral (optional)\n\nE.g., 0.30 means max 30% of collateral can be this type.",
+          "format": "double",
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "fx_haircut_addon": {
+          "default": 0.0,
+          "description": "Additional FX haircut for currency mismatch (decimal)\n\nApplied when collateral currency differs from settlement currency.",
+          "format": "double",
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "type": "number"
+        },
+        "haircut": {
+          "description": "Haircut as decimal (e.g., 0.02 = 2%)",
+          "format": "double",
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "type": "number"
+        },
+        "maturity_constraints": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/MaturityConstraints"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Remaining maturity constraints"
+        },
+        "min_rating": {
+          "description": "Minimum credit rating requirement (e.g., \"A-\", \"BBB\")\n\nIf None, no rating constraint applies.",
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "asset_class",
+        "haircut"
+      ],
+      "type": "object"
+    },
+    "EligibleCollateralSchedule": {
+      "additionalProperties": false,
+      "description": "Eligible collateral schedule with haircuts.\n\nDefines the complete set of collateral types accepted under a CSA\nor margin agreement, along with associated haircuts and constraints.\n\n# Example\n\n```\nuse finstack_quant_margin::{CollateralEligibility, EligibleCollateralSchedule};\n\n// Start from a standard schedule (BCBS-IOSCO compliant)\nlet schedule = EligibleCollateralSchedule::bcbs_standard()?;\n# let _ = schedule;\n# Ok::<(), finstack_quant_core::Error>(())\n```",
+      "properties": {
+        "default_haircut": {
+          "description": "Default haircut for unlisted collateral (if accepted)\n\nIf None, only explicitly listed collateral types are accepted.",
+          "format": "double",
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "eligible": {
+          "description": "List of eligible collateral types with haircuts",
+          "items": {
+            "$ref": "#/$defs/CollateralEligibility"
+          },
+          "type": "array"
+        },
+        "rehypothecation_allowed": {
+          "default": false,
+          "description": "Whether rehypothecation of posted collateral is permitted\n\nFor IM under BCBS-IOSCO rules, rehypothecation is prohibited.\nFor VM, rehypothecation may be permitted by bilateral agreement.",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "eligible"
+      ],
+      "type": "object"
+    },
+    "MarginTenor": {
+      "description": "Margin call frequency.\n\nDetermines how often margin calls are made and collateral is exchanged.\nIndustry standard for OTC derivatives is daily under BCBS-IOSCO rules.",
+      "oneOf": [
+        {
+          "const": "daily",
+          "description": "Daily margin calls (standard for OTC derivatives post-2016)",
+          "type": "string"
+        },
+        {
+          "const": "weekly",
+          "description": "Weekly margin calls (pre-regulatory period)",
+          "type": "string"
+        },
+        {
+          "const": "monthly",
+          "description": "Monthly margin calls (pre-regulatory period)",
+          "type": "string"
+        },
+        {
+          "const": "on_demand",
+          "description": "On-demand margin calls (used for repos and some bilateral agreements)",
+          "type": "string"
+        }
+      ]
+    },
+    "MaturityConstraints": {
+      "additionalProperties": false,
+      "description": "Maturity constraints for eligible collateral.\n\nSome CSAs restrict collateral based on remaining maturity to limit\nduration risk in the collateral portfolio.",
+      "properties": {
+        "max_remaining_years": {
+          "default": null,
+          "description": "Maximum remaining years to maturity (if any)",
+          "format": "double",
+          "minimum": 0.0,
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "min_remaining_years": {
+          "default": null,
+          "description": "Minimum remaining years to maturity (if any)",
+          "format": "double",
+          "minimum": 0.0,
+          "type": [
+            "number",
+            "null"
+          ]
+        }
+      },
+      "type": "object"
+    },
+    "RepoMarginType": {
+      "description": "Repo margin type.\n\nDifferent margin mechanisms offer varying levels of protection\nand operational complexity.",
+      "oneOf": [
+        {
+          "const": "none",
+          "description": "No margining - fixed haircut only.\n\nSimplest approach where the haircut at inception is the only\nprotection mechanism. No margin calls during the life of the repo.",
+          "type": "string"
+        },
+        {
+          "const": "mark_to_market",
+          "description": "Mark-to-market margining with daily/periodic calls.\n\nCollateral is revalued periodically and margin calls are made\nwhen the coverage ratio falls below the margin ratio.",
+          "type": "string"
+        },
+        {
+          "const": "net_exposure",
+          "description": "Net exposure margining across a netting set.\n\nMultiple repos with the same counterparty are netted and\nmargin is calculated on the net position.",
+          "type": "string"
+        },
+        {
+          "const": "triparty",
+          "description": "Tri-party repo managed by a third-party agent.\n\nA tri-party agent (e.g., Bank of New York Mellon, J.P. Morgan)\nmanages collateral allocation, substitution, and margin calls.",
+          "type": "string"
+        }
+      ]
+    }
+  },
+  "$id": "https://finstack_quant.dev/schemas/margin/1/repo_margin_spec.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "GMRA 2011 compliant repo margin specification.",
+  "properties": {
+    "call_frequency": {
+      "$ref": "#/$defs/MarginTenor",
+      "description": "Tenor of margin valuation and calls."
+    },
+    "eligible_substitutes": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/EligibleCollateralSchedule"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "Eligible collateral for substitution (if allowed)."
+    },
+    "margin_call_threshold": {
+      "description": "Percentage deviation that triggers a margin call.\n\nE.g., 0.01 = 1% deviation from margin ratio triggers a call.\nIf the current ratio falls below `margin_ratio * (1 - threshold)`,\na margin call is generated.",
+      "format": "double",
+      "type": "number"
+    },
+    "margin_interest_rate": {
+      "description": "Margin interest rate (if applicable).\n\nTypically tied to overnight rates (Fed Funds, SONIA, ESTR).",
+      "format": "double",
+      "type": [
+        "number",
+        "null"
+      ]
+    },
+    "margin_ratio": {
+      "description": "Margin ratio (e.g., 1.02 = 102% collateralization required).\n\nGMRA typically expresses this as the ratio of Market Value\nof Securities to Purchase Price.",
+      "format": "double",
+      "type": "number"
+    },
+    "margin_type": {
+      "$ref": "#/$defs/RepoMarginType",
+      "description": "Type of margin mechanism."
+    },
+    "pays_margin_interest": {
+      "description": "Whether margin interest is paid on cash margin transfers.\n\nUnder GMRA, the parties may agree to pay interest on\ncash margin transfers.",
+      "type": "boolean"
+    },
+    "settlement_lag": {
+      "description": "Settlement lag for margin transfers (business days).\n\nGMRA standard is typically same-day (0) or next-day (1).",
+      "format": "uint32",
+      "minimum": 0,
+      "type": "integer"
+    },
+    "substitution_allowed": {
+      "description": "Whether collateral substitution is permitted.\n\nGMRA Paragraph 8 governs substitution rights.",
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "margin_type",
+    "margin_ratio",
+    "margin_call_threshold",
+    "call_frequency",
+    "settlement_lag",
+    "pays_margin_interest",
+    "substitution_allowed"
+  ],
+  "title": "RepoMarginSpec",
+  "type": "object"
+}

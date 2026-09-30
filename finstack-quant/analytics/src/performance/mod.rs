@@ -62,10 +62,19 @@ mod table;
 /// # Ok::<(), finstack_quant_core::Error>(())
 /// ```
 #[derive(Clone, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(try_from = "serialization::PerformanceState")]
 pub struct Performance {
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "Vec<finstack_quant_core::wire::DateWire>")
+    )]
     price_dates: Vec<Date>,
     #[serde(skip_serializing)]
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "Vec<finstack_quant_core::wire::DateWire>")
+    )]
     dates: Vec<Date>,
     returns: Vec<Vec<f64>>,
     return_spans: Vec<TickerSpan>,
@@ -81,6 +90,7 @@ pub struct Performance {
 }
 
 #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 struct TickerSpan {
     start: usize,
     end: usize,
@@ -1010,6 +1020,7 @@ impl Performance {
 
 /// Lookback returns for each period horizon.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct LookbackReturns {
     /// Ticker names aligned with every per-ticker vector below.
     pub ticker_names: Vec<String>,

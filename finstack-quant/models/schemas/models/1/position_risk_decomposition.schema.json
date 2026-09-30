@@ -1,0 +1,156 @@
+{
+  "$defs": {
+    "DecompositionMethod": {
+      "description": "Method used for position-level VaR/ES decomposition.",
+      "oneOf": [
+        {
+          "const": "parametric",
+          "description": "Covariance-based using normal distribution assumption.\n\nFast (O(n^2) in positions). Exact Euler property.\nRequires a position-level return covariance matrix.",
+          "type": "string"
+        },
+        {
+          "const": "historical",
+          "description": "Full historical simulation with per-position P&L attribution.\n\nSlow (O(n * scenarios)). Approximate Euler property.\nHandles non-normality and non-linear positions.",
+          "type": "string"
+        }
+      ]
+    },
+    "PositionEsContribution": {
+      "description": "Expected Shortfall decomposition result for a single portfolio position.",
+      "properties": {
+        "component_es": {
+          "description": "Component ES: position's contribution to portfolio Expected Shortfall.\n\nParametric: analytical formula using truncated normal moments.\n```text\nCES_i = w_i * (Sigma * w)_i / sigma_p * phi(z_alpha) / (1 - alpha)\n```\n\nHistorical: average of position-level losses in tail scenarios.\n```text\nCES_i = E[L_i | L_portfolio > VaR_portfolio]\n```",
+          "format": "double",
+          "type": "number"
+        },
+        "marginal_es": {
+          "description": "Marginal ES: per-unit sensitivity of portfolio ES to this position.\n\n`None` when the engine cannot produce a true gradient (e.g.\nhistorical mode without finite-difference repricing).",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "position_id": {
+          "description": "Position identifier.",
+          "type": "string"
+        },
+        "relative_es": {
+          "description": "Component ES as a fraction of total portfolio ES.",
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "required": [
+        "position_id",
+        "component_es",
+        "relative_es"
+      ],
+      "type": "object"
+    },
+    "PositionVarContribution": {
+      "description": "Risk decomposition result for a single portfolio position.\n\nAll monetary fields are in the same units as the portfolio VaR\n(typically the portfolio's base currency).",
+      "properties": {
+        "component_var": {
+          "description": "Component VaR: position's Euler-allocated share of portfolio VaR.\n\nSum of all component VaRs equals total portfolio VaR (exact under\nthe parametric normal assumption; approximate for historical).\n\nFormula (parametric, loss-signed):\n```text\nCVaR_i = -w_i * (Sigma * w)_i / sigma_p * z_alpha\n```",
+          "format": "double",
+          "type": "number"
+        },
+        "incremental_var": {
+          "description": "Incremental VaR: change in portfolio VaR from removing this position.\n\n```text\nIVaR_i = VaR(portfolio) - VaR(portfolio \\ {i})\n```\n\nRequires full repricing for each position removal. `None` if\nincremental VaR was not requested (it is expensive).",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "marginal_var": {
+          "description": "Marginal VaR: per-unit sensitivity of portfolio VaR to this position.\n\nFormula (parametric, loss-signed):\n```text\nMVaR_i = -(Sigma * w)_i / sigma_p * z_alpha\n```\n\nUsed as gradient input for mean-variance optimization and\nrisk-budgeting rebalancing.\n\n`None` when the engine cannot produce a true gradient (e.g.\nhistorical mode without finite-difference repricing); callers that\nneed a marginal must choose a fallback or skip rebalancing.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "position_id": {
+          "description": "Position identifier.",
+          "type": "string"
+        },
+        "relative_var": {
+          "description": "Component VaR as a fraction of total portfolio VaR.\n\n`relative_var = component_var / portfolio_var`. Sums to 1.0.\nA negative value indicates the position is a diversifier.",
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "required": [
+        "position_id",
+        "component_var",
+        "relative_var"
+      ],
+      "type": "object"
+    }
+  },
+  "$id": "https://finstack_quant.dev/schemas/models/1/position_risk_decomposition.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Complete position-level risk decomposition of a portfolio.",
+  "properties": {
+    "confidence": {
+      "description": "Confidence level used for both VaR and ES.",
+      "format": "double",
+      "type": "number"
+    },
+    "es_contributions": {
+      "description": "Per-position ES decomposition.",
+      "items": {
+        "$ref": "#/$defs/PositionEsContribution"
+      },
+      "type": "array"
+    },
+    "euler_residual": {
+      "description": "Residual from Euler decomposition (should be near zero).\n\n`residual = portfolio_var - sum(component_var_i)`.\nOnly meaningful for the parametric engine, where a non-zero residual\nsignals a numerical issue (ill-conditioned covariance, floating-point\naccumulation error).\n\n`None` in historical mode: the Tasche scaling used there makes the\nresidual algebraically zero by construction, so it carries no\ndiagnostic information.",
+      "format": "double",
+      "type": [
+        "number",
+        "null"
+      ]
+    },
+    "method": {
+      "$ref": "#/$defs/DecompositionMethod",
+      "description": "Method used for decomposition."
+    },
+    "n_positions": {
+      "description": "Number of positions in the portfolio.",
+      "format": "uint",
+      "minimum": 0,
+      "type": "integer"
+    },
+    "portfolio_es": {
+      "description": "Total portfolio Expected Shortfall.\n\nSame loss convention as [`Self::portfolio_var`]; ES lies at or\nbeyond VaR in the loss tail (`portfolio_es <= portfolio_var`).",
+      "format": "double",
+      "type": "number"
+    },
+    "portfolio_var": {
+      "description": "Total portfolio VaR.\n\nLoss convention (workspace-wide): VaR follows the P&L sign, so\nlosses are reported as **negative** numbers, matching the\nfactor-level engines and `analytics::value_at_risk`.",
+      "format": "double",
+      "type": "number"
+    },
+    "var_contributions": {
+      "description": "Per-position VaR decomposition.",
+      "items": {
+        "$ref": "#/$defs/PositionVarContribution"
+      },
+      "type": "array"
+    }
+  },
+  "required": [
+    "portfolio_var",
+    "portfolio_es",
+    "confidence",
+    "method",
+    "var_contributions",
+    "es_contributions",
+    "n_positions"
+  ],
+  "title": "PositionRiskDecomposition",
+  "type": "object"
+}

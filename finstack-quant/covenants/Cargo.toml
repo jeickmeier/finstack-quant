@@ -24,7 +24,13 @@ default = ["json-schema"]
 json-schema = ["dep:schemars", "finstack-quant-core/json-schema"]
 
 [dev-dependencies]
+jsonschema = { version = "0.28", default-features = false }
 time = { workspace = true, features = ["macros"] }
+
+[[bin]]
+name = "gen_covenants_schemas"
+path = "src/bin/gen_schemas.rs"
+required-features = ["json-schema"]
 
 [lints]
 workspace = true

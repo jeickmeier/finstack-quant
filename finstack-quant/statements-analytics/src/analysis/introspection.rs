@@ -272,6 +272,7 @@ impl<'a> DependencyTracer<'a> {
 /// Represents the complete dependency hierarchy for a node, suitable for
 /// visualization and analysis.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct DependencyTree {
     /// Node identifier
@@ -580,6 +581,7 @@ impl<'a> FormulaExplainer<'a> {
 
 /// Detailed explanation of a node's calculation.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct Explanation {
     /// Node identifier
     pub node_id: String,
@@ -590,6 +592,10 @@ pub struct Explanation {
     /// Final calculated value; non-finite values serialize as `"nan"`,
     /// `"inf"` or `"-inf"`.
     #[serde(with = "finstack_quant_core::wire::non_finite_f64")]
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "finstack_quant_core::wire::NonFiniteF64Wire")
+    )]
     pub final_value: f64,
 
     /// Type of node (Value, Calculated, etc.)
@@ -635,6 +641,7 @@ impl Explanation {
 
 /// Step in a calculation breakdown.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct ExplanationStep {
     /// Component identifier (e.g., "revenue")
     pub component: String,
@@ -642,6 +649,10 @@ pub struct ExplanationStep {
     /// Value of the component; non-finite values serialize as `"nan"`,
     /// `"inf"` or `"-inf"`.
     #[serde(with = "finstack_quant_core::wire::non_finite_f64")]
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "finstack_quant_core::wire::NonFiniteF64Wire")
+    )]
     pub value: f64,
 
     /// Operation applied (e.g., "+", "-", "*", "/")

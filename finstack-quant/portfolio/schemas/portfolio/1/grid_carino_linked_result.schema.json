@@ -1,0 +1,208 @@
+{
+  "$defs": {
+    "GridAttributionResult": {
+      "additionalProperties": false,
+      "description": "Single-period hierarchical grid attribution result.\n\nThis type is *input-reachable*: multi-period linking (Task 5) consumes a\nslice of these, and the Python/WASM bindings deserialize them from JSON.\nIt therefore denies unknown fields, like the other inbound types in this\nmodule, so a misspelled or stale key fails closed instead of being\nsilently dropped.",
+      "properties": {
+        "active_return": {
+          "description": "Active return `r^P − r^B`.",
+          "format": "double",
+          "type": "number"
+        },
+        "benchmark_return": {
+          "description": "Benchmark total return `r^B = Σ_t x_t^B r_t^B`.",
+          "format": "double",
+          "type": "number"
+        },
+        "curve_effects": {
+          "description": "Per-cell curve effects, in first-appearance order.",
+          "items": {
+            "$ref": "#/$defs/GridCellEffect"
+          },
+          "type": "array"
+        },
+        "portfolio_return": {
+          "description": "Portfolio total return `r^P = Σ_t x_t^P r_t^P`.",
+          "format": "double",
+          "type": "number"
+        },
+        "sector_effects": {
+          "description": "Per-(cell, sector) allocation effects, in first-appearance order\n(cells, then sectors within each cell).",
+          "items": {
+            "$ref": "#/$defs/GridSectorEffect"
+          },
+          "type": "array"
+        },
+        "selection_effects": {
+          "description": "Per-(cell, sector) selection effects, in the same order as\n`sector_effects`.",
+          "items": {
+            "$ref": "#/$defs/GridSelectionEffect"
+          },
+          "type": "array"
+        },
+        "total_curve": {
+          "description": "Sum of the curve effects.",
+          "format": "double",
+          "type": "number"
+        },
+        "total_sector": {
+          "description": "Sum of the sector allocation effects.",
+          "format": "double",
+          "type": "number"
+        },
+        "total_selection": {
+          "description": "Sum of the selection effects.",
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "required": [
+        "portfolio_return",
+        "benchmark_return",
+        "active_return",
+        "curve_effects",
+        "sector_effects",
+        "selection_effects",
+        "total_curve",
+        "total_sector",
+        "total_selection"
+      ],
+      "type": "object"
+    },
+    "GridCellEffect": {
+      "additionalProperties": false,
+      "description": "Per-cell curve (duration-cell positioning) effect.",
+      "properties": {
+        "benchmark_cell_return": {
+          "description": "Benchmark cell return, `r_t^B`. For a cell absent from the benchmark\nthis is the out-of-benchmark fallback (`r_t^P`); see the module docs.",
+          "format": "double",
+          "type": "number"
+        },
+        "benchmark_weight": {
+          "description": "Benchmark net weight in the cell, `x_t^B`.",
+          "format": "double",
+          "type": "number"
+        },
+        "cell": {
+          "description": "Duration-cell label.",
+          "type": "string"
+        },
+        "curve_effect": {
+          "description": "Curve effect `(x_t^P − x_t^B)(r_t^B − r^B)`.",
+          "format": "double",
+          "type": "number"
+        },
+        "portfolio_weight": {
+          "description": "Portfolio net weight in the cell, `x_t^P`.",
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "required": [
+        "cell",
+        "portfolio_weight",
+        "benchmark_weight",
+        "benchmark_cell_return",
+        "curve_effect"
+      ],
+      "type": "object"
+    },
+    "GridSectorEffect": {
+      "additionalProperties": false,
+      "description": "Per-(cell, sector) within-cell sector-allocation effect.",
+      "properties": {
+        "allocation_effect": {
+          "description": "Allocation effect `x_t^P (z_st^P − z_st^B)(r_st^B − r_t^B)`.",
+          "format": "double",
+          "type": "number"
+        },
+        "cell": {
+          "description": "Duration-cell label.",
+          "type": "string"
+        },
+        "sector": {
+          "description": "Sector label within the cell.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "cell",
+        "sector",
+        "allocation_effect"
+      ],
+      "type": "object"
+    },
+    "GridSelectionEffect": {
+      "additionalProperties": false,
+      "description": "Per-(cell, sector) security-selection effect.",
+      "properties": {
+        "cell": {
+          "description": "Duration-cell label.",
+          "type": "string"
+        },
+        "sector": {
+          "description": "Sector label within the cell.",
+          "type": "string"
+        },
+        "selection_effect": {
+          "description": "Selection effect `y_st^P (r_st^P − r_st^B)`.",
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "required": [
+        "cell",
+        "sector",
+        "selection_effect"
+      ],
+      "type": "object"
+    }
+  },
+  "$id": "https://finstack_quant.dev/schemas/portfolio/1/grid_carino_linked_result.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Multi-period Carino-linked hierarchical grid attribution.",
+  "properties": {
+    "benchmark_return_compounded": {
+      "description": "Geometrically compounded benchmark return, `∏_t (1 + r_b,t) − 1`.",
+      "format": "double",
+      "type": "number"
+    },
+    "linked_curve": {
+      "description": "Sum of per-period Carino-scaled curve effects.\n\n`linked_curve + linked_sector + linked_selection` reconstructs\n`portfolio_return_compounded − benchmark_return_compounded` exactly.",
+      "format": "double",
+      "type": "number"
+    },
+    "linked_sector": {
+      "description": "Sum of per-period Carino-scaled sector allocation effects.",
+      "format": "double",
+      "type": "number"
+    },
+    "linked_selection": {
+      "description": "Sum of per-period Carino-scaled selection effects.",
+      "format": "double",
+      "type": "number"
+    },
+    "periods": {
+      "description": "Per-period single-period grid attribution results, in chronological\norder.",
+      "items": {
+        "$ref": "#/$defs/GridAttributionResult"
+      },
+      "type": "array"
+    },
+    "portfolio_return_compounded": {
+      "description": "Geometrically compounded portfolio return, `∏_t (1 + r_p,t) − 1`.",
+      "format": "double",
+      "type": "number"
+    }
+  },
+  "required": [
+    "periods",
+    "portfolio_return_compounded",
+    "benchmark_return_compounded",
+    "linked_curve",
+    "linked_sector",
+    "linked_selection"
+  ],
+  "title": "GridCarinoLinkedResult",
+  "type": "object"
+}

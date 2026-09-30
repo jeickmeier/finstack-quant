@@ -1,0 +1,157 @@
+{
+  "$defs": {
+    "CeclMethodology": {
+      "description": "CECL calculation methodology.\n\n[`CeclMethodology::PdLgdEad`] is the discounted PD-LGD-EAD integration;\n[`CeclMethodology::Warm`] is the undiscounted weighted-average remaining\nmaturity loss-rate method. (A `Vintage` variant existed through 0.6.x but\nwas removed before it was ever implemented — no cohort data model exists\nto support it honestly.)",
+      "oneOf": [
+        {
+          "const": "pd_lgd_ead",
+          "description": "PD-LGD-EAD approach (same formula as IFRS 9, always lifetime).",
+          "type": "string"
+        },
+        {
+          "const": "warm",
+          "description": "Weighted-Average Remaining Maturity (WARM) loss-rate method.\n\n`ECL = warm_annual_loss_rate × Σ EAD(t_mid) × Δt` — the average annual\ncharge-off rate applied to the amortization-adjusted exposure-years\nover the remaining contractual life (`Exposure::ead_at` over\n`remaining_maturity_years`). Undiscounted; PD term structures,\nscenarios, LGD, and EIR are not used. Credit-impaired exposures\nrequiring individual assessment should use\n[`CeclMethodology::PdLgdEad`].\n\n# References\n\n- ASC 326-20-30-3 (methodology flexibility); FASB Staff Q&A (2019),\n  \"Whether the WARM Method Is Acceptable\" — WARM is an acceptable\n  CECL loss-rate method for less complex pools. `docs/REFERENCES.md#asc-326-cecl`\n- Fed/FASB/SEC interagency webinar (April 2019): \"CECL:\n  Weighted-Average Remaining Maturity (WARM) Method.\" `docs/REFERENCES.md#asc-326-cecl`",
+          "type": "string"
+        }
+      ]
+    },
+    "MacroScenario": {
+      "additionalProperties": false,
+      "description": "A forward-looking macro scenario with a probability weight.\n\nUsed for probability-weighted ECL calculation per IFRS 9 B5.5.42.",
+      "properties": {
+        "id": {
+          "description": "Scenario identifier (e.g., \"base\", \"upside\", \"downside\").",
+          "type": "string"
+        },
+        "lgd_override": {
+          "description": "Optional LGD override for this scenario (downturn LGD).",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "weight": {
+          "description": "Probability weight in \\[0, 1\\]. All scenario weights must sum to 1.0.",
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "required": [
+        "id",
+        "weight"
+      ],
+      "type": "object"
+    },
+    "ReversionMethod": {
+      "description": "How the PD curve reverts from forecast to historical after the R&S period.",
+      "oneOf": [
+        {
+          "const": "immediate",
+          "description": "Immediate: PD jumps to historical at the R&S boundary.",
+          "type": "string"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Linear: PD linearly interpolates from forecast to historical over\na specified reversion period.",
+          "properties": {
+            "linear": {
+              "properties": {
+                "reversion_years": {
+                  "description": "Reversion period in years (e.g., 1.0 = 1-year linear fade).",
+                  "format": "double",
+                  "type": "number"
+                }
+              },
+              "required": [
+                "reversion_years"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "linear"
+          ],
+          "type": "object"
+        }
+      ]
+    }
+  },
+  "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/cecl_config.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Configuration for CECL (US GAAP ASC 326) calculation.",
+  "properties": {
+    "bucket_width_years": {
+      "description": "Time bucket width in years (same as IFRS 9). Default: 0.25.\nMust be finite and at least 0.0001 years (at most one million buckets\nfor the maximum supported 100-year maturity).",
+      "format": "double",
+      "type": "number"
+    },
+    "discount_expected_losses": {
+      "default": true,
+      "description": "Whether expected losses are discounted at the exposure EIR. Default:\ntrue for continuity with the existing PD-LGD-EAD implementation.",
+      "type": "boolean"
+    },
+    "forecast_horizon_years": {
+      "description": "Reasonable and supportable (R&S) forecast period in years.\nBeyond this horizon, PD reverts to historical average.\nTypical range: 1-3 years.",
+      "format": "double",
+      "type": "number"
+    },
+    "historical_annual_pd": {
+      "description": "Historical long-run annual PD used after the R&S period.",
+      "format": "double",
+      "type": "number"
+    },
+    "impaired_dpd_threshold": {
+      "default": 90,
+      "description": "DPD threshold at or above which an exposure is treated as\ncredit-impaired under CECL. Default: 90.",
+      "format": "uint32",
+      "minimum": 0,
+      "type": "integer"
+    },
+    "impaired_qualitative_triggers_enabled": {
+      "default": true,
+      "description": "Whether objective qualitative default evidence triggers the\ncredit-impaired CECL shortcut. Default: true.",
+      "type": "boolean"
+    },
+    "impaired_time_to_recovery_years": {
+      "default": 1.0,
+      "description": "Expected time to recovery / resolution for credit-impaired exposures,\nin years. Impaired allowance is current EAD less expected recovery\n`(1 - LGD) * EAD`, discounted to this horizon when discounting is enabled.\nDefault: 1.0.",
+      "format": "double",
+      "type": "number"
+    },
+    "methodology": {
+      "$ref": "#/$defs/CeclMethodology",
+      "description": "CECL methodology selection."
+    },
+    "reversion_method": {
+      "$ref": "#/$defs/ReversionMethod",
+      "description": "Reversion method: how PD transitions from R&S to historical."
+    },
+    "scenarios": {
+      "description": "Macro scenario specifications (same structure as IFRS 9).",
+      "items": {
+        "$ref": "#/$defs/MacroScenario"
+      },
+      "type": "array"
+    },
+    "warm_annual_loss_rate": {
+      "description": "Average annual net charge-off rate (decimal) for the WARM method.\nRequired when `methodology == CeclMethodology::Warm`; rejected otherwise.",
+      "format": "double",
+      "type": [
+        "number",
+        "null"
+      ]
+    }
+  },
+  "required": [
+    "bucket_width_years",
+    "forecast_horizon_years",
+    "reversion_method",
+    "historical_annual_pd",
+    "scenarios",
+    "methodology"
+  ],
+  "title": "CeclConfig",
+  "type": "object"
+}

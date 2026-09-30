@@ -1,0 +1,18 @@
+{
+  "$id": "https://finstack_quant.dev/schemas/models/1/option_type.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Option payoff direction used by analytical and numerical model engines.",
+  "oneOf": [
+    {
+      "const": "call",
+      "description": "Call option.",
+      "type": "string"
+    },
+    {
+      "const": "put",
+      "description": "Put option.",
+      "type": "string"
+    }
+  ],
+  "title": "OptionType"
+}

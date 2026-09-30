@@ -1,0 +1,23 @@
+{
+  "$id": "https://finstack_quant.dev/schemas/models/1/basis_kind.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Supported regression basis families for LSMC pricers.",
+  "oneOf": [
+    {
+      "const": "laguerre",
+      "description": "Laguerre polynomials normalized by strike.",
+      "type": "string"
+    },
+    {
+      "const": "polynomial",
+      "description": "Raw polynomial basis `{1, x, x², ...}`.",
+      "type": "string"
+    },
+    {
+      "const": "normalized_polynomial",
+      "description": "Polynomial basis centered and scaled by a supplied reference level.",
+      "type": "string"
+    }
+  ],
+  "title": "BasisKind"
+}

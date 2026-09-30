@@ -22,6 +22,57 @@ pub use registry::{
     COMMON_SCHEMA_BASE, COMMON_SCHEMA_DEFINITIONS, JSON_SCHEMA_DIALECT,
 };
 
+/// Register one schema artifact for a contract type under a crate's family.
+///
+/// Expands to a [`SchemaArtifact`] at
+/// `schemas/<family>/1/<file>.schema.json` whose `$id` is the matching
+/// `https://finstack_quant.dev/schemas/<family>/1/<file>.schema.json`. The
+/// title is the Rust type name, the description is `summary`, and the index
+/// kind is the named [`SchemaKind`] variant.
+///
+/// # Arguments
+///
+/// * `$ty` - Contract type in scope at the call site; must implement
+///   [`SerdeSchema`].
+/// * `$family` - Schema family directory (for example `"analytics"`).
+/// * `$file` - Snake-case file stem inside the family's `1/` directory.
+/// * `$kind` - [`SchemaKind`] variant name: `Input`, `Output` or `Component`.
+/// * `$summary` - One sentence describing the contract.
+///
+/// # Examples
+///
+/// ```rust
+/// use finstack_quant_core::market_data::context::MarketContextState;
+/// use finstack_quant_core::schema::SchemaArtifact;
+///
+/// const ENTRY: SchemaArtifact = finstack_quant_core::schema_artifact!(
+///     MarketContextState,
+///     "market_data",
+///     "market_context_state",
+///     Input,
+///     "Complete market-data snapshot."
+/// );
+/// assert_eq!(ENTRY.title, "MarketContextState");
+/// ```
+#[macro_export]
+macro_rules! schema_artifact {
+    ($ty:ident, $family:literal, $file:literal, $kind:ident, $summary:literal) => {
+        $crate::schema::SchemaArtifact::new::<$ty>(
+            concat!("schemas/", $family, "/1/", $file, ".schema.json"),
+            concat!(
+                "https://finstack_quant.dev/schemas/",
+                $family,
+                "/1/",
+                $file,
+                ".schema.json"
+            ),
+            stringify!($ty),
+            $summary,
+        )
+        .with_kind($crate::schema::SchemaKind::$kind)
+    };
+}
+
 /// A valid but empty market snapshot.
 ///
 /// Deliberately minimal: its job is to show the required-key shape, including

@@ -1,0 +1,33 @@
+{
+  "$defs": {
+    "DateWire": {
+      "description": "ISO 8601 calendar date encoded as a `YYYY-MM-DD` JSON string.",
+      "format": "date",
+      "type": "string"
+    }
+  },
+  "$id": "https://finstack_quant.dev/schemas/covenants/1/consequence_application.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Result of applying a covenant consequence.",
+  "properties": {
+    "applied_date": {
+      "$ref": "#/$defs/DateWire",
+      "description": "Date when applied"
+    },
+    "consequence_type": {
+      "description": "Type of consequence applied",
+      "type": "string"
+    },
+    "details": {
+      "description": "Details about the application",
+      "type": "string"
+    }
+  },
+  "required": [
+    "consequence_type",
+    "applied_date",
+    "details"
+  ],
+  "title": "ConsequenceApplication",
+  "type": "object"
+}

@@ -249,21 +249,38 @@ pub(crate) fn r_squared(returns: &[f64], benchmark: &[f64]) -> f64 {
 /// All fields are [`f64::NAN`] when fewer than three paired observations are
 /// available or the benchmark variance is zero.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct BetaResult {
     /// Estimated beta coefficient, or [`f64::NAN`] when it is not estimable
     /// together with the confidence interval.
     #[serde(with = "finstack_quant_core::wire::non_finite_f64")]
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "finstack_quant_core::wire::NonFiniteF64Wire")
+    )]
     pub beta: f64,
     /// Standard error of the beta estimate, or [`f64::NAN`] when undefined.
     #[serde(with = "finstack_quant_core::wire::non_finite_f64")]
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "finstack_quant_core::wire::NonFiniteF64Wire")
+    )]
     pub std_err: f64,
     /// Lower bound of the 95% confidence interval, or [`f64::NAN`] when
     /// undefined.
     #[serde(with = "finstack_quant_core::wire::non_finite_f64")]
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "finstack_quant_core::wire::NonFiniteF64Wire")
+    )]
     pub ci_lower: f64,
     /// Upper bound of the 95% confidence interval, or [`f64::NAN`] when
     /// undefined.
     #[serde(with = "finstack_quant_core::wire::non_finite_f64")]
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "finstack_quant_core::wire::NonFiniteF64Wire")
+    )]
     pub ci_upper: f64,
 }
 
@@ -472,19 +489,36 @@ fn jensen_alpha(
 /// zero-variance portfolio, and adjusted R-squared is `NaN` with fewer than
 /// three observations.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct GreeksResult {
     /// Annualized Jensen alpha, or [`f64::NAN`] when the regression slope is
     /// undefined.
     #[serde(with = "finstack_quant_core::wire::non_finite_f64")]
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "finstack_quant_core::wire::NonFiniteF64Wire")
+    )]
     pub alpha: f64,
     /// Beta (slope) of portfolio vs benchmark, or [`f64::NAN`] when undefined.
     #[serde(with = "finstack_quant_core::wire::non_finite_f64")]
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "finstack_quant_core::wire::NonFiniteF64Wire")
+    )]
     pub beta: f64,
     /// R-squared of the regression, or [`f64::NAN`] when undefined.
     #[serde(with = "finstack_quant_core::wire::non_finite_f64")]
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "finstack_quant_core::wire::NonFiniteF64Wire")
+    )]
     pub r_squared: f64,
     /// Adjusted R-squared of the regression, or [`f64::NAN`] when undefined.
     #[serde(with = "finstack_quant_core::wire::non_finite_f64")]
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "finstack_quant_core::wire::NonFiniteF64Wire")
+    )]
     pub adjusted_r_squared: f64,
 }
 
@@ -569,8 +603,13 @@ pub(crate) fn greeks(
 
 /// Rolling greeks output.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct RollingGreeks {
     /// End dates for each rolling window.
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "Vec<finstack_quant_core::wire::DateWire>")
+    )]
     pub dates: Vec<Date>,
     /// Rolling alpha values.
     pub alphas: Vec<f64>,
@@ -863,6 +902,7 @@ pub(crate) fn batting_average(returns: &[f64], benchmark: &[f64]) -> f64 {
 /// The default, used by the bindings when the kind is omitted, is
 /// [`ReturnKind::Excess`].
 #[derive(Debug, Clone, Copy, Default, PartialEq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(rename_all = "snake_case")]
 pub enum ReturnKind {
     /// `returns` are already excess returns. Alpha is the annualized OLS
@@ -921,6 +961,7 @@ impl std::str::FromStr for ReturnKind {
 
 /// Result of a multi-factor regression.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct MultiFactorResult {
     /// Annualized OLS intercept of the (possibly rf-adjusted) dependent series.
     pub alpha: f64,
@@ -928,6 +969,10 @@ pub struct MultiFactorResult {
     pub betas: Vec<f64>,
     /// Fraction of variance explained; NaN for a constant dependent series.
     #[serde(with = "finstack_quant_core::wire::non_finite_f64")]
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "finstack_quant_core::wire::NonFiniteF64Wire")
+    )]
     pub r_squared: f64,
     /// Adjusted R-squared; NaN when R-squared or residual degrees of freedom are undefined.
     ///
@@ -935,6 +980,10 @@ pub struct MultiFactorResult {
     /// adj_R² = 1 − (1 − R²) × (n − 1) / (n − k − 1)
     /// ```
     #[serde(with = "finstack_quant_core::wire::non_finite_f64")]
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "finstack_quant_core::wire::NonFiniteF64Wire")
+    )]
     pub adjusted_r_squared: f64,
     /// Annualized residual volatility.
     pub residual_vol: f64,

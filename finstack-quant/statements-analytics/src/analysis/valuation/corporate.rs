@@ -25,6 +25,7 @@ use finstack_quant_valuations::instruments::{Attributes, Instrument};
 /// `FinancialModelSpec::meta["currency"]`. Ratios such as
 /// `equity_value_per_share` are plain scalars.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct CorporateValuationResult {
     /// Equity value (EV - Net Debt, after discounts)
     pub equity_value: Money,
@@ -64,6 +65,7 @@ pub const DEFAULT_UFCF_NODE: &str = "ufcf";
 /// rejected. For example `{"exit_multiple_bump": {"relative": 0.10}}` keeps
 /// every other default and shocks the exit multiple by ±10%.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(default, deny_unknown_fields)]
 pub struct DcfOptions {
     /// Enable mid-year discounting convention (default: false).
@@ -152,6 +154,7 @@ impl Default for DcfOptions {
 /// ±1.0x). Relative bumps are decimal fractions of the base multiple
 /// (e.g. `Relative(0.10)` is ±10%).
 #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(rename_all = "snake_case")]
 pub enum ExitMultipleBump {
     /// Absolute bump in turns of the multiple.
@@ -309,6 +312,7 @@ const SENSITIVITY_CLAMP_EPSILON: f64 = 1e-12;
 /// `FinancialModelSpec::meta["currency"]`. Rates are decimal fractions
 /// (`0.10` means `10%`) and multiples are plain scalars (`9.5` means `9.5x`).
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct DcfSensitivityResult {
     /// Unshocked enterprise value the tornado deltas are measured against.
     pub baseline_enterprise_value: Money,

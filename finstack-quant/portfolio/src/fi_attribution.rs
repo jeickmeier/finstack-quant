@@ -214,6 +214,7 @@ impl ScaledL1Norm {
 /// docs. `period_years` has no serde default — an omitted key fails closed
 /// rather than silently assuming a period length.
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct FiAttributionConfig {
     /// Length of the attribution period in years (e.g. `0.25` for a
@@ -249,6 +250,7 @@ impl FiAttributionConfig {
 /// to 1.0 within each side. Returns, yields and spreads are decimals
 /// (`0.02` = 2 %); durations are in years.
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct FiPositionSnapshot {
     /// Sector bucket label (industry / quality / any grouping).
@@ -288,6 +290,7 @@ pub struct FiPositionSnapshot {
 /// Absolute Campisi component contributions for one side (portfolio or
 /// benchmark), each `Σ_j w_j × component_j`.
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct FiComponents {
     /// Income effect `Σ w · y · Δt`.
@@ -304,6 +307,7 @@ pub struct FiComponents {
 
 /// Per-sector benchmark-relative effects.
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct FiSectorEffect {
     /// Sector label (mirrors [`FiPositionSnapshot::sector`]).
@@ -347,6 +351,7 @@ pub struct FiSectorEffect {
 /// denies unknown fields like the other inbound types in this module, so a
 /// misspelled or stale key fails closed instead of being silently dropped.
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct FiAttributionResult {
     /// Per-sector effects, in first-seen order (portfolio first, then
@@ -377,6 +382,7 @@ pub struct FiAttributionResult {
 /// Report from reconciling the five effect totals against the active return,
 /// mirroring [`crate::attribution`] reconciliation conventions.
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct FiReconciliationReport {
     /// `active_return − (allocation + carry + treasury + spread + selection)`.
@@ -817,6 +823,7 @@ pub fn campisi_attribution(
 
 /// One attribution period's raw inputs for multi-period linking.
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct FiPeriodInput {
     /// Portfolio snapshots for the period.
@@ -827,6 +834,7 @@ pub struct FiPeriodInput {
 
 /// Carino-linked per-sector FI effects summed across periods.
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct FiLinkedSectorEffect {
     /// Sector label.
     pub sector: String,
@@ -846,6 +854,7 @@ pub struct FiLinkedSectorEffect {
 
 /// Multi-period Carino-linked Campisi attribution.
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct FiCarinoLinkedResult {
     /// Per-period single-period results, in chronological order.
     pub periods: Vec<FiAttributionResult>,

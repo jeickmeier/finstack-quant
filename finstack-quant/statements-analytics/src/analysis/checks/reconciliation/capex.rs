@@ -23,6 +23,7 @@ use finstack_quant_statements::Result;
 /// outflow should be normalized at ingest to a magnitude — the
 /// `sign_convention` field below flags violations at runtime).
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct CapexReconciliation {
     /// Capex from the cash flow statement (investing section).
     pub capex_cf_node: NodeId,

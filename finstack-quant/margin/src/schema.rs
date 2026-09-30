@@ -4,6 +4,16 @@ use serde::{Deserialize, Serialize};
 #[cfg(feature = "json-schema")]
 use serde_json::Value;
 
+#[cfg(feature = "json-schema")]
+use crate::{
+    calculators::CcpMethodology, metrics::ExcessCollateral, metrics::Haircut01,
+    metrics::MarginFundingCost, metrics::MarginUtilization, regulatory::EadResult,
+    regulatory::FrtbRiskClass, regulatory::FrtbSbaResult, regulatory::FrtbSensitivities,
+    regulatory::SaCcrNettingSetConfig, regulatory::SaCcrTrade, types::SimmSensitivitiesJson,
+    xva::mva::ImDecayProfile, xva::mva::MvaResult, xva::types::ExposureProfile,
+    xva::types::FundingConfig, xva::types::XvaResult, ImCollateralResult, ImResult, RepoMarginSpec,
+    ScheduleAssetClass, SimmSensitivities, SimmVersion, VmResult,
+};
 use crate::{CsaSpec, MarginCall, OtcMarginSpec};
 
 /// Stable base URI for margin-owned schemas.
@@ -164,6 +174,174 @@ pub const ARTIFACTS: &[finstack_quant_core::schema::SchemaArtifact] = &[
         "One of three closed root shapes: an OTC margin spec, a CSA spec, or a margin call.",
     )
     .with_examples(margin_examples),
+    finstack_quant_core::schema_artifact!(
+        CcpMethodology,
+        "margin",
+        "ccp_methodology",
+        Component,
+        "CCP methodology type."
+    ),
+    finstack_quant_core::schema_artifact!(
+        EadResult,
+        "margin",
+        "ead_result",
+        Output,
+        "SA-CCR Exposure at Default result."
+    ),
+    finstack_quant_core::schema_artifact!(
+        ExcessCollateral,
+        "margin",
+        "excess_collateral",
+        Output,
+        "Excess collateral result."
+    ),
+    finstack_quant_core::schema_artifact!(
+        ExposureProfile,
+        "margin",
+        "exposure_profile",
+        Input,
+        "Exposure profile computed at each time grid point."
+    ),
+    finstack_quant_core::schema_artifact!(
+        FrtbRiskClass,
+        "margin",
+        "frtb_risk_class",
+        Component,
+        "FRTB risk classes per BCBS d457."
+    ),
+    finstack_quant_core::schema_artifact!(
+        FrtbSbaResult,
+        "margin",
+        "frtb_sba_result",
+        Output,
+        "Complete FRTB SBA capital charge result."
+    ),
+    finstack_quant_core::schema_artifact!(
+        FrtbSensitivities,
+        "margin",
+        "frtb_sensitivities",
+        Input,
+        "FRTB sensitivity inputs organized by risk class."
+    ),
+    finstack_quant_core::schema_artifact!(
+        FundingConfig,
+        "margin",
+        "funding_config",
+        Input,
+        "Funding cost/benefit configuration for FVA and MVA calculation."
+    ),
+    finstack_quant_core::schema_artifact!(
+        Haircut01,
+        "margin",
+        "haircut01",
+        Output,
+        "Haircut sensitivity (Haircut01) result."
+    ),
+    finstack_quant_core::schema_artifact!(
+        ImCollateralResult,
+        "margin",
+        "im_collateral_result",
+        Output,
+        "One-way IM collateral account after applying the CSA's allocated threshold."
+    ),
+    finstack_quant_core::schema_artifact!(
+        ImDecayProfile,
+        "margin",
+        "im_decay_profile",
+        Input,
+        "Deterministic decay applied to today's SIMM IM to approximate `E[IM(t)]`."
+    ),
+    finstack_quant_core::schema_artifact!(
+        ImResult,
+        "margin",
+        "im_result",
+        Output,
+        "Initial margin calculation result."
+    ),
+    finstack_quant_core::schema_artifact!(
+        MarginFundingCost,
+        "margin",
+        "margin_funding_cost",
+        Output,
+        "Margin funding cost result."
+    ),
+    finstack_quant_core::schema_artifact!(
+        MarginUtilization,
+        "margin",
+        "margin_utilization",
+        Output,
+        "Margin utilization result."
+    ),
+    finstack_quant_core::schema_artifact!(
+        MvaResult,
+        "margin",
+        "mva_result",
+        Output,
+        "Result of an MVA computation."
+    ),
+    finstack_quant_core::schema_artifact!(
+        RepoMarginSpec,
+        "margin",
+        "repo_margin_spec",
+        Input,
+        "GMRA 2011 compliant repo margin specification."
+    ),
+    finstack_quant_core::schema_artifact!(
+        SaCcrNettingSetConfig,
+        "margin",
+        "sa_ccr_netting_set_config",
+        Input,
+        "Netting set configuration for SA-CCR."
+    ),
+    finstack_quant_core::schema_artifact!(
+        SaCcrTrade,
+        "margin",
+        "sa_ccr_trade",
+        Input,
+        "A single derivative trade for SA-CCR EAD computation."
+    ),
+    finstack_quant_core::schema_artifact!(
+        ScheduleAssetClass,
+        "margin",
+        "schedule_asset_class",
+        Component,
+        "Asset class for schedule-based IM calculation."
+    ),
+    finstack_quant_core::schema_artifact!(
+        SimmSensitivities,
+        "margin",
+        "simm_sensitivities",
+        Input,
+        "SIMM sensitivity inputs organized by risk class."
+    ),
+    finstack_quant_core::schema_artifact!(
+        SimmSensitivitiesJson,
+        "margin",
+        "simm_sensitivities_json",
+        Input,
+        "JSON-friendly representation of `SimmSensitivities`."
+    ),
+    finstack_quant_core::schema_artifact!(
+        SimmVersion,
+        "margin",
+        "simm_version",
+        Component,
+        "SIMM version identifier."
+    ),
+    finstack_quant_core::schema_artifact!(
+        VmResult,
+        "margin",
+        "vm_result",
+        Output,
+        "Variation margin calculation result."
+    ),
+    finstack_quant_core::schema_artifact!(
+        XvaResult,
+        "margin",
+        "xva_result",
+        Output,
+        "Result of XVA calculations."
+    ),
 ];
 
 /// Generate the published margin schema exactly as it is checked in.

@@ -21,6 +21,7 @@ use finstack_quant_valuations::instruments::RatesCurveKind;
 /// alone so the index can route spot, vol, FX, and series changes without
 /// a second abstraction layer.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(rename_all = "snake_case", deny_unknown_fields)]
 pub enum MarketFactorKey {
     /// A curve-like factor identified by ID and kind.

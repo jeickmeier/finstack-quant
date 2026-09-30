@@ -36,6 +36,7 @@ use super::types::LiquidityProfile;
 /// `eta` is the temporary impact coefficient, and `delta` is the power-law
 /// exponent (typically 0.5-0.6).
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct AlmgrenChrissModel {
     /// Permanent impact coefficient (gamma).
     gamma: f64,

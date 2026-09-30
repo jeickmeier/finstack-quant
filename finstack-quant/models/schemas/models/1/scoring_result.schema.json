@@ -1,0 +1,57 @@
+{
+  "$defs": {
+    "ScoringZone": {
+      "description": "Zone classification across all scoring models.\n\nRepresents the risk category derived from a model's score:\n- `Safe`: low bankruptcy probability.\n- `Grey`: ambiguous / requires further analysis.\n- `Distress`: high bankruptcy probability.",
+      "oneOf": [
+        {
+          "const": "safe",
+          "description": "Safe zone (low bankruptcy probability).",
+          "type": "string"
+        },
+        {
+          "const": "grey",
+          "description": "Grey zone (ambiguous).",
+          "type": "string"
+        },
+        {
+          "const": "distress",
+          "description": "Distress zone (high bankruptcy probability).",
+          "type": "string"
+        }
+      ]
+    }
+  },
+  "$id": "https://finstack_quant.dev/schemas/models/1/scoring_result.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Result from any academic scoring model.",
+  "properties": {
+    "implied_pd": {
+      "description": "Optional implied probability of default.\n\nAltman score results leave this as `None` unless an explicit,\nversioned heuristic calibration is requested. Ohlson and Zmijewski\nretain their native logistic and probit probabilities.",
+      "format": "double",
+      "type": [
+        "number",
+        "null"
+      ]
+    },
+    "model": {
+      "description": "Name of the model that produced this result.",
+      "type": "string"
+    },
+    "score": {
+      "description": "The raw score value (Z, Z', Z'', O, or Zmijewski Y).",
+      "format": "double",
+      "type": "number"
+    },
+    "zone": {
+      "$ref": "#/$defs/ScoringZone",
+      "description": "Risk zone classification (Safe/Grey/Distress)."
+    }
+  },
+  "required": [
+    "score",
+    "zone",
+    "model"
+  ],
+  "title": "ScoringResult",
+  "type": "object"
+}

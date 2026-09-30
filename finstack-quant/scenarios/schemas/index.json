@@ -8,6 +8,15 @@
       "summary": "Ordered shock and roll operations over market, statement and valuation targets.",
       "title": "Finstack Quant Scenario Specification",
       "type_name": "ScenarioEnvelope"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/scenarios/1/template_metadata.schema.json",
+      "bytes": 3880,
+      "kind": "output",
+      "path": "schemas/scenarios/1/template_metadata.schema.json",
+      "summary": "Descriptive metadata of a built-in scenario template.",
+      "title": "TemplateMetadata",
+      "type_name": "TemplateMetadata"
     }
   ],
   "schema_index_version": 1

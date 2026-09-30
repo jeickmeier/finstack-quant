@@ -31,6 +31,7 @@ use serde::{Deserialize, Serialize};
 /// or EBIT, so changing the DSCR numerator cannot silently redefine interest
 /// coverage.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct CreditContextMetrics {
     /// Cash DSCR by period: `CFADS / (interest_cash + principal)`.
     pub dscr: Vec<(PeriodId, f64)>,

@@ -1,0 +1,55 @@
+{
+  "$id": "https://finstack_quant.dev/schemas/analytics/1/lookback_returns.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Lookback returns for each period horizon.",
+  "properties": {
+    "fytd": {
+      "description": "Fiscal-year-to-date compounded return per ticker.",
+      "items": {
+        "format": "double",
+        "type": "number"
+      },
+      "type": "array"
+    },
+    "mtd": {
+      "description": "Month-to-date compounded return per ticker.",
+      "items": {
+        "format": "double",
+        "type": "number"
+      },
+      "type": "array"
+    },
+    "qtd": {
+      "description": "Quarter-to-date compounded return per ticker.",
+      "items": {
+        "format": "double",
+        "type": "number"
+      },
+      "type": "array"
+    },
+    "ticker_names": {
+      "description": "Ticker names aligned with every per-ticker vector below.",
+      "items": {
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "ytd": {
+      "description": "Year-to-date compounded return per ticker.",
+      "items": {
+        "format": "double",
+        "type": "number"
+      },
+      "type": "array"
+    }
+  },
+  "required": [
+    "ticker_names",
+    "mtd",
+    "qtd",
+    "ytd",
+    "fytd"
+  ],
+  "title": "LookbackReturns",
+  "type": "object"
+}

@@ -1,0 +1,54 @@
+{
+  "$defs": {
+    "BuiltInScheduleAssetClass": {
+      "description": "Built-in [`ScheduleAssetClass`] spellings.",
+      "oneOf": [
+        {
+          "const": "interest_rate",
+          "description": "`interest_rate`.",
+          "type": "string"
+        },
+        {
+          "const": "credit",
+          "description": "`credit`.",
+          "type": "string"
+        },
+        {
+          "const": "equity",
+          "description": "`equity`.",
+          "type": "string"
+        },
+        {
+          "const": "commodity",
+          "description": "`commodity`.",
+          "type": "string"
+        },
+        {
+          "const": "fx",
+          "description": "`fx`.",
+          "type": "string"
+        },
+        {
+          "const": "other",
+          "description": "`other`.",
+          "type": "string"
+        }
+      ]
+    }
+  },
+  "$id": "https://finstack_quant.dev/schemas/margin/1/schedule_asset_class.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "anyOf": [
+    {
+      "$ref": "#/$defs/BuiltInScheduleAssetClass",
+      "description": "One of the built-in asset classes."
+    },
+    {
+      "description": "A user-defined class, `custom_` followed by lowercase ASCII letters,\ndigits or underscores.",
+      "pattern": "^custom_[a-z0-9_]+$",
+      "type": "string"
+    }
+  ],
+  "description": "Asset class for schedule-based IM calculation.",
+  "title": "ScheduleAssetClass"
+}

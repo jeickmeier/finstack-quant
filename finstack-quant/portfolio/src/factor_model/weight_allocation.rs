@@ -10,6 +10,7 @@ const MAX_SOLVER_ITERATIONS: usize = 10_000;
 
 /// Strategy allocation scheme.
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(rename_all = "snake_case")]
 pub enum AllocationScheme {
     /// Equal weights across all strategies.
@@ -24,6 +25,7 @@ pub enum AllocationScheme {
 
 /// JSON specification for strategy-level allocation.
 #[derive(Clone, Debug, Deserialize, Serialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct WeightAllocationSpec {
     /// Allocation scheme to apply.
@@ -41,6 +43,7 @@ pub struct WeightAllocationSpec {
 
 /// Per-strategy allocation input row.
 #[derive(Clone, Debug, Deserialize, Serialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct StrategyAllocationInput {
     /// Stable strategy identifier.
@@ -56,6 +59,7 @@ pub struct StrategyAllocationInput {
 
 /// Strategy allocation result.
 #[derive(Clone, Debug, Deserialize, Serialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct WeightAllocationResult {
     /// Allocation scheme applied.
@@ -68,6 +72,7 @@ pub struct WeightAllocationResult {
 
 /// Per-strategy allocation output row.
 #[derive(Clone, Debug, Deserialize, Serialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct StrategyAllocation {
     /// Strategy identifier.
@@ -86,6 +91,7 @@ pub struct StrategyAllocation {
 
 /// Portfolio-level allocation diagnostics.
 #[derive(Clone, Debug, Deserialize, Serialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct AllocationDiagnostics {
     /// Sum of allocation weights.

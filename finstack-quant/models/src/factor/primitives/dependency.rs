@@ -71,6 +71,7 @@ impl fmt::Display for DependencyType {
 
 /// A single market dependency extracted from an instrument.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(rename_all = "snake_case", deny_unknown_fields)]
 pub enum MarketDependency {
     /// Discount, forward, or other rate curve.

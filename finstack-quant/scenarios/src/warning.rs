@@ -14,6 +14,7 @@ use finstack_quant_valuations::pricer::InstrumentType;
 /// always include a wildcard arm.
 #[non_exhaustive]
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum Warning {
     /// Par-spread shocks used the approximation delta hazard = delta spread / (1 - recovery).

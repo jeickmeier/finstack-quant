@@ -39,6 +39,7 @@ use super::{
 ///
 /// The first entry always records the initial state at time 0.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct RatingPath {
     /// Transition events as (time, state_index) pairs, starting with (0.0, s₀).
     transitions: Vec<(f64, usize)>,
@@ -144,6 +145,7 @@ impl RatingPath {
 /// assert_eq!(paths.len(), 1000);
 /// ```
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(try_from = "MigrationSimulatorWire")]
 pub struct MigrationSimulator {
     /// The generator matrix.
@@ -153,6 +155,7 @@ pub struct MigrationSimulator {
 }
 
 #[derive(Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 struct MigrationSimulatorWire {
     generator: GeneratorMatrix,

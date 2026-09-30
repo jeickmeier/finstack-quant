@@ -132,6 +132,7 @@ use std::sync::Arc;
 
 /// Geometric Brownian Motion parameters.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct GbmParams {
     /// Risk-free rate (annual)
     pub r: f64,

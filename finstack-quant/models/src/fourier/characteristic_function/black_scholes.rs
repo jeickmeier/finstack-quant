@@ -16,6 +16,7 @@ use num_complex::Complex64;
 /// - Black, F. & Scholes, M. (1973). "The Pricing of Options and Corporate
 ///   Liabilities." *Journal of Political Economy*, 81(3), 637-654. `docs/REFERENCES.md#black-scholes-1973`
 #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct BlackScholesCf {
     /// Risk-free rate.
     pub r: f64,

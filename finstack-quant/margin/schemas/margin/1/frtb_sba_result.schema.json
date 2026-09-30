@@ -1,0 +1,256 @@
+{
+  "$defs": {
+    "CorrelationScenario": {
+      "description": "FRTB correlation scenario for capital charge aggregation.\n\nThe final SBA capital charge is max(low, medium, high).\nLow and high scenarios scale prescribed correlations per BCBS d457,\nfloored/capped by the scenario-specific Basel formulas.",
+      "oneOf": [
+        {
+          "const": "low",
+          "description": "`rho_low = max(2 * rho_medium - 1, 0.75 * rho_medium)`",
+          "type": "string"
+        },
+        {
+          "const": "medium",
+          "description": "Prescribed correlation (base case).",
+          "type": "string"
+        },
+        {
+          "const": "high",
+          "description": "`rho_high = min(1.25 * rho_medium, cap)`",
+          "type": "string"
+        }
+      ]
+    },
+    "PositiveF64Wire": {
+      "description": "Finite JSON number that is strictly greater than zero.\n\nThis type is used by serde field adapters so runtime deserialization and\ngenerated schemas enforce the same positive-number contract.",
+      "exclusiveMinimum": 0.0,
+      "format": "double",
+      "type": "number"
+    },
+    "ResultsMeta": {
+      "description": "Metadata bundle that accompanies valuation outputs.\n\nThe metadata is intentionally small so it can be attached to reports and\ndownstream data stores for reproducibility and audit trails.\n\n# Examples\n```rust\nuse finstack_quant_core::config::{results_meta, FinstackConfig, NUMERIC_MODE_F64};\n\nlet meta = results_meta(&FinstackConfig::default());\nassert_eq!(meta.numeric_mode, NUMERIC_MODE_F64);\nassert!(meta.timestamp.is_none()); // deterministic by default\n```",
+      "properties": {
+        "fx_policy_applied": {
+          "default": null,
+          "description": "Optional FX policy applied by the computing layer (human-readable key).",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "numeric_mode": {
+          "description": "Numeric engine mode used to produce the results.\n\nAlways [`NUMERIC_MODE_F64`] today; a plain string so result\nenvelopes stay wire-compatible across host languages.",
+          "type": "string"
+        },
+        "parallel": {
+          "description": "Whether the producing computation ran in parallel.\n\nSerial results omit the field entirely so existing payloads and golden\nfiles stay byte-identical.",
+          "type": "boolean"
+        },
+        "rounding": {
+          "$ref": "#/$defs/RoundingContext",
+          "description": "Rounding context snapshot applied to IO boundaries."
+        },
+        "timestamp": {
+          "description": "Timestamp when result was computed (ISO 8601 format).\nUseful for audit trails and reproducibility.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "version": {
+          "description": "Finstack Quant library version used to produce the result.",
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "numeric_mode",
+        "rounding"
+      ],
+      "type": "object"
+    },
+    "RoundingContext": {
+      "description": "Snapshot of active rounding settings used for result stamping.\n\nInstances are typically produced via [`rounding_context_from`] and persisted\nalongside valuation results.",
+      "properties": {
+        "ingest_scale_by_currency": {
+          "additionalProperties": {
+            "format": "uint32",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "description": "Ingest scale map snapshot by currency code.",
+          "type": "object"
+        },
+        "mode": {
+          "$ref": "#/$defs/RoundingMode",
+          "description": "Active rounding mode."
+        },
+        "output_scale_by_currency": {
+          "additionalProperties": {
+            "format": "uint32",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "description": "Output scale map snapshot by currency code.",
+          "type": "object"
+        },
+        "tolerances": {
+          "$ref": "#/$defs/ToleranceConfig",
+          "default": {
+            "generic_epsilon": 1e-10,
+            "rate_epsilon": 1e-12
+          },
+          "description": "Tolerance settings snapshot for floating-point comparisons."
+        },
+        "version": {
+          "description": "Schema version for forward compatibility.",
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "mode",
+        "ingest_scale_by_currency",
+        "output_scale_by_currency",
+        "version"
+      ],
+      "type": "object"
+    },
+    "RoundingMode": {
+      "description": "Rounding modes supported by the library.\n\nThe variants mirror the most common conventions found in pricing engines.\n\n# Examples\n```rust\nuse finstack_quant_core::config::{FinstackConfig, RoundingMode};\n\nlet mut cfg = FinstackConfig::default();\ncfg.rounding.mode = RoundingMode::TowardZero;\nassert!(matches!(cfg.rounding.mode, RoundingMode::TowardZero));\n```",
+      "oneOf": [
+        {
+          "const": "bankers",
+          "description": "Banker's rounding (ties to even).",
+          "type": "string"
+        },
+        {
+          "const": "away_from_zero",
+          "description": "Round halves away from zero.",
+          "type": "string"
+        },
+        {
+          "const": "toward_zero",
+          "description": "Round toward zero (truncate).",
+          "type": "string"
+        },
+        {
+          "const": "floor",
+          "description": "Round toward negative infinity.",
+          "type": "string"
+        },
+        {
+          "const": "ceil",
+          "description": "Round toward positive infinity.",
+          "type": "string"
+        }
+      ]
+    },
+    "ToleranceConfig": {
+      "additionalProperties": false,
+      "description": "Numerical tolerance configuration for floating-point comparisons.\n\nProvides configurable epsilon values for zero-checks in rate calculations\nand generic floating-point comparisons. These defaults are chosen to balance\nnumerical stability with practical precision requirements.\n\n# Examples\n```rust\nuse finstack_quant_core::config::ToleranceConfig;\n\nlet mut tol = ToleranceConfig::default();\nassert_eq!(tol.rate_epsilon, 1e-12);\n\n// Customize for stricter rate comparisons\ntol.rate_epsilon = 1e-14;\n```",
+      "properties": {
+        "generic_epsilon": {
+          "$ref": "#/$defs/PositiveF64Wire",
+          "default": 1e-10,
+          "description": "Epsilon for generic floating-point comparisons (default: 1e-10).\n\nUsed for general numerical comparisons where higher tolerance is acceptable."
+        },
+        "rate_epsilon": {
+          "$ref": "#/$defs/PositiveF64Wire",
+          "default": 1e-12,
+          "description": "Epsilon for rate comparisons (default: 1e-12).\n\nUsed when comparing interest rates, yields, and other small ratios."
+        }
+      },
+      "type": "object"
+    }
+  },
+  "$id": "https://finstack_quant.dev/schemas/margin/1/frtb_sba_result.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Complete FRTB SBA capital charge result.",
+  "properties": {
+    "binding_scenario": {
+      "$ref": "#/$defs/CorrelationScenario",
+      "description": "Which correlation scenario produced the binding charge for each component."
+    },
+    "curvature_by_risk_class": {
+      "additionalProperties": {
+        "format": "double",
+        "type": "number"
+      },
+      "description": "Curvature risk charge by risk class.",
+      "type": "object"
+    },
+    "delta_by_risk_class": {
+      "additionalProperties": {
+        "format": "double",
+        "type": "number"
+      },
+      "description": "Delta risk charge by risk class.",
+      "type": "object"
+    },
+    "drc": {
+      "description": "Default Risk Charge (credit + equity).",
+      "format": "double",
+      "type": "number"
+    },
+    "meta": {
+      "$ref": "#/$defs/ResultsMeta",
+      "default": {
+        "fx_policy_applied": null,
+        "numeric_mode": "f64",
+        "rounding": {
+          "ingest_scale_by_currency": {},
+          "mode": "bankers",
+          "output_scale_by_currency": {},
+          "tolerances": {
+            "generic_epsilon": 1e-10,
+            "rate_epsilon": 1e-12
+          },
+          "version": 1
+        },
+        "version": "0.9.0"
+      },
+      "description": "Policy metadata stamped by the computing layer: numeric mode, active\nrounding context, any applied FX policy, and the parallel-execution\nflag."
+    },
+    "rrao": {
+      "description": "Residual Risk Add-On.",
+      "format": "double",
+      "type": "number"
+    },
+    "scenario_charges": {
+      "additionalProperties": {
+        "format": "double",
+        "type": "number"
+      },
+      "description": "Delta+Vega+Curvature charge under each scenario (for transparency).",
+      "type": "object"
+    },
+    "total": {
+      "description": "Total capital charge (sum of all components).",
+      "format": "double",
+      "type": "number"
+    },
+    "vega_by_risk_class": {
+      "additionalProperties": {
+        "format": "double",
+        "type": "number"
+      },
+      "description": "Vega risk charge by risk class.",
+      "type": "object"
+    }
+  },
+  "required": [
+    "total",
+    "delta_by_risk_class",
+    "vega_by_risk_class",
+    "curvature_by_risk_class",
+    "drc",
+    "rrao",
+    "binding_scenario",
+    "scenario_charges"
+  ],
+  "title": "FrtbSbaResult",
+  "type": "object"
+}

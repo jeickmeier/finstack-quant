@@ -1,0 +1,48 @@
+{
+  "$id": "https://finstack_quant.dev/schemas/models/1/rough_heston_fourier_params.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Rough Heston model parameters for Fourier-based European option pricing.",
+  "properties": {
+    "hurst": {
+      "description": "Hurst exponent.",
+      "format": "double",
+      "type": "number"
+    },
+    "kappa": {
+      "description": "Mean reversion speed.",
+      "format": "double",
+      "type": "number"
+    },
+    "rho": {
+      "description": "Spot-vol correlation.",
+      "format": "double",
+      "type": "number"
+    },
+    "sigma": {
+      "description": "Vol-of-vol.",
+      "format": "double",
+      "type": "number"
+    },
+    "theta": {
+      "description": "Long-run variance.",
+      "format": "double",
+      "type": "number"
+    },
+    "v0": {
+      "description": "Initial variance.",
+      "format": "double",
+      "type": "number"
+    }
+  },
+  "required": [
+    "v0",
+    "kappa",
+    "theta",
+    "sigma",
+    "rho",
+    "hurst"
+  ],
+  "title": "RoughHestonFourierParams",
+  "type": "object"
+}

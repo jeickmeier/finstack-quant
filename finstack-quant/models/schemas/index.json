@@ -35,6 +35,879 @@
       "summary": "Factor definitions, matchers and covariance settings.",
       "title": "Finstack Quant Factor Model Configuration",
       "type_name": "FactorModelConfigEnvelope"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/models/1/almgren_chriss_model.schema.json",
+      "bytes": 787,
+      "kind": "input",
+      "path": "schemas/models/1/almgren_chriss_model.schema.json",
+      "summary": "Almgren-Chriss (2001) market impact model.",
+      "title": "AlmgrenChrissModel",
+      "type_name": "AlmgrenChrissModel"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/models/1/altman_z_double_prime_input.schema.json",
+      "bytes": 1128,
+      "kind": "input",
+      "path": "schemas/models/1/altman_z_double_prime_input.schema.json",
+      "summary": "Input ratios for the Altman Z''-Score (non-manufacturing firms).",
+      "title": "AltmanZDoublePrimeInput",
+      "type_name": "AltmanZDoublePrimeInput"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/models/1/altman_z_prime_input.schema.json",
+      "bytes": 1270,
+      "kind": "input",
+      "path": "schemas/models/1/altman_z_prime_input.schema.json",
+      "summary": "Input ratios for the Altman Z'-Score (private firms).",
+      "title": "AltmanZPrimeInput",
+      "type_name": "AltmanZPrimeInput"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/models/1/altman_z_score_input.schema.json",
+      "bytes": 1275,
+      "kind": "input",
+      "path": "schemas/models/1/altman_z_score_input.schema.json",
+      "summary": "Input ratios for the original Altman Z-Score (1968).",
+      "title": "AltmanZScoreInput",
+      "type_name": "AltmanZScoreInput"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/models/1/arbitrage_check_config.schema.json",
+      "bytes": 2942,
+      "kind": "input",
+      "path": "schemas/models/1/arbitrage_check_config.schema.json",
+      "summary": "Configuration for the arbitrage detection suite.",
+      "title": "ArbitrageCheckConfig",
+      "type_name": "ArbitrageCheckConfig"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/models/1/arbitrage_report.schema.json",
+      "bytes": 6527,
+      "kind": "output",
+      "path": "schemas/models/1/arbitrage_report.schema.json",
+      "summary": "Aggregated arbitrage report for a volatility surface.",
+      "title": "ArbitrageReport",
+      "type_name": "ArbitrageReport"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/models/1/arbitrage_validation_result.schema.json",
+      "bytes": 2630,
+      "kind": "output",
+      "path": "schemas/models/1/arbitrage_validation_result.schema.json",
+      "summary": "Result of arbitrage validation, containing any violations found.",
+      "title": "ArbitrageValidationResult",
+      "type_name": "ArbitrageValidationResult"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/models/1/averaging_method.schema.json",
+      "bytes": 484,
+      "kind": "component",
+      "path": "schemas/models/1/averaging_method.schema.json",
+      "summary": "Asian averaging method.",
+      "title": "AveragingMethod",
+      "type_name": "AveragingMethod"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/models/1/basis_kind.schema.json",
+      "bytes": 686,
+      "kind": "component",
+      "path": "schemas/models/1/basis_kind.schema.json",
+      "summary": "Supported regression basis families for LSMC pricers.",
+      "title": "BasisKind",
+      "type_name": "BasisKind"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/models/1/black_scholes_cf.schema.json",
+      "bytes": 664,
+      "kind": "component",
+      "path": "schemas/models/1/black_scholes_cf.schema.json",
+      "summary": "Black-Scholes characteristic function.",
+      "title": "BlackScholesCf",
+      "type_name": "BlackScholesCf"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/models/1/brownian_params.schema.json",
+      "bytes": 600,
+      "kind": "input",
+      "path": "schemas/models/1/brownian_params.schema.json",
+      "summary": "Parameters for one-dimensional Brownian motion with drift.",
+      "title": "BrownianParams",
+      "type_name": "BrownianParams"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/models/1/bs_greeks.schema.json",
+      "bytes": 1231,
+      "kind": "component",
+      "path": "schemas/models/1/bs_greeks.schema.json",
+      "summary": "Black–Scholes/Garman–Kohlhagen Greeks (per unit, not scaled by contract size).",
+      "title": "BsGreeks",
+      "type_name": "BsGreeks"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/models/1/cheyette_rough_vol_params.schema.json",
+      "bytes": 1494,
+      "kind": "input",
+      "path": "schemas/models/1/cheyette_rough_vol_params.schema.json",
+      "summary": "Cheyette + rough stochastic volatility model parameters.",
+      "title": "CheyetteRoughVolParams",
+      "type_name": "CheyetteRoughVolParams"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/models/1/cir_params.schema.json",
+      "bytes": 673,
+      "kind": "input",
+      "path": "schemas/models/1/cir_params.schema.json",
+      "summary": "CIR process parameters.",
+      "title": "CirParams",
+      "type_name": "CirParams"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/models/1/correlation_structure.schema.json",
+      "bytes": 1941,
+      "kind": "component",
+      "path": "schemas/models/1/correlation_structure.schema.json",
+      "summary": "Correlation structure specification.",
+      "title": "CorrelationStructure",
+      "type_name": "CorrelationStructure"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/models/1/cos_config.schema.json",
+      "bytes": 825,
+      "kind": "input",
+      "path": "schemas/models/1/cos_config.schema.json",
+      "summary": "COS method configuration.",
+      "title": "CosConfig",
+      "type_name": "CosConfig"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/models/1/credit_exposure.schema.json",
+      "bytes": 1145,
+      "kind": "component",
+      "path": "schemas/models/1/credit_exposure.schema.json",
+      "summary": "One name in a finite credit portfolio.",
+      "title": "CreditExposure",
+      "type_name": "CreditExposure"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/models/1/credit_state.schema.json",
+      "bytes": 1377,
+      "kind": "component",
+      "path": "schemas/models/1/credit_state.schema.json",
+      "summary": "Observable credit state at a point in time.",
+      "title": "CreditState",
+      "type_name": "CreditState"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/models/1/decomposition_config.schema.json",
+      "bytes": 1543,
+      "kind": "input",
+      "path": "schemas/models/1/decomposition_config.schema.json",
+      "summary": "Configuration for position-level VaR decomposition.",
+      "title": "DecompositionConfig",
+      "type_name": "DecompositionConfig"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/models/1/diebold_li.schema.json",
+      "bytes": 4959,
+      "kind": "component",
+      "path": "schemas/models/1/diebold_li.schema.json",
+      "summary": "Diebold-Li (2006) dynamic Nelson-Siegel model.",
+      "title": "DieboldLi",
+      "type_name": "DieboldLi"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/models/1/downturn_lgd.schema.json",
+      "bytes": 3700,
+      "kind": "component",
+      "path": "schemas/models/1/downturn_lgd.schema.json",
+      "summary": "Downturn LGD adjuster.",
+      "title": "DownturnLgd",
+      "type_name": "DownturnLgd"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/models/1/dynamic_recovery_spec.schema.json",
+      "bytes": 3514,
+      "kind": "input",
+      "path": "schemas/models/1/dynamic_recovery_spec.schema.json",
+      "summary": "Specification for dynamic (notional-dependent) recovery rate.",
+      "title": "DynamicRecoverySpec",
+      "type_name": "DynamicRecoverySpec"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/models/1/ead_calculator.schema.json",
+      "bytes": 1232,
+      "kind": "component",
+      "path": "schemas/models/1/ead_calculator.schema.json",
+      "summary": "Exposure at Default calculator.",
+      "title": "EadCalculator",
+      "type_name": "EadCalculator"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/models/1/endogenous_hazard_spec.schema.json",
+      "bytes": 3408,
+      "kind": "input",
+      "path": "schemas/models/1/endogenous_hazard_spec.schema.json",
+      "summary": "Specification for endogenous (leverage-dependent) hazard rate.",
+      "title": "EndogenousHazardSpec",
+      "type_name": "EndogenousHazardSpec"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/models/1/estimate.schema.json",
+      "bytes": 3105,
+      "kind": "output",
+      "path": "schemas/models/1/estimate.schema.json",
+      "summary": "Numeric Monte Carlo estimate for discounted path values.",
+      "title": "Estimate",
+      "type_name": "Estimate"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/models/1/exchange_offer_analysis.schema.json",
+      "bytes": 3065,
+      "kind": "output",
+      "path": "schemas/models/1/exchange_offer_analysis.schema.json",
+      "summary": "Hold-versus-tender economics of a distressed exchange offer.",
+      "title": "ExchangeOfferAnalysis",
+      "type_name": "ExchangeOfferAnalysis"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/models/1/execution_trajectory.schema.json",
+      "bytes": 1292,
+      "kind": "component",
+      "path": "schemas/models/1/execution_trajectory.schema.json",
+      "summary": "Optimal execution schedule for a trade.",
+      "title": "ExecutionTrajectory",
+      "type_name": "ExecutionTrajectory"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/models/1/exercise_style.schema.json",
+      "bytes": 641,
+      "kind": "component",
+      "path": "schemas/models/1/exercise_style.schema.json",
+      "summary": "Exercise schedule convention for option models.",
+      "title": "ExerciseStyle",
+      "type_name": "ExerciseStyle"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/models/1/forward_greeks.schema.json",
+      "bytes": 886,
+      "kind": "component",
+      "path": "schemas/models/1/forward_greeks.schema.json",
+      "summary": "Undiscounted forward Greeks of a European option on a forward.",
+      "title": "ForwardGreeks",
+      "type_name": "ForwardGreeks"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/models/1/gbm_params.schema.json",
+      "bytes": 670,
+      "kind": "input",
+      "path": "schemas/models/1/gbm_params.schema.json",
+      "summary": "Geometric Brownian Motion parameters.",
+      "title": "GbmParams",
+      "type_name": "GbmParams"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/models/1/gbm_path_summary.schema.json",
+      "bytes": 1179,
+      "kind": "output",
+      "path": "schemas/models/1/gbm_path_summary.schema.json",
+      "summary": "Compact captured GBM paths for plotting and diagnostics.",
+      "title": "GbmPathSummary",
+      "type_name": "GbmPathSummary"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/models/1/heston_params.schema.json",
+      "bytes": 967,
+      "kind": "input",
+      "path": "schemas/models/1/heston_params.schema.json",
+      "summary": "Heston stochastic volatility model parameters.",
+      "title": "HestonParams",
+      "type_name": "HestonParams"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/models/1/heston_pricing_params.schema.json",
+      "bytes": 1281,
+      "kind": "input",
+      "path": "schemas/models/1/heston_pricing_params.schema.json",
+      "summary": "Market inputs for closed-form Heston pricing.",
+      "title": "HestonPricingParams",
+      "type_name": "HestonPricingParams"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/models/1/hull_white1_f_params.schema.json",
+      "bytes": 1342,
+      "kind": "input",
+      "path": "schemas/models/1/hull_white1_f_params.schema.json",
+      "summary": "Validated Hull-White one-factor process parameters.",
+      "title": "HullWhite1FParams",
+      "type_name": "HullWhite1FParams"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/models/1/hull_white_calibration_params.schema.json",
+      "bytes": 511,
+      "kind": "input",
+      "path": "schemas/models/1/hull_white_calibration_params.schema.json",
+      "summary": "Validated constant-parameter Hull-White one-factor model.",
+      "title": "HullWhiteCalibrationParams",
+      "type_name": "HullWhiteCalibrationParams"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/models/1/hull_white_params.schema.json",
+      "bytes": 1058,
+      "kind": "input",
+      "path": "schemas/models/1/hull_white_params.schema.json",
+      "summary": "Hull-White parameters with piecewise-constant short-rate volatility.",
+      "title": "HullWhiteParams",
+      "type_name": "HullWhiteParams"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/models/1/impact_estimate.schema.json",
+      "bytes": 1443,
+      "kind": "output",
+      "path": "schemas/models/1/impact_estimate.schema.json",
+      "summary": "Estimated market-impact execution *costs* from a trade.",
+      "title": "ImpactEstimate",
+      "type_name": "ImpactEstimate"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/models/1/kyle_lambda_model.schema.json",
+      "bytes": 441,
+      "kind": "input",
+      "path": "schemas/models/1/kyle_lambda_model.schema.json",
+      "summary": "Kyle (1985) price impact model.",
+      "title": "KyleLambdaModel",
+      "type_name": "KyleLambdaModel"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/models/1/latent_factor_spec.schema.json",
+      "bytes": 2779,
+      "kind": "input",
+      "path": "schemas/models/1/latent_factor_spec.schema.json",
+      "summary": "Factor model specification for configuration and serialization.",
+      "title": "LatentFactorSpec",
+      "type_name": "LatentFactorSpec"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/models/1/levels_at_date.schema.json",
+      "bytes": 3464,
+      "kind": "component",
+      "path": "schemas/models/1/levels_at_date.schema.json",
+      "summary": "Snapshot of all hierarchy-level factor values at a single date, produced from observed issuer spreads.",
+      "title": "LevelsAtDate",
+      "type_name": "LevelsAtDate"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/models/1/liquidity_config.schema.json",
+      "bytes": 722,
+      "kind": "input",
+      "path": "schemas/models/1/liquidity_config.schema.json",
+      "summary": "Configuration for liquidity calculations.",
+      "title": "LiquidityConfig",
+      "type_name": "LiquidityConfig"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/models/1/liquidity_tier.schema.json",
+      "bytes": 875,
+      "kind": "component",
+      "path": "schemas/models/1/liquidity_tier.schema.json",
+      "summary": "Liquidity tier classification based on days-to-liquidate.",
+      "title": "LiquidityTier",
+      "type_name": "LiquidityTier"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/models/1/lme_analysis.schema.json",
+      "bytes": 4229,
+      "kind": "output",
+      "path": "schemas/models/1/lme_analysis.schema.json",
+      "summary": "Issuer-side economics of a liability management exercise.",
+      "title": "LmeAnalysis",
+      "type_name": "LmeAnalysis"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/models/1/lmm_params.schema.json",
+      "bytes": 2268,
+      "kind": "input",
+      "path": "schemas/models/1/lmm_params.schema.json",
+      "summary": "Parameters for the LMM/BGM model.",
+      "title": "LmmParams",
+      "type_name": "LmmParams"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/models/1/lvar_bangia_scalar.schema.json",
+      "bytes": 1052,
+      "kind": "component",
+      "path": "schemas/models/1/lvar_bangia_scalar.schema.json",
+      "summary": "Scalar Bangia LVaR outputs for an isolated position where relative spread statistics are already known.",
+      "title": "LvarBangiaScalar",
+      "type_name": "LvarBangiaScalar"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/models/1/market_dependency.schema.json",
+      "bytes": 25891,
+      "kind": "component",
+      "path": "schemas/models/1/market_dependency.schema.json",
+      "summary": "A single market dependency extracted from an instrument.",
+      "title": "MarketDependency",
+      "type_name": "MarketDependency"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/models/1/master_scale.schema.json",
+      "bytes": 1371,
+      "kind": "component",
+      "path": "schemas/models/1/master_scale.schema.json",
+      "summary": "A master scale mapping continuous PDs to discrete rating grades.",
+      "title": "MasterScale",
+      "type_name": "MasterScale"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/models/1/master_scale_result.schema.json",
+      "bytes": 913,
+      "kind": "output",
+      "path": "schemas/models/1/master_scale_result.schema.json",
+      "summary": "Result of mapping a PD to a master scale grade.",
+      "title": "MasterScaleResult",
+      "type_name": "MasterScaleResult"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/models/1/merton_jump_cf.schema.json",
+      "bytes": 1112,
+      "kind": "component",
+      "path": "schemas/models/1/merton_jump_cf.schema.json",
+      "summary": "Merton (1976) jump-diffusion characteristic function.",
+      "title": "MertonJumpCf",
+      "type_name": "MertonJumpCf"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/models/1/merton_model.schema.json",
+      "bytes": 5700,
+      "kind": "input",
+      "path": "schemas/models/1/merton_model.schema.json",
+      "summary": "Merton structural credit model.",
+      "title": "MertonModel",
+      "type_name": "MertonModel"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/models/1/migration_simulator.schema.json",
+      "bytes": 3503,
+      "kind": "component",
+      "path": "schemas/models/1/migration_simulator.schema.json",
+      "summary": "Simulator for generating rating paths from a generator matrix.",
+      "title": "MigrationSimulator",
+      "type_name": "MigrationSimulator"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/models/1/monte_carlo_result.schema.json",
+      "bytes": 35935,
+      "kind": "output",
+      "path": "schemas/models/1/monte_carlo_result.schema.json",
+      "summary": "Monte Carlo pricing result with optional captured paths.",
+      "title": "MonteCarloResult",
+      "type_name": "MonteCarloResult"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/models/1/multi_ou_params.schema.json",
+      "bytes": 1164,
+      "kind": "input",
+      "path": "schemas/models/1/multi_ou_params.schema.json",
+      "summary": "Parameters for a multi-dimensional Ornstein-Uhlenbeck process.",
+      "title": "MultiOuParams",
+      "type_name": "MultiOuParams"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/models/1/ohlson_o_score_input.schema.json",
+      "bytes": 3457,
+      "kind": "input",
+      "path": "schemas/models/1/ohlson_o_score_input.schema.json",
+      "summary": "Input for the Ohlson O-Score logistic model (1980).",
+      "title": "OhlsonOScoreInput",
+      "type_name": "OhlsonOScoreInput"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/models/1/option_kind.schema.json",
+      "bytes": 471,
+      "kind": "component",
+      "path": "schemas/models/1/option_kind.schema.json",
+      "summary": "Vanilla option kind for barrier payoff evaluation.",
+      "title": "OptionKind",
+      "type_name": "OptionKind"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/models/1/option_type.schema.json",
+      "bytes": 468,
+      "kind": "component",
+      "path": "schemas/models/1/option_type.schema.json",
+      "summary": "Option payoff direction used by analytical and numerical model engines.",
+      "title": "OptionType",
+      "type_name": "OptionType"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/models/1/parametric_es_decomposition_view.schema.json",
+      "bytes": 2151,
+      "kind": "output",
+      "path": "schemas/models/1/parametric_es_decomposition_view.schema.json",
+      "summary": "Serializable Expected Shortfall decomposition view.",
+      "title": "ParametricEsDecompositionView",
+      "type_name": "ParametricEsDecompositionView"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/models/1/pd_cycle_params.schema.json",
+      "bytes": 871,
+      "kind": "input",
+      "path": "schemas/models/1/pd_cycle_params.schema.json",
+      "summary": "Parameters for the Merton-Vasicek single-factor PiT/TtC conversion.",
+      "title": "PdCycleParams",
+      "type_name": "PdCycleParams"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/models/1/period_decomposition.schema.json",
+      "bytes": 3296,
+      "kind": "output",
+      "path": "schemas/models/1/period_decomposition.schema.json",
+      "summary": "Difference between two `LevelsAtDate` snapshots.",
+      "title": "PeriodDecomposition",
+      "type_name": "PeriodDecomposition"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/models/1/pool_granularity.schema.json",
+      "bytes": 881,
+      "kind": "component",
+      "path": "schemas/models/1/pool_granularity.schema.json",
+      "summary": "AssetPool-granularity policy for the structured-credit default engine.",
+      "title": "PoolGranularity",
+      "type_name": "PoolGranularity"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/models/1/portfolio_loss_config.schema.json",
+      "bytes": 3761,
+      "kind": "input",
+      "path": "schemas/models/1/portfolio_loss_config.schema.json",
+      "summary": "Portfolio credit-loss simulation settings.",
+      "title": "PortfolioLossConfig",
+      "type_name": "PortfolioLossConfig"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/models/1/portfolio_loss_result.schema.json",
+      "bytes": 1259,
+      "kind": "output",
+      "path": "schemas/models/1/portfolio_loss_result.schema.json",
+      "summary": "Portfolio credit-loss distribution and tail statistics.",
+      "title": "PortfolioLossResult",
+      "type_name": "PortfolioLossResult"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/models/1/position_risk_decomposition.schema.json",
+      "bytes": 6771,
+      "kind": "output",
+      "path": "schemas/models/1/position_risk_decomposition.schema.json",
+      "summary": "Complete position-level risk decomposition of a portfolio.",
+      "title": "PositionRiskDecomposition",
+      "type_name": "PositionRiskDecomposition"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/models/1/rating_factor_table.schema.json",
+      "bytes": 716,
+      "kind": "component",
+      "path": "schemas/models/1/rating_factor_table.schema.json",
+      "summary": "Rating factor table for a specific rating-agency methodology.",
+      "title": "RatingFactorTable",
+      "type_name": "RatingFactorTable"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/models/1/rating_path.schema.json",
+      "bytes": 2569,
+      "kind": "component",
+      "path": "schemas/models/1/rating_path.schema.json",
+      "summary": "A simulated rating trajectory: sequence of (time, state_index) pairs.",
+      "title": "RatingPath",
+      "type_name": "RatingPath"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/models/1/recovery_claim.schema.json",
+      "bytes": 1540,
+      "kind": "component",
+      "path": "schemas/models/1/recovery_claim.schema.json",
+      "summary": "A claim participating in a recovery waterfall.",
+      "title": "RecoveryClaim",
+      "type_name": "RecoveryClaim"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/models/1/recovery_spec.schema.json",
+      "bytes": 2037,
+      "kind": "input",
+      "path": "schemas/models/1/recovery_spec.schema.json",
+      "summary": "Recovery model specification for configuration and serialization.",
+      "title": "RecoverySpec",
+      "type_name": "RecoverySpec"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/models/1/recovery_waterfall_result.schema.json",
+      "bytes": 2922,
+      "kind": "output",
+      "path": "schemas/models/1/recovery_waterfall_result.schema.json",
+      "summary": "Result of allocating a distributable estate across claims.",
+      "title": "RecoveryWaterfallResult",
+      "type_name": "RecoveryWaterfallResult"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/models/1/risk_budget_result.schema.json",
+      "bytes": 3985,
+      "kind": "output",
+      "path": "schemas/models/1/risk_budget_result.schema.json",
+      "summary": "Result of comparing actual risk decomposition against a risk budget.",
+      "title": "RiskBudgetResult",
+      "type_name": "RiskBudgetResult"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/models/1/risk_decomposition.schema.json",
+      "bytes": 9154,
+      "kind": "output",
+      "path": "schemas/models/1/risk_decomposition.schema.json",
+      "summary": "Portfolio-level decomposition of total risk across common factors and residuals.",
+      "title": "RiskDecomposition",
+      "type_name": "RiskDecomposition"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/models/1/rough_bergomi_params.schema.json",
+      "bytes": 1597,
+      "kind": "input",
+      "path": "schemas/models/1/rough_bergomi_params.schema.json",
+      "summary": "rBergomi model parameters.",
+      "title": "RoughBergomiParams",
+      "type_name": "RoughBergomiParams"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/models/1/rough_heston_fourier_params.schema.json",
+      "bytes": 1134,
+      "kind": "input",
+      "path": "schemas/models/1/rough_heston_fourier_params.schema.json",
+      "summary": "Rough Heston model parameters for Fourier-based European option pricing.",
+      "title": "RoughHestonFourierParams",
+      "type_name": "RoughHestonFourierParams"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/models/1/rough_heston_params.schema.json",
+      "bytes": 2055,
+      "kind": "input",
+      "path": "schemas/models/1/rough_heston_params.schema.json",
+      "summary": "Rough Heston model parameters.",
+      "title": "RoughHestonParams",
+      "type_name": "RoughHestonParams"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/models/1/sabr_market_data.schema.json",
+      "bytes": 1336,
+      "kind": "component",
+      "path": "schemas/models/1/sabr_market_data.schema.json",
+      "summary": "Market data for SABR calibration.",
+      "title": "SabrMarketData",
+      "type_name": "SabrMarketData"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/models/1/sabr_parameters.schema.json",
+      "bytes": 2049,
+      "kind": "input",
+      "path": "schemas/models/1/sabr_parameters.schema.json",
+      "summary": "SABR model parameters",
+      "title": "SabrParameters",
+      "type_name": "SabrParameters"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/models/1/schwartz_smith_params.schema.json",
+      "bytes": 1484,
+      "kind": "input",
+      "path": "schemas/models/1/schwartz_smith_params.schema.json",
+      "summary": "Schwartz-Smith process parameters.",
+      "title": "SchwartzSmithParams",
+      "type_name": "SchwartzSmithParams"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/models/1/scoring_result.schema.json",
+      "bytes": 1845,
+      "kind": "output",
+      "path": "schemas/models/1/scoring_result.schema.json",
+      "summary": "Result from any academic scoring model.",
+      "title": "ScoringResult",
+      "type_name": "ScoringResult"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/models/1/seniority_calibration.schema.json",
+      "bytes": 3469,
+      "kind": "component",
+      "path": "schemas/models/1/seniority_calibration.schema.json",
+      "summary": "Historical recovery calibration by seniority class.",
+      "title": "SeniorityCalibration",
+      "type_name": "SeniorityCalibration"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/models/1/seniority_recovery.schema.json",
+      "bytes": 3094,
+      "kind": "component",
+      "path": "schemas/models/1/seniority_recovery.schema.json",
+      "summary": "Recovery model driven by seniority-class Beta distributions.",
+      "title": "SeniorityRecovery",
+      "type_name": "SeniorityRecovery"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/models/1/simulated_paths.schema.json",
+      "bytes": 1051,
+      "kind": "component",
+      "path": "schemas/models/1/simulated_paths.schema.json",
+      "summary": "Results from Monte Carlo path simulation.",
+      "title": "SimulatedPaths",
+      "type_name": "SimulatedPaths"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/models/1/stochastic_default_spec.schema.json",
+      "bytes": 11735,
+      "kind": "input",
+      "path": "schemas/models/1/stochastic_default_spec.schema.json",
+      "summary": "Stochastic default model specification.",
+      "title": "StochasticDefaultSpec",
+      "type_name": "StochasticDefaultSpec"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/models/1/stochastic_prepay_spec.schema.json",
+      "bytes": 9417,
+      "kind": "input",
+      "path": "schemas/models/1/stochastic_prepay_spec.schema.json",
+      "summary": "Stochastic prepayment model specification.",
+      "title": "StochasticPrepaySpec",
+      "type_name": "StochasticPrepaySpec"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/models/1/stress_attribution.schema.json",
+      "bytes": 3810,
+      "kind": "output",
+      "path": "schemas/models/1/stress_attribution.schema.json",
+      "summary": "Per-position attribution of portfolio losses in tail scenarios.",
+      "title": "StressAttribution",
+      "type_name": "StressAttribution"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/models/1/svi_params.schema.json",
+      "bytes": 963,
+      "kind": "input",
+      "path": "schemas/models/1/svi_params.schema.json",
+      "summary": "SVI (Stochastic Volatility Inspired) raw parameterization.",
+      "title": "SviParams",
+      "type_name": "SviParams"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/models/1/toggle_exercise_model.schema.json",
+      "bytes": 5904,
+      "kind": "input",
+      "path": "schemas/models/1/toggle_exercise_model.schema.json",
+      "summary": "Toggle exercise model for PIK/cash decision.",
+      "title": "ToggleExerciseModel",
+      "type_name": "ToggleExerciseModel"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/models/1/trade_params.schema.json",
+      "bytes": 5788,
+      "kind": "input",
+      "path": "schemas/models/1/trade_params.schema.json",
+      "summary": "Input parameters for a market impact calculation.",
+      "title": "TradeParams",
+      "type_name": "TradeParams"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/models/1/tranche_loss_statistics.schema.json",
+      "bytes": 2581,
+      "kind": "output",
+      "path": "schemas/models/1/tranche_loss_statistics.schema.json",
+      "summary": "Loss statistics for one attachment/detachment tranche over a simulated pool loss distribution.",
+      "title": "TrancheLossStatistics",
+      "type_name": "TrancheLossStatistics"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/models/1/transition_matrix.schema.json",
+      "bytes": 2274,
+      "kind": "component",
+      "path": "schemas/models/1/transition_matrix.schema.json",
+      "summary": "Row-stochastic N×N transition matrix representing migration probabilities over a fixed time horizon.",
+      "title": "TransitionMatrix",
+      "type_name": "TransitionMatrix"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/models/1/variance_gamma_cf.schema.json",
+      "bytes": 1015,
+      "kind": "component",
+      "path": "schemas/models/1/variance_gamma_cf.schema.json",
+      "summary": "Variance Gamma model characteristic function.",
+      "title": "VarianceGammaCf",
+      "type_name": "VarianceGammaCf"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/models/1/volatility_convention.schema.json",
+      "bytes": 1217,
+      "kind": "component",
+      "path": "schemas/models/1/volatility_convention.schema.json",
+      "summary": "Volatility quoting convention.",
+      "title": "VolatilityConvention",
+      "type_name": "VolatilityConvention"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/models/1/workout_lgd.schema.json",
+      "bytes": 4140,
+      "kind": "component",
+      "path": "schemas/models/1/workout_lgd.schema.json",
+      "summary": "Workout-based LGD model using a collateral-first recovery waterfall.",
+      "title": "WorkoutLgd",
+      "type_name": "WorkoutLgd"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/models/1/workout_lgd_result.schema.json",
+      "bytes": 943,
+      "kind": "output",
+      "path": "schemas/models/1/workout_lgd_result.schema.json",
+      "summary": "Outcome of evaluating a `WorkoutLgd` model at one exposure at default.",
+      "title": "WorkoutLgdResult",
+      "type_name": "WorkoutLgdResult"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/models/1/yield_forecast.schema.json",
+      "bytes": 1565,
+      "kind": "output",
+      "path": "schemas/models/1/yield_forecast.schema.json",
+      "summary": "h-step ahead yield curve forecast with confidence bands.",
+      "title": "YieldForecast",
+      "type_name": "YieldForecast"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/models/1/yield_panel.schema.json",
+      "bytes": 1558,
+      "kind": "component",
+      "path": "schemas/models/1/yield_panel.schema.json",
+      "summary": "A panel of yield observations: rows = dates, columns = tenors.",
+      "title": "YieldPanel",
+      "type_name": "YieldPanel"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/models/1/yield_pca.schema.json",
+      "bytes": 2804,
+      "kind": "component",
+      "path": "schemas/models/1/yield_pca.schema.json",
+      "summary": "PCA decomposition of yield curve changes.",
+      "title": "YieldPca",
+      "type_name": "YieldPca"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/models/1/yield_pca_view.schema.json",
+      "bytes": 2091,
+      "kind": "output",
+      "path": "schemas/models/1/yield_pca_view.schema.json",
+      "summary": "Serializable view of the leading components of a `YieldPca` fit.",
+      "title": "YieldPcaView",
+      "type_name": "YieldPcaView"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/models/1/zmijewski_input.schema.json",
+      "bytes": 983,
+      "kind": "input",
+      "path": "schemas/models/1/zmijewski_input.schema.json",
+      "summary": "Input for the Zmijewski (1984) probit bankruptcy prediction model.",
+      "title": "ZmijewskiInput",
+      "type_name": "ZmijewskiInput"
     }
   ],
   "schema_index_version": 1

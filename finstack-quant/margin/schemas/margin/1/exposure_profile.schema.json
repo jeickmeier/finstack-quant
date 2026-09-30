@@ -1,0 +1,91 @@
+{
+  "$defs": {
+    "ExposureDiagnostics": {
+      "additionalProperties": false,
+      "description": "Diagnostics from exposure simulation capturing data quality metrics.\n\nPopulated by the exposure computation engine to let callers distinguish\ngenuine zero exposure from missing data.",
+      "properties": {
+        "market_roll_failures": {
+          "description": "Number of time grid points where market data could not be rolled forward.",
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "total_time_points": {
+          "description": "Total time grid points evaluated.",
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "valuation_failures": {
+          "description": "Total number of individual instrument valuation failures across all time points.",
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "market_roll_failures",
+        "valuation_failures",
+        "total_time_points"
+      ],
+      "type": "object"
+    }
+  },
+  "$id": "https://finstack_quant.dev/schemas/margin/1/exposure_profile.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Exposure profile computed at each time grid point.",
+  "properties": {
+    "diagnostics": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ExposureDiagnostics"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "Simulation quality diagnostics (populated by the exposure engine)."
+    },
+    "ene": {
+      "description": "Expected Negative Exposure at each time point: max(-V(t), 0).",
+      "items": {
+        "format": "double",
+        "type": "number"
+      },
+      "type": "array"
+    },
+    "epe": {
+      "description": "Expected Positive Exposure at each time point: max(V(t), 0).",
+      "items": {
+        "format": "double",
+        "type": "number"
+      },
+      "type": "array"
+    },
+    "mtm_values": {
+      "description": "Portfolio mark-to-market value at each time point (may be negative).",
+      "items": {
+        "format": "double",
+        "type": "number"
+      },
+      "type": "array"
+    },
+    "times": {
+      "description": "Nonnegative time points in years from valuation date. An explicit zero\nnode supplies opening exposure; before the first node exposure is held\nflat at that node, consistently across CVA, DVA, FVA and MVA.",
+      "items": {
+        "format": "double",
+        "type": "number"
+      },
+      "type": "array"
+    }
+  },
+  "required": [
+    "times",
+    "mtm_values",
+    "epe",
+    "ene"
+  ],
+  "title": "ExposureProfile",
+  "type": "object"
+}

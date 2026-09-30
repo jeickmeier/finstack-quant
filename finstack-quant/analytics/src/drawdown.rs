@@ -14,12 +14,25 @@ use crate::dates::Date;
 
 /// Drawdown episode with start, valley, optional recovery, and max drawdown.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct DrawdownEpisode {
     /// Date when the drawdown began (peak date).
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "finstack_quant_core::wire::DateWire")
+    )]
     pub start: Date,
     /// Date of the maximum drawdown depth.
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "finstack_quant_core::wire::DateWire")
+    )]
     pub valley: Date,
     /// Date when wealth recovered to the prior peak (None if still in drawdown).
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "Option<finstack_quant_core::wire::DateWire>")
+    )]
     pub end: Option<Date>,
     /// Calendar days from start to end (or last observation).
     pub duration_days: i64,

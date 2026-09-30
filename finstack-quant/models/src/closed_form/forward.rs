@@ -67,6 +67,7 @@ use crate::types::OptionType;
 /// # Ok::<(), finstack_quant_core::Error>(())
 /// ```
 #[derive(Clone, Copy, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct ForwardGreeks {
     /// Sensitivity of the undiscounted premium to the forward (`dV/dF`).

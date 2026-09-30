@@ -14,7 +14,7 @@ autotests = false
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-finstack-quant-analytics = { path = "../finstack-quant/analytics", version = "0.9.0" }
+finstack-quant-analytics = { path = "../finstack-quant/analytics", version = "0.9.0", default-features = false }
 finstack-quant-attribution = { path = "../finstack-quant/attribution", version = "0.9.0", default-features = false }
 finstack-quant-cashflows = { path = "../finstack-quant/cashflows", version = "0.9.0", default-features = false }
 finstack-quant-covenants = { path = "../finstack-quant/covenants", version = "0.9.0", default-features = false }
@@ -22,7 +22,7 @@ finstack-quant-core = { path = "../finstack-quant/core", version = "0.9.0", defa
 finstack-quant-features = { path = "../finstack-quant/features", version = "0.9.0", default-features = false }
 finstack-quant-margin = { path = "../finstack-quant/margin", version = "0.9.0", default-features = false }
 finstack-quant-statements = { path = "../finstack-quant/statements", version = "0.9.0", default-features = false }
-finstack-quant-statements-analytics = { path = "../finstack-quant/statements-analytics", version = "0.9.0" }
+finstack-quant-statements-analytics = { path = "../finstack-quant/statements-analytics", version = "0.9.0", default-features = false }
 finstack-quant-valuations = { path = "../finstack-quant/valuations", version = "0.9.0", default-features = false }
 finstack-quant-calibration = { path = "../finstack-quant/calibration", version = "0.9.0", default-features = false }
 finstack-quant-models = { path = "../finstack-quant/models", version = "0.9.0", default-features = false }

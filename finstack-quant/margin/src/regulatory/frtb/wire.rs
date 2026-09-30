@@ -16,8 +16,10 @@ type CurrencyPairVega = (Currency, Currency, String, f64);
 type CurrencyPairCurvature = (Currency, Currency, f64, f64);
 
 #[derive(serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[cfg_attr(feature = "json-schema", schemars(rename = "FrtbSensitivities"))]
 #[serde(deny_unknown_fields)]
-struct FrtbSensitivitiesWire {
+pub(super) struct FrtbSensitivitiesWire {
     base_currency: Currency,
     girr_delta: Vec<CurrencyTenor>,
     girr_inflation_delta: Vec<CurrencyValue>,

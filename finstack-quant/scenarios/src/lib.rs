@@ -129,7 +129,7 @@ pub use spec::{
     Compounding, CurveKind, HazardBumpMode, HierarchyTarget, InstrumentType, NodeId, OperationSpec,
     RateBindingSpec, ScenarioSpec, TenorMatchMode, TimeRollMode,
 };
-pub use templates::{AssetClass, Severity, TemplateMetadata, TemplateRegistry};
+pub use templates::{AssetClass, TemplateMetadata, TemplateRegistry, TemplateSeverity};
 pub use warning::Warning;
 
 /// Compiles the crate `README.md` Rust samples as doctests.

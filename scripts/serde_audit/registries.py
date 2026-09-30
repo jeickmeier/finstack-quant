@@ -46,53 +46,6 @@ ONE_WAY_EXCEPTIONS = (
         "spec side, not the result side.",
         frozenset({"JsonSchema"}),
     ),
-    *_exception(
-        "models",
-        "src/factor/risk/views.rs",
-        (
-            "PositionEsContributionView",
-            "ParametricEsDecompositionView",
-        ),
-        "binding-view",
-        "Round-trippable factor-risk output; no published JSON schema.",
-        frozenset({"JsonSchema"}),
-    ),
-    *_exception(
-        "portfolio",
-        "src/factor_model/weight_allocation.rs",
-        ("WeightAllocationResult", "StrategyAllocation", "AllocationDiagnostics"),
-        "allocation-output",
-        "Computed allocation output; callers persist inputs and rerun allocation.",
-        # These three gained `Deserialize`, so the exception no longer needs to
-        # cover it. Narrowed rather than left broad: a blanket allowance would
-        # stop the audit noticing if `Deserialize` were dropped again.
-        allowed_missing=frozenset({"JsonSchema"}),
-    ),
-    *_exception(
-        "portfolio",
-        "src/scenarios.rs",
-        ("ScenarioRevalueView", "ScenarioPnlView"),
-        "scenario-view",
-        "Scenario output view intentionally replacing persistence-implying Envelope names.",
-    ),
-    *_exception(
-        "portfolio",
-        "src/sensitivity/json.rs",
-        ("SensitivityMatrixJson",),
-        "binding-view",
-        "Canonical sensitivity-matrix wire form both hosts emit and accept; it "
-        "gained a validating `Deserialize` (via `TryFrom` into the matrix) but "
-        "has no published JSON schema.",
-        frozenset({"JsonSchema"}),
-    ),
-    *_exception(
-        "statements-analytics",
-        "src/analysis/reports.rs",
-        ("CreditAssessmentPoint", "CreditAssessment"),
-        "analysis-report",
-        "Computed statement-analysis report; source statement results are canonical.",
-        frozenset({"JsonSchema"}),
-    ),
 )
 
 
@@ -145,13 +98,11 @@ def _in_process_spec(
 
 
 NON_MAINTAINED_SERDE_EXCEPTIONS = (
-    *_computed_output("analytics", "src/benchmark.rs", ("BetaResult", "GreeksResult", "MultiFactorResult")),
     *_in_process_spec(
         "attribution",
         "src/return_contribution.rs",
         ("ReturnContributionSpec",),
     ),
-    *_computed_output("models", "src/credit/pd/master_scale.rs", ("MasterScaleResult",)),
     *_classification(
         "models",
         "src/credit/registry.rs",
@@ -160,7 +111,6 @@ NON_MAINTAINED_SERDE_EXCEPTIONS = (
         "Embedded credit-assumption registry is loaded through component-specific validation "
         "and is outside the maintained public persistence catalog.",
     ),
-    *_computed_output("models", "src/credit/scoring/types.rs", ("ScoringResult",)),
     *_computed_output("core", "src/expr/ast.rs", ("EvaluationResult",)),
     *_in_process_spec("core", "src/market_data/bumps.rs", ("BumpSpec",)),
     *_computed_output(
@@ -177,46 +127,6 @@ NON_MAINTAINED_SERDE_EXCEPTIONS = (
         "Embedded rating-scale registry uses component validation and is explicitly outside "
         "the maintained public persistence catalog.",
     ),
-    *_in_process_spec(
-        "covenants",
-        "src/engine/types.rs",
-        ("CovenantSpec",),
-    ),
-    *_computed_output("margin", "src/regulatory/frtb/types.rs", ("FrtbSbaResult",)),
-    *_computed_output("margin", "src/regulatory/sa_ccr/types.rs", ("EadResult",)),
-    *_computed_output("models", "src/monte_carlo/results.rs", ("MonteCarloResult",)),
-    *_computed_output("portfolio", "src/brinson.rs", ("BrinsonPeriodResult",)),
-    *_computed_output("portfolio", "src/excess_return.rs", ("ExcessReturnResult",)),
-    *_computed_output("portfolio", "src/factor_brinson.rs", ("FactorBrinsonResult",)),
-    *_computed_output("models", "src/factor/risk/budget.rs", ("RiskBudgetResult",)),
-    *_in_process_spec(
-        "portfolio",
-        "src/factor_model/weight_allocation.rs",
-        ("WeightAllocationSpec",),
-    ),
-    *_computed_output("portfolio", "src/factor_model/whatif.rs", ("WhatIfResult", "StressResult")),
-    *_computed_output(
-        "portfolio",
-        "src/fi_attribution.rs",
-        ("FiAttributionResult", "FiCarinoLinkedResult"),
-    ),
-    *_computed_output(
-        "portfolio",
-        "src/grid_attribution.rs",
-        ("GridAttributionResult", "GridCarinoLinkedResult"),
-    ),
-    *_classification(
-        "portfolio",
-        "src/margin/results.rs",
-        ("PortfolioMarginResult",),
-        "non-maintained-serde-output",
-        "Portfolio margin aggregate round-trips through its private wire adapter for host "
-        "transport, but is not a versioned maintained result document.",
-    ),
-    *_in_process_spec("portfolio", "src/optimization/helpers.rs", ("PortfolioOptimizationSpec",)),
-    *_in_process_spec("portfolio", "src/portfolio.rs", ("PortfolioSpec",)),
-    *_in_process_spec("portfolio", "src/position.rs", ("PositionSpec",)),
-    *_computed_output("portfolio", "src/replay.rs", ("ReplayResult",)),
     *_classification(
         "scenarios",
         "src/engine/types.rs",
@@ -239,60 +149,6 @@ NON_MAINTAINED_SERDE_EXCEPTIONS = (
         "internal-registry-document",
         "Embedded statement-metric registry has registry-specific validation and is outside "
         "the maintained public persistence catalog.",
-    ),
-    *_computed_output(
-        "statements-analytics",
-        "src/analysis/comps/scoring.rs",
-        ("RelativeValueResult",),
-    ),
-    *_computed_output(
-        "statements-analytics",
-        "src/analysis/comps/stats.rs",
-        ("RegressionResult",),
-    ),
-    *_computed_output("statements-analytics", "src/analysis/ecl/cecl.rs", ("CeclResult",)),
-    *_computed_output(
-        "statements-analytics",
-        "src/analysis/ecl/engine.rs",
-        ("EclResult", "WeightedEclResult", "ExposureEclResult"),
-    ),
-    *_computed_output(
-        "statements-analytics",
-        "src/analysis/ecl/portfolio.rs",
-        ("PortfolioEclResult",),
-    ),
-    *_computed_output(
-        "statements-analytics",
-        "src/analysis/ecl/staging.rs",
-        ("StageResult",),
-    ),
-    *_classification(
-        "statements-analytics",
-        "src/analysis/scenarios/types.rs",
-        ("ParameterSpec",),
-        "in-process-serde-spec",
-        "Scenario parameter input is accepted by the analysis engine but is not a maintained versioned document.",
-    ),
-    *_computed_output(
-        "statements-analytics",
-        "src/analysis/scenarios/types.rs",
-        ("SensitivityResult",),
-    ),
-    *_in_process_spec(
-        "statements-analytics",
-        "src/templates/real_estate/mod.rs",
-        (
-            "RentStepSpec",
-            "FreeRentWindowSpec",
-            "RenewalSpec",
-            "LeaseSpec",
-            "ManagementFeeSpec",
-        ),
-    ),
-    *_computed_output(
-        "valuations",
-        "src/instruments/fixed_income/structured_credit/metrics/risk/oas.rs",
-        ("OasResult",),
     ),
 )
 
@@ -350,30 +206,6 @@ RUNTIME_RESULT_EXCEPTIONS = (
         "src/capital_structure/waterfall/mod.rs",
         ("WaterfallPeriodResult",),
     ),
-    *_exception(
-        "statements-analytics",
-        "src/analysis/valuation/corporate.rs",
-        ("CorporateValuationResult", "DcfSensitivityResult"),
-        "runtime-result",
-        "Round-trippable valuation output; no published JSON schema.",
-        frozenset({"JsonSchema"}),
-    ),
-    *_exception(
-        "statements-analytics",
-        "src/analysis/valuation/lbo.rs",
-        ("LboResult",),
-        "runtime-result",
-        "Round-trippable valuation output; no published JSON schema.",
-        frozenset({"JsonSchema"}),
-    ),
-    *_exception(
-        "statements-analytics",
-        "src/analysis/goal_seek.rs",
-        ("GoalSeekResult",),
-        "runtime-result",
-        "Round-trippable goal-seek output (Python `GoalSeekResult.from_json`); no published JSON schema.",
-        frozenset({"JsonSchema"}),
-    ),
     *_runtime_exception(
         "valuations",
         "src/instruments/credit_derivatives/cds_index/types.rs",
@@ -399,14 +231,6 @@ RUNTIME_RESULT_EXCEPTIONS = (
         "valuations",
         "src/instruments/fixed_income/dollar_roll/carry.rs",
         ("CarryResult",),
-    ),
-    *_exception(
-        "valuations",
-        "src/instruments/fixed_income/revolving_credit/pricing/results.rs",
-        ("PathResult", "EnhancedMonteCarloResult"),
-        "runtime-result",
-        "Round-trippable valuation output; no published JSON schema.",
-        frozenset({"JsonSchema"}),
     ),
     *_runtime_exception(
         "valuations",

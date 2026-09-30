@@ -10,6 +10,7 @@ use super::types::LiquidityProfile;
 
 /// Input parameters for a market impact calculation.
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct TradeParams {
     /// Total quantity to execute (positive = buy, negative = sell).
@@ -57,6 +58,7 @@ impl TradeParams {
 /// per-share price displacements. The field names keep their historical
 /// `*_impact` spelling for wire stability.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct ImpactEstimate {
     /// Permanent-impact component of the expected execution cost, in
     /// currency units (information leakage, irreversible). Despite the
@@ -81,6 +83,7 @@ pub struct ImpactEstimate {
 
 /// Optimal execution schedule for a trade.
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct ExecutionTrajectory {
     /// Quantity to trade in each time bucket.
     pub quantities: Vec<f64>,

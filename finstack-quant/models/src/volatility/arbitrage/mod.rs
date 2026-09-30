@@ -66,6 +66,7 @@ use std::collections::BTreeMap;
 
 /// Configuration for the arbitrage detection suite.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct ArbitrageCheckConfig {
     /// Run butterfly (strike convexity) check.

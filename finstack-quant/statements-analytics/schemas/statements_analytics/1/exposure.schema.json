@@ -1,0 +1,203 @@
+{
+  "$defs": {
+    "QualitativeFlags": {
+      "description": "Qualitative triggers for SICR detection (IFRS 9 B5.5.17) and\n\"unlikely-to-pay\" evidence of default (IFRS 9 B5.5.37).\n\nThese flags represent non-quantitative indicators. SICR flags\n(`watchlist`, `forbearance`, `adverse_conditions`, `custom`) may\ntrigger a Stage 2 classification. The `default_evidence` flags\n(`bankruptcy`, `distressed_modification`, `cross_default`,\n`other_default_evidence`) represent objective evidence of default\nand should trigger Stage 3 independently of the 90-DPD backstop.",
+      "properties": {
+        "adverse_conditions": {
+          "description": "Significant adverse change in business or financial conditions.",
+          "type": "boolean"
+        },
+        "bankruptcy": {
+          "description": "Obligor has filed or is subject to bankruptcy / insolvency\nproceedings. Non-rebuttable Stage 3 trigger.",
+          "type": "boolean"
+        },
+        "cross_default": {
+          "description": "Cross-default has been triggered on another obligation of the\nsame obligor.",
+          "type": "boolean"
+        },
+        "custom": {
+          "description": "Custom user-defined SICR flags (e.g., sector-specific triggers).",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "distressed_modification": {
+          "description": "Distressed restructuring / modification with material NPV loss\nto the lender. IFRS 9 B5.5.37(e) / EBA GL on default.",
+          "type": "boolean"
+        },
+        "forbearance": {
+          "description": "Forbearance or concession granted. Under IFRS 9 forbearance is\nat minimum a SICR trigger; distressed modifications (deep\nconcessions such as haircut, maturity extension with NPV loss)\nare tracked separately under `distressed_modification` and\ntrigger Stage 3.",
+          "type": "boolean"
+        },
+        "other_default_evidence": {
+          "description": "Custom user-defined Stage 3 default-evidence flags.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "watchlist": {
+          "description": "On internal watchlist.",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "watchlist",
+        "forbearance",
+        "adverse_conditions",
+        "custom",
+        "bankruptcy",
+        "distressed_modification",
+        "cross_default",
+        "other_default_evidence"
+      ],
+      "type": "object"
+    },
+    "Stage": {
+      "description": "IFRS 9 impairment stage for a credit exposure.\n\nUnder IFRS 9, financial instruments are classified into three stages that\ndetermine the ECL measurement horizon:\n\n- **Stage 1**: 12-month ECL (no significant increase in credit risk)\n- **Stage 2**: Lifetime ECL (significant increase in credit risk detected)\n- **Stage 3**: Lifetime ECL (credit-impaired, objective evidence of default)\n\n# References\n\nIFRS 9 Financial Instruments, Section 5.5 -- Impairment. `docs/REFERENCES.md#ifrs-9-impairment`",
+      "oneOf": [
+        {
+          "const": "stage1",
+          "description": "Performing -- 12-month ECL. No significant increase in credit risk\nsince initial recognition.",
+          "type": "string"
+        },
+        {
+          "const": "stage2",
+          "description": "Underperforming -- lifetime ECL. Significant increase in credit risk\n(SICR) detected but not yet credit-impaired.",
+          "type": "string"
+        },
+        {
+          "const": "stage3",
+          "description": "Non-performing -- lifetime ECL. Credit-impaired (objective evidence of\ndefault: DPD >= 90, restructuring, etc.).",
+          "type": "string"
+        }
+      ]
+    }
+  },
+  "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/exposure.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "A single credit exposure for ECL computation.",
+  "properties": {
+    "ccf": {
+      "default": 0.75,
+      "description": "Credit-conversion factor applied to [`Self::undrawn`], as a decimal\nin `[0, 1]`. Default [`DEFAULT_REVOLVER_CCF`] (0.75, Basel IRB\nrevolver). Unused when `undrawn` is zero.",
+      "format": "double",
+      "type": "number"
+    },
+    "consecutive_performing_periods": {
+      "description": "Number of consecutive performing periods since last Stage 2/3\nclassification. Used for curing logic.",
+      "format": "uint32",
+      "minimum": 0,
+      "type": "integer"
+    },
+    "current_rating": {
+      "description": "Current rating label (must match the `PdTermStructure` scale).\n`None` if the exposure is unrated.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "days_past_due": {
+      "description": "Current days past due (DPD). Used for backstop staging triggers.",
+      "format": "uint32",
+      "minimum": 0,
+      "type": "integer"
+    },
+    "ead": {
+      "description": "Outstanding balance (drawn amount) at the reporting date.",
+      "format": "double",
+      "type": "number"
+    },
+    "ead_schedule": {
+      "description": "Optional EAD amortization profile as `(time_years, ead)` knots.\n\nWhen present, the ECL engines evaluate EAD at each bucket midpoint by\nlinear interpolation between knots with flat extrapolation at both\nends. When `None`, the constant [`Exposure::ead`] is used for every\nbucket. Knot times must be strictly increasing, finite, and\nnon-negative; EAD values must be finite and non-negative.",
+      "items": {
+        "maxItems": 2,
+        "minItems": 2,
+        "prefixItems": [
+          {
+            "format": "double",
+            "type": "number"
+          },
+          {
+            "format": "double",
+            "type": "number"
+          }
+        ],
+        "type": "array"
+      },
+      "type": [
+        "array",
+        "null"
+      ]
+    },
+    "eir": {
+      "description": "Effective interest rate (annualized, decimal). Used as the IFRS 9\ndiscount rate. Example: 0.05 = 5%.",
+      "format": "double",
+      "type": "number"
+    },
+    "id": {
+      "description": "Unique identifier for the exposure (instrument ID, facility ID, etc.).",
+      "type": "string"
+    },
+    "lgd": {
+      "description": "Loss given default (decimal, 0..1). Can be point-in-time or\ndownturn LGD depending on methodology. For credit-impaired exposures,\nthis is the undiscounted fraction lost: recovery at the configured\nhorizon is `(1 - lgd) * ead_at(0)`; the engine discounts recovery once.",
+      "format": "double",
+      "type": "number"
+    },
+    "origination_rating": {
+      "description": "Rating at origination (initial recognition). Used for SICR delta PD\ncomparison. `None` disables the PD delta trigger.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "previous_stage": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/Stage"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "Previous reporting period's stage (for migration tracking)."
+    },
+    "qualitative_flags": {
+      "$ref": "#/$defs/QualitativeFlags",
+      "description": "Qualitative flags that can trigger Stage 2 classification."
+    },
+    "remaining_maturity_years": {
+      "description": "Remaining maturity in years from reporting date. For revolving\nfacilities, use behavioural maturity.",
+      "format": "double",
+      "type": "number"
+    },
+    "segments": {
+      "description": "Segment keys for portfolio aggregation (product type, geography, rating\nbucket, etc.). Empty vec means \"unclassified\".",
+      "items": {
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "undrawn": {
+      "default": 0.0,
+      "description": "Undrawn commitment at the reporting date, in the same currency as\n[`Self::ead`]. Constant across the horizon (no undrawn schedule).\nDefault `0.0` (fully drawn term loan). EAD is\n`drawn + undrawn × ccf` via core `ead_revolver`.",
+      "format": "double",
+      "type": "number"
+    }
+  },
+  "required": [
+    "id",
+    "segments",
+    "ead",
+    "eir",
+    "remaining_maturity_years",
+    "lgd",
+    "days_past_due",
+    "qualitative_flags",
+    "consecutive_performing_periods"
+  ],
+  "title": "Exposure",
+  "type": "object"
+}

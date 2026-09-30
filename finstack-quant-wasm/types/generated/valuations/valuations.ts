@@ -2094,7 +2094,7 @@ export type ConstituentReference =
       };
     };
 /**
- * Canonical tagged union of all supported instrument serde types.
+ * Tagged `{type, spec}` payload for one instrument, without the envelope marker.
  */
 export type InstrumentJson =
   | {
@@ -3885,6 +3885,22 @@ export type BasketAssetType = "equity" | "bond" | "etf" | "cash" | "commodity" |
  */
 export type FxConversionPolicy = "cashflow_date" | "period_end" | "period_average";
 /**
+ * Classifies captured cashflows by economic meaning.
+ *
+ * These tags are diagnostic metadata only. They do not change pricing logic by
+ * themselves.
+ */
+export type CashflowType =
+  | "principal"
+  | "interest"
+  | "commitment_fee"
+  | "usage_fee"
+  | "facility_fee"
+  | "upfront_fee"
+  | "recovery"
+  | "mark_to_market"
+  | "other";
+/**
  * Rounding modes supported by the library.
  *
  * The variants mirror the most common conventions found in pricing engines.
@@ -4180,6 +4196,10 @@ export type TraceEntry =
  */
 export type SchemaVersion = number;
 /**
+ * Canonical schema marker for persisted instrument envelopes.
+ */
+export type InstrumentSchema = "finstack_quant.instrument/1";
+/**
  * Stage of persisted artifact loading that produced a diagnostic.
  */
 export type LoadPhase = "parse" | "version" | "structure" | "semantic" | "canonicalize" | "hash" | "build";
@@ -4187,6 +4207,23 @@ export type LoadPhase = "parse" | "version" | "structure" | "semantic" | "canoni
  * Severity assigned to a persisted artifact diagnostic.
  */
 export type Severity = "error" | "warning";
+/**
+ * Records how a captured dataset was selected from the full simulation.
+ */
+export type PathSamplingMethod =
+  | "all"
+  | {
+      random_sample: {
+        /**
+         * Target number of paths to capture on average.
+         */
+        count: number;
+        /**
+         * Seed used by the deterministic sampling rule.
+         */
+        seed: number;
+      };
+    };
 /**
  * Built-in function identifiers.
  */
@@ -4240,10 +4277,6 @@ export type Function =
   | "sqrt"
   | "clamp"
   | "is_missing";
-/**
- * Canonical schema marker for persisted instrument envelopes.
- */
-export type InstrumentSchema = "finstack_quant.instrument/1";
 
 /**
  * Advance rate applied to one collateral class.
@@ -19176,6 +19209,50 @@ export interface ExplanationTrace {
   [k: string]: unknown;
 }
 /**
+ * Result of resolving a new composite holdings state.
+ */
+export interface CompositeRebalanceResult {
+  /**
+   * Newly resolved, immutable, priceable composite, serialized as its
+   * canonical instrument envelope.
+   */
+  instrument: InstrumentEnvelope;
+  /**
+   * Net primitive execution deltas required to reach the new state.
+   */
+  trades: CompositeTrade[];
+}
+/**
+ * Canonical v1 envelope for every supported financial instrument.
+ */
+export interface InstrumentEnvelope {
+  /**
+   * The instrument definition
+   */
+  instrument: InstrumentJson;
+  /**
+   * Required v1 instrument contract marker.
+   */
+  schema: InstrumentSchema;
+}
+/**
+ * Primitive execution delta produced by initialization or rebalance.
+ */
+export interface CompositeTrade {
+  /**
+   * Primitive instrument identifier.
+   */
+  instrument_id: Id;
+  /**
+   * Canonical primitive instrument type discriminator.
+   */
+  instrument_type: string;
+  /**
+   * Signed change in primitive quantity.
+   */
+  quantity_delta: number;
+}
+/**
  * One structured finding emitted while loading a persisted contract.
  */
 export interface Diagnostic {
@@ -19229,6 +19306,349 @@ export interface Diagnostic {
   severity: Severity;
 }
 /**
+ * Revolving-credit Monte Carlo value with per-path details.
+ */
+export interface EnhancedMonteCarloResult {
+  /**
+   * Monte Carlo estimate of [`PathResult::draw_option_cost`] across paths,
+   * with the same antithetic-aware standard error as the present value.
+   */
+  draw_option_cost: MoneyEstimate;
+  /**
+   * Standard MC statistics (mean, std error, CI)
+   */
+  mc_result: MonteCarloResult;
+  /**
+   * Individual path results for distribution analysis
+   */
+  path_results: PathResult[];
+  [k: string]: unknown;
+}
+/**
+ * Discounted Monte Carlo estimate tagged with a currency.
+ *
+ * The engine computes these values from discounted path outcomes. `mean` and
+ * `ci_95` are stored as [`Money`], while the auxiliary statistics remain raw
+ * `f64` values in the same currency unit as `mean.amount()`.
+ */
+export interface MoneyEstimate {
+  /**
+   * 95% confidence interval for the discounted mean present value.
+   *
+   * @minItems 2
+   * @maxItems 2
+   */
+  ci_95: [unknown, unknown];
+  /**
+   * Optional maximum of captured discounted path values.
+   */
+  max?: number | null;
+  /**
+   * Discounted mean present value.
+   */
+  mean: Money;
+  /**
+   * Optional median of captured discounted path values.
+   *
+   * This is populated only when captured-path diagnostics are available.
+   */
+  median?: number | null;
+  /**
+   * Optional minimum of captured discounted path values.
+   */
+  min?: number | null;
+  /**
+   * Number of independent path estimators contributing to the estimate.
+   *
+   * See [`crate::monte_carlo::estimate::Estimate::num_paths`] for the full semantics,
+   * including how antithetic variates split simulated work across
+   * estimators.
+   */
+  num_paths: number;
+  /**
+   * Total number of simulated sample paths driving the estimator.
+   *
+   * See [`crate::monte_carlo::estimate::Estimate::num_simulated_paths`]. Equal to
+   * `num_paths` without variance reduction, or `2 * num_paths` with
+   * antithetic variates.
+   */
+  num_simulated_paths: number;
+  /**
+   * Optional 25th percentile of captured discounted path values.
+   */
+  percentile_25?: number | null;
+  /**
+   * Optional 75th percentile of captured discounted path values.
+   */
+  percentile_75?: number | null;
+  /**
+   * Optional sample standard deviation of discounted path values.
+   */
+  std_dev?: number | null;
+  /**
+   * Standard error of the discounted mean, in `mean.amount()` units.
+   */
+  stderr: number;
+}
+/**
+ * Monte Carlo pricing result with optional captured paths.
+ *
+ * The estimate always reflects all simulated discounted path values used by the
+ * pricing run. When `paths` is present, it contains the captured subset only.
+ */
+export interface MonteCarloResult {
+  /**
+   * Discounted pricing estimate for the full simulation.
+   */
+  estimate: MoneyEstimate;
+  /**
+   * Optional captured-path subset for diagnostics and visualization.
+   */
+  paths?: PathDataset | null;
+  /**
+   * Reproducibility metadata for the run (execution policy and seed).
+   */
+  run?: RunMetadata | null;
+  [k: string]: unknown;
+}
+/**
+ * Captured-path collection plus the metadata needed to interpret it.
+ *
+ * The dataset may contain every path or only a deterministic sample of the
+ * full simulation, depending on the value of `sampling_method`.
+ */
+export interface PathDataset {
+  /**
+   * Total number of paths simulated by the engine.
+   */
+  num_paths_total: number;
+  /**
+   * Captured paths in deterministic order.
+   */
+  paths: SimulatedPath[];
+  /**
+   * Metadata needed to interpret captured state vectors.
+   */
+  process_params: ProcessParams;
+  /**
+   * Sampling method used to retain `paths`.
+   */
+  sampling_method: PathSamplingMethod;
+  [k: string]: unknown;
+}
+/**
+ * A complete captured Monte Carlo path.
+ *
+ * Contains all captured points for a single simulated path, plus the final
+ * discounted value used in summary statistics.
+ */
+export interface SimulatedPath {
+  /**
+   * Final discounted payoff value for this path.
+   *
+   * This is the path-level amount after the engine applies the run's
+   * `discount_factor`.
+   */
+  final_value: number;
+  /**
+   * Internal rate of return inferred from the captured cashflow amounts, if calculable.
+   */
+  irr?: number | null;
+  /**
+   * Path identifier (0-indexed)
+   */
+  path_id: number;
+  /**
+   * Time points along the path
+   */
+  points: PathPoint[];
+  [k: string]: unknown;
+}
+/**
+ * A single captured point along a Monte Carlo path.
+ *
+ * Captures the process state at a specific time step, together with any
+ * cashflows emitted at that step and, optionally, a payoff snapshot.
+ *
+ * # State Vector Layout
+ *
+ * The `state` vector contains the raw state variables in process-defined order.
+ * For simple single-asset models, the crate's internal `state_indices`
+ * constants provide common aliases.
+ * For multi-asset or process-specific layouts, consult
+ * [`PathDataset::process_params.factor_names`](PathDataset::process_params) or
+ * [`PathDataset::state_var_keys`].
+ */
+export interface PathPoint {
+  /**
+   * Typed cashflows generated at this time step as `(time, amount, type)`.
+   *
+   * Amounts follow the sign convention `positive = inflow`,
+   * `negative = outflow`.
+   */
+  cashflows?: [unknown, unknown, unknown][];
+  /**
+   * Optional payoff snapshot at this point.
+   *
+   * This is populated only when path capture requested payoff snapshots. It
+   * uses the payoff's native amount units and is not additionally discounted
+   * inside `PathPoint`.
+   */
+  payoff_value?: number | null;
+  /**
+   * State variables at this point (spot, variance, rate, etc.)
+   * Indexed by position - see `state_indices` for standard layout
+   */
+  state: number[];
+  /**
+   * Time step index (0 = initial, N = final)
+   */
+  step: number;
+  /**
+   * Time in years from valuation date
+   */
+  time: number;
+  [k: string]: unknown;
+}
+/**
+ * Metadata describing the process behind a captured dataset.
+ *
+ * This structure is typically populated by
+ * [`crate::monte_carlo::process::metadata::ProcessMetadata`] implementations and stored in a
+ * [`PathDataset`]. It describes how to interpret captured state vectors rather
+ * than how to price the instrument.
+ */
+export interface ProcessParams {
+  /**
+   * Optional row-major `n x n` correlation matrix.
+   */
+  correlation?: number[] | null;
+  /**
+   * Names describing the order of captured state-vector entries.
+   */
+  factor_names: string[];
+  /**
+   * Process parameters keyed by implementation-defined names such as `r`,
+   * `q`, `sigma`, `kappa`, or `theta`.
+   */
+  parameters: {
+    [k: string]: number;
+  };
+  /**
+   * Process type identifier, such as `"GBM"` or `"Heston"`.
+   */
+  process_type: string;
+  [k: string]: unknown;
+}
+/**
+ * Reproducibility metadata stamped on a Monte Carlo pricing run.
+ *
+ * Records the execution policy that produced an estimate so results are
+ * auditable and replayable: the same `(seed, num_paths, num_steps,
+ * chunk_size)` reproduces the run bit-for-bit regardless of thread count or
+ * host (see the determinism notes on [`crate::monte_carlo::engine::McEngine::price`]).
+ */
+export interface RunMetadata {
+  /**
+   * Whether antithetic variates were enabled.
+   */
+  antithetic?: boolean;
+  /**
+   * Effective chunk size of the deterministic reduction tree.
+   */
+  chunk_size?: number;
+  /**
+   * Number of time-grid steps.
+   */
+  num_steps?: number;
+  /**
+   * Root RNG seed, when the calling pricer derived the stream from one.
+   *
+   * `None` when the engine was driven by an externally constructed
+   * [`crate::monte_carlo::traits::RandomStream`] whose seed the engine cannot observe.
+   */
+  seed?: number | null;
+  /**
+   * Whether the run used the parallel execution path.
+   */
+  use_parallel?: boolean;
+  [k: string]: unknown;
+}
+/**
+ * Result for a single path valuation.
+ *
+ * Contains the present value, optional 3-factor path data, and the detailed cashflow schedule.
+ */
+export interface PathResult {
+  /**
+   * Cashflow schedule for this path
+   */
+  cashflows: CashFlowSchedule;
+  /**
+   * Value to the lender of the path's draws having been made at the
+   * contractual margin instead of the path's fair spread. The fair spread
+   * is anchored to the margin at the valuation date, so each draw is a
+   * forward loan to maturity worth `−ΔD · (s − s₀) · risky annuity`,
+   * summed over the path's draws. Negative when the spread has widened
+   * since the valuation date (the option the borrower holds has been
+   * exercised against the lender); zero for deterministic schedules and
+   * for any constant spread process. Loan-equivalent draws at default
+   * belong to the default leg and are excluded.
+   */
+  draw_option_cost: Money;
+  /**
+   * 3-factor path data (if from MC)
+   */
+  path_data?: ThreeFactorPathData | null;
+  /**
+   * Present value for this path
+   */
+  pv: Money;
+  [k: string]: unknown;
+}
+/**
+ * Path data from 3-factor Monte Carlo simulation.
+ *
+ * Contains the full trajectory of utilization, interest rates, and credit spreads
+ * at each observation date (contractual accrual boundaries plus term-index
+ * reset dates), enabling cashflow generation and survival probability
+ * computation.
+ */
+export interface ThreeFactorPathData {
+  /**
+   * Credit spread trajectory (for survival probability)
+   */
+  credit_spread_path: number[];
+  /**
+   * Observation dates aligned with the trajectories: the contractual
+   * accrual boundaries plus every term-index reset date inside the facility
+   * life, sorted ascending. The name predates the separation of accrual,
+   * reset and adjusted payment dates.
+   */
+  payment_dates: DateWire[];
+  /**
+   * Short rate trajectory (for floating rates)
+   */
+  short_rate_path: number[];
+  /**
+   * Whether `short_rate_path` was simulated by a stochastic rate process
+   * (Hull-White with σ > 0). When true the pricer discounts pathwise on
+   * the simulated bank account; when false the static discount curve is
+   * used (deterministic-forward or fixed-rate modes).
+   */
+  stochastic_rates?: boolean;
+  /**
+   * Time points corresponding to each value: years from the commitment date
+   * on the ACT/365F model clock (`MC_CLOCK_DAY_COUNT`).
+   */
+  time_points: number[];
+  /**
+   * Utilization trajectory at each payment date [0, 1]
+   */
+  utilization_path: number[];
+  [k: string]: unknown;
+}
+/**
  * Native cashflow rows, reporting-currency PV and reconciliation status.
  */
 export interface InstrumentCashflowEnvelope {
@@ -19278,17 +19698,165 @@ export interface InstrumentCashflowEnvelope {
   [k: string]: unknown;
 }
 /**
- * Canonical v1 envelope for every supported financial instrument.
+ * Structured-credit option-adjusted spread and its solver diagnostics.
  */
-export interface InstrumentEnvelope {
+export interface OasResult {
   /**
-   * The instrument definition
+   * Target clean settlement price (% of current balance).
    */
-  instrument: InstrumentJson;
+  market_price: number;
   /**
-   * Required v1 instrument contract marker.
+   * Model clean settlement price (% of the tranche's CURRENT balance, the
+   * factor-adjusted quote basis) at the solved OAS.
    */
-  schema: InstrumentSchema;
+  model_price: number;
+  /**
+   * Number of scenarios used.
+   */
+  num_paths: number;
+  /**
+   * Option-adjusted spread (decimal; `0.01` = 100 bp).
+   */
+  oas: number;
+  /**
+   * Monte-Carlo standard error of the mean price (% of current balance).
+   */
+  price_std_error: number;
+  [k: string]: unknown;
+}
+/**
+ * One evaluated cell of the scenario table.
+ */
+export interface ScenarioCell {
+  /**
+   * Annual CDR (decimal) for this cell.
+   */
+  cdr: number;
+  /**
+   * Annual CPR (decimal) for this cell.
+   */
+  cpr: number;
+  /**
+   * Clean settlement price as a percentage of the tranche's CURRENT
+   * balance (the factor-adjusted quote basis): the model dirty value at
+   * buyer settlement less accrued, the same figure as
+   * `TrancheMetrics::price_pct`.
+   */
+  price: number;
+  /**
+   * Loss severity (decimal) for this cell.
+   */
+  severity: number;
+  /**
+   * Weighted-average life in years.
+   */
+  wal: number;
+  /**
+   * Total principal writedown in currency units.
+   */
+  writedown: number;
+}
+/**
+ * Structured-credit scenario grid results for one tranche.
+ */
+export interface ScenarioTable {
+  /**
+   * Evaluated cells, in CPR-major, then CDR, then severity order.
+   */
+  cells: ScenarioCell[];
+  /**
+   * Identifier of the tranche evaluated.
+   */
+  tranche_id: string;
+}
+/**
+ * Per-tranche risk and spread metrics from the tranche's own projected cashflows.
+ */
+export interface TrancheMetrics {
+  /**
+   * Effective convexity (years²) from the same ±1 bp re-projection.
+   */
+  convexity: number;
+  /**
+   * Credit-spread DV01 — currency change for a +1 bp z-spread shock. Negative
+   * for a long tranche (wider spreads reduce PV).
+   */
+  cs01: number;
+  /**
+   * ISO-4217 code of the currency `pv` and `cs01` are denominated in.
+   */
+  currency: Currency;
+  /**
+   * Discount margin to maturity at `target_price_pct` (basis points): the
+   * constant spread over the deal discount curve that reprices the
+   * floater's projected cashflows; `None` for fixed-rate tranches.
+   */
+  dm_bp?: number | null;
+  /**
+   * Discount margin to the assumed call (basis points); floating-rate
+   * tranches only.
+   */
+  dm_to_call_bp?: number | null;
+  /**
+   * Pool factor of the note: `current_balance / original_balance`, so a
+   * price on original face is `price_pct * factor`.
+   */
+  factor: number;
+  /**
+   * Effective (rate) duration (years): the tranche is re-projected with
+   * every rate curve in the market (discount and forward) bumped ±1 bp in
+   * parallel and the dirty settlement values differenced, so a floater's
+   * coupon resets move with the curve and its duration is short, while a
+   * fixed-coupon note's equals its modified duration.
+   */
+  modified_duration: number;
+  /**
+   * Model clean settlement price as a percentage of the tranche's CURRENT
+   * balance (the factor-adjusted secondary-market quote basis).
+   */
+  price_pct: number;
+  /**
+   * Present value of the tranche (currency units).
+   */
+  pv: number;
+  /**
+   * Spread convexity (years²): second-order z-spread sensitivity of the
+   * projected cashflows at the solved z-spread, on the same kernel as
+   * `spread_duration`.
+   */
+  spread_convexity: number;
+  /**
+   * Spread duration (years): `-CS01 / (dirty settlement target · 1bp)`.
+   */
+  spread_duration: number;
+  /**
+   * Price the z-spread/CS01 were solved against (% of current balance) —
+   * the supplied market price, or the model price when none was given.
+   */
+  target_price_pct: number;
+  /**
+   * Identifier of the tranche.
+   */
+  tranche_id: string;
+  /**
+   * Weighted-average life (years).
+   */
+  wal: number;
+  /**
+   * Weighted-average life to the deal's assumed call (years); `None`
+   * without a `call_assumption` covering this tranche.
+   */
+  wal_to_call?: number | null;
+  /**
+   * Z-spread to `target_price_pct` (basis points): the constant spread over the
+   * discount curve equating the tranche's PV to that price. Zero when solved
+   * against the tranche's own model price (no spread to its curve-discounted value).
+   */
+  z_spread_bp: number;
+  /**
+   * Z-spread to the assumed call at `target_price_pct` (basis points).
+   */
+  z_spread_to_call_bp?: number | null;
 }
 /**
  * Bounded structured diagnostics emitted by persisted-contract validation.

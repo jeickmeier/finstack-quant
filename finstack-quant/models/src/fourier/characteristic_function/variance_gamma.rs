@@ -34,6 +34,7 @@ use num_complex::Complex64;
 /// - Madan, D. B., Carr, P. P. & Chang, E. C. (1998). "The Variance Gamma
 ///   Process and Option Pricing." *European Finance Review*, 2, 79-105. `docs/REFERENCES.md#madan-carr-chang-1998`
 #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct VarianceGammaCf {
     /// Risk-free rate.
     pub r: f64,

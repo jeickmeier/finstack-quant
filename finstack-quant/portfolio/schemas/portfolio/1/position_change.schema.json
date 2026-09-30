@@ -1,0 +1,58 @@
+{
+  "$defs": {
+    "PositionId": {
+      "description": "Position identifier.",
+      "type": "string"
+    }
+  },
+  "$id": "https://finstack_quant.dev/schemas/portfolio/1/position_change.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Position edits supported by `WhatIfEngine::position_what_if`.",
+  "oneOf": [
+    {
+      "additionalProperties": false,
+      "description": "Remove an existing position by identifier.",
+      "properties": {
+        "kind": {
+          "const": "remove",
+          "type": "string"
+        },
+        "position_id": {
+          "$ref": "#/$defs/PositionId",
+          "description": "Position identifier to remove from the scenario."
+        }
+      },
+      "required": [
+        "kind",
+        "position_id"
+      ],
+      "type": "object"
+    },
+    {
+      "additionalProperties": false,
+      "description": "Resize an existing position to a new quantity.",
+      "properties": {
+        "kind": {
+          "const": "resize",
+          "type": "string"
+        },
+        "new_quantity": {
+          "description": "Replacement quantity for the position.",
+          "format": "double",
+          "type": "number"
+        },
+        "position_id": {
+          "$ref": "#/$defs/PositionId",
+          "description": "Position identifier to resize."
+        }
+      },
+      "required": [
+        "kind",
+        "position_id",
+        "new_quantity"
+      ],
+      "type": "object"
+    }
+  ],
+  "title": "PositionChange"
+}

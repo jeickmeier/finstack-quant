@@ -50,6 +50,8 @@ pub mod liquidity;
 pub mod monte_carlo;
 pub mod pde;
 pub mod rates;
+#[cfg(feature = "json-schema")]
+pub mod schema;
 pub mod trees;
 pub mod types;
 pub mod volatility;

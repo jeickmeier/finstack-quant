@@ -34,6 +34,7 @@ use std::str::FromStr;
 /// call. Set [`allow_partial`](Self::allow_partial) to keep a partial
 /// ladder with those issues recorded on [`PortfolioCashflows::issues`].
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct CashflowAggregationOptions {
     /// When `false` (default), a non-empty [`PortfolioCashflows::issues`]
     /// list fails the call. When `true`, remaining positions still
@@ -49,6 +50,7 @@ pub struct CashflowAggregationOptions {
 /// Collapse uses spot at `as_of` for due-or-past flows and CIP forwards for
 /// later dates.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(rename_all = "snake_case")]
 pub enum CashflowFxPolicy {
     /// Spot FX at `as_of` when `payment_date <= as_of`; otherwise the CIP
@@ -59,6 +61,7 @@ pub enum CashflowFxPolicy {
 
 /// Why a position did not contribute classified cashflows to a portfolio ladder.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(rename_all = "snake_case")]
 pub enum CashflowExtractionIssueKind {
     /// The instrument exposes `CashflowProvider`, but schedule construction failed.
@@ -67,6 +70,7 @@ pub enum CashflowExtractionIssueKind {
 
 /// Structured issue captured while extracting full cashflow schedules.
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct CashflowExtractionIssue {
     /// Position whose cashflow extraction was attempted.
     pub position_id: PositionId,
@@ -82,6 +86,7 @@ pub struct CashflowExtractionIssue {
 
 /// Per-position cashflow summary, including empty-schedule intent metadata.
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct PortfolioCashflowPositionSummary {
     /// Position identifier.
     pub position_id: PositionId,
@@ -97,6 +102,7 @@ pub struct PortfolioCashflowPositionSummary {
 
 /// One scaled portfolio cashflow event derived from an instrument schedule.
 #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct PortfolioCashflowEvent {
     /// Position contributing the event.
     pub position_id: PositionId,
@@ -105,12 +111,20 @@ pub struct PortfolioCashflowEvent {
     /// Underlying instrument type key.
     pub instrument_type: InstrumentType,
     /// Payment date.
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "finstack_quant_core::wire::DateWire")
+    )]
     pub date: Date,
     /// Position-scaled amount.
     pub amount: Money,
     /// Cashflow classification preserved from the instrument schedule.
     pub kind: CFKind,
     /// Optional reset date for floating coupons.
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "Option<finstack_quant_core::wire::DateWire>")
+    )]
     pub reset_date: Option<Date>,
     /// Accrual factor used to compute the event when available.
     pub accrual_factor: f64,
@@ -120,6 +134,7 @@ pub struct PortfolioCashflowEvent {
 
 /// Rich portfolio cashflow ladder preserving event classifications.
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct PortfolioCashflows {
     /// Scaled cashflow events for all supported positions, sorted by payment date.
     pub events: Vec<PortfolioCashflowEvent>,
@@ -128,6 +143,12 @@ pub struct PortfolioCashflows {
     pub by_position: IndexMap<PositionId, Vec<PortfolioCashflowEvent>>,
 
     /// Aggregated totals by date, currency, and `CFKind`.
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(
+            with = "IndexMap<finstack_quant_core::wire::DateWire, IndexMap<Currency, IndexMap<CFKind, Money>>>"
+        )
+    )]
     pub by_date: IndexMap<Date, IndexMap<Currency, IndexMap<CFKind, Money>>>,
 
     /// Per-position schedule metadata, including placeholder/no-residual intent.

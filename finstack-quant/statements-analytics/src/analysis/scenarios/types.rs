@@ -7,6 +7,7 @@ use serde::{Deserialize, Serialize};
 
 /// Entry in a tornado chart representing one parameter's impact on a metric.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct TornadoEntry {
     /// Parameter node identifier.
     pub parameter_id: String,
@@ -25,6 +26,7 @@ impl TornadoEntry {
 
 /// Parameter to vary in sensitivity analysis.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct ParameterSpec {
     /// Node identifier
     pub node_id: String,
@@ -85,6 +87,7 @@ impl ParameterSpec {
 
 /// Sensitivity analysis mode.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(rename_all = "snake_case")]
 pub enum SensitivityMode {
     /// One-at-a-time parameter variations
@@ -99,6 +102,7 @@ pub enum SensitivityMode {
 
 /// Sensitivity analysis configuration.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct SensitivityConfig {
     /// Analysis mode
@@ -134,6 +138,7 @@ impl SensitivityConfig {
 
 /// Result of a single sensitivity scenario.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct SensitivityScenario {
     /// Parameter values for this scenario keyed as `node_id@period_id`.
     pub parameter_values: IndexMap<String, f64>,
@@ -144,6 +149,7 @@ pub struct SensitivityScenario {
 
 /// Results of sensitivity analysis.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct SensitivityResult {
     /// Configuration used
     pub config: SensitivityConfig,

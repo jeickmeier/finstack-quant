@@ -12,6 +12,7 @@ use finstack_quant_statements::Result;
 /// Tracks consecutive periods of negative free cash flow and flags at
 /// configurable thresholds.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct FcfSignCheck {
     /// Free cash flow node.
     pub fcf_node: NodeId,

@@ -17,6 +17,7 @@ use finstack_quant_statements::Result;
 /// of non-positive EBITDA). A *zero* denominator means there is no debt
 /// service / interest to cover and the period is skipped.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct CoverageFloorCheck {
     /// Numerator node (e.g. EBITDA, cash flow available for debt service).
     pub numerator_node: NodeId,

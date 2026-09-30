@@ -1,0 +1,48 @@
+{
+  "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/regression_result.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "OLS regression result for fair-value estimation.",
+  "properties": {
+    "fitted_value": {
+      "description": "Fitted (fair) value for the subject.",
+      "format": "double",
+      "type": "number"
+    },
+    "intercept": {
+      "description": "Intercept (alpha).",
+      "format": "double",
+      "type": "number"
+    },
+    "n": {
+      "description": "Number of observations used.",
+      "format": "uint",
+      "minimum": 0,
+      "type": "integer"
+    },
+    "r_squared": {
+      "description": "R-squared goodness of fit.",
+      "format": "double",
+      "type": "number"
+    },
+    "residual": {
+      "description": "Residual: actual - fitted. Positive = cheap, negative = rich.",
+      "format": "double",
+      "type": "number"
+    },
+    "slope": {
+      "description": "Slope coefficient (beta).",
+      "format": "double",
+      "type": "number"
+    }
+  },
+  "required": [
+    "intercept",
+    "slope",
+    "r_squared",
+    "fitted_value",
+    "residual",
+    "n"
+  ],
+  "title": "RegressionResult",
+  "type": "object"
+}

@@ -74,6 +74,7 @@ use serde::{Deserialize, Serialize};
 /// On the wire `cashflows` may be omitted, meaning a period with no external
 /// flows; unknown keys are rejected.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct TwrrPeriod {
     /// PV at period start.
@@ -94,6 +95,7 @@ pub struct TwrrPeriod {
 
 /// A single external cashflow within a TWRR sub-period.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct DietzFlow {
     /// Signed flow amount from the portfolio's books: positive = contribution
@@ -170,6 +172,7 @@ pub fn twrr_modified_dietz(period: &TwrrPeriod) -> finstack_quant_core::Result<f
 
 /// Result of geometrically linking sub-period returns.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct LinkedReturn {
     /// Cumulative return over the full horizon: `Π(1 + r_i) − 1`.
     pub cumulative: f64,
@@ -182,8 +185,13 @@ pub struct LinkedReturn {
 
 /// A dated cashflow amount for money-weighted return calculations.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct DatedCashflow {
     /// Cashflow date.
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "finstack_quant_core::wire::DateWire")
+    )]
     pub date: Date,
     /// Signed amount from the investor's cash account: contributions are
     /// negative; terminal value or distributions back to the investor are

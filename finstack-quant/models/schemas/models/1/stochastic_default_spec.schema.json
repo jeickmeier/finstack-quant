@@ -1,0 +1,363 @@
+{
+  "$defs": {
+    "CopulaSpec": {
+      "description": "Copula model specification for configuration and serialization.\n\nAllows copula selection without constructing the full model,\nenabling deferred construction with market data.",
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "description": "One-factor Gaussian copula (market standard default).\n\nSimple and fast, but lacks tail dependence.",
+          "properties": {
+            "type": {
+              "const": "gaussian",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Student-t copula with specified degrees of freedom.\n\nCaptures tail dependence - joint extreme defaults are more likely\nthan Gaussian predicts. Lower df = more tail dependence.\n\nTypical calibration: df ∈ [4, 10] for CDX tranches.\n\n# Invariant\n\n`degrees_of_freedom` **must** be finite and `> 2`. Programmatic\nconstruction and [`CopulaSpec::build`] both reject invalid values.",
+          "properties": {
+            "degrees_of_freedom": {
+              "description": "Degrees of freedom (must be > 2 for finite variance)",
+              "format": "double",
+              "type": "number"
+            },
+            "type": {
+              "const": "student_t",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "degrees_of_freedom"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Random Factor Loading copula (stochastic correlation).\n\nModels correlation itself as random, capturing the empirical\nobservation that correlation increases during market stress.",
+          "properties": {
+            "loading_volatility": {
+              "description": "Volatility of the factor loading (correlation vol proxy)",
+              "format": "double",
+              "type": "number"
+            },
+            "type": {
+              "const": "random_factor_loading",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "loading_volatility"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Two-factor Gaussian copula with one global and one shared sector factor.",
+          "properties": {
+            "type": {
+              "const": "multi_factor",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "DefaultCurve": {
+      "description": "Default curve shape.",
+      "oneOf": [
+        {
+          "description": "Constant CDR (no seasoning effect)",
+          "properties": {
+            "curve": {
+              "const": "constant",
+              "type": "string"
+            }
+          },
+          "required": [
+            "curve"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "SDA standard curve: ramps to peak then declines",
+          "properties": {
+            "curve": {
+              "const": "sda",
+              "type": "string"
+            },
+            "speed_multiplier": {
+              "description": "Speed multiplier (1.0 = 100% SDA)",
+              "format": "double",
+              "type": "number"
+            }
+          },
+          "required": [
+            "curve",
+            "speed_multiplier"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Explicit annual CDR for each month of seasoning; the last value is\nheld for later months. The `cdr` field is ignored.",
+          "properties": {
+            "curve": {
+              "const": "vector",
+              "type": "string"
+            },
+            "monthly_cdr": {
+              "description": "Annual CDR per month of seasoning as decimals, month 1 first.",
+              "items": {
+                "format": "double",
+                "type": "number"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "curve",
+            "monthly_cdr"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Cumulative net loss curve (rating-agency ABS convention): losses as a\npercent of the original pool balance by month of seasoning, with a\nconstant loss severity. Defaults in month `t` are\n`Δloss_t / severity` of the original balance; see\n[`DefaultModelSpec::mdr_with_survival`] for the conversion to a\nmonthly rate on the surviving balance. The `cdr` field is ignored.",
+          "properties": {
+            "cumulative_net_loss_pct": {
+              "description": "Cumulative net loss in percent of the original balance per month\nof seasoning (`1.5` = 1.5%), non-decreasing, month 1 first; the\nlast value is held.",
+              "items": {
+                "format": "double",
+                "type": "number"
+              },
+              "type": "array"
+            },
+            "curve": {
+              "const": "cumulative_loss",
+              "type": "string"
+            },
+            "severity": {
+              "description": "Loss severity as a decimal fraction of defaulted par in `(0, 1]`.",
+              "format": "double",
+              "type": "number"
+            }
+          },
+          "required": [
+            "curve",
+            "cumulative_net_loss_pct",
+            "severity"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Rating-agency default timing: a lifetime cumulative default rate\nspread over the years of the pool's life. Defaults within a year\naccrue linearly by month. The `cdr` field is ignored.",
+          "properties": {
+            "annual_pct": {
+              "description": "Share of lifetime defaults occurring in each year of seasoning, in\npercent (e.g. `[15, 30, 30, 15, 10]`); must sum to 100.",
+              "items": {
+                "format": "double",
+                "type": "number"
+              },
+              "type": "array"
+            },
+            "cumulative_default_rate": {
+              "description": "Lifetime defaults as a decimal fraction of the original balance.",
+              "format": "double",
+              "type": "number"
+            },
+            "curve": {
+              "const": "timing",
+              "type": "string"
+            }
+          },
+          "required": [
+            "curve",
+            "cumulative_default_rate",
+            "annual_pct"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "DefaultModelSpec": {
+      "additionalProperties": false,
+      "description": "Default model specification.",
+      "properties": {
+        "cdr": {
+          "description": "CDR: Constant Default Rate (annual, e.g., 0.02 for 2%).\n\nThis field is **ignored** when any curve other than\n[`DefaultCurve::Constant`] is active: the monthly rate is then derived\nentirely from the curve.",
+          "format": "double",
+          "type": "number"
+        },
+        "curve": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/DefaultCurve"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Optional curve shape (default: constant)"
+        }
+      },
+      "required": [
+        "cdr"
+      ],
+      "type": "object"
+    }
+  },
+  "$id": "https://finstack_quant.dev/schemas/models/1/stochastic_default_spec.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Stochastic default model specification.",
+  "oneOf": [
+    {
+      "additionalProperties": false,
+      "description": "Use deterministic default model (no stochastic component).",
+      "properties": {
+        "cdr": {
+          "description": "CDR: Constant Default Rate (annual, e.g., 0.02 for 2%).\n\nThis field is **ignored** when any curve other than\n[`DefaultCurve::Constant`] is active: the monthly rate is then derived\nentirely from the curve.",
+          "format": "double",
+          "type": "number"
+        },
+        "curve": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/DefaultCurve"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Optional curve shape (default: constant)"
+        },
+        "model": {
+          "const": "deterministic",
+          "type": "string"
+        }
+      },
+      "required": [
+        "model",
+        "cdr"
+      ],
+      "type": "object"
+    },
+    {
+      "additionalProperties": false,
+      "description": "Copula-based default correlation model.\n\nUses Li (2000) framework with specified copula.",
+      "properties": {
+        "base_cdr": {
+          "description": "Base annual CDR",
+          "format": "double",
+          "type": "number"
+        },
+        "copula_spec": {
+          "$ref": "#/$defs/CopulaSpec",
+          "description": "Copula specification"
+        },
+        "correlation": {
+          "description": "Asset correlation",
+          "format": "double",
+          "type": "number"
+        },
+        "model": {
+          "const": "copula",
+          "type": "string"
+        }
+      },
+      "required": [
+        "model",
+        "base_cdr",
+        "copula_spec",
+        "correlation"
+      ],
+      "type": "object"
+    },
+    {
+      "additionalProperties": false,
+      "description": "Intensity process (Cox model) for default.\n\nMean-reverting intensity with factor loading.",
+      "properties": {
+        "base_hazard": {
+          "description": "Base annual hazard rate",
+          "format": "double",
+          "type": "number"
+        },
+        "correlation": {
+          "default": 0.2,
+          "description": "Asset correlation",
+          "format": "double",
+          "type": "number"
+        },
+        "factor_loading": {
+          "description": "Loading (β) on the systematic factor, clamped to [-1, 1]",
+          "format": "double",
+          "type": "number"
+        },
+        "mean_reversion": {
+          "description": "Mean reversion speed",
+          "format": "double",
+          "type": "number"
+        },
+        "model": {
+          "const": "intensity_process",
+          "type": "string"
+        },
+        "volatility": {
+          "description": "Intensity volatility",
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "required": [
+        "model",
+        "base_hazard",
+        "factor_loading",
+        "mean_reversion",
+        "volatility"
+      ],
+      "type": "object"
+    },
+    {
+      "additionalProperties": false,
+      "description": "Factor-correlated CDR model.\n\nSimple model that shocks base CDR by systematic factor.",
+      "properties": {
+        "base_spec": {
+          "$ref": "#/$defs/DefaultModelSpec",
+          "description": "Base deterministic default specification"
+        },
+        "cdr_volatility": {
+          "description": "CDR volatility",
+          "format": "double",
+          "type": "number"
+        },
+        "factor_loading": {
+          "description": "Factor loading",
+          "format": "double",
+          "type": "number"
+        },
+        "model": {
+          "const": "factor_correlated",
+          "type": "string"
+        }
+      },
+      "required": [
+        "model",
+        "base_spec",
+        "factor_loading",
+        "cdr_volatility"
+      ],
+      "type": "object"
+    }
+  ],
+  "title": "StochasticDefaultSpec"
+}

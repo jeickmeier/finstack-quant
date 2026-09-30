@@ -22,6 +22,7 @@ use std::f64::consts::PI;
 
 /// COS method configuration.
 #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct CosConfig {
     /// Number of cosine terms in `1..=`[`CosConfig::MAX_TERMS`] (default: 128).
     /// More terms = higher accuracy for non-smooth or heavy-tailed densities.
