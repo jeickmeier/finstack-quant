@@ -8,10 +8,9 @@
 use crate::utils::input::{js_bool, js_f64_seq, js_string, js_u64, js_uint, json_text};
 use crate::utils::{parse_iso_date, to_js_err};
 use finstack_quant_core::dates::DayCount;
-use finstack_quant_core::math::random::Pcg64Rng;
 use finstack_quant_models::credit::{
     AssetDynamics, CreditState, CreditStateVariable, DynamicRecoverySpec, EndogenousHazardSpec,
-    MertonBarrierType, MertonModel, OptimalToggle, ThresholdDirection, ToggleExerciseModel,
+    MertonBarrierType, MertonModel, ThresholdDirection, ToggleExerciseModel,
 };
 use js_sys::Float64Array;
 use wasm_bindgen::prelude::*;
@@ -470,7 +469,7 @@ pub fn merton_to_hazard_curve_json(
 /// @param num_paths - Number of Monte Carlo paths to simulate.
 /// @param num_steps - Number of time steps per path; must be at least 1.
 /// @param horizon - Simulation horizon in years; must be positive and finite.
-/// @param seed - RNG seed for reproducible draws (`Pcg64Rng`).
+/// @param seed - Seed for reproducible draws; the Rust `MertonModel::simulate_paths_seeded` owns the generator (PCG64), so equal seeds give equal paths in every host.
 /// @param antithetic - When `true`, use antithetic variates for variance reduction.
 #[wasm_bindgen(js_name = mertonSimulatePathsJson)]
 pub fn merton_simulate_paths_json(
@@ -487,9 +486,8 @@ pub fn merton_simulate_paths_json(
     let seed = js_u64(&seed, "seed")?;
     let antithetic = js_bool(&antithetic, "antithetic")?;
     let model: MertonModel = serde_json::from_str(model_json).map_err(to_js_err)?;
-    let mut rng = Pcg64Rng::new(seed);
     let paths = model
-        .simulate_paths(num_paths, num_steps, horizon, &mut rng, antithetic)
+        .simulate_paths_seeded(num_paths, num_steps, horizon, seed, antithetic)
         .map_err(to_js_err)?;
     serde_json::to_string(&paths).map_err(to_js_err)
 }
@@ -591,8 +589,8 @@ pub fn endogenous_hazard_power_law_json(
 ///
 /// # Errors
 ///
-/// Throws a JavaScript exception if the credit state cannot be serialized to
-/// JSON.
+/// Throws a `validation` error if any supplied value is non-finite (JSON
+/// cannot carry `NaN` or infinities).
 /// @param hazard_rate - Annualized instantaneous default intensity, expressed as a decimal.
 /// @param distance_to_default - Optional distance to default, measured as standard deviations from the default point.
 /// @param leverage - Debt-to-assets leverage ratio used by the structural credit model.
@@ -608,14 +606,15 @@ pub fn credit_state_json(
     coupon_due: f64,
     asset_value: Option<f64>,
 ) -> Result<String, JsValue> {
-    let state = CreditState {
+    let state = CreditState::new(
         hazard_rate,
         distance_to_default,
         leverage,
         accreted_notional,
         coupon_due,
         asset_value,
-    };
+    )
+    .map_err(to_js_err)?;
     serde_json::to_string(&state).map_err(to_js_err)
 }
 
@@ -623,8 +622,8 @@ pub fn credit_state_json(
 ///
 /// # Errors
 ///
-/// Throws a JavaScript exception if `variable` or `direction` is not a
-/// supported value, or if the model cannot be serialized to JSON.
+/// Throws a `validation` error if `variable` or `direction` is not a
+/// supported value or `threshold` is non-finite.
 /// @param variable - Credit-state variable: `"hazard_rate"`, `"distance_to_default"`, or `"leverage"`.
 /// @param threshold - Threshold value in the units of the selected credit-state variable.
 /// @param direction - Threshold comparison: `"above"` selects PIK above the level and `"below"` below it.
@@ -638,7 +637,8 @@ pub fn toggle_exercise_threshold_json(
     let direction: &str = &js_string(&direction, "direction")?;
     let variable = variable.parse::<CreditStateVariable>().map_err(to_js_err)?;
     let direction = direction.parse::<ThresholdDirection>().map_err(to_js_err)?;
-    let model = ToggleExerciseModel::threshold(variable, threshold, direction);
+    let model =
+        ToggleExerciseModel::threshold(variable, threshold, direction).map_err(to_js_err)?;
     serde_json::to_string(&model).map_err(to_js_err)
 }
 
@@ -651,8 +651,10 @@ pub fn toggle_exercise_threshold_json(
 ///
 /// # Errors
 ///
-/// Throws a JavaScript exception if `nested_paths` exceeds JavaScript's safe
-/// integer range or the model cannot be serialized to JSON.
+/// Throws a `TypeError` if `nested_paths` is not a safe non-negative
+/// integer, and a `validation` error if it is zero, a rate is non-finite,
+/// `asset_vol` is negative or non-finite, or `horizon` is not finite and
+/// positive.
 /// @param nested_paths - Number of nested Monte Carlo paths for continuation-value estimation; must fit JavaScript's safe integer range.
 /// @param equity_discount_rate - Annual equity-holder discount rate used in the nested toggle decision.
 /// @param asset_vol - Annualized volatility of firm-asset returns, expressed as a decimal.
@@ -667,13 +669,14 @@ pub fn toggle_exercise_optimal_json(
     horizon: f64,
 ) -> Result<String, JsValue> {
     let nested_paths: usize = js_uint(&nested_paths, "nestedPaths")?;
-    let model = ToggleExerciseModel::OptimalExercise(OptimalToggle {
+    let model = ToggleExerciseModel::optimal(
         nested_paths,
         equity_discount_rate,
         asset_vol,
         risk_free_rate,
         horizon,
-    });
+    )
+    .map_err(to_js_err)?;
     serde_json::to_string(&model).map_err(to_js_err)
 }
 

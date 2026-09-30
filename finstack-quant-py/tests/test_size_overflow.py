@@ -37,10 +37,10 @@ def test_cholesky_solve_names_both_lengths() -> None:
 def test_merton_path_simulation_rejects_overflowing_sizes() -> None:
     model = MertonModel(100.0, 0.25, 80.0, 0.05)
     with pytest.raises(ValueError, match="num_steps"):
-        model.simulate_paths(1, 2**64 - 1, 1.0, 7)
+        model.simulate_paths(1, 2**64 - 1, 1.0, 7, False)
     with pytest.raises(ValueError, match="overflow"):
-        model.simulate_paths(2**63, 4, 1.0, 7)
-    assert len(model.simulate_paths(2, 4, 1.0, 7).asset_values) == 2 * 5
+        model.simulate_paths(2**63, 4, 1.0, 7, False)
+    assert len(model.simulate_paths(2, 4, 1.0, 7, False).asset_values) == 2 * 5
 
 
 def test_student_t_propagates_nan_instead_of_panicking() -> None:

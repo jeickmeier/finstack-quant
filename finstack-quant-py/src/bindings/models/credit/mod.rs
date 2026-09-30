@@ -17,11 +17,10 @@ use crate::bindings::pandas_utils::{
     dict_to_dataframe, serde_object_to_single_row_dataframe, serde_to_py, values_to_series,
 };
 use crate::errors::{core_to_py, serde_json_to_py, value_error};
-use finstack_quant_core::math::random::Pcg64Rng;
 use finstack_quant_models::credit::{
     moodys_warf_factor as rust_moodys_warf_factor, AssetDynamics, CreditState, CreditStateVariable,
-    DynamicRecoverySpec, EndogenousHazardSpec, MertonBarrierType, MertonModel, OptimalToggle,
-    RatingFactorTable, SimulatedPaths, ThresholdDirection, ToggleExerciseModel,
+    DynamicRecoverySpec, EndogenousHazardSpec, MertonBarrierType, MertonModel, RatingFactorTable,
+    SimulatedPaths, ThresholdDirection, ToggleExerciseModel,
 };
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList, PyModule};
@@ -684,29 +683,25 @@ impl PyMertonModel {
 
     /// Risk-neutral cumulative default probabilities over several horizons.
     ///
+    /// A pandas convenience over :meth:`default_probability`: each horizon
+    /// follows the same Rust rule, so a non-positive horizon gives ``0.0``.
+    ///
     /// Parameters
     /// ----------
     /// horizons : list[float]
-    ///     Horizons in years; each must be finite and strictly positive.
+    ///     Horizons in years.
     ///
     /// Returns
     /// -------
     /// pandas.Series
     ///     Float series named ``default_probability`` indexed by the horizon
     ///     labels (``str(horizon)``), in input order.
-    ///
-    /// Raises ``ValueError`` when any horizon is non-finite or non-positive.
     #[pyo3(text_signature = "($self, horizons)")]
     fn default_probabilities<'py>(
         &self,
         py: Python<'py>,
         horizons: Vec<f64>,
     ) -> PyResult<Bound<'py, PyAny>> {
-        if let Some(bad) = horizons.iter().find(|h| !h.is_finite() || **h <= 0.0) {
-            return Err(value_error(format!(
-                "horizons must be finite and strictly positive, got {bad}"
-            )));
-        }
         let labels: Vec<String> = horizons.iter().map(|h| h.to_string()).collect();
         let values: Vec<f64> = horizons
             .iter()
@@ -796,8 +791,9 @@ impl PyMertonModel {
     /// * `recovery` - Recovery rate assumption as a decimal in ``[0, 1]``;
     ///   must equal the model's ``mean_recovery`` under CreditGrades dynamics
     /// * `day_count` - Day-count convention the curve uses to turn dates into
-    ///   year fractions (default ``"act_365f"``)
-    #[pyo3(signature = (id, base_date, tenors, recovery, day_count="act_365f"))]
+    ///   year fractions; pass the convention of the discount curve the hazard
+    ///   curve will be paired with (required, as in Rust and WASM)
+    #[pyo3(text_signature = "($self, id, base_date, tenors, recovery, day_count)")]
     fn to_hazard_curve(
         &self,
         id: &str,
@@ -822,9 +818,12 @@ impl PyMertonModel {
     /// * `num_paths` - Number of paths to simulate
     /// * `num_steps` - Number of time steps per path (must be >= 1)
     /// * `horizon` - Simulation horizon in years (must be > 0)
-    /// * `seed` - RNG seed for reproducible draws
-    /// * `antithetic` - When ``True``, use antithetic variates for variance reduction
-    #[pyo3(signature = (num_paths, num_steps, horizon, seed, antithetic=false))]
+    /// * `seed` - Seed for reproducible draws; the Rust
+    ///   ``MertonModel::simulate_paths_seeded`` owns the generator (PCG64), so
+    ///   equal seeds give equal paths in every host
+    /// * `antithetic` - When ``True``, use antithetic variates for variance
+    ///   reduction (required, as in Rust and WASM)
+    #[pyo3(text_signature = "($self, num_paths, num_steps, horizon, seed, antithetic)")]
     fn simulate_paths(
         &self,
         num_paths: usize,
@@ -833,10 +832,9 @@ impl PyMertonModel {
         seed: u64,
         antithetic: bool,
     ) -> PyResult<PySimulatedPaths> {
-        let mut rng = Pcg64Rng::new(seed);
         let paths = self
             .inner
-            .simulate_paths(num_paths, num_steps, horizon, &mut rng, antithetic)
+            .simulate_paths_seeded(num_paths, num_steps, horizon, seed, antithetic)
             .map_err(core_to_py)?;
         Ok(PySimulatedPaths::from_inner(paths))
     }
@@ -1411,6 +1409,8 @@ impl PyCreditState {
     ///     Cash coupon due at the decision date.
     /// asset_value : float | None, default None
     ///     Fair value of the firm's assets, when available.
+    ///
+    /// Raises ``ValueError`` if any supplied value is non-finite.
     #[new]
     #[pyo3(signature = (hazard_rate=0.0, distance_to_default=None, leverage=0.0, accreted_notional=0.0, coupon_due=0.0, asset_value=None))]
     #[pyo3(
@@ -1423,17 +1423,17 @@ impl PyCreditState {
         accreted_notional: f64,
         coupon_due: f64,
         asset_value: Option<f64>,
-    ) -> Self {
-        Self {
-            inner: CreditState {
-                hazard_rate,
-                distance_to_default,
-                leverage,
-                accreted_notional,
-                coupon_due,
-                asset_value,
-            },
-        }
+    ) -> PyResult<Self> {
+        CreditState::new(
+            hazard_rate,
+            distance_to_default,
+            leverage,
+            accreted_notional,
+            coupon_due,
+            asset_value,
+        )
+        .map(|inner| Self { inner })
+        .map_err(core_to_py)
     }
 
     /// Serialize this snapshot to compact canonical JSON.
@@ -1544,15 +1544,20 @@ impl PyToggleExerciseModel {
     ///     ``"above"`` to PIK when the variable exceeds the threshold,
     ///     ``"below"`` to PIK when it falls under it.
     ///
-    /// Raises ``ValueError`` for an unknown variable or direction string.
+    /// Raises ``ValueError`` for an unknown variable or direction string, or
+    /// a non-finite threshold.
     #[staticmethod]
     #[pyo3(text_signature = "(variable, threshold, direction)")]
     fn threshold(variable: &str, threshold: f64, direction: &str) -> PyResult<Self> {
-        let variable = parse_state_variable(variable)?;
-        let direction = parse_direction(direction)?;
-        Ok(Self {
-            inner: ToggleExerciseModel::threshold(variable, threshold, direction),
-        })
+        let variable = variable
+            .parse::<CreditStateVariable>()
+            .map_err(value_error)?;
+        let direction = direction
+            .parse::<ThresholdDirection>()
+            .map_err(value_error)?;
+        ToggleExerciseModel::threshold(variable, threshold, direction)
+            .map(|inner| Self { inner })
+            .map_err(core_to_py)
     }
 
     /// Stochastic rule: PIK with probability ``logistic(intercept + sensitivity * x)``.
@@ -1567,14 +1572,17 @@ impl PyToggleExerciseModel {
     /// sensitivity : float
     ///     Logit slope per unit of the variable.
     ///
-    /// Raises ``ValueError`` for an unknown variable string.
+    /// Raises ``ValueError`` for an unknown variable string or a non-finite
+    /// intercept or sensitivity.
     #[staticmethod]
     #[pyo3(text_signature = "(variable, intercept, sensitivity)")]
     fn stochastic(variable: &str, intercept: f64, sensitivity: f64) -> PyResult<Self> {
-        let variable = parse_state_variable(variable)?;
-        Ok(Self {
-            inner: ToggleExerciseModel::stochastic(variable, intercept, sensitivity),
-        })
+        let variable = variable
+            .parse::<CreditStateVariable>()
+            .map_err(value_error)?;
+        ToggleExerciseModel::stochastic(variable, intercept, sensitivity)
+            .map(|inner| Self { inner })
+            .map_err(core_to_py)
     }
 
     /// Whether the rule elects PIK for ``state`` given one uniform draw.
@@ -1606,6 +1614,10 @@ impl PyToggleExerciseModel {
     ///     Continuously compounded risk-free rate (decimal).
     /// horizon : float
     ///     Inner simulation horizon in years.
+    ///
+    /// Raises ``ValueError`` if ``nested_paths`` is zero, a rate is
+    /// non-finite, ``asset_vol`` is negative or non-finite, or ``horizon`` is
+    /// not finite and positive.
     #[staticmethod]
     #[pyo3(
         text_signature = "(nested_paths, equity_discount_rate, asset_vol, risk_free_rate, horizon)"
@@ -1616,16 +1628,16 @@ impl PyToggleExerciseModel {
         asset_vol: f64,
         risk_free_rate: f64,
         horizon: f64,
-    ) -> Self {
-        Self {
-            inner: ToggleExerciseModel::OptimalExercise(OptimalToggle {
-                nested_paths,
-                equity_discount_rate,
-                asset_vol,
-                risk_free_rate,
-                horizon,
-            }),
-        }
+    ) -> PyResult<Self> {
+        ToggleExerciseModel::optimal(
+            nested_paths,
+            equity_discount_rate,
+            asset_vol,
+            risk_free_rate,
+            horizon,
+        )
+        .map(|inner| Self { inner })
+        .map_err(core_to_py)
     }
 
     /// Support `pickle` (and therefore `multiprocessing`, `joblib`, `dask`).
@@ -1725,20 +1737,6 @@ fn variant_repr<T: serde::Serialize>(type_name: &str, value: &T) -> String {
         }
         _ => format!("{type_name}(...)"),
     }
-}
-
-fn parse_state_variable(value: &str) -> PyResult<CreditStateVariable> {
-    value.parse::<CreditStateVariable>().map_err(|err| {
-        value_error(format!(
-            "{err} (expected one of hazard_rate, distance_to_default, leverage)"
-        ))
-    })
-}
-
-fn parse_direction(value: &str) -> PyResult<ThresholdDirection> {
-    value
-        .parse::<ThresholdDirection>()
-        .map_err(|err| value_error(format!("{err} (expected one of above, below)")))
 }
 
 pub(crate) fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {

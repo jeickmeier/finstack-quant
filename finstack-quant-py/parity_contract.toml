@@ -192,7 +192,7 @@ public = ["credit", "risk", "schema"]
 [crates.models.factor.modules]
 matching           = { python = "finstack_quant.models.factor.matching", status = "missing", note = "MatchingConfig typed host-language constructors deferred; JSON contracts remain Rust-owned. The crate-root matching re-exports (CascadeMatcher, HierarchicalMatcher, MappingTableMatcher, FactorMatcher trait family, MappingRule, AttributeFilter, DependencyFilter) are Rust-only." }
 credit             = { python = "finstack_quant.models.factor.credit", status = "exists", note = "Credit hierarchy artifacts, covariance forecasts, VolHorizon, and typed FactorCovarianceMatrix/FactorModelConfig forecast outputs are flattened into this namespace. CreditCalibrator accepts CreditCalibrationConfig / CreditCalibrationInputs as dicts or JSON strings (plus CreditCalibrator.from_dataframe for pandas panels); the config/input structs themselves (CreditCalibrationConfig, CreditCalibrationInputs, HistoryPanel, IssuerTagPanel, GenericFactorSeries, BucketSizeThresholds and the enum families PanelFrequency, PanelSpace, VolModelChoice, CovarianceStrategy, BetaShrinkage, BucketWeighting, IssuerBetaPolicy) are reached through those wire shapes and CreditFactorModel getters, not parallel constructors. Rust-only families: hierarchy internals (CreditHierarchySpec, HierarchyDimension, IssuerBetaRow, IssuerBetas, IssuerBetaMode, IssuerTags, FitQuality, LevelsAtAnchor, LevelAnchor, VolState, FactorVolModel, FactorHistories, FactorCorrelationMatrix, CalibrationDiagnostics, FoldUpRecord, DateRange, GenericFactorSpec, dimension_key), the peel kernel (credit::peel), unit helpers (credit::units), DecompositionError (mapped to KeyError/ValueError/RuntimeError), and the calibration sub-pipeline (assemble, inventory, panel, peel_fit, statistics, validation)." }
-risk               = { python = "finstack_quant.models.factor.risk", status = "exists", note = "Pure factor and position decomposition, stress attribution, and risk-budget result types and functions. parametric_es_decomposition returns the ParametricEsDecompositionView reporting view (WASM parametricEsDecomposition returns the same view as a plain object). Rust-only families: the decomposer engines (ParametricDecomposer, ParametricPositionDecomposer, HistoricalPositionDecomposer, DecompositionMethod as a bare enum - hosts read DecompositionConfig.method), residual plumbing (apply_residual_contributions, ResidualContributionSource as a bare enum - hosts read source_kind/source_issuer_id), the VaR/budget view structs ParametricVarDecompositionView, PositionVarContributionView, PositionBudgetEntryView, RiskBudgetResultView and their builders parametric_var_decomposition_view/risk_budget_result_view (hosts use the typed PositionRiskDecomposition/RiskBudgetResult wrappers), the flat-matrix adapters flatten_square_matrix/flatten_position_pnls (host extractors accept lists, NumPy and pandas directly), evaluate_risk_budget_arrays (bound as evaluate_risk_budget), and risk::math kernels." }
+risk               = { python = "finstack_quant.models.factor.risk", status = "exists", note = "Pure factor and position decomposition, stress attribution, and risk-budget result types and functions. Both hosts return the canonical Rust results: parametric_var_decomposition / historical_var_decomposition return PositionRiskDecomposition and evaluate_risk_budget returns RiskBudgetResult (WASM returns the same serde shapes as plain objects); parametric_es_decomposition returns the ParametricEsDecompositionView reporting view in both. An omitted confidence resolves to DecompositionConfig::parametric_95() / historical_95() in both hosts. Position P&L matrices are position-major (one row per position) in both hosts; Python additionally reads a labelled pandas.DataFrame (rows = scenarios) and NumPy arrays as host input conversions. Rust-only families: the decomposer engines (ParametricDecomposer, ParametricPositionDecomposer, HistoricalPositionDecomposer, DecompositionMethod as a bare enum - hosts read DecompositionConfig.method), residual plumbing (apply_residual_contributions, ResidualContributionSource as a bare enum - hosts read source_kind/source_issuer_id), the ES view builder parametric_es_decomposition_view, the flat-matrix adapters flatten_square_matrix/flatten_position_pnls (the hosts call them on list input), evaluate_risk_budget_arrays (bound as evaluate_risk_budget), and risk::math kernels." }
 schema             = { python = "finstack_quant.models.factor.schema", status = "exists", note = "Compiled-in JSON Schema accessors; the WASM twin is tracked in the [parity] ledger backlog." }
 
 # The remaining crate-root `pub use` surface (BumpSizeConfig, PricingMode,
@@ -582,10 +582,10 @@ public = [
 ]
 
 # Rust-only in `liquidity`: `LiquidityConfig` (tier thresholds are passed
-# per call via `liquidity_tier(thresholds=...)`), `LiquidityTier` (surfaced as
-# the `"tier1".."tier5"` strings), `SpreadVolatilityKind` (surfaced as the
-# `"relative"` / `"absolute"` strings on `LiquidityProfile`) and
-# `classify_tier` (the `liquidity_tier` free function is its host twin).
+# per call via `liquidity_tier(days, thresholds)` in both hosts and validated by
+# the Rust `LiquidityConfig::try_new`), `LiquidityTier` (surfaced as
+# the `"tier1".."tier5"` strings) and `SpreadVolatilityKind` (surfaced as the
+# `"relative"` / `"absolute"` strings on `LiquidityProfile`).
 # `KyleLambdaModel.lambda_from_series` is bound as the `kyle_lambda` free
 # function; the Rust argument order is `(returns, volumes, reference_price)`
 # in both hosts.
@@ -864,7 +864,10 @@ public = [
 # `MultiFactorCopula`) and recovery structs (`ConstantRecovery`,
 # `CorrelatedRecovery`) are reached through `CopulaSpec.build()` /
 # `RecoverySpec.build()`; `NearestCorrelationOpts` is flattened into
-# `nearest_correlation(max_iter=, tol=)`.
+# `nearest_correlation(max_iter=, tol=)`. `PortfolioLossResult` deserializes
+# through `PortfolioLossResult::from_losses` in both hosts. Host input conversion: the Python matrix functions also read nested rows or
+# a 2-D NumPy array (shape-checked by the Rust `flatten_square_matrix`); WASM
+# takes the flat row-major form only.
 [crates.models.correlation]
 python_package = "finstack_quant.models.correlation"
 public = [
@@ -1827,7 +1830,7 @@ exclusion_reasons = ["pandas", "arrow", "pickle", "pure-python", "dunder"]
 python_rule_excluded_members = { to_dataframe = "pandas", to_series = "pandas", from_dataframe = "pandas", to_arrow = "arrow" }
 js_rule_members = { free = "wasm ownership: releases the wasm-bindgen handle", toString = "JavaScript twin of Python __str__" }
 # Ratchet: remaining backlog sizes. Lower these as names are bound; never raise them.
-backlog_ceiling = { modules = 835, members = 392 }
+backlog_ceiling = { modules = 830, members = 392 }
 
 [parity.modules."finstack_quant"]
 js = ""
@@ -2412,6 +2415,7 @@ types = { BsGreeks = "BsGreeks" }
 
 [parity.modules."finstack_quant.models.correlation"]
 js = "models.correlation"
+types = { TrancheLossStatistics = "TrancheLossStatistics" }
 backlog = [
     "CorrelatedBernoulli",
     "CreditExposure",
@@ -2422,8 +2426,6 @@ backlog = [
     "LatentTwoFactor",
     "MAX_PORTFOLIO_LOSS_PATHS",
     "PortfolioLossConfig",
-    "PortfolioLossResult",
-    "TrancheLossStatistics",
     "cholesky_decompose",
     "simulate_portfolio_loss",
 ]
@@ -2527,16 +2529,13 @@ backlog = [
 
 [parity.modules."finstack_quant.models.factor.risk"]
 js = "models.factor.risk"
-types = { PositionBudgetEntry = "PositionBudgetEntry", PositionEsContribution = "PositionEsContribution", PositionVarContribution = "PositionVarContribution", RiskBudgetResult = "RiskBudgetResult" }
+types = { ParametricEsDecompositionView = "ParametricEsDecompositionView", PositionBudgetEntry = "PositionBudgetEntry", PositionEsContribution = "PositionEsContribution", PositionEsContributionView = "PositionEsContributionView", PositionRiskDecomposition = "PositionRiskDecomposition", PositionVarContribution = "PositionVarContribution", RiskBudgetResult = "RiskBudgetResult" }
 backlog = [
     "DEFAULT_UTILIZATION_THRESHOLD",
     "DecompositionConfig",
     "FactorContribution",
-    "ParametricEsDecompositionView",
-    "PositionEsContributionView",
     "PositionFactorContribution",
     "PositionResidualContribution",
-    "PositionRiskDecomposition",
     "RiskDecomposition",
     "StressAttribution",
     "StressPositionEntry",
@@ -3023,9 +3022,6 @@ calculateVm = "JSON-first twin of the Python VM calculator (P4 binds the class)"
 csaEurRegulatoryJson = "JSON document twin of Python CsaSpec.eur_regulatory"
 csaUsdRegulatoryJson = "JSON document twin of Python CsaSpec.usd_regulatory"
 validateCsaJson = "JSON wire validation twin of Python CsaSpec.from_json"
-
-[parity.js."models.correlation".wasm_only]
-trancheLossStatistics = "S13: WASM-only composition, replaced by a PortfolioLossResult handle"
 
 [parity.js."models.credit".wasm_only]
 creditGradesModelJson = "JSON-first twin of a Python credit model constructor (P5 binds the class)"

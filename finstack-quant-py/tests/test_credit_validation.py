@@ -100,7 +100,7 @@ def test_structural_spec_constructors_and_equality() -> None:
     series = model.default_probabilities([1.0, 2.0])
     assert list(series.index) == ["1", "2"]
     assert series.iloc[0] == pytest.approx(model.default_probability(1.0))
-    paths = model.simulate_paths(3, 4, 1.0, 7)
+    paths = model.simulate_paths(3, 4, 1.0, 7, False)
     assert paths.values_per_path == 5
     frame = paths.to_dataframe()
     assert list(frame.columns) == ["path", "time", "asset_value"]

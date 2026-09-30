@@ -15,32 +15,7 @@ use crate::errors::{core_to_py, value_error};
 
 use super::super::json_bridge::{deserialize_json, serialize_json};
 use super::super::matrix_input::{extract_position_pnls, extract_square_matrix, PositionPnlMatrix};
-use super::config::PyDecompositionConfig;
 use super::contributions::PyPositionRiskDecomposition;
-
-/// Merge an optional `DecompositionConfig` with scalar overrides.
-///
-/// The `base` supplies the method; `config` (when given) supplies the
-/// confidence and incremental flag; explicit scalars win over both.
-pub(super) fn resolve_config(
-    base: DecompositionConfig,
-    config: Option<&PyDecompositionConfig>,
-    confidence: Option<f64>,
-    compute_incremental: Option<bool>,
-) -> DecompositionConfig {
-    let mut resolved = base;
-    if let Some(cfg) = config {
-        resolved.confidence = cfg.inner.confidence;
-        resolved.compute_incremental = cfg.inner.compute_incremental;
-    }
-    if let Some(confidence) = confidence {
-        resolved.confidence = confidence;
-    }
-    if let Some(flag) = compute_incremental {
-        resolved.compute_incremental = flag;
-    }
-    resolved
-}
 
 /// `True` when `obj` is a `pandas.DataFrame` (checked by module + type name so
 /// pandas is not imported when it is not already loaded).
@@ -107,10 +82,7 @@ fn extract_covariance_input(
 /// - `pandas.DataFrame` — rows are scenarios, columns are positions
 ///   (`position_ids` defaults to the column labels);
 /// - nested list or 2-D NumPy array shaped `n_positions × n_scenarios`
-///   (position-major, the documented layout);
-/// - nested list or 2-D NumPy array shaped `n_scenarios × n_positions`
-///   (scenario-major), accepted only when the two dimensions differ so the
-///   orientation is unambiguous.
+///   (position-major), the Rust `flatten_position_pnls` layout WASM shares.
 pub(super) fn extract_pnl_input(
     py: Python<'_>,
     position_ids: Option<Vec<String>>,
@@ -139,40 +111,7 @@ pub(super) fn extract_pnl_input(
     let ids = position_ids.ok_or_else(|| {
         value_error("position_ids is required unless position_pnls is a pandas.DataFrame")
     })?;
-    let n_positions = ids.len();
-
-    // Scenario-major NumPy input: rows == scenarios, columns == positions.
-    if let Ok(array) = position_pnls.extract::<PyReadonlyArray2<'_, f64>>() {
-        let shape = array.shape();
-        if shape[0] != n_positions && shape[1] == n_positions {
-            let data: Vec<f64> = array.as_array().iter().copied().collect();
-            return Ok((ids, PositionPnlMatrix::from_scenario_major(data, shape[0])));
-        }
-        if shape[0] != n_positions {
-            return Err(value_error(format!(
-                "position_pnls has shape ({}, {}) but there are {n_positions} position ids; \
-                 expected n_positions x n_scenarios (position-major) or, when unambiguous, \
-                 n_scenarios x n_positions (scenario-major)",
-                shape[0], shape[1]
-            )));
-        }
-    } else if let Ok(nested) = position_pnls.extract::<Vec<Vec<f64>>>() {
-        let rows = nested.len();
-        let cols = nested.first().map_or(0, Vec::len);
-        if rows != n_positions && cols == n_positions && nested.iter().all(|r| r.len() == cols) {
-            let data: Vec<f64> = nested.into_iter().flatten().collect();
-            return Ok((ids, PositionPnlMatrix::from_scenario_major(data, rows)));
-        }
-        if rows != n_positions {
-            return Err(value_error(format!(
-                "position_pnls has {rows} rows of {cols} but there are {n_positions} position \
-                 ids; expected n_positions x n_scenarios (position-major) or, when \
-                 unambiguous, n_scenarios x n_positions (scenario-major)"
-            )));
-        }
-    }
-
-    let matrix = extract_position_pnls(py, position_pnls, n_positions)?;
+    let matrix = extract_position_pnls(py, position_pnls, ids.len())?;
     Ok((ids, matrix))
 }
 
@@ -188,13 +127,10 @@ pub(super) fn extract_pnl_input(
 ///         ``position_ids`` — nested list, 2-D NumPy array, or
 ///         ``pandas.DataFrame``.
 ///     confidence: Tail confidence as a decimal probability strictly inside
-///         ``(0.5, 1)``; overrides ``config.confidence``. Defaults to ``0.95``
-///         when neither is given.
+///         ``(0.5, 1)``. ``None`` uses the Rust
+///         ``DecompositionConfig.parametric_95()`` preset (``0.95``).
 ///     compute_incremental: Whether to compute leave-one-out incremental VaR
-///         (one full repricing per position); overrides
-///         ``config.compute_incremental``. Defaults to ``False``.
-///     config: Optional ``DecompositionConfig`` supplying the defaults for the
-///         two scalars above.
+///         (one full repricing per position). Defaults to ``False``.
 ///
 /// Returns:
 ///     ``PositionRiskDecomposition`` with portfolio VaR/ES (losses negative)
@@ -204,24 +140,24 @@ pub(super) fn extract_pnl_input(
 ///     ValueError: If dimensions disagree, the covariance is not symmetric
 ///         positive semidefinite, or ``confidence`` is outside ``(0.5, 1)``.
 #[pyfunction]
-#[pyo3(signature = (position_ids, weights, covariance, confidence = None, compute_incremental = None, config = None))]
+#[pyo3(signature = (position_ids, weights, covariance, confidence = None, compute_incremental = false))]
 pub(super) fn parametric_var_decomposition(
     py: Python<'_>,
     position_ids: Option<Vec<String>>,
     weights: Vec<f64>,
     covariance: &Bound<'_, PyAny>,
     confidence: Option<f64>,
-    compute_incremental: Option<bool>,
-    config: Option<&PyDecompositionConfig>,
+    compute_incremental: bool,
 ) -> PyResult<PyPositionRiskDecomposition> {
     let n = weights.len();
     let (position_ids, cov_flat) = extract_covariance_input(py, position_ids, covariance, n)?;
-    let config = resolve_config(
-        DecompositionConfig::parametric_95(),
-        config,
-        confidence,
-        compute_incremental,
+    let mut config = confidence.map_or_else(
+        DecompositionConfig::parametric_95,
+        DecompositionConfig::parametric,
     );
+    if compute_incremental {
+        config = config.with_incremental();
+    }
 
     let result = py
         .detach(move || {
@@ -252,9 +188,8 @@ pub(super) fn parametric_var_decomposition(
 ///     covariance: Square covariance matrix — nested list, 2-D NumPy array,
 ///         or ``pandas.DataFrame``.
 ///     confidence: ES tail confidence as a decimal probability strictly
-///         inside ``(0.5, 1)``; overrides ``config.confidence``. Defaults to
-///         ``0.95``.
-///     config: Optional ``DecompositionConfig`` supplying the confidence.
+///         inside ``(0.5, 1)``. ``None`` uses the Rust
+///         ``DecompositionConfig.parametric_95()`` preset (``0.95``).
 ///
 /// Returns:
 ///     ``ParametricEsDecompositionView`` with ``portfolio_var``,
@@ -264,24 +199,20 @@ pub(super) fn parametric_var_decomposition(
 ///     ValueError: If dimensions disagree, the covariance is malformed, or
 ///         ``confidence`` is outside ``(0.5, 1)``.
 #[pyfunction]
-#[pyo3(signature = (position_ids, weights, covariance, confidence = None, config = None))]
+#[pyo3(signature = (position_ids, weights, covariance, confidence = None))]
 pub(super) fn parametric_es_decomposition(
     py: Python<'_>,
     position_ids: Option<Vec<String>>,
     weights: Vec<f64>,
     covariance: &Bound<'_, PyAny>,
     confidence: Option<f64>,
-    config: Option<&PyDecompositionConfig>,
 ) -> PyResult<PyParametricEsDecompositionView> {
     let n = weights.len();
     let (position_ids, cov_flat) = extract_covariance_input(py, position_ids, covariance, n)?;
-    let mut config = resolve_config(
-        DecompositionConfig::parametric_95(),
-        config,
-        confidence,
-        None,
+    let config = confidence.map_or_else(
+        DecompositionConfig::parametric_95,
+        DecompositionConfig::parametric,
     );
-    config.compute_incremental = false;
 
     let view = py
         .detach(move || {
@@ -303,39 +234,35 @@ pub(super) fn parametric_es_decomposition(
 ///         used).
 ///     position_pnls: P&L matrix. A ``pandas.DataFrame`` is read as rows =
 ///         scenarios, columns = positions. A nested list or 2-D NumPy array is
-///         read as ``n_positions x n_scenarios`` (position-major); a
-///         ``n_scenarios x n_positions`` layout is accepted when the two
-///         dimensions differ. Losses are negative.
+///         read as ``n_positions x n_scenarios`` (position-major, one row per
+///         position). Losses are negative.
 ///     confidence: Tail confidence as a decimal probability strictly inside
-///         ``(0.5, 1)``; overrides ``config.confidence``. Defaults to ``0.95``.
-///     config: Optional ``DecompositionConfig`` supplying the confidence.
+///         ``(0.5, 1)``. ``None`` uses the Rust
+///         ``DecompositionConfig.historical_95()`` preset (``0.95``).
 ///
 /// Returns:
 ///     ``PositionRiskDecomposition`` with historical VaR/ES totals and
 ///     per-position contributions (marginal and incremental VaR are ``None``).
 ///
 /// Raises:
-///     ValueError: If the matrix is empty, ragged, its orientation cannot be
-///         resolved against ``position_ids``, too few scenarios resolve the
-///         tail, or ``confidence`` is outside ``(0.5, 1)``.
+///     ValueError: If the matrix is empty, ragged, does not have one row per
+///         position id, too few scenarios resolve the tail, or ``confidence``
+///         is outside ``(0.5, 1)``.
 #[pyfunction]
-#[pyo3(signature = (position_ids, position_pnls, confidence = None, config = None))]
+#[pyo3(signature = (position_ids, position_pnls, confidence = None))]
 pub(super) fn historical_var_decomposition(
     py: Python<'_>,
     position_ids: Option<Vec<String>>,
     position_pnls: &Bound<'_, PyAny>,
     confidence: Option<f64>,
-    config: Option<&PyDecompositionConfig>,
 ) -> PyResult<PyPositionRiskDecomposition> {
     let (position_ids, position_pnls) = extract_pnl_input(py, position_ids, position_pnls)?;
     let n = position_ids.len();
     let n_scenarios = position_pnls.n_scenarios();
 
-    let config = resolve_config(
-        DecompositionConfig::historical(0.95),
-        config,
-        confidence,
-        None,
+    let config = confidence.map_or_else(
+        DecompositionConfig::historical_95,
+        DecompositionConfig::historical,
     );
     let result = py
         .detach(move || {

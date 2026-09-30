@@ -59,7 +59,7 @@ fn invalid_input(message: impl Into<String>) -> Error {
 }
 
 pub use types::{
-    classify_tier, days_to_liquidate, LiquidityConfig, LiquidityProfile, LiquidityTier,
+    days_to_liquidate, liquidity_tier, LiquidityConfig, LiquidityProfile, LiquidityTier,
     SpreadVolatilityKind,
 };
 

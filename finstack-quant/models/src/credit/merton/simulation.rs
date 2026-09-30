@@ -1,4 +1,4 @@
-use finstack_quant_core::math::random::{poisson_inverse_cdf, RandomNumberGenerator};
+use finstack_quant_core::math::random::{poisson_inverse_cdf, Pcg64Rng, RandomNumberGenerator};
 use finstack_quant_core::{Error, Result};
 
 use super::{AssetDynamics, MertonModel};
@@ -261,6 +261,40 @@ impl MertonModel {
             num_steps,
         })
     }
+
+    /// Simulate asset value paths from a seed, reproducibly.
+    ///
+    /// Runs [`Self::simulate_paths`] with a PCG64 generator
+    /// ([`Pcg64Rng`]) seeded by `seed`, so the same model, arguments and
+    /// seed return bit-identical paths on every platform. This is the entry
+    /// point both language bindings expose.
+    ///
+    /// # Arguments
+    ///
+    /// * `num_paths` - Number of independent paths to simulate; with
+    ///   `antithetic` set, each path is paired with its sign-flipped twin.
+    /// * `num_steps` - Number of equally spaced time steps per path; must be
+    ///   at least 1, and each path stores `num_steps + 1` values.
+    /// * `horizon` - Time horizon T in years spanned by the grid; must be
+    ///   finite and strictly positive.
+    /// * `seed` - PCG64 seed; equal seeds reproduce equal paths.
+    /// * `antithetic` - When true, generate each odd-indexed path from the
+    ///   negated normals of its predecessor for variance reduction.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::simulate_paths`].
+    pub fn simulate_paths_seeded(
+        &self,
+        num_paths: usize,
+        num_steps: usize,
+        horizon: f64,
+        seed: u64,
+        antithetic: bool,
+    ) -> Result<SimulatedPaths> {
+        let mut rng = Pcg64Rng::new(seed);
+        self.simulate_paths(num_paths, num_steps, horizon, &mut rng, antithetic)
+    }
 }
 
 /// Empty buffer with room for exactly `len` values, or a validation error when
@@ -278,6 +312,19 @@ fn reserve_values(len: usize) -> Result<Vec<f64>> {
 #[cfg(test)]
 mod tests {
     use super::super::{AssetDynamics, MertonBarrierType, MertonModel};
+
+    #[test]
+    fn simulate_paths_seeded_is_reproducible_pcg64() {
+        let m = MertonModel::new(100.0, 0.25, 80.0, 0.04).unwrap();
+        let a = m.simulate_paths_seeded(8, 12, 1.0, 7, true).unwrap();
+        let b = m.simulate_paths_seeded(8, 12, 1.0, 7, true).unwrap();
+        assert_eq!(a.asset_values, b.asset_values);
+        let mut rng = finstack_quant_core::math::random::Pcg64Rng::new(7);
+        let explicit = m.simulate_paths(8, 12, 1.0, &mut rng, true).unwrap();
+        assert_eq!(a.asset_values, explicit.asset_values);
+        let other = m.simulate_paths_seeded(8, 12, 1.0, 8, true).unwrap();
+        assert_ne!(a.asset_values, other.asset_values);
+    }
 
     #[test]
     fn simulate_paths_rejects_degenerate_grid() {

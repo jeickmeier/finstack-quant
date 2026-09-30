@@ -423,6 +423,23 @@ mod tests {
             .is_err());
     }
 
+    /// The forecast never returns a non-finite vol: an overflowing horizon
+    /// is an error, so hosts need no output check of their own.
+    #[test]
+    fn idiosyncratic_forecast_rejects_overflowing_horizon() {
+        let mut model = fixture_model();
+        let issuer = IssuerId::new("ACME");
+        model.vol_state.idiosyncratic.insert(
+            issuer.clone(),
+            IdiosyncraticVolModel::Sample { variance: 1e308 },
+        );
+        let forecast = FactorCovarianceForecast::new(&model);
+        let error = forecast
+            .idiosyncratic_vol(&issuer, VolHorizon::NSteps(10))
+            .expect_err("1e308 * 10 overflows to inf");
+        assert!(error.to_string().contains("invalid idiosyncratic variance"));
+    }
+
     #[test]
     fn horizon_parser_accepts_fractional_years_and_rejects_invalid_input() {
         assert_eq!(

@@ -15,7 +15,7 @@ mod fi_attribution;
 mod grid_attribution;
 mod json_bridge;
 mod materialization;
-mod matrix_input;
+pub(crate) mod matrix_input;
 mod optimization_spec;
 mod performance;
 mod pipeline;

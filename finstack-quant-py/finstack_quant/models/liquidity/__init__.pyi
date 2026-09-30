@@ -1672,7 +1672,9 @@ def liquidity_tier(
     Raises
     ------
     ValueError
-        If ``thresholds`` is given but not strictly ascending or non-finite.
+        If ``thresholds`` is given but a value is non-finite or not positive,
+        or the values are not strictly ascending (the Rust
+        ``LiquidityConfig::try_new`` rule WASM ``liquidityTier`` shares).
 
     Examples
     --------

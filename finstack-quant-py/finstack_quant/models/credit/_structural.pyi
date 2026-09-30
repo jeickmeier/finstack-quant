@@ -523,7 +523,7 @@ class SimulatedPaths:
     --------
     >>> from finstack_quant.models.credit import MertonModel
     >>> model = MertonModel(100.0, 0.25, 80.0, 0.05)
-    >>> paths = model.simulate_paths(4, 10, 1.0, seed=42)
+    >>> paths = model.simulate_paths(4, 10, 1.0, seed=42, antithetic=False)
     >>> (paths.num_paths, paths.num_steps, len(paths.times))
     (4, 10, 11)
 
@@ -1409,10 +1409,13 @@ class MertonModel:
         """
         Risk-neutral cumulative default probabilities over several horizons.
 
+        A pandas convenience over :meth:`default_probability`: each horizon
+        follows the same Rust rule, so a non-positive horizon gives ``0.0``.
+
         Parameters
         ----------
         horizons : list[float]
-            Horizons in years; each must be finite and strictly positive.
+            Horizons in years.
 
         Returns
         -------
@@ -1420,10 +1423,9 @@ class MertonModel:
             Float series named ``default_probability`` indexed by the horizon
             labels (``str(horizon)``), in input order.
 
-        Raises
-        ------
-        ValueError
-            If any horizon is non-finite or non-positive.
+        Notes
+        -----
+        This method does not raise.
         """
         ...
 
@@ -1616,7 +1618,7 @@ class MertonModel:
         base_date: datetime.date,
         tenors: list[float],
         recovery: float,
-        day_count: str = "act_365f",
+        day_count: str,
     ) -> HazardCurve:
         """
         Bootstrap a piecewise-constant hazard curve from structural default probabilities.
@@ -1637,11 +1639,11 @@ class MertonModel:
             Recovery rate assumption as a decimal in ``[0, 1]``. Under
             CreditGrades dynamics it must equal the model's own
             ``mean_recovery``, since that value already sets the barrier.
-        day_count : str, optional
+        day_count : str
             Day-count convention the curve uses to turn dates into year
-            fractions. Pass the convention of the discount curve the hazard
-            curve will be paired with. Default ``"act_365f"``, which matches
-            the year-fraction axis the model's horizons use.
+            fractions, e.g. ``"act_365f"``. Pass the convention of the discount
+            curve the hazard curve will be paired with; there is no default,
+            as in Rust and WASM.
 
         Returns
         -------
@@ -1664,7 +1666,7 @@ class MertonModel:
         num_steps: int,
         horizon: float,
         seed: int,
-        antithetic: bool = False,
+        antithetic: bool,
     ) -> SimulatedPaths:
         """
         Simulate asset value paths using Monte Carlo.
@@ -1678,10 +1680,12 @@ class MertonModel:
         horizon : float
             Simulation horizon in years (must be > 0).
         seed : int
-            RNG seed for reproducible draws.
-        antithetic : bool, optional
+            Seed for reproducible draws. The Rust
+            ``MertonModel::simulate_paths_seeded`` owns the generator (PCG64),
+            so equal seeds give equal paths in Python and WASM.
+        antithetic : bool
             When ``True``, use antithetic variates for variance reduction.
-            Default ``False``.
+            Required, as in Rust and WASM.
 
         Returns
         -------
@@ -2342,9 +2346,11 @@ class CreditState:
         asset_value : float, optional
             Firm asset value for structural/toggle models.
 
-        Notes
-        -----
-        Construction does not raise; arguments are stored as supplied.
+        Raises
+        ------
+        ValueError
+            If any supplied value is non-finite (JSON cannot carry ``NaN`` or
+            infinities).
         """
         ...
 
@@ -2550,7 +2556,8 @@ class ToggleExerciseModel:
         Raises
         ------
         ValueError
-            If ``variable`` or ``direction`` is not recognized.
+            If ``variable`` or ``direction`` is not recognized (the message
+            lists the accepted labels), or ``threshold`` is non-finite.
 
         Examples
         --------
@@ -2592,9 +2599,11 @@ class ToggleExerciseModel:
         ToggleExerciseModel
             Optimal exercise specification.
 
-        Notes
-        -----
-        This method does not raise; it returns a fixed instance.
+        Raises
+        ------
+        ValueError
+            If ``nested_paths`` is zero, a rate is non-finite, ``asset_vol`` is
+            negative or non-finite, or ``horizon`` is not finite and positive.
 
         Examples
         --------
@@ -2629,7 +2638,8 @@ class ToggleExerciseModel:
         Raises
         ------
         ValueError
-            For an unknown variable string.
+            For an unknown variable string, or a non-finite intercept or
+            sensitivity.
 
         Examples
         --------

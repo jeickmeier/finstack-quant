@@ -293,7 +293,7 @@ impl LiquidityTier {
 
 /// Configuration for liquidity calculations.
 ///
-/// Holds the tier-classification thresholds consumed by [`classify_tier`].
+/// Holds the tier-classification thresholds consumed by [`liquidity_tier`].
 /// All thresholds use trading days (not calendar days).
 ///
 /// Historical note (breaking wire change, 2026-08): the former
@@ -327,27 +327,98 @@ impl Default for LiquidityConfig {
     }
 }
 
+impl LiquidityConfig {
+    /// Build a configuration from explicit tier thresholds, validated by
+    /// [`Self::validate`].
+    ///
+    /// # Arguments
+    ///
+    /// * `tier_thresholds` - Upper days-to-liquidate bounds of Tiers 1-4,
+    ///   `[tier1_max, tier2_max, tier3_max, tier4_max]`, in trading days.
+    ///   Each must be finite and positive, and the four must be strictly
+    ///   ascending.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`finstack_quant_core::Error::Validation`] when a threshold is
+    /// non-finite or not positive, or the thresholds are not strictly
+    /// ascending.
+    pub fn try_new(tier_thresholds: [f64; 4]) -> Result<Self> {
+        let config = Self { tier_thresholds };
+        config.validate()?;
+        Ok(config)
+    }
+
+    /// Check that every tier threshold is finite and positive and that the
+    /// thresholds are strictly ascending.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`finstack_quant_core::Error::Validation`] naming the first
+    /// offending threshold.
+    pub fn validate(&self) -> Result<()> {
+        let mut prev = 0.0;
+        for (idx, threshold) in self.tier_thresholds.iter().copied().enumerate() {
+            if !(threshold.is_finite() && threshold > 0.0) {
+                return Err(invalid_input(format!(
+                    "liquidity tier_thresholds[{idx}] must be finite and positive, got {threshold}"
+                )));
+            }
+            if threshold <= prev {
+                return Err(invalid_input(format!(
+                    "liquidity tier_thresholds[{idx}] ({threshold}) must be greater than the \
+                     prior threshold ({prev})"
+                )));
+            }
+            prev = threshold;
+        }
+        Ok(())
+    }
+
+    /// Classify a days-to-liquidate horizon against these thresholds.
+    fn tier(&self, days_to_liquidate: f64) -> LiquidityTier {
+        let [t1, t2, t3, t4] = self.tier_thresholds;
+        if days_to_liquidate < t1 {
+            LiquidityTier::Tier1
+        } else if days_to_liquidate < t2 {
+            LiquidityTier::Tier2
+        } else if days_to_liquidate < t3 {
+            LiquidityTier::Tier3
+        } else if days_to_liquidate < t4 {
+            LiquidityTier::Tier4
+        } else {
+            LiquidityTier::Tier5
+        }
+    }
+}
+
 /// Classify a position into a liquidity tier based on days-to-liquidate.
 ///
-/// Pure function using the configured thresholds.
+/// A horizon below `tier1_max` is Tier 1, below `tier2_max` Tier 2, and so on;
+/// a horizon at or above `tier4_max` is Tier 5.
 ///
 /// # Arguments
 ///
 /// * `days_to_liquidate` - Estimated trading days needed to liquidate the
 ///   position under the selected participation assumption.
-/// * `thresholds` - Four ascending day-count boundaries separating Tiers 1–5.
-pub fn classify_tier(days_to_liquidate: f64, thresholds: &[f64; 4]) -> LiquidityTier {
-    if days_to_liquidate < thresholds[0] {
-        LiquidityTier::Tier1
-    } else if days_to_liquidate < thresholds[1] {
-        LiquidityTier::Tier2
-    } else if days_to_liquidate < thresholds[2] {
-        LiquidityTier::Tier3
-    } else if days_to_liquidate < thresholds[3] {
-        LiquidityTier::Tier4
-    } else {
-        LiquidityTier::Tier5
-    }
+/// * `thresholds` - Optional upper bounds of Tiers 1-4 in trading days,
+///   `[tier1_max, tier2_max, tier3_max, tier4_max]`, validated by
+///   [`LiquidityConfig::try_new`]. `None` uses the registry default
+///   [`LiquidityConfig::default`] (`[1, 5, 20, 60]`).
+///
+/// # Errors
+///
+/// Returns [`finstack_quant_core::Error::Validation`] when supplied
+/// thresholds are non-finite, not positive, or not strictly ascending.
+pub fn liquidity_tier(
+    days_to_liquidate: f64,
+    thresholds: Option<[f64; 4]>,
+) -> Result<LiquidityTier> {
+    let config = match thresholds {
+        Some(tier_thresholds) => LiquidityConfig::try_new(tier_thresholds)?,
+        None => LiquidityConfig::default(),
+    };
+    Ok(config.tier(days_to_liquidate))
 }
 
 /// Compute the number of trading days required to liquidate a position
@@ -417,17 +488,55 @@ mod tests {
     }
 
     #[test]
-    fn tier_classification() {
-        let thresholds = [1.0, 5.0, 20.0, 60.0];
-        assert_eq!(classify_tier(0.5, &thresholds), LiquidityTier::Tier1);
-        assert_eq!(classify_tier(1.0, &thresholds), LiquidityTier::Tier2);
-        assert_eq!(classify_tier(3.0, &thresholds), LiquidityTier::Tier2);
-        assert_eq!(classify_tier(5.0, &thresholds), LiquidityTier::Tier3);
-        assert_eq!(classify_tier(19.0, &thresholds), LiquidityTier::Tier3);
-        assert_eq!(classify_tier(20.0, &thresholds), LiquidityTier::Tier4);
-        assert_eq!(classify_tier(59.0, &thresholds), LiquidityTier::Tier4);
-        assert_eq!(classify_tier(60.0, &thresholds), LiquidityTier::Tier5);
-        assert_eq!(classify_tier(100.0, &thresholds), LiquidityTier::Tier5);
+    fn tier_classification() -> Result<()> {
+        let thresholds = Some([1.0, 5.0, 20.0, 60.0]);
+        assert_eq!(liquidity_tier(0.5, thresholds)?, LiquidityTier::Tier1);
+        assert_eq!(liquidity_tier(1.0, thresholds)?, LiquidityTier::Tier2);
+        assert_eq!(liquidity_tier(3.0, thresholds)?, LiquidityTier::Tier2);
+        assert_eq!(liquidity_tier(5.0, thresholds)?, LiquidityTier::Tier3);
+        assert_eq!(liquidity_tier(19.0, thresholds)?, LiquidityTier::Tier3);
+        assert_eq!(liquidity_tier(20.0, thresholds)?, LiquidityTier::Tier4);
+        assert_eq!(liquidity_tier(59.0, thresholds)?, LiquidityTier::Tier4);
+        assert_eq!(liquidity_tier(60.0, thresholds)?, LiquidityTier::Tier5);
+        assert_eq!(liquidity_tier(100.0, thresholds)?, LiquidityTier::Tier5);
+        Ok(())
+    }
+
+    #[test]
+    fn tier_defaults_and_custom_thresholds() -> Result<()> {
+        assert_eq!(liquidity_tier(3.0, None)?, LiquidityTier::Tier2);
+        assert_eq!(
+            liquidity_tier(3.0, Some([0.5, 2.0, 10.0, 30.0]))?,
+            LiquidityTier::Tier3
+        );
+        assert_eq!(
+            liquidity_tier(12.0, Some([1.0, 2.0, 3.0, 4.0]))?,
+            LiquidityTier::Tier5
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn tier_thresholds_must_be_positive_finite_and_ascending() {
+        for bad in [
+            [-1.0, 0.0, 1.0, 2.0],
+            [0.0, 1.0, 2.0, 3.0],
+            [4.0, 3.0, 2.0, 1.0],
+            [1.0, 1.0, 2.0, 3.0],
+            [1.0, f64::NAN, 2.0, 3.0],
+            [1.0, 2.0, 3.0, f64::INFINITY],
+        ] {
+            assert!(
+                LiquidityConfig::try_new(bad).is_err(),
+                "{bad:?} must be rejected"
+            );
+            assert!(
+                liquidity_tier(3.0, Some(bad)).is_err(),
+                "{bad:?} must be rejected"
+            );
+        }
+        assert!(LiquidityConfig::try_new([1.0, 5.0, 20.0, 60.0]).is_ok());
+        assert!(LiquidityConfig::default().validate().is_ok());
     }
 
     #[test]

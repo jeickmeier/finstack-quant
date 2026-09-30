@@ -64,8 +64,17 @@ pub struct PortfolioLossConfig {
 /// sign and losses are negative, e.g. `metrics::risk::VarResult` and the
 /// portfolio risk engines): here the random variable is the loss itself,
 /// not a P&L.
+///
+/// # Wire format
+///
+/// Deserialization is routed through [`PortfolioLossResult::from_losses`]
+/// via a private raw wire struct: the losses and confidence are validated
+/// and the aggregates are recomputed, and a payload whose aggregates
+/// disagree with its losses is rejected. The serialized field set is
+/// unchanged.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(try_from = "RawPortfolioLossResult")]
 pub struct PortfolioLossResult {
     /// Loss for each path in ascending path-index order.
     pub losses: Vec<f64>,
@@ -78,6 +87,45 @@ pub struct PortfolioLossResult {
     /// Loss-positive confidence used for [`Self::var`] and
     /// [`Self::expected_shortfall`], in `(0, 1)`.
     pub confidence: f64,
+}
+
+/// Unvalidated wire representation of a [`PortfolioLossResult`].
+///
+/// Exists solely so `#[serde(try_from = ...)]` can funnel deserialization
+/// through [`PortfolioLossResult::from_losses`]. Field names and types mirror
+/// [`PortfolioLossResult`] exactly, so the JSON representation is identical.
+#[derive(Debug, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[cfg_attr(feature = "json-schema", schemars(rename = "PortfolioLossResult"))]
+struct RawPortfolioLossResult {
+    /// Loss for each path in ascending path-index order.
+    losses: Vec<f64>,
+    /// Arithmetic mean path loss.
+    expected_loss: f64,
+    /// Loss-positive nearest-rank VaR at the configured confidence.
+    var: f64,
+    /// Probability-weighted mean of the worst `1 - confidence` share of losses.
+    expected_shortfall: f64,
+    /// Loss-positive confidence used for `var` and `expected_shortfall`, in
+    /// `(0, 1)`.
+    confidence: f64,
+}
+
+impl TryFrom<RawPortfolioLossResult> for PortfolioLossResult {
+    type Error = Error;
+
+    fn try_from(raw: RawPortfolioLossResult) -> Result<Self> {
+        let result = Self::from_losses(raw.losses, raw.confidence)?;
+        let carried = (raw.expected_loss, raw.var, raw.expected_shortfall);
+        let rebuilt = (result.expected_loss, result.var, result.expected_shortfall);
+        if carried != rebuilt {
+            return Err(validation_error(format!(
+                "portfolio loss aggregates (expected_loss, var, expected_shortfall) = \
+                 {carried:?} do not match the losses, which give {rebuilt:?}"
+            )));
+        }
+        Ok(result)
+    }
 }
 
 /// Loss statistics for one attachment/detachment tranche over a simulated pool

@@ -171,16 +171,14 @@ impl PyCreditFactorModel {
     ///     ValueError: If the JSON is malformed or fails validation.
     #[staticmethod]
     fn from_json(json: &str) -> PyResult<Self> {
-        let inner: CreditFactorModel = serde_json::from_str(json)
-            .map_err(|e| serde_json_to_py(e, "invalid CreditFactorModel JSON"))?;
-        inner.validate().map_err(core_to_py)?;
-        Ok(Self { inner })
+        CreditFactorModel::from_json(json)
+            .map(|inner| Self { inner })
+            .map_err(core_to_py)
     }
 
     /// Serialize this model to compact JSON.
     fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner)
-            .map_err(|e| serde_json_to_py(e, "cannot serialize CreditFactorModel"))
+        self.inner.to_json().map_err(core_to_py)
     }
 
     /// Namespaced schema marker (``"finstack_quant.credit_factor_model/1"``).
@@ -673,18 +671,14 @@ impl PyLevelsAtDate {
     ///     ValueError: If the JSON is malformed or fails validation.
     #[staticmethod]
     fn from_json(json: &str) -> PyResult<Self> {
-        let inner: finstack_quant_models::factor::credit::decomposition::LevelsAtDate =
-            serde_json::from_str(json)
-                .map_err(|e| serde_json_to_py(e, "invalid LevelsAtDate JSON"))?;
-        inner.validate().map_err(core_to_py)?;
-        Ok(Self { inner })
+        finstack_quant_models::factor::credit::decomposition::LevelsAtDate::from_json(json)
+            .map(|inner| Self { inner })
+            .map_err(core_to_py)
     }
 
     /// Serialize the snapshot to compact canonical JSON.
     fn to_json(&self) -> PyResult<String> {
-        self.inner.validate().map_err(core_to_py)?;
-        serde_json::to_string(&self.inner)
-            .map_err(|e| serde_json_to_py(e, "cannot serialize LevelsAtDate"))
+        self.inner.to_json().map_err(core_to_py)
     }
 
     /// Support pickle through the canonical JSON representation.
@@ -843,18 +837,14 @@ impl PyPeriodDecomposition {
     ///     ValueError: If the JSON is malformed or fails validation.
     #[staticmethod]
     fn from_json(json: &str) -> PyResult<Self> {
-        let inner: finstack_quant_models::factor::credit::decomposition::PeriodDecomposition =
-            serde_json::from_str(json)
-                .map_err(|e| serde_json_to_py(e, "invalid PeriodDecomposition JSON"))?;
-        inner.validate().map_err(core_to_py)?;
-        Ok(Self { inner })
+        finstack_quant_models::factor::credit::decomposition::PeriodDecomposition::from_json(json)
+            .map(|inner| Self { inner })
+            .map_err(core_to_py)
     }
 
     /// Serialize the decomposition to compact canonical JSON.
     fn to_json(&self) -> PyResult<String> {
-        self.inner.validate().map_err(core_to_py)?;
-        serde_json::to_string(&self.inner)
-            .map_err(|e| serde_json_to_py(e, "cannot serialize PeriodDecomposition"))
+        self.inner.to_json().map_err(core_to_py)
     }
 
     /// Support pickle through the canonical JSON representation.

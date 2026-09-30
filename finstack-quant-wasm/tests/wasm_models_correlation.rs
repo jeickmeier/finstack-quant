@@ -44,3 +44,19 @@ fn nearest_correlation_repairs_near_psd_input() {
         assert!((out[i * 3 + i] - 1.0).abs() < 1e-9);
     }
 }
+
+#[wasm_bindgen_test]
+fn portfolio_loss_result_handle_matches_rust() {
+    let losses: JsValue = js_sys::Float64Array::from(&[0.0, 1.0, 2.0, 5.0, 10.0][..]).into();
+    let result = JsPortfolioLossResult::from_losses(losses, 0.75).expect("valid losses");
+    assert_eq!(result.var(), 5.0);
+    assert!((result.expected_shortfall() - 9.0).abs() < 1e-12);
+    assert!(result.tranche_loss_statistics(0.02, 0.06, 100.0).is_ok());
+    let json = result.to_json().expect("json");
+    let loaded = JsPortfolioLossResult::from_json(JsValue::from(&json)).expect("round trip");
+    assert_eq!(loaded.to_json().unwrap(), json);
+    assert!(JsPortfolioLossResult::from_json(JsValue::from(
+        json.replace("\"var\":5.0", "\"var\":6.0")
+    ))
+    .is_err());
+}

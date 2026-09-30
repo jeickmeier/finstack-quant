@@ -598,12 +598,12 @@
     "keys": [
       "Copula",
       "CopulaSpec",
+      "PortfolioLossResult",
       "RecoveryModel",
       "RecoverySpec",
       "correlationBounds",
       "jointProbabilities",
       "nearestCorrelation",
-      "trancheLossStatistics",
       "validateCorrelationMatrix"
     ]
   },
@@ -631,6 +631,12 @@
     "methods": ["conditionalLgd", "conditionalRecovery", "free"],
     "getters": ["expectedRecovery", "isStochastic", "lgd", "modelName", "recoveryVolatility"]
   },
+  "models.correlation.PortfolioLossResult": {
+    "kind": "class",
+    "statics": ["fromJson", "fromLosses"],
+    "methods": ["free", "toJson", "trancheLossStatistics"],
+    "getters": ["confidence", "expectedLoss", "expectedShortfall", "losses", "var"]
+  },
   "models.correlation.correlationBounds": {
     "kind": "function"
   },
@@ -641,9 +647,6 @@
     "kind": "function"
   },
   "models.correlation.nearestCorrelation": {
-    "kind": "function"
-  },
-  "models.correlation.trancheLossStatistics": {
     "kind": "function"
   },
   "models.credit": {

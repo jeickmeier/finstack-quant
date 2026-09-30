@@ -97,6 +97,7 @@ def test_to_hazard_curve_returns_hazard_curve() -> None:
         datetime.date(2024, 1, 15),
         [1.0, 3.0, 5.0],
         0.40,
+        "act_365f",
     )
     assert curve.id == "ACME-HZD"
 

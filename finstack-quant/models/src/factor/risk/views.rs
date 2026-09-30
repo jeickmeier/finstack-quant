@@ -1,6 +1,6 @@
 //! Serializable factor-risk reporting views and matrix input adapters.
 
-use super::{PositionRiskDecomposition, RiskBudgetResult};
+use super::PositionRiskDecomposition;
 
 /// Serializable Expected Shortfall contribution row.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -30,108 +30,6 @@ pub struct ParametricEsDecompositionView {
     pub contributions: Vec<PositionEsContributionView>,
 }
 
-/// Serializable VaR contribution row.
-#[derive(Debug, Clone, PartialEq, serde::Serialize)]
-pub struct PositionVarContributionView {
-    /// Position identifier.
-    pub position_id: String,
-    /// Component VaR allocated to the position.
-    pub component_var: f64,
-    /// Marginal VaR, when available.
-    pub marginal_var: Option<f64>,
-    /// Fraction of total VaR contributed by this position.
-    pub pct_contribution: f64,
-    /// Incremental VaR, when available.
-    pub incremental_var: Option<f64>,
-}
-
-/// Serializable VaR decomposition view.
-#[derive(Debug, Clone, PartialEq, serde::Serialize)]
-pub struct ParametricVarDecompositionView {
-    /// Total portfolio VaR.
-    pub portfolio_var: f64,
-    /// Total portfolio Expected Shortfall.
-    pub portfolio_es: f64,
-    /// Confidence level used for VaR.
-    pub confidence: f64,
-    /// Number of positions in the decomposition.
-    pub n_positions: usize,
-    /// Euler residual, when computed by the engine.
-    pub euler_residual: Option<f64>,
-    /// Per-position VaR contributions.
-    pub contributions: Vec<PositionVarContributionView>,
-}
-
-/// Serializable risk-budget row.
-#[derive(Debug, Clone, PartialEq, serde::Serialize)]
-pub struct PositionBudgetEntryView {
-    /// Position identifier.
-    pub position_id: String,
-    /// Actual component VaR.
-    pub actual_component_var: f64,
-    /// Target component VaR.
-    pub target_component_var: f64,
-    /// Target share of portfolio VaR (`inf` when the portfolio VaR is zero
-    /// but the target level is not).
-    #[serde(with = "finstack_quant_core::wire::non_finite_f64")]
-    pub target_pct: f64,
-    /// Utilization ratio (negative for diversifiers, `±inf` for a non-zero
-    /// component against a zero target).
-    #[serde(with = "finstack_quant_core::wire::non_finite_f64")]
-    pub utilization: f64,
-    /// Over-budget amount.
-    pub excess: f64,
-    /// Whether utilization exceeds the configured threshold.
-    pub breach: bool,
-}
-
-/// Serializable risk-budget result view.
-#[derive(Debug, Clone, PartialEq, serde::Serialize)]
-pub struct RiskBudgetResultView {
-    /// Portfolio VaR used for target scaling.
-    pub portfolio_var: f64,
-    /// Sum of over-budget amounts.
-    pub total_overbudget: f64,
-    /// Whether any position breached the utilization threshold.
-    pub has_breach: bool,
-    /// Utilization threshold used for breach classification.
-    pub utilization_threshold: f64,
-    /// Per-position budget rows.
-    pub positions: Vec<PositionBudgetEntryView>,
-}
-
-/// Convert a full position risk decomposition into the serializable VaR view.
-///
-/// # Arguments
-///
-/// * `decomposition` - Position-level risk decomposition whose VaR
-///   contributions, confidence, and portfolio totals are copied into the
-///   reporting representation.
-#[must_use]
-pub fn parametric_var_decomposition_view(
-    decomposition: &PositionRiskDecomposition,
-) -> ParametricVarDecompositionView {
-    let contributions = decomposition
-        .var_contributions
-        .iter()
-        .map(|contribution| PositionVarContributionView {
-            position_id: contribution.position_id.clone(),
-            component_var: contribution.component_var,
-            marginal_var: contribution.marginal_var,
-            pct_contribution: contribution.relative_var,
-            incremental_var: contribution.incremental_var,
-        })
-        .collect();
-    ParametricVarDecompositionView {
-        portfolio_var: decomposition.portfolio_var,
-        portfolio_es: decomposition.portfolio_es,
-        confidence: decomposition.confidence,
-        n_positions: decomposition.n_positions,
-        euler_residual: decomposition.euler_residual,
-        contributions,
-    }
-}
-
 /// Convert a full position risk decomposition into the serializable ES view.
 ///
 /// # Arguments
@@ -159,53 +57,6 @@ pub fn parametric_es_decomposition_view(
         confidence: decomposition.confidence,
         n_positions: decomposition.n_positions,
         contributions,
-    }
-}
-
-/// Convert a risk-budget result into the serializable reporting view.
-///
-/// # Arguments
-///
-/// * `result` - Per-position risk-budget allocation result to expose.
-/// * `portfolio_var` - Signed portfolio VaR in reporting-currency amount
-///   units; its absolute magnitude scales each target percentage.
-/// * `utilization_threshold` - Dimensionless utilization ratio above which a
-///   position is flagged as breaching its risk budget.
-#[must_use]
-pub fn risk_budget_result_view(
-    result: &RiskBudgetResult,
-    portfolio_var: f64,
-    utilization_threshold: f64,
-) -> RiskBudgetResultView {
-    let portfolio_var_magnitude = portfolio_var.abs();
-    let positions = result
-        .positions
-        .iter()
-        .map(|entry| {
-            let target_pct = if portfolio_var_magnitude > 1e-15 {
-                entry.target_component_var / portfolio_var_magnitude
-            } else if entry.target_component_var.abs() > 1e-15 {
-                f64::INFINITY
-            } else {
-                0.0
-            };
-            PositionBudgetEntryView {
-                position_id: entry.position_id.clone(),
-                actual_component_var: entry.actual_component_var,
-                target_component_var: entry.target_component_var,
-                target_pct,
-                utilization: entry.utilization,
-                excess: entry.excess,
-                breach: entry.utilization > utilization_threshold,
-            }
-        })
-        .collect();
-    RiskBudgetResultView {
-        portfolio_var,
-        total_overbudget: result.total_overbudget,
-        has_breach: result.has_breach,
-        utilization_threshold,
-        positions,
     }
 }
 
@@ -290,22 +141,6 @@ pub fn flatten_position_pnls(
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn budget_entry_view_serializes_non_finite_fields() {
-        let view = PositionBudgetEntryView {
-            position_id: "A".to_string(),
-            actual_component_var: 1.0,
-            target_component_var: 1.0,
-            target_pct: f64::INFINITY,
-            utilization: f64::NEG_INFINITY,
-            excess: 0.0,
-            breach: false,
-        };
-        let json = serde_json::to_string(&view).expect("serialize");
-        assert!(json.contains("\"target_pct\":\"inf\""));
-        assert!(json.contains("\"utilization\":\"-inf\""));
-    }
 
     #[test]
     fn flatten_square_matrix_validates_shape() {

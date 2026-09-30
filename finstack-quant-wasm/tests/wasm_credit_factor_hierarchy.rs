@@ -120,7 +120,7 @@ fn calibrate_then_decompose_round_trip() {
     let config_json = minimal_config_json();
     let inputs_json = minimal_inputs_json();
 
-    let calibrator = JsCreditCalibrator::new(JsValue::from(&config_json))
+    let calibrator = JsCreditCalibrator::new(Some(JsValue::from(&config_json)))
         .expect("JsCreditCalibrator::new must succeed");
     let model = calibrator
         .calibrate(JsValue::from(&inputs_json))
@@ -140,7 +140,7 @@ fn calibrate_then_decompose_round_trip() {
 /// truncating or wrapping to another hierarchy level.
 #[wasm_bindgen_test]
 fn level_values_reject_non_integer_indices() {
-    let calibrator = JsCreditCalibrator::new(JsValue::from(&minimal_config_json()))
+    let calibrator = JsCreditCalibrator::new(Some(JsValue::from(&minimal_config_json())))
         .expect("JsCreditCalibrator::new must succeed");
     let model = calibrator
         .calibrate(JsValue::from(&minimal_inputs_json()))
@@ -163,7 +163,7 @@ fn level_values_reject_non_integer_indices() {
 #[wasm_bindgen_test]
 fn covariance_forecast_returns_structured_objects() {
     let calibrator =
-        JsCreditCalibrator::new(JsValue::from(&minimal_config_json())).expect("calibrator");
+        JsCreditCalibrator::new(Some(JsValue::from(&minimal_config_json()))).expect("calibrator");
     let model = calibrator
         .calibrate(JsValue::from(&minimal_inputs_json()))
         .expect("model");
@@ -177,10 +177,21 @@ fn covariance_forecast_returns_structured_objects() {
     assert!(covariance["data"].is_array());
 
     let config = forecast
-        .factor_model_at(JsValue::from("one_step"), JsValue::from("\"variance\""))
+        .factor_model_at(
+            JsValue::from("one_step"),
+            Some(JsValue::from("\"variance\"")),
+        )
         .expect("factor model");
     let config: serde_json::Value = serde_wasm_bindgen::from_value(config).unwrap();
     assert!(config["factors"].is_array());
     assert!(config["covariance"].is_object());
     assert_eq!(config["risk_measure"], "variance");
+
+    // Omitted risk measure resolves to the Rust `RiskMeasure::default()`.
+    let defaulted = forecast
+        .factor_model_at(JsValue::from("one_step"), None)
+        .expect("default risk measure");
+    let defaulted: serde_json::Value = serde_wasm_bindgen::from_value(defaulted).unwrap();
+    assert_eq!(defaulted["risk_measure"], "variance");
+    assert!(JsCreditCalibrator::new(None).is_ok());
 }

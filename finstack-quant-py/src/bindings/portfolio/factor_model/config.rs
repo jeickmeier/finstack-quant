@@ -186,9 +186,10 @@ impl PyVolHorizon {
 ///
 /// Holds the tail ``confidence`` (decimal probability in ``(0.5, 1)``), the
 /// ``method`` (``"parametric"`` or ``"historical"``) and whether
-/// leave-one-out incremental VaR is computed. Pass an instance as ``config=``
-/// to ``parametric_var_decomposition`` / ``historical_var_decomposition``;
-/// any scalar keyword given alongside overrides the matching field.
+/// leave-one-out incremental VaR is computed. The decomposition functions
+/// take ``confidence`` / ``compute_incremental`` directly and resolve an
+/// omitted confidence to the ``parametric_95()`` / ``historical_95()``
+/// presets.
 ///
 /// Example:
 ///     >>> from finstack_quant.models.factor.risk import DecompositionConfig
@@ -250,6 +251,13 @@ impl PyDecompositionConfig {
     #[pyo3(text_signature = "(cls, confidence)")]
     fn historical(_cls: &Bound<'_, PyType>, confidence: f64) -> Self {
         Self::from_inner(DecompositionConfig::historical(confidence))
+    }
+
+    /// Standard 95% historical-simulation configuration.
+    #[classmethod]
+    #[pyo3(text_signature = "(cls)")]
+    fn historical_95(_cls: &Bound<'_, PyType>) -> Self {
+        Self::from_inner(DecompositionConfig::historical_95())
     }
 
     /// Return a copy that also computes leave-one-out incremental VaR

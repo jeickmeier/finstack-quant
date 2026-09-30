@@ -65,6 +65,7 @@ value crosses the debt barrier.
 | `try_implied_equity(horizon)` | `-> Result<(equity_value, equity_vol)>` via Black-Scholes with a continuous payout rate; diffusion-only |
 | `to_hazard_curve(id, base_date, &tenors, recovery, day_count)` | Piecewise-constant `HazardCurve` from the structural survival curve; tenors need not be sorted |
 | `simulate_paths(num_paths, num_steps, horizon, &mut rng, antithetic)` | `-> Result<SimulatedPaths>` |
+| `simulate_paths_seeded(num_paths, num_steps, horizon, seed, antithetic)` | `simulate_paths` with a PCG64 generator seeded by `seed`; the entry point both bindings expose |
 
 Read-only accessors: `asset_value()`, `asset_vol()`, `debt_barrier()`,
 `risk_free_rate()`, `payout_rate()`, `barrier_type()`, `dynamics()`.
@@ -160,8 +161,9 @@ attainable spread range or the competing brackets.
 
 Flat path storage with `values_per_path()`, `get(path_idx, time_idx)`,
 `path(path_idx)`, `iter_paths()`, and `to_nested()`. Seeded via the
-`RandomNumberGenerator` the caller passes to `simulate_paths`, so the same seed
-reproduces the same paths. `num_steps == 0` or `horizon <= 0` is a validation
+`RandomNumberGenerator` the caller passes to `simulate_paths`, or via the PCG64
+seed given to `simulate_paths_seeded`, so the same seed reproduces the same
+paths. `num_steps == 0` or `horizon <= 0` is a validation
 error, not a degenerate grid.
 
 `simulate_paths` returns the raw asset grid with no barrier applied. Inferring
@@ -225,11 +227,12 @@ Decides cash versus PIK at each coupon date.
 | `Stochastic(StochasticToggle)` | `P(PIK) = 1 / (1 + exp(−(intercept + sensitivity·x)))` |
 | `OptimalExercise(OptimalToggle)` | Nested Monte Carlo comparing equity value under cash and PIK |
 
-Constructors `ToggleExerciseModel::threshold(variable, threshold, direction)`
-and `::stochastic(variable, intercept, sensitivity)` are infallible;
-`OptimalExercise` is built by naming the `OptimalToggle` fields
-(`nested_paths`, `equity_discount_rate`, `asset_vol`, `risk_free_rate`,
-`horizon`) directly.
+Constructors `ToggleExerciseModel::threshold(variable, threshold, direction)`,
+`::stochastic(variable, intercept, sensitivity)` and
+`::optimal(nested_paths, equity_discount_rate, asset_vol, risk_free_rate,
+horizon)` return `Result` and reject non-finite parameters (and, for
+`optimal`, zero paths, a negative volatility or a non-positive horizon).
+`CreditState::new(...)` likewise rejects non-finite values.
 
 Decision entry points: `should_pik(&CreditState, &mut dyn
 RandomNumberGenerator) -> bool`, the deterministic
@@ -237,7 +240,8 @@ RandomNumberGenerator) -> bool`, the deterministic
 
 `CreditStateVariable` is `HazardRate`, `DistanceToDefault`, or `Leverage`;
 `ThresholdDirection` is `Above` or `Below`. Both implement `FromStr` over the
-snake_case serde names, which is how the Python binding accepts strings.
+snake_case serde names, which is how both bindings accept strings; an unknown
+label's error lists the accepted ones.
 
 `CreditState` carries `hazard_rate`, `distance_to_default: Option<f64>`,
 `leverage`, `accreted_notional`, `coupon_due`, and `asset_value:
@@ -399,7 +403,7 @@ let toggle = ToggleExerciseModel::threshold(
     CreditStateVariable::HazardRate,
     0.15,
     ThresholdDirection::Above,
-);
+)?;
 
 // 35% relative CDS-option vol on a 3% hazard is a 1.05% absolute hazard vol.
 let survival_end = (-0.03_f64 * 5.0).exp();
@@ -416,7 +420,9 @@ assert!((conv.hazard_volatility - 0.0105).abs() < 1e-12);
 - `MertonModel`, `AssetDynamics`, `MertonBarrierType`, `DynamicRecoverySpec`,
   `EndogenousHazardSpec`, `CreditState`, and `ToggleExerciseModel` all derive
   `Serialize`/`Deserialize`/`JsonSchema`, so a whole `MertonMcConfig`
-  round-trips through the wire format. `CreditVolatilityConversion` is a
+  round-trips through the wire format. `MertonModel`, `DynamicRecoverySpec`
+  and `EndogenousHazardSpec` deserialize through their validating
+  constructors, so JSON cannot build a spec the constructors reject. `CreditVolatilityConversion` is a
   plain-value diagnostic and is not serialized.
 - Fallible constructors return `finstack_quant_core::Result<Self>` with
   `InputError` variants or `Error::Validation`.

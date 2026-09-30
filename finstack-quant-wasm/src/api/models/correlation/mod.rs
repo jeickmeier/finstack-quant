@@ -389,44 +389,131 @@ pub fn nearest_correlation(
         .map_err(to_js_err)
 }
 
-/// Tranche loss statistics over a simulated pool loss distribution.
+/// Portfolio credit-loss distribution with loss-positive VaR and expected
+/// shortfall.
 ///
-/// `attachment` and `detachment` are **fractions** of pool notional in
-/// `[0, 1]` — a 0-3% equity tranche is `(0.0, 0.03)`, not `(0.0, 3.0)`. Each
-/// path's pool loss fraction `L = loss / poolNotional` maps through
-/// `clamp(L - attachment, 0, width) / width`, and the resulting distribution is
-/// aggregated at `confidence` using loss-positive nearest-rank VaR and ES over
-/// exactly the worst `1 - confidence` probability mass, with fractional weight
-/// on the boundary observation when necessary.
-///
-/// Returns an object with `attachment`, `detachment`, `tranche_notional`,
-/// `expected_loss_fraction`, `expected_loss_amount`, `var_fraction`,
-/// `var_amount`, `expected_shortfall_fraction`, `expected_shortfall_amount`,
-/// `prob_attachment_breached`, and `prob_full_writedown`.
-/// @param losses - Loss-positive path losses in one caller-defined unit, one entry per simulated path.
-/// @param confidence - Loss-positive VaR and expected-shortfall confidence strictly between 0 and 1.
-/// @param attachment - Lower tranche boundary as a fraction of pool notional from 0 through 1.
-/// @param detachment - Upper tranche boundary as a fraction of pool notional, strictly above the attachment and at most 1.
-/// @param pool_notional - Total pool notional, finite and strictly positive, in the same unit as the losses.
-///
-/// # Errors
-///
-/// Throws a JavaScript exception if the loss distribution is empty or contains
-/// a non-finite or negative loss; `confidence` is outside `(0, 1)`; tranche
-/// boundaries are invalid; `poolNotional` is not finite and positive; a derived
-/// statistic is non-finite; allocation fails; or conversion to JavaScript fails.
-#[wasm_bindgen(js_name = trancheLossStatistics)]
-pub fn tranche_loss_statistics(
-    losses: Vec<f64>,
-    confidence: f64,
-    attachment: f64,
-    detachment: f64,
-    pool_notional: f64,
-) -> Result<JsValue, JsValue> {
-    let stats = corr::PortfolioLossResult::from_losses(losses, confidence)
-        .and_then(|result| result.tranche_loss_statistics(attachment, detachment, pool_notional))
-        .map_err(to_js_err)?;
-    crate::utils::to_js_value(&stats)
+/// Mirrors the Rust `PortfolioLossResult` and the Python class of the same
+/// name. Build one from a simulated loss vector with `fromLosses`, or load one
+/// with `fromJson`; the aggregates are always recomputed from the losses.
+#[wasm_bindgen(js_name = PortfolioLossResult)]
+pub struct JsPortfolioLossResult {
+    pub(crate) inner: corr::PortfolioLossResult,
+}
+
+#[wasm_bindgen(js_class = PortfolioLossResult)]
+impl JsPortfolioLossResult {
+    /// Aggregate a finite loss distribution under loss-positive conventions.
+    ///
+    /// VaR is the nearest-rank loss quantile at `confidence`; expected
+    /// shortfall averages exactly the worst `1 - confidence` probability
+    /// mass, with fractional weight on the boundary observation.
+    /// @param losses - Loss-positive path losses in one caller-defined unit, one entry per simulated path, as a `number[]` or `Float64Array`.
+    /// @param confidence - Loss-positive VaR and expected-shortfall confidence strictly between 0 and 1.
+    /// @returns A `PortfolioLossResult` handle.
+    ///
+    /// # Errors
+    ///
+    /// Throws a `TypeError` if `losses` is not an array of numbers, and a
+    /// `validation` error if the distribution is empty, a loss is non-finite
+    /// or negative, or `confidence` is outside `(0, 1)`.
+    #[wasm_bindgen(js_name = fromLosses)]
+    pub fn from_losses(losses: JsValue, confidence: f64) -> Result<JsPortfolioLossResult, JsValue> {
+        let losses = crate::utils::input::js_f64_seq(&losses, "losses")?;
+        corr::PortfolioLossResult::from_losses(losses, confidence)
+            .map(|inner| Self { inner })
+            .map_err(to_js_err)
+    }
+
+    /// Load a result from its canonical JSON form.
+    ///
+    /// The losses and confidence are validated and the aggregates recomputed;
+    /// a payload whose aggregates disagree with its losses is rejected.
+    /// @param json - `PortfolioLossResult` JSON (`losses`, `expected_loss`, `var`, `expected_shortfall`, `confidence`), as a string or plain object.
+    /// @returns A `PortfolioLossResult` handle.
+    ///
+    /// # Errors
+    ///
+    /// Throws a `TypeError` if `json` is neither a string nor a plain object,
+    /// and a `validation` error if it is malformed or fails the checks above.
+    #[wasm_bindgen(js_name = fromJson)]
+    pub fn from_json(json: JsValue) -> Result<JsPortfolioLossResult, JsValue> {
+        crate::utils::input::from_js_json(&json, "json").map(|inner| Self { inner })
+    }
+
+    /// Serialize to the canonical JSON wire format.
+    ///
+    /// # Errors
+    ///
+    /// Throws a `validation` error if serialization fails.
+    #[wasm_bindgen(js_name = toJson)]
+    pub fn to_json(&self) -> Result<String, JsValue> {
+        serde_json::to_string(&self.inner).map_err(to_js_err)
+    }
+
+    /// Loss per simulated path, in path order.
+    #[wasm_bindgen(getter)]
+    pub fn losses(&self) -> Box<[f64]> {
+        self.inner.losses.clone().into_boxed_slice()
+    }
+
+    /// Arithmetic mean path loss.
+    #[wasm_bindgen(getter, js_name = expectedLoss)]
+    pub fn expected_loss(&self) -> f64 {
+        self.inner.expected_loss
+    }
+
+    /// Loss-positive nearest-rank VaR at `confidence` (larger is worse).
+    #[wasm_bindgen(getter)]
+    pub fn var(&self) -> f64 {
+        self.inner.var
+    }
+
+    /// Probability-weighted mean loss in the worst `1 - confidence` tail.
+    #[wasm_bindgen(getter, js_name = expectedShortfall)]
+    pub fn expected_shortfall(&self) -> f64 {
+        self.inner.expected_shortfall
+    }
+
+    /// Confidence used for `var` and `expectedShortfall`, in `(0, 1)`.
+    #[wasm_bindgen(getter)]
+    pub fn confidence(&self) -> f64 {
+        self.inner.confidence
+    }
+
+    /// Tranche loss statistics for one attachment/detachment pair.
+    ///
+    /// `attachment` and `detachment` are **fractions** of pool notional in
+    /// `[0, 1]` — a 0-3% equity tranche is `(0.0, 0.03)`, not `(0.0, 3.0)`.
+    /// Each path's pool loss fraction `L = loss / poolNotional` maps through
+    /// `clamp(L - attachment, 0, width) / width`, and the resulting
+    /// distribution is aggregated at this result's own `confidence`.
+    ///
+    /// Returns an object with `attachment`, `detachment`, `tranche_notional`,
+    /// `expected_loss_fraction`, `expected_loss_amount`, `var_fraction`,
+    /// `var_amount`, `expected_shortfall_fraction`, `expected_shortfall_amount`,
+    /// `prob_attachment_breached`, and `prob_full_writedown`.
+    /// @param attachment - Lower tranche boundary as a fraction of pool notional from 0 through 1.
+    /// @param detachment - Upper tranche boundary as a fraction of pool notional, strictly above the attachment and at most 1.
+    /// @param pool_notional - Total pool notional, finite and strictly positive, in the same unit as the losses.
+    ///
+    /// # Errors
+    ///
+    /// Throws a `validation` error if the tranche boundaries are invalid,
+    /// `poolNotional` is not finite and positive, or a derived statistic is
+    /// non-finite.
+    #[wasm_bindgen(js_name = trancheLossStatistics)]
+    pub fn tranche_loss_statistics(
+        &self,
+        attachment: f64,
+        detachment: f64,
+        pool_notional: f64,
+    ) -> Result<JsValue, JsValue> {
+        let stats = self
+            .inner
+            .tranche_loss_statistics(attachment, detachment, pool_notional)
+            .map_err(to_js_err)?;
+        crate::utils::to_js_value(&stats)
+    }
 }
 
 #[cfg(test)]

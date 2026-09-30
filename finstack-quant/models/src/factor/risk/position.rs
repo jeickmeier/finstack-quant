@@ -84,13 +84,26 @@ impl DecompositionConfig {
         Self::parametric(0.99)
     }
 
-    /// Historical simulation configuration.
+    /// Historical simulation configuration at an arbitrary confidence level.
+    ///
+    /// # Arguments
+    ///
+    /// * `confidence` - Tail confidence as a decimal probability (e.g. `0.95`).
     pub fn historical(confidence: f64) -> Self {
         Self {
             confidence,
             method: DecompositionMethod::Historical,
             compute_incremental: false,
         }
+    }
+
+    /// Standard 95% historical-simulation configuration.
+    ///
+    /// Both bindings resolve an omitted `confidence` on the historical
+    /// decomposition to this preset, as they resolve the parametric ones to
+    /// [`Self::parametric_95`].
+    pub fn historical_95() -> Self {
+        Self::historical(0.95)
     }
 
     /// Enable incremental VaR computation.
@@ -1064,6 +1077,18 @@ mod tests {
     type TestResult = finstack_quant_core::Result<()>;
 
     // Parametric tests
+
+    #[test]
+    fn presets_are_ninety_five_percent() {
+        let historical = DecompositionConfig::historical_95();
+        assert_eq!(historical, DecompositionConfig::historical(0.95));
+        assert_eq!(historical.method, DecompositionMethod::Historical);
+        assert!(!historical.compute_incremental);
+        assert_eq!(
+            DecompositionConfig::parametric_95().method,
+            DecompositionMethod::Parametric
+        );
+    }
 
     #[test]
     fn euler_exhaustion_two_position_portfolio() -> TestResult {

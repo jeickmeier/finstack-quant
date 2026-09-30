@@ -52,7 +52,7 @@
 //!   }
 //! }"#;
 //!
-//! let model: CreditFactorModel = serde_json::from_str(json).expect("valid artifact");
+//! let model = CreditFactorModel::from_json(json).expect("valid artifact");
 //! assert_eq!(model.schema, CreditFactorModelSchema::CURRENT);
 //! ```
 //!
@@ -942,6 +942,48 @@ impl CreditFactorModel {
         Ok((model, ValidationReport::default()))
     }
 
+    /// Deserialize and validate a credit-factor-model artifact from JSON.
+    ///
+    /// Runs the serde shape checks (including the exact `schema` marker and
+    /// `deny_unknown_fields`) and then [`Self::validate`]. Use
+    /// [`Self::from_slice_strict`] instead when loading an untrusted
+    /// persisted artifact that needs resource limits and a structured
+    /// diagnostics report.
+    ///
+    /// # Arguments
+    ///
+    /// * `json` - Complete JSON encoding of a credit factor model, as produced
+    ///   by [`Self::to_json`] or the calibrator.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`finstack_quant_core::Error::Validation`] when the JSON is
+    /// malformed, does not match the artifact shape, or fails
+    /// [`Self::validate`].
+    pub fn from_json(json: &str) -> finstack_quant_core::Result<Self> {
+        let model: Self = serde_json::from_str(json).map_err(|error| {
+            finstack_quant_core::Error::Validation(format!(
+                "invalid CreditFactorModel JSON: {error}"
+            ))
+        })?;
+        model.validate()?;
+        Ok(model)
+    }
+
+    /// Serialize the artifact to compact canonical JSON.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`finstack_quant_core::Error::Validation`] if serialization
+    /// fails.
+    pub fn to_json(&self) -> finstack_quant_core::Result<String> {
+        serde_json::to_string(self).map_err(|error| {
+            finstack_quant_core::Error::Validation(format!(
+                "cannot serialize CreditFactorModel: {error}"
+            ))
+        })
+    }
+
     /// Validate the artifact's internal consistency.
     ///
     /// # Errors
@@ -1158,6 +1200,24 @@ mod tests {
             level_fit_quality: vec![],
             spread_duration: 1.0,
         }
+    }
+
+    #[test]
+    fn from_json_validates_and_to_json_round_trips() {
+        let model = minimal_model();
+        let json = model.to_json().unwrap();
+        let back = CreditFactorModel::from_json(&json).unwrap();
+        assert_eq!(back.to_json().unwrap(), json);
+
+        let error = CreditFactorModel::from_json("{").unwrap_err();
+        assert!(error.to_string().contains("invalid CreditFactorModel JSON"));
+
+        // Well-formed JSON that fails `validate()` is rejected too.
+        let mut invalid = model;
+        invalid.hierarchy.levels = vec![HierarchyDimension::Rating, HierarchyDimension::Rating];
+        let error =
+            CreditFactorModel::from_json(&serde_json::to_string(&invalid).unwrap()).unwrap_err();
+        assert!(error.to_string().contains("duplicate hierarchy dimension"));
     }
 
     #[test]

@@ -65,10 +65,16 @@ def test_kyle_lambda_uses_reference_price() -> None:
 
 
 def test_liquidity_tier_accepts_custom_thresholds() -> None:
+    # Same cases as finstack-quant-wasm/tests/facade/models_liquidity.test.mjs:
+    # the Rust `liquidity_tier` owns the thresholds rule for both hosts.
     assert liquidity_tier(3.0) == "tier2"
     assert liquidity_tier(3.0, (0.5, 2.0, 10.0, 30.0)) == "tier3"
-    with pytest.raises(ValueError, match="strictly ascending"):
+    assert liquidity_tier(12.0, (1.0, 2.0, 3.0, 4.0)) == "tier5"
+    with pytest.raises(ValueError, match="greater than the prior threshold"):
         liquidity_tier(3.0, (5.0, 2.0, 10.0, 30.0))
+    for bad in ((-1.0, 0.0, 1.0, 2.0), (0.0, 1.0, 2.0, 3.0), (1.0, float("nan"), 2.0, 3.0)):
+        with pytest.raises(ValueError, match="must be finite and positive"):
+            liquidity_tier(3.0, bad)
 
 
 def test_impact_models_round_trip_and_trade() -> None:

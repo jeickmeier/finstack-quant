@@ -5,9 +5,9 @@ export const correlation = {
   Copula: wasm.Copula,
   RecoverySpec: wasm.RecoverySpec,
   RecoveryModel: wasm.RecoveryModel,
+  PortfolioLossResult: wasm.PortfolioLossResult,
   correlationBounds: wasm.correlationBounds,
   jointProbabilities: wasm.jointProbabilities,
   validateCorrelationMatrix: wasm.validateCorrelationMatrix,
   nearestCorrelation: wasm.nearestCorrelation,
-  trancheLossStatistics: wasm.trancheLossStatistics,
 };

@@ -2,6 +2,26 @@
 
 ## [Unreleased]
 
+### WASM binding audit: models credit, factor, correlation and liquidity (2026-09-29)
+
+#### Changed (BREAKING)
+
+- WASM factor-risk decompositions return the Rust types. `parametricVarDecomposition` and `historicalVarDecomposition` return `PositionRiskDecomposition`; historical results now carry `es_contributions`. `evaluateRiskBudget` returns `RiskBudgetResult`. The binding-only view types are removed.
+- WASM factor-risk and liquidity inputs are arrays instead of JSON strings: `positionIds`, `weights`, `covariance`, `positionPnls`, `actualVar`, `targetVarPct`, `returns`, `volumes`. `confidence` is optional on the three decompositions (the Rust 95% presets), and `CreditCalibrator(configJson?)` and `factorModelAt(horizon, riskMeasureJson?)` take Rust defaults.
+- WASM `models.correlation.trancheLossStatistics` is replaced by the `PortfolioLossResult` class (`fromLosses`, `fromJson`, `toJson`, `trancheLossStatistics`). Python gains `PortfolioLossResult.from_losses`. `PortfolioLossResult`, `DynamicRecoverySpec` and `EndogenousHazardSpec` validate on deserialize.
+- Liquidity tiers use `liquidity_tier(days, thresholds?)` (was `classify_tier`). `LiquidityConfig::try_new` / `validate` require finite, positive, strictly ascending thresholds.
+- Python binding-invented defaults are removed:
+  - `analyze_exchange_offer` fees and `exchange_type`, `analyze_lme` `opt_acceptance_pct`, `to_hazard_curve` `day_count` and `simulate_paths` `antithetic` are required.
+  - `config=` is removed from the VaR/ES decompositions, and `compute_incremental` is `bool = False`.
+- Python P&L matrices are position-major only; the scenario-major guess is gone. `default_probabilities` follows the Rust horizon rule.
+- `ToggleExerciseModel::threshold` / `stochastic` return `Result`, and `CreditState` and the credit spec constructors reject non-finite values. The WASM `*Json` helpers throw on NaN instead of writing `null`.
+- Unknown-label errors for the model enums come from Rust and list the accepted labels.
+
+#### Added
+
+- `MertonModel::simulate_paths_seeded` (used by both hosts), `DecompositionConfig::historical_95` (Python `DecompositionConfig.historical_95`) and `ToggleExerciseModel::optimal`.
+- `from_json` / `to_json` on `CreditFactorModel`, `LevelsAtDate` and `PeriodDecomposition`.
+
 ### WASM binding audit: portfolio (2026-09-29)
 
 #### Changed (BREAKING)

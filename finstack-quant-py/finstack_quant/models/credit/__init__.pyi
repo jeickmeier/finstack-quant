@@ -100,7 +100,7 @@ class liability_management:
     Examples
     --------
     >>> from finstack_quant.models.credit import liability_management
-    >>> analysis = liability_management.analyze_exchange_offer(60.0, 75.0, consent_fee=2.0)
+    >>> analysis = liability_management.analyze_exchange_offer(60.0, 75.0, 2.0, 0.0, "par_for_par")
     >>> (analysis.delta_npv, analysis.tender_recommended)
     (17.0, True)
 
@@ -117,7 +117,7 @@ class liability_management:
         Examples
         --------
         >>> from finstack_quant.models.credit import liability_management
-        >>> analysis = liability_management.analyze_exchange_offer(60.0, 75.0, consent_fee=2.0)
+        >>> analysis = liability_management.analyze_exchange_offer(60.0, 75.0, 2.0, 0.0, "par_for_par")
         >>> (analysis.delta_npv, analysis.tender_recommended)
         (17.0, True)
 
@@ -314,7 +314,7 @@ class liability_management:
 
             Examples
             --------
-            >>> value = liability_management.analyze_exchange_offer(60.0, 75.0, consent_fee=2.0)
+            >>> value = liability_management.analyze_exchange_offer(60.0, 75.0, 2.0, 0.0, "par_for_par")
             >>> liability_management.ExchangeOfferAnalysis.from_json(value.to_json()) == value
             True
             """
@@ -468,7 +468,7 @@ class liability_management:
 
             Examples
             --------
-            >>> value = liability_management.analyze_lme("tender_offer", 100.0, 0.8, ebitda=20.0).leverage_impact
+            >>> value = liability_management.analyze_lme("tender_offer", 100.0, 0.8, 1.0, ebitda=20.0).leverage_impact
             >>> liability_management.LeverageImpact.from_json(value.to_json()) == value
             True
             """
@@ -702,7 +702,7 @@ class liability_management:
 
             Examples
             --------
-            >>> value = liability_management.analyze_lme("tender_offer", 100.0, 0.8)
+            >>> value = liability_management.analyze_lme("tender_offer", 100.0, 0.8, 1.0)
             >>> liability_management.LmeAnalysis.from_json(value.to_json()) == value
             True
             """
@@ -744,9 +744,9 @@ class liability_management:
     def analyze_exchange_offer(
         old_pv: float,
         new_pv: float,
-        consent_fee: float = 0.0,
-        equity_sweetener_value: float = 0.0,
-        exchange_type: str = "par_for_par",
+        consent_fee: float,
+        equity_sweetener_value: float,
+        exchange_type: str,
     ) -> liability_management.ExchangeOfferAnalysis:
         """
         Compare hold-versus-tender economics for a distressed exchange offer.
@@ -759,16 +759,17 @@ class liability_management:
         new_pv : float
             Present value of the new instrument received on tendering,
             expressed in the same unit as ``old_pv``.
-        consent_fee : float, optional
+        consent_fee : float
             Cash consent or early-tender fee paid to participating holders, in
-            the same unit as ``old_pv``.
-        equity_sweetener_value : float, optional
+            the same unit as ``old_pv``; pass ``0.0`` when there is none.
+        equity_sweetener_value : float
             Estimated value of equity or warrants attached to the new
-            instrument, in the same unit as ``old_pv``.
-        exchange_type : str, optional
+            instrument, in the same unit as ``old_pv``; pass ``0.0`` when there
+            is none.
+        exchange_type : str
             Offer structure: ``par_for_par`` (alias ``par``), ``discount``,
             ``uptier``, or ``downtier``. Case-insensitive; ``-`` is normalised
-            to ``_``.
+            to ``_``. Every argument is required, as in Rust and WASM.
 
         Returns
         -------
@@ -785,7 +786,7 @@ class liability_management:
         Examples
         --------
         >>> from finstack_quant.models.credit import liability_management
-        >>> liability_management.analyze_exchange_offer(60.0, 75.0, consent_fee=2.0).tender_total
+        >>> liability_management.analyze_exchange_offer(60.0, 75.0, 2.0, 0.0, "par_for_par").tender_total
         77.0
 
         """
@@ -796,7 +797,7 @@ class liability_management:
         lme_type: str,
         notional: float,
         repurchase_price_pct: float,
-        opt_acceptance_pct: float = 1.0,
+        opt_acceptance_pct: float,
         ebitda: float | None = None,
     ) -> liability_management.LmeAnalysis:
         """
@@ -816,9 +817,9 @@ class liability_management:
             Price as a fraction of par for repurchases and tenders (``(0, 1.5]``),
             the extension fee for amend-and-extend (``[0, 0.10]``), or the
             transferred-asset fraction for a dropdown (``[0, 1]``).
-        opt_acceptance_pct : float, optional
-            Fraction of holders participating, in ``[0, 1]``. Defaults to full
-            participation.
+        opt_acceptance_pct : float
+            Fraction of holders participating, in ``[0, 1]``; required, as in
+            Rust and WASM.
         ebitda : float or None, optional
             EBITDA in the same unit as ``notional``. A positive value adds the
             ``leverage_impact`` block; None or a non-positive value omits it.

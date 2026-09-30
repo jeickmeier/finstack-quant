@@ -3606,7 +3606,7 @@ declare class CreditFactorModel {
    * Deserialize and validate a `CreditFactorModel` from JSON.
    * @returns A calibrated `CreditFactorModel` handle.
    * @param json - JSON-serialized CreditFactorModel to deserialize.
-   * @throws Error - Throws if the JSON is malformed or fails validation.
+   * @throws Error - Throws a `validation` error if the JSON is malformed or fails validation.
    */
   static fromJson(json: JsonInput): CreditFactorModel;
   /**
@@ -3629,15 +3629,17 @@ declare class CreditFactorModel {
 /**
  * Deterministic calibrator that produces a `CreditFactorModel`.
  *
- * Configuration and inputs are passed as JSON strings.
+ * Configuration and inputs are passed as JSON strings or plain objects.
  */
 declare class CreditCalibrator {
   /**
    * Construct a calibrator from a JSON-serialized `CreditCalibrationConfig`.
-   * @param configJson - Credit-factor calibration configuration JSON controlling model fitting.
+   * Omitting `configJson` uses the Rust `CreditCalibrationConfig::default()`,
+   * as Python's `CreditCalibrator()` does.
+   * @param configJson - Optional credit-factor calibration configuration JSON; omitted or `null` uses the Rust `CreditCalibrationConfig::default()`.
    * @throws Error - Throws if `config_json` is not a valid `CreditCalibrationConfig`.
    */
-  constructor(configJson: JsonInput);
+  constructor(configJson?: JsonInput | null);
   /**
    * Run the calibration pipeline and return a `CreditFactorModel`.
    * @returns A calibrated `CreditFactorModel` handle.
@@ -3921,13 +3923,15 @@ declare class FactorCovarianceForecast {
    */
   idiosyncraticVol(issuerId: string, horizonJson: JsonInput): number;
   /**
-   * Build a portfolio-level `FactorModelConfig` at the given horizon and risk measure.
+   * Build a portfolio-level `FactorModelConfig` at the given horizon and risk
+   * measure. Omitting the risk measure uses the Rust `RiskMeasure::default()`
+   * (`"variance"`), as Python's `factor_model_at` does.
    * @param horizonJson - JSON-serialized forecast horizon defining the future covariance date or period.
-   * @param riskMeasureJson - Risk-measure configuration JSON applied when constructing the horizon factor model.
+   * @param riskMeasureJson - Optional risk-measure JSON for the horizon factor model; omitted or `null` uses the Rust `RiskMeasure::default()` (`"variance"`).
    * @returns Structured factor-model configuration ready for portfolio risk workflows.
    * @throws Error - Throws if the horizon or risk measure is invalid, or the model builder rejects the assembled configuration.
    */
-  factorModelAt(horizonJson: JsonInput, riskMeasureJson: JsonInput): FactorModelConfig;
+  factorModelAt(horizonJson: JsonInput, riskMeasureJson?: JsonInput | null): FactorModelConfig;
   /**
    * Release the underlying wasm heap allocation. Do not use this handle after calling `free()`.
    */
@@ -4023,86 +4027,99 @@ export interface FactorModelCreditNamespace {
 
 /**
  * Product-independent factor and position risk decomposition kernels.
+ *
+ * The VaR and risk-budget functions return the canonical Rust result types
+ * (`PositionRiskDecomposition`, `RiskBudgetResult`), the same objects the
+ * Python functions return; `parametricEsDecomposition` returns the
+ * `ParametricEsDecompositionView` reporting view, as in Python.
  * @example
  * ```typescript
  * import init, { models } from "finstack-quant-wasm";
  * await init();
  * const result = models.factor.risk.parametricVarDecomposition(
- *   JSON.stringify(["A", "B"]),
- *   JSON.stringify([0.6, 0.4]),
- *   JSON.stringify([[0.04, 0.01], [0.01, 0.09]]),
- *   0.95
+ *   ["A", "B"],
+ *   [0.6, 0.4],
+ *   [[0.04, 0.01], [0.01, 0.09]],
  * );
- * console.log(result.portfolio_var);
+ * console.log(result.portfolio_var, result.var_contributions[0].relative_var);
  * ```
  */
 export interface FactorRiskNamespace {
   /**
-   * Decompose portfolio VaR into position contributions via parametric Euler
-   * allocation. Inputs mirror the Python binding's signature.
+   * Decompose portfolio VaR and ES into position contributions via
+   * parametric Euler allocation.
    *
-   * `covariance_json` must deserialize to an `n x n` row-major nested array.
-   * @returns Returns a structured `VarDecompositionResult` object.
-   * @param positionIdsJson - JSON array of position identifiers.
-   * @param weightsJson - Position or asset weight-vector JSON.
-   * @param covarianceJson - Covariance-matrix JSON.
-   * @param confidence - Tail confidence as a decimal probability, such as 0.95 for 95%.
-   * @param computeIncremental - Optional; when `true`, also computes incremental VaR (one full repricing per position). Defaults to `false`, mirroring the Python `compute_incremental=` keyword.
-   * @throws Error - Throws a JavaScript exception if any JSON input is malformed; identifier, weight, or covariance dimensions disagree; the covariance matrix is not finite, symmetric, and positive semidefinite; `confidence` is not finite and in `(0.5, 1)`; or the result cannot be converted to a JavaScript value.
+   * Returns the canonical `PositionRiskDecomposition` (the object Python's
+   * `parametric_var_decomposition` returns): portfolio VaR/ES (losses
+   * negative), `method`, and per-position `var_contributions` and
+   * `es_contributions` rows.
+   * @returns The canonical `PositionRiskDecomposition` with VaR and ES contributions.
+   * @param positionIds - Position identifiers, one per weight.
+   * @param weights - Position weights or exposures in portfolio currency.
+   * @param covariance - Square position-return covariance matrix as nested rows (`n x n`, row-major).
+   * @param confidence - Optional tail confidence as a decimal probability in `(0.5, 1)`; omitted or `null` uses the Rust `DecompositionConfig::parametric_95()` preset (0.95).
+   * @param computeIncremental - Optional; when `true`, also computes incremental VaR (one full repricing per position). Defaults to `false`.
+   * @throws Error - Throws a `TypeError` if an argument has the wrong JavaScript type, and a `validation` error if identifier, weight, or covariance dimensions disagree; the covariance matrix is not finite, symmetric, and positive semidefinite; or `confidence` is not finite and in `(0.5, 1)`.
    */
   parametricVarDecomposition(
-    positionIdsJson: JsonInput,
-    weightsJson: JsonInput,
-    covarianceJson: JsonInput,
-    confidence: number,
-    computeIncremental?: boolean
-  ): VarDecompositionResult;
+    positionIds: string[],
+    weights: NumericArray,
+    covariance: NumericArray[],
+    confidence?: number | null,
+    computeIncremental?: boolean | null
+  ): PositionRiskDecomposition;
   /**
    * Decompose portfolio Expected Shortfall into position contributions via
    * parametric Euler allocation.
-   * @returns Returns a structured `EsDecompositionResult` object.
-   * @param positionIdsJson - JSON array of position identifiers.
-   * @param weightsJson - Position or asset weight-vector JSON.
-   * @param covarianceJson - Covariance-matrix JSON.
-   * @param confidence - Tail confidence as a decimal probability, such as 0.95 for 95%.
-   * @throws Error - Throws a JavaScript exception if any JSON input is malformed; identifier, weight, or covariance dimensions disagree; the covariance matrix is not finite, symmetric, and positive semidefinite; `confidence` is not finite and in `(0.5, 1)`; or the result cannot be converted to a JavaScript value.
+   *
+   * Returns the `ParametricEsDecompositionView` reporting view (the object
+   * Python's `parametric_es_decomposition` returns).
+   * @returns The `ParametricEsDecompositionView` with per-position ES rows.
+   * @param positionIds - Position identifiers, one per weight.
+   * @param weights - Position weights or exposures in portfolio currency.
+   * @param covariance - Square position-return covariance matrix as nested rows (`n x n`, row-major).
+   * @param confidence - Optional tail confidence as a decimal probability in `(0.5, 1)`; omitted or `null` uses the Rust `DecompositionConfig::parametric_95()` preset (0.95).
+   * @throws Error - Throws a `TypeError` if an argument has the wrong JavaScript type, and a `validation` error if identifier, weight, or covariance dimensions disagree; the covariance matrix is not finite, symmetric, and positive semidefinite; or `confidence` is not finite and in `(0.5, 1)`.
    */
   parametricEsDecomposition(
-    positionIdsJson: JsonInput,
-    weightsJson: JsonInput,
-    covarianceJson: JsonInput,
-    confidence: number
-  ): EsDecompositionResult;
+    positionIds: string[],
+    weights: NumericArray,
+    covariance: NumericArray[],
+    confidence?: number | null
+  ): ParametricEsDecompositionView;
   /**
    * Decompose portfolio VaR and Expected Shortfall from per-position scenario
    * profit-and-loss series using historical simulation.
-   * @returns Returns a structured `VarDecompositionResult` object.
-   * @param positionIdsJson - JSON array of position identifiers.
-   * @param positionPnlsJson - Per-position P&L JSON.
-   * @param confidence - Tail confidence as a decimal probability, such as 0.95 for 95%.
-   * @throws Error - Throws a JavaScript exception if either JSON input is malformed, position or scenario dimensions disagree, `confidence` is not finite and in `(0.5, 1)`, too few scenarios resolve the requested tail, a P-and-L value is non-finite, or the result cannot be converted to a JavaScript value.
+   *
+   * `positionPnls` is position-major (one row per position), the Rust
+   * layout both hosts share.
+   * @returns The canonical `PositionRiskDecomposition`, including the historical `es_contributions` rows.
+   * @param positionIds - Position identifiers, one per P&L row.
+   * @param positionPnls - Position-major P&L matrix: one row per position, one column per scenario (losses negative).
+   * @param confidence - Optional tail confidence as a decimal probability in `(0.5, 1)`; omitted or `null` uses the Rust `DecompositionConfig::historical_95()` preset (0.95).
+   * @throws Error - Throws a `TypeError` if an argument has the wrong JavaScript type, and a `validation` error if the matrix does not have one row per position or its rows have different scenario counts, `confidence` is not finite and in `(0.5, 1)`, too few scenarios resolve the requested tail, or a P&L value is non-finite.
    */
   historicalVarDecomposition(
-    positionIdsJson: JsonInput,
-    positionPnlsJson: JsonInput,
-    confidence: number
-  ): VarDecompositionResult;
+    positionIds: string[],
+    positionPnls: NumericArray[],
+    confidence?: number | null
+  ): PositionRiskDecomposition;
   /**
    * Evaluate per-position component VaRs against target risk-budget shares.
-   * @returns Returns a structured `RiskBudgetResult` object.
-   * @param positionIdsJson - JSON array of position identifiers.
-   * @param actualVarJson - Actual component-VaR JSON.
-   * @param targetVarPctJson - Target VaR-share JSON.
+   * @returns The canonical `RiskBudgetResult` with per-position utilization and excess.
+   * @param positionIds - Position identifiers, one per budget row.
+   * @param actualVar - Actual component VaR per position, in portfolio currency (loss-signed as the engine reports it).
+   * @param targetVarPct - Target share of portfolio VaR per position; non-empty targets must sum to one.
    * @param portfolioVar - Total portfolio VaR used to convert risk-budget shares into absolute amounts.
    * @param utilizationThreshold - Optional actual-to-target risk ratio that flags a budget breach; omit for the Rust default of 1.2.
-   * @throws Error - Throws a JavaScript exception if any JSON input is malformed, actual or target arrays do not match the identifier count, a position id is duplicated, non-empty target shares do not sum to one within tolerance, nonzero component risk is paired with zero `portfolioVar`, or the result cannot be converted to a JavaScript value.
+   * @throws Error - Throws a `TypeError` if an argument has the wrong JavaScript type, and a `validation` error if actual or target arrays do not match the identifier count, a position id is duplicated, non-empty target shares do not sum to one within tolerance, or nonzero component risk is paired with zero `portfolioVar`.
    */
   evaluateRiskBudget(
-    positionIdsJson: JsonInput,
-    actualVarJson: JsonInput,
-    targetVarPctJson: JsonInput,
+    positionIds: string[],
+    actualVar: NumericArray,
+    targetVarPct: NumericArray,
     portfolioVar: number,
-    utilizationThreshold?: number
+    utilizationThreshold?: number | null
   ): RiskBudgetResult;
 }
 
@@ -4577,13 +4594,105 @@ export interface RecoveryModelClass {
 }
 
 /**
+ * Portfolio credit-loss distribution with loss-positive VaR and expected
+ * shortfall (Rust and Python `PortfolioLossResult`).
+ */
+export interface PortfolioLossResult extends WasmOwned {
+  /**
+   * Loss per simulated path, in path order.
+   */
+  readonly losses: Float64Array;
+  /**
+   * Arithmetic mean path loss.
+   */
+  readonly expectedLoss: number;
+  /**
+   * Loss-positive nearest-rank VaR at `confidence` (larger is worse).
+   */
+  readonly var: number;
+  /**
+   * Probability-weighted mean loss in the worst `1 - confidence` tail.
+   */
+  readonly expectedShortfall: number;
+  /**
+   * Confidence used for `var` and `expectedShortfall`, in `(0, 1)`.
+   */
+  readonly confidence: number;
+  /**
+   * Tranche loss statistics for one attachment/detachment pair.
+   *
+   * `attachment` and `detachment` are fractions of pool notional in `[0, 1]` —
+   * a 0-3% equity tranche is `(0.0, 0.03)`, not `(0.0, 3.0)`. Each path's pool
+   * loss fraction `L = loss / poolNotional` maps through
+   * `clamp(L - attachment, 0, width) / width`, and the resulting distribution
+   * is aggregated at this result's own `confidence`.
+   * @returns The tranche notional, expected loss, VaR, expected shortfall, and breach probabilities.
+   * @param attachment - Lower tranche boundary as a fraction of pool notional from 0 through 1.
+   * @param detachment - Upper tranche boundary as a fraction of pool notional, strictly above the attachment and at most 1.
+   * @param poolNotional - Total pool notional, finite and strictly positive, in the same unit as the losses.
+   * @throws Error - Throws a `validation` error if the tranche boundaries are invalid, `poolNotional` is not finite and positive, or a derived statistic is non-finite.
+   */
+  trancheLossStatistics(
+    attachment: number,
+    detachment: number,
+    poolNotional: number
+  ): TrancheLossStatistics;
+  /**
+   * Serialize to the canonical JSON wire format.
+   * @returns Canonical `PortfolioLossResult` JSON.
+   * @throws Error - Throws a `validation` error if serialization fails.
+   */
+  toJson(): string;
+}
+
+/**
+ * Portfolio credit-loss distribution constructors.
+ * @example
+ * ```typescript
+ * import init, { models } from "finstack-quant-wasm";
+ * await init();
+ * const result = models.correlation.PortfolioLossResult.fromLosses([0, 1, 2, 5, 10], 0.75);
+ * const equity = result.trancheLossStatistics(0, 0.03, 100);
+ * console.log(result.var, equity.expected_loss_fraction);
+ * ```
+ */
+export interface PortfolioLossResultConstructor {
+  /**
+   * JavaScript prototype of `PortfolioLossResult`; instances come from the static factories, not `new`.
+   */
+  readonly prototype: PortfolioLossResult;
+  /**
+   * Aggregate a finite loss distribution under loss-positive conventions.
+   *
+   * VaR is the nearest-rank loss quantile at `confidence`; expected shortfall
+   * averages exactly the worst `1 - confidence` probability mass, with
+   * fractional weight on the boundary observation.
+   * @param losses - Loss-positive path losses in one caller-defined unit, one entry per simulated path, as a `number[]` or `Float64Array`.
+   * @param confidence - Loss-positive VaR and expected-shortfall confidence strictly between 0 and 1.
+   * @returns A `PortfolioLossResult` handle.
+   * @throws Error - Throws a `TypeError` if `losses` is not an array of numbers, and a `validation` error if the distribution is empty, a loss is non-finite or negative, or `confidence` is outside `(0, 1)`.
+   */
+  fromLosses(losses: NumericArray, confidence: number): PortfolioLossResult;
+  /**
+   * Load a result from its canonical JSON form; the losses and confidence are
+   * validated and the aggregates recomputed, so a payload whose aggregates
+   * disagree with its losses is rejected.
+   * @param json - `PortfolioLossResult` JSON (`losses`, `expected_loss`, `var`, `expected_shortfall`, `confidence`), as a string or plain object.
+   * @returns A `PortfolioLossResult` handle.
+   * @throws Error - Throws a `TypeError` if `json` is neither a string nor a plain object, and a `validation` error if it is malformed or fails the checks above.
+   */
+  fromJson(json: JsonInput): PortfolioLossResult;
+}
+
+/**
  * Tranche loss statistics returned by
- * {@link CorrelationNamespace.trancheLossStatistics}.
+ * {@link PortfolioLossResult.trancheLossStatistics} (Rust and Python
+ * `TrancheLossStatistics`).
  *
  * Fractions are expressed relative to the tranche notional unless the field
  * name says otherwise; amounts are in the same unit as the input losses.
  */
-export interface TrancheLossStatisticsJson {
+export interface TrancheLossStatistics {
   /**
    * Tranche attachment point as a fraction of pool notional, in `[0, 1)`.
    */
@@ -4658,6 +4767,10 @@ export interface CorrelationNamespace {
    */
   RecoveryModel: RecoveryModelClass;
   /**
+   * Portfolio credit-loss distribution handle with tranche loss statistics.
+   */
+  PortfolioLossResult: PortfolioLossResultConstructor;
+  /**
    * Fréchet-Hoeffding correlation bounds for two Bernoulli marginals.
    *
    * Returns `[rho_min, rho_max]`.
@@ -4713,30 +4826,6 @@ export interface CorrelationNamespace {
    * @throws Error - Throws a `validation` error if the flat length is not `n * n` or the input has a gross diagonal or symmetry violation, and a `computation` error if the projection does not converge within `maxIter` iterations at `tol`.
    */
   nearestCorrelation(matrix: NumericArray, n: number, maxIter?: number, tol?: number): Float64Array;
-  /**
-   * Tranche loss statistics over a simulated pool loss distribution.
-   *
-   * `attachment` and `detachment` are fractions of pool notional in `[0, 1]` —
-   * a 0-3% equity tranche is `(0.0, 0.03)`, not `(0.0, 3.0)`. Each path's pool
-   * loss fraction `L = loss / poolNotional` maps through
-   * `clamp(L - attachment, 0, width) / width`, and the resulting distribution
-   * uses loss-positive nearest-rank VaR and ES over exactly the worst
-   * `1 - confidence` probability mass, with fractional boundary weight.
-   * @returns Returns the tranche notional, expected loss, VaR, expected shortfall, and breach probabilities.
-   * @param losses - Loss-positive path losses in one caller-defined unit, one entry per simulated path.
-   * @param confidence - Loss-positive VaR and expected-shortfall confidence strictly between 0 and 1.
-   * @param attachment - Lower tranche boundary as a fraction of pool notional from 0 through 1.
-   * @param detachment - Upper tranche boundary as a fraction of pool notional, strictly above the attachment and at most 1.
-   * @param poolNotional - Total pool notional, finite and strictly positive, in the same unit as the losses.
-   * @throws Error - Throws a JavaScript exception if the loss distribution is empty or contains a non-finite or negative loss; `confidence` is outside `(0, 1)`; tranche boundaries are invalid; `poolNotional` is not finite and positive; a derived statistic is non-finite; allocation fails; or conversion to JavaScript fails.
-   */
-  trancheLossStatistics(
-    losses: NumericArray,
-    confidence: number,
-    attachment: number,
-    detachment: number,
-    poolNotional: number
-  ): TrancheLossStatisticsJson;
 }
 
 // --- models.monteCarlo ----------------------------------------------------------
@@ -7186,7 +7275,7 @@ export interface ModelCreditNamespace {
    * @param numPaths - Number of Monte Carlo paths to simulate.
    * @param numSteps - Number of time steps per path; must be at least 1.
    * @param horizon - Simulation horizon in years; must be positive and finite.
-   * @param seed - RNG seed for reproducible draws (`Pcg64Rng`).
+   * @param seed - Seed for reproducible draws; the Rust `MertonModel::simulate_paths_seeded` owns the generator (PCG64), so equal seeds give equal paths in every host.
    * @param antithetic - When `true`, use antithetic variates for variance reduction.
    * @throws Error - Throws a JavaScript exception if `model_json` is malformed, if path or step counts exceed the safe-integer range, if `num_steps` is zero, if `horizon` is non-positive or non-finite, or if the result cannot be serialized to JSON.
    */
@@ -7261,7 +7350,7 @@ export interface ModelCreditNamespace {
    * @param accretedNotional - Outstanding notional after PIK accrual, in the debt's monetary units.
    * @param couponDue - Cash coupon amount due at the toggle decision date, in debt monetary units.
    * @param assetValue - Current fair value of the firm's assets in monetary units.
-   * @throws Error - Throws a JavaScript exception if the credit state cannot be serialized to JSON.
+   * @throws Error - Throws a `validation` error if any supplied value is non-finite (JSON cannot carry `NaN` or infinities).
    */
   creditStateJson(
     hazardRate: number,
@@ -7277,7 +7366,7 @@ export interface ModelCreditNamespace {
    * @param variable - Credit-state variable: `"hazard_rate"`, `"distance_to_default"`, or `"leverage"`.
    * @param threshold - Threshold value in the units of the selected credit-state variable.
    * @param direction - Threshold comparison: `"above"` selects PIK above the level and `"below"` below it.
-   * @throws Error - Throws a JavaScript exception if `variable` or `direction` is not a supported value, or if the model cannot be serialized to JSON.
+   * @throws Error - Throws a `validation` error if `variable` or `direction` is not a supported value or `threshold` is non-finite.
    */
   toggleExerciseThresholdJson(
     variable: 'hazard_rate' | 'distance_to_default' | 'leverage',
@@ -7297,7 +7386,7 @@ export interface ModelCreditNamespace {
    * @param assetVol - Annualized volatility of firm-asset returns, expressed as a decimal.
    * @param riskFreeRate - Annualized risk-free rate expressed as a decimal, such as 0.05 for 5%.
    * @param horizon - Forward-looking model horizon measured in years.
-   * @throws Error - Throws a JavaScript exception if `nested_paths` exceeds JavaScript's safe integer range or the model cannot be serialized to JSON.
+   * @throws Error - Throws a `TypeError` if `nested_paths` is not a safe non-negative integer, and a `validation` error if it is zero, a rate is non-finite, `asset_vol` is negative or non-finite, or `horizon` is not finite and positive.
    */
   toggleExerciseOptimalJson(
     nestedPaths: number,
@@ -7827,19 +7916,19 @@ export interface SviParams {
 export interface LiquidityNamespace {
   /**
    * Estimate Roll effective spread from an ordered return series.
-   * @param returnsJson - JSON array of decimal returns in time order.
+   * @param returns - Decimal returns in time order, as a `number[]` or `Float64Array`.
    * @returns Effective spread in return units, or `undefined` when it cannot be estimated.
-   * @throws Error - Throws a JavaScript exception if `returnsJson` is malformed or is not a numeric array. Invalid estimator samples return `undefined`.
+   * @throws Error - Throws a `TypeError` if `returns` is not an array of numbers. Invalid estimator samples return `undefined`.
    */
-  rollEffectiveSpread(returnsJson: JsonInput): number | undefined;
+  rollEffectiveSpread(returns: NumericArray): number | undefined;
   /**
    * Compute Amihud illiquidity from aligned returns and volumes.
-   * @param returnsJson - JSON array of decimal returns in time order.
-   * @param volumesJson - JSON array of positive volumes aligned with the returns.
+   * @param returns - Decimal returns in time order, as a `number[]` or `Float64Array`.
+   * @param volumes - Positive traded volumes aligned with `returns`, as a `number[]` or `Float64Array`.
    * @returns Mean absolute return per unit volume, or `undefined` for an invalid sample.
-   * @throws Error - Throws a JavaScript exception if either JSON input is malformed or is not a numeric array. Invalid estimator samples return `undefined`.
+   * @throws Error - Throws a `TypeError` if either argument is not an array of numbers. Invalid estimator samples return `undefined`.
    */
-  amihudIlliquidity(returnsJson: JsonInput, volumesJson: JsonInput): number | undefined;
+  amihudIlliquidity(returns: NumericArray, volumes: NumericArray): number | undefined;
   /**
    * Calculate the trading days required to liquidate a position.
    * @param positionQuantity - Shares or contracts to liquidate; the absolute value is used.
@@ -7849,11 +7938,14 @@ export interface LiquidityNamespace {
    */
   daysToLiquidate(positionQuantity: number, adv: number, participationRate: number): number;
   /**
-   * Classify a liquidation horizon using the default model thresholds.
+   * Classify a liquidation horizon into a liquidity tier, using the Rust
+   * `LiquidityConfig` default thresholds unless custom ones are supplied.
    * @param daysToLiquidate - Estimated unwind horizon in trading days.
+   * @param thresholds - Optional upper bounds of Tiers 1-4 in trading days, `[tier1Max, tier2Max, tier3Max, tier4Max]`; omitted or `null` uses the Rust `LiquidityConfig` default `[1, 5, 20, 60]`.
    * @returns One of `tier1` through `tier5`, with Tier 1 the most liquid.
+   * @throws Error - Throws a `TypeError` if `thresholds` is not an array of four numbers, and a `validation` error if a threshold is non-finite or not positive, or the thresholds are not strictly ascending.
    */
-  liquidityTier(daysToLiquidate: number): string;
+  liquidityTier(daysToLiquidate: number, thresholds?: NumericArray | null): string;
   /**
    * Compute Bangia liquidity-adjusted VaR under the loss-sign convention.
    * @param spreadMean - Finite non-negative mean relative bid-ask spread as a decimal.
@@ -7896,17 +7988,13 @@ export interface LiquidityNamespace {
    * Estimate price-space Kyle lambda using an Amihud-ratio proxy.
    *
    * Argument order matches `amihudIlliquidity`: returns first, then volumes.
-   * @param returnsJson - JSON array of decimal returns in time order.
-   * @param volumesJson - JSON array of positive volume observations aligned with the returns.
+   * @param returns - Decimal returns in time order, as a `number[]` or `Float64Array`.
+   * @param volumes - Positive volume observations aligned with `returns`, as a `number[]` or `Float64Array`.
    * @param referencePrice - Positive price per share or contract.
    * @returns Estimated price-space impact coefficient, or `undefined` for invalid inputs.
-   * @throws Error - Throws a JavaScript exception if either JSON input is malformed or is not a numeric array. Invalid estimator samples return `undefined`.
+   * @throws Error - Throws a `TypeError` if `returns` or `volumes` is not an array of numbers. Invalid estimator samples return `undefined`.
    */
-  kyleLambda(
-    returnsJson: JsonInput,
-    volumesJson: JsonInput,
-    referencePrice: number
-  ): number | undefined;
+  kyleLambda(returns: NumericArray, volumes: NumericArray, referencePrice: number): number | undefined;
 }
 
 /**
@@ -10031,7 +10119,7 @@ export interface FactorRiskDecomposition {
 }
 
 /**
- * Per-position VaR contribution row.
+ * Per-position VaR contribution row of a `PositionRiskDecomposition`.
  */
 export interface PositionVarContribution {
   /**
@@ -10039,57 +10127,97 @@ export interface PositionVarContribution {
    */
   position_id: string;
   /**
-   * Component VaR allocated to the position.
+   * Component VaR: the position's Euler-allocated share of portfolio VaR
+   * (loss-signed, portfolio currency).
    */
   component_var: number;
   /**
-   * Marginal VaR, when the engine computed one.
+   * Component VaR as a fraction of portfolio VaR; sums to 1, negative for a
+   * diversifier.
    */
-  marginal_var?: number | null;
+  relative_var: number;
   /**
-   * Fraction of total VaR contributed by this position.
+   * Marginal VaR per unit of the position, or `null` when the engine has no
+   * gradient (historical mode).
    */
-  pct_contribution: number;
+  marginal_var: number | null;
   /**
-   * Incremental VaR, when the engine computed one.
+   * Incremental VaR (change from removing the position), or `null` when not
+   * requested.
    */
-  incremental_var?: number | null;
+  incremental_var: number | null;
 }
 
 /**
- * Position-level VaR decomposition.
+ * Per-position Expected Shortfall contribution row of a
+ * `PositionRiskDecomposition`.
  */
-export interface VarDecompositionResult {
+export interface PositionEsContribution {
   /**
-   * Total portfolio VaR.
+   * Position identifier.
+   */
+  position_id: string;
+  /**
+   * Component ES allocated to the position (loss-signed, portfolio currency).
+   */
+  component_es: number;
+  /**
+   * Component ES as a fraction of portfolio ES.
+   */
+  relative_es: number;
+  /**
+   * Marginal ES per unit of the position, or `null` when the engine has no
+   * gradient (historical mode).
+   */
+  marginal_es: number | null;
+}
+
+/**
+ * Complete position-level VaR and ES decomposition (Rust
+ * `PositionRiskDecomposition`, Python `PositionRiskDecomposition.to_json()`).
+ *
+ * VaR and ES follow the P&L sign: losses are negative.
+ */
+export interface PositionRiskDecomposition {
+  /**
+   * Total portfolio VaR (losses negative).
    */
   portfolio_var: number;
   /**
-   * Total portfolio Expected Shortfall.
+   * Total portfolio Expected Shortfall (losses negative; at or beyond VaR).
    */
   portfolio_es: number;
   /**
-   * Confidence level used for VaR.
+   * Confidence level used for both VaR and ES.
    */
   confidence: number;
   /**
-   * Number of positions in the decomposition.
+   * Decomposition method.
    */
-  n_positions: number;
-  /**
-   * Euler residual, when computed by the engine.
-   */
-  euler_residual?: number | null;
+  method: 'parametric' | 'historical';
   /**
    * Per-position VaR contributions.
    */
-  contributions: PositionVarContribution[];
+  var_contributions: PositionVarContribution[];
+  /**
+   * Per-position ES contributions.
+   */
+  es_contributions: PositionEsContribution[];
+  /**
+   * Number of positions in the portfolio.
+   */
+  n_positions: number;
+  /**
+   * Euler residual `portfolio_var - sum(component_var)` for the parametric
+   * engine; `null` in historical mode.
+   */
+  euler_residual: number | null;
 }
 
 /**
- * Per-position Expected Shortfall contribution row.
+ * Per-position row of a `ParametricEsDecompositionView`.
  */
-export interface PositionEsContribution {
+export interface PositionEsContributionView {
   /**
    * Position identifier.
    */
@@ -10101,7 +10229,7 @@ export interface PositionEsContribution {
   /**
    * Marginal ES, when the engine computed one.
    */
-  marginal_es?: number | null;
+  marginal_es: number | null;
   /**
    * Fraction of total ES contributed by this position.
    */
@@ -10109,9 +10237,10 @@ export interface PositionEsContribution {
 }
 
 /**
- * Position-level Expected Shortfall decomposition.
+ * Expected Shortfall reporting view returned by `parametricEsDecomposition`
+ * (Rust and Python `ParametricEsDecompositionView`).
  */
-export interface EsDecompositionResult {
+export interface ParametricEsDecompositionView {
   /**
    * Total portfolio VaR.
    */
@@ -10131,11 +10260,11 @@ export interface EsDecompositionResult {
   /**
    * Per-position ES contributions.
    */
-  contributions: PositionEsContribution[];
+  contributions: PositionEsContributionView[];
 }
 
 /**
- * Per-position risk-budget row.
+ * Per-position risk-budget row of a `RiskBudgetResult`.
  */
 export interface PositionBudgetEntry {
   /**
@@ -10143,55 +10272,41 @@ export interface PositionBudgetEntry {
    */
   position_id: string;
   /**
-   * Actual component VaR.
+   * Actual component VaR, signed as reported by the engine.
    */
   actual_component_var: number;
   /**
-   * Target component VaR.
+   * Target component VaR level: target share times `|portfolioVar|`.
    */
   target_component_var: number;
   /**
-   * Target share of portfolio VaR.
+   * Consuming-side utilization ratio (negative for a diversifier); a non-zero
+   * component against a zero target is `'inf'` or `'-inf'`.
    */
-  target_pct: number;
+  utilization: number | 'nan' | 'inf' | '-inf';
   /**
-   * Actual-to-target utilization ratio.
-   */
-  utilization: number;
-  /**
-   * Over-budget amount.
+   * Consuming-side component VaR minus the target level.
    */
   excess: number;
-  /**
-   * Whether utilization exceeds the configured threshold.
-   */
-  breach: boolean;
 }
 
 /**
- * Risk-budget evaluation across positions.
+ * Risk-budget evaluation across positions (Rust and Python
+ * `RiskBudgetResult`).
  */
 export interface RiskBudgetResult {
-  /**
-   * Portfolio VaR used for target scaling.
-   */
-  portfolio_var: number;
-  /**
-   * Sum of over-budget amounts.
-   */
-  total_overbudget: number;
-  /**
-   * Whether any position breached the utilization threshold.
-   */
-  has_breach: boolean;
-  /**
-   * Utilization threshold used for breach classification.
-   */
-  utilization_threshold: number;
   /**
    * Per-position budget rows.
    */
   positions: PositionBudgetEntry[];
+  /**
+   * Sum of positive consuming-side exceedances.
+   */
+  total_overbudget: number;
+  /**
+   * Whether any position's utilization exceeds the threshold.
+   */
+  has_breach: boolean;
 }
 
 /**

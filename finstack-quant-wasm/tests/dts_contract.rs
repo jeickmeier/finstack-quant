@@ -64,9 +64,11 @@ fn credit_factor_hierarchy_dts_exposes_public_surface() {
     assert!(contains_signature(&dts, "toJson(): string;"));
 
     assert!(dts.contains("declare class CreditCalibrator {"));
+    // Python's `CreditCalibrator(config=None)` twin: the config defaults to
+    // the Rust `CreditCalibrationConfig::default()` in both hosts.
     assert!(contains_signature(
         &dts,
-        "constructor(configJson: JsonInput);"
+        "constructor(configJson?: JsonInput | null);"
     ));
     assert!(contains_signature(
         &dts,
@@ -93,7 +95,7 @@ fn credit_factor_hierarchy_dts_exposes_public_surface() {
     ));
     assert!(contains_signature(
         &dts,
-        "factorModelAt(horizonJson: JsonInput, riskMeasureJson: JsonInput): FactorModelConfig;"
+        "factorModelAt(horizonJson: JsonInput, riskMeasureJson?: JsonInput | null): FactorModelConfig;"
     ));
 
     // The decomposition functions live on `models.factor.credit`; the package
@@ -379,6 +381,21 @@ fn models_correlation_dts_uses_float64array_returns() {
         &dts,
         "nearestCorrelation(matrix: NumericArray, n: number, maxIter?: number, tol?: number): Float64Array;",
     ));
+    // Tranche statistics hang off the `PortfolioLossResult` handle, as in
+    // Rust and Python; there is no flat WASM-only composition.
+    assert!(contains_ignoring_ws(
+        &dts,
+        "PortfolioLossResult: PortfolioLossResultConstructor;",
+    ));
+    assert!(contains_ignoring_ws(
+        &dts,
+        "fromLosses(losses: NumericArray, confidence: number): PortfolioLossResult;",
+    ));
+    assert!(contains_ignoring_ws(
+        interface_block(&dts, "PortfolioLossResult "),
+        "trancheLossStatistics(attachment: number, detachment: number, poolNotional: number): TrancheLossStatistics;",
+    ));
+    assert!(!interface_block(&dts, "CorrelationNamespace").contains("trancheLossStatistics("));
     // The stale `number[]` declarations must be gone from this namespace.
     assert!(!dts.contains("correlationBounds(p1: number, p2: number): number[];"));
     assert!(
@@ -678,14 +695,27 @@ fn portfolio_dts_pins_python_parity_optional_parameters() {
         &dts,
         "valuePortfolioBuilt(portfolio: Portfolio, marketJson: JsonInput, strictRisk?: boolean, metrics?: string[]): Record<string, unknown>;",
     ));
+    // Python defaults `confidence` from the Rust 95% presets; WASM does too.
     assert!(contains_ignoring_ws(
         &dts,
-        "parametricVarDecomposition(positionIdsJson: JsonInput, weightsJson: JsonInput, covarianceJson: JsonInput, confidence: number, computeIncremental?: boolean): VarDecompositionResult;",
+        "parametricVarDecomposition(positionIds: string[], weights: NumericArray, covariance: NumericArray[], confidence?: number | null, computeIncremental?: boolean | null): PositionRiskDecomposition;",
     ));
     assert!(contains_ignoring_ws(
         &dts,
-        "evaluateRiskBudget(positionIdsJson: JsonInput, actualVarJson: JsonInput, targetVarPctJson: JsonInput, portfolioVar: number, utilizationThreshold?: number): RiskBudgetResult;",
+        "parametricEsDecomposition(positionIds: string[], weights: NumericArray, covariance: NumericArray[], confidence?: number | null): ParametricEsDecompositionView;",
     ));
+    assert!(contains_ignoring_ws(
+        &dts,
+        "historicalVarDecomposition(positionIds: string[], positionPnls: NumericArray[], confidence?: number | null): PositionRiskDecomposition;",
+    ));
+    assert!(contains_ignoring_ws(
+        &dts,
+        "evaluateRiskBudget(positionIds: string[], actualVar: NumericArray, targetVarPct: NumericArray, portfolioVar: number, utilizationThreshold?: number | null): RiskBudgetResult;",
+    ));
+    // The WASM-only reporting views are gone: both hosts return the canonical
+    // Rust result types.
+    assert!(!dts.contains("VarDecompositionResult"));
+    assert!(!dts.contains("EsDecompositionResult"));
     assert!(contains_ignoring_ws(&dts, "execution_risk: number;"));
 }
 
@@ -767,8 +797,13 @@ fn models_liquidity_dts_requires_reference_price_for_kyle_lambda() {
 
     assert!(contains_signature(
         liquidity,
-        "kyleLambda(returnsJson: JsonInput, volumesJson: JsonInput, referencePrice: number): number | undefined;",
+        "kyleLambda(returns: NumericArray, volumes: NumericArray, referencePrice: number): number | undefined;",
     ));
+    assert!(contains_signature(
+        liquidity,
+        "liquidityTier(daysToLiquidate: number, thresholds?: NumericArray | null): string;",
+    ));
+    assert!(!liquidity.contains("Json: JsonInput"));
     assert!(!interface_block(&dts, "PortfolioNamespace").contains("kyleLambda("));
 }
 

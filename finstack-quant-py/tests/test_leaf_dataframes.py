@@ -261,7 +261,7 @@ def test_recovery_waterfall_ordering_ignores_the_input_order() -> None:
 
 
 def test_exchange_offer_analysis_to_dataframe_is_one_row() -> None:
-    analysis = liability_management.analyze_exchange_offer(60.0, 75.0, consent_fee=2.0)
+    analysis = liability_management.analyze_exchange_offer(60.0, 75.0, 2.0, 0.0, "par_for_par")
     df = analysis.to_dataframe()
     assert isinstance(df, pd.DataFrame)
     assert len(df) == 1

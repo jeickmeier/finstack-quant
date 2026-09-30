@@ -47,7 +47,10 @@ pub enum LeverageHazardMap {
 /// notional (and hence leverage), which drives the hazard rate higher.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(deny_unknown_fields)]
+// Deserialization runs the validating constructors (see `RawEndogenousHazardSpec`),
+// so a spec loaded from JSON satisfies the same invariants as one built in
+// Rust.
+#[serde(try_from = "RawEndogenousHazardSpec")]
 pub struct EndogenousHazardSpec {
     /// Base (reference) hazard rate `lambda_0`.
     base_hazard_rate: f64,
@@ -57,14 +60,72 @@ pub struct EndogenousHazardSpec {
     leverage_hazard_map: LeverageHazardMap,
 }
 
+/// Unvalidated wire representation of an [`EndogenousHazardSpec`].
+///
+/// Exists solely so `#[serde(try_from = ...)]` can funnel deserialization
+/// through the validating constructors. Field names and types mirror
+/// [`EndogenousHazardSpec`] exactly, so the JSON representation is identical.
+#[derive(Debug, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[cfg_attr(feature = "json-schema", schemars(rename = "EndogenousHazardSpec"))]
+#[serde(deny_unknown_fields)]
+struct RawEndogenousHazardSpec {
+    /// Base (reference) hazard rate `lambda_0`.
+    base_hazard_rate: f64,
+    /// Base (reference) leverage level `L_0`.
+    base_leverage: f64,
+    /// Mapping function from leverage to hazard rate.
+    leverage_hazard_map: LeverageHazardMap,
+}
+
+impl TryFrom<RawEndogenousHazardSpec> for EndogenousHazardSpec {
+    type Error = Error;
+
+    fn try_from(raw: RawEndogenousHazardSpec) -> Result<Self> {
+        let wire = Self {
+            base_hazard_rate: raw.base_hazard_rate,
+            base_leverage: raw.base_leverage,
+            leverage_hazard_map: raw.leverage_hazard_map.clone(),
+        };
+        let spec = match raw.leverage_hazard_map {
+            LeverageHazardMap::PowerLaw { exponent } => {
+                Self::power_law(raw.base_hazard_rate, raw.base_leverage, exponent)?
+            }
+            LeverageHazardMap::Exponential { sensitivity } => {
+                Self::exponential(raw.base_hazard_rate, raw.base_leverage, sensitivity)?
+            }
+            LeverageHazardMap::Tabular {
+                leverage_points,
+                hazard_points,
+            } => Self::tabular(leverage_points, hazard_points)?,
+        };
+        // Only a tabular spec derives fields itself (the base hazard and
+        // leverage are its first point); reject a payload that disagrees
+        // rather than drop the carried values.
+        if spec != wire {
+            return Err(Error::Validation(format!(
+                "tabular endogenous-hazard spec must carry its first point as \
+                 base_hazard_rate and base_leverage, got ({}, {})",
+                raw.base_hazard_rate, raw.base_leverage
+            )));
+        }
+        Ok(spec)
+    }
+}
+
 impl EndogenousHazardSpec {
     /// Validate base parameters common to all parametric models.
-    fn validate(base_hazard: f64, base_leverage: f64) -> Result<()> {
-        if base_hazard < 0.0 {
+    fn validate(base_hazard: f64, base_leverage: f64, slope: f64) -> Result<()> {
+        if !(base_hazard.is_finite() && base_hazard >= 0.0) {
             return Err(InputError::NegativeValue.into());
         }
-        if base_leverage <= 0.0 {
+        if !(base_leverage.is_finite() && base_leverage > 0.0) {
             return Err(InputError::NonPositiveValue.into());
+        }
+        if !slope.is_finite() {
+            return Err(Error::Validation(format!(
+                "endogenous hazard exponent/sensitivity must be finite, got {slope}"
+            )));
         }
         Ok(())
     }
@@ -75,9 +136,11 @@ impl EndogenousHazardSpec {
     ///
     /// # Errors
     ///
-    /// Returns an error if `base_hazard < 0` or `base_leverage <= 0`.
+    /// Returns an error if `base_hazard` is negative or non-finite,
+    /// `base_leverage` is not finite and positive, or `exponent` is
+    /// non-finite.
     pub fn power_law(base_hazard: f64, base_leverage: f64, exponent: f64) -> Result<Self> {
-        Self::validate(base_hazard, base_leverage)?;
+        Self::validate(base_hazard, base_leverage, exponent)?;
         Ok(Self {
             base_hazard_rate: base_hazard,
             base_leverage,
@@ -91,9 +154,11 @@ impl EndogenousHazardSpec {
     ///
     /// # Errors
     ///
-    /// Returns an error if `base_hazard < 0` or `base_leverage <= 0`.
+    /// Returns an error if `base_hazard` is negative or non-finite,
+    /// `base_leverage` is not finite and positive, or `sensitivity` is
+    /// non-finite.
     pub fn exponential(base_hazard: f64, base_leverage: f64, sensitivity: f64) -> Result<Self> {
-        Self::validate(base_hazard, base_leverage)?;
+        Self::validate(base_hazard, base_leverage, sensitivity)?;
         Ok(Self {
             base_hazard_rate: base_hazard,
             base_leverage,
@@ -161,9 +226,7 @@ impl EndogenousHazardSpec {
     ///
     /// The result is always finite, floored at 0.0 (never negative), and
     /// capped at `MAX_HAZARD_RATE` so a divergent
-    /// mapping cannot produce a non-finite (`inf`/`NaN`) rate. A degenerate
-    /// tabular table (empty, or with mismatched vector lengths — reachable
-    /// only via `Deserialize`, since the constructor validates) yields `0.0`.
+    /// mapping cannot produce a non-finite (`inf`/`NaN`) rate.
     pub fn hazard_at_leverage(&self, leverage: f64) -> f64 {
         let raw = match &self.leverage_hazard_map {
             LeverageHazardMap::PowerLaw { exponent } => {
@@ -221,10 +284,10 @@ impl EndogenousHazardSpec {
 ///
 /// - `xs` is expected to be sorted ascending.
 /// - A degenerate table — empty, or with `xs.len() != ys.len()` — has no
-///   well-defined hazard and returns `0.0` rather than panicking. The
-///   [`tabular`](EndogenousHazardSpec::tabular) constructor rejects such
-///   tables, but `#[derive(Deserialize)]` bypasses it, so this function is
-///   defensively total: it never panics and never indexes out of bounds.
+///   well-defined hazard and returns `0.0` rather than panicking. Both the
+///   [`tabular`](EndogenousHazardSpec::tabular) constructor and
+///   deserialization reject such tables; the function stays total anyway so
+///   it never panics and never indexes out of bounds.
 fn tabular_interpolate(xs: &[f64], ys: &[f64], x: f64) -> f64 {
     // Degenerate table: no data to interpolate. Walk both slices through the
     // same bounded range so a length mismatch can never index out of bounds.
@@ -370,49 +433,41 @@ mod tests {
         assert!(EndogenousHazardSpec::tabular(vec![1.0], vec![0.05, 0.10]).is_err());
     }
 
+    /// Deserialization runs the constructors, so JSON cannot build a table
+    /// or parametric spec the constructors reject.
     #[test]
-    fn deserialized_empty_tabular_does_not_panic() {
-        // The `tabular()` constructor validates, but `#[derive(Deserialize)]`
-        // bypasses it: a JSON spec with empty `leverage_points` /
-        // `hazard_points` deserialises into a `Tabular` map whose
-        // `hazard_at_leverage` previously hit a panicking `assert!`. It must
-        // instead return a finite, non-negative value.
-        let json = r#"{
-            "base_hazard_rate": 0.05,
-            "base_leverage": 1.5,
-            "leverage_hazard_map": { "tabular": {
-                "leverage_points": [],
-                "hazard_points": []
-            }}
-        }"#;
-        let spec: EndogenousHazardSpec =
-            serde_json::from_str(json).expect("malformed-but-valid JSON deserialises");
-        let h = spec.hazard_at_leverage(2.0);
-        assert!(
-            h.is_finite() && h >= 0.0,
-            "empty tabular hazard must be finite and non-negative, got {h}"
-        );
-    }
-
-    #[test]
-    fn deserialized_mismatched_tabular_does_not_panic() {
-        // A `Tabular` map whose two vectors differ in length must not panic
-        // (the old `assert!` / panicking indexing path).
-        let json = r#"{
-            "base_hazard_rate": 0.05,
-            "base_leverage": 1.5,
-            "leverage_hazard_map": { "tabular": {
-                "leverage_points": [1.0, 2.0, 3.0],
-                "hazard_points": [0.05]
-            }}
-        }"#;
-        let spec: EndogenousHazardSpec =
-            serde_json::from_str(json).expect("malformed-but-valid JSON deserialises");
-        let h = spec.hazard_at_leverage(2.5);
-        assert!(
-            h.is_finite() && h >= 0.0,
-            "mismatched tabular hazard must be finite and non-negative, got {h}"
-        );
+    fn deserialize_routes_through_constructors() {
+        for bad in [
+            // empty and mismatched tables
+            r#"{"base_hazard_rate":0.05,"base_leverage":1.5,
+                "leverage_hazard_map":{"tabular":{"leverage_points":[],"hazard_points":[]}}}"#,
+            r#"{"base_hazard_rate":0.05,"base_leverage":1.0,
+                "leverage_hazard_map":{"tabular":{"leverage_points":[1.0,2.0,3.0],"hazard_points":[0.05]}}}"#,
+            // base fields that disagree with the table's first point
+            r#"{"base_hazard_rate":0.07,"base_leverage":1.0,
+                "leverage_hazard_map":{"tabular":{"leverage_points":[1.0,2.0],"hazard_points":[0.05,0.1]}}}"#,
+            // negative base hazard / non-positive base leverage
+            r#"{"base_hazard_rate":-0.1,"base_leverage":1.5,
+                "leverage_hazard_map":{"power_law":{"exponent":2.0}}}"#,
+            r#"{"base_hazard_rate":0.1,"base_leverage":0.0,
+                "leverage_hazard_map":{"exponential":{"sensitivity":2.0}}}"#,
+        ] {
+            assert!(
+                serde_json::from_str::<EndogenousHazardSpec>(bad).is_err(),
+                "{bad} must be rejected"
+            );
+        }
+        for spec in [
+            EndogenousHazardSpec::power_law(0.05, 1.5, 2.0).unwrap(),
+            EndogenousHazardSpec::exponential(0.05, 1.5, 2.0).unwrap(),
+            EndogenousHazardSpec::tabular(vec![1.0, 2.0], vec![0.05, 0.1]).unwrap(),
+        ] {
+            let json = serde_json::to_string(&spec).unwrap();
+            let back: EndogenousHazardSpec = serde_json::from_str(&json).unwrap();
+            assert_eq!(back, spec);
+        }
+        assert!(EndogenousHazardSpec::power_law(0.05, 1.5, f64::NAN).is_err());
+        assert!(EndogenousHazardSpec::exponential(f64::NAN, 1.5, 2.0).is_err());
     }
 
     #[test]

@@ -1066,26 +1066,15 @@ fn days_to_liquidate(position_quantity: f64, adv: f64, participation_rate: f64) 
 /// Raises
 /// ------
 /// ValueError
-///     If ``thresholds`` is given but is not strictly ascending or contains a
-///     non-finite value.
+///     If ``thresholds`` is given but a value is non-finite or not positive,
+///     or the values are not strictly ascending.
 #[pyfunction]
 #[pyo3(signature = (days_to_liquidate, thresholds = None))]
 #[pyo3(text_signature = "(days_to_liquidate, thresholds=None)")]
 fn liquidity_tier(days_to_liquidate: f64, thresholds: Option<[f64; 4]>) -> PyResult<&'static str> {
-    let thresholds = match thresholds {
-        Some(values) => {
-            if values.iter().any(|value| !value.is_finite())
-                || values.windows(2).any(|pair| pair[0] >= pair[1])
-            {
-                return Err(value_error(format!(
-                    "thresholds must be four finite, strictly ascending day counts, got {values:?}"
-                )));
-            }
-            values
-        }
-        None => liquidity::LiquidityConfig::default().tier_thresholds,
-    };
-    Ok(liquidity::classify_tier(days_to_liquidate, &thresholds).as_binding_str())
+    liquidity::liquidity_tier(days_to_liquidate, thresholds)
+        .map(|tier| tier.as_binding_str())
+        .map_err(core_to_py)
 }
 
 /// Liquidity-adjusted VaR following Bangia, Diebold, Schuermann & Stroughair (1999).

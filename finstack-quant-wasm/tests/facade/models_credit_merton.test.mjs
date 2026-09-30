@@ -98,3 +98,68 @@ test('hazard-curve export carries the requested day count', () => {
     credit.mertonToHazardCurveJson(modelJson, 'ACME-HZD', '2024-01-15', [1.0], 0.4, 'nope')
   );
 });
+
+// Same cases as finstack-quant-py/tests/test_models_credit_rust_owned.py.
+const SEEDED_FIRST_PATH = [
+  100.0, 106.3619193858413, 173.31551865077458, 179.24766644780442, 171.48303098644598,
+];
+
+test('Merton path simulation is seeded in Rust (PCG64), like Python', () => {
+  const paths = JSON.parse(credit.mertonSimulatePathsJson(modelJson, 2, 4, 1.0, 7, true));
+  const firstPath = paths.asset_values.slice(0, 5);
+  for (let i = 0; i < 5; i += 1) {
+    assert.ok(Math.abs(firstPath[i] / SEEDED_FIRST_PATH[i] - 1) < 1e-12, `step ${i}`);
+  }
+});
+
+test('toggle label errors carry the Rust list of accepted labels', () => {
+  assert.throws(
+    () => credit.toggleExerciseThresholdJson('bogus', 1.0, 'above'),
+    (e) =>
+      e.kind === 'validation' &&
+      e.message.endsWith(
+        'unknown credit state variable: bogus (expected one of hazard_rate, distance_to_default, leverage)'
+      )
+  );
+  assert.throws(
+    () => credit.toggleExerciseThresholdJson('leverage', 1.0, 'sideways'),
+    (e) =>
+      e.kind === 'validation' &&
+      e.message.endsWith('unknown threshold direction: sideways (expected one of above, below)')
+  );
+});
+
+test('credit spec builders reject NaN instead of writing null', () => {
+  for (const call of [
+    () => credit.creditStateJson(NaN, null, 0, 0, 0, null),
+    () => credit.toggleExerciseThresholdJson('leverage', NaN, 'above'),
+    () => credit.toggleExerciseOptimalJson(100, NaN, 0.2, 0.03, 1),
+    () => credit.endogenousHazardPowerLawJson(0.05, 1.5, NaN),
+  ]) {
+    assert.throws(call, (e) => e.kind === 'validation');
+  }
+  const state = JSON.parse(credit.creditStateJson(0.05, null, 0.5, 100, 2, 200));
+  assert.equal(state.hazard_rate, 0.05);
+});
+
+test('spec JSON is validated by the Rust constructors on the way in', () => {
+  for (const spec of [
+    '{"base_recovery":1.5,"base_notional":-10,"model":"constant"}',
+    '{"base_recovery":-0.5,"base_notional":100,"model":"inverse_linear"}',
+  ]) {
+    assert.throws(
+      () => credit.dynamicRecoveryAtNotional(spec, 120),
+      (e) => e.kind === 'validation'
+    );
+  }
+  assert.throws(
+    () =>
+      credit.endogenousHazardAtLeverage(
+        '{"base_hazard_rate":0.05,"base_leverage":1.5,"leverage_hazard_map":{"tabular":{"leverage_points":[],"hazard_points":[]}}}',
+        2
+      ),
+    (e) => e.kind === 'validation'
+  );
+  const constant = credit.dynamicRecoveryConstantJson(0.4);
+  assert.equal(credit.dynamicRecoveryAtNotional(constant, 120), 0.4);
+});

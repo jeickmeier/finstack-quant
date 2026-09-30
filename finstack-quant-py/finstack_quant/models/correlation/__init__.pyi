@@ -801,6 +801,45 @@ class PortfolioLossResult:
 
     """
 
+    @staticmethod
+    def from_losses(losses: list[float], confidence: float) -> PortfolioLossResult:
+        """
+        Aggregate a finite loss distribution under loss-positive conventions.
+
+        The WASM ``PortfolioLossResult.fromLosses`` twin: both hosts call the
+        Rust ``PortfolioLossResult::from_losses``.
+
+        Parameters
+        ----------
+        losses : list[float]
+            Loss-positive path losses in one caller-defined unit, one entry per
+            simulated path.
+        confidence : float
+            Loss-positive VaR and expected-shortfall confidence strictly
+            between 0 and 1.
+
+        Returns
+        -------
+        PortfolioLossResult
+            Losses with the nearest-rank VaR at ``confidence`` and the expected
+            shortfall over exactly the worst ``1 - confidence`` probability
+            mass (fractional weight on the boundary observation).
+
+        Raises
+        ------
+        ValueError
+            If ``losses`` is empty, a loss is non-finite or negative, or
+            ``confidence`` is outside ``(0, 1)``.
+
+        Examples
+        --------
+        >>> from finstack_quant.models.correlation import PortfolioLossResult
+        >>> result = PortfolioLossResult.from_losses([0.0, 1.0, 2.0, 5.0, 10.0], 0.75)
+        >>> (result.var, result.expected_shortfall)
+        (5.0, 9.0)
+        """
+        ...
+
     @property
     def losses(self) -> list[float]:
         """
@@ -1049,7 +1088,9 @@ class PortfolioLossResult:
         Raises
         ------
         ValueError
-            If ``json`` is malformed or does not match the serialized schema.
+            If ``json`` is malformed, does not match the serialized schema, has
+            an invalid loss or confidence, or carries aggregates that disagree
+            with its losses (deserialization reruns :meth:`from_losses`).
         """
         ...
 
@@ -2728,9 +2769,10 @@ def validate_correlation_matrix(matrix: Sequence[float] | Sequence[Sequence[floa
     Raises
     ------
     ValueError
-        If the shape does not match ``n`` (the message states the rows and
-        widths found), or the matrix is invalid (diagonal not one, entry out
-        of ``[-1, 1]``, not symmetric, not PSD).
+        If the shape does not match ``n`` (the Rust shape check names the
+        row count or the first row of the wrong width), or the matrix is
+        invalid (diagonal not one, entry out of ``[-1, 1]``, not symmetric,
+        not PSD).
 
     Examples
     --------

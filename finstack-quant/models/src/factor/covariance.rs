@@ -53,7 +53,11 @@ impl FactorCovarianceMatrix {
     /// - `data.len() == n * n`
     /// - factor identifiers are unique
     /// - the matrix is symmetric within a small floating-point tolerance
-    /// - the matrix is positive semi-definite according to a Cholesky-style test
+    /// - the matrix is positive semi-definite according to a Cholesky-style test,
+    ///   which also rejects every non-finite entry
+    ///
+    /// Deserialization goes through this constructor too, so every matrix has
+    /// finite entries and serializes to JSON without loss.
     ///
     /// The `data` vector is row-major in the exact `factor_ids` order. Its
     /// entries must use the canonical annualized covariance units described on
@@ -138,25 +142,6 @@ impl FactorCovarianceMatrix {
     #[must_use]
     pub fn as_slice(&self) -> &[f64] {
         &self.data
-    }
-
-    /// Reject any non-finite covariance entry.
-    ///
-    /// `serde_json` encodes `NaN`/`±inf` as `null`, so hosts call this before
-    /// handing the matrix across a wire boundary.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`finstack_quant_core::Error::Validation`] naming the first
-    /// non-finite entry by row-major index.
-    pub fn validate(&self) -> finstack_quant_core::Result<()> {
-        match self.data.iter().position(|v| !v.is_finite()) {
-            Some(i) => Err(finstack_quant_core::Error::Validation(format!(
-                "non-finite value ({}) in covariance.data[{i}]",
-                self.data[i]
-            ))),
-            None => Ok(()),
-        }
     }
 
     /// Row/column index of `factor`, or `None` if the identifier is unknown.

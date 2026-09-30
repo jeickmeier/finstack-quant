@@ -427,12 +427,17 @@ impl PyLmeAnalysis {
 ///     Present value of the existing claim if not tendered.
 /// new_pv : float
 ///     Present value of the new instrument received on tendering, same units.
-/// consent_fee : float, default 0.0
-///     Cash consent / early-tender fee per unit tendered, same units.
-/// equity_sweetener_value : float, default 0.0
-///     Value of equity or warrants attached to the new instrument, same units.
-/// exchange_type : str, default "par_for_par"
+/// consent_fee : float
+///     Cash consent / early-tender fee per unit tendered, same units; pass
+///     ``0.0`` when the offer carries none.
+/// equity_sweetener_value : float
+///     Value of equity or warrants attached to the new instrument, same units;
+///     pass ``0.0`` when there is none.
+/// exchange_type : str
 ///     One of ``par_for_par``, ``discount``, ``uptier``, ``downtier``.
+///
+/// Every argument is required, as in Rust and WASM: the offer terms are
+/// deal-specific, so there is no default structure or fee.
 ///
 /// Returns an ``ExchangeOfferAnalysis``; tendering is recommended only when
 /// ``tender_total > old_pv * TENDER_RECOMMENDATION_HURDLE``.
@@ -440,10 +445,7 @@ impl PyLmeAnalysis {
 /// Raises ``ValueError`` for an unknown ``exchange_type`` or a negative /
 /// non-finite monetary input.
 #[pyfunction]
-#[pyo3(signature = (old_pv, new_pv, consent_fee=0.0, equity_sweetener_value=0.0, exchange_type="par_for_par"))]
-#[pyo3(
-    text_signature = "(old_pv, new_pv, consent_fee=0.0, equity_sweetener_value=0.0, exchange_type='par_for_par')"
-)]
+#[pyo3(text_signature = "(old_pv, new_pv, consent_fee, equity_sweetener_value, exchange_type)")]
 fn analyze_exchange_offer(
     old_pv: f64,
     new_pv: f64,
@@ -476,8 +478,9 @@ fn analyze_exchange_offer(
 ///     Price as a decimal fraction of par for repurchases and tenders
 ///     (``(0, 1.5]``), the extension fee for amend-and-extend (``[0, 0.1]``),
 ///     or the transferred-asset fraction for a dropdown (``[0, 1]``).
-/// opt_acceptance_pct : float, default 1.0
-///     Fraction of holders participating, in [0, 1].
+/// opt_acceptance_pct : float
+///     Fraction of holders participating, in [0, 1]; required, as in Rust
+///     and WASM, because participation drives cost and notional reduction.
 /// ebitda : float | None, default None
 ///     EBITDA in the same units as ``notional``; a positive value adds the
 ///     ``leverage_impact`` block.
@@ -486,9 +489,9 @@ fn analyze_exchange_offer(
 ///
 /// Raises ``ValueError`` for an unknown ``lme_type`` or an out-of-range input.
 #[pyfunction]
-#[pyo3(signature = (lme_type, notional, repurchase_price_pct, opt_acceptance_pct=1.0, ebitda=None))]
+#[pyo3(signature = (lme_type, notional, repurchase_price_pct, opt_acceptance_pct, ebitda=None))]
 #[pyo3(
-    text_signature = "(lme_type, notional, repurchase_price_pct, opt_acceptance_pct=1.0, ebitda=None)"
+    text_signature = "(lme_type, notional, repurchase_price_pct, opt_acceptance_pct, ebitda=None)"
 )]
 fn analyze_lme(
     lme_type: &str,

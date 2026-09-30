@@ -58,18 +58,6 @@ ONE_WAY_EXCEPTIONS = (
         frozenset({"JsonSchema"}),
     ),
     *_exception(
-        "models",
-        "src/factor/risk/views.rs",
-        (
-            "PositionVarContributionView",
-            "ParametricVarDecompositionView",
-            "PositionBudgetEntryView",
-            "RiskBudgetResultView",
-        ),
-        "binding-view",
-        "Binding-oriented factor-risk view with no accepted inbound representation.",
-    ),
-    *_exception(
         "portfolio",
         "src/factor_model/weight_allocation.rs",
         ("WeightAllocationResult", "StrategyAllocation", "AllocationDiagnostics"),

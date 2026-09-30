@@ -52,7 +52,10 @@ pub enum RecoveryModel {
 /// original base, recovery declines according to the chosen [`RecoveryModel`].
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(deny_unknown_fields)]
+// Deserialization runs the validating constructors (see `RawDynamicRecoverySpec`),
+// so a spec loaded from JSON satisfies the same invariants as one built in
+// Rust.
+#[serde(try_from = "RawDynamicRecoverySpec")]
 pub struct DynamicRecoverySpec {
     /// Base (reference) recovery rate `R_0`.
     base_recovery: f64,
@@ -62,14 +65,82 @@ pub struct DynamicRecoverySpec {
     model: RecoveryModel,
 }
 
+/// Unvalidated wire representation of a [`DynamicRecoverySpec`].
+///
+/// Exists solely so `#[serde(try_from = ...)]` can funnel deserialization
+/// through the validating constructors. Field names and types mirror
+/// [`DynamicRecoverySpec`] exactly, so the JSON representation is identical.
+#[derive(Debug, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[cfg_attr(feature = "json-schema", schemars(rename = "DynamicRecoverySpec"))]
+#[serde(deny_unknown_fields)]
+struct RawDynamicRecoverySpec {
+    /// Base (reference) recovery rate `R_0`.
+    base_recovery: f64,
+    /// Base (reference) notional `N_0`.
+    base_notional: f64,
+    /// Recovery model governing the notional-to-recovery mapping.
+    model: RecoveryModel,
+}
+
+impl TryFrom<RawDynamicRecoverySpec> for DynamicRecoverySpec {
+    type Error = Error;
+
+    fn try_from(raw: RawDynamicRecoverySpec) -> Result<Self> {
+        let spec = match raw.model {
+            RecoveryModel::Constant => Self::constant(raw.base_recovery)?,
+            RecoveryModel::InverseLinear => {
+                Self::inverse_linear(raw.base_recovery, raw.base_notional)?
+            }
+            RecoveryModel::InversePower { exponent } => {
+                Self::inverse_power(raw.base_recovery, raw.base_notional, exponent)?
+            }
+            RecoveryModel::FlooredInverse { floor } => {
+                Self::floored_inverse(raw.base_recovery, raw.base_notional, floor)?
+            }
+            RecoveryModel::LinearDecline { sensitivity, floor } => {
+                Self::linear_decline(raw.base_recovery, raw.base_notional, sensitivity, floor)?
+            }
+        };
+        // Only a constant spec fixes a field itself (`base_notional = 1.0`);
+        // reject a payload that carries any other value rather than drop it.
+        let wire = Self {
+            base_recovery: raw.base_recovery,
+            base_notional: raw.base_notional,
+            model: raw.model,
+        };
+        if spec != wire {
+            return Err(Error::Validation(format!(
+                "constant dynamic-recovery spec must carry base_notional 1.0, got {}",
+                raw.base_notional
+            )));
+        }
+        Ok(spec)
+    }
+}
+
 impl DynamicRecoverySpec {
     /// Validate base parameters common to all non-constant models.
     fn validate(base_recovery: f64, base_notional: f64) -> Result<()> {
         if !(0.0..=1.0).contains(&base_recovery) {
             return Err(InputError::Invalid.into());
         }
-        if base_notional <= 0.0 {
+        if !(base_notional.is_finite() && base_notional > 0.0) {
             return Err(InputError::NonPositiveValue.into());
+        }
+        Ok(())
+    }
+
+    /// Validate a recovery floor against the base recovery.
+    fn validate_floor(model: &str, base_recovery: f64, floor: f64) -> Result<()> {
+        if !(floor.is_finite() && floor >= 0.0) {
+            return Err(InputError::NegativeValue.into());
+        }
+        if floor > base_recovery {
+            return Err(Error::Validation(format!(
+                "{model}: floor ({floor}) must not exceed base_recovery \
+                 ({base_recovery}) — the outer clamp would silently disable it"
+            )));
         }
         Ok(())
     }
@@ -99,7 +170,7 @@ impl DynamicRecoverySpec {
     /// # Errors
     ///
     /// Returns an error if `base_recovery` is outside `[0, 1]` or
-    /// `base_notional <= 0`.
+    /// `base_notional` is not finite and positive.
     pub fn inverse_linear(base_recovery: f64, base_notional: f64) -> Result<Self> {
         Self::validate(base_recovery, base_notional)?;
         Ok(Self {
@@ -116,10 +187,11 @@ impl DynamicRecoverySpec {
     /// # Errors
     ///
     /// Returns an error if `base_recovery` is outside `[0, 1]`,
-    /// `base_notional <= 0`, or `exponent <= 0`.
+    /// `base_notional` is not finite and positive, or `exponent` is not
+    /// finite and positive.
     pub fn inverse_power(base_recovery: f64, base_notional: f64, exponent: f64) -> Result<Self> {
         Self::validate(base_recovery, base_notional)?;
-        if exponent <= 0.0 {
+        if !(exponent.is_finite() && exponent > 0.0) {
             return Err(InputError::NonPositiveValue.into());
         }
         Ok(Self {
@@ -136,18 +208,11 @@ impl DynamicRecoverySpec {
     /// # Errors
     ///
     /// Returns an error if `base_recovery` is outside `[0, 1]`,
-    /// `base_notional <= 0`, or `floor` is negative.
+    /// `base_notional` is not finite and positive, or `floor` is negative,
+    /// non-finite, or above `base_recovery`.
     pub fn floored_inverse(base_recovery: f64, base_notional: f64, floor: f64) -> Result<Self> {
         Self::validate(base_recovery, base_notional)?;
-        if floor < 0.0 {
-            return Err(InputError::NegativeValue.into());
-        }
-        if floor > base_recovery {
-            return Err(Error::Validation(format!(
-                "floored_inverse: floor ({floor}) must not exceed base_recovery \
-                 ({base_recovery}) — the outer clamp would silently disable it"
-            )));
-        }
+        Self::validate_floor("floored_inverse", base_recovery, floor)?;
         Ok(Self {
             base_recovery,
             base_notional,
@@ -162,7 +227,9 @@ impl DynamicRecoverySpec {
     /// # Errors
     ///
     /// Returns an error if `base_recovery` is outside `[0, 1]`,
-    /// `base_notional <= 0`, or `floor` is negative.
+    /// `base_notional` is not finite and positive, `sensitivity` is
+    /// non-finite, or `floor` is negative, non-finite, or above
+    /// `base_recovery`.
     pub fn linear_decline(
         base_recovery: f64,
         base_notional: f64,
@@ -170,15 +237,12 @@ impl DynamicRecoverySpec {
         floor: f64,
     ) -> Result<Self> {
         Self::validate(base_recovery, base_notional)?;
-        if floor < 0.0 {
-            return Err(InputError::NegativeValue.into());
-        }
-        if floor > base_recovery {
+        if !sensitivity.is_finite() {
             return Err(Error::Validation(format!(
-                "linear_decline: floor ({floor}) must not exceed base_recovery \
-                 ({base_recovery}) — the outer clamp would silently disable it"
+                "linear_decline: sensitivity must be finite, got {sensitivity}"
             )));
         }
+        Self::validate_floor("linear_decline", base_recovery, floor)?;
         Ok(Self {
             base_recovery,
             base_notional,
@@ -326,5 +390,41 @@ mod tests {
         assert!(DynamicRecoverySpec::inverse_linear(0.40, 0.0).is_err());
         assert!(DynamicRecoverySpec::inverse_power(0.40, 100.0, 0.0).is_err());
         assert!(DynamicRecoverySpec::floored_inverse(0.40, 100.0, -0.1).is_err());
+        assert!(DynamicRecoverySpec::inverse_linear(0.40, f64::NAN).is_err());
+        assert!(DynamicRecoverySpec::inverse_power(0.40, 100.0, f64::NAN).is_err());
+        assert!(DynamicRecoverySpec::floored_inverse(0.40, 100.0, f64::NAN).is_err());
+        assert!(DynamicRecoverySpec::linear_decline(0.40, 100.0, f64::NAN, 0.1).is_err());
+    }
+
+    /// Deserialization runs the constructors, so JSON cannot build a spec
+    /// the constructors reject (a negative `base_recovery` used to reach
+    /// `f64::clamp` with `min > max` and panic).
+    #[test]
+    fn deserialize_routes_through_constructors() {
+        for bad in [
+            r#"{"base_recovery":-0.5,"base_notional":100.0,"model":"inverse_linear"}"#,
+            r#"{"base_recovery":1.5,"base_notional":-10.0,"model":"constant"}"#,
+            r#"{"base_recovery":0.4,"base_notional":0.0,"model":"inverse_linear"}"#,
+            r#"{"base_recovery":0.4,"base_notional":100.0,"model":{"floored_inverse":{"floor":0.5}}}"#,
+            r#"{"base_recovery":0.4,"base_notional":100.0,"model":{"inverse_power":{"exponent":0.0}}}"#,
+            r#"{"base_recovery":0.4,"base_notional":7.0,"model":"constant"}"#,
+            r#"{"base_recovery":0.4,"base_notional":1.0,"model":"constant","extra":1}"#,
+        ] {
+            assert!(
+                serde_json::from_str::<DynamicRecoverySpec>(bad).is_err(),
+                "{bad} must be rejected"
+            );
+        }
+        for spec in [
+            DynamicRecoverySpec::constant(0.4).unwrap(),
+            DynamicRecoverySpec::inverse_linear(0.4, 100.0).unwrap(),
+            DynamicRecoverySpec::inverse_power(0.4, 100.0, 0.5).unwrap(),
+            DynamicRecoverySpec::floored_inverse(0.4, 100.0, 0.1).unwrap(),
+            DynamicRecoverySpec::linear_decline(0.4, 100.0, 0.5, 0.1).unwrap(),
+        ] {
+            let json = serde_json::to_string(&spec).unwrap();
+            let back: DynamicRecoverySpec = serde_json::from_str(&json).unwrap();
+            assert_eq!(back, spec);
+        }
     }
 }
