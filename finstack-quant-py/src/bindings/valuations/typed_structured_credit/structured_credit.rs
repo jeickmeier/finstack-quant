@@ -334,15 +334,7 @@ impl PyStructuredCredit {
     #[staticmethod]
     #[pyo3(text_signature = "(json)")]
     fn from_json(json: &str) -> PyResult<Self> {
-        match parse_typed_instrument_json(json)? {
-            InstrumentJson::StructuredCredit(inner) => {
-                let inner = *inner;
-                Ok(Self { inner })
-            }
-            _ => Err(value_error(
-                "expected instrument type \"structured_credit\", got a different instrument type",
-            )),
-        }
+        parse_typed_instrument_json(json).map(|inner| Self { inner })
     }
 
     /// Price the deal with the scenario-waterfall Monte Carlo engine.

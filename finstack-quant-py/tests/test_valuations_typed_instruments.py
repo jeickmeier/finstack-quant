@@ -147,7 +147,7 @@ class TestBondTyped:
             Bond.from_json("{not valid json")
 
     def test_wrong_instrument_type_raises_value_error(self) -> None:
-        with pytest.raises(ValueError, match='expected instrument type "bond"'):
+        with pytest.raises(ValueError, match=r"expected instrument type `bond`, got `term_loan`"):
             Bond.from_json(TermLoan.example().to_json())
 
     def test_invalid_dates_raise_value_error(self) -> None:
@@ -234,7 +234,7 @@ class TestTermLoanTyped:
             TermLoan.from_json("[1, 2")
 
     def test_wrong_instrument_type_raises_value_error(self) -> None:
-        with pytest.raises(ValueError, match='expected instrument type "term_loan"'):
+        with pytest.raises(ValueError, match=r"expected instrument type `term_loan`, got `bond`"):
             TermLoan.from_json(_fixed_bond().to_json())
 
     def test_price_instrument_typed_equals_json(self) -> None:

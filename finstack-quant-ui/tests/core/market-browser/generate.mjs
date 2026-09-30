@@ -68,7 +68,7 @@ const supplemental = {
     ],
   },
 };
-const handle = new native.Market(JSON.stringify(supplemental));
+const handle = native.MarketContext.fromJson(JSON.stringify(supplemental));
 try {
   await writeFile(
     new URL("./cases.json", import.meta.url),

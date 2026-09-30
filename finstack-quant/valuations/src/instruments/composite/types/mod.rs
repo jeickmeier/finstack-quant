@@ -285,6 +285,38 @@ mod tests {
     }
 
     #[test]
+    fn rebalance_result_wire_carries_the_canonical_instrument_envelope() -> Result<()> {
+        let composite = CompositeInstrument::example()?;
+        let result = composite.spec.initialize_fixed(date!(2025 - 01 - 01))?;
+        let json =
+            serde_json::to_value(&result).map_err(|error| Error::Internal(error.to_string()))?;
+        assert_eq!(json["instrument"]["schema"], "finstack_quant.instrument/1");
+        assert_eq!(json["instrument"]["instrument"]["type"], "composite");
+        // The envelope is accepted by the typed instrument loader as-is.
+        let envelope = serde_json::to_string(&json["instrument"])
+            .map_err(|error| Error::Internal(error.to_string()))?;
+        crate::pricer::parse_typed_instrument_json::<CompositeInstrument>(&envelope)?;
+        let back: CompositeRebalanceResult = serde_json::from_value(json.clone())
+            .map_err(|error| Error::Internal(error.to_string()))?;
+        assert_eq!(
+            serde_json::to_value(&back).map_err(|error| Error::Internal(error.to_string()))?,
+            json
+        );
+
+        let mut wrong = json;
+        wrong["instrument"] = serde_json::to_value(crate::instruments::InstrumentEnvelope::new(
+            crate::instruments::Equity::example()?.into(),
+        ))
+        .map_err(|error| Error::Internal(error.to_string()))?;
+        let error = serde_json::from_value::<CompositeRebalanceResult>(wrong)
+            .expect_err("a non-composite envelope must be rejected");
+        assert!(error
+            .to_string()
+            .contains("expected instrument type `composite`, got `equity`"));
+        Ok(())
+    }
+
+    #[test]
     fn execution_rejects_conflicting_primitive_definitions_between_states() -> Result<()> {
         let previous = CompositeInstrument::example()?;
         let mut changed_spec = previous.spec.clone();

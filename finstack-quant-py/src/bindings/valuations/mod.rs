@@ -508,8 +508,9 @@ fn validate_instrument_json(
 /// Validate a payload as one exact instrument type and return the canonical envelope.
 ///
 /// Pure delegation to the Rust
-/// ``finstack_quant_valuations::pricer::validate_typed_instrument_json`` used
-/// by the WASM typed FX classes' ``fromJson`` constructors.
+/// ``finstack_quant_valuations::pricer::validate_typed_instrument_json``; a
+/// different instrument type raises ``expected instrument type `<type_tag>`,
+/// got `<actual>` ``, the same message every typed ``from_json`` reports.
 ///
 /// Parameters
 /// ----------
@@ -540,8 +541,9 @@ fn validate_typed_instrument_json(type_tag: &str, json: &str) -> PyResult<String
 /// Re-render a canonical instrument envelope as pretty-printed JSON.
 ///
 /// Pure delegation to the Rust
-/// ``finstack_quant_valuations::pricer::pretty_instrument_json`` used by the
-/// WASM typed FX classes' ``toJson`` methods.
+/// ``finstack_quant_valuations::pricer::pretty_instrument_json``, an
+/// inspection helper; typed ``to_json`` methods in both hosts emit the compact
+/// canonical envelope instead.
 ///
 /// Parameters
 /// ----------

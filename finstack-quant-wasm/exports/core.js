@@ -48,6 +48,7 @@ export const core = {
   ForwardCurve: wasm.ForwardCurve,
   VolCube: wasm.VolCube,
   FxDeltaVolSurface: wasm.FxDeltaVolSurface,
+  MarketContext: wasm.MarketContext,
   FxConversionPolicy: wasm.FxConversionPolicy,
   FxRateResult: wasm.FxRateResult,
   FxMatrix: wasm.FxMatrix,

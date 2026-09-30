@@ -2,6 +2,27 @@
 
 ## [Unreleased]
 
+### WASM binding audit: valuations (2026-09-30)
+
+#### Changed (BREAKING)
+
+- WASM `valuations.Market` is replaced by `core.MarketContext`. Build one with `core.MarketContext.fromJson(json)`; there is no constructor. The root `Market` type export is now the `MarketContext` interface. `priceInstrumentWithMarket` takes an optional `model`, which defaults to `"default"`.
+- The metric `exercise_probability` (custom, unit unknown) is now the standard metric `expected_exercise_time` (`MetricId::ExpectedExerciseTime`: Rates group, in years), so `listStandardMetrics*` gains one entry.
+- Typed instrument conversions have one Rust owner:
+  - Every registry type implements `From<T> for InstrumentJson` and `TryFrom<InstrumentJson> for T`.
+  - `pricer::parse_typed_instrument_json` and `pricer::instrument_from_spec` are new.
+  - A type mismatch reads ``expected instrument type `x`, got `y` `` in both hosts.
+- WASM FX instrument classes:
+  - They store the Rust instrument.
+  - `toJson` is compact canonical JSON; it was pretty-printed with sorted keys.
+  - `id` no longer throws.
+  - `greeks()` keys follow `STANDARD_OPTION_GREEKS` order.
+  - `FxTouchOption` and `FxBarrierOption` gain `theta`.
+- `CompositeRebalanceResult.instrument` serializes as the `finstack_quant.instrument/1` envelope in both hosts and is validated on deserialize. Python `to_json()["instrument"]` was a bare `{spec, state}`.
+- Bonds: Python `Bond.fixed(convention=...)` is removed; use `Bond.with_convention(...)` and the new `Bond.with_stub`. WASM gains `Bond.withConvention` and `bond.withStub`.
+- Python basis-point arguments go through `Bps::try_new`, so fractional basis points raise `ValueError` instead of being rounded.
+- Structured-credit borrowing-base terms validate in Rust: `AdvanceRate::validate`, `ConcentrationLimit::validate` and `AmortizationEvent::validate`. The Python constructors call them, and scope names use the serde form.
+
 ### WASM binding audit: strict number arguments (2026-09-30)
 
 #### Changed (BREAKING)

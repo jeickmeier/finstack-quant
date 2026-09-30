@@ -219,6 +219,7 @@
       "FxQuoteConvention",
       "FxRateResult",
       "HazardCurve",
+      "MarketContext",
       "Money",
       "Percentage",
       "Rate",
@@ -373,6 +374,12 @@
     "statics": ["fromJson"],
     "methods": ["free"],
     "getters": ["expiries", "id", "numExpiries"]
+  },
+  "core.MarketContext": {
+    "kind": "class",
+    "statics": ["fromJson"],
+    "methods": ["free", "toJson"],
+    "getters": []
   },
   "core.FxConversionPolicy": {
     "kind": "class",
@@ -1423,7 +1430,6 @@
   "valuations": {
     "kind": "namespace",
     "keys": [
-      "Market",
       "callableRangeAccrualAccrued",
       "cmsSpreadOptionIntrinsic",
       "composite",
@@ -1555,7 +1561,7 @@
   "valuations.fx.FxTouchOption": {
     "kind": "class",
     "statics": ["fromJson"],
-    "methods": ["delta", "free", "gamma", "greeks", "price", "rho", "toJson", "vega"],
+    "methods": ["delta", "free", "gamma", "greeks", "price", "rho", "theta", "toJson", "vega"],
     "getters": ["id"]
   },
   "valuations.fx.FxBarrierOption": {
@@ -1568,6 +1574,7 @@
       "greeks",
       "price",
       "rho",
+      "theta",
       "toJson",
       "vanna",
       "vega",
@@ -1627,8 +1634,8 @@
   },
   "valuations.instruments.Bond": {
     "kind": "class",
-    "statics": ["fixed", "floating", "fromJson"],
-    "methods": ["free", "toJson"],
+    "statics": ["fixed", "floating", "fromJson", "withConvention"],
+    "methods": ["free", "toJson", "withStub"],
     "getters": ["id"]
   },
   "valuations.instruments.TermLoan": {
@@ -1709,12 +1716,6 @@
   },
   "valuations.valuationResultToJson": {
     "kind": "function"
-  },
-  "valuations.Market": {
-    "kind": "class",
-    "statics": [],
-    "methods": ["free", "toJson"],
-    "getters": []
   },
   "valuations.tarnCouponProfile": {
     "kind": "function"

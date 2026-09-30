@@ -751,3 +751,35 @@ fn floating_facility_interest_is_tagged_float_reset() {
     assert!(floating_kinds.iter().all(|k| *k == CFKind::FloatReset));
     assert!(kinds(&fixed).iter().all(|k| *k == CFKind::Fixed));
 }
+
+#[test]
+fn borrowing_base_items_and_amortization_events_validate_on_their_own() {
+    let rate = |asset_class: &str, rate: f64| AdvanceRate {
+        asset_class: asset_class.to_string(),
+        rate,
+        eligibility: EligibilityRule::default(),
+    };
+    assert!(rate("commercial_mortgage", 0.8).validate().is_ok());
+    assert!(rate("", 0.8).validate().is_err());
+    assert!(rate("commercial_mortgage", 1.5).validate().is_err());
+
+    let limit = |max_pct: f64| ConcentrationLimit {
+        scope: ConcentrationScope::Obligor,
+        max_pct,
+    };
+    assert!(limit(100.0).validate().is_ok());
+    assert!(limit(0.0).validate().is_err());
+    assert!(limit(150.0).validate().is_err());
+
+    let loss = |max_cumulative_loss: f64| AmortizationEvent::CumulativeLoss {
+        max_cumulative_loss,
+    };
+    assert!(loss(0.04).validate().is_ok());
+    assert!(loss(0.0).validate().is_err());
+    assert!(loss(2.5).validate().is_err());
+    assert!(AmortizationEvent::ExcessSpread {
+        min_excess_spread_3m: f64::NAN
+    }
+    .validate()
+    .is_err());
+}

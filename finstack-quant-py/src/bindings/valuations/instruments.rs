@@ -26,15 +26,18 @@ use finstack_quant_core::types::{CurveId, InstrumentId};
 use finstack_quant_valuations::instruments::{Instrument, InstrumentEnvelope, InstrumentJson};
 
 use super::convert::{
-    attributes_from_py, attributes_to_py, bps_from_py, enum_to_py_string, money_from_py,
-    money_to_py, opt_repr, rate_decimal_from_py,
+    attributes_from_py, attributes_to_py, enum_to_py_string, money_from_py, money_to_py, opt_repr,
+    rate_decimal_from_py,
 };
 use super::pricing::{binding_pricing_options, market_history_json, metric_pricing_overrides_json};
 use super::PyValuationResult;
 
 /// Parse a canonical typed-instrument envelope through the shared Rust path.
-pub(crate) fn parse_typed_instrument_json(json: &str) -> PyResult<InstrumentJson> {
-    finstack_quant_valuations::pricer::json::parse_instrument_from_json(json).map_err(core_to_py)
+pub(crate) fn parse_typed_instrument_json<T>(json: &str) -> PyResult<T>
+where
+    T: TryFrom<InstrumentJson, Error = finstack_quant_core::Error>,
+{
+    finstack_quant_valuations::pricer::parse_typed_instrument_json(json).map_err(core_to_py)
 }
 
 /// Serialize a typed instrument as the canonical v1 persistence envelope.
@@ -128,21 +131,27 @@ pub(crate) fn rate_from_py(
     })
 }
 
-/// Coerce `float | int | Bps` to a core `Bps` (whole basis points, rounded).
+/// Coerce `float | int | Bps` to a core `Bps`.
+///
+/// A `Bps` hands over its Rust value unchanged; a number goes through the
+/// Rust `Bps::try_new`, which rejects non-finite, fractional and out-of-range
+/// basis points (`ValueError`), exactly as WASM `Bps` does.
 pub(crate) fn bps_value_from_py(
     obj: &Bound<'_, PyAny>,
     what: &str,
 ) -> PyResult<finstack_quant_core::types::Bps> {
-    let bp = bps_from_py(obj, what)?;
-    if !bp.is_finite() {
-        return Err(value_error(format!("{what}: basis points must be finite")));
+    if let Ok(bps) = obj.cast::<crate::bindings::core::types::PyBps>() {
+        return Ok(bps.borrow().inner);
     }
-    let rounded = bp.round();
-    if rounded > f64::from(i32::MAX) || rounded < f64::from(i32::MIN) {
-        return Err(value_error(format!("{what}: basis points out of range")));
-    }
-    // Truncation is impossible after the range check above.
-    Ok(finstack_quant_core::types::Bps::new(rounded as i32))
+    let bp: f64 = obj.extract().map_err(|_| {
+        pyo3::exceptions::PyTypeError::new_err(format!(
+            "{what}: expected basis points as float or finstack_quant.core.types.Bps, got {}",
+            obj.get_type()
+                .name()
+                .map_or_else(|_| "object".to_string(), |name| name.to_string())
+        ))
+    })?;
+    finstack_quant_core::types::Bps::try_new(bp).map_err(core_to_py)
 }
 
 /// Price an instrument envelope through the canonical Rust pricer.
@@ -299,8 +308,8 @@ fn bond_convention_from_str(
 
 /// Typed wrapper for the Rust `Bond` instrument.
 ///
-/// Construct via ``Bond.fixed`` (US-corporate or a named convention preset),
-/// ``Bond.with_convention``, ``Bond.floating`` /
+/// Construct via ``Bond.fixed`` (US corporate), ``Bond.with_convention`` (a
+/// named preset; override its stub with ``.with_stub``), ``Bond.floating`` /
 /// ``Bond.floating_with_convention``, ``Bond.zero_coupon``, the
 /// ``Bond.builder()`` fluent builder (callable, credit-curve, custom
 /// day-count / frequency / settlement), the ``Bond.example*`` presets, or
@@ -349,11 +358,11 @@ impl PyBond {
         }
     }
 
-    /// Create a fixed-rate bond from a settlement/day-count convention preset.
+    /// Create a US corporate fixed-rate bond (semi-annual, 30/360, T+1).
     ///
-    /// Mirrors Rust ``Bond::fixed`` (``convention=None``, US corporate:
-    /// semi-annual, 30/360, T+1) and ``Bond::with_convention`` followed by
-    /// ``with_stub`` when ``convention`` names a preset.
+    /// Mirrors Rust ``Bond::fixed``. For another market's conventions use
+    /// ``Bond.with_convention`` and, to override the preset's stub rule,
+    /// chain ``.with_stub(...)``.
     ///
     /// Parameters
     /// ----------
@@ -373,12 +382,6 @@ impl PyBond {
     ///     ``"long_back"`` or a ``StubKind``).
     /// discount_curve_id : str
     ///     Discount curve identifier used for pricing.
-    /// convention : str, optional
-    ///     Bond convention preset: ``"us_treasury"``, ``"us_agency"``,
-    ///     ``"german_bund"``, ``"uk_gilt"``, ``"french_oat"``, ``"jgb"``,
-    ///     ``"us_corporate"`` (default) or ``"eur_corporate"``. Sets coupon
-    ///     frequency, day count, calendar, business-day convention and
-    ///     settlement lag.
     /// currency : str, optional
     ///     ISO-4217 code applied when ``notional`` is a bare number.
     ///
@@ -390,9 +393,9 @@ impl PyBond {
     /// Raises
     /// ------
     /// ValueError
-    ///     If ``convention``/``stub`` is not a recognized name, a bare
-    ///     ``notional`` has no ``currency``, or validation fails (e.g.
-    ///     maturity not after issue_date).
+    ///     If ``stub`` is not a recognized name, a bare ``notional`` has no
+    ///     ``currency``, or validation fails (e.g. maturity not after
+    ///     issue_date).
     /// TypeError
     ///     If ``coupon_rate`` or ``notional`` has an unsupported type, or a
     ///     date cannot be interpreted.
@@ -407,9 +410,9 @@ impl PyBond {
     /// >>> bond.id
     /// 'BOND-1'
     #[staticmethod]
-    #[pyo3(signature = (id, notional, coupon_rate, issue_date, maturity, stub, discount_curve_id, *, convention = None, currency = None))]
+    #[pyo3(signature = (id, notional, coupon_rate, issue_date, maturity, stub, discount_curve_id, *, currency = None))]
     #[pyo3(
-        text_signature = "(id, notional, coupon_rate, issue_date, maturity, stub, discount_curve_id, *, convention=None, currency=None)"
+        text_signature = "(id, notional, coupon_rate, issue_date, maturity, stub, discount_curve_id, *, currency=None)"
     )]
     // PyO3 binding: the argument list mirrors the Python keyword-argument API.
     #[allow(clippy::too_many_arguments)]
@@ -421,44 +424,65 @@ impl PyBond {
         maturity: &Bound<'_, PyAny>,
         stub: &Bound<'_, PyAny>,
         discount_curve_id: &str,
-        convention: Option<&str>,
         currency: Option<&str>,
     ) -> PyResult<Self> {
-        let notional = money_from_py(notional, currency, "notional")?;
-        let coupon_rate = rate_from_py(coupon_rate, "coupon_rate")?;
-        let stub = stub_kind_from_py(Some(stub), "stub")?;
-        let issue_date = extract_date(issue_date)?;
-        let maturity = extract_date(maturity)?;
-        let inner = match convention {
-            None => finstack_quant_valuations::instruments::Bond::fixed(
-                id,
-                notional,
-                coupon_rate,
-                issue_date,
-                maturity,
-                stub,
-                discount_curve_id,
-            )
-            .map_err(core_to_py)?,
-            Some(name) => finstack_quant_valuations::instruments::Bond::with_convention(
-                id,
-                notional,
-                coupon_rate,
-                issue_date,
-                maturity,
-                bond_convention_from_str(name)?,
-                discount_curve_id,
-            )
-            .map_err(core_to_py)?
-            .with_stub(stub),
-        };
+        let inner = finstack_quant_valuations::instruments::Bond::fixed(
+            id,
+            money_from_py(notional, currency, "notional")?,
+            rate_from_py(coupon_rate, "coupon_rate")?,
+            extract_date(issue_date)?,
+            extract_date(maturity)?,
+            stub_kind_from_py(Some(stub), "stub")?,
+            discount_curve_id,
+        )
+        .map_err(core_to_py)?;
         Ok(Self { inner })
+    }
+
+    /// Return a copy of this bond with a different coupon-schedule stub rule.
+    ///
+    /// Mirrors Rust ``Bond::with_stub``; the receiver is not modified.
+    ///
+    /// Parameters
+    /// ----------
+    /// stub : StubKind | str
+    ///     Placement and length policy for an irregular coupon period
+    ///     (``"none"``, ``"short_front"``, ``"long_front"``, ``"short_back"``,
+    ///     ``"long_back"`` or a ``StubKind``).
+    ///
+    /// Returns
+    /// -------
+    /// Bond
+    ///     A new bond whose coupon schedule uses ``stub``.
+    ///
+    /// Raises
+    /// ------
+    /// ValueError
+    ///     If ``stub`` is not a recognized stub name.
+    ///
+    /// Examples
+    /// --------
+    /// >>> from finstack_quant.valuations.instruments import Bond
+    /// >>> gilt = Bond.with_convention(
+    /// ...     "GILT", 1_000_000.0, 0.04, "2024-01-15", "2034-03-07", "uk_gilt", "GBP-SONIA",
+    /// ...     currency="GBP",
+    /// ... ).with_stub("long_back")
+    /// >>> gilt.to_dict()["cashflow_spec"]["fixed"]["stub"]
+    /// 'long_back'
+    #[pyo3(text_signature = "($self, stub)")]
+    fn with_stub(&self, stub: &Bound<'_, PyAny>) -> PyResult<Self> {
+        Ok(Self {
+            inner: self
+                .inner
+                .clone()
+                .with_stub(stub_kind_from_py(Some(stub), "stub")?),
+        })
     }
 
     /// Create a fixed-rate bond from a named market convention.
     ///
     /// Mirrors Rust ``Bond::with_convention``; the stub rule is the preset's
-    /// own (use ``Bond.fixed(..., convention=...)`` to override it).
+    /// own (chain ``.with_stub(...)`` to override it).
     ///
     /// Parameters
     /// ----------
@@ -552,8 +576,8 @@ impl PyBond {
     /// forward_curve_id : str
     ///     Forward curve identifier (e.g. ``"USD-SOFR-3M"``).
     /// spread_bp : float | Bps
-    ///     Spread over the index in whole basis points (fractions are
-    ///     rounded).
+    ///     Spread over the index in whole basis points; fractional values
+    ///     raise ``ValueError`` (use ``Bond.from_json`` for sub-bp margins).
     /// issue_date : datetime.date | datetime.datetime | pandas.Timestamp | str
     ///     Issue date.
     /// maturity : datetime.date | datetime.datetime | pandas.Timestamp | str
@@ -576,7 +600,8 @@ impl PyBond {
     /// ------
     /// ValueError
     ///     If the notional currency has no mapped settlement convention,
-    ///     ``notional`` is not finite and positive, or ``issue_date`` is not
+    ///     ``notional`` is not finite and positive, ``spread_bp`` is not a
+    ///     finite whole number of basis points, or ``issue_date`` is not
     ///     strictly before ``maturity``.
     /// TypeError
     ///     If ``spread_bp``/``notional`` has an unsupported type or a date
@@ -639,8 +664,8 @@ impl PyBond {
     /// forward_curve_id : str
     ///     Forward curve identifier (e.g. ``"USD-SOFR-3M"``).
     /// spread_bp : float | Bps
-    ///     Spread over the index in whole basis points (fractions are
-    ///     rounded).
+    ///     Spread over the index in whole basis points; fractional values
+    ///     raise ``ValueError`` (use ``Bond.from_json`` for sub-bp margins).
     /// issue_date : datetime.date | datetime.datetime | pandas.Timestamp | str
     ///     Issue date.
     /// maturity : datetime.date | datetime.datetime | pandas.Timestamp | str
@@ -665,7 +690,8 @@ impl PyBond {
     /// ------
     /// ValueError
     ///     If ``convention`` is unknown, a bare ``notional`` has no
-    ///     ``currency``, or validation fails.
+    ///     ``currency``, ``spread_bp`` is not a finite whole number of basis
+    ///     points, or validation fails.
     /// TypeError
     ///     If ``spread_bp``/``notional`` has an unsupported type or a date
     ///     cannot be interpreted.
@@ -918,12 +944,7 @@ impl PyBond {
     #[staticmethod]
     #[pyo3(text_signature = "(json)")]
     fn from_json(json: &str) -> PyResult<Self> {
-        match parse_typed_instrument_json(json)? {
-            InstrumentJson::Bond(inner) => Ok(Self { inner }),
-            _ => Err(value_error(
-                "expected instrument type \"bond\", got a different instrument type",
-            )),
-        }
+        parse_typed_instrument_json(json).map(|inner| Self { inner })
     }
 
     /// Serialize to a canonical ``finstack_quant.instrument/1`` envelope.
@@ -1811,12 +1832,7 @@ impl PyTermLoan {
     #[staticmethod]
     #[pyo3(text_signature = "(json)")]
     fn from_json(json: &str) -> PyResult<Self> {
-        match parse_typed_instrument_json(json)? {
-            InstrumentJson::TermLoan(inner) => Ok(Self { inner }),
-            _ => Err(value_error(
-                "expected instrument type \"term_loan\", got a different instrument type",
-            )),
-        }
+        parse_typed_instrument_json(json).map(|inner| Self { inner })
     }
 
     /// Canonical example term loan (mirrors Rust ``TermLoan::example``).

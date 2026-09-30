@@ -92,7 +92,56 @@ test('Bond.fixed constructs, round-trips through the canonical envelope', () => 
 test('Bond.fromJson rejects malformed JSON and wrong instrument types', () => {
   assert.throws(() => valuations.instruments.Bond.fromJson('{not valid json'));
   const loanJson = valuations.instruments.TermLoan.example().toJson();
-  assert.throws(() => valuations.instruments.Bond.fromJson(loanJson));
+  assert.throws(
+    () => valuations.instruments.Bond.fromJson(loanJson),
+    (error) => {
+      assert.equal(error.kind, 'validation');
+      assert.match(error.message, /expected instrument type `bond`, got `term_loan`/);
+      return true;
+    }
+  );
+});
+
+test('Bond.withConvention applies a preset and withStub overrides its stub', () => {
+  const gbp = new core.Currency('GBP');
+  const gilt = valuations.instruments.Bond.withConvention(
+    'GILT-1',
+    new core.Money(1_000_000, gbp),
+    new core.Rate(0.04),
+    '2024-01-15',
+    '2034-03-07',
+    'uk_gilt',
+    'GBP-SONIA'
+  );
+  const presetSpec = JSON.parse(gilt.toJson()).instrument.spec;
+  const longBack = gilt.withStub('long_back');
+  const spec = JSON.parse(longBack.toJson()).instrument.spec;
+  assert.equal(spec.cashflow_spec.fixed.stub, 'long_back');
+  // Only the stub changes; the receiver keeps the preset's stub.
+  assert.equal(
+    JSON.parse(gilt.toJson()).instrument.spec.cashflow_spec.fixed.stub,
+    presetSpec.cashflow_spec.fixed.stub
+  );
+  delete spec.cashflow_spec.fixed.stub;
+  delete presetSpec.cashflow_spec.fixed.stub;
+  assert.deepEqual(spec, presetSpec);
+  assert.throws(
+    () => gilt.withStub('not_a_stub'),
+    (error) => error.kind === 'validation'
+  );
+  assert.throws(
+    () =>
+      valuations.instruments.Bond.withConvention(
+        'BAD',
+        new core.Money(1_000_000, gbp),
+        new core.Rate(0.04),
+        '2024-01-15',
+        '2034-03-07',
+        'not_a_convention',
+        'GBP-SONIA'
+      ),
+    (error) => error.kind === 'validation'
+  );
 });
 
 test('TermLoan.example round-trips through the canonical envelope', () => {
@@ -247,6 +296,13 @@ test('metricMetadata returns ordered native interpretation for canonical keys', 
     },
   ]);
   assert.deepEqual(valuations.instruments.metricMetadata([]), []);
+  // The Bermudan exercise statistic is a standard years metric, not a
+  // mislabelled custom "exercise_probability".
+  const [exercise] = valuations.instruments.metricMetadata(['expected_exercise_time']);
+  assert.equal(exercise.unit, 'years');
+  assert.equal(exercise.group, 'Rates');
+  assert.ok(valuations.instruments.listStandardMetrics().includes('expected_exercise_time'));
+  assert.ok(!valuations.instruments.listStandardMetrics().includes('exercise_probability'));
   assert.throws(
     () => valuations.instruments.metricMetadata(['pv01::USD_x2dOIS']),
     (error) => error.name === 'FinstackError' && error.kind === 'validation'

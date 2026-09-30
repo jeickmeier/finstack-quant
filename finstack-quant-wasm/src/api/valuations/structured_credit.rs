@@ -15,19 +15,11 @@ use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
     calculate_tranche_breakeven_cdr, calculate_tranche_discount_margin, calculate_tranche_metrics,
     calculate_tranche_oas, scenario_table, OasConfig, ScenarioGrid, StructuredCredit,
 };
-use finstack_quant_valuations::instruments::InstrumentJson;
 use wasm_bindgen::prelude::*;
 
 fn parse_structured_credit(instrument_json: &str) -> Result<StructuredCredit, JsValue> {
-    match finstack_quant_valuations::pricer::json::parse_instrument_from_json(instrument_json)
-        .map_err(to_js_err)?
-    {
-        InstrumentJson::StructuredCredit(deal) => Ok(*deal),
-        other => Err(to_js_err(finstack_quant_core::Error::Validation(format!(
-            "expected a structured_credit instrument, got {}",
-            other.type_tag()
-        )))),
-    }
+    finstack_quant_valuations::pricer::parse_typed_instrument_json(instrument_json)
+        .map_err(to_js_err)
 }
 
 /// Decode a JSON host argument into its typed Rust input.

@@ -23,7 +23,7 @@ it("validates all nine variants against the generated contract and native Market
   const native = createRequire(import.meta.url)(
     "../../../finstack-quant-wasm/pkg-node/finstack_quant_wasm.js",
   );
-  const market = new native.Market(JSON.stringify(fixture));
+  const market = native.MarketContext.fromJson(JSON.stringify(fixture));
   try {
     expect(JSON.parse(market.toJson())).toEqual(fixture);
   } finally {

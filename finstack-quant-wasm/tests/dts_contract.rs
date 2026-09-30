@@ -453,6 +453,20 @@ fn valuations_dts_exposes_direct_fx_instruments() {
     ));
     // Every FX class carries an `id` getter, mirroring the Python typed
     // wrappers' `id` property.
+    // Touch (and, by inheritance, barrier) options expose theta: the Rust
+    // metric registry computes it for both.
+    let bond = interface_block(&dts, "Bond ");
+    assert!(contains_signature(
+        bond,
+        "withStub(stub: 'none' | 'short_front' | 'short_back' | 'long_front' | 'long_back'): Bond;"
+    ));
+    let bond_ctor = interface_block(&dts, "BondConstructor");
+    assert!(contains_ignoring_ws(bond_ctor, "withConvention(id: string, notional: Money, couponRate: Rate, issueDate: string, maturity: string, convention:"));
+    let touch = interface_block(&dts, "FxTouchOptionInstrument");
+    assert!(contains_signature(
+        touch,
+        "theta(marketJson: JsonInput, asOf: string, model?: string | null): number;"
+    ));
     let fx_instrument = interface_block(&dts, "FxInstrument");
     assert!(fx_instrument.contains("readonly id: string;"));
     assert!(contains_ignoring_ws(
@@ -465,14 +479,24 @@ fn valuations_dts_exposes_direct_fx_instruments() {
 fn valuations_dts_exposes_reusable_market_handle_pricing() {
     let dts = index_dts();
 
-    assert!(dts.contains("declare class Market {"));
+    let market = interface_block(&dts, "MarketContextConstructor");
+    assert!(contains_signature(
+        market,
+        "fromJson(json: JsonInput): MarketContext;"
+    ));
+    let core_ns = interface_block(&dts, "CoreNamespace");
+    assert!(contains_signature(
+        core_ns,
+        "MarketContext: MarketContextConstructor;"
+    ));
+    assert!(!interface_block(&dts, "ValuationsNamespace").contains("\n  Market:"));
     assert!(contains_ignoring_ws(
         &dts,
-        "priceInstrumentWithMarket(instrumentJson: JsonInput, market: Market, asOf: string, model: string, metrics?: string[] | null, metricPricingOverrides?: JsonInput | null, marketHistory?: JsonInput | null): ValuationResult;",
+        "priceInstrumentWithMarket(instrumentJson: JsonInput, market: MarketContext, asOf: string, model?: string | null, metrics?: string[] | null, metricPricingOverrides?: JsonInput | null, marketHistory?: JsonInput | null): ValuationResult;",
     ));
     assert!(contains_ignoring_ws(
         &dts,
-        "instrumentCashflowsWithMarketJson(instrumentJson: JsonInput, market: Market, asOf: string, model: string): string;",
+        "instrumentCashflowsWithMarketJson(instrumentJson: JsonInput, market: MarketContext, asOf: string, model: string): string;",
     ));
 }
 
@@ -864,6 +888,7 @@ fn dts_documents_wasm_owned_handles_and_dispose_contract() {
         "ForwardCurve ",
         "VolCube ",
         "FxDeltaVolSurface ",
+        "MarketContext ",
         "FxMatrix ",
     ] {
         let block = interface_block(&dts, interface_name);
@@ -883,7 +908,6 @@ fn dts_documents_wasm_owned_handles_and_dispose_contract() {
         "LevelsAtDate",
         "PeriodDecomposition",
         "FactorCovarianceForecast",
-        "Market",
         "Portfolio",
     ] {
         assert!(

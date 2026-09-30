@@ -60,7 +60,7 @@ beforeEach(() => {
       case "validate":
         return native.validateInstrumentJson(request);
       case "validateMarket": {
-        const market = new native.Market(request);
+        const market = native.MarketContext.fromJson(request);
         try {
           return market.toJson();
         } finally {
@@ -114,7 +114,7 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 const canonicalMarket = (json: string) => {
-  const market = new native.Market(json);
+  const market = native.MarketContext.fromJson(json);
   try {
     return market.toJson();
   } finally {

@@ -13,7 +13,6 @@ const ownedClasses = [
   'LevelsAtDate',
   'PeriodDecomposition',
   'FactorCovarianceForecast',
-  'Market',
   'Portfolio',
 ];
 

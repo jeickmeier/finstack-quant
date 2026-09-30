@@ -754,11 +754,11 @@ impl Pricer for BermudanSwaptionPricer {
         config.hw1f_mean_reversion = Some(params.kappa);
         config.hw1f_sigma = Some(params.sigma);
         config.tree_steps = Some(steps);
-        let exercise_metric = crate::metrics::MetricId::custom("exercise_probability");
+        let exercise_metric = crate::metrics::MetricId::ExpectedExerciseTime;
         if metrics.contains(&exercise_metric) {
             if self.method != BermudanPricingMethod::HullWhiteTree {
                 return Err(finstack_quant_core::Error::Validation(
-                    "exercise_probability requires the Hull-White tree exercise policy".into(),
+                    "expected_exercise_time requires the Hull-White tree exercise policy".into(),
                 ));
             }
             let disc = context

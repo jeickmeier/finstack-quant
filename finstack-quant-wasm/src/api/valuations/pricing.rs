@@ -5,7 +5,7 @@
 //!
 //! # Monte-Carlo determinism
 //!
-//! `priceInstrument` (and its `Market` variant) accept Monte-Carlo models
+//! `priceInstrument` (and its `MarketContext`-handle variant) accept Monte-Carlo models
 //! (e.g. `monte_carlo_gbm`,
 //! `monte_carlo_hull_white_1f`). These bindings deliberately expose **no**
 //! explicit RNG-seed parameter: the seed is part of the *instrument*
@@ -21,7 +21,7 @@
 //! that label inside the instrument JSON. This contract is verified by
 //! `tests::price_instrument_mc_is_deterministic_without_explicit_seed`.
 
-use super::market_handle::JsMarket;
+use crate::api::core::market_context::JsMarketContext;
 use crate::utils::input::{
     from_js_json, js_opt_f64, js_opt_string, js_opt_string_seq, js_string, js_string_seq,
     json_text, opt_json_text,
@@ -553,9 +553,9 @@ pub fn listed_product_catalog(exchange: Option<JsValue>) -> Result<JsValue, JsVa
     to_js_value(&rows)
 }
 
-// JsMarket overloads — parse market once, reuse across pricing calls
+// MarketContext-handle overloads — parse market once, reuse across pricing calls
 
-/// Price an instrument using a pre-parsed [`JsMarket`].
+/// Price an instrument using a pre-parsed `MarketContext` handle.
 ///
 /// Avoids the per-call market-parse overhead of `priceInstrument`. Returns the
 /// same plain JavaScript ValuationResult object. For bonds, `"discounting"`
@@ -566,9 +566,9 @@ pub fn listed_product_catalog(exchange: Option<JsValue>) -> Result<JsValue, JsVa
 /// `result.details`. Their `seed` is a lossless JavaScript `BigInt`; serialize
 /// such results with `valuationResultToJson`.
 /// @param instrument_json - Canonical instrument envelope JSON in the Finstack v1 schema.
-/// @param market - Pre-parsed `Market` handle supplying curves, quotes, and FX data for this call.
+/// @param market - Pre-parsed `core.MarketContext` handle supplying curves, quotes, and FX data for this call.
 /// @param as_of - ISO-8601 valuation date used to resolve date-dependent market data.
-/// @param model - Pricing-model identifier; use `"default"` for the instrument-native model when supported.
+/// @param model - Optional pricing-model identifier; omit, `null`, or `"default"` for the instrument-native model.
 /// @param metrics - Optional canonical metric IDs such as `"ytm"`, `"dv01"`,
 /// `"hvar"`, or `"expected_shortfall"`. Omit, `null`, or `undefined` for a
 /// valuation-only result.
@@ -590,16 +590,16 @@ pub fn listed_product_catalog(exchange: Option<JsValue>) -> Result<JsValue, JsVa
 #[wasm_bindgen(js_name = priceInstrumentWithMarket)]
 pub fn price_instrument_with_market(
     instrument_json: JsValue,
-    market: &JsMarket,
+    market: &JsMarketContext,
     as_of: JsValue,
-    model: JsValue,
+    model: Option<JsValue>,
     metrics: Option<JsValue>,
     metric_pricing_overrides: Option<JsValue>,
     market_history: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
     let instrument_json: &str = &json_text(&instrument_json, "instrumentJson")?;
     let as_of: &str = &js_string(&as_of, "asOf")?;
-    let model: &str = &js_string(&model, "model")?;
+    let model = js_opt_string(model.as_ref(), "model")?;
     let metric_pricing_overrides =
         opt_json_text(metric_pricing_overrides.as_ref(), "metricPricingOverrides")?;
     let market_history = opt_json_text(market_history.as_ref(), "marketHistory")?;
@@ -610,18 +610,18 @@ pub fn price_instrument_with_market(
         &instrument,
         market.inner(),
         as_of,
-        model,
+        model.as_deref().unwrap_or("default"),
         metric_strs,
         market_history.as_deref(),
     )?;
     valuation_result_value(&result)
 }
 
-/// Per-flow cashflow envelope using a pre-parsed [`JsMarket`]. Hazard-rate
+/// Per-flow cashflow envelope using a pre-parsed `MarketContext` handle. Hazard-rate
 /// export rejects bonds with call, put, or return-floor rights because static
 /// rows cannot represent exercise-contingent value.
 /// @param instrument_json - Canonical instrument envelope JSON in the Finstack v1 schema.
-/// @param market - Market context or JSON payload supplying curves, quotes, and FX data.
+/// @param market - Pre-parsed `core.MarketContext` handle supplying curves, quotes, and FX data.
 /// @param as_of - ISO-8601 valuation date used to resolve date-dependent market data.
 /// @param model - Must be `"discounting"` or `"hazard_rate"`; `"default"` is not accepted.
 ///
@@ -635,7 +635,7 @@ pub fn price_instrument_with_market(
 #[wasm_bindgen(js_name = instrumentCashflowsWithMarketJson)]
 pub fn instrument_cashflows_with_market_json(
     instrument_json: JsValue,
-    market: &JsMarket,
+    market: &JsMarketContext,
     as_of: JsValue,
     model: JsValue,
 ) -> Result<String, JsValue> {

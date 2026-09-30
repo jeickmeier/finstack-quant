@@ -19,7 +19,6 @@ use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
     calculate_tranche_oas, scenario_table, OasConfig, OasResult, ScenarioGrid, ScenarioTable,
     StructuredCredit, TrancheMetrics,
 };
-use finstack_quant_valuations::instruments::InstrumentJson;
 use pyo3::prelude::*;
 use pyo3::types::PyModule;
 use std::collections::BTreeMap;
@@ -42,14 +41,9 @@ fn extract_structured_credit(
 ) -> PyResult<StructuredCredit> {
     let instrument_json = extract_instrument_json(instrument)?;
     py.detach(move || {
-        match finstack_quant_valuations::pricer::json::parse_instrument_from_json(&instrument_json)?
-        {
-            InstrumentJson::StructuredCredit(deal) => Ok(*deal),
-            other => Err(finstack_quant_core::Error::Validation(format!(
-                "expected a structured_credit instrument, got {}",
-                other.type_tag()
-            ))),
-        }
+        finstack_quant_valuations::pricer::parse_typed_instrument_json::<StructuredCredit>(
+            &instrument_json,
+        )
     })
     .map_err(core_to_py)
 }

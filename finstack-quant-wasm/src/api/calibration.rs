@@ -157,7 +157,7 @@ pub fn dry_run_json(envelope_json: JsValue) -> Result<String, JsValue> {
 #[wasm_bindgen(js_name = calibrateBermudanLmmBaseVol)]
 pub fn calibrate_bermudan_lmm_base_vol(
     instrument_json: JsValue,
-    market: &crate::api::valuations::market_handle::JsMarket,
+    market: &crate::api::core::market_context::JsMarketContext,
     as_of: JsValue,
 ) -> Result<f64, JsValue> {
     let instrument_json: &str = &json_text(&instrument_json, "instrumentJson")?;

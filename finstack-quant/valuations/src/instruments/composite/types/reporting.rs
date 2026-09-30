@@ -27,14 +27,47 @@ pub struct CompositeTrade {
 }
 
 /// Result of resolving a new composite holdings state.
+///
+/// On the wire, `instrument` is the canonical `finstack_quant.instrument/1`
+/// envelope, so it can be passed straight back to any composite or pricing
+/// entry point that takes an instrument envelope.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct CompositeRebalanceResult {
-    /// Newly resolved, immutable, priceable composite.
+    /// Newly resolved, immutable, priceable composite, serialized as its
+    /// canonical instrument envelope.
+    #[serde(with = "composite_envelope")]
+    #[cfg_attr(feature = "json-schema", schemars(with = "InstrumentEnvelope"))]
     pub instrument: CompositeInstrument,
     /// Net primitive execution deltas required to reach the new state.
     pub trades: Vec<CompositeTrade>,
+}
+
+/// Serde adapter writing a [`CompositeInstrument`] as its canonical
+/// instrument envelope and reading it back through the validating loader.
+mod composite_envelope {
+    use super::CompositeInstrument;
+    use crate::instruments::{InstrumentEnvelope, InstrumentJson};
+    use serde::{Deserialize, Deserializer, Serialize, Serializer};
+
+    pub(super) fn serialize<S: Serializer>(
+        instrument: &CompositeInstrument,
+        serializer: S,
+    ) -> std::result::Result<S::Ok, S::Error> {
+        InstrumentEnvelope::new(InstrumentJson::from(instrument.clone())).serialize(serializer)
+    }
+
+    pub(super) fn deserialize<'de, D: Deserializer<'de>>(
+        deserializer: D,
+    ) -> std::result::Result<CompositeInstrument, D::Error> {
+        let envelope = InstrumentEnvelope::deserialize(deserializer)?;
+        envelope
+            .instrument
+            .validate_for_pricing()
+            .map_err(serde::de::Error::custom)?;
+        CompositeInstrument::try_from(envelope.instrument).map_err(serde::de::Error::custom)
+    }
 }
 
 /// Path-level primitive exposure in a resolved composite tree.

@@ -624,6 +624,67 @@ pub(crate) fn instrument_json_from_any(value: &dyn std::any::Any) -> Option<Inst
     with_instrument_json_registry!(instrument_json_from_any_match, value)
 }
 
+/// Error for a payload whose `type` is not the one the caller asked for.
+///
+/// Shared by every generated `TryFrom<InstrumentJson>` impl, so each typed
+/// entry point reports the same message.
+pub(crate) fn instrument_type_mismatch(expected: &str, actual: &str) -> finstack_quant_core::Error {
+    finstack_quant_core::Error::Validation(format!(
+        "expected instrument type `{expected}`, got `{actual}`"
+    ))
+}
+
+macro_rules! instrument_json_conversions {
+    (
+        []
+        $(plain: $variant:ident($ty:ty) => $tag:literal @ $category:literal = $example:expr;)*
+        $(boxed: $boxed_variant:ident($boxed_ty:ty) => $boxed_tag:literal @ $boxed_category:literal = $boxed_example:expr;)*
+    ) => {
+        $(
+            impl From<$ty> for InstrumentJson {
+                fn from(instrument: $ty) -> Self {
+                    Self::$variant(instrument)
+                }
+            }
+
+            impl TryFrom<InstrumentJson> for $ty {
+                type Error = finstack_quant_core::Error;
+
+                /// Extract the concrete payload, rejecting any other `type`
+                /// with `Error::Validation`.
+                fn try_from(instrument: InstrumentJson) -> Result<Self> {
+                    match instrument {
+                        InstrumentJson::$variant(inner) => Ok(inner),
+                        other => Err(instrument_type_mismatch($tag, other.type_tag())),
+                    }
+                }
+            }
+        )*
+        $(
+            impl From<$boxed_ty> for InstrumentJson {
+                fn from(instrument: $boxed_ty) -> Self {
+                    Self::$boxed_variant(Box::new(instrument))
+                }
+            }
+
+            impl TryFrom<InstrumentJson> for $boxed_ty {
+                type Error = finstack_quant_core::Error;
+
+                /// Extract the concrete payload, rejecting any other `type`
+                /// with `Error::Validation`.
+                fn try_from(instrument: InstrumentJson) -> Result<Self> {
+                    match instrument {
+                        InstrumentJson::$boxed_variant(inner) => Ok(*inner),
+                        other => Err(instrument_type_mismatch($boxed_tag, other.type_tag())),
+                    }
+                }
+            }
+        )*
+    };
+}
+
+with_instrument_json_registry!(instrument_json_conversions);
+
 macro_rules! instrument_json_type_tag_match {
     (
         [$value:expr]

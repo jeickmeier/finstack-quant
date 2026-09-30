@@ -155,12 +155,7 @@ impl PyAssetBackedFacility {
     #[staticmethod]
     #[pyo3(text_signature = "(json)")]
     fn from_json(json: &str) -> PyResult<Self> {
-        match parse_typed_instrument_json(json)? {
-            InstrumentJson::AssetBackedFacility(inner) => Ok(Self { inner: *inner }),
-            _ => Err(value_error(
-                "expected instrument type \"asset_backed_facility\", got a different instrument type",
-            )),
-        }
+        parse_typed_instrument_json(json).map(|inner| Self { inner })
     }
 
     /// Serialize to the canonical instrument envelope.

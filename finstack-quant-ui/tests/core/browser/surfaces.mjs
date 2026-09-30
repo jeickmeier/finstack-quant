@@ -62,7 +62,7 @@ try {
   const bond = JSON.parse(
     await readFile(path.join(root, "src/fixtures/results/bond.json"), "utf8"),
   );
-  const market = new native.Market(
+  const market = native.MarketContext.fromJson(
     JSON.stringify({
       ...JSON.parse(bond.request.marketJson),
       surfaces: [stored, normal, large],

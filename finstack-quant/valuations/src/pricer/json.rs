@@ -86,6 +86,50 @@ pub fn parse_instrument_from_json(json: &str) -> finstack_quant_core::Result<Ins
     Ok(instrument)
 }
 
+/// Build and validate an instrument payload from a bare spec object.
+///
+/// # Arguments
+///
+/// * `type_tag` - Canonical instrument discriminator expected by the caller's
+///   API route, such as `"fx_option"`.
+/// * `spec` - Bare instrument spec object for `type_tag`. Tagged payloads and
+///   envelopes are rejected.
+///
+/// # Returns
+///
+/// The tagged [`InstrumentJson`] payload after type-specific deserialization
+/// and validation has succeeded. Convert it to the concrete Rust type with
+/// `TryFrom`.
+///
+/// # Errors
+///
+/// Returns `Error::Validation` when `spec` is not a bare object, does not
+/// deserialize as a `type_tag` instrument, or fails instrument validation.
+pub fn instrument_from_spec(
+    type_tag: &str,
+    spec: Value,
+) -> finstack_quant_core::Result<InstrumentJson> {
+    let object = spec.as_object().ok_or_else(|| {
+        Error::Validation("instrument constructor requires a bare spec object".to_string())
+    })?;
+    if (object.contains_key("type") && object.contains_key("spec"))
+        || (object.contains_key("schema") && object.contains_key("instrument"))
+    {
+        return Err(Error::Validation(
+            "instrument constructor requires a bare spec object, not a tagged payload or envelope"
+                .to_string(),
+        ));
+    }
+
+    let instrument: InstrumentJson = serde_json::from_value(serde_json::json!({
+        "type": type_tag,
+        "spec": spec,
+    }))
+    .map_err(|error| Error::Validation(format!("invalid {type_tag} instrument spec: {error}")))?;
+    instrument.validate_for_pricing()?;
+    Ok(instrument)
+}
+
 /// Build and validate a canonical instrument envelope from a bare spec object.
 ///
 /// # Arguments
@@ -108,26 +152,33 @@ pub fn instrument_envelope_from_spec(
     type_tag: &str,
     spec: Value,
 ) -> finstack_quant_core::Result<String> {
-    let object = spec.as_object().ok_or_else(|| {
-        Error::Validation("instrument constructor requires a bare spec object".to_string())
-    })?;
-    if (object.contains_key("type") && object.contains_key("spec"))
-        || (object.contains_key("schema") && object.contains_key("instrument"))
-    {
-        return Err(Error::Validation(
-            "instrument constructor requires a bare spec object, not a tagged payload or envelope"
-                .to_string(),
-        ));
-    }
-
-    let instrument: InstrumentJson = serde_json::from_value(serde_json::json!({
-        "type": type_tag,
-        "spec": spec,
-    }))
-    .map_err(|error| Error::Validation(format!("invalid {type_tag} instrument spec: {error}")))?;
-    instrument.validate_for_pricing()?;
+    let instrument = instrument_from_spec(type_tag, spec)?;
     serde_json::to_string(&InstrumentEnvelope::new(instrument))
         .map_err(|error| Error::Validation(format!("invalid instrument JSON: {error}")))
+}
+
+/// Parse a canonical envelope into one concrete instrument type.
+///
+/// This is the typed twin of [`validate_typed_instrument_json`]: the envelope
+/// is parsed and validated by [`parse_instrument_from_json`], then converted
+/// with the registry-generated `TryFrom<InstrumentJson>` impl of `T`.
+///
+/// # Arguments
+///
+/// * `json` - Required canonical v1 instrument envelope whose `type` must be
+///   the discriminator of `T` (for example `"bond"` for
+///   [`crate::instruments::Bond`]).
+///
+/// # Errors
+///
+/// Returns `Error::Validation` when `json` is malformed, fails instrument
+/// validation, or carries another instrument type
+/// (``expected instrument type `bond`, got `term_loan` ``).
+pub fn parse_typed_instrument_json<T>(json: &str) -> finstack_quant_core::Result<T>
+where
+    T: TryFrom<InstrumentJson, Error = Error>,
+{
+    T::try_from(parse_instrument_from_json(json)?)
 }
 
 /// Validate a canonical envelope for one exact instrument type.
@@ -148,9 +199,9 @@ pub fn validate_typed_instrument_json(
     let instrument = parse_instrument_from_json(json)?;
     let actual = instrument.type_tag();
     if actual != type_tag {
-        return Err(Error::Validation(format!(
-            "expected instrument type `{type_tag}`, got `{actual}`"
-        )));
+        return Err(crate::instruments::json_loader::instrument_type_mismatch(
+            type_tag, actual,
+        ));
     }
     serde_json::to_string(&InstrumentEnvelope::new(instrument))
         .map_err(|error| Error::Validation(format!("invalid instrument JSON: {error}")))
@@ -889,6 +940,21 @@ mod tests {
             .expect("canonical fx spot");
         let err = validate_typed_instrument_json("fx_forward", &fx_spot)
             .expect_err("wrong envelope type should be rejected");
+        assert!(err
+            .to_string()
+            .contains("expected instrument type `fx_forward`, got `fx_spot`"));
+    }
+
+    #[test]
+    fn parse_typed_instrument_json_returns_the_concrete_type() {
+        let fx_spot = instrument_envelope_from_spec("fx_spot", fx_spot_spec_value())
+            .expect("canonical fx spot");
+        let spot: crate::instruments::FxSpot =
+            parse_typed_instrument_json(&fx_spot).expect("typed fx spot");
+        assert_eq!(spot.id.as_str(), "EURUSD-SPOT");
+        let err = parse_typed_instrument_json::<crate::instruments::FxForward>(&fx_spot)
+            .expect_err("wrong envelope type should be rejected");
+        assert!(matches!(err, Error::Validation(_)));
         assert!(err
             .to_string()
             .contains("expected instrument type `fx_forward`, got `fx_spot`"));

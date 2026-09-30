@@ -123,6 +123,15 @@ impl MetricId {
     pub const FloatingFirstAccrualFactor: Self =
         Self(Cow::Borrowed("floating_first_accrual_factor"));
 
+    // Bermudan exercise
+
+    /// Expected exercise time of a Bermudan swaption, conditional on exercise.
+    ///
+    /// Units: years from the valuation date. Computed on the Hull-White tree as
+    /// `Σ tᵢ·pᵢ / Σ pᵢ`, where `pᵢ` is the probability of exercising at the
+    /// `i`-th exercise date; `0` when the swaption never exercises on the tree.
+    pub const ExpectedExerciseTime: Self = Self(Cow::Borrowed("expected_exercise_time"));
+
     // TRS Metrics
 
     /// Financing annuity for TRS

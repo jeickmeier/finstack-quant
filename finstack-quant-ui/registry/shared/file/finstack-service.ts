@@ -5,7 +5,7 @@ import type {
   calibration,
   statements,
   statements_analytics,
-  Market,
+  MarketContext,
 } from "finstack-quant-wasm";
 import { exportValuation } from "@/lib/finstack/host";
 import { serializeHost } from "@/lib/finstack/codec.mjs";
@@ -21,7 +21,11 @@ export function createService(native: {
   initialize: (wasmUrl?: string) => Promise<unknown>;
   core: Pick<
     typeof core,
-    "availableCalendars" | "FxDeltaVolSurface" | "Money" | "VolCube"
+    | "availableCalendars"
+    | "FxDeltaVolSurface"
+    | "MarketContext"
+    | "Money"
+    | "VolCube"
   >;
   models: {
     volatility: Pick<
@@ -55,11 +59,11 @@ export function createService(native: {
   >;
   valuations: Pick<
     typeof valuations,
-    "Market" | "instruments" | "validateValuationResultJson"
+    "instruments" | "validateValuationResultJson"
   >;
 }): WorkerApi {
   let ready: Promise<unknown> | undefined;
-  const markets = new Map<string, { json: string; handle: Market }>();
+  const markets = new Map<string, { json: string; handle: MarketContext }>();
   const initialize = (url?: string) =>
     (ready ??= Promise.resolve().then(() => native.initialize(url)));
   async function result<T>(
@@ -75,7 +79,7 @@ export function createService(native: {
   function market(json: string) {
     let entry = markets.get(json);
     if (!entry) {
-      const handle = new native.valuations.Market(json);
+      const handle = native.core.MarketContext.fromJson(json);
       let canonical: string;
       try {
         canonical = handle.toJson();

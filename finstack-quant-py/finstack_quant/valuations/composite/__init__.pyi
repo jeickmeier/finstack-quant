@@ -1327,7 +1327,9 @@ class CompositeRebalanceResult:
         Parameters
         ----------
         json : str
-            Strict JSON produced by :meth:`to_json`.
+            Strict JSON produced by :meth:`to_json` (or by the WASM
+            ``valuations.composite.initialize`` / ``rebalance``): ``instrument``
+            is the canonical ``finstack_quant.instrument/1`` composite envelope.
 
         Returns
         -------
@@ -1337,7 +1339,8 @@ class CompositeRebalanceResult:
         Raises
         ------
         ValueError
-            If JSON is malformed or the embedded composite state is invalid.
+            If JSON is malformed, the envelope is not a composite, or the
+            embedded composite state is invalid.
 
         Examples
         --------
@@ -1439,7 +1442,9 @@ class CompositeRebalanceResult:
         Returns
         -------
         str
-            JSON containing the resolved instrument data and primitive trades.
+            JSON ``{"instrument": <canonical composite instrument envelope>,
+            "trades": [...]}``; the same shape the WASM composite functions
+            return.
 
         Raises
         ------

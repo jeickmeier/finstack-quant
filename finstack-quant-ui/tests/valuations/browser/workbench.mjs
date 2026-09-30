@@ -192,7 +192,7 @@ try {
         await panel
           .getByRole("button", { name: "Use calibrated market", exact: true })
           .click();
-        const marketHandle = new native.Market(
+        const marketHandle = native.MarketContext.fromJson(
           JSON.stringify(value.result.final_market),
         );
         const expectedMarket = marketHandle.toJson();

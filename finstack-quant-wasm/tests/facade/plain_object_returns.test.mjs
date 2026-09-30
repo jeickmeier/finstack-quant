@@ -106,6 +106,20 @@ test('FxOption price and greeks return plain objects', () => {
   for (const [key, value] of entries) {
     assert.equal(typeof value, 'number', `greek ${key} is a number`);
   }
+  // Keys keep the Rust STANDARD_OPTION_GREEKS order (not alphabetical).
+  const standardOrder = ['delta', 'gamma', 'vega', 'theta', 'rho', 'foreign_rho', 'vanna', 'volga'];
+  assert.deepEqual(
+    Object.keys(greeks),
+    standardOrder.filter((key) => key in greeks),
+    'greeks keep the Rust STANDARD_OPTION_GREEKS order'
+  );
+
+  // toJson is the compact canonical envelope: byte-identical round trip.
+  const canonical = option.toJson();
+  assert.ok(!canonical.includes('\n'), 'toJson emits compact JSON');
+  assert.equal(JSON.parse(canonical).schema, 'finstack_quant.instrument/1');
+  assert.equal(wasm.FxOption.fromJson(canonical).toJson(), canonical);
+  assert.equal(option.id, fixture.instrument.instrument.spec.id);
 });
 
 test('SabrCalibrator surface: withTolerance, withShift, calibrate, params', () => {

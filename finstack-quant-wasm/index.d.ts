@@ -94,14 +94,13 @@ export type { PriorMarketObject } from './types/generated/PriorMarketObject';
 export type { CalibrationResult } from './types/generated/CalibrationResult';
 export type { CalibrationReport } from './types/generated/CalibrationReport';
 // wasm-bindgen handle classes are reached through their namespace (for example
-// `valuations.Market`); the package root exports their types only.
+// `valuations.instruments.Bond`); the package root exports their types only.
 export type {
   CreditCalibrator,
   CreditFactorModel,
   FactorCovarianceForecast,
   InstrumentArtifactCache,
   LevelsAtDate,
-  Market,
   Performance,
   PeriodDecomposition,
   Portfolio,
@@ -169,22 +168,6 @@ interface PeriodDecomposition extends WasmOwned {}
  * `VolHorizon::Custom` is intentionally **not** exposed.
  */
 interface FactorCovarianceForecast extends WasmOwned {}
-/**
- * Opaque handle wrapping a parsed [`MarketContext`].
- *
- * Construct once from JSON, then pass to `priceInstrumentWithMarket` and
- * other `*WithMarket` pricing entry points. Eliminates the per-call
- * market-parse overhead in bulk-pricing and Greeks-sweep loops.
- *
- * @example
- * ```javascript
- * const market = new valuations.Market(marketJson);
- * for (const instr of instruments) {
- *   const result = valuations.instruments.priceInstrumentWithMarket(instr, market, "2025-06-15", "default");
- * }
- * ```
- */
-interface Market extends WasmOwned {}
 /**
  * Handle to a built [`finstack_quant_portfolio::Portfolio`] that can be reused
  * across WASM calls without re-parsing and rebuilding from the spec.
@@ -1875,6 +1858,51 @@ export interface FxDeltaVolSurfaceConstructor {
 }
 
 /**
+ * Parsed Rust `MarketContext` held across pricing calls.
+ *
+ * Build it with `MarketContext.fromJson`, then pass it to
+ * `valuations.instruments.priceInstrumentWithMarket` and the other
+ * `*WithMarket` entry points. This avoids re-parsing the market JSON in
+ * bulk-pricing and Greeks-sweep loops. WASM binds only the JSON round trip;
+ * the Python class also exposes the insertion and lookup methods.
+ */
+export interface MarketContext extends WasmOwned {
+  /**
+   * Serialize the wrapped MarketContext back to canonical JSON.
+   * @returns Canonical MarketContext JSON accepted by `MarketContext.fromJson` and every `marketJson` argument.
+   * @throws Error - Throws if the market context cannot be serialized to JSON.
+   */
+  toJson(): string;
+}
+
+/**
+ * Static entry points of the `MarketContext` handle.
+ * @example
+ * ```typescript
+ * import init, { core, valuations } from "finstack-quant-wasm";
+ * await init();
+ * const market = core.MarketContext.fromJson(marketJson);
+ * for (const instr of instruments) {
+ *   const result = valuations.instruments.priceInstrumentWithMarket(instr, market, "2025-06-15");
+ * }
+ * market.free();
+ * ```
+ */
+export interface MarketContextConstructor {
+  /**
+   * JavaScript prototype of `MarketContext`; instances come from `fromJson`, not `new`.
+   */
+  readonly prototype: MarketContext;
+  /**
+   * Parse a market context from its canonical JSON representation.
+   * @param json - Canonical MarketContext JSON (string or plain object), the same payload accepted by pricing `marketJson` arguments. Unknown fields are rejected.
+   * @returns A `MarketContext` handle that can be reused across pricing calls; release it with free().
+   * @throws Error - Throws with kind `validation` when the JSON is malformed or does not match the MarketContext schema, and a `TypeError` when `json` is neither a string nor a plain object.
+   */
+  fromJson(json: JsonInput): MarketContext;
+}
+
+/**
  * Monte Carlo estimate of a money-valued price: the canonical serde form of the
  * Rust `MoneyEstimate` (identical to Python `MoneyEstimate.to_json()`).
  *
@@ -2249,6 +2277,10 @@ export interface CoreNamespace {
    * FX delta-quoted volatility surface constructor.
    */
   FxDeltaVolSurface: FxDeltaVolSurfaceConstructor;
+  /**
+   * Parsed market-context handle for reuse across `*WithMarket` calls.
+   */
+  MarketContext: MarketContextConstructor;
   /**
    * FX conversion timing-policy constructor.
    */
@@ -5298,38 +5330,6 @@ export declare const covenants: CovenantsNamespace;
 // --- valuations ------------------------------------------------------------
 
 /**
- * Opaque handle wrapping a parsed [`MarketContext`].
- *
- * Construct once from JSON, then pass to `priceInstrumentWithMarket` and
- * other `*WithMarket` pricing entry points. Eliminates the per-call
- * market-parse overhead in bulk-pricing and Greeks-sweep loops.
- *
- * @example
- * ```javascript
- * const market = new valuations.Market(marketJson);
- * for (const instr of instruments) {
- *   const result = valuations.instruments.priceInstrumentWithMarket(instr, market, "2025-06-15", "default");
- * }
- * ```
- */
-declare class Market {
-  /**
-   * Parse a MarketContext from its JSON representation.
-   *
-   * @param json - Canonical MarketContext JSON, the same payload accepted by pricing `marketJson` arguments.
-   * @returns A `Market` handle that can be reused across pricing calls.
-   * @throws If the JSON is malformed or does not match the MarketContext schema.
-   */
-  constructor(json: JsonInput);
-  /**
-   * Serialize the wrapped MarketContext back to JSON.
-   * @returns Canonical JSON string.
-   * @throws Error - Throws a JavaScript exception if the market context cannot be serialized to JSON.
-   */
-  toJson(): string;
-}
-
-/**
  * Typed bond instrument handle; serialize with `toJson()` for generic pricing entry points.
  *
  * Thin wrapper over the canonical Rust `Bond`. Serialize with `toJson()` and
@@ -5351,6 +5351,15 @@ export interface Bond extends WasmOwned {
    * @throws If serialization fails.
    */
   toJson(): string;
+  /**
+   * Return a copy of this bond with a different coupon-schedule stub rule.
+   *
+   * Mirrors Rust `Bond::with_stub`; the receiver is not modified.
+   * @param stub - Stub policy: `none`, `short_front`, `short_back`, `long_front`, or `long_back`.
+   * @returns A new bond whose coupon schedule uses `stub`.
+   * @throws Error - Throws with kind `validation` if `stub` is not a known stub policy.
+   */
+  withStub(stub: 'none' | 'short_front' | 'short_back' | 'long_front' | 'long_back'): Bond;
 }
 
 /**
@@ -5397,6 +5406,39 @@ export interface BondConstructor {
     issueDate: string,
     maturity: string,
     stub: 'none' | 'short_front' | 'short_back' | 'long_front' | 'long_back',
+    discountCurveId: string
+  ): Bond;
+  /**
+   * Create a fixed-rate bond from a named market convention preset.
+   *
+   * Mirrors Rust `Bond::with_convention`: frequency, day count, calendar,
+   * business-day convention, settlement lag and stub rule all come from the
+   * preset. Chain `withStub` to override the preset's stub rule.
+   * @param id - Unique instrument identifier.
+   * @param notional - Principal amount of the bond.
+   * @param couponRate - Annual coupon rate.
+   * @param issueDate - Issue date as an ISO-8601 string (`"YYYY-MM-DD"`).
+   * @param maturity - Maturity date as an ISO-8601 string (`"YYYY-MM-DD"`).
+   * @param convention - Bond convention preset: `us_treasury`, `us_agency`, `german_bund`, `uk_gilt`, `french_oat`, `jgb`, `us_corporate`, or `eur_corporate`.
+   * @param discountCurveId - Discount curve identifier used for pricing.
+   * @returns The validated fixed-rate bond.
+   * @throws Error - Throws with kind `validation` if `convention` is not a known preset, a date is malformed, or bond validation fails (e.g. maturity not after issue_date).
+   */
+  withConvention(
+    id: string,
+    notional: Money,
+    couponRate: Rate,
+    issueDate: string,
+    maturity: string,
+    convention:
+      | 'us_treasury'
+      | 'us_agency'
+      | 'german_bund'
+      | 'uk_gilt'
+      | 'french_oat'
+      | 'jgb'
+      | 'us_corporate'
+      | 'eur_corporate',
     discountCurveId: string
   ): Bond;
   /**
@@ -5952,7 +5994,7 @@ export interface ValuationInstrumentsNamespace {
     marketHistory?: JsonInput | null
   ): ValuationResult;
   /**
-   * Price an instrument using a pre-parsed [`Market`].
+   * Price an instrument using a pre-parsed `core.MarketContext` handle.
    *
    * Avoids the per-call market-parse overhead of `priceInstrument`.
    * For bonds, `"discounting"` is non-callable rates-only PV,
@@ -5963,9 +6005,9 @@ export interface ValuationInstrumentsNamespace {
    * Their `seed` is a lossless `bigint`; serialize such results with
    * `valuations.valuationResultToJson`.
    * @param instrumentJson - Canonical instrument envelope JSON in the Finstack v1 schema.
-   * @param market - Pre-parsed `Market` handle supplying curves, quotes, and FX data for this call.
+   * @param market - Pre-parsed `core.MarketContext` handle supplying curves, quotes, and FX data for this call.
    * @param asOf - ISO-8601 valuation date used to resolve date-dependent market data.
-   * @param model - Pricing-model identifier; use `"default"` for the instrument-native model when supported.
+   * @param model - Optional pricing-model identifier; omit, `null`, or `"default"` for the instrument-native model.
    * @param metrics - Optional canonical metric IDs such as `"ytm"`, `"dv01"`, `"hvar"`, or `"expected_shortfall"`. Omit, `null`, or `undefined` for a valuation-only result.
    * @param metricPricingOverrides - Optional JSON metric-pricing overrides merged into the envelope before validation. Omit, `null`, or `undefined` to use the envelope as-is.
    * @param marketHistory - Optional serialized market-history JSON required by historical risk metrics such as historical VaR.
@@ -5974,9 +6016,9 @@ export interface ValuationInstrumentsNamespace {
    */
   priceInstrumentWithMarket(
     instrumentJson: JsonInput,
-    market: Market,
+    market: MarketContext,
     asOf: string,
-    model: string,
+    model?: string | null,
     metrics?: string[] | null,
     metricPricingOverrides?: JsonInput | null,
     marketHistory?: JsonInput | null
@@ -6003,19 +6045,19 @@ export interface ValuationInstrumentsNamespace {
     model: string
   ): string;
   /**
-   * Per-flow cashflow envelope using a pre-parsed [`Market`]. Hazard-rate export
+   * Per-flow cashflow envelope using a pre-parsed `core.MarketContext` handle. Hazard-rate export
    * rejects bonds with call, put, or return-floor rights because static rows
    * cannot represent exercise-contingent value.
    * @returns Per-flow cashflow envelope JSON using the pre-parsed market.
    * @param instrumentJson - Canonical instrument envelope JSON in the Finstack v1 schema.
-   * @param market - Market context or JSON payload supplying curves, quotes, and FX data.
+   * @param market - Pre-parsed `core.MarketContext` handle supplying curves, quotes, and FX data.
    * @param asOf - ISO-8601 valuation date used to resolve date-dependent market data.
    * @param model - Must be `"discounting"` or `"hazard_rate"`; `"default"` is not accepted.
    * @throws Error - Throws a JavaScript exception if `instrumentJson` or `asOf` is invalid, `model` is unsupported or incompatible with the instrument, a bond with embedded exercise rights is requested under a static cashflow model, required curves are missing, the schedule mixes currencies, canonical pricing fails, or the cash-flow envelope cannot be serialized.
    */
   instrumentCashflowsWithMarketJson(
     instrumentJson: JsonInput,
-    market: Market,
+    market: MarketContext,
     asOf: string,
     model: string
   ): string;
@@ -6368,8 +6410,9 @@ export interface FxInstrument extends WasmOwned {
    */
   readonly id: string;
   /**
-   * Serialize this `FxInstrument` value to canonical JSON.
-   * @returns Canonical JSON instrument specification.
+   * Serialize to the canonical `finstack_quant.instrument/1` envelope.
+   * @returns Compact canonical instrument envelope, byte-identical to the Python `to_json()` of the same instrument and accepted by `fromJson` and `priceInstrument`.
+   * @throws Error - Throws a JavaScript exception if the instrument cannot be serialized.
    */
   toJson(): string;
   /**
@@ -6466,7 +6509,7 @@ export interface FxOptionInstrument extends FxInstrument {
    * @param marketJson - Canonical market-context JSON supplying curves, quotes, and FX data.
    * @param asOf - ISO-8601 valuation date used to select market inputs and date-dependent cashflows.
    * @param model - Optional pricing-model identifier; omit to use the instrument's default model.
-   * @returns Map of greek name to value, such as `delta`, `gamma`, and `vega`.
+   * @returns Map of greek name to value, keyed in the Rust `STANDARD_OPTION_GREEKS` order (`delta`, `gamma`, `vega`, `theta`, `rho`, …); only the Greeks that apply to the instrument are present.
    */
   greeks(marketJson: JsonInput, asOf: string, model?: string | null): Record<string, number>;
 }
@@ -6520,7 +6563,7 @@ export interface FxDigitalOptionInstrument extends FxInstrument {
    * @param marketJson - Canonical market-context JSON supplying curves, quotes, and FX data.
    * @param asOf - ISO-8601 valuation date used to select market inputs and date-dependent cashflows.
    * @param model - Optional pricing-model identifier; omit to use the instrument's default model.
-   * @returns Map of greek name to value, such as `delta`, `gamma`, and `vega`.
+   * @returns Map of greek name to value, keyed in the Rust `STANDARD_OPTION_GREEKS` order (`delta`, `gamma`, `vega`, `theta`, `rho`, …); only the Greeks that apply to the instrument are present.
    */
   greeks(marketJson: JsonInput, asOf: string, model?: string | null): Record<string, number>;
 }
@@ -6554,6 +6597,14 @@ export interface FxTouchOptionInstrument extends FxInstrument {
    */
   vega(marketJson: JsonInput, asOf: string, model?: string | null): number;
   /**
+   * Theta of the option under the selected model.
+   * @param marketJson - Canonical market-context JSON supplying curves, quotes, and FX data.
+   * @param asOf - ISO-8601 valuation date used to select market inputs and date-dependent cashflows.
+   * @param model - Optional pricing-model identifier; omit to use the instrument's default model.
+   * @returns Theta: change in value per year of calendar time.
+   */
+  theta(marketJson: JsonInput, asOf: string, model?: string | null): number;
+  /**
    * Domestic-rate rho of the option under the selected model.
    * @param marketJson - Canonical market-context JSON supplying curves, quotes, and FX data.
    * @param asOf - ISO-8601 valuation date used to select market inputs and date-dependent cashflows.
@@ -6566,7 +6617,7 @@ export interface FxTouchOptionInstrument extends FxInstrument {
    * @param marketJson - Canonical market-context JSON supplying curves, quotes, and FX data.
    * @param asOf - ISO-8601 valuation date used to select market inputs and date-dependent cashflows.
    * @param model - Optional pricing-model identifier; omit to use the instrument's default model.
-   * @returns Map of greek name to value, such as `delta`, `gamma`, and `vega`.
+   * @returns Map of greek name to value, keyed in the Rust `STANDARD_OPTION_GREEKS` order (`delta`, `gamma`, `vega`, `theta`, `rho`, …); only the Greeks that apply to the instrument are present.
    */
   greeks(marketJson: JsonInput, asOf: string, model?: string | null): Record<string, number>;
 }
@@ -7459,7 +7510,9 @@ export interface CompositeTrade {
 }
 
 /**
- * Canonical resolved composite envelope plus primitive trade deltas.
+ * Serde form of the Rust `CompositeRebalanceResult`: the canonical resolved
+ * composite envelope plus primitive trade deltas. Python
+ * `CompositeRebalanceResult.to_json()` / `from_json()` use the same shape.
  */
 export interface CompositeRebalanceResult {
   /**
@@ -8659,7 +8712,7 @@ export interface CalibrationNamespace {
    */
   calibrateBermudanLmmBaseVol(
     instrument: Record<string, unknown> | string,
-    market: Market,
+    market: MarketContext,
     asOf: string
   ): number;
 }
@@ -8724,10 +8777,6 @@ export interface ValuationsNamespace {
    * @throws Error - Throws a JavaScript exception if `result` does not match the `ValuationResult` schema (for example a seed given as a string) or the canonical result cannot be serialized.
    */
   valuationResultToJson(result: ValuationResult): string;
-  /**
-   * Parsed `MarketContext` handle for reuse across pricing calls.
-   */
-  Market: typeof Market;
   /**
    * Simulated TARN coupon profile along a deterministic floating-rate path.
    *
@@ -11054,13 +11103,13 @@ export interface PortfolioNamespace {
     bumpConfigJson?: JsonInput
   ): SensitivityMatrixResult;
   /**
-   * Compute first-order factor sensitivities using a pre-parsed [`Market`].
+   * Compute first-order factor sensitivities using a pre-parsed `core.MarketContext` handle.
    *
    * Avoids reparsing market JSON for repeated factor analytics calls.
    * @returns Returns a structured `SensitivityMatrixResult` object.
    * @param positionsJson - Canonical portfolio-positions JSON to bump and revalue.
    * @param factorsJson - Canonical factor-definition JSON identifying the market factors to shock.
-   * @param market - Market context or JSON payload supplying curves, quotes, and FX data.
+   * @param market - Pre-parsed `core.MarketContext` handle supplying curves, quotes, and FX data.
    * @param asOf - ISO-8601 valuation date used to resolve date-dependent market data.
    * @param baseCurrency - ISO reporting currency for all returned monetary exposures; missing FX throws an error.
    * @param bumpConfigJson - Canonical bump-configuration JSON defining factor shock sizes and conventions.
@@ -11069,7 +11118,7 @@ export interface PortfolioNamespace {
   computeFactorSensitivitiesWithMarket(
     positionsJson: JsonInput,
     factorsJson: JsonInput,
-    market: Market,
+    market: MarketContext,
     asOf: string,
     baseCurrency: string,
     bumpConfigJson?: JsonInput
@@ -11101,11 +11150,11 @@ export interface PortfolioNamespace {
     nScenarioPoints?: number
   ): FactorPnlProfile[];
   /**
-   * Compute scenario P&L profiles using a pre-parsed [`Market`].
+   * Compute scenario P&L profiles using a pre-parsed `core.MarketContext` handle.
    * @returns Returns a structured `FactorPnlProfile` array.
    * @param positionsJson - Canonical portfolio-positions JSON to bump and revalue.
    * @param factorsJson - Canonical factor-definition JSON identifying the market factors to shock.
-   * @param market - Market context or JSON payload supplying curves, quotes, and FX data.
+   * @param market - Pre-parsed `core.MarketContext` handle supplying curves, quotes, and FX data.
    * @param asOf - ISO-8601 valuation date used to resolve date-dependent market data.
    * @param baseCurrency - ISO reporting currency for all returned monetary exposures; missing FX throws an error.
    * @param bumpConfigJson - Canonical bump-configuration JSON defining factor shock sizes and conventions.
@@ -11115,7 +11164,7 @@ export interface PortfolioNamespace {
   computePnlProfilesWithMarket(
     positionsJson: JsonInput,
     factorsJson: JsonInput,
-    market: Market,
+    market: MarketContext,
     asOf: string,
     baseCurrency: string,
     bumpConfigJson?: JsonInput,

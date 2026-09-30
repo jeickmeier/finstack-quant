@@ -2,6 +2,7 @@
 
 pub mod currency;
 pub mod dates;
+pub mod market_context;
 pub mod market_data;
 pub mod math;
 pub mod money;

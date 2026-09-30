@@ -21,9 +21,13 @@ use finstack_quant_core::dates::StubKind;
 use finstack_quant_valuations::instruments::{InstrumentEnvelope, InstrumentJson};
 use wasm_bindgen::prelude::*;
 
-/// Parse a canonical instrument envelope through the shared JSON-loader path.
-fn parse_envelope(json: &str) -> Result<InstrumentJson, JsValue> {
-    finstack_quant_valuations::pricer::json::parse_instrument_from_json(json).map_err(to_js_err)
+/// Parse a canonical instrument envelope into one concrete Rust instrument;
+/// Rust rejects a different instrument type with a `validation` error.
+fn parse_typed<T>(json: &str) -> Result<T, JsValue>
+where
+    T: TryFrom<InstrumentJson, Error = finstack_quant_core::Error>,
+{
+    finstack_quant_valuations::pricer::parse_typed_instrument_json(json).map_err(to_js_err)
 }
 
 /// Typed wrapper for the Rust `Bond` instrument.
@@ -73,6 +77,72 @@ impl JsBond {
         )
         .map_err(to_js_err)?;
         Ok(JsBond { inner })
+    }
+
+    /// Create a fixed-rate bond from a named market convention preset.
+    ///
+    /// Mirrors Rust `Bond::with_convention`: frequency, day count, calendar,
+    /// business-day convention, settlement lag and stub rule all come from the
+    /// preset. Chain `withStub` to override the preset's stub rule.
+    /// @param id - Unique instrument identifier.
+    /// @param notional - Principal amount of the bond.
+    /// @param couponRate - Annual coupon rate.
+    /// @param issue_date - Issue date as an ISO-8601 string (`"YYYY-MM-DD"`).
+    /// @param maturity - Maturity date as an ISO-8601 string (`"YYYY-MM-DD"`).
+    /// @param convention - Bond convention preset: `us_treasury`, `us_agency`,
+    /// `german_bund`, `uk_gilt`, `french_oat`, `jgb`, `us_corporate`, or
+    /// `eur_corporate`.
+    /// @param discountCurveId - Discount curve identifier used for pricing.
+    /// @returns The validated fixed-rate bond.
+    /// @throws Error - Throws with kind `validation` if `convention` is not a
+    /// known preset, a date is malformed, or bond validation fails (e.g.
+    /// maturity not after issue_date).
+    #[wasm_bindgen(js_name = withConvention)]
+    pub fn with_convention(
+        id: JsValue,
+        notional: &JsMoney,
+        coupon_rate: &JsRate,
+        issue_date: JsValue,
+        maturity: JsValue,
+        convention: JsValue,
+        discount_curve_id: JsValue,
+    ) -> Result<JsBond, JsValue> {
+        let id: &str = &js_string(&id, "id")?;
+        let issue_date: &str = &js_string(&issue_date, "issueDate")?;
+        let maturity: &str = &js_string(&maturity, "maturity")?;
+        let convention: &str = &js_string(&convention, "convention")?;
+        let discount_curve_id: &str = &js_string(&discount_curve_id, "discountCurveId")?;
+        let inner = finstack_quant_valuations::instruments::Bond::with_convention(
+            id,
+            notional.inner,
+            coupon_rate.inner,
+            parse_iso_date(issue_date)?,
+            parse_iso_date(maturity)?,
+            convention
+                .parse::<finstack_quant_valuations::instruments::BondConvention>()
+                .map_err(to_js_err)?,
+            discount_curve_id,
+        )
+        .map_err(to_js_err)?;
+        Ok(JsBond { inner })
+    }
+
+    /// Return a copy of this bond with a different coupon-schedule stub rule.
+    ///
+    /// Mirrors Rust `Bond::with_stub`; the receiver is not modified.
+    /// @param stub - Stub policy: `none`, `short_front`, `short_back`,
+    /// `long_front`, or `long_back`.
+    /// @returns A new bond whose coupon schedule uses `stub`.
+    /// @throws Error - Throws with kind `validation` if `stub` is not a known stub policy.
+    #[wasm_bindgen(js_name = withStub)]
+    pub fn with_stub(&self, stub: JsValue) -> Result<JsBond, JsValue> {
+        let stub: &str = &js_string(&stub, "stub")?;
+        Ok(JsBond {
+            inner: self
+                .inner
+                .clone()
+                .with_stub(stub.parse::<StubKind>().map_err(to_js_err)?),
+        })
     }
 
     /// Create a floating-rate bond (FRN) linked to a forward index.
@@ -136,13 +206,7 @@ impl JsBond {
     #[wasm_bindgen(js_name = fromJson)]
     pub fn from_json(json: JsValue) -> Result<JsBond, JsValue> {
         let json: &str = &json_text(&json, "json")?;
-        match parse_envelope(json)? {
-            InstrumentJson::Bond(inner) => Ok(JsBond { inner }),
-            other => Err(to_js_err(finstack_quant_core::Error::Validation(format!(
-                "expected instrument type \"bond\", found '{}'",
-                other.type_tag()
-            )))),
-        }
+        parse_typed(json).map(|inner| JsBond { inner })
     }
 
     /// Serialize to a canonical `finstack_quant.instrument/1` envelope.
@@ -188,13 +252,7 @@ impl JsTermLoan {
     #[wasm_bindgen(js_name = fromJson)]
     pub fn from_json(json: JsValue) -> Result<JsTermLoan, JsValue> {
         let json: &str = &json_text(&json, "json")?;
-        match parse_envelope(json)? {
-            InstrumentJson::TermLoan(inner) => Ok(JsTermLoan { inner }),
-            other => Err(to_js_err(finstack_quant_core::Error::Validation(format!(
-                "expected instrument type \"term_loan\", found '{}'",
-                other.type_tag()
-            )))),
-        }
+        parse_typed(json).map(|inner| JsTermLoan { inner })
     }
 
     /// Canonical example term loan (mirrors Rust `TermLoan::example`).
@@ -253,15 +311,7 @@ impl JsAssetBackedFacility {
     #[wasm_bindgen(js_name = fromJson)]
     pub fn from_json(json: JsValue) -> Result<JsAssetBackedFacility, JsValue> {
         let json: &str = &json_text(&json, "json")?;
-        match parse_envelope(json)? {
-            InstrumentJson::AssetBackedFacility(inner) => {
-                Ok(JsAssetBackedFacility { inner: *inner })
-            }
-            other => Err(to_js_err(finstack_quant_core::Error::Validation(format!(
-                "expected instrument type \"asset_backed_facility\", found '{}'",
-                other.type_tag()
-            )))),
-        }
+        parse_typed(json).map(|inner| JsAssetBackedFacility { inner })
     }
 
     /// The canonical example facility: the example CLO pool financed by a
@@ -325,13 +375,7 @@ impl JsRevolvingCredit {
     #[wasm_bindgen(js_name = fromJson)]
     pub fn from_json(json: JsValue) -> Result<JsRevolvingCredit, JsValue> {
         let json: &str = &json_text(&json, "json")?;
-        match parse_envelope(json)? {
-            InstrumentJson::RevolvingCredit(inner) => Ok(JsRevolvingCredit { inner }),
-            other => Err(to_js_err(finstack_quant_core::Error::Validation(format!(
-                "expected instrument type \"revolving_credit\", found '{}'",
-                other.type_tag()
-            )))),
-        }
+        parse_typed(json).map(|inner| JsRevolvingCredit { inner })
     }
 
     /// Canonical example facility (mirrors Rust `RevolvingCredit::example`).

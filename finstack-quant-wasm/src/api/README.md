@@ -23,6 +23,7 @@ enforces.
 | `core/types.rs`                    | `core`                                 | `Rate`, `Bps`, `Percentage`                                                                                                                                                                                                                |
 | `core/dates.rs`                    | `core`                                 | `DayCount`, `DayCountContext`, `Tenor`, `createDate`, `dateFromEpochDays`, `adjust`, `availableCalendars`                                                                                                                                  |
 | `core/market_data.rs`              | `core`                                 | `DiscountCurve`, `HazardCurve`, `ForwardCurve`, `VolCube`, `FxDeltaVolSurface`, `FxMatrix`, `FxConversionPolicy`, `FxRateResult`, `FxQuoteConvention`, `FxPairConvention`, `fxMarketPair`, `fxPairConvention`, `fxPipSize`, `invertFxRate` |
+| `core/market_context.rs`           | `core`                                 | `MarketContext` — `fromJson` once, reuse across `*WithMarket` calls                                                                                                                                                                        |
 | `core/math.rs`                     | `core`                                 | Cholesky, statistics, special functions, compensated summation, `longestPositiveRun`                                                                                                                                                       |
 | `models/liability_management.rs`   | `models.credit`                        | `analyzeExchangeOffer`, `analyzeLme` (liability management)                                                                                                                                                                                |
 | `analytics/performance.rs`         | `analytics`                            | `JsPerformance` → JS `Performance`; the only class in the analytics namespace                                                                                                                                                              |
@@ -57,7 +58,6 @@ enforces.
 | `valuations/exotic_rates.rs`       | `valuations`                           | Deterministic coupon helpers: TARN, snowball, inverse floater, CMS spread, range accrual                                                                                                                                                   |
 | `models/volatility.rs`             | `models.volatility`                    | `SabrParameters`, `SabrModel`, `SabrSmile`, `SabrCalibrator`, surface/cube/FX volatility evaluation                                                                                                                                        |
 | `calibration.rs`                   | `calibration`                          | `calibrate`, `validateCalibrationJson`, `dryRun`, `dryRunJson`, `calibrateBermudanLmmBaseVol`                                                                                                                                              |
-| `valuations/market_handle.rs`      | `valuations`                           | `Market` — parse a `MarketContext` once, reuse across `*WithMarket` calls                                                                                                                                                                  |
 
 The table lists binding-bearing files plus the root wiring and analytics
 conversion helper. The remaining `mod.rs` files only declare submodules or
@@ -121,8 +121,8 @@ export that is not in it is invisible to TypeScript users, and
   sibling module borrows it:
 
   ```rust
-  #[wasm_bindgen(js_name = Market)]
-  pub struct JsMarket {
+  #[wasm_bindgen(js_name = MarketContext)]
+  pub struct JsMarketContext {
       inner: Arc<MarketContext>,
   }
   ```

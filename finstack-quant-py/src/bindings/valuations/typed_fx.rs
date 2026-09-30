@@ -375,15 +375,7 @@ macro_rules! instrument_envelope_methods {
             #[staticmethod]
             #[pyo3(text_signature = "(json)")]
             fn from_json(json: &str) -> PyResult<Self> {
-                match $crate::bindings::valuations::instruments::parse_typed_instrument_json(json)?
-                {
-                    InstrumentJson::$variant(inner) => Ok(Self { inner }),
-                    _ => Err($crate::errors::value_error(concat!(
-                        "expected instrument type \"",
-                        $type_tag,
-                        "\", got a different instrument type"
-                    ))),
-                }
+                $crate::bindings::valuations::instruments::parse_typed_instrument_json(json).map(|inner| Self { inner })
             }
 
             /// Serialize to a canonical ``finstack_quant.instrument/1`` envelope.

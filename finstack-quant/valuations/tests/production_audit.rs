@@ -63,7 +63,7 @@ fn b8_cached_hw_risk_rebuilds_the_active_grid() {
                 MetricId::Delta,
                 MetricId::HwSigmaVega,
                 MetricId::Theta,
-                MetricId::custom("exercise_probability"),
+                MetricId::ExpectedExerciseTime,
             ],
             PricingOptions::default(),
         )
@@ -82,7 +82,7 @@ fn b8_cached_hw_risk_rebuilds_the_active_grid() {
     assert!((result.measures["delta"] - delta).abs() < 1e-5);
     assert!((result.measures["hw_sigma_vega"] - vega).abs() < 1e-5);
     assert!(result.measures["theta"].is_finite());
-    assert!((result.measures["exercise_probability"] - expected_time).abs() < 1e-12);
+    assert!((result.measures["expected_exercise_time"] - expected_time).abs() < 1e-12);
 }
 
 #[test]

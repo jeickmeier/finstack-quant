@@ -7,19 +7,22 @@ const wasm = createRequire(import.meta.url)(workerData.packagePath);
 let constructed = 0,
   freed = 0,
   calls = 0;
-class Market extends wasm.Market {
-  constructor(json) {
-    super(json);
+class MarketContext extends wasm.MarketContext {
+  static fromJson(json) {
+    const handle = super.fromJson(json);
     constructed++;
-  }
-  toJson() {
-    if (workerData.failMarketSerialization)
-      throw new TypeError("Market serialization failed");
-    return super.toJson();
-  }
-  free() {
-    super.free();
-    freed++;
+    const toJson = handle.toJson.bind(handle);
+    handle.toJson = () => {
+      if (workerData.failMarketSerialization)
+        throw new TypeError("Market serialization failed");
+      return toJson();
+    };
+    const free = handle.free.bind(handle);
+    handle.free = () => {
+      free();
+      freed++;
+    };
+    return handle;
   }
 }
 let cubeConstructed = 0,
@@ -75,7 +78,7 @@ const service = createService({
         cause: new Error("fixture cause"),
       });
   },
-  core: { ...wasm, FxDeltaVolSurface, Money, VolCube },
+  core: { ...wasm, FxDeltaVolSurface, MarketContext, Money, VolCube },
   models: {
     volatility: {
       getCubeVol: wasm.getCubeVol,
@@ -91,7 +94,6 @@ const service = createService({
   statements: wasm,
   statements_analytics: wasm,
   valuations: {
-    Market,
     validateValuationResultJson: wasm.validateValuationResultJson,
     instruments: {
       ...wasm,

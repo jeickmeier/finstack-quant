@@ -59,7 +59,7 @@ it("retains the realistic CDX calibration and native canonical supplemental fixt
   expect(native.calibrate(source).result.final_market).toEqual(
     fixture.calibrated,
   );
-  const handle = new native.Market(JSON.stringify(market));
+  const handle = native.MarketContext.fromJson(JSON.stringify(market));
   try {
     expect(JSON.parse(handle.toJson())).toEqual(market);
   } finally {

@@ -65,7 +65,7 @@ Its `README.md` and `.d.ts` are wasm-pack copies; treat nothing in `pkg/` or
 | `scenarios`            | spec parse/compose/validate, builtin templates and components, `applyScenario`, `computeHorizonReturn`                                                                                                                                                          |
 | `statements`           | model and check-suite validation, `evaluateModel`, `evaluateMonteCarlo`, formula parsing                                                                                                                                                                        |
 | `statements_analytics` | sensitivity, variance, scenario sets, backtesting, goal seek, DCF, LBO, WACC, check reports, comps                                                                                                                                                              |
-| `valuations`           | nested `instruments`, `fx`, `creditDerivatives`, `composite`, and `market`; product-specific coupon helpers; and the reusable `Market` handle                                                                                                                   |
+| `valuations`           | nested `instruments`, `fx`, `creditDerivatives`, `composite`, and `market`; product-specific coupon helpers (the reusable market handle is `core.MarketContext`)                                                                                                |
 
 Hover any namespace member in a TypeScript IDE for its arguments, result shape,
 error behavior, and conventions. `index.d.ts` is the authoritative surface; use its
@@ -116,18 +116,17 @@ JSON.parse(bond.toJson()).schema; // 'finstack_quant.instrument/1'
 
 `calibration.calibrate` turns a quote envelope into a materialized market; the result's
 `result.final_market` is the MarketContext every pricing entry point accepts. When
-pricing many instruments, parse it once into a `Market` handle.
+pricing many instruments, parse it once into a `core.MarketContext` handle.
 
 ```javascript
 const calibrated = calibration.calibrate(envelope); // CalibrationResultEnvelope
-const market = new valuations.Market(JSON.stringify(calibrated.result.final_market));
+const market = core.MarketContext.fromJson(calibrated.result.final_market);
 
 for (const instrumentJson of instruments) {
   const result = valuations.instruments.priceInstrumentWithMarket(
     instrumentJson,
     market,
-    '2025-06-15',
-    'default'
+    '2025-06-15'
   );
   console.log(result.instrument_id, result.value);
 }

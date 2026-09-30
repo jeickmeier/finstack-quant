@@ -38,7 +38,7 @@
         "version": 1
       },
       "fx_policy_applied": null,
-      "timestamp": "+002026-09-28T22:57:13.595000000Z",
+      "timestamp": "+002026-09-30T08:10:37.551000000Z",
       "version": "0.9.0"
     },
     "covenants": null
@@ -190,6 +190,7 @@
       "df_end",
       "df_end_from_quote",
       "df_start",
+      "expected_exercise_time",
       "financing_annuity",
       "fixed_first_accrual_factor",
       "fixed_first_payment_date",
@@ -430,5 +431,5 @@
       "bucketed": true
     }
   ],
-  "facadeWasmSha256": "b4d45f0c8ee040f2a0b1b46fdaed2703f44549a079843a5a4ef5abb5bec51f8e"
+  "facadeWasmSha256": "a47a1be75f7d7aed763d65c6175ea7e2d483495cb16c9b5e60fa73a491149361"
 }

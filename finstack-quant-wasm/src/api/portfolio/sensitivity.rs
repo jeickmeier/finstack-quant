@@ -1,6 +1,6 @@
 //! WASM bindings for factor-model sensitivities and risk decomposition.
 
-use crate::api::valuations::market_handle::JsMarket;
+use crate::api::core::market_context::JsMarketContext;
 use crate::utils::date::parse_iso_date;
 use crate::utils::input::{js_opt_uint, js_string, json_text, opt_json_text};
 use crate::utils::{to_js_err, to_js_value};
@@ -64,12 +64,12 @@ pub fn compute_factor_sensitivities(
     to_js_value(&output)
 }
 
-/// Compute first-order factor sensitivities using a pre-parsed [`JsMarket`].
+/// Compute first-order factor sensitivities using a pre-parsed `MarketContext` handle.
 ///
 /// Avoids reparsing market JSON for repeated factor analytics calls.
 /// @param positions_json - Canonical portfolio-positions JSON to bump and revalue.
 /// @param factors_json - Canonical factor-definition JSON identifying the market factors to shock.
-/// @param market - Market context or JSON payload supplying curves, quotes, and FX data.
+/// @param market - Pre-parsed `core.MarketContext` handle supplying curves, quotes, and FX data.
 /// @param as_of - ISO-8601 valuation date used to resolve date-dependent market data.
 /// @param base_currency - ISO reporting currency for all returned monetary exposures; missing FX throws an error.
 /// @param bump_config_json - Canonical bump-configuration JSON defining factor shock sizes and conventions.
@@ -84,7 +84,7 @@ pub fn compute_factor_sensitivities(
 pub fn compute_factor_sensitivities_with_market(
     positions_json: JsValue,
     factors_json: JsValue,
-    market: &JsMarket,
+    market: &JsMarketContext,
     as_of: JsValue,
     base_currency: JsValue,
     bump_config_json: Option<JsValue>,
@@ -172,10 +172,10 @@ pub fn compute_pnl_profiles(
     to_js_value(&profiles)
 }
 
-/// Compute scenario P&L profiles using a pre-parsed [`JsMarket`].
+/// Compute scenario P&L profiles using a pre-parsed `MarketContext` handle.
 /// @param positions_json - Canonical portfolio-positions JSON to bump and revalue.
 /// @param factors_json - Canonical factor-definition JSON identifying the market factors to shock.
-/// @param market - Market context or JSON payload supplying curves, quotes, and FX data.
+/// @param market - Pre-parsed `core.MarketContext` handle supplying curves, quotes, and FX data.
 /// @param as_of - ISO-8601 valuation date used to resolve date-dependent market data.
 /// @param base_currency - ISO reporting currency for all returned monetary exposures; missing FX throws an error.
 /// @param bump_config_json - Canonical bump-configuration JSON defining factor shock sizes and conventions.
@@ -191,7 +191,7 @@ pub fn compute_pnl_profiles(
 pub fn compute_pnl_profiles_with_market(
     positions_json: JsValue,
     factors_json: JsValue,
-    market: &JsMarket,
+    market: &JsMarketContext,
     as_of: JsValue,
     base_currency: JsValue,
     bump_config_json: Option<JsValue>,

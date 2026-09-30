@@ -66,7 +66,7 @@ export const portfolio = {
   optimizePortfolio: wasm.optimizePortfolio,
   replayPortfolio: wasm.replayPortfolio,
   // ⚠️ BLOCKING: prefer computeFactorSensitivitiesWithMarket for repeated calls
-  // so large MarketContext JSON is parsed once into Market.
+  // so large MarketContext JSON is parsed once into a core.MarketContext handle.
   computeFactorSensitivities: wasm.computeFactorSensitivities,
   computeFactorSensitivitiesWithMarket: wasm.computeFactorSensitivitiesWithMarket,
   computePnlProfiles: wasm.computePnlProfiles,

@@ -124,8 +124,8 @@ class Bond:
     """
     Typed wrapper for the canonical Rust ``Bond`` instrument.
 
-    Construct via :meth:`Bond.fixed` (US-corporate or a named convention
-    preset), :meth:`Bond.with_convention`, :meth:`Bond.floating` /
+    Construct via :meth:`Bond.fixed` (US corporate), :meth:`Bond.with_convention`
+    (a named preset; override its stub with :meth:`Bond.with_stub`), :meth:`Bond.floating` /
     :meth:`Bond.floating_with_convention`, :meth:`Bond.zero_coupon`, the
     :meth:`Bond.builder` fluent builder (callable schedules, credit curve,
     custom cashflow specs and settlement conventions), the ``Bond.example*``
@@ -185,18 +185,14 @@ class Bond:
         stub: StubKind | Literal["none", "short_front", "long_front", "short_back", "long_back"],
         discount_curve_id: str,
         *,
-        convention: Literal[
-            "us_treasury", "us_agency", "german_bund", "uk_gilt", "french_oat", "jgb", "us_corporate", "eur_corporate"
-        ]
-        | None = None,
         currency: str | None = None,
     ) -> Bond:
         """
-        Create a fixed-rate bond from a settlement/day-count convention preset.
+        Create a US corporate fixed-rate bond (semi-annual, 30/360, T+1).
 
-        Mirrors Rust ``Bond::fixed`` when ``convention`` is ``None`` (US corporate:
-        semi-annual, 30/360, T+1) and ``Bond::with_convention`` followed by
-        ``with_stub`` when a preset is named.
+        Mirrors Rust ``Bond::fixed``. For another market's conventions use
+        :meth:`Bond.with_convention` and, to override the preset's stub rule,
+        chain :meth:`Bond.with_stub`.
 
         Parameters
         ----------
@@ -215,10 +211,6 @@ class Bond:
             ``StubKind`` or its serde name (``"none"``, ``"short_front"``, ...).
         discount_curve_id : str
             Discount curve identifier used for pricing.
-        convention : str, optional
-            Bond convention preset controlling coupon frequency, day count,
-            calendar, business-day convention and settlement lag. ``None`` is
-            ``"us_corporate"``.
         currency : str, optional
             ISO-4217 code applied when ``notional`` is a bare number.
 
@@ -230,9 +222,9 @@ class Bond:
         Raises
         ------
         ValueError
-            If ``convention``/``stub`` is not a recognized name, a bare
-            ``notional`` has no ``currency``, or validation fails (e.g. maturity
-            not after issue_date).
+            If ``stub`` is not a recognized name, a bare ``notional`` has no
+            ``currency``, or validation fails (e.g. maturity not after
+            issue_date).
         TypeError
             If ``coupon_rate`` or ``notional`` has an unsupported type or a date
             cannot be interpreted.
@@ -240,19 +232,45 @@ class Bond:
         Examples
         --------
         >>> from finstack_quant.valuations.instruments import Bond
-        >>> bund = Bond.fixed(
-        ...     "BUND",
-        ...     1_000_000.0,
-        ...     0.025,
-        ...     "2024-01-15",
-        ...     "2034-01-15",
-        ...     "none",
-        ...     "EUR-OIS",
-        ...     convention="german_bund",
-        ...     currency="EUR",
+        >>> bond = Bond.fixed(
+        ...     "BOND-1", 1_000_000.0, 0.05, "2024-01-01", "2034-01-01", "none", "USD-OIS", currency="USD"
         ... )
-        >>> bund.settlement_days
-        2
+        >>> bond.settlement_days
+        1
+        """
+        ...
+    def with_stub(
+        self, stub: StubKind | Literal["none", "short_front", "long_front", "short_back", "long_back"]
+    ) -> Bond:
+        """
+        Return a copy of this bond with a different coupon-schedule stub rule.
+
+        Mirrors Rust ``Bond::with_stub``; the receiver is not modified.
+
+        Parameters
+        ----------
+        stub : StubKind | str
+            Placement and length policy for an irregular coupon period, as a
+            ``StubKind`` or its serde name (``"none"``, ``"short_front"``, ...).
+
+        Returns
+        -------
+        Bond
+            A new bond whose coupon schedule uses ``stub``.
+
+        Raises
+        ------
+        ValueError
+            If ``stub`` is not a recognized stub name.
+
+        Examples
+        --------
+        >>> from finstack_quant.valuations.instruments import Bond
+        >>> bund = Bond.with_convention(
+        ...     "BUND", 1_000_000.0, 0.025, "2024-01-15", "2034-01-15", "german_bund", "EUR-OIS", currency="EUR"
+        ... ).with_stub("long_back")
+        >>> bund.to_dict()["cashflow_spec"]["fixed"]["stub"]
+        'long_back'
         """
         ...
     @staticmethod
@@ -273,7 +291,7 @@ class Bond:
         Create a fixed-rate bond from a named market convention.
 
         Mirrors Rust ``Bond::with_convention``; the stub rule is the preset's own
-        (use :meth:`Bond.fixed` with ``convention=`` to override it).
+        (chain :meth:`Bond.with_stub` to override it).
 
         Parameters
         ----------
@@ -359,7 +377,8 @@ class Bond:
         forward_curve_id : str
             Forward curve identifier (e.g. ``"USD-SOFR-3M"``).
         spread_bp : float | Bps
-            Spread over the index in whole basis points (fractions are rounded).
+            Spread over the index in whole basis points; fractional values raise
+            ``ValueError`` (use :meth:`Bond.from_json` for sub-bp margins).
         issue_date : datetime.date | datetime.datetime | pd.Timestamp | str
             Issue date.
         maturity : datetime.date | datetime.datetime | pd.Timestamp | str
@@ -382,8 +401,9 @@ class Bond:
         ------
         ValueError
             If the notional currency has no mapped settlement convention,
-            ``notional`` is not finite and positive, or ``issue_date`` is not strictly
-            before ``maturity``.
+            ``notional`` is not finite and positive, ``spread_bp`` is not a finite
+            whole number of basis points, or ``issue_date`` is not strictly before
+            ``maturity``.
         TypeError
             If ``spread_bp``/``notional`` has an unsupported type or a date cannot
             be interpreted.
@@ -439,7 +459,8 @@ class Bond:
         forward_curve_id : str
             Forward curve identifier (e.g. ``"EUR-EURIBOR-3M"``).
         spread_bp : float | Bps
-            Spread over the index in whole basis points (fractions are rounded).
+            Spread over the index in whole basis points; fractional values raise
+            ``ValueError`` (use :meth:`Bond.from_json` for sub-bp margins).
         issue_date : datetime.date | datetime.datetime | pd.Timestamp | str
             Issue date.
         maturity : datetime.date | datetime.datetime | pd.Timestamp | str
@@ -464,7 +485,8 @@ class Bond:
         ------
         ValueError
             If ``convention`` is unknown, a bare ``notional`` has no ``currency``,
-            or validation fails.
+            ``spread_bp`` is not a finite whole number of basis points, or
+            validation fails.
         TypeError
             If ``spread_bp``/``notional`` has an unsupported type or a date cannot
             be interpreted.
@@ -20134,7 +20156,8 @@ class AdvanceRate:
         Raises
         ------
         ValueError
-            If ``rate`` is outside ``[0, 1]`` or not finite.
+            If ``asset_class`` is empty or ``rate`` is not a finite decimal in
+            ``[0, 1]`` (Rust ``AdvanceRate::validate``).
         """
         ...
 
@@ -20304,8 +20327,8 @@ class ConcentrationLimit:
         Raises
         ------
         ValueError
-            If ``scope`` is not one of the three names or ``max_pct`` is
-            outside ``[0, 100]``.
+            If ``scope`` is not one of the three names or ``max_pct`` is not a
+            finite percent in ``(0, 100]`` (Rust ``ConcentrationLimit::validate``).
         """
         ...
 

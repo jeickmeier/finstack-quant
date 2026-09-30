@@ -303,7 +303,7 @@ def test_leg_spec_repr_is_python_style() -> None:
 # --------------------------------------------------------------------------- bonds
 
 
-def test_bond_fixed_accepts_floats_strings_and_convention() -> None:
+def test_bond_fixed_accepts_floats_strings_and_with_convention_takes_a_stub() -> None:
     bond = Bond.fixed("BOND-STR", 1_000_000.0, 0.05, "2024-01-15", "2034-01-15", "none", "USD-OIS", currency="USD")
     assert bond.issue_date == datetime.date(2024, 1, 15)
     assert bond.maturity == datetime.date(2034, 1, 15)
@@ -319,22 +319,17 @@ def test_bond_fixed_accepts_floats_strings_and_convention() -> None:
         "USD-OIS",
     )
     assert typed.to_dict()["cashflow_spec"] == bond.to_dict()["cashflow_spec"]
-    bund = Bond.fixed(
-        "BUND",
-        1_000_000.0,
-        0.025,
-        "2024-01-15",
-        "2034-01-15",
-        "none",
-        "EUR-OIS",
-        convention="german_bund",
-        currency="EUR",
-    )
+    bund = Bond.with_convention(
+        "BUND", 1_000_000.0, 0.025, "2024-01-15", "2034-01-15", "german_bund", "EUR-OIS", currency="EUR"
+    ).with_stub("long_back")
     assert bund.settlement_days == 2
+    assert bund.to_dict()["cashflow_spec"]["fixed"]["stub"] == "long_back"
     with pytest.raises(ValueError, match=r"needs a currency"):
         Bond.fixed("X", 1.0, 0.05, "2024-01-15", "2034-01-15", "none", "USD-OIS")
     with pytest.raises(ValueError, match=r"unknown variant `martian`"):
-        Bond.fixed("X", 1.0, 0.05, "2024-01-15", "2034-01-15", "none", "USD-OIS", currency="USD", convention="martian")
+        Bond.with_convention("X", 1.0, 0.05, "2024-01-15", "2034-01-15", "martian", "USD-OIS", currency="USD")
+    with pytest.raises(TypeError):
+        Bond.fixed("X", 1.0, 0.05, "2024-01-15", "2034-01-15", "none", "USD-OIS", currency="USD", convention="uk_gilt")
 
 
 def test_bond_constructors_and_examples() -> None:

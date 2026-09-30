@@ -150,19 +150,11 @@ impl PyAmortizationEvent {
     #[staticmethod]
     #[pyo3(text_signature = "(max_cumulative_loss)")]
     fn cumulative_loss(max_cumulative_loss: f64) -> PyResult<Self> {
-        if !(max_cumulative_loss.is_finite()
-            && max_cumulative_loss > 0.0
-            && max_cumulative_loss <= 1.0)
-        {
-            return Err(crate::errors::value_error(format!(
-                "cumulative loss max_cumulative_loss ({max_cumulative_loss}) must be a decimal fraction in (0, 1]"
-            )));
-        }
-        Ok(Self {
-            inner: AmortizationEvent::CumulativeLoss {
-                max_cumulative_loss,
-            },
-        })
+        let inner = AmortizationEvent::CumulativeLoss {
+            max_cumulative_loss,
+        };
+        inner.validate().map_err(crate::errors::core_to_py)?;
+        Ok(Self { inner })
     }
 
     /// The revolving period ends once trailing excess spread falls below a
@@ -192,16 +184,11 @@ impl PyAmortizationEvent {
     #[staticmethod]
     #[pyo3(text_signature = "(min_excess_spread_3m)")]
     fn excess_spread(min_excess_spread_3m: f64) -> PyResult<Self> {
-        if !min_excess_spread_3m.is_finite() {
-            return Err(crate::errors::value_error(format!(
-                "excess spread min_excess_spread_3m ({min_excess_spread_3m}) must be finite"
-            )));
-        }
-        Ok(Self {
-            inner: AmortizationEvent::ExcessSpread {
-                min_excess_spread_3m,
-            },
-        })
+        let inner = AmortizationEvent::ExcessSpread {
+            min_excess_spread_3m,
+        };
+        inner.validate().map_err(crate::errors::core_to_py)?;
+        Ok(Self { inner })
     }
 
     /// ``"date"``, ``"cumulative_loss"`` or ``"excess_spread"``.

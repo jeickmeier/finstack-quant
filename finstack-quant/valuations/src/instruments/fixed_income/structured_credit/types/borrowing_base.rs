@@ -110,6 +110,47 @@ pub struct ConcentrationLimit {
     pub max_pct: f64,
 }
 
+impl AdvanceRate {
+    /// Validate the class name and rate of one advance-rate entry.
+    ///
+    /// # Errors
+    ///
+    /// Returns `Error::Validation` when `asset_class` is empty or `rate` is
+    /// not a finite decimal in `[0, 1]`.
+    pub fn validate(&self) -> finstack_quant_core::Result<()> {
+        if self.asset_class.trim().is_empty() {
+            return Err(finstack_quant_core::Error::Validation(
+                "advance rate asset_class must not be empty".to_string(),
+            ));
+        }
+        if !self.rate.is_finite() || !(0.0..=1.0).contains(&self.rate) {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "advance rate for {} ({}) must be a decimal in [0, 1]",
+                self.asset_class, self.rate
+            )));
+        }
+        Ok(())
+    }
+}
+
+impl ConcentrationLimit {
+    /// Validate the cap of one concentration limit.
+    ///
+    /// # Errors
+    ///
+    /// Returns `Error::Validation` when `max_pct` is not a finite percent in
+    /// `(0, 100]`.
+    pub fn validate(&self) -> finstack_quant_core::Result<()> {
+        if !self.max_pct.is_finite() || self.max_pct <= 0.0 || self.max_pct > 100.0 {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "concentration limit ({}) must be a percent in (0, 100]",
+                self.max_pct
+            )));
+        }
+        Ok(())
+    }
+}
+
 /// Advance rates and concentration limits that define a borrowing base.
 #[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
@@ -146,32 +187,16 @@ impl BorrowingBaseRules {
     /// outside `[0, 1]`, a class name is empty, or a limit is outside
     /// `(0, 100]`.
     pub fn validate(&self) -> finstack_quant_core::Result<()> {
-        let invalid = |msg: String| finstack_quant_core::Error::Validation(msg);
         if self.advance_rates.is_empty() {
-            return Err(invalid(
+            return Err(finstack_quant_core::Error::Validation(
                 "borrowing base needs at least one advance rate".to_string(),
             ));
         }
         for advance in &self.advance_rates {
-            if advance.asset_class.trim().is_empty() {
-                return Err(invalid(
-                    "advance rate asset_class must not be empty".to_string(),
-                ));
-            }
-            if !advance.rate.is_finite() || !(0.0..=1.0).contains(&advance.rate) {
-                return Err(invalid(format!(
-                    "advance rate for {} ({}) must be a decimal in [0, 1]",
-                    advance.asset_class, advance.rate
-                )));
-            }
+            advance.validate()?;
         }
         for limit in &self.concentration_limits {
-            if !limit.max_pct.is_finite() || limit.max_pct <= 0.0 || limit.max_pct > 100.0 {
-                return Err(invalid(format!(
-                    "concentration limit ({}) must be a percent in (0, 100]",
-                    limit.max_pct
-                )));
-            }
+            limit.validate()?;
         }
         Ok(())
     }

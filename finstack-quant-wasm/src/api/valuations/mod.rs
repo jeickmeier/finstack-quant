@@ -11,6 +11,5 @@ pub mod credit_derivatives;
 pub mod exotic_rates;
 pub mod fixed_income;
 pub mod fx;
-pub mod market_handle;
 pub mod pricing;
 pub mod structured_credit;

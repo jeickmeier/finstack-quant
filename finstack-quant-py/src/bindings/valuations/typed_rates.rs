@@ -258,12 +258,7 @@ impl PyInterestRateSwap {
     #[staticmethod]
     #[pyo3(text_signature = "(json)")]
     fn from_json(json: &str) -> PyResult<Self> {
-        match parse_typed_instrument_json(json)? {
-            InstrumentJson::InterestRateSwap(inner) => Ok(Self { inner }),
-            _ => Err(value_error(
-                "expected instrument type \"interest_rate_swap\", got a different instrument type",
-            )),
-        }
+        parse_typed_instrument_json(json).map(|inner| Self { inner })
     }
 
     /// Serialize to a canonical ``finstack_quant.instrument/1`` envelope.
@@ -848,12 +843,7 @@ impl PySwaption {
     #[staticmethod]
     #[pyo3(text_signature = "(json)")]
     fn from_json(json: &str) -> PyResult<Self> {
-        match parse_typed_instrument_json(json)? {
-            InstrumentJson::Swaption(inner) => Ok(Self { inner }),
-            _ => Err(value_error(
-                "expected instrument type \"swaption\", got a different instrument type",
-            )),
-        }
+        parse_typed_instrument_json(json).map(|inner| Self { inner })
     }
 
     /// Serialize to a canonical ``finstack_quant.instrument/1`` envelope.
@@ -1657,12 +1647,7 @@ impl PyCapFloor {
     #[staticmethod]
     #[pyo3(text_signature = "(json)")]
     fn from_json(json: &str) -> PyResult<Self> {
-        match parse_typed_instrument_json(json)? {
-            InstrumentJson::CapFloor(inner) => Ok(Self { inner }),
-            _ => Err(value_error(
-                "expected instrument type \"cap_floor\", got a different instrument type",
-            )),
-        }
+        parse_typed_instrument_json(json).map(|inner| Self { inner })
     }
 
     /// Serialize to a canonical ``finstack_quant.instrument/1`` envelope.

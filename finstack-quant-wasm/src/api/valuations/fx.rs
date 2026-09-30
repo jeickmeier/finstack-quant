@@ -17,34 +17,26 @@ use super::pricing::{
 };
 use crate::utils::input::{from_js_json, js_opt_string, js_string, json_text};
 use crate::utils::{to_js_err, to_js_value};
-use finstack_quant_valuations::pricer::{
-    instrument_envelope_from_spec, pretty_instrument_json, validate_typed_instrument_json,
-};
-use serde_json::{Map, Value};
+use finstack_quant_valuations::instruments::{InstrumentEnvelope, InstrumentJson};
+use finstack_quant_valuations::pricer::{instrument_from_spec, parse_typed_instrument_json};
+use indexmap::IndexMap;
+use serde_json::Value;
 use wasm_bindgen::prelude::*;
 
-fn from_spec(type_tag: &str, spec: JsValue) -> Result<String, JsValue> {
+/// Build the concrete instrument from a bare JS spec object through the Rust
+/// validating constructor.
+fn from_spec<T>(type_tag: &str, spec: JsValue) -> Result<T, JsValue>
+where
+    T: TryFrom<InstrumentJson, Error = finstack_quant_core::Error>,
+{
     let spec: Value = from_js_json(&spec, "spec")?;
-    instrument_envelope_from_spec(type_tag, spec).map_err(to_js_err)
+    let instrument = instrument_from_spec(type_tag, spec).map_err(to_js_err)?;
+    T::try_from(instrument).map_err(to_js_err)
 }
 
-fn from_json_payload(type_tag: &str, json: &str) -> Result<String, JsValue> {
-    validate_typed_instrument_json(type_tag, json).map_err(to_js_err)
-}
-
-fn pretty_json(json: &str) -> Result<String, JsValue> {
-    pretty_instrument_json(json).map_err(to_js_err)
-}
-
-/// Shared body for the `id` getter emitted by the FX-class macro.
-///
-/// Re-parses the stored (already validated) canonical envelope and reads the
-/// instrument identifier through the canonical `Instrument` trait, matching
-/// the Python typed wrappers' `id` property.
-fn instrument_id_from_json(json: &str) -> Result<String, JsValue> {
-    finstack_quant_valuations::pricer::parse_boxed_instrument_from_json(json, None)
-        .map(|instrument| instrument.as_instrument().id().to_string())
-        .map_err(to_js_err)
+/// Serialize a concrete instrument as its compact canonical v1 envelope.
+fn envelope_json(instrument: impl Into<InstrumentJson>) -> Result<String, JsValue> {
+    serde_json::to_string(&InstrumentEnvelope::new(instrument.into())).map_err(to_js_err)
 }
 
 fn metric_value(
@@ -65,11 +57,11 @@ fn metric_value(
     )
 }
 
-/// Shared body for the `greeks` method emitted by both FX-option macros.
+/// Shared body for the `greeks` method emitted by the FX-option macro.
 ///
-/// Prices the standard Greek set with market context and returns a JS object.
-/// Non-finite Greeks are rejected rather than serialized: `serde_json` maps
-/// them to `null`, which would silently look like "not computed".
+/// Prices the Rust-ordered subset of `STANDARD_OPTION_GREEKS` that applies to
+/// the instrument and returns a JS object whose keys keep that order.
+/// Non-finite Greeks are rejected by Rust rather than serialized.
 fn option_greeks_object(
     instrument_json: &str,
     market_json: &str,
@@ -84,43 +76,24 @@ fn option_greeks_object(
         as_of,
         model.unwrap_or("default"),
     )?;
-    let mut out = Map::new();
-    for (metric, value) in pairs {
-        out.insert(metric.to_string(), Value::from(value));
-    }
-    to_js_value(&Value::Object(out))
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn public_json_routes_validate_instrument_before_market_json() {
-        assert!(super::super::pricing::tests::not_a_market_request()
-            .price("{}")
-            .is_err());
-        assert!(metric_value(
-            "{}",
-            "not-market-json",
-            "not-a-date",
-            Some("not-a-model".to_string()),
-            "not-a-metric",
-        )
-        .is_err());
-        assert!(
-            option_greeks_object("{}", "not-market-json", "not-a-date", Some("not-a-model"),)
-                .is_err()
-        );
-    }
+    let ordered: IndexMap<&'static str, f64> = pairs.into_iter().collect();
+    to_js_value(&ordered)
 }
 
 macro_rules! fx_class {
-    ($rust_name:ident, $js_name:literal, $type_tag:literal) => {
-        #[doc = concat!("FX instrument `", $js_name, "`: holds a validated JSON spec.")]
+    ($rust_name:ident, $js_name:literal, $type_tag:literal, $rust_ty:ty) => {
+        #[doc = concat!("Typed WASM wrapper for the Rust FX instrument `", $js_name, "`.")]
         #[wasm_bindgen(js_name = $js_name)]
+        #[derive(Clone)]
         pub struct $rust_name {
-            json: String,
+            pub(crate) inner: $rust_ty,
+        }
+
+        impl $rust_name {
+            /// The instrument as its compact canonical v1 envelope.
+            fn envelope_json(&self) -> Result<String, JsValue> {
+                envelope_json(self.inner.clone())
+            }
         }
 
         #[wasm_bindgen(js_class = $js_name)]
@@ -131,12 +104,12 @@ macro_rules! fx_class {
             /// # Errors
             ///
             /// Throws a JavaScript exception if `spec` cannot be converted from
-            /// JavaScript, is not a bare object for this FX instrument type, fails
-            /// instrument validation, or cannot be serialized as a canonical envelope.
+            /// JavaScript, is not a bare object for this FX instrument type, or
+            /// fails instrument validation.
             #[wasm_bindgen(constructor)]
             pub fn new(spec: JsValue) -> Result<$rust_name, JsValue> {
                 Ok(Self {
-                    json: from_spec($type_tag, spec)?,
+                    inner: from_spec($type_tag, spec)?,
                 })
             }
 
@@ -146,37 +119,33 @@ macro_rules! fx_class {
             /// # Errors
             ///
             /// Throws a JavaScript exception if `json` is malformed, is not a
-            /// canonical envelope for this exact FX instrument type, fails
-            /// instrument validation, or cannot be canonically serialized.
+            /// canonical envelope for this exact FX instrument type, or fails
+            /// instrument validation.
             #[wasm_bindgen(js_name = fromJson)]
             pub fn from_json(json: JsValue) -> Result<$rust_name, JsValue> {
                 let json: &str = &json_text(&json, "json")?;
                 Ok(Self {
-                    json: from_json_payload($type_tag, json)?,
+                    inner: parse_typed_instrument_json::<$rust_ty>(json).map_err(to_js_err)?,
                 })
             }
 
-            /// Serialize the instrument spec to pretty JSON.
+            /// Serialize to the canonical `finstack_quant.instrument/1` envelope.
+            ///
+            /// The output is compact JSON, byte-identical to the Python
+            /// `to_json()` of the same instrument.
             ///
             /// # Errors
             ///
-            /// Throws a JavaScript exception if the stored canonical instrument
-            /// envelope cannot be parsed or rendered as pretty JSON.
+            /// Throws a JavaScript exception if the instrument cannot be serialized.
             #[wasm_bindgen(js_name = toJson)]
             pub fn to_json(&self) -> Result<String, JsValue> {
-                pretty_json(&self.json)
+                self.envelope_json()
             }
 
             /// Instrument identifier (mirrors the Python wrappers' `id` property).
-            ///
-            /// # Errors
-            ///
-            /// Throws a JavaScript exception if the stored canonical instrument
-            /// envelope cannot be re-parsed (should not happen for a validated
-            /// instance).
             #[wasm_bindgen(getter)]
-            pub fn id(&self) -> Result<String, JsValue> {
-                instrument_id_from_json(&self.json)
+            pub fn id(&self) -> String {
+                self.inner.id.to_string()
             }
 
             /// Price the instrument against a market JSON snapshot.
@@ -217,238 +186,51 @@ macro_rules! fx_class {
                     metric_pricing_overrides.as_ref(),
                     market_history.as_ref(),
                 )?
-                .price(&self.json)
+                .price(&self.envelope_json()?)
             }
         }
     };
 }
 
+/// Emit an FX option class: the `fx_class!` surface plus one method per
+/// applicable Greek and `greeks()`.
+///
+/// Each Greek entry is `(method, "jsName", "metric_id", "summary doc", "@returns doc")`. The
+/// method list is pinned against the Rust metric registry by
+/// `tests::option_greek_methods_match_the_metric_registry`.
 macro_rules! fx_option_class {
-    ($rust_name:ident, $js_name:literal, $type_tag:literal) => {
-        fx_class!($rust_name, $js_name, $type_tag);
+    (
+        $rust_name:ident, $js_name:literal, $type_tag:literal, $rust_ty:ty, $instrument_type:ident,
+        [$(($method:ident, $js_method:literal, $metric:literal, $summary:literal, $returns:literal)),+ $(,)?]
+    ) => {
+        fx_class!($rust_name, $js_name, $type_tag, $rust_ty);
 
-        #[wasm_bindgen(js_class = $js_name)]
         impl $rust_name {
-            /// Spot delta of the option.
-            /// @param market_json - Canonical market-context JSON supplying curves, quotes, and FX data.
-            /// @param as_of - ISO-8601 valuation date used to resolve date-dependent market data.
-            /// @param model - Optional pricing-model identifier; omit to use the instrument's default model.
-            /// @returns Spot delta: change in value per unit spot.
-            ///
-            /// # Errors
-            ///
-            /// Throws a JavaScript exception if the instrument or market JSON,
-            /// `asOf`, or `model` is invalid; required market data is missing;
-            /// pricing fails; or delta is not produced by the selected model.
-            pub fn delta(
-                &self,
-                market_json: JsValue,
-                as_of: JsValue,
-                model: Option<JsValue>,
-            ) -> Result<f64, JsValue> {
-                let market_json: &str = &json_text(&market_json, "marketJson")?;
-                let as_of: &str = &js_string(&as_of, "asOf")?;
-                let model = js_opt_string(model.as_ref(), "model")?;
-                metric_value(&self.json, market_json, as_of, model, "delta")
-            }
-
-            /// Spot gamma of the option.
-            /// @param market_json - Canonical market-context JSON supplying curves, quotes, and FX data.
-            /// @param as_of - ISO-8601 valuation date used to resolve date-dependent market data.
-            /// @param model - Optional pricing-model identifier; omit to use the instrument's default model.
-            /// @returns Spot gamma: change in delta per unit spot.
-            ///
-            /// # Errors
-            ///
-            /// Throws a JavaScript exception if the instrument or market JSON,
-            /// `asOf`, or `model` is invalid; required market data is missing;
-            /// pricing fails; or gamma is not produced by the selected model.
-            pub fn gamma(
-                &self,
-                market_json: JsValue,
-                as_of: JsValue,
-                model: Option<JsValue>,
-            ) -> Result<f64, JsValue> {
-                let market_json: &str = &json_text(&market_json, "marketJson")?;
-                let as_of: &str = &js_string(&as_of, "asOf")?;
-                let model = js_opt_string(model.as_ref(), "model")?;
-                metric_value(&self.json, market_json, as_of, model, "gamma")
-            }
-
-            /// Vega of the option.
-            /// @param market_json - Canonical market-context JSON supplying curves, quotes, and FX data.
-            /// @param as_of - ISO-8601 valuation date used to resolve date-dependent market data.
-            /// @param model - Optional pricing-model identifier; omit to use the instrument's default model.
-            /// @returns Vega: change in value per 1.0 absolute move in implied volatility.
-            ///
-            /// # Errors
-            ///
-            /// Throws a JavaScript exception if the instrument or market JSON,
-            /// `asOf`, or `model` is invalid; required market data is missing;
-            /// pricing fails; or vega is not produced by the selected model.
-            pub fn vega(
-                &self,
-                market_json: JsValue,
-                as_of: JsValue,
-                model: Option<JsValue>,
-            ) -> Result<f64, JsValue> {
-                let market_json: &str = &json_text(&market_json, "marketJson")?;
-                let as_of: &str = &js_string(&as_of, "asOf")?;
-                let model = js_opt_string(model.as_ref(), "model")?;
-                metric_value(&self.json, market_json, as_of, model, "vega")
-            }
-
-            /// Theta of the option.
-            /// @param market_json - Canonical market-context JSON supplying curves, quotes, and FX data.
-            /// @param as_of - ISO-8601 valuation date used to resolve date-dependent market data.
-            /// @param model - Optional pricing-model identifier; omit to use the instrument's default model.
-            /// @returns Theta: change in value per year of calendar time.
-            ///
-            /// # Errors
-            ///
-            /// Throws a JavaScript exception if the instrument or market JSON,
-            /// `asOf`, or `model` is invalid; required market data is missing;
-            /// pricing fails; or theta is not produced by the selected model.
-            pub fn theta(
-                &self,
-                market_json: JsValue,
-                as_of: JsValue,
-                model: Option<JsValue>,
-            ) -> Result<f64, JsValue> {
-                let market_json: &str = &json_text(&market_json, "marketJson")?;
-                let as_of: &str = &js_string(&as_of, "asOf")?;
-                let model = js_opt_string(model.as_ref(), "model")?;
-                metric_value(&self.json, market_json, as_of, model, "theta")
-            }
-
-            /// Domestic rate rho of the option.
-            /// @param market_json - Canonical market-context JSON supplying curves, quotes, and FX data.
-            /// @param as_of - ISO-8601 valuation date used to resolve date-dependent market data.
-            /// @param model - Optional pricing-model identifier; omit to use the instrument's default model.
-            /// @returns Domestic rho: change in value per 1.0 absolute move in the domestic rate.
-            ///
-            /// # Errors
-            ///
-            /// Throws a JavaScript exception if the instrument or market JSON,
-            /// `asOf`, or `model` is invalid; required market data is missing;
-            /// pricing fails; or domestic rho is not produced by the selected model.
-            pub fn rho(
-                &self,
-                market_json: JsValue,
-                as_of: JsValue,
-                model: Option<JsValue>,
-            ) -> Result<f64, JsValue> {
-                let market_json: &str = &json_text(&market_json, "marketJson")?;
-                let as_of: &str = &js_string(&as_of, "asOf")?;
-                let model = js_opt_string(model.as_ref(), "model")?;
-                metric_value(&self.json, market_json, as_of, model, "rho")
-            }
-
-            /// Foreign rate rho of the option.
-            /// @param market_json - Canonical market-context JSON supplying curves, quotes, and FX data.
-            /// @param as_of - ISO-8601 valuation date used to resolve date-dependent market data.
-            /// @param model - Optional pricing-model identifier; omit to use the instrument's default model.
-            /// @returns Foreign rho: change in value per 1.0 absolute move in the foreign rate.
-            ///
-            /// # Errors
-            ///
-            /// Throws a JavaScript exception if the instrument or market JSON,
-            /// `asOf`, or `model` is invalid; required market data is missing;
-            /// pricing fails; or foreign rho is not produced by the selected model.
-            #[wasm_bindgen(js_name = foreignRho)]
-            pub fn foreign_rho(
-                &self,
-                market_json: JsValue,
-                as_of: JsValue,
-                model: Option<JsValue>,
-            ) -> Result<f64, JsValue> {
-                let market_json: &str = &json_text(&market_json, "marketJson")?;
-                let as_of: &str = &js_string(&as_of, "asOf")?;
-                let model = js_opt_string(model.as_ref(), "model")?;
-                metric_value(&self.json, market_json, as_of, model, "foreign_rho")
-            }
-
-            /// Vanna of the option.
-            /// @param market_json - Canonical market-context JSON supplying curves, quotes, and FX data.
-            /// @param as_of - ISO-8601 valuation date used to resolve date-dependent market data.
-            /// @param model - Optional pricing-model identifier; omit to use the instrument's default model.
-            /// @returns Vanna: cross sensitivity of delta to implied volatility.
-            ///
-            /// # Errors
-            ///
-            /// Throws a JavaScript exception if the instrument or market JSON,
-            /// `asOf`, or `model` is invalid; required market data is missing;
-            /// pricing fails; or vanna is not produced by the selected model.
-            pub fn vanna(
-                &self,
-                market_json: JsValue,
-                as_of: JsValue,
-                model: Option<JsValue>,
-            ) -> Result<f64, JsValue> {
-                let market_json: &str = &json_text(&market_json, "marketJson")?;
-                let as_of: &str = &js_string(&as_of, "asOf")?;
-                let model = js_opt_string(model.as_ref(), "model")?;
-                metric_value(&self.json, market_json, as_of, model, "vanna")
-            }
-
-            /// Volga of the option.
-            /// @param market_json - Canonical market-context JSON supplying curves, quotes, and FX data.
-            /// @param as_of - ISO-8601 valuation date used to resolve date-dependent market data.
-            /// @param model - Optional pricing-model identifier; omit to use the instrument's default model.
-            /// @returns Volga: change in vega per 1.0 absolute move in implied volatility.
-            ///
-            /// # Errors
-            ///
-            /// Throws a JavaScript exception if the instrument or market JSON,
-            /// `asOf`, or `model` is invalid; required market data is missing;
-            /// pricing fails; or volga is not produced by the selected model.
-            pub fn volga(
-                &self,
-                market_json: JsValue,
-                as_of: JsValue,
-                model: Option<JsValue>,
-            ) -> Result<f64, JsValue> {
-                let market_json: &str = &json_text(&market_json, "marketJson")?;
-                let as_of: &str = &js_string(&as_of, "asOf")?;
-                let model = js_opt_string(model.as_ref(), "model")?;
-                metric_value(&self.json, market_json, as_of, model, "volga")
-            }
-
-            /// Compute standard FX option Greeks as a JavaScript object.
-            /// @param market_json - Canonical market-context JSON supplying curves, quotes, and FX data.
-            /// @param as_of - ISO-8601 valuation date used to resolve date-dependent market data.
-            /// @param model - Optional pricing-model identifier; omit to use the instrument's default model.
-            /// @returns Map of greek name to value, such as `delta`, `gamma`, and `vega`.
-            ///
-            /// # Errors
-            ///
-            /// Throws a JavaScript exception if the instrument or market JSON,
-            /// `asOf`, or `model` is invalid; required market data is missing;
-            /// pricing fails; a returned Greek is non-finite; or the result cannot
-            /// be converted to a JavaScript value.
-            pub fn greeks(
-                &self,
-                market_json: JsValue,
-                as_of: JsValue,
-                model: Option<JsValue>,
-            ) -> Result<JsValue, JsValue> {
-                let market_json: &str = &json_text(&market_json, "marketJson")?;
-                let as_of: &str = &js_string(&as_of, "asOf")?;
-                let model = js_opt_string(model.as_ref(), "model")?;
-                option_greeks_object(&self.json, market_json, as_of, model.as_deref())
-            }
+            /// Metric IDs of the Greek methods this class exposes, in
+            /// `STANDARD_OPTION_GREEKS` order.
+            #[cfg(test)]
+            const GREEK_METHODS: &'static [&'static str] = &[$($metric),+];
+            /// Rust instrument type whose registry decides which Greeks apply.
+            #[cfg(test)]
+            const INSTRUMENT_TYPE: finstack_quant_valuations::pricer::InstrumentType =
+                finstack_quant_valuations::pricer::InstrumentType::$instrument_type;
         }
-    };
-}
-
-macro_rules! fx_option_subset_class {
-    ($rust_name:ident, $js_name:literal, $type_tag:literal, [$(($method:ident, $metric:literal)),+ $(,)?]) => {
-        fx_class!($rust_name, $js_name, $type_tag);
 
         #[wasm_bindgen(js_class = $js_name)]
         impl $rust_name {
             $(
-                /// Compute this supported option sensitivity.
+                #[doc = $summary]
+                /// @param market_json - Canonical market-context JSON supplying curves, quotes, and FX data.
+                /// @param as_of - ISO-8601 valuation date used to resolve date-dependent market data.
+                /// @param model - Optional pricing-model identifier; omit to use the instrument's default model.
+                #[doc = $returns]
+                ///
+                /// # Errors
+                ///
+                /// Throws a JavaScript exception if the instrument or market JSON,
+                /// `asOf`, or `model` is invalid; required market data is missing;
+                /// pricing fails; or the Greek is not produced by the selected model.
+                #[wasm_bindgen(js_name = $js_method)]
                 pub fn $method(
                     &self,
                     market_json: JsValue,
@@ -458,14 +240,16 @@ macro_rules! fx_option_subset_class {
                     let market_json: &str = &json_text(&market_json, "marketJson")?;
                     let as_of: &str = &js_string(&as_of, "asOf")?;
                     let model = js_opt_string(model.as_ref(), "model")?;
-                    metric_value(&self.json, market_json, as_of, model, $metric)
+                    metric_value(&self.envelope_json()?, market_json, as_of, model, $metric)
                 }
             )+
 
-            /// Compute all Greeks supported by this instrument as a JavaScript object.
+            /// Compute every Greek that applies to this instrument as a JavaScript object.
             /// @param market_json - Canonical market-context JSON supplying curves, quotes, and FX data.
             /// @param as_of - ISO-8601 valuation date used to resolve date-dependent market data.
             /// @param model - Optional pricing-model identifier; omit to use the instrument's default model.
+            /// @returns Map of Greek name to value, with keys in the Rust
+            /// `STANDARD_OPTION_GREEKS` order (`delta`, `gamma`, `vega`, `theta`, `rho`, …).
             ///
             /// # Errors
             ///
@@ -482,52 +266,264 @@ macro_rules! fx_option_subset_class {
                 let market_json: &str = &json_text(&market_json, "marketJson")?;
                 let as_of: &str = &js_string(&as_of, "asOf")?;
                 let model = js_opt_string(model.as_ref(), "model")?;
-                option_greeks_object(&self.json, market_json, as_of, model.as_deref())
+                option_greeks_object(&self.envelope_json()?, market_json, as_of, model.as_deref())
             }
         }
     };
 }
 
-fx_class!(JsFxSpot, "FxSpot", "fx_spot");
-fx_class!(JsFxForward, "FxForward", "fx_forward");
-fx_class!(JsFxSwap, "FxSwap", "fx_swap");
-fx_class!(JsNdf, "Ndf", "ndf");
-fx_option_class!(JsFxOption, "FxOption", "fx_option");
-fx_option_subset_class!(
+use finstack_quant_valuations::instruments as fxi;
+
+fx_class!(JsFxSpot, "FxSpot", "fx_spot", fxi::FxSpot);
+fx_class!(JsFxForward, "FxForward", "fx_forward", fxi::FxForward);
+fx_class!(JsFxSwap, "FxSwap", "fx_swap", fxi::FxSwap);
+fx_class!(JsNdf, "Ndf", "ndf", fxi::Ndf);
+fx_class!(
+    JsFxVarianceSwap,
+    "FxVarianceSwap",
+    "fx_variance_swap",
+    fxi::FxVarianceSwap
+);
+
+macro_rules! fx_option_with_all_greeks {
+    ($rust_name:ident, $js_name:literal, $type_tag:literal, $rust_ty:ty, $instrument_type:ident) => {
+        fx_option_class!(
+            $rust_name, $js_name, $type_tag, $rust_ty, $instrument_type,
+            [
+                (delta, "delta", "delta", "Spot delta of the option.", "@returns Spot delta: change in value per unit spot."),
+                (gamma, "gamma", "gamma", "Spot gamma of the option.", "@returns Spot gamma: change in delta per unit spot."),
+                (vega, "vega", "vega", "Vega of the option.", "@returns Vega: change in value per 1.0 absolute move in implied volatility."),
+                (theta, "theta", "theta", "Theta of the option.", "@returns Theta: change in value per year of calendar time."),
+                (rho, "rho", "rho", "Domestic rate rho of the option.", "@returns Domestic rho: change in value per 1.0 absolute move in the domestic rate."),
+                (foreign_rho, "foreignRho", "foreign_rho", "Foreign rate rho of the option.", "@returns Foreign rho: change in value per 1.0 absolute move in the foreign rate."),
+                (vanna, "vanna", "vanna", "Vanna of the option.", "@returns Vanna: cross sensitivity of delta to implied volatility."),
+                (volga, "volga", "volga", "Volga of the option.", "@returns Volga: change in vega per 1.0 absolute move in implied volatility."),
+            ]
+        );
+    };
+}
+
+fx_option_with_all_greeks!(JsFxOption, "FxOption", "fx_option", fxi::FxOption, FxOption);
+fx_option_with_all_greeks!(
+    JsQuantoOption,
+    "QuantoOption",
+    "quanto_option",
+    fxi::QuantoOption,
+    QuantoOption
+);
+fx_option_class!(
     JsFxDigitalOption,
     "FxDigitalOption",
     "fx_digital_option",
+    fxi::FxDigitalOption,
+    FxDigitalOption,
     [
-        (delta, "delta"),
-        (gamma, "gamma"),
-        (vega, "vega"),
-        (theta, "theta"),
-        (rho, "rho"),
+        (
+            delta,
+            "delta",
+            "delta",
+            "Spot delta of the option.",
+            "@returns Spot delta: change in value per unit spot."
+        ),
+        (
+            gamma,
+            "gamma",
+            "gamma",
+            "Spot gamma of the option.",
+            "@returns Spot gamma: change in delta per unit spot."
+        ),
+        (
+            vega,
+            "vega",
+            "vega",
+            "Vega of the option.",
+            "@returns Vega: change in value per 1.0 absolute move in implied volatility."
+        ),
+        (
+            theta,
+            "theta",
+            "theta",
+            "Theta of the option.",
+            "@returns Theta: change in value per year of calendar time."
+        ),
+        (
+            rho,
+            "rho",
+            "rho",
+            "Domestic rate rho of the option.",
+            "@returns Domestic rho: change in value per 1.0 absolute move in the domestic rate."
+        ),
     ]
 );
-fx_option_subset_class!(
+fx_option_class!(
     JsFxTouchOption,
     "FxTouchOption",
     "fx_touch_option",
+    fxi::FxTouchOption,
+    FxTouchOption,
     [
-        (delta, "delta"),
-        (gamma, "gamma"),
-        (vega, "vega"),
-        (rho, "rho"),
+        (
+            delta,
+            "delta",
+            "delta",
+            "Spot delta of the option.",
+            "@returns Spot delta: change in value per unit spot."
+        ),
+        (
+            gamma,
+            "gamma",
+            "gamma",
+            "Spot gamma of the option.",
+            "@returns Spot gamma: change in delta per unit spot."
+        ),
+        (
+            vega,
+            "vega",
+            "vega",
+            "Vega of the option.",
+            "@returns Vega: change in value per 1.0 absolute move in implied volatility."
+        ),
+        (
+            theta,
+            "theta",
+            "theta",
+            "Theta of the option.",
+            "@returns Theta: change in value per year of calendar time."
+        ),
+        (
+            rho,
+            "rho",
+            "rho",
+            "Domestic rate rho of the option.",
+            "@returns Domestic rho: change in value per 1.0 absolute move in the domestic rate."
+        ),
     ]
 );
-fx_option_subset_class!(
+fx_option_class!(
     JsFxBarrierOption,
     "FxBarrierOption",
     "fx_barrier_option",
+    fxi::FxBarrierOption,
+    FxBarrierOption,
     [
-        (delta, "delta"),
-        (gamma, "gamma"),
-        (vega, "vega"),
-        (rho, "rho"),
-        (vanna, "vanna"),
-        (volga, "volga"),
+        (
+            delta,
+            "delta",
+            "delta",
+            "Spot delta of the option.",
+            "@returns Spot delta: change in value per unit spot."
+        ),
+        (
+            gamma,
+            "gamma",
+            "gamma",
+            "Spot gamma of the option.",
+            "@returns Spot gamma: change in delta per unit spot."
+        ),
+        (
+            vega,
+            "vega",
+            "vega",
+            "Vega of the option.",
+            "@returns Vega: change in value per 1.0 absolute move in implied volatility."
+        ),
+        (
+            theta,
+            "theta",
+            "theta",
+            "Theta of the option.",
+            "@returns Theta: change in value per year of calendar time."
+        ),
+        (
+            rho,
+            "rho",
+            "rho",
+            "Domestic rate rho of the option.",
+            "@returns Domestic rho: change in value per 1.0 absolute move in the domestic rate."
+        ),
+        (
+            vanna,
+            "vanna",
+            "vanna",
+            "Vanna of the option.",
+            "@returns Vanna: cross sensitivity of delta to implied volatility."
+        ),
+        (
+            volga,
+            "volga",
+            "volga",
+            "Volga of the option.",
+            "@returns Volga: change in vega per 1.0 absolute move in implied volatility."
+        ),
     ]
 );
-fx_class!(JsFxVarianceSwap, "FxVarianceSwap", "fx_variance_swap");
-fx_option_class!(JsQuantoOption, "QuantoOption", "quanto_option");
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use finstack_quant_valuations::metrics::{standard_registry, MetricId};
+    use finstack_quant_valuations::pricer::{InstrumentType, STANDARD_OPTION_GREEKS};
+
+    #[test]
+    fn public_json_routes_validate_instrument_before_market_json() {
+        assert!(super::super::pricing::tests::not_a_market_request()
+            .price("{}")
+            .is_err());
+        assert!(metric_value(
+            "{}",
+            "not-market-json",
+            "not-a-date",
+            Some("not-a-model".to_string()),
+            "not-a-metric",
+        )
+        .is_err());
+        assert!(
+            option_greeks_object("{}", "not-market-json", "not-a-date", Some("not-a-model"),)
+                .is_err()
+        );
+    }
+
+    /// The Greeks the registry computes for `instrument_type`, in
+    /// `STANDARD_OPTION_GREEKS` order.
+    fn registry_greeks(instrument_type: InstrumentType) -> Vec<String> {
+        let menu: Vec<MetricId> = STANDARD_OPTION_GREEKS
+            .iter()
+            .map(|metric| MetricId::parse_strict(metric).expect("standard greek"))
+            .collect();
+        standard_registry()
+            .applicable_subset(&menu, instrument_type)
+            .iter()
+            .map(|id| id.as_str().to_string())
+            .collect()
+    }
+
+    #[test]
+    fn option_greek_methods_match_the_metric_registry() {
+        let classes: [(&[&str], InstrumentType); 5] = [
+            (JsFxOption::GREEK_METHODS, JsFxOption::INSTRUMENT_TYPE),
+            (
+                JsQuantoOption::GREEK_METHODS,
+                JsQuantoOption::INSTRUMENT_TYPE,
+            ),
+            (
+                JsFxDigitalOption::GREEK_METHODS,
+                JsFxDigitalOption::INSTRUMENT_TYPE,
+            ),
+            (
+                JsFxTouchOption::GREEK_METHODS,
+                JsFxTouchOption::INSTRUMENT_TYPE,
+            ),
+            (
+                JsFxBarrierOption::GREEK_METHODS,
+                JsFxBarrierOption::INSTRUMENT_TYPE,
+            ),
+        ];
+        for (methods, instrument_type) in classes {
+            assert_eq!(
+                methods.to_vec(),
+                registry_greeks(instrument_type),
+                "{instrument_type:?} Greek methods drifted from the metric registry"
+            );
+        }
+    }
+}

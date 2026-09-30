@@ -28,7 +28,7 @@ test('typed instrument fromJson rejects a different instrument type', () => {
     () => valuations.instruments.Bond.fromJson(termLoan),
     (error) => {
       structured('validation')(error);
-      assert.match(error.message, /expected instrument type "bond", found 'term_loan'/);
+      assert.match(error.message, /expected instrument type `bond`, got `term_loan`/);
       return true;
     }
   );

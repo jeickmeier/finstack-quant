@@ -9,34 +9,17 @@
 use crate::utils::input::{from_js_json, js_string, json_text, opt_json_text};
 use crate::utils::{to_js_err, to_js_value};
 use finstack_quant_valuations::instruments::composite::{
-    history, history_from_spec, CompositeInstrument, CompositeMarketObservation,
-    CompositeRebalanceResult, CompositeSpec,
+    history, history_from_spec, CompositeInstrument, CompositeMarketObservation, CompositeSpec,
 };
-use finstack_quant_valuations::instruments::{InstrumentEnvelope, InstrumentJson};
 use finstack_quant_valuations::metrics::MetricId;
-use serde::Serialize;
 use wasm_bindgen::prelude::*;
-
-#[derive(Serialize)]
-struct CompositeRebalanceWire {
-    instrument: InstrumentEnvelope,
-    trades: Vec<finstack_quant_valuations::instruments::composite::CompositeTrade>,
-}
 
 fn parse_spec(json: &str) -> Result<CompositeSpec, JsValue> {
     serde_json::from_str(json).map_err(to_js_err)
 }
 
 fn parse_composite(json: &str) -> Result<CompositeInstrument, JsValue> {
-    match finstack_quant_valuations::pricer::json::parse_instrument_from_json(json)
-        .map_err(to_js_err)?
-    {
-        InstrumentJson::Composite(instrument) => Ok(*instrument),
-        other => Err(to_js_err(finstack_quant_core::Error::Validation(format!(
-            "expected composite instrument envelope, found '{}'",
-            other.type_tag()
-        )))),
-    }
+    finstack_quant_valuations::pricer::parse_typed_instrument_json(json).map_err(to_js_err)
 }
 
 fn parse_observations(json: Option<&str>) -> Result<Vec<CompositeMarketObservation>, JsValue> {
@@ -49,13 +32,6 @@ fn parse_metrics(metrics: Option<JsValue>) -> Result<Vec<MetricId>, JsValue> {
         Some(value) if value.is_null() || value.is_undefined() => Ok(Vec::new()),
         Some(value) => from_js_json::<Vec<MetricId>>(&value, "metrics"),
     }
-}
-
-fn rebalance_value(result: CompositeRebalanceResult) -> Result<JsValue, JsValue> {
-    to_js_value(&CompositeRebalanceWire {
-        instrument: InstrumentEnvelope::new(InstrumentJson::Composite(Box::new(result.instrument))),
-        trades: result.trades,
-    })
 }
 
 /// Resolve an unresolved composite specification into a priceable instrument.
@@ -101,7 +77,7 @@ pub fn initialize_composite(
     let result = spec
         .initialize(&market, date, &history)
         .map_err(to_js_err)?;
-    rebalance_value(result)
+    to_js_value(&result)
 }
 
 /// Explicitly rebalance a resolved composite without mutating the prior state.
@@ -146,7 +122,7 @@ pub fn rebalance_composite(
     let result = instrument
         .rebalance(&market, date, &history)
         .map_err(to_js_err)?;
-    rebalance_value(result)
+    to_js_value(&result)
 }
 
 /// Return path-level plus net/gross primitive value and additive risk.

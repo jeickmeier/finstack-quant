@@ -83,7 +83,7 @@ def test_typed_specs_validate_their_inputs() -> None:
         PrepaymentPenalty.step_down([])
     with pytest.raises(ValueError, match="appraisal_reduction_pct"):
         SpecialServicingSpec(140.0)
-    with pytest.raises(ValueError, match="concentration scope"):
+    with pytest.raises(ValueError, match="invalid scope: unknown variant `country`"):
         ConcentrationLimit("country", 20.0)
     with pytest.raises(ValueError, match="advance rate"):
         AdvanceRate("commercial_mortgage", 1.5)

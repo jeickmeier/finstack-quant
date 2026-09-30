@@ -103,7 +103,7 @@
 - Error handling: centralized `core_to_py()` in `errors.rs` (Python), `JsValue::from_str` (WASM); never use `.unwrap()` or `.expect()` in non-test binding code
 - Module registration: every submodule sets `__all__` via `PyList` in `register()`; no dynamic export discovery
 - Builder pattern: fluent chaining (e.g., `Type.builder(id).field(val).build()`)
-- **WASM exposes a strict subset of `finstack-quant-core`** (currently `currency`, `dates`, `market_data`, `math`, `money`, `types`). Python tracks the full crate surface; WASM is opt-in per module. The agreed subset is documented in `[wasm_core_subset]` in `finstack-quant-py/parity_contract.toml` — update it whenever the WASM core surface changes.
+- **Python↔WASM parity is tracked per namespace** in the `[parity.modules.*]` ledger of `finstack-quant-py/parity_contract.toml`: every public Python name maps to its WASM twin (`js`/`types`), a host exclusion, or the `backlog`, and `backlog_ceiling` only shrinks. `finstack-quant-py/tests/parity/test_parity_ledger.py` enforces it against the live Python surface and `finstack-quant-wasm/facade-surface.json`. Update the ledger in the same change whenever either surface changes.
 
 ## API Conventions
 
