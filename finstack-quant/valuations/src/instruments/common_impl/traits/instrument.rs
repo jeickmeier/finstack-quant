@@ -843,6 +843,47 @@ pub trait Instrument: CashflowProvider + Send + Sync {
         true
     }
 
+    /// Copy of this instrument whose observation state covers a theta roll.
+    ///
+    /// Theta holds the market fixed: spot stays at its `as_of` level over
+    /// `[as_of, rolled_date]`. A path-dependent instrument whose monitoring or
+    /// observation window the roll enters therefore observes the current spot
+    /// throughout it. A barrier or touch is breached over the roll only if it
+    /// is already breached or the current spot is at or beyond the barrier.
+    /// The theta calculator reprices the returned copy at `rolled_date` and
+    /// keeps `self` for the `as_of` valuation and the period cash.
+    ///
+    /// The default returns `None` (the instrument carries no observation
+    /// state that the roll changes). Only instrument-held state is rolled.
+    /// Market-held fixings, such as `FIXING:*` rate series or historical price
+    /// series, are not added to the rolled market.
+    ///
+    /// # Arguments
+    /// * `market` - Market at `as_of`; supplies the spot that is held fixed
+    ///   over the roll.
+    /// * `as_of` - Valuation date the roll starts from.
+    /// * `rolled_date` - Date theta reprices at, after capping at expiry;
+    ///   later than `as_of`.
+    ///
+    /// # Returns
+    ///
+    /// `Some(copy)` with the observation state implied by the held spot when
+    /// the roll changes it, else `None` to reprice `self` unchanged.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the spot needed to decide the observed state is
+    /// missing from `market`.
+    fn theta_observed_state(
+        &self,
+        market: &MarketContext,
+        as_of: Date,
+        rolled_date: Date,
+    ) -> finstack_quant_core::Result<Option<Box<dyn Instrument>>> {
+        let _ = (market, as_of, rolled_date);
+        Ok(None)
+    }
+
     /// Last date with outstanding settlement economics for period-carry metrics.
     ///
     /// Defaults to contractual expiry. Products with adjusted or lagged cash

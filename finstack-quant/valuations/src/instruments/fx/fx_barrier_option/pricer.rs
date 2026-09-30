@@ -351,7 +351,7 @@ fn seasoned_breached_value_per_unit(
     }
 }
 
-fn resolve_fx_spot(
+pub(crate) fn resolve_fx_spot(
     inst: &FxBarrierOption,
     curves: &MarketContext,
     as_of: Date,

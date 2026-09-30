@@ -388,7 +388,7 @@ fx_option_class!(
             "theta",
             "theta",
             "Theta of the option.",
-            "@returns Theta: change in value per year of calendar time."
+            "@returns Theta: P&L over the theta horizon (default one day, capped at expiry) with spot held at its `asOf` level, so a roll into the monitoring window observes that spot; not annualized."
         ),
         (
             rho,
@@ -432,7 +432,7 @@ fx_option_class!(
             "theta",
             "theta",
             "Theta of the option.",
-            "@returns Theta: change in value per year of calendar time."
+            "@returns Theta: P&L over the theta horizon (default one day, capped at expiry) with spot held at its `asOf` level, so a roll into the monitoring window observes that spot; not annualized."
         ),
         (
             rho,

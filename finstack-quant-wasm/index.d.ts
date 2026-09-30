@@ -6601,7 +6601,7 @@ export interface FxTouchOptionInstrument extends FxInstrument {
    * @param marketJson - Canonical market-context JSON supplying curves, quotes, and FX data.
    * @param asOf - ISO-8601 valuation date used to select market inputs and date-dependent cashflows.
    * @param model - Optional pricing-model identifier; omit to use the instrument's default model.
-   * @returns Theta: change in value per year of calendar time.
+   * @returns Theta: P&L over the theta horizon (default one day, capped at expiry) with spot held at its `asOf` level, so a roll into the monitoring window observes that spot; not annualized.
    */
   theta(marketJson: JsonInput, asOf: string, model?: string | null): number;
   /**

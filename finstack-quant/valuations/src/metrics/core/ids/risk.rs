@@ -5,7 +5,12 @@ use std::borrow::Cow;
 impl MetricId {
     // Core Risk Metrics
 
-    /// Time decay (theta) - 1D Day Time decay P&L
+    /// Time decay (theta): P&L over the theta horizon (default one day,
+    /// capped at expiry) with the market held fixed, including period cash.
+    ///
+    /// Spot stays at its valuation-date level, so path-dependent observations
+    /// inside the horizon (barrier monitoring, touch state, scheduled fixings)
+    /// observe that spot.
     pub const Theta: Self = Self(Cow::Borrowed("theta"));
 
     /// Theta carry component (coupon accrual, pull-to-par, funding)

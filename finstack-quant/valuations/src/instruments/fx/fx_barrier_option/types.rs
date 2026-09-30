@@ -555,8 +555,58 @@ impl crate::instruments::common_impl::traits::Instrument for FxBarrierOption {
         Ok(result.value)
     }
 
+    fn expiry(&self) -> Option<Date> {
+        Some(self.expiry)
+    }
+
     fn effective_start_date(&self) -> Option<finstack_quant_core::dates::Date> {
         None
+    }
+
+    /// Roll the observed barrier state with spot held at its `as_of` level.
+    ///
+    /// When the roll enters the monitoring window (continuous monitoring from
+    /// `monitoring_start_date`, a discrete observation date before
+    /// `rolled_date`, or expiry) and no state is recorded, the copy records
+    /// the barrier as breached exactly when the `as_of` FX spot is at or
+    /// beyond it.
+    ///
+    /// # Arguments
+    /// * `market` - Market at `as_of` supplying the FX spot held over the roll.
+    /// * `as_of` - Valuation date the roll starts from.
+    /// * `rolled_date` - Date theta reprices at, capped at expiry.
+    fn theta_observed_state(
+        &self,
+        market: &finstack_quant_core::market_data::context::MarketContext,
+        as_of: Date,
+        rolled_date: Date,
+    ) -> finstack_quant_core::Result<
+        Option<Box<dyn crate::instruments::common_impl::traits::Instrument>>,
+    > {
+        if self.observed_barrier_breached.is_some() || as_of > self.expiry {
+            return Ok(None);
+        }
+        let monitored = rolled_date >= self.expiry
+            || match &self.monitoring {
+                Monitoring::Continuous => self
+                    .monitoring_start_date
+                    .is_some_and(|start| start < rolled_date),
+                Monitoring::Discrete { observation_dates } => {
+                    observation_dates.iter().any(|date| *date < rolled_date)
+                }
+            };
+        if !monitored {
+            return Ok(None);
+        }
+        let spot = super::pricer::resolve_fx_spot(self, market, as_of)?;
+        let breached = if self.barrier_type.is_up() {
+            spot >= self.barrier
+        } else {
+            spot <= self.barrier
+        };
+        let mut observed = self.clone();
+        observed.observed_barrier_breached = Some(breached);
+        Ok(Some(Box::new(observed)))
     }
 
     crate::impl_focused_pricing_overrides!();

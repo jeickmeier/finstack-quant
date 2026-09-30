@@ -12,6 +12,7 @@
 //! - `greek_relationships` - Mathematical relationships between Greeks
 //! - `invariants` - Property-based tests for metric invariants
 //! - `sign_conventions` - Correct sign conventions for all Greeks
+//! - `theta_observed_fixings` - Theta records the held spot for fixings inside the roll
 //! - `var_quantile` - Historical-simulation VaR/ES quantile-estimator tests
 //!
 //! ## Notes
@@ -28,5 +29,6 @@ mod greek_relationships;
 mod invariants;
 mod option_provider_consolidation;
 mod sign_conventions;
+mod theta_observed_fixings;
 mod vanna_volga_pockets;
 mod var_quantile;

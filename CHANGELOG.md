@@ -2,6 +2,21 @@
 
 ## [Unreleased]
 
+### WASM binding audit: theta for path-dependent options (2026-09-30)
+
+#### Fixed
+
+- Theta no longer fails when the roll enters a monitoring or observation window. This covered seasoned and monitoring-window FX barrier and FX touch options, equity barriers with a discrete observation in the roll or rolling to expiry, and Asian, autocallable and cliquet options with a fixing inside the roll.
+  - Theta holds the market fixed, so the rolled repricing records the observation state implied by the as-of spot: a barrier counts as breached if spot is at or beyond it, and fixings in the window equal spot.
+  - This is implemented by the new provided `Instrument::theta_observed_state` hook (default `None`).
+  - Base pricing and the seasoned-state validation are unchanged.
+- `FxBarrierOption::expiry()` and `BarrierOption::expiry()` return the expiry, so theta is capped at expiry for them.
+- The WASM `FxTouchOption` / `FxBarrierOption` `theta` docs describe the P&L over the theta horizon; they had described an annualized figure.
+
+#### Known limitation
+
+- Instruments whose fixings live in the market (RFR/IBOR swaps, floating-rate bonds and loans, caps/floors, variance swaps) still cannot roll theta across a fixing date. OIS swaps valued inside an accrual period fail at the default 1D horizon. Tracked separately.
+
 ### WASM binding audit: valuations (2026-09-30)
 
 #### Changed (BREAKING)

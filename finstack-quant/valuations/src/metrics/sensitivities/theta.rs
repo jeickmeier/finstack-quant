@@ -30,6 +30,32 @@
 //!    - Swaps: Net interest payments
 //!    - Options: Usually zero (no interim cashflows)
 //!
+//! ## Market Held Fixed
+//!
+//! Theta rolls only the valuation date: the market is held fixed. Curves
+//! are rolled with `MarketContext::roll_forward`, and spot, volatility and
+//! every other quote stay at their `as_of` values. A path-dependent
+//! instrument therefore observes the `as_of` spot over the whole horizon.
+//! Before the rolled repricing, the calculator asks the
+//! instrument for that observation state through
+//! [`Instrument::theta_observed_state`](crate::instruments::Instrument::theta_observed_state):
+//!
+//! - Barrier and touch options whose monitoring window the roll enters (FX
+//!   barrier, FX touch, and equity barriers with a discrete observation in the
+//!   roll or a roll to expiry) record the barrier as breached only if it
+//!   already was or the `as_of` spot is at or beyond it. Before expiry, a
+//!   continuously monitored equity barrier needs no recorded state: its
+//!   pricer reads a breach from the held spot.
+//! - Scheduled fixings inside the roll (Asian averaging dates, autocallable
+//!   observations, cliquet resets) record the `as_of` spot, and a trade struck
+//!   at `as_of` records that spot as its strike-set level.
+//!
+//! The `as_of` valuation and the period cash use the instrument unchanged,
+//! and ordinary pricing still requires recorded state for past observations.
+//! Market-held fixings (`FIXING:*` rate series, historical price series) are
+//! not added to the rolled market, so theta across such a fixing date still
+//! requires that fixing in the market.
+//!
 //! ## Sign Convention
 //!
 //! - **Negative theta**: Instrument loses value over time (e.g., long options)
@@ -306,7 +332,18 @@ fn compute_theta_breakdown(context: &mut crate::metrics::MetricContext) -> Resul
 
     let horizon_days = (rolled_date - context.as_of).whole_days();
     let rolled_market = context.curves.roll_forward(horizon_days)?;
-    let rolled_pv = context.reprice_money(&rolled_market, rolled_date)?.amount();
+    // Spot is held at its as-of level, so the observation state over the roll
+    // is the one that spot implies (`Instrument::theta_observed_state`).
+    let observed =
+        context
+            .instrument
+            .theta_observed_state(&context.curves, context.as_of, rolled_date)?;
+    let rolled_instrument = observed
+        .as_deref()
+        .unwrap_or_else(|| context.instrument.as_ref());
+    let rolled_pv = context
+        .reprice_instrument_money(rolled_instrument, &rolled_market, rolled_date)?
+        .amount();
 
     let start_date = context.as_of;
     let carry =
@@ -344,6 +381,11 @@ fn store_theta_breakdown(context: &mut crate::metrics::MetricContext, breakdown:
 ///
 /// This calculator works with `dyn Instrument` directly, using the trait's `value()` method,
 /// and is registered as the default theta calculator for all instruments.
+///
+/// The market is held fixed over the horizon: `PV(end_date)` reprices the
+/// instrument returned by `Instrument::theta_observed_state` (observation
+/// state implied by the as-of spot), or the unchanged instrument when it
+/// returns `None`. See the module docs, "Market Held Fixed".
 #[derive(Default)]
 pub(crate) struct GenericThetaAny;
 
