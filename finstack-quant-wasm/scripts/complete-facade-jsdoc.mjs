@@ -144,39 +144,19 @@ function firstSummarySentence(existingSummary) {
   return first.replace(/\.$/, '');
 }
 
-function numericReturnDescription(name, existingSummary) {
-  const method = (name || '').toLowerCase();
-  if (method === 'df') return 'Discount factor for 1 unit paid at the requested time.';
-  if (method === 'zero') return 'Continuously compounded zero rate as a decimal.';
-  if (method === 'forward' || method === 'rate' || method === 'ratebetween')
-    return 'Forward or zero rate as a decimal.';
-  if (method === 'volga')
-    return 'Volga: change in vega per 1.0 absolute move in implied volatility.';
-  if (method.includes('vol') || method === 'impliedvol' || method === 'atmvol')
-    return 'Implied volatility as a decimal, such as 0.20 for 20%.';
-  if (method.includes('yearfraction') || method === 'toyearssimple')
-    return 'Year fraction in years under the selected day-count convention.';
-  if (method.includes('prob') || method.includes('cdf')) return 'Probability in `[0, 1]`.';
-  if (method.includes('price') || method.includes('pv'))
-    return 'Price in the same units as the supplied spot, forward, or notional.';
-  if (method === 'delta') return 'Spot delta: change in value per unit spot.';
-  if (method === 'gamma') return 'Spot gamma: change in delta per unit spot.';
-  if (method === 'vega')
-    return 'Vega: change in value per 1.0 absolute move in implied volatility.';
-  if (method === 'theta') return 'Theta: change in value per year of calendar time.';
-  if (method === 'rho' || method === 'foreignrho')
-    return 'Interest-rate rho: change in value per 1.0 absolute move in the corresponding rate.';
-  if (method === 'vanna') return 'Vanna: cross sensitivity of delta to implied volatility.';
+// A number-returning member with no `@returns` repeats its own summary. The
+// completer never derives units or conventions from a method name: those are
+// written in the Rustdoc and reach this file through `sync-facade-jsdoc`.
+function summaryReturnDescription(existingSummary) {
   const summary = firstSummarySentence(existingSummary);
-  if (summary) return `${summary}.`;
-  return `Returns the ${humanize(name)} as a finite number.`;
+  return summary ? `${summary}.` : null;
 }
 
 function returnDescription(type, name, existingSummary) {
   if (!type) return 'Returns the result of this call.';
   const text = type.getText(sourceFile);
   const method = name || '';
-  if (text === 'number') return numericReturnDescription(method, existingSummary);
+  if (text === 'number') return summaryReturnDescription(existingSummary);
   if (text === 'boolean') {
     const summary = firstSummarySentence(existingSummary);
     if (summary) return `${summary}.`;
@@ -184,8 +164,7 @@ function returnDescription(type, name, existingSummary) {
   }
   if (text === 'string') {
     if (method === 'toString') return 'Human-readable string form of this value.';
-    if (method === 'toJson' || method.endsWith('Json')) return 'Canonical JSON string.';
-    return 'JSON string or identifier produced by this call.';
+    return summaryReturnDescription(existingSummary);
   }
   if (text === 'bigint') return 'Integer count produced by this call.';
   if (/^Promise<(.+)>$/.test(text))
@@ -213,87 +192,18 @@ function returnDescription(type, name, existingSummary) {
   return `Returns a \`${text}\` result.`;
 }
 
+// Parameters whose meaning is fixed by the facade itself, not by the callable.
+// Every other undocumented parameter is left without an `@param`, which
+// `check-typescript-docs.mjs` reports: its description belongs in the Rustdoc.
 const parameterDescriptions = new Map([
   [
     'moduleOrPath',
     'Optional module source: a URL, Response, WebAssembly.Module, or Promise accepted by wasm-bindgen initialization.',
   ],
-  ['marketJson', 'Canonical market-context JSON supplying curves, quotes, and FX data.'],
-  ['asOf', 'ISO-8601 valuation date used to select market inputs and date-dependent cashflows.'],
-  ['model', "Optional pricing-model identifier; omit to use the instrument's default model."],
-  [
-    'envelope',
-    'Calibration envelope containing the plan, market data, and optional prior market objects.',
-  ],
-  ['id', 'Identifier assigned to this object.'],
-  ['baseDate', 'ISO-8601 base or valuation date that anchors the curve time axis.'],
-  ['dayCount', 'Day-count convention used to convert dates into year fractions.'],
-  [
-    'projectionGrid',
-    "Projection-grid specification that defines the curve's forward-rate intervals.",
-  ],
-  ['resetLag', 'Reset lag applied when projecting the index or forward rate.'],
-  ['expiries', 'Option-expiry tenors that define the surface rows in ascending order.'],
-  ['tenors', 'Underlying tenors that define the surface columns in ascending order.'],
-  ['paramsFlat', 'Row-major flattened parameter array aligned with the expiry and tenor axes.'],
-  ['forwards', 'Forward values aligned with the corresponding expiry and tenor grid points.'],
-  ['interpolationMode', 'Interpolation policy used between the supplied surface pillars.'],
-  ['base', 'Base currency of the FX quote or conversion.'],
-  ['quote', 'Quote currency of the FX quote or conversion.'],
-  ['rate', 'FX or interest rate as a decimal in the quote convention of the surrounding call.'],
-  ['date', 'ISO-8601 date at which the requested value or market quote applies.'],
-  ['policy', 'FX conversion timing policy applied to the requested cashflow or value.'],
-  ['atmVols', 'At-the-money implied volatilities aligned with the supplied expiries.'],
-  ['rr25d', '25-delta risk reversals aligned with the supplied expiries.'],
-  ['bf25d', '25-delta butterflies aligned with the supplied expiries.'],
-  ['rr10d', '10-delta risk reversals aligned with the supplied expiries.'],
-  ['bf10d', '10-delta butterflies aligned with the supplied expiries.'],
-  ['fromLevels', 'Earlier hierarchy-level snapshot used as the start of the period comparison.'],
-  ['toLevels', 'Later hierarchy-level snapshot used as the end of the period comparison.'],
-  [
-    'metrics',
-    "Optional metric identifiers to compute with this call; omit, null, or empty follows that callable's documented default.",
-  ],
-  [
-    'metricPricingOverrides',
-    'Optional JSON metric-pricing overrides merged into the instrument envelope before validation.',
-  ],
-  [
-    'marketHistory',
-    'Optional serialized market-history JSON required by historical risk metrics such as historical VaR.',
-  ],
-  ['spec', 'Specification object or JSON used to construct this value.'],
-  ['json', 'Canonical JSON string for this value.'],
-  ['jsonStr', 'Canonical JSON string to validate and re-serialize.'],
-  ['params', 'Optional parameters; omit to use defaults.'],
-  ['t', 'Time from the curve base date in years.'],
-  ['spot', 'Current spot price or exchange rate in the same units as the strike.'],
-  ['isCall', 'Whether to value a call (`true`) or put (`false`).'],
-  ['computeIncremental', 'When true, also compute incremental VaR; omit to skip.'],
-  ['midYearConvention', 'When true, apply mid-year DCF discounting.'],
-  ['marketVols', 'Market implied volatilities used as calibration or pricing inputs.'],
-  ['varValue', 'Loss-convention VaR in the same units as `positionValue`; must be non-positive.'],
-  ['instrumentJson', 'Canonical instrument envelope JSON in the Finstack v1 schema.'],
-  ['modelJson', 'Financial-model specification JSON.'],
-  ['configJson', 'Configuration JSON for this call.'],
-  ['resultsJson', 'Evaluated statement-result JSON.'],
-  ['returnsJson', 'Numeric return-series JSON.'],
-  ['scenarioJson', 'JSON-serialized scenario definition applied to the market or instrument.'],
-  ['method', 'Method name selecting the calculation variant.'],
 ]);
 
 function parameterDescription(parameter) {
-  const name = parameter.name.getText(sourceFile);
-  const type = parameter.type?.getText(sourceFile) ?? 'value';
-  if (parameterDescriptions.has(name)) return parameterDescriptions.get(name);
-  if (name.endsWith('Json')) return `Canonical JSON for ${humanize(name.slice(0, -4))}.`;
-  if (name.endsWith('Date')) return `ISO-8601 ${humanize(name)} used by this calculation.`;
-  if (name === 'matrix')
-    return 'Square numeric matrix as nested `number[][]` or flat row-major entries.';
-  if (type === 'number') return `${capitalize(humanize(name))} as a finite number.`;
-  if (type === 'string') return `${capitalize(humanize(name))} as a string.`;
-  if (type === 'boolean') return `Whether ${humanize(name)} is true.`;
-  return `${capitalize(humanize(name))} used by this call.`;
+  return parameterDescriptions.get(parameter.name.getText(sourceFile)) ?? null;
 }
 
 function classNameFor(interfaceName) {
@@ -362,18 +272,18 @@ function completeDocumentation(node, interfaceName) {
     const parameters = documentedParameters(documentationText);
     for (const parameter of node.parameters ?? []) {
       const name = parameter.name.getText(sourceFile);
-      if (!parameters.has(name)) tags.push(`@param ${name} - ${parameterDescription(parameter)}`);
+      const description = parameters.has(name) ? null : parameterDescription(parameter);
+      if (description) tags.push(`@param ${name} - ${description}`);
     }
     const skipReturns =
       ts.isConstructorDeclaration(node) || node.type?.kind === ts.SyntaxKind.VoidKeyword;
     if (!skipReturns && !hasTag(documentationText, 'returns')) {
-      tags.push(
-        `@returns ${returnDescription(
-          node.type,
-          nodeName(node),
-          existingSummary && existingSummary.length >= 16 ? existingSummary : defaultSummary
-        )}`
+      const description = returnDescription(
+        node.type,
+        nodeName(node),
+        existingSummary && existingSummary.length >= 16 ? existingSummary : defaultSummary
       );
+      if (description) tags.push(`@returns ${description}`);
     }
   }
   return appendTags(documentationText, tags);

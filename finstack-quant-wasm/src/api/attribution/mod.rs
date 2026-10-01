@@ -2,11 +2,13 @@
 //!
 //! # Number safety
 //!
-//! All counts and metrics (`num_repricings`, residuals, factor P&Ls) cross the
-//! wasm boundary *inside* JSON strings, not as raw `usize`/`f64` values. JS's
-//! `JSON.parse` reads those numbers as IEEE-754 doubles, so integer counts
-//! above `Number.MAX_SAFE_INTEGER` (2^53 − 1) would silently round in the
-//! consumer. Today every count in the attribution surface is bounded by a
+//! The structured entry points (`attributePnl`, `attributePnlEnvelope`,
+//! `attributePnlMany`) return objects built by `crate::utils::to_js_value`, so
+//! counts and metrics (`num_repricings`, residuals, factor P&Ls) arrive as JS
+//! numbers; that serializer rejects an integer above `Number.MAX_SAFE_INTEGER`
+//! (2^53 − 1) instead of rounding it. Only the `*Json` wire twins carry them
+//! inside JSON strings, where `JSON.parse` would silently round a larger
+//! integer. Today every count in the attribution surface is bounded by a
 //! handful of factors (≤ 12) and a handful of repricings (≤ ~30), well under
 //! the safe-integer ceiling.
 
@@ -53,15 +55,6 @@ impl JsAttributionJsonInputs {
     /// * `config_json` - Optional complete attribution configuration JSON.
     /// * `full_cross_attribution` - When `Some(true)`, evaluate every pairwise
     ///   cross-factor term.
-    ///
-    /// @param instrument_json - Canonical instrument envelope JSON in the Finstack v1 schema.
-    /// @param market_t0_json - Canonical MarketContext JSON at the attribution start date.
-    /// @param market_t1_json - Canonical MarketContext JSON at the attribution end date.
-    /// @param as_of_t0 - ISO-8601 valuation date for the start market snapshot.
-    /// @param as_of_t1 - ISO-8601 valuation date for the end market snapshot.
-    /// @param method_json - `AttributionMethod` wire value selecting the P-and-L decomposition: a unit variant name such as `"parallel"` or `"metrics_based"`, an object such as `{ waterfall: ["carry", "rates_curves"] }`, or the same value as JSON text.
-    /// @param config_json - Optional attribution configuration JSON controlling calculation settings.
-    /// @param full_cross_attribution - Whether to calculate all pairwise cross-factor attribution terms.
     #[wasm_bindgen(constructor)]
     #[allow(clippy::too_many_arguments)]
     pub fn new(
@@ -106,8 +99,6 @@ impl JsAttributionJsonInputs {
     /// # Arguments
     ///
     /// * `value` - JSON snapshot of T₀ model parameters, or omitted.
-    ///
-    /// @param value - Optional serialized opening ModelParamsSnapshot JSON.
     #[wasm_bindgen(setter, js_name = modelParamsT0Json)]
     pub fn set_model_params_t0_json(&mut self, value: Option<JsValue>) -> Result<(), JsValue> {
         self.model_params_t0_json = opt_json_text(value.as_ref(), "modelParamsT0Json")?;
@@ -119,8 +110,6 @@ impl JsAttributionJsonInputs {
     /// # Returns
     ///
     /// The JSON snapshot attached after construction, or omitted.
-    ///
-    /// @returns The JSON snapshot attached after construction, or omitted.
     #[wasm_bindgen(getter, js_name = modelParamsT0Json)]
     pub fn model_params_t0_json(&self) -> Option<String> {
         self.model_params_t0_json.clone()
@@ -131,8 +120,6 @@ impl JsAttributionJsonInputs {
     /// # Arguments
     ///
     /// * `value` - JSON credit-factor model, or omitted.
-    ///
-    /// @param value - Optional serialized CreditFactorModel JSON.
     #[wasm_bindgen(setter, js_name = creditFactorModelJson)]
     pub fn set_credit_factor_model_json(&mut self, value: Option<JsValue>) -> Result<(), JsValue> {
         self.credit_factor_model_json = opt_json_text(value.as_ref(), "creditFactorModelJson")?;
@@ -144,8 +131,6 @@ impl JsAttributionJsonInputs {
     /// # Returns
     ///
     /// The JSON credit-factor model attached after construction, or omitted.
-    ///
-    /// @returns The JSON credit-factor model attached after construction, or omitted.
     #[wasm_bindgen(getter, js_name = creditFactorModelJson)]
     pub fn credit_factor_model_json(&self) -> Option<String> {
         self.credit_factor_model_json.clone()
@@ -190,14 +175,14 @@ fn attribution_spec(
 
 /// Run P&L attribution for a single instrument.
 ///
-/// Accepts a [`JsAttributionJsonInputs`] object with the instrument JSON, two market
+/// Accepts an `AttributionJsonInputs` object with the instrument JSON, two market
 /// snapshots, dates, and a method descriptor. Returns the `PnlAttribution`
 /// result as a structured JavaScript object whose fields carry the canonical
 /// Rust serde names (`total_pnl.amount`, `carry`, `meta`, ...); use
 /// [`attribute_pnl_json`] for the JSON wire string. `config_json` may include
-/// `"execution_policy": "parallel"` to opt into inner Rayon when the host
-/// is not already parallelizing attribution at a higher level. Serial is
-/// the default.
+/// `"execution_policy": "parallel"`, which opts into inner Rayon on native
+/// hosts; WebAssembly builds have no Rayon, so the field is accepted but
+/// ignored here and attribution always runs serially (same result).
 ///
 /// # Errors
 ///
@@ -224,7 +209,7 @@ pub fn attribute_pnl(params: &JsAttributionJsonInputs) -> Result<JsValue, JsValu
 ///
 /// # Errors
 ///
-/// Rejects the same conditions as [`attribute_pnl`], plus failure to
+/// Rejects the same conditions as `attributePnl`, plus failure to
 /// serialize the result to JSON.
 /// @param params - Fully specified AttributionJsonInputs object containing instrument, markets, dates, and method.
 #[wasm_bindgen(js_name = attributePnlJson)]
@@ -271,7 +256,7 @@ pub fn attribute_pnl_envelope(spec_json: JsValue) -> Result<JsValue, JsValue> {
 ///
 /// # Errors
 ///
-/// Rejects the same conditions as [`attribute_pnl_envelope`], plus failure to
+/// Rejects the same conditions as `attributePnlEnvelope`, plus failure to
 /// serialize the result envelope.
 /// @param spec_json - JSON-serialized AttributionEnvelope (schema `finstack_quant.attribution/1`) to validate and execute.
 #[wasm_bindgen(js_name = attributePnlEnvelopeJson)]

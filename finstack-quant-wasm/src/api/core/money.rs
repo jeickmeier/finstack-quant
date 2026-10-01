@@ -11,7 +11,7 @@ use wasm_bindgen::prelude::*;
 
 /// Currency-tagged monetary amount.
 ///
-/// Money values pin a numeric amount to a [`JsCurrency`]. The arithmetic
+/// Money values pin a numeric amount to a `Currency`. The arithmetic
 /// methods carry the Rust names: `checkedAdd` / `checkedSub` refuse to mix
 /// currencies; `checkedMulF64` / `checkedDivF64` scale by a number and keep
 /// the currency; `checkedNeg` negates exactly.
@@ -85,7 +85,7 @@ impl JsMoney {
 
     /// Currency of this amount.
     ///
-    /// @returns The [`JsCurrency`] this amount is tagged with.
+    /// @returns The `Currency` this amount is tagged with.
     #[wasm_bindgen(getter, js_name = currency)]
     pub fn currency(&self) -> JsCurrency {
         JsCurrency {

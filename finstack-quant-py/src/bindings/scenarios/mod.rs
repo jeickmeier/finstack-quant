@@ -24,16 +24,16 @@ fn builtin_registry() -> PyResult<&'static finstack_quant_scenarios::TemplateReg
 
 /// Compose several scenario specifications into one.
 ///
-/// Later specs layer on top of earlier ones. Where two specs touch the same
-/// target, the composed spec resolves the conflict using each operation's
-/// ``resolution_mode`` (see ``ScenarioSpec``). Every input must use
-/// the same ``hazard_bump_mode``; mixed hazard delivery conventions are
-/// rejected rather than silently selecting one.
+/// Specs are stably sorted by ascending ``priority`` (equal priorities keep
+/// input order) and their operations concatenated in that order. Every input
+/// must use the same ``hazard_bump_mode``; mixed hazard delivery conventions
+/// are rejected rather than silently selecting one.
 ///
 /// Parameters
 /// ----------
 /// specs : list[ScenarioSpec]
-///     Typed scenario specifications in application order.
+///     Typed scenario specifications; execution order is determined by each
+///     spec's ``priority``, not by list position.
 ///
 /// Returns
 /// -------

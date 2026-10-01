@@ -842,7 +842,7 @@ pub fn aggregate_full_cashflows(
 }
 
 /// Aggregate the full classified cashflow ladder for an already-built
-/// [`JsPortfolio`] handle.
+/// `Portfolio` handle.
 ///
 /// Skips the per-call `PortfolioSpec` parse + `Portfolio::from_spec` rebuild.
 /// For batched or chained workflows (repeated cashflow builds across market
@@ -883,7 +883,7 @@ pub fn aggregate_full_cashflows_built(
     to_js_value(&cashflows)
 }
 
-/// Value an already-built [`JsPortfolio`] handle. Skips the per-call
+/// Value an already-built `Portfolio` handle. Skips the per-call
 /// `PortfolioSpec` parse + `Portfolio::from_spec` rebuild that
 /// [`value_portfolio`] performs; use this when sweeping market scenarios
 /// against a fixed portfolio.
@@ -958,7 +958,7 @@ pub fn value_portfolio_built(
     to_js_value_with_bigints(&valuation)
 }
 
-/// Apply a scenario to an already-built [`JsPortfolio`] handle and revalue.
+/// Apply a scenario to an already-built `Portfolio` handle and revalue.
 /// Returns a JS object with structured `valuation` and `report` values.
 /// @param portfolio - Built portfolio object whose positions and weights are used by the calculation.
 /// @param scenario_json - Scenario specification JSON.
@@ -1031,7 +1031,7 @@ pub fn apply_scenario_and_revalue(
 }
 
 /// Compute the profit and loss attributable to a scenario for an already-built
-/// [`JsPortfolio`] handle.
+/// `Portfolio` handle.
 ///
 /// Values the portfolio against the unshocked market and against the
 /// scenario-shocked market, and returns a JS object with structured `pnl`

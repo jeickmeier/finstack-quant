@@ -78,36 +78,41 @@ function rawDocumentation() {
   return { classes, functions };
 }
 
-function camelCase(name) {
-  return name.replace(/_([a-zA-Z])/g, (_, letter) => letter.toUpperCase());
-}
-
 function canonicalParameterName(name) {
   return name.replace(/_/g, '').toLowerCase();
 }
 
-function normalizeParameterTags(documentationText, node) {
-  if (!documentationText || !('parameters' in node)) return documentationText;
-  const names = new Map(
-    node.parameters.map((parameter) => {
-      const name = parameter.name.getText(facade);
-      return [canonicalParameterName(name), name];
-    })
-  );
-  return documentationText.replace(/@param\s+([A-Za-z_$][\w$]*)\b/g, (tag, name) => {
-    const normalized = names.get(canonicalParameterName(name));
-    return normalized ? `@param ${normalized}` : tag;
-  });
-}
-
-function convertRustArguments(documentationText, node) {
-  if (!documentationText) return documentationText;
+// Facade parameter for a Rust parameter name. The facade drops the `Json`
+// suffix where it also accepts a plain object (`instrument_json` is declared
+// as `instrument`), so that spelling is tried after the exact name.
+function facadeParameterNames(node) {
   const names = new Map(
     ('parameters' in node ? node.parameters : []).map((parameter) => {
       const name = parameter.name.getText(facade);
       return [canonicalParameterName(name), name];
     })
   );
+  return (rustName) => {
+    const canonical = canonicalParameterName(rustName);
+    return (
+      names.get(canonical) ??
+      (canonical.endsWith('json') ? names.get(canonical.slice(0, -'json'.length)) : undefined)
+    );
+  };
+}
+
+function normalizeParameterTags(documentationText, node) {
+  if (!documentationText || !('parameters' in node)) return documentationText;
+  const facadeName = facadeParameterNames(node);
+  return documentationText.replace(/@param\s+([A-Za-z_$][\w$]*)\b/g, (tag, name) => {
+    const normalized = facadeName(name);
+    return normalized ? `@param ${normalized}` : tag;
+  });
+}
+
+function convertRustArguments(documentationText, node) {
+  if (!documentationText) return documentationText;
+  const facadeName = facadeParameterNames(node);
   const body = documentationText
     .replace(/^\/\*\*\s*|\s*\*\/$/g, '')
     .split('\n')
@@ -135,7 +140,7 @@ function convertRustArguments(documentationText, node) {
     if (inArguments) {
       const argument = stripped.match(/^\*\s*`([A-Za-z_][A-Za-z0-9_]*)`\s*-\s*(.+)$/);
       if (argument) {
-        const name = names.get(canonicalParameterName(argument[1]));
+        const name = facadeName(argument[1]);
         if (name) converted.push(`@param ${name} - ${argument[2]}`);
         continue;
       }
@@ -168,9 +173,8 @@ function formatDocumentation(documentationText, node) {
   ].join('\n');
 }
 
-function tagsFromRustdoc(documentationText, parameterNames) {
+function tagsFromRustdoc(documentationText, facadeName) {
   const lines = documentationText.split('\n');
-  const parameterMap = new Map(parameterNames.map((name) => [camelCase(name), name]));
   const tags = [];
   let section = null;
   let sectionText = [];
@@ -207,14 +211,14 @@ function tagsFromRustdoc(documentationText, parameterNames) {
     const parameter = stripped.match(/^@param\s+([A-Za-z_][A-Za-z0-9_]*)\s*-\s*(.+)$/);
     if (parameter) {
       flushSection();
-      const name = parameterMap.get(camelCase(parameter[1]));
+      const name = facadeName(parameter[1]);
       if (name) tags.push(`@param ${name} - ${parameter[2]}`);
       continue;
     }
     const argument = stripped.match(/^\*\s*`([A-Za-z_][A-Za-z0-9_]*)`\s*-\s*(.+)$/);
     if (argument) {
       flushSection();
-      const name = parameterMap.get(camelCase(argument[1]));
+      const name = facadeName(argument[1]);
       if (name) tags.push(`@param ${name} - ${argument[2]}`);
       continue;
     }
@@ -237,6 +241,10 @@ function tagsFromRustdoc(documentationText, parameterNames) {
   }
   flushSection();
   return tags;
+}
+
+function parameterTagName(tag) {
+  return tag.trim().match(/^@param(?:\s+\{[^}]+\})?\s+([A-Za-z_$][\w$]*)/)?.[1] ?? null;
 }
 
 function stripRustdocHeadings(documentationText) {
@@ -274,9 +282,7 @@ function synchronizeTags(rawDocumentationText, facadeDocumentationText, node) {
     return documentationFromBlocks(blocks);
   }
 
-  const parameterNames =
-    'parameters' in node ? node.parameters.map((parameter) => parameter.name.getText(facade)) : [];
-  const rawTags = tagsFromRustdoc(rawDocumentationText, parameterNames);
+  const rawTags = tagsFromRustdoc(rawDocumentationText, facadeParameterNames(node));
   const authoritative = new Map(
     ['param', 'returns', 'throws'].map((kind) => [
       kind,
@@ -294,21 +300,36 @@ function synchronizeTags(rawDocumentationText, facadeDocumentationText, node) {
   );
   for (const [kind, tags] of authoritative) {
     if (!tags.length) continue;
-    blocks = blocks.filter((block) => block.kind !== kind);
+    if (kind === 'param') {
+      // A facade parameter the Rustdoc does not name (the facade renamed or
+      // added it) keeps its hand-written entry.
+      const documented = new Set(tags.map(parameterTagName));
+      blocks = blocks.filter(
+        (block) => block.kind !== 'param' || !documented.has(parameterTagName(block.lines[0]))
+      );
+    } else {
+      blocks = blocks.filter((block) => block.kind !== kind);
+    }
     blocks.push(...tags.map((tag) => ({ kind, lines: [tag] })));
   }
   return documentationFromBlocks(blocks);
 }
 
-function rawClassName(interfaceName) {
-  return interfaceName.endsWith('Constructor')
-    ? interfaceName.slice(0, -'Constructor'.length)
-    : interfaceName;
+// Raw wasm-bindgen class documented by a facade interface: `<Name>Constructor`
+// holds the statics of `<Name>`, and `<Name>Instrument` (the FX instrument
+// handles) holds the instance members of `<Name>`.
+function rawClassName(interfaceName, raw) {
+  if (interfaceName.endsWith('Constructor')) return interfaceName.slice(0, -'Constructor'.length);
+  if (!raw.classes.has(interfaceName) && interfaceName.endsWith('Instrument')) {
+    const stripped = interfaceName.slice(0, -'Instrument'.length);
+    if (raw.classes.has(stripped)) return stripped;
+  }
+  return interfaceName;
 }
 
 function candidateDocumentation(node, interfaceName, file, raw) {
   if (ts.isInterfaceDeclaration(node)) {
-    return raw.classes.get(rawClassName(interfaceName))?.documentation ?? null;
+    return raw.classes.get(rawClassName(interfaceName, raw))?.documentation ?? null;
   }
   if (
     !ts.isMethodSignature(node) &&
@@ -321,14 +342,14 @@ function candidateDocumentation(node, interfaceName, file, raw) {
   const name = memberName(node, file);
   if (!name) return null;
   if (interfaceName.endsWith('Constructor')) {
-    const source = raw.classes.get(rawClassName(interfaceName));
+    const source = raw.classes.get(rawClassName(interfaceName, raw));
     const scope = name === 'constructor' ? 'instance' : 'static';
     return source?.members.get(`${scope}:${name}`) ?? null;
   }
   if (interfaceName.endsWith('Namespace')) {
     return ts.isMethodSignature(node) ? (raw.functions.get(name) ?? null) : null;
   }
-  const source = raw.classes.get(interfaceName);
+  const source = raw.classes.get(rawClassName(interfaceName, raw));
   return source?.members.get(`instance:${name}`) ?? null;
 }
 

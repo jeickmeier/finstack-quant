@@ -60,7 +60,7 @@ fn parse_config(
 /// Rejects malformed or schema-incompatible `json_str`, a blank scenario ID,
 /// multiple time-roll operations, invalid operation identifiers or numeric
 /// fields, variant-specific operation violations, or serialization failure.
-/// @param json_str - Canonical JSON string to validate and re-serialize.
+/// @param json_str - Scenario specification JSON string to deserialize and validate; the result is returned as a plain object.
 #[wasm_bindgen(js_name = parseScenarioSpec)]
 pub fn parse_scenario_spec(json_str: JsValue) -> Result<JsValue, JsValue> {
     let json_str: &str = &json_text(&json_str, "jsonStr")?;
@@ -100,7 +100,7 @@ pub fn compose_scenarios(specs: JsValue) -> Result<JsValue, JsValue> {
 /// Rejects malformed or schema-incompatible `json_str`, a blank scenario ID,
 /// multiple time-roll operations, invalid operation identifiers or numeric
 /// fields, or variant-specific operation violations.
-/// @param json_str - Canonical JSON string to validate and re-serialize.
+/// @param json_str - Scenario specification JSON string to deserialize and validate.
 #[wasm_bindgen(js_name = validateScenarioSpec)]
 pub fn validate_scenario_spec(json_str: JsValue) -> Result<(), JsValue> {
     let json_str: &str = &json_text(&json_str, "jsonStr")?;
@@ -110,7 +110,7 @@ pub fn validate_scenario_spec(json_str: JsValue) -> Result<(), JsValue> {
 
 /// List all built-in template identifiers.
 ///
-/// Returns a JSON array of template ID strings.
+/// Returns a JavaScript array of built-in template ID strings in registry order.
 ///
 /// # Errors
 ///

@@ -107,7 +107,7 @@ pub fn population_variance(data: JsValue) -> Result<f64, JsValue> {
 /// Pearson correlation over typed numeric arrays.
 /// @param x - First numeric series; must have the same length as `y`.
 /// @param y - Second numeric series, aligned one-for-one with `x`.
-/// @returns Sample correlation in `[-1, 1]`, or NaN when a series has fewer than two points.
+/// @returns Sample correlation in `[-1, 1]`; 0.0 when fewer than two points or either series is constant; NaN when `x` and `y` lengths differ.
 #[wasm_bindgen(js_name = correlation)]
 pub fn correlation(x: JsValue, y: JsValue) -> Result<f64, JsValue> {
     let x: &[f64] = &js_f64_seq(&x, "x")?;
@@ -118,7 +118,7 @@ pub fn correlation(x: JsValue, y: JsValue) -> Result<f64, JsValue> {
 /// Sample covariance over typed numeric arrays.
 /// @param x - First numeric series; must have the same length as `y`.
 /// @param y - Second numeric series, aligned one-for-one with `x`.
-/// @returns Unbiased sample covariance, or 0.0 when a series has fewer than two points.
+/// @returns Unbiased sample covariance; 0.0 when fewer than two points; NaN when `x` and `y` lengths differ.
 #[wasm_bindgen(js_name = covariance)]
 pub fn covariance(x: JsValue, y: JsValue) -> Result<f64, JsValue> {
     let x: &[f64] = &js_f64_seq(&x, "x")?;

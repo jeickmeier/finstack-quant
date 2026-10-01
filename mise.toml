@@ -586,7 +586,7 @@ env = { CARGO_INCREMENTAL = "0" }
 run = "wasm-pack build finstack-quant-wasm --target web"
 
 [tasks.wasm-test]
-description = "Run WASM package tests (wasm-bindgen + Node facade)"
+description = "Run WASM package tests (wasm-bindgen + Node facade) and the facade JSDoc sync check"
 # Facade builds use profile.wasm-test (opt-level 1, no LTO). Published packages
 # stay on wasm-build / wasm-pkg.
 run = [
@@ -594,11 +594,15 @@ run = [
   "wasm-pack build finstack-quant-wasm --target web --profile wasm-test --no-opt --out-dir pkg",
   "wasm-pack build finstack-quant-wasm --target nodejs --profile wasm-test --no-opt --out-dir pkg-node",
   "npm --prefix finstack-quant-wasm run test:facade",
+  "npm --prefix finstack-quant-wasm run docs:check-sync",
 ]
 
 [tasks.wasm-test-built]
-description = "Run Node facade tests against the already built web and Node WASM packages"
-run = "npm --prefix finstack-quant-wasm run test:facade"
+description = "Run Node facade tests and the facade JSDoc sync check against the already built web and Node WASM packages"
+run = [
+  "npm --prefix finstack-quant-wasm run test:facade",
+  "npm --prefix finstack-quant-wasm run docs:check-sync",
+]
 
 [tasks.wasm-test-cov]
 description = "Run WASM binding tests with HTML coverage report"

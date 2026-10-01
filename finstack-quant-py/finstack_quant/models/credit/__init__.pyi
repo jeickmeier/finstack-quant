@@ -767,9 +767,10 @@ class liability_management:
             instrument, in the same unit as ``old_pv``; pass ``0.0`` when there
             is none.
         exchange_type : str
-            Offer structure: ``par_for_par`` (alias ``par``), ``discount``,
-            ``uptier``, or ``downtier``. Case-insensitive; ``-`` is normalised
-            to ``_``. Every argument is required, as in Rust and WASM.
+            Offer structure, as the canonical snake_case label:
+            ``par_for_par``, ``discount``, ``uptier``, or ``downtier``. Any
+            other spelling raises. Every argument is required, as in Rust and
+            WASM.
 
         Returns
         -------
@@ -806,10 +807,9 @@ class liability_management:
         Parameters
         ----------
         lme_type : str
-            Structure of the exercise: ``open_market`` (aliases
-            ``open_market_repurchase``, ``omr``), ``tender_offer`` (alias
-            ``tender``), ``amend_and_extend`` (aliases ``ae``, ``a&e``), or
-            ``dropdown``. Case-insensitive; ``-`` and ``&`` normalise to ``_``.
+            Structure of the exercise, as the canonical snake_case label:
+            ``open_market_repurchase``, ``tender_offer``, ``amend_and_extend``,
+            or ``dropdown``. Any other spelling raises.
         notional : float
             Outstanding face amount of the target instrument, in the caller's
             monetary unit. Must be finite and strictly positive.

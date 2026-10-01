@@ -40,10 +40,6 @@ fn parse_metrics(metrics: Option<JsValue>) -> Result<Vec<MetricId>, JsValue> {
 /// weighting requires `history_json` to be strictly increasing and to end on
 /// `as_of`. There is no separate `initializeFixed` export.
 ///
-/// @param spec_json - Bare canonical `CompositeSpec` JSON.
-/// @param market_json - Complete canonical market-context JSON at the effective date.
-/// @param as_of - ISO-8601 effective date for the resolved holdings state.
-/// @param history_json - Optional chronological `CompositeMarketObservation[]` JSON available through `asOf`.
 /// @returns Object containing a canonical composite instrument envelope and primitive establishment trades.
 ///
 /// # Arguments
@@ -85,10 +81,6 @@ pub fn initialize_composite(
 /// Trades are net primitive quantity deltas from the supplied envelope to the
 /// newly resolved state. Volatility weighting requires history ending on `as_of`.
 ///
-/// @param instrument_json - Canonical resolved composite instrument envelope.
-/// @param market_json - Complete canonical market-context JSON at the rebalance date.
-/// @param as_of - ISO-8601 effective date for the new state.
-/// @param history_json - Optional chronological observation JSON available through `asOf`.
 /// @returns Object containing the new envelope and net primitive quantity deltas.
 ///
 /// # Arguments
@@ -131,10 +123,6 @@ pub fn rebalance_composite(
 /// volatility, and other non-linear measures are rejected. Amounts are
 /// converted to the composite reporting currency on `as_of`.
 ///
-/// @param instrument_json - Canonical resolved composite instrument envelope.
-/// @param market_json - Complete canonical market-context JSON used for primitive pricing and FX.
-/// @param as_of - ISO-8601 valuation date.
-/// @param metrics - Optional additive metric identifier array.
 /// @returns Plain object containing primitive paths and net/gross aggregates.
 ///
 /// # Arguments
@@ -171,8 +159,6 @@ pub fn composite_primitive_exposures(
 
 /// Flatten current holdings or a state transition into executable primitive deltas.
 ///
-/// @param instrument_json - Canonical target composite instrument envelope.
-/// @param previous_instrument_json - Optional canonical prior composite envelope; omit for establishment trades.
 /// @returns Primitive trade array with signed quantity deltas.
 ///
 /// # Arguments
@@ -211,10 +197,6 @@ pub fn composite_execution_trades(
 /// financed value. Period return is `pnl / capital`. The first row has
 /// `return_index = 100` and zero P&L, cashflows, and period return.
 ///
-/// @param spec_json - Bare canonical `CompositeSpec` JSON.
-/// @param observations_json - Strictly increasing output observation array JSON.
-/// @param warmup_json - Optional strictly earlier observation array used only for weighting inputs.
-/// @param metrics - Optional additive primitive metric identifier array.
 /// @returns Chronological rows containing value, cashflows, P&L, return, index, exposures, state dates, and trades.
 ///
 /// # Arguments
@@ -256,9 +238,6 @@ pub fn composite_history_from_spec(
 /// observation. Scheduled rebalances after that date are close-effective.
 /// Period return is `pnl / capital`; `return_index` starts at `100`.
 ///
-/// @param instrument_json - Canonical resolved composite instrument envelope.
-/// @param observations_json - Strictly increasing complete market observation array JSON.
-/// @param metrics - Optional additive primitive metric identifier array.
 /// @returns Chronological composite history rows.
 ///
 /// # Arguments

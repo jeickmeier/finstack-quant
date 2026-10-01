@@ -87,7 +87,7 @@ impl FromStr for PeriodKind {
             "annual" | "A" | "Y" | "YE" => Ok(PeriodKind::Annual),
             _ => Err(crate::Error::Validation(format!(
                 "unknown period kind '{s}'; expected one of daily, weekly, monthly, quarterly, \
-                 semi_annual, annual (or a pandas offset alias D, B, W, M, Q, A, Y)"
+                 semi_annual, semiannual, annual (or a pandas offset alias D, B, W, M, ME, Q, QE, A, Y, YE)"
             ))),
         }
     }

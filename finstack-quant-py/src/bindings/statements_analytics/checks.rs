@@ -402,7 +402,9 @@ impl PyThreeStatementMapping {
 /// cash_burn_node : str | None
 ///     Cash-burn node (liquidity runway).
 /// leverage_warn : tuple[float, float] | None
-///     ``(warn, error)`` debt/EBITDA thresholds in turns.
+///     ``(min, max)`` debt/EBITDA warning band in turns; leverage outside it
+///     warns. The error band is fixed at ``(0, 10)``. ``None`` uses the
+///     Rust default ``(0.0, 6.0)``.
 /// coverage_min_warn : float | None
 ///     Minimum EBITDA/interest coverage in turns before a warning.
 ///
@@ -495,7 +497,7 @@ impl PyCreditMapping {
         opt_node_str(&self.inner.cash_burn_node)
     }
 
-    /// ``(warn, error)`` leverage thresholds in turns, or ``None``.
+    /// ``(min, max)`` leverage warning band in turns, or ``None``.
     #[getter]
     fn leverage_warn(&self) -> Option<(f64, f64)> {
         self.inner.leverage_warn
@@ -679,7 +681,9 @@ fn run_checks(
 /// ValueError
 ///     If the mapping is malformed or the evaluation fails.
 /// KeyError
-///     If a mapped node is missing from the model.
+///     If ``results`` is omitted and a model formula references a node that
+///     does not exist. A mapped node that is missing from the model does not
+///     raise: its check is skipped or reported as a finding.
 ///
 /// Examples
 /// --------
@@ -731,7 +735,9 @@ fn run_three_statement_checks(
 /// ValueError
 ///     If the mapping is malformed or the evaluation fails.
 /// KeyError
-///     If a mapped node is missing from the model.
+///     If ``results`` is omitted and a model formula references a node that
+///     does not exist. A mapped node that is missing from the model does not
+///     raise: its check is skipped or reported as a finding.
 ///
 /// Examples
 /// --------

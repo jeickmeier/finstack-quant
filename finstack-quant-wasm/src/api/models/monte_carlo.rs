@@ -53,8 +53,8 @@ use wasm_bindgen::prelude::*;
 /// registry European-pricer default (100 000).
 /// @param seed - Deterministic random-number seed (number or BigInt); omitted or `null` uses
 /// the Rust registry default seed, so results stay reproducible.
-/// @param num_steps - Number of time steps per simulated path.
-/// @param currency - ISO-4217 currency code for the monetary amount or market convention.
+/// @param num_steps - Optional time steps per simulated path; omitted uses the Rust registry default.
+/// @param currency - Optional ISO-4217 code stamped on the estimate; omitted uses the Rust registry default currency.
 #[wasm_bindgen(js_name = priceHestonCall)]
 pub fn price_heston_call(
     spot: JsValue,
@@ -120,8 +120,8 @@ pub fn price_heston_call(
 /// registry European-pricer default (100 000).
 /// @param seed - Deterministic random-number seed (number or BigInt); omitted or `null` uses
 /// the Rust registry default seed, so results stay reproducible.
-/// @param num_steps - Number of time steps per simulated path.
-/// @param currency - ISO-4217 currency code for the monetary amount or market convention.
+/// @param num_steps - Optional time steps per simulated path; omitted uses the Rust registry default.
+/// @param currency - Optional ISO-4217 code stamped on the estimate; omitted uses the Rust registry default currency.
 #[wasm_bindgen(js_name = priceHestonPut)]
 pub fn price_heston_put(
     spot: JsValue,

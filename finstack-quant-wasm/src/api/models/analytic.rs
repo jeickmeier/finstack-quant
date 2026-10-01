@@ -151,7 +151,7 @@ pub fn vanilla_expiry_payoff(
 /// matching the Rust/Python canonical `BsGreeks` fields). `vega` and
 /// both rho values are **per 1% move**; `theta` is **per day** under
 /// `thetaDaysPerYear`.
-/// @throws If serialization to JS fails (should not happen on valid inputs).
+/// @throws `FinstackError` (kind `validation`) if any input is non-finite, `spot` or `strike` is not positive, `vol`, `expiry` or `thetaDaysPerYear` is not positive, or a computed Greek is non-finite.
 ///
 /// @example
 /// ```javascript

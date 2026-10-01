@@ -48,7 +48,7 @@ impl JsCopulaSpec {
     }
 
     /// Random Factor Loading copula with stochastic correlation.
-    /// @param loading_vol - Standard deviation used to randomize the factor loading.
+    /// @param loading_vol - Factor-loading volatility (standard deviation of the loading); clamped to `[0, 0.5]`, typically 0.05 to 0.20.
     #[wasm_bindgen(js_name = randomFactorLoading)]
     pub fn random_factor_loading(loading_vol: JsValue) -> Result<Self, JsValue> {
         let loading_vol = js_f64(&loading_vol, "loadingVol")?;
@@ -115,7 +115,7 @@ impl JsCopula {
     /// Conditional default probability given factor realization(s).
     /// @param default_threshold - Latent-variable default threshold corresponding to the marginal default probability.
     /// @param factor_realization - Realized systematic-factor value conditioning the default probability.
-    /// @param correlation - Dependence correlation from -1 through 1 under the selected copula or recovery model.
+    /// @param correlation - Asset correlation as a decimal in `[0, 1]`; values outside this range throw.
     ///
     /// # Errors
     ///
@@ -155,7 +155,7 @@ impl JsCopula {
     /// Returns `NaN` when the model has no closed-form `λ_L` (Random Factor
     /// Loading); check `Number.isNaN()` before using the result. For the
     /// RFL heuristic stress gauge use `stressCorrelationProxy` instead.
-    /// @param correlation - Dependence correlation from -1 through 1 under the selected copula or recovery model.
+    /// @param correlation - Asset correlation as a decimal in `[0, 1]`. Out-of-range values are clamped by the model, not rejected (Student-t clamps to its supported correlation range; Gaussian models ignore the value and return 0).
     #[wasm_bindgen(js_name = tailDependence)]
     pub fn tail_dependence(&self, correlation: JsValue) -> Result<f64, JsValue> {
         let correlation = js_f64(&correlation, "correlation")?;
@@ -169,7 +169,7 @@ impl JsCopula {
     /// `λ_L` (which has no closed form for RFL — `tailDependence` returns
     /// `NaN`). It gauges the extra correlation mass in the high-loading
     /// tail and vanishes in the Gaussian (`loadingVol = 0`) limit.
-    /// @param correlation - Dependence correlation from -1 through 1 under the selected copula or recovery model.
+    /// @param correlation - Base asset correlation as a decimal in `[0, 1]`; out-of-range values are clamped to `[0, 1]`.
     ///
     /// # Errors
     ///
@@ -211,8 +211,8 @@ impl JsRecoverySpec {
 
     /// Market-correlated (Andersen-Sidenius) stochastic recovery.
     /// @param mean - Mean recovery rate expressed as a fraction from 0 through 1.
-    /// @param vol - Recovery-rate volatility scale in the correlated recovery model.
-    /// @param correlation - Dependence correlation from -1 through 1 under the selected copula or recovery model.
+    /// @param vol - Recovery-rate volatility; finite values are clamped to `[0, 0.5]`.
+    /// @param correlation - Correlation between recovery and the systematic factor, from -1 through 1; finite values outside that range are clamped.
     ///
     /// # Errors
     ///
@@ -391,8 +391,8 @@ pub fn validate_correlation_matrix(matrix: JsValue, n: JsValue) -> Result<(), Js
 /// Gross input violations raise rather than being silently reshaped.
 /// @param matrix - Flat row-major `n * n` near-correlation matrix to project onto the correlation set.
 /// @param n - Positive square-matrix dimension; `matrix` must contain exactly `n * n` entries.
-/// @param max_iter - Maximum number of Higham nearest-correlation projection iterations.
-/// @param tol - Positive convergence tolerance for the nearest-correlation projection.
+/// @param max_iter - Maximum number of Higham nearest-correlation projection iterations; omitted uses Rust `NearestCorrelationOpts::default()` (200).
+/// @param tol - Positive convergence tolerance for the nearest-correlation projection; omitted uses Rust `NearestCorrelationOpts::default()` (`1e-10`).
 ///
 /// # Errors
 ///

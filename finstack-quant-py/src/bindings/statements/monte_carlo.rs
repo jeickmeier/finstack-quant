@@ -40,9 +40,12 @@ impl PyMonteCarloConfig {
     ///     same seed reproduces the run exactly, in serial and in parallel.
     /// percentiles : list[float] | None
     ///     Percentiles to compute, each a **decimal fraction in [0, 1]** —
-    ///     ``0.05`` is the 5th percentile, not ``5``. Values are sorted and
-    ///     deduplicated; out-of-range values raise. ``None`` uses the engine
-    ///     default ``[0.05, 0.5, 0.95]``.
+    ///     ``0.05`` is the 5th percentile, not ``5``. Stored as given; the
+    ///     engine sorts, deduplicates and range-checks them when
+    ///     ``Evaluator.evaluate_monte_carlo`` starts, which raises
+    ///     ``ValueError`` for a value that is not finite or lies outside
+    ///     [0, 1]. ``None`` or an empty list uses the engine default
+    ///     ``[0.05, 0.5, 0.95]``.
     /// include_path_data : bool
     ///     Whether to retain the full per-path long table. Off by default
     ///     because it grows as ``n_paths * metrics * forecast periods``.
@@ -109,8 +112,10 @@ impl PyMonteCarloConfig {
     /// Returns
     /// -------
     /// list[float]
-    ///     Sorted, deduplicated quantile levels — ``0.05`` is the 5th
-    ///     percentile, not ``5``.
+    ///     Quantile levels exactly as supplied (not yet normalized) —
+    ///     ``0.05`` is the 5th percentile, not ``5``. See
+    ///     ``MonteCarloResults.percentiles`` for the sorted, deduplicated
+    ///     levels a run computed.
     #[getter]
     fn percentiles(&self) -> Vec<f64> {
         self.inner.percentiles.clone()

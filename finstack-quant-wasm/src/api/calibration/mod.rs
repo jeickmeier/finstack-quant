@@ -5,11 +5,14 @@
 //!
 //! # Number safety
 //!
-//! Counts (`iterations`, `residual_evals`, `lm_jacobian_evals`) are embedded
-//! inside the JSON result envelope rather than crossed as raw `usize`. JS's
-//! `JSON.parse` reads them as IEEE-754 doubles; values above
-//! `Number.MAX_SAFE_INTEGER` (2^53 − 1) would round silently; in practice
-//! iteration counts stay under ~10⁴ for any non-pathological calibration.
+//! `calibrate` and `dryRun` return structured objects built by
+//! `crate::utils::to_js_value`, so counts (`iterations`, `residual_evals`,
+//! `lm_jacobian_evals`) arrive as JS numbers. That serializer refuses to emit
+//! an integer above `Number.MAX_SAFE_INTEGER` (2^53 − 1) instead of rounding
+//! it, so there is no silent loss on this path. Only the JSON-string surfaces
+//! (`validateCalibrationJson`, `dryRunJson`) hand the caller text whose
+//! integers `JSON.parse` would round above that limit; iteration counts stay
+//! under ~10⁴ for any non-pathological calibration.
 //!
 //! On error, the host functions throw a JS `Error` with `name =
 //! "CalibrationEnvelopeError"`. The error exposes `kind` (the execution
@@ -70,11 +73,11 @@ fn validate_calibration_json_inner(json: &str) -> Result<String, ExecuteError> {
 }
 
 /// Validate a calibration plan JSON and return the canonical (pretty-printed) form.
-/// @param json - Canonical JSON string defining the object to deserialize or normalize.
+/// @param json - `CalibrationEnvelope` as a plain object or its JSON string.
 ///
 /// # Errors
 ///
-/// Throws a JavaScript exception if `json` is malformed, its calibration
+/// Throws a `CalibrationEnvelopeError` if the envelope is malformed, its calibration
 /// schema marker is missing, malformed, or unsupported, static envelope
 /// validation fails (fail-fast: first error; `dryRun` lists every static
 /// error), or the canonical envelope cannot be serialized.
@@ -128,11 +131,11 @@ fn calibrate_inner(envelope_json: &str) -> Result<CalibrationResultEnvelope, Exe
 /// `CalibrationResultEnvelope` object — the shape `index.d.ts` has always
 /// declared. Re-ingest a sub-document (e.g. `result.result.final_market`) with
 /// `JSON.stringify`.
-/// @param envelope_json - CalibrationEnvelope JSON containing targets, parameters, bounds, and dependencies.
+/// @param envelope_json - `CalibrationEnvelope` as a plain object or its JSON string: the plan (steps, quote sets, settings) plus `market_data` and optional `prior_market`.
 ///
 /// # Errors
 ///
-/// Throws a JavaScript exception if `envelopeJson` is malformed or violates
+/// Throws a `CalibrationEnvelopeError` if the envelope is malformed or violates
 /// the calibration schema or static plan contract (fail-fast: first static
 /// error; `dryRun` lists every static error), market context construction
 /// or a calibration step fails, a solver does not converge, or the result
@@ -213,11 +216,11 @@ pub fn calibration_result_content_hash(result_json: JsValue) -> Result<String, J
 /// static error found (`errors`) plus the dependency graph
 /// (`dependency_graph`). Microseconds. Use [`dry_run_json`] for the JSON
 /// wire string.
-/// @param envelope_json - CalibrationEnvelope JSON containing targets, parameters, bounds, and dependencies.
+/// @param envelope_json - `CalibrationEnvelope` as a plain object or its JSON string: the plan (steps, quote sets, settings) plus `market_data` and optional `prior_market`.
 ///
 /// # Errors
 ///
-/// Throws a JavaScript exception if `envelopeJson` is malformed, its schema
+/// Throws a `CalibrationEnvelopeError` if the envelope is malformed, its schema
 /// marker is missing, malformed, or unsupported, the envelope structure is
 /// invalid, or the validation report cannot be converted to a JavaScript
 /// value. Semantic findings are returned in the report rather than thrown.
@@ -230,11 +233,11 @@ pub fn dry_run(envelope_json: JsValue) -> Result<JsValue, JsValue> {
 }
 
 /// JSON wire twin of [`dry_run`]: the validation report as pretty-printed JSON.
-/// @param envelope_json - CalibrationEnvelope JSON containing targets, parameters, bounds, and dependencies.
+/// @param envelope_json - `CalibrationEnvelope` as a plain object or its JSON string: the plan (steps, quote sets, settings) plus `market_data` and optional `prior_market`.
 ///
 /// # Errors
 ///
-/// Throws a JavaScript exception if `envelopeJson` is malformed, its schema
+/// Throws a `CalibrationEnvelopeError` if the envelope is malformed, its schema
 /// marker is missing, malformed, or unsupported, the envelope structure is
 /// invalid, or the validation report cannot be serialized. Semantic findings
 /// are returned in the report rather than thrown.
@@ -248,7 +251,7 @@ pub fn dry_run_json(envelope_json: JsValue) -> Result<String, JsValue> {
 ///
 /// Callers must place the returned value in `modelConfig.lmmBaseVol` before
 /// pricing; the Bermudan pricer never reads or fits the surface itself.
-/// @param instrument_json - Canonical Bermudan swaption instrument envelope JSON.
+/// @param instrument_json - Canonical Bermudan swaption instrument envelope, as a plain object or its JSON string.
 /// @param market - Reusable market handle containing discount and swaption-volatility inputs.
 /// @param as_of - ISO-8601 valuation date.
 /// @returns Positive finite LMM base volatility.

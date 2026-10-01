@@ -139,7 +139,139 @@ export interface Sample {
   assert.doesNotMatch(completed, /accepted by this operation/);
   assert.doesNotMatch(completed, /Construction and factory entry points/);
   assert.doesNotMatch(completed, /Compute delta for this/);
-  assert.match(completed, /Spot delta: change in value per unit spot/);
+  // No unit is derived from the method name: the missing `@returns` repeats the summary.
+  assert.doesNotMatch(completed, /change in value per|per 1\.0 absolute|per year of calendar/);
+  assert.match(completed, /@returns Delta for this `Sample`\./);
+  // An undocumented parameter stays undocumented so the checker reports it.
+  assert.doesNotMatch(completed, /@param spot/);
+});
+
+function temporaryDeclarations(t, files) {
+  const directory = mkdtempSync(join(tmpdir(), 'finstack-typescript-docs-'));
+  t.after(() => rmSync(directory, { recursive: true, force: true }));
+  return Object.fromEntries(
+    Object.entries(files).map(([name, text]) => {
+      const path = join(directory, name);
+      writeFileSync(path, text);
+      return [name, path];
+    })
+  );
+}
+
+test('synchronizer maps renamed JSON parameters and keeps facade-only parameters', (t) => {
+  const paths = temporaryDeclarations(t, {
+    'facade.d.ts': `export interface CalibrationNamespace {
+  /**
+   * Fit the loading scale from the market surface.
+   * @param instrument - Stale facade text.
+   * @param extra - Facade-only option with its own description.
+   * @returns Stale return text.
+   */
+  fit(instrument: object | string, asOf: string, extra?: boolean): number;
+}
+`,
+    'raw.d.ts': `/**
+ * Fit the loading scale from the market surface.
+ * @param instrument_json - Bermudan swaption instrument envelope.
+ * @param as_of - ISO-8601 valuation date.
+ * @returns Positive finite base volatility.
+ */
+export function fit(instrument_json: any, as_of: any): number;
+`,
+  });
+  const args = [`--facade=${paths['facade.d.ts']}`, `--raw=${paths['raw.d.ts']}`];
+  const result = run('sync-facade-jsdoc.mjs', ...args, '--write');
+  assert.equal(result.status, 0, result.stderr);
+  const updated = readFileSync(paths['facade.d.ts'], 'utf8');
+  assert.match(updated, /@param instrument - Bermudan swaption instrument envelope\./);
+  assert.match(updated, /@param asOf - ISO-8601 valuation date\./);
+  assert.match(updated, /@param extra - Facade-only option with its own description\./);
+  assert.match(updated, /@returns Positive finite base volatility\./);
+  assert.doesNotMatch(updated, /Stale/);
+  // The written file is a fixed point: the check gate passes on it.
+  assert.equal(run('sync-facade-jsdoc.mjs', ...args, '--check').status, 0);
+});
+
+test('synchronizer documents `<Name>Instrument` interfaces from the raw class', (t) => {
+  const paths = temporaryDeclarations(t, {
+    'facade.d.ts': `export interface FxOptionInstrument {
+  /**
+   * Vega of the option.
+   * @returns Vega: change in value per 1.0 absolute move in implied volatility.
+   */
+  vega(): number;
+}
+`,
+    'raw.d.ts': `export class FxOption {
+  /**
+   * Vega of the option.
+   * @returns Cash vega: PV change for a 1 vol-point (0.01 absolute) move in implied volatility.
+   */
+  vega(): number;
+}
+`,
+  });
+  const result = run(
+    'sync-facade-jsdoc.mjs',
+    `--facade=${paths['facade.d.ts']}`,
+    `--raw=${paths['raw.d.ts']}`,
+    '--write'
+  );
+  assert.equal(result.status, 0, result.stderr);
+  const updated = readFileSync(paths['facade.d.ts'], 'utf8');
+  assert.match(updated, /@returns Cash vega: PV change for a 1 vol-point/);
+  assert.doesNotMatch(updated, /per 1\.0 absolute move/);
+});
+
+test('checker rejects placeholders, template units, internal names, repeats and orphan blocks', (t) => {
+  const paths = temporaryDeclarations(t, {
+    'bad.d.ts': `/**
+ * Facade interface used to exercise the documentation checker.
+ */
+export interface Sample {
+  /**
+   * Stale description left above the real one.
+   */
+  /**
+   * Calibrate against the supplied instrument.
+   * @param instrument - Instrument used by this call.
+   * @returns Calibrated base volatility as a decimal.
+   */
+  calibrate(instrument: string): number;
+  /**
+   * Vega of the option under the selected model.
+   * @returns Vega: change in value per 1.0 absolute move in implied volatility.
+   */
+  vega(): number;
+  /**
+   * Theta of the option under the selected model.
+   * @returns Theta: change in value per year of calendar time.
+   */
+  theta(): number;
+  /**
+   * Currency of this amount, a [\`JsCurrency\`] wrapper.
+   * @returns The currency this amount is tagged with.
+   */
+  currency(): string;
+  /**
+   * Lookback returns ending on the reference date.
+   * @param refDate - ISO-8601 date on which the windows end.
+   * @param refDate - ISO-8601 reference date.
+   * @returns Lookback returns as decimal fractions.
+   */
+  lookback(refDate: string): number;
+}
+`,
+  });
+  const result = run('check-typescript-docs.mjs', `--declaration=${paths['bad.d.ts']}`);
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /Sample\.calibrate: contains placeholder @param/);
+  assert.match(result.stderr, /Sample\.vega: contains template Greek unit/);
+  assert.match(result.stderr, /Sample\.theta: contains template Greek unit/);
+  assert.match(result.stderr, /Sample\.currency: names the internal Rust wrapper \[`JsCurrency`\]/);
+  assert.match(result.stderr, /Sample\.lookback: documents @param `refDate` more than once/);
+  assert.match(result.stderr, /orphan JSDoc block before another JSDoc block/);
+  assert.match(result.stderr, /6 error\(s\)/);
 });
 
 test('checker accepts concrete contracts and rejects exact legacy shapes', () => {

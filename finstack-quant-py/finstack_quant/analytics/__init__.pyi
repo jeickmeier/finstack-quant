@@ -1653,8 +1653,9 @@ class Performance:
         frequency : str, optional
             Return aggregation frequency. One of ``"daily"``, ``"weekly"``,
             ``"monthly"``, ``"quarterly"``, ``"semi_annual"``, or ``"annual"``,
-            or a pandas offset alias (``D``/``B``, ``W``, ``M``, ``Q``,
-            ``A``/``Y``). Sets the annualization factor (252, 52, 12, 4, 2, 1).
+            or a pandas offset alias (``D``/``B``, ``W``, ``M``/``ME``,
+            ``Q``/``QE``, ``A``/``Y``/``YE``). Sets the annualization factor
+            (252, 52, 12, 4, 2, 1).
             ``None`` uses the Rust default ``DEFAULT_FREQUENCY`` (daily).
 
         Raises
@@ -1695,7 +1696,8 @@ class Performance:
         frequency : str, optional
             One of ``"daily"``, ``"weekly"``, ``"monthly"``, ``"quarterly"``,
             ``"semi_annual"``, or ``"annual"``, or a pandas offset alias
-            (``D``/``B``, ``W``, ``M``, ``Q``, ``A``/``Y``). Default ``"daily"``.
+            (``D``/``B``, ``W``, ``M``/``ME``, ``Q``/``QE``, ``A``/``Y``/``YE``).
+            Default ``"daily"``.
 
         Returns
         -------
@@ -1742,7 +1744,8 @@ class Performance:
         frequency : str, optional
             One of ``"daily"``, ``"weekly"``, ``"monthly"``, ``"quarterly"``,
             ``"semi_annual"``, or ``"annual"``, or a pandas offset alias
-            (``D``/``B``, ``W``, ``M``, ``Q``, ``A``/``Y``). Default ``"daily"``.
+            (``D``/``B``, ``W``, ``M``/``ME``, ``Q``/``QE``, ``A``/``Y``/``YE``).
+            Default ``"daily"``.
 
         Raises
         ------
@@ -1794,7 +1797,8 @@ class Performance:
         frequency : str, optional
             One of ``"daily"``, ``"weekly"``, ``"monthly"``, ``"quarterly"``,
             ``"semi_annual"``, or ``"annual"``, or a pandas offset alias
-            (``D``/``B``, ``W``, ``M``, ``Q``, ``A``/``Y``). Default ``"daily"``.
+            (``D``/``B``, ``W``, ``M``/``ME``, ``Q``/``QE``, ``A``/``Y``/``YE``).
+            Default ``"daily"``.
 
         Returns
         -------
@@ -3301,8 +3305,8 @@ class Performance:
         frequency : str, optional
             Calendar-bucketing frequency: one of ``"daily"``, ``"weekly"``,
             ``"monthly"``, ``"quarterly"``, ``"semi_annual"``, or
-            ``"annual"`` (pandas offset aliases ``D``/``B``, ``W``, ``M``,
-            ``Q``, ``A``/``Y`` are accepted too); ``None`` uses the Rust
+            ``"annual"`` (pandas offset aliases ``D``/``B``, ``W``, ``M``/``ME``,
+            ``Q``/``QE``, ``A``/``Y``/``YE`` are accepted too); ``None`` uses the Rust
             default ``DEFAULT_PERIODIC_FREQUENCY`` (monthly).
 
         Returns
@@ -3443,8 +3447,8 @@ class Performance:
         frequency : str, optional
             Bucketing frequency: one of ``"daily"``, ``"weekly"``,
             ``"monthly"``, ``"quarterly"``, ``"semi_annual"``, ``"annual"``
-            or a pandas offset alias (``D``/``B``, ``W``, ``M``, ``Q``,
-            ``A``/``Y``); ``None`` uses the Rust default
+            or a pandas offset alias (``D``/``B``, ``W``, ``M``/``ME``,
+            ``Q``/``QE``, ``A``/``Y``/``YE``); ``None`` uses the Rust default
             ``DEFAULT_PERIODIC_FREQUENCY`` (monthly).
 
         Returns
